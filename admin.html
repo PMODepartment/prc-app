@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>User Management — EPC WPM Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css"/>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="assets/js/firebase-config.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <style>
+    .utbl{width:100%;border-collapse:collapse;font-size:12px}
+    .utbl th{font-size:10px;font-weight:600;color:var(--text-secondary);padding:8px 10px;
+      border-bottom:2px solid var(--border-md);background:var(--surface-2);text-align:left;
+      text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+    .utbl td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+    .utbl tr:hover td{background:var(--blue-50)}
+    .b-admin{background:#E6F1FB;color:#0C447C;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px}
+    .b-user{background:var(--gray-50);color:var(--gray-600);font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px}
+    .b-pending{background:#FAEEDA;color:#854F0B;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px}
+    .b-approved{background:#EAF3DE;color:#3B6D11;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px}
+    .b-rejected{background:#FCEBEB;color:#A32D2D;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px}
+    .proj-tag{background:var(--blue-50);color:var(--blue-800);font-size:10px;font-weight:500;padding:2px 7px;border-radius:10px;display:inline-block;margin:1px}
+    .ab{font-size:10px;padding:3px 10px;border-radius:6px;border:1px solid;cursor:pointer;font-weight:500;transition:all .15s}
+    .ab-approve{background:#EAF3DE;color:#3B6D11;border-color:#B8DDA0}.ab-approve:hover{background:#3B6D11;color:#fff}
+    .ab-reject{background:#FCEBEB;color:#A32D2D;border-color:#F5B8B8}.ab-reject:hover{background:#A32D2D;color:#fff}
+    .ab-edit{background:var(--blue-50);color:var(--blue-800);border-color:var(--blue-100)}.ab-edit:hover{background:var(--blue-600);color:#fff}
+    .tabs{display:flex;gap:2px;margin-bottom:16px;background:var(--surface-2);border-radius:10px;padding:3px;width:fit-content}
+    .tab{font-size:12px;padding:6px 16px;border-radius:8px;border:none;cursor:pointer;font-weight:500;color:var(--text-secondary);background:transparent;transition:all .15s}
+    .tab.active{background:var(--surface);color:var(--text-primary);box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+    .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
+    .empty{text-align:center;padding:32px;color:var(--text-hint);font-size:12px}
+    .empty i{font-size:32px;display:block;margin-bottom:8px;opacity:.3}
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+    .modal-bg.hidden{display:none}
+    .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:460px;box-shadow:0 8px 40px rgba(0,0,0,0.2)}
+    .modal h3{font-size:15px;font-weight:600;margin-bottom:4px}
+    .modal p{font-size:12px;color:var(--text-secondary);margin-bottom:18px}
+    .mfield{margin-bottom:14px}
+    .mfield label{display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+    .proj-checks{display:flex;flex-wrap:wrap;gap:8px}
+    .pcheck{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;
+      padding:5px 10px;border-radius:8px;border:1px solid var(--border-md);transition:all .15s}
+    .pcheck:hover{border-color:var(--blue-400);background:var(--blue-50)}
+    .pcheck input{accent-color:var(--blue-600)}
+    .msel{font-size:12px;padding:6px 10px;border:1px solid var(--border-md);border-radius:8px;
+      background:var(--surface-2);color:var(--text-primary);width:100%}
+    .mactions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+    .mactions button{font-size:12px;padding:7px 16px;border-radius:8px;border:1px solid var(--border-md);cursor:pointer;font-weight:500}
+    .mactions .mc{background:var(--blue-600);color:#fff;border-color:var(--blue-600)}.mactions .mc:hover{background:var(--blue-800)}
+    .mactions .mx{background:transparent;color:var(--text-secondary)}
+    .srow{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:18px}
+    .sbox{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 14px}
+    .sbox .v{font-size:22px;font-weight:700}.sbox .l{font-size:10px;color:var(--text-secondary);margin-top:2px}
+    .notice{background:var(--amber-50);border:1px solid #F5D9A8;border-radius:var(--radius-md);
+      padding:12px 14px;font-size:12px;color:var(--amber-600);margin-bottom:16px;display:flex;gap:8px;align-items:flex-start}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="org">EPC · Procurement</div>
+      <div class="app-name">Consolidated<br>Dashboard</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>All Projects</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Admin</div>
+      <a class="nav-item active" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+    </div>
+    <div class="sidebar-footer">EPC · PRC WPM Dashboard<br>Powered by GitHub Pages</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="page-title">User Management</div>
+        <div class="page-sub">Review registrations and manage project access</div>
+      </div>
+      <div class="topbar-right"><div id="user-bar"></div></div>
+    </div>
+    <div class="content">
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading users…</span></div>
+      <div id="main-content" style="display:none">
+        <div class="srow" id="srow"></div>
+        <div class="tabs">
+          <button class="tab active" id="tab-pending" onclick="switchTab('pending')">
+            Pending <span class="tbadge" id="pending-ct">0</span>
+          </button>
+          <button class="tab" id="tab-all" onclick="switchTab('all')">All Users</button>
+        </div>
+        <div class="panel">
+          <div id="pending-panel"></div>
+          <div id="all-panel" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Approve Modal -->
+<div class="modal-bg hidden" id="modal-approve">
+  <div class="modal">
+    <h3>Approve Registration</h3>
+    <p>Assign projects and role for this user, then confirm approval.</p>
+    <div class="mfield"><label>User</label><div id="m-user-info" style="font-size:13px;font-weight:500"></div></div>
+    <div class="mfield"><label>Assign Projects</label><div class="proj-checks" id="m-proj-checks"></div></div>
+    <div class="mfield"><label>Role</label>
+      <select class="msel" id="m-role">
+        <option value="user">User — assigned projects only</option>
+        <option value="admin">Admin — all projects + user management</option>
+      </select>
+    </div>
+    <div class="mactions">
+      <button class="mx" onclick="closeModal('modal-approve')">Cancel</button>
+      <button class="mc" onclick="confirmApprove()"><i class="ti ti-check" style="font-size:13px;vertical-align:middle"></i> Approve & Assign</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-bg hidden" id="modal-edit">
+  <div class="modal">
+    <h3>Edit User Access</h3>
+    <p>Update project assignments and role.</p>
+    <div class="mfield"><label>User</label><div id="e-user-info" style="font-size:13px;font-weight:500"></div></div>
+    <div class="mfield"><label>Assigned Projects</label><div class="proj-checks" id="e-proj-checks"></div></div>
+    <div class="mfield"><label>Role</label>
+      <select class="msel" id="e-role">
+        <option value="user">User — assigned projects only</option>
+        <option value="admin">Admin — all projects + user management</option>
+      </select>
+    </div>
+    <div class="mactions">
+      <button class="mx" onclick="closeModal('modal-edit')">Cancel</button>
+      <button class="mc" onclick="confirmEdit()"><i class="ti ti-device-floppy" style="font-size:13px;vertical-align:middle"></i> Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script>
+let adminProfile, allUsers=[], allProjects=[], selectedUid=null;
+
+AppAuth.requireAdmin(async (user, profile) => {
+  adminProfile=profile;
+  AppAuth.renderUserBar('user-bar', profile);
+  allProjects = await DataStore.loadProjects();
+  await loadUsers();
+  document.getElementById('loading').style.display='none';
+  document.getElementById('main-content').style.display='block';
+});
+
+async function loadUsers() {
+  allUsers = await AppAuth.getAllUsers();
+  renderStats(); renderPending(); renderAll();
+}
+
+function renderStats() {
+  const p=allUsers.filter(u=>u.status==='pending').length;
+  const a=allUsers.filter(u=>u.status==='approved').length;
+  const r=allUsers.filter(u=>u.status==='rejected').length;
+  document.getElementById('pending-ct').textContent=p;
+  document.getElementById('srow').innerHTML=[
+    {v:allUsers.length,l:'Total registrations',cls:''},
+    {v:p,l:'Pending approval',cls:'amber'},
+    {v:a,l:'Approved users',cls:'green'},
+    {v:r,l:'Rejected',cls:'red'},
+  ].map(c=>`<div class="sbox"><div class="v ${c.cls}">${c.v}</div><div class="l">${c.l}</div></div>`).join('');
+}
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const d=ts.toDate?ts.toDate():new Date(ts);
+  return d.toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+function renderPending() {
+  const pending=allUsers.filter(u=>u.status==='pending');
+  const el=document.getElementById('pending-panel');
+  if (!pending.length) { el.innerHTML='<div class="empty"><i class="ti ti-circle-check"></i>No pending registrations — all caught up!</div>'; return; }
+  el.innerHTML=`<div style="overflow-x:auto"><table class="utbl">
+    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Registered</th><th>Actions</th></tr></thead>
+    <tbody>${pending.map((u,i)=>`<tr>
+      <td style="color:var(--text-hint);font-size:10px">${i+1}</td>
+      <td style="font-weight:500">${u.name}</td>
+      <td style="color:var(--text-secondary)">${u.email}</td>
+      <td style="color:var(--text-hint);font-size:10px">${fmtDate(u.createdAt)}</td>
+      <td style="display:flex;gap:5px">
+        <button class="ab ab-approve" onclick="openApprove('${u.uid}','${u.name}','${u.email}')"><i class="ti ti-check" style="font-size:11px"></i> Approve</button>
+        <button class="ab ab-reject"  onclick="doReject('${u.uid}','${u.name}')"><i class="ti ti-x" style="font-size:11px"></i> Reject</button>
+      </td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function renderAll() {
+  const el=document.getElementById('all-panel');
+  if (!allUsers.length) { el.innerHTML='<div class="empty"><i class="ti ti-users"></i>No users yet</div>'; return; }
+  el.innerHTML=`<div style="overflow-x:auto"><table class="utbl">
+    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Projects</th><th>Registered</th><th>Actions</th></tr></thead>
+    <tbody>${allUsers.map((u,i)=>`<tr>
+      <td style="color:var(--text-hint);font-size:10px">${i+1}</td>
+      <td style="font-weight:500">${u.name}</td>
+      <td style="color:var(--text-secondary);font-size:11px">${u.email}</td>
+      <td><span class="b-${u.role}">${u.role}</span></td>
+      <td><span class="b-${u.status}">${u.status}</span></td>
+      <td>${(u.projects||[]).map(p=>`<span class="proj-tag">${p}</span>`).join('')||'<span style="color:var(--text-hint);font-size:10px">—</span>'}</td>
+      <td style="color:var(--text-hint);font-size:10px">${fmtDate(u.createdAt)}</td>
+      <td>${u.status==='approved'?`<button class="ab ab-edit" onclick="openEdit('${u.uid}','${u.name}','${u.email}','${(u.projects||[]).join(',')}','${u.role}')"><i class="ti ti-edit" style="font-size:11px"></i> Edit</button>`:'—'}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function switchTab(tab) {
+  document.getElementById('pending-panel').style.display=tab==='pending'?'block':'none';
+  document.getElementById('all-panel').style.display=tab==='all'?'block':'none';
+  document.getElementById('tab-pending').classList.toggle('active',tab==='pending');
+  document.getElementById('tab-all').classList.toggle('active',tab==='all');
+}
+
+function projChecks(containerId, selectedProjects) {
+  document.getElementById(containerId).innerHTML=allProjects.map(p=>
+    `<label class="pcheck"><input type="checkbox" value="${p.id}" ${(selectedProjects||[]).includes(p.id)?'checked':''}> ${p.id}</label>`
+  ).join('');
+}
+
+function openApprove(uid, name, email) {
+  selectedUid=uid;
+  document.getElementById('m-user-info').textContent=name+' — '+email;
+  projChecks('m-proj-checks',[]);
+  document.getElementById('m-role').value='user';
+  document.getElementById('modal-approve').classList.remove('hidden');
+}
+
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); selectedUid=null; }
+
+async function confirmApprove() {
+  const checks=[...document.querySelectorAll('#m-proj-checks input:checked')].map(c=>c.value);
+  const role=document.getElementById('m-role').value;
+  const projects=role==='admin'?['ALL']:checks;
+  if (!projects.length) { alert('Please select at least one project.'); return; }
+  try { await AppAuth.approveUser(selectedUid, projects, role, adminProfile.name); closeModal('modal-approve'); await loadUsers(); }
+  catch(e) { alert('Error: '+e.message); }
+}
+
+async function doReject(uid, name) {
+  if (!confirm('Reject registration for '+name+'?')) return;
+  await AppAuth.rejectUser(uid); await loadUsers();
+}
+
+function openEdit(uid, name, email, projectsStr, role) {
+  selectedUid=uid;
+  const projects=projectsStr?projectsStr.split(',').filter(Boolean):[];
+  document.getElementById('e-user-info').textContent=name+' — '+email;
+  projChecks('e-proj-checks', projects);
+  document.getElementById('e-role').value=role||'user';
+  document.getElementById('modal-edit').classList.remove('hidden');
+}
+
+async function confirmEdit() {
+  const checks=[...document.querySelectorAll('#e-proj-checks input:checked')].map(c=>c.value);
+  const role=document.getElementById('e-role').value;
+  const projects=role==='admin'?['ALL']:checks;
+  if (!projects.length) { alert('Please select at least one project.'); return; }
+  try { await AppAuth.updateUser(selectedUid, projects, role); closeModal('modal-edit'); await loadUsers(); }
+  catch(e) { alert('Error: '+e.message); }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Request Access — EPC WPM Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--blue-600:#185FA5;--blue-800:#0C447C;--blue-900:#042C53;--red-400:#E24B4A;--green-400:#1D9E75;
+      --bg:#F0F4F9;--surface:#fff;--border:rgba(0,0,0,0.10);--border-md:rgba(0,0,0,0.15);
+      --text-primary:#1A1A1A;--text-secondary:#5A5A6A;--text-hint:#9898A8;--radius-md:10px;--radius-lg:16px}
+    html,body{height:100%;font-family:'Inter','Segoe UI',system-ui,sans-serif}
+    body{background:linear-gradient(135deg,var(--blue-900),var(--blue-800),var(--blue-600));
+      display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+    .wrap{width:100%;max-width:440px}
+    .brand{text-align:center;margin-bottom:22px}
+    .brand-icon{width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,0.12);
+      border:1px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+    .brand-icon i{font-size:24px;color:#fff}
+    .brand-org{font-size:11px;font-weight:600;letter-spacing:.1em;color:rgba(255,255,255,0.5);text-transform:uppercase}
+    .brand-title{font-size:18px;font-weight:700;color:#fff;margin-top:3px}
+    .card{background:var(--surface);border-radius:var(--radius-lg);padding:28px;box-shadow:0 4px 24px rgba(0,0,0,0.10)}
+    .card-title{font-size:16px;font-weight:600;color:var(--text-primary);margin-bottom:4px}
+    .card-sub{font-size:12px;color:var(--text-secondary);margin-bottom:20px}
+    .field{margin-bottom:14px}
+    .field label{display:block;font-size:11px;font-weight:600;color:var(--text-secondary);
+      margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+    .iw{position:relative}
+    .iw i.ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:15px;
+      color:var(--text-hint);pointer-events:none}
+    .field input{width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--border-md);
+      border-radius:var(--radius-md);font-size:13px;color:var(--text-primary);background:var(--bg);outline:none;transition:border-color .15s}
+    .field input:focus{border-color:#378ADD;box-shadow:0 0 0 3px rgba(55,138,221,0.12);background:#fff}
+    .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;
+      cursor:pointer;color:var(--text-hint);font-size:15px;padding:0;display:flex;align-items:center}
+    .hint{font-size:10px;color:var(--text-hint);margin-top:4px}
+    .alert{border-radius:var(--radius-md);padding:10px 14px;font-size:12px;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px}
+    .alert-error{background:#FFF0F0;border:1px solid #FFD0D0;color:var(--red-400)}
+    .hidden{display:none!important}
+    .btn-submit{width:100%;padding:11px;background:var(--blue-600);color:#fff;border:none;
+      border-radius:var(--radius-md);font-size:14px;font-weight:600;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px;transition:background .15s}
+    .btn-submit:hover{background:var(--blue-800)}
+    .btn-submit:disabled{opacity:.6;cursor:default}
+    .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
+      border-radius:50%;animation:spin .7s linear infinite;display:none}
+    .btn-submit.loading .spinner{display:block}
+    .btn-submit.loading .btn-text{display:none}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--text-hint);font-size:11px}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+    .link-btn{display:block;text-align:center;font-size:12px;color:var(--blue-600);text-decoration:none;font-weight:500}
+    .link-btn:hover{text-decoration:underline}
+    .footer{text-align:center;margin-top:18px;font-size:10px;color:rgba(255,255,255,0.35);line-height:1.6}
+    .success-screen{display:none;text-align:center;padding:20px 0}
+    .success-screen i{font-size:48px;color:var(--green-400);margin-bottom:14px;display:block}
+    .success-screen h3{font-size:16px;font-weight:600;margin-bottom:8px}
+    .success-screen p{font-size:12px;color:var(--text-secondary);line-height:1.7}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <div class="brand-icon"><i class="ti ti-building-skyscraper"></i></div>
+    <div class="brand-org">EPC · Procurement</div>
+    <div class="brand-title">Request Access</div>
+  </div>
+  <div class="card">
+    <div id="form-screen">
+      <div class="card-title">Create your account</div>
+      <div class="card-sub">The admin will review your request and assign project access.</div>
+      <div class="alert alert-error hidden" id="alert">
+        <i class="ti ti-alert-circle" style="flex-shrink:0;margin-top:1px"></i>
+        <span id="alert-text"></span>
+      </div>
+      <div class="field">
+        <label>Full Name</label>
+        <div class="iw"><i class="ti ti-user ico"></i>
+          <input type="text" id="name" placeholder="e.g. Juan dela Cruz"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Email Address</label>
+        <div class="iw"><i class="ti ti-mail ico"></i>
+          <input type="email" id="email" placeholder="you@company.com"/>
+        </div>
+        <div class="hint">Use your company email address.</div>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <div class="iw"><i class="ti ti-lock ico"></i>
+          <input type="password" id="password" placeholder="At least 8 characters"/>
+          <button class="pw-toggle" id="pw-toggle" type="button" tabindex="-1">
+            <i class="ti ti-eye" id="pw-icon"></i>
+          </button>
+        </div>
+        <div class="hint">Minimum 8 characters.</div>
+      </div>
+      <div class="field">
+        <label>Confirm Password</label>
+        <div class="iw"><i class="ti ti-lock-check ico"></i>
+          <input type="password" id="confirm-password" placeholder="Repeat your password"/>
+        </div>
+      </div>
+      <button class="btn-submit" id="btn-register">
+        <div class="spinner"></div>
+        <span class="btn-text"><i class="ti ti-user-plus" style="font-size:14px;vertical-align:middle"></i> &nbsp;Submit Registration</span>
+      </button>
+      <div class="divider">already have an account?</div>
+      <a class="link-btn" href="login.html"><i class="ti ti-login" style="font-size:13px;vertical-align:middle"></i> &nbsp;Sign in</a>
+    </div>
+    <div class="success-screen" id="success-screen">
+      <i class="ti ti-circle-check"></i>
+      <h3>Registration submitted!</h3>
+      <p>Your request has been sent to the administrator.<br><br>
+      You can log in once your access has been approved and projects assigned.</p>
+      <br>
+      <a href="login.html" style="font-size:12px;color:#185FA5;font-weight:500;text-decoration:none">
+        <i class="ti ti-arrow-left" style="font-size:13px;vertical-align:middle"></i> Back to Sign In
+      </a>
+    </div>
+  </div>
+  <div class="footer">EPC · PRC Work Package Monitoring Dashboard<br>Authorized personnel only.</div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="assets/js/firebase-config.js"></script>
+<script src="assets/js/auth.js"></script>
+<script>
+  document.getElementById('pw-toggle').addEventListener('click', () => {
+    const inp=document.getElementById('password'), ico=document.getElementById('pw-icon');
+    inp.type=inp.type==='password'?'text':'password';
+    ico.className=inp.type==='password'?'ti ti-eye':'ti ti-eye-off';
+  });
+  async function doRegister() {
+    const btn=document.getElementById('btn-register'), alertEl=document.getElementById('alert'), alertTx=document.getElementById('alert-text');
+    const name=document.getElementById('name').value.trim(), email=document.getElementById('email').value.trim();
+    const pw=document.getElementById('password').value, pw2=document.getElementById('confirm-password').value;
+    const showErr=msg=>{ alertTx.textContent=msg; alertEl.className='alert alert-error'; };
+    alertEl.className='alert alert-error hidden';
+    if (!name)         return showErr('Please enter your full name.');
+    if (!email)        return showErr('Please enter your email address.');
+    if (pw.length < 8) return showErr('Password must be at least 8 characters.');
+    if (pw !== pw2)    return showErr('Passwords do not match.');
+    btn.disabled=true; btn.classList.add('loading');
+    try {
+      await AppAuth.register(name, email, pw);
+      document.getElementById('form-screen').style.display='none';
+      document.getElementById('success-screen').style.display='block';
+    } catch(e) {
+      let msg=e.message;
+      if (msg.includes('email-already-in-use')) msg='This email is already registered. Try signing in.';
+      if (msg.includes('invalid-email'))        msg='Please enter a valid email address.';
+      showErr(msg);
+    }
+    btn.disabled=false; btn.classList.remove('loading');
+  }
+  document.getElementById('btn-register').addEventListener('click', doRegister);
+  document.getElementById('confirm-password').addEventListener('keydown', e=>{ if(e.key==='Enter') doRegister(); });
+</script>
+</body>
+</html>
