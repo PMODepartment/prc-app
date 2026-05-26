@@ -3,99 +3,142 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sign In — EPC WPM Dashboard</title>
+  <title>Sign In — Megawide Procurement Dashboard</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{--blue-600:#185FA5;--blue-800:#0C447C;--blue-900:#042C53;--red-400:#E24B4A;
-      --bg:#F0F4F9;--surface:#fff;--border:rgba(0,0,0,0.10);--border-md:rgba(0,0,0,0.15);
-      --text-primary:#1A1A1A;--text-secondary:#5A5A6A;--text-hint:#9898A8;--radius-md:10px;--radius-lg:16px}
-    html,body{height:100%;font-family:'Inter','Segoe UI',system-ui,sans-serif}
-    body{background:linear-gradient(135deg,var(--blue-900),var(--blue-800),var(--blue-600));
-      display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-    .wrap{width:100%;max-width:420px}
-    .brand{text-align:center;margin-bottom:28px}
-    .brand-icon{width:56px;height:56px;border-radius:14px;background:rgba(255,255,255,0.12);
-      border:1px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;
-      margin:0 auto 14px}
-    .brand-icon i{font-size:28px;color:#fff}
-    .brand-org{font-size:11px;font-weight:600;letter-spacing:.1em;color:rgba(255,255,255,0.5);text-transform:uppercase}
-    .brand-title{font-size:20px;font-weight:700;color:#fff;margin-top:3px}
-    .brand-sub{font-size:12px;color:rgba(255,255,255,0.5);margin-top:4px}
-    .card{background:var(--surface);border-radius:var(--radius-lg);padding:32px;box-shadow:0 4px 24px rgba(0,0,0,0.10)}
-    .card-title{font-size:16px;font-weight:600;color:var(--text-primary);margin-bottom:4px}
-    .card-sub{font-size:12px;color:var(--text-secondary);margin-bottom:24px}
+    :root{
+      --mw-red:#EE3124;--mw-red-dark:#C42127;--mw-red-light:#FDECEA;--mw-red-mid:#F9C8C5;
+      --mw-black:#231F20;--mw-dark:#282C28;
+      --bg:#F5F5F5;--surface:#fff;--border:rgba(0,0,0,0.10);--border-md:rgba(0,0,0,0.15);
+      --text-primary:#231F20;--text-secondary:#5A5858;--text-hint:#9B9999;
+      --radius-md:8px;--radius-lg:12px;--radius-xl:16px;
+      --font:'Montserrat','Segoe UI',system-ui,sans-serif;
+    }
+    html,body{height:100%;font-family:var(--font)}
+    body{
+      background: var(--mw-black);
+      display:flex;align-items:stretch;min-height:100vh;
+    }
+    /* Left panel - brand */
+    .brand-panel{
+      width:42%;flex-shrink:0;
+      background: var(--mw-red);
+      display:flex;flex-direction:column;justify-content:space-between;
+      padding:40px 48px;
+      position:relative;overflow:hidden;
+    }
+    .brand-panel::before{
+      content:'';position:absolute;
+      bottom:-80px;right:-80px;
+      width:320px;height:320px;
+      border-radius:50%;
+      background:rgba(0,0,0,0.12);
+    }
+    .brand-panel::after{
+      content:'';position:absolute;
+      top:-60px;left:-60px;
+      width:200px;height:200px;
+      border-radius:50%;
+      background:rgba(255,255,255,0.07);
+    }
+    .brand-logo img{width:180px;height:auto;position:relative;z-index:1}
+    .brand-tagline{position:relative;z-index:1}
+    .brand-tagline h1{font-size:28px;font-weight:800;color:#fff;line-height:1.25;margin-bottom:12px}
+    .brand-tagline p{font-size:13px;color:rgba(255,255,255,0.75);line-height:1.6;font-weight:500}
+    .brand-footer{font-size:10px;color:rgba(255,255,255,0.4);font-weight:600;letter-spacing:.08em;text-transform:uppercase;position:relative;z-index:1}
+    /* Right panel - form */
+    .form-panel{
+      flex:1;background:var(--surface);
+      display:flex;align-items:center;justify-content:center;
+      padding:40px 48px;
+    }
+    .form-wrap{width:100%;max-width:360px}
+    .form-title{font-size:22px;font-weight:800;color:var(--text-primary);margin-bottom:4px}
+    .form-sub{font-size:12px;color:var(--text-secondary);margin-bottom:28px;font-weight:500}
     .field{margin-bottom:16px}
-    .field label{display:block;font-size:11px;font-weight:600;color:var(--text-secondary);
-      margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+    .field label{display:block;font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
     .iw{position:relative}
-    .iw i.ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:16px;
-      color:var(--text-hint);pointer-events:none}
-    .field input{width:100%;padding:10px 12px 10px 36px;border:1.5px solid var(--border-md);
-      border-radius:var(--radius-md);font-size:13px;color:var(--text-primary);background:var(--bg);
-      outline:none;transition:border-color .15s}
-    .field input:focus{border-color:#378ADD;box-shadow:0 0 0 3px rgba(55,138,221,0.12);background:#fff}
-    .pw-toggle{position:absolute;right:11px;top:50%;transform:translateY(-50%);
-      background:none;border:none;cursor:pointer;color:var(--text-hint);font-size:16px;padding:0;display:flex;align-items:center}
-    .alert{border-radius:var(--radius-md);padding:10px 14px;font-size:12px;margin-bottom:16px;
-      display:flex;align-items:center;gap:8px}
-    .alert-error{background:#FFF0F0;border:1px solid #FFD0D0;color:var(--red-400)}
+    .iw i.ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text-hint);pointer-events:none}
+    .field input{width:100%;padding:11px 12px 11px 38px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:13px;color:var(--text-primary);background:var(--bg);outline:none;transition:border-color .15s;font-family:var(--font)}
+    .field input:focus{border-color:var(--mw-red);box-shadow:0 0 0 3px rgba(238,49,36,0.10);background:#fff}
+    .pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-hint);font-size:16px;padding:0;display:flex;align-items:center}
+    .alert{border-radius:var(--radius-md);padding:10px 14px;font-size:12px;margin-bottom:16px;display:flex;align-items:center;gap:8px;font-weight:500}
+    .alert-error{background:var(--mw-red-light);border:1.5px solid var(--mw-red-mid);color:var(--mw-red-dark)}
     .hidden{display:none!important}
-    .btn-submit{width:100%;padding:11px;background:var(--blue-600);color:#fff;border:none;
-      border-radius:var(--radius-md);font-size:14px;font-weight:600;cursor:pointer;
-      display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;transition:background .15s}
-    .btn-submit:hover{background:var(--blue-800)}
+    .btn-submit{width:100%;padding:12px;background:var(--mw-red);color:#fff;border:none;border-radius:var(--radius-md);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s;letter-spacing:.02em}
+    .btn-submit:hover{background:var(--mw-red-dark)}
     .btn-submit:disabled{opacity:.6;cursor:default}
-    .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
-      border-radius:50%;animation:spin .7s linear infinite;display:none}
+    .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
     .btn-submit.loading .spinner{display:block}
     .btn-submit.loading .btn-text{display:none}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .divider{display:flex;align-items:center;gap:10px;margin:18px 0;color:var(--text-hint);font-size:11px}
-    .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
-    .link-btn{display:block;text-align:center;font-size:12px;color:var(--blue-600);text-decoration:none;font-weight:500}
+    .divider{display:flex;align-items:center;gap:10px;margin:20px 0;color:var(--text-hint);font-size:11px;font-weight:600}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border-md)}
+    .link-btn{display:block;text-align:center;font-size:12px;font-weight:700;color:var(--mw-red);text-decoration:none;letter-spacing:.02em}
     .link-btn:hover{text-decoration:underline}
-    .footer{text-align:center;margin-top:20px;font-size:10px;color:rgba(255,255,255,0.35);line-height:1.6}
+    /* Mobile */
+    @media(max-width:640px){
+      .brand-panel{display:none}
+      .form-panel{padding:32px 24px}
+      .form-wrap{max-width:100%}
+    }
   </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="brand">
-    <div class="brand-icon"><i class="ti ti-building-skyscraper"></i></div>
-    <div class="brand-org">EPC · Procurement</div>
-    <div class="brand-title">Work Package Monitoring</div>
-    <div class="brand-sub">Consolidated Project Dashboard</div>
+  <!-- Brand Panel -->
+  <div class="brand-panel">
+    <div class="brand-logo">
+      <img src="assets/img/logo-white.png" alt="Megawide Construction"/>
+    </div>
+    <div class="brand-tagline">
+      <h1>Procurement<br>Dashboard</h1>
+      <p>Work Package Monitoring System<br>for EPC Projects</p>
+    </div>
+    <div class="brand-footer">Megawide Construction Corporation &nbsp;·&nbsp; 2025</div>
   </div>
-  <div class="card">
-    <div class="card-title">Sign in to your account</div>
-    <div class="card-sub">Use your registered email and password.</div>
-    <div class="alert alert-error hidden" id="alert">
-      <i class="ti ti-alert-circle"></i><span id="alert-text"></span>
-    </div>
-    <div class="field">
-      <label>Email address</label>
-      <div class="iw"><i class="ti ti-mail ico"></i>
-        <input type="email" id="email" placeholder="you@company.com" autocomplete="email"/>
+
+  <!-- Form Panel -->
+  <div class="form-panel">
+    <div class="form-wrap">
+      <div class="form-title">Sign in</div>
+      <div class="form-sub">Enter your registered credentials to continue.</div>
+
+      <div class="alert alert-error hidden" id="alert">
+        <i class="ti ti-alert-circle"></i><span id="alert-text"></span>
       </div>
-    </div>
-    <div class="field">
-      <label>Password</label>
-      <div class="iw"><i class="ti ti-lock ico"></i>
-        <input type="password" id="password" placeholder="Your password" autocomplete="current-password"/>
-        <button class="pw-toggle" id="pw-toggle" type="button" tabindex="-1">
-          <i class="ti ti-eye" id="pw-icon"></i>
-        </button>
+
+      <div class="field">
+        <label>Email address</label>
+        <div class="iw">
+          <i class="ti ti-mail ico"></i>
+          <input type="email" id="email" placeholder="you@megawide.com.ph" autocomplete="email"/>
+        </div>
       </div>
+      <div class="field">
+        <label>Password</label>
+        <div class="iw">
+          <i class="ti ti-lock ico"></i>
+          <input type="password" id="password" placeholder="Your password" autocomplete="current-password"/>
+          <button class="pw-toggle" id="pw-toggle" type="button" tabindex="-1">
+            <i class="ti ti-eye" id="pw-icon"></i>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn-submit" id="btn-login">
+        <div class="spinner"></div>
+        <span class="btn-text">Sign In &nbsp;<i class="ti ti-arrow-right" style="font-size:14px;vertical-align:middle"></i></span>
+      </button>
+
+      <div class="divider">New user?</div>
+      <a class="link-btn" href="register.html">
+        <i class="ti ti-user-plus" style="font-size:13px;vertical-align:middle"></i> &nbsp;Request access
+      </a>
     </div>
-    <button class="btn-submit" id="btn-login">
-      <div class="spinner"></div>
-      <span class="btn-text">Sign In &nbsp;<i class="ti ti-arrow-right" style="font-size:14px;vertical-align:middle"></i></span>
-    </button>
-    <div class="divider">new user?</div>
-    <a class="link-btn" href="register.html"><i class="ti ti-user-plus" style="font-size:13px;vertical-align:middle"></i> &nbsp;Request access</a>
   </div>
-  <div class="footer">EPC · PRC Work Package Monitoring Dashboard<br>Authorized personnel only.</div>
-</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -110,29 +153,28 @@
     }
   });
   document.getElementById('pw-toggle').addEventListener('click', () => {
-    const inp = document.getElementById('password');
-    const ico = document.getElementById('pw-icon');
-    inp.type = inp.type === 'password' ? 'text' : 'password';
-    ico.className = inp.type === 'password' ? 'ti ti-eye' : 'ti ti-eye-off';
+    const inp=document.getElementById('password'), ico=document.getElementById('pw-icon');
+    inp.type=inp.type==='password'?'text':'password';
+    ico.className=inp.type==='password'?'ti ti-eye':'ti ti-eye-off';
   });
-  ['email','password'].forEach(id => document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); }));
-  async function doLogin() {
-    const btn=document.getElementById('btn-login'), alertEl=document.getElementById('alert'), alertTx=document.getElementById('alert-text');
-    const email=document.getElementById('email').value.trim(), password=document.getElementById('password').value;
-    if (!email||!password) { alertTx.textContent='Please enter your email and password.'; alertEl.className='alert alert-error'; return; }
-    btn.disabled=true; btn.classList.add('loading'); alertEl.className='alert alert-error hidden';
-    try {
-      await AppAuth.login(email, password);
-      window.location.href = 'index.html';
-    } catch(e) {
+  ['email','password'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();}));
+  async function doLogin(){
+    const btn=document.getElementById('btn-login'),alertEl=document.getElementById('alert'),alertTx=document.getElementById('alert-text');
+    const email=document.getElementById('email').value.trim(),password=document.getElementById('password').value;
+    if(!email||!password){alertTx.textContent='Please enter your email and password.';alertEl.className='alert alert-error';return;}
+    btn.disabled=true;btn.classList.add('loading');alertEl.className='alert alert-error hidden';
+    try{
+      await AppAuth.login(email,password);
+      window.location.href='index.html';
+    }catch(e){
       let msg=e.message;
-      if (msg.includes('user-not-found')||msg.includes('wrong-password')||msg.includes('invalid-credential')) msg='Invalid email or password.';
-      alertTx.textContent=msg; alertEl.className='alert alert-error';
+      if(msg.includes('user-not-found')||msg.includes('wrong-password')||msg.includes('invalid-credential'))msg='Invalid email or password.';
+      alertTx.textContent=msg;alertEl.className='alert alert-error';
       document.getElementById('password').value='';
     }
-    btn.disabled=false; btn.classList.remove('loading');
+    btn.disabled=false;btn.classList.remove('loading');
   }
-  document.getElementById('btn-login').addEventListener('click', doLogin);
+  document.getElementById('btn-login').addEventListener('click',doLogin);
 </script>
 </body>
 </html>

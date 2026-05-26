@@ -11,6 +11,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="assets/js/firebase-config.js"></script>
   <script src="assets/js/auth.js"></script>
+  <script src="assets/js/ui.js"></script>
   <script src="assets/js/db.js"></script>
   <style>
     .wp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
@@ -31,11 +32,13 @@
   </style>
 </head>
 <body>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
 <div class="app-shell">
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <div class="org">EPC · Procurement</div>
-      <div class="app-name">Consolidated<br>Dashboard</div>
+      <img src="assets/img/logo-white.png" alt="Megawide Construction"/>
+      <div class="app-label">Procurement Dashboard</div>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-section-label">Overview</div>
@@ -46,12 +49,13 @@
       <a class="nav-item active" href="my-wps.html"><i class="ti ti-clipboard-list"></i>My Work Packages</a>
       <a class="nav-item" href="wp-form.html"><i class="ti ti-plus"></i>Add Work Package</a>
     </div>
-    <div class="sidebar-footer">EPC · PRC WPM Dashboard</div>
+    <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
 
   <div class="main">
     <div class="topbar">
       <div class="topbar-left">
+        <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
         <div class="page-title">My Work Packages</div>
         <div class="page-sub">Work packages assigned to you</div>
       </div>
@@ -85,6 +89,8 @@
 
 <script>
   let allWPs = [], activeFilter = 'all';
+
+  initMobileMenu();
 
   AppAuth.requireLogin(async (user, profile) => {
     AppAuth.renderUserBar('user-bar', profile);

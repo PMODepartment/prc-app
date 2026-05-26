@@ -11,6 +11,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="assets/js/firebase-config.js"></script>
   <script src="assets/js/auth.js"></script>
+  <script src="assets/js/ui.js"></script>
   <style>
     .utbl{width:100%;border-collapse:collapse;font-size:12px}
     .utbl th{font-size:10px;font-weight:600;color:var(--text-secondary);padding:8px 10px;
@@ -60,11 +61,13 @@
   </style>
 </head>
 <body>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
 <div class="app-shell">
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <div class="org">EPC · Procurement</div>
-      <div class="app-name">Consolidated<br>Dashboard</div>
+      <img src="assets/img/logo-white.png" alt="Megawide Construction"/>
+      <div class="app-label">Procurement Dashboard</div>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-section-label">Overview</div>
@@ -74,12 +77,13 @@
       <div class="sidebar-section-label">Admin</div>
       <a class="nav-item active" href="admin.html"><i class="ti ti-users"></i>User Management</a>
     </div>
-    <div class="sidebar-footer">EPC · PRC WPM Dashboard<br>Powered by GitHub Pages</div>
+    <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
 
   <div class="main">
     <div class="topbar">
       <div class="topbar-left">
+        <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
         <div class="page-title">User Management</div>
         <div class="page-sub">Review registrations and manage project access</div>
       </div>
@@ -148,7 +152,9 @@
 <script>
 let adminProfile, allUsers=[], allProjects=[], selectedUid=null;
 
-AppAuth.requireAdmin(async (user, profile) => {
+initMobileMenu();
+
+  AppAuth.requireAdmin(async (user, profile) => {
   adminProfile=profile;
   AppAuth.renderUserBar('user-bar', profile);
   allProjects = await DataStore.loadProjects();

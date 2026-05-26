@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AVR101 Procurement Dashboard — Megawide Construction</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#EE3124;--red-dark:#C42127;--red-light:#FDECEA;--red-mid:#F9C8C5;
+  --black:#231F20;--dark:#282C28;--gray:#DCDBDB;--gray-mid:#A8A7A7;--gray-light:#F4F4F4;
+  --green:#2D9B6F;--green-light:#E8F5EE;--amber:#D97706;--amber-light:#FEF3C7;
+  --bg:#F2F2F2;--surface:#fff;--surface-2:#F8F8F8;
+  --border:rgba(0,0,0,0.08);--border-md:rgba(0,0,0,0.13);
+  --text:#231F20;--text-2:#5A5858;--text-3:#9B9999;
+  --font:'Montserrat','Segoe UI',system-ui,sans-serif;
+  --r4:4px;--r8:8px;--r12:12px;
+  --sh:0 1px 4px rgba(0,0,0,0.07);
+}
+html{font-size:13px}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.hdr{background:var(--black);padding:10px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.hdr-logo{height:28px;width:auto}
+.hdr-divider{width:1px;height:24px;background:rgba(255,255,255,0.2)}
+.hdr-title{font-size:13px;font-weight:700;color:#fff;letter-spacing:.04em}
+.hdr-meta{font-size:10px;color:rgba(255,255,255,0.45);margin-left:auto;display:flex;align-items:center;gap:8px}
+.hdr-badge{font-size:10px;background:var(--red);color:#fff;padding:2px 8px;border-radius:20px;font-weight:600}
+
+/* ── Tabs ─────────────────────────────────────────────────────────── */
+.tab-bar{background:var(--surface);border-bottom:2px solid var(--gray);display:flex;padding:0 20px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tab{font-size:12px;font-weight:600;padding:12px 18px;border:none;background:none;color:var(--text-2);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;font-family:var(--font);transition:all .15s}
+.tab:hover{color:var(--red)}
+.tab.active{color:var(--red);border-bottom-color:var(--red);font-weight:700}
+
+/* ── Filter bar ───────────────────────────────────────────────────── */
+.fbar{background:var(--surface);padding:8px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.fbar-label{font-size:10px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em}
+.fbar select,.fbar input{font-size:11px;padding:5px 8px;border:1.5px solid var(--border-md);border-radius:var(--r4);background:var(--surface-2);color:var(--text);font-family:var(--font);outline:none;transition:border-color .15s}
+.fbar select:focus,.fbar input:focus{border-color:var(--red)}
+.fbar input{width:160px}
+.fsep{width:1px;height:18px;background:var(--border-md);flex-shrink:0}
+
+/* ── Content ──────────────────────────────────────────────────────── */
+.content{padding:16px 20px 40px}
+.tab-panel{display:none}.tab-panel.active{display:block}
+
+/* ── KPI row ──────────────────────────────────────────────────────── */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r8);padding:14px 16px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px}
+.kpi.red::before{background:var(--red)}
+.kpi.green::before{background:var(--green)}
+.kpi.amber::before{background:var(--amber)}
+.kpi.dark::before{background:var(--dark)}
+.kpi-label{font-size:9px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.kpi-value{font-size:22px;font-weight:800;letter-spacing:-.5px;line-height:1}
+.kpi-sub{font-size:10px;color:var(--text-3);margin-top:4px}
+.kpi-value.red{color:var(--red)}.kpi-value.green{color:var(--green)}.kpi-value.amber{color:var(--amber)}.kpi-value.dark{color:var(--dark)}
+
+/* ── Grid ─────────────────────────────────────────────────────────── */
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-bottom:12px}
+.g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px}
+.g4{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px}
+
+/* ── Panel ────────────────────────────────────────────────────────── */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r8);padding:14px;box-shadow:var(--sh)}
+.panel-title{font-size:10px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.panel-title i{color:var(--red);font-size:14px}
+.panel-title .pt-right{margin-left:auto;font-size:10px;color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0}
+
+/* ── Legend ───────────────────────────────────────────────────────── */
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--text-2);margin-bottom:8px}
+.ld{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle}
+
+/* ── WP Status big numbers (Image 1 top right) ─────────────────────── */
+.wp-status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ws-box{padding:12px;background:var(--surface-2);border-radius:var(--r8);text-align:center}
+.ws-num{font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1}
+.ws-num.red{color:var(--red)}.ws-num.dark{color:var(--dark)}.ws-num.green{color:var(--green)}.ws-num.amber{color:var(--amber)}
+.ws-label{font-size:9px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
+.ws-pct{font-size:18px;font-weight:800;color:var(--text)}
+.ws-pct-label{font-size:9px;color:var(--text-2);margin-top:2px}
+
+/* ── Table ────────────────────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--r4)}
+.dtbl{width:100%;border-collapse:collapse;font-size:11px}
+.dtbl thead th{font-size:10px;font-weight:700;color:#fff;background:var(--red);padding:8px 10px;text-align:left;white-space:nowrap;letter-spacing:.04em;text-transform:uppercase;border-right:1px solid rgba(255,255,255,0.15)}
+.dtbl thead th:last-child{border-right:none}
+.dtbl tbody tr{border-bottom:1px solid var(--border)}
+.dtbl tbody tr:hover td{background:var(--red-light)}
+.dtbl tbody tr.group-row td{background:var(--dark);color:#fff;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding:6px 10px}
+.dtbl tbody tr.subgroup-row td{background:#F0EFEF;color:var(--dark);font-weight:600;font-size:10px;padding:5px 10px 5px 20px}
+.dtbl td{padding:7px 10px;white-space:nowrap;vertical-align:middle}
+.dtbl td.wp-name{white-space:normal;max-width:240px;font-weight:500}
+.dtbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+.dtbl tfoot td{background:var(--dark);color:#fff;font-weight:700;font-size:11px;padding:8px 10px}
+
+/* ── Badges ───────────────────────────────────────────────────────── */
+.badge{font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;display:inline-block}
+.b-awarded{background:var(--green-light);color:var(--green)}
+.b-notyet{background:var(--gray-light);color:#555}
+.b-due{background:var(--amber-light);color:var(--amber)}
+.b-solicitation{background:#E0F2FE;color:#0369A1}
+.b-negotiation{background:#F3E8FF;color:#7E22CE}
+.b-notstarted{background:var(--gray-light);color:#555}
+.b-sourcing{background:#FEF9C3;color:#854D0E}
+
+/* ── Aging chip ───────────────────────────────────────────────────── */
+.aging{font-size:10px;font-weight:700}
+.aging.late{color:var(--red)}.aging.ok{color:var(--green)}.aging.warn{color:var(--amber)}
+
+/* ── Pager ────────────────────────────────────────────────────────── */
+.pager{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11px;color:var(--text-2)}
+.pager button{font-size:11px;font-weight:600;padding:4px 10px;border-radius:var(--r4);border:1.5px solid var(--border-md);background:var(--surface);color:var(--text);cursor:pointer;font-family:var(--font);transition:all .15s}
+.pager button:hover{border-color:var(--red);color:var(--red)}
+.pager button:disabled{opacity:.35;cursor:default}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media(max-width:768px){
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .content{padding:12px 12px 40px}
+  .hdr{padding:8px 12px}
+  .tab{padding:10px 12px;font-size:11px}
+}
+@media(max-width:400px){.kpi-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="hdr">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="background:var(--red);border-radius:4px;padding:4px 8px">
+      <span style="color:#fff;font-size:14px;font-weight:900;letter-spacing:-.5px">M</span>
+    </div>
+    <div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.5);letter-spacing:.1em;text-transform:uppercase">Megawide Construction</div>
+      <div class="hdr-title">Procurement Dashboard</div>
+    </div>
+  </div>
+  <div class="hdr-divider"></div>
+  <span style="font-size:11px;color:rgba(255,255,255,0.6)">AVR101 — Avesta Residences T1</span>
+  <div class="hdr-meta">
+    <span class="hdr-badge">REV001</span>
+    <span style="color:rgba(255,255,255,0.4)">Data: Feb 24, 2025</span>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tab-bar" id="tab-bar">
+  <button class="tab active" onclick="switchTab('projects')"><i class="ti ti-building-skyscraper" style="font-size:13px;vertical-align:middle;margin-right:4px"></i>Projects</button>
+  <button class="tab" onclick="switchTab('backlog')"><i class="ti ti-clock" style="font-size:13px;vertical-align:middle;margin-right:4px"></i>Backlog</button>
+  <button class="tab" onclick="switchTab('budget')"><i class="ti ti-coins" style="font-size:13px;vertical-align:middle;margin-right:4px"></i>Budget</button>
+  <button class="tab" onclick="switchTab('schedule')"><i class="ti ti-calendar" style="font-size:13px;vertical-align:middle;margin-right:4px"></i>Schedule</button>
+  <button class="tab" onclick="switchTab('works')"><i class="ti ti-tools" style="font-size:13px;vertical-align:middle;margin-right:4px"></i>Works</button>
+</div>
+
+<!-- Filter bar -->
+<div class="fbar">
+  <span class="fbar-label">Trade</span>
+  <select id="f-trade" onchange="applyFilters()">
+    <option value="">All Trades</option>
+    <option>GENERAL REQUIREMENT</option>
+    <option>STRUCTURAL WORKS</option>
+    <option>ARCHITECTURAL WORKS</option>
+    <option>MEPF & ALLIED SERVICES</option>
+    <option>SITE WORKS</option>
+    <option>SITE DEVELOPMENT</option>
+  </select>
+  <div class="fsep"></div>
+  <span class="fbar-label">Status</span>
+  <select id="f-status" onchange="applyFilters()">
+    <option value="">All Statuses</option>
+    <option>Awarded</option>
+    <option>Not Yet Awarded</option>
+  </select>
+  <div class="fsep"></div>
+  <span class="fbar-label"><i class="ti ti-search" style="font-size:12px"></i></span>
+  <input type="text" id="f-search" placeholder="Search work package…" oninput="applyFilters()"/>
+</div>
+
+<!-- Content -->
+<div class="content">
+
+<!-- ═══ PROJECTS TAB ═══ -->
+<div class="tab-panel active" id="tab-projects">
+  <div class="kpi-row" id="proj-kpis"></div>
+  <div class="g2">
+    <div class="panel" style="grid-column:1/-1">
+      <div class="panel-title"><i class="ti ti-chart-line"></i>Budget (BCB) and Awarded by Period
+        <span class="pt-right">Quarterly</span>
+      </div>
+      <div class="legend">
+        <span><span class="ld" style="background:var(--dark)"></span>Budget (BCB)</span>
+        <span><span class="ld" style="background:var(--red)"></span>Awarded</span>
+        <span><span class="ld" style="background:var(--dark);opacity:.4"></span>Cumulative Budget</span>
+        <span><span class="ld" style="background:var(--red);opacity:.4"></span>Cumulative Awarded</span>
+      </div>
+      <div style="position:relative;height:220px"><canvas id="c-period"></canvas></div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Trade</div>
+      <div class="legend">
+        <span><span class="ld" style="background:var(--dark)"></span>Total WP</span>
+        <span><span class="ld" style="background:var(--red)"></span>Awarded WP</span>
+      </div>
+      <div style="position:relative;height:220px"><canvas id="c-trade"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package Status</div>
+      <div class="wp-status-grid" id="wp-status-grid"></div>
+    </div>
+  </div>
+  <!-- WP Monitoring Table -->
+  <div class="panel">
+    <div class="panel-title" style="margin-bottom:8px">
+      <i class="ti ti-table"></i>Work Package Monitoring
+      <span class="pt-right" id="proj-tbl-count"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table class="dtbl" id="proj-table">
+        <thead><tr>
+          <th style="min-width:60px">WP No.</th>
+          <th style="min-width:220px">Work Package</th>
+          <th style="min-width:120px">Trade</th>
+          <th style="min-width:90px">Status</th>
+          <th style="min-width:90px" class="num">Budget (BCB)</th>
+          <th style="min-width:80px" class="num">Awarded</th>
+          <th style="min-width:80px" class="num">Variance</th>
+          <th style="min-width:55px" class="num">% Var</th>
+          <th style="min-width:90px">Planned Award</th>
+          <th style="min-width:90px">Actual Award</th>
+          <th style="min-width:65px" class="num">Aging</th>
+          <th style="min-width:80px">Submittal</th>
+          <th style="min-width:90px">Delivery</th>
+        </tr></thead>
+        <tbody id="proj-tbody"></tbody>
+        <tfoot id="proj-tfoot"></tfoot>
+      </table>
+    </div>
+    <div class="pager">
+      <button id="proj-prev" onclick="changePage('proj',-1)">‹ Prev</button>
+      <span id="proj-pginfo"></span>
+      <button id="proj-next" onclick="changePage('proj',1)">Next ›</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BACKLOG TAB ═══ -->
+<div class="tab-panel" id="tab-backlog">
+  <div class="kpi-row" id="backlog-kpis"></div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog
+        <span class="pt-right" id="backlog-count"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="dtbl" id="backlog-table">
+          <thead><tr>
+            <th style="min-width:220px">Work Package</th>
+            <th style="min-width:65px" class="num">Aging</th>
+            <th style="min-width:90px">Planned Award</th>
+            <th style="min-width:90px" class="num">Budget (BCB)</th>
+            <th style="min-width:90px">Status</th>
+            <th style="min-width:90px">Submittal</th>
+          </tr></thead>
+          <tbody id="backlog-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="backlog-prev" onclick="changePage('backlog',-1)">‹ Prev</button>
+        <span id="backlog-pginfo"></span>
+        <button id="backlog-next" onclick="changePage('backlog',1)">Next ›</button>
+      </div>
+    </div>
+    <div>
+      <div class="panel" style="margin-bottom:12px">
+        <div class="panel-title"><i class="ti ti-chart-bar"></i>WP by Aging per Trade</div>
+        <div style="position:relative;height:200px"><canvas id="c-aging-trade"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><i class="ti ti-chart-bar"></i>WP by Period — Planned vs Cumulative</div>
+        <div style="position:relative;height:160px"><canvas id="c-backlog-period"></canvas></div>
+      </div>
+    </div>
+  </div>
+  <div class="g3">
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-chart-donut"></i>WP by Status</div>
+      <div class="legend">
+        <span><span class="ld" style="background:var(--red)"></span>Due but Not Awarded</span>
+        <span><span class="ld" style="background:var(--dark)"></span>Not Due</span>
+      </div>
+      <div style="position:relative;height:160px"><canvas id="c-bl-status"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-chart-donut"></i>WP by Submittal Status</div>
+      <div class="legend">
+        <span><span class="ld" style="background:var(--red)"></span>Submitted</span>
+        <span><span class="ld" style="background:var(--dark)"></span>Not Submitted</span>
+        <span><span class="ld" style="background:var(--green)"></span>Approved</span>
+      </div>
+      <div style="position:relative;height:160px"><canvas id="c-bl-submittal"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-chart-bar"></i>WP Aging Buckets</div>
+      <div style="position:relative;height:160px"><canvas id="c-aging-bucket"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BUDGET TAB ═══ -->
+<div class="tab-panel" id="tab-budget">
+  <div class="kpi-row" id="budget-kpis"></div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-chart-line"></i>Budget (BCB) and Awarded by Period</div>
+      <div class="legend">
+        <span><span class="ld" style="background:var(--dark)"></span>Budget (BCB)</span>
+        <span><span class="ld" style="background:var(--red)"></span>Awarded</span>
+      </div>
+      <div style="position:relative;height:220px"><canvas id="c-budget-period"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Trade</div>
+      <div class="legend">
+        <span><span class="ld" style="background:var(--dark)"></span>Budget (BCB)</span>
+        <span><span class="ld" style="background:var(--red)"></span>Awarded</span>
+      </div>
+      <div style="position:relative;height:220px"><canvas id="c-budget-trade"></canvas></div>
+    </div>
+  </div>
+  <div class="panel" style="margin-bottom:12px">
+    <div class="panel-title"><i class="ti ti-table"></i>Budget (BCB) and Awarded by Trade</div>
+    <div class="tbl-wrap">
+      <table class="dtbl" id="budget-table">
+        <thead><tr>
+          <th style="min-width:200px">Trade / Work Package</th>
+          <th style="min-width:100px" class="num">Budget (BCB)</th>
+          <th style="min-width:90px" class="num">Awarded</th>
+          <th style="min-width:80px" class="num">Variance</th>
+          <th style="min-width:60px" class="num">% Var</th>
+        </tr></thead>
+        <tbody id="budget-tbody"></tbody>
+        <tfoot id="budget-tfoot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SCHEDULE TAB ═══ -->
+<div class="tab-panel" id="tab-schedule">
+  <div class="kpi-row" id="sched-kpis"></div>
+  <div class="g3">
+    <div class="panel" style="grid-column:span 2">
+      <div class="panel-title"><i class="ti ti-chart-line"></i>Work Package by Period — Planned vs Actual</div>
+      <div class="legend">
+        <span><span class="ld" style="background:var(--dark)"></span>Planned</span>
+        <span><span class="ld" style="background:var(--red)"></span>Actual</span>
+        <span><span class="ld" style="background:var(--dark);opacity:.35"></span>Cum. Planned</span>
+        <span><span class="ld" style="background:var(--red);opacity:.35"></span>Cum. Actual</span>
+      </div>
+      <div style="position:relative;height:200px"><canvas id="c-sched-period"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-chart-bar"></i>WP by Trade</div>
+      <div class="legend">
+        <span><span class="ld" style="background:var(--dark)"></span>Total</span>
+        <span><span class="ld" style="background:var(--red)"></span>Awarded</span>
+      </div>
+      <div style="position:relative;height:200px"><canvas id="c-sched-trade"></canvas></div>
+    </div>
+  </div>
+  <div class="g2" style="margin-bottom:12px">
+    <div class="panel" style="grid-column:1/-1">
+      <div class="panel-title" style="margin-bottom:8px">
+        <i class="ti ti-calendar-event"></i>Work Package Schedule
+        <span class="pt-right" id="sched-tbl-count"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="dtbl" id="sched-table">
+          <thead><tr>
+            <th style="min-width:60px">WP No.</th>
+            <th style="min-width:220px">Work Package</th>
+            <th style="min-width:120px">Trade</th>
+            <th style="min-width:90px">Planned Award</th>
+            <th style="min-width:90px">Actual Award</th>
+            <th style="min-width:65px" class="num">Aging</th>
+            <th style="min-width:90px" class="num">Budget (BCB)</th>
+            <th style="min-width:90px">Status</th>
+            <th style="min-width:90px">Submittal</th>
+            <th style="min-width:90px">Delivery</th>
+          </tr></thead>
+          <tbody id="sched-tbody"></tbody>
+          <tfoot id="sched-tfoot"></tfoot>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="sched-prev" onclick="changePage('sched',-1)">‹ Prev</button>
+        <span id="sched-pginfo"></span>
+        <button id="sched-next" onclick="changePage('sched',1)">Next ›</button>
+      </div>
+    </div>
+  </div>
+  <div class="panel" style="max-width:300px">
+    <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+    <div class="legend">
+      <span><span class="ld" style="background:var(--red)"></span>Awarded</span>
+      <span><span class="ld" style="background:var(--dark)"></span>Due but Not Awarded</span>
+      <span><span class="ld" style="background:var(--gray)"></span>Not Due</span>
+    </div>
+    <div style="position:relative;height:180px"><canvas id="c-sched-status"></canvas></div>
+  </div>
+</div>
+
+<!-- ═══ WORKS TAB ═══ -->
+<div class="tab-panel" id="tab-works">
+  <div class="kpi-row" id="works-kpis"></div>
+  <div class="g4">
+    <div class="panel" style="grid-column:span 2">
+      <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) by Period per Trade</div>
+      <div class="legend">
+        <span><span class="ld" style="background:var(--red)"></span>CSA / Structural</span>
+        <span><span class="ld" style="background:var(--dark)"></span>Gen Req</span>
+        <span><span class="ld" style="background:var(--gray-mid)"></span>MEPF</span>
+        <span><span class="ld" style="background:var(--amber)"></span>Site Dev</span>
+      </div>
+      <div style="position:relative;height:200px"><canvas id="c-works-period"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-chart-donut"></i>Budget by Trade</div>
+      <div style="position:relative;height:200px"><canvas id="c-works-budget-donut"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-chart-donut"></i>Awarded by Trade</div>
+      <div style="position:relative;height:200px"><canvas id="c-works-award-donut"></canvas></div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-table"></i>Budget by Trade Summary</div>
+      <div class="tbl-wrap">
+        <table class="dtbl" id="works-trade-table">
+          <thead><tr>
+            <th>Trade</th>
+            <th class="num">Budget (BCB)</th>
+            <th class="num">Awarded</th>
+            <th class="num">Variance</th>
+            <th class="num">% Var</th>
+          </tr></thead>
+          <tbody id="works-trade-tbody"></tbody>
+          <tfoot id="works-trade-tfoot"></tfoot>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><i class="ti ti-table"></i>Top Variance Items</div>
+      <div class="tbl-wrap">
+        <table class="dtbl" id="works-var-table">
+          <thead><tr>
+            <th>Work Package</th>
+            <th>Trade</th>
+            <th class="num">Budget</th>
+            <th class="num">Awarded</th>
+            <th class="num">Variance</th>
+          </tr></thead>
+          <tbody id="works-var-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+// DATA — Real AVR101 work packages from Excel
+// ══════════════════════════════════════════════════════════════════════
+const RAW_WPS = [{"t":"GENERAL REQUIREMENT","n":"1","d":"Mobilization/Demobilization","s":"Awarded","b":220000,"a":133026,"v":86974,"lt":11.0,"ad":"2024-11-04","aa":"2025-03-19","alt":7.0,"td":"2024-11-11","dlt":7.0,"ti":"2024-11-15","tc":"2029-07-31","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Repeat Order","aging":-135},{"t":"GENERAL REQUIREMENT","n":"2","d":"Ready-Mix Concrete for Lean Concrete","s":"Awarded","b":399643,"a":643125,"v":-243482,"lt":7.0,"ad":"2024-11-25","aa":"2025-04-25","alt":7.0,"td":"2024-12-02","dlt":7.0,"ti":"2024-12-02","tc":"2024-12-16","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Bulk Order","aging":-151},{"t":"GENERAL REQUIREMENT","n":"3","d":"Modular House for MCC, Subcon Office and Barracks","s":"Awarded","b":2975917,"a":null,"v":2975917,"lt":30.0,"ad":"2024-11-02","aa":"2025-02-20","alt":30.0,"td":"2024-12-02","dlt":7.0,"ti":"2024-12-02","tc":"2025-01-02","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Negotiated","aging":-110},{"t":"GENERAL REQUIREMENT","n":"4","d":"Materials and Consumables for Construction of Modular Houses","s":"Awarded","b":2375506,"a":2226624,"v":148882,"lt":10.0,"ad":"2024-11-25","aa":"2025-02-19","alt":7.0,"td":"2024-12-02","dlt":7.0,"ti":"2024-12-05","tc":"2025-01-15","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-86},{"t":"GENERAL REQUIREMENT","n":"5","d":"Labor for Construction of Modular Houses","s":"Awarded","b":2021920,"a":2000000,"v":21920,"lt":17.0,"ad":"2024-11-18","aa":"2025-02-17","alt":14.0,"td":"2024-12-02","dlt":3.0,"ti":"2024-12-05","tc":"2025-01-15","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-91},{"t":"GENERAL REQUIREMENT","n":"6","d":"Materials and Consumables for Construction of Staging Area and Project Site","s":"Awarded","b":3749186,"a":1268441,"v":2480745,"lt":17.0,"ad":"2024-11-18","aa":"2025-04-25","alt":14.0,"td":"2024-12-02","dlt":3.0,"ti":"2024-12-05","tc":"2025-01-15","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Repeat Order","aging":-158},{"t":"GENERAL REQUIREMENT","n":"7","d":"Labor for Construction of Staging Area and Project Site","s":"Awarded","b":958258,"a":1240881,"v":-282623,"lt":17.0,"ad":"2024-11-18","aa":"2025-04-03","alt":14.0,"td":"2024-12-02","dlt":3.0,"ti":"2024-12-05","tc":"2025-01-15","pr":null,"as2":null,"resp":null,"svc":"Subcon Weekly - JO","proc":"Repeat Order","aging":-136},{"t":"GENERAL REQUIREMENT","n":"8","d":"Lot Rental for Staging Area","s":"Awarded","b":5089286,"a":null,"v":5089286,"lt":17.0,"ad":"2024-01-18","aa":"2025-03-06","alt":14.0,"td":"2024-02-01","dlt":3.0,"ti":"2024-02-04","tc":"2029-02-28","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-413},{"t":"GENERAL REQUIREMENT","n":"9","d":"Modular Gate and Perimeter Fence","s":"Awarded","b":2550095,"a":2980586,"v":-430491,"lt":17.0,"ad":"2024-11-18","aa":"2025-02-27","alt":14.0,"td":"2024-12-02","dlt":3.0,"ti":"2024-12-05","tc":"2025-01-15","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-101},{"t":"GENERAL REQUIREMENT","n":"10","d":"Modular Gate and Perimeter Fence Installation including Washbay Construction","s":"Awarded","b":616454,"a":1013589,"v":-397135,"lt":17.0,"ad":"2024-11-18","aa":"2025-02-27","alt":14.0,"td":"2024-12-02","dlt":3.0,"ti":"2024-12-05","tc":"2025-01-15","pr":null,"as2":null,"resp":null,"svc":"Subcon Weekly - JO","proc":"Negotiated","aging":-101},{"t":"GENERAL REQUIREMENT","n":"11","d":"Temporary Facilities - MEP","s":"Awarded","b":3172075,"a":2350757,"v":821318,"lt":10.0,"ad":"2024-11-25","aa":"2025-04-25","alt":7.0,"td":"2024-12-02","dlt":3.0,"ti":"2024-12-05","tc":"2025-01-15","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-151},{"t":"GENERAL REQUIREMENT","n":"12","d":"Office Equipment and Furnitures","s":"Awarded","b":1183482,"a":1062196,"v":121286,"lt":13.0,"ad":"2024-12-03","aa":"2025-06-11","alt":7.0,"td":"2024-12-10","dlt":6.0,"ti":"2024-12-16","tc":"2025-01-15","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Repeat Order","aging":-190},{"t":"GENERAL REQUIREMENT","n":"13","d":"Rental of Printer","s":"Awarded","b":510714,"a":312500,"v":198214,"lt":13.0,"ad":"2024-12-03","aa":"2025-03-10","alt":7.0,"td":"2024-12-10","dlt":6.0,"ti":"2024-12-16","tc":"2025-01-15","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Repeat Order","aging":-97},{"t":"GENERAL REQUIREMENT","n":"14","d":"Office Supplies and Office Consumables","s":"Awarded","b":232143,"a":217621,"v":14522,"lt":13.0,"ad":"2024-12-03","aa":"2025-03-27","alt":7.0,"td":"2024-12-10","dlt":6.0,"ti":"2024-12-16","tc":"2025-01-15","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-114},{"t":"GENERAL REQUIREMENT","n":"15","d":"Admin Workers","s":"Awarded","b":10001786,"a":12271338,"v":-2269552,"lt":7.0,"ad":"2024-11-25","aa":"2025-05-30","alt":7.0,"td":"2024-12-02","dlt":5.0,"ti":"2024-12-02","tc":"2029-10-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-186},{"t":"GENERAL REQUIREMENT","n":"16","d":"Security Sevices","s":"Awarded","b":4092662,"a":4930719,"v":-838057,"lt":7.0,"ad":"2024-11-25","aa":"2025-03-06","alt":7.0,"td":"2024-12-02","dlt":0.0,"ti":"2024-12-02","tc":"2029-12-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-101},{"t":"GENERAL REQUIREMENT","n":"17","d":"Fogging / Misting / Pest Control","s":"Awarded","b":974420,"a":638393,"v":336027,"lt":10.0,"ad":"2024-12-03","aa":"2025-03-15","alt":7.0,"td":"2024-12-10","dlt":3.0,"ti":"2024-12-13","tc":"2029-12-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Repeat Order","aging":-102},{"t":"GENERAL REQUIREMENT","n":"18","d":"Declogging / Siphoning","s":"Awarded","b":1200000,"a":1190000,"v":10000,"lt":10.0,"ad":"2024-12-03","aa":"2025-03-15","alt":7.0,"td":"2024-12-10","dlt":3.0,"ti":"2024-12-13","tc":"2029-12-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Repeat Order","aging":-102},{"t":"GENERAL REQUIREMENT","n":"19","d":"Garbage Disposal","s":"Awarded","b":2880000,"a":2477679,"v":402321,"lt":10.0,"ad":"2024-12-03","aa":"2025-03-10","alt":7.0,"td":"2024-12-10","dlt":3.0,"ti":"2024-12-13","tc":"2029-12-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Repeat Order","aging":-97},{"t":"GENERAL REQUIREMENT","n":"20","d":"Cleaning Consumables","s":"Awarded","b":364286,"a":278438,"v":85848,"lt":10.0,"ad":"2024-12-03","aa":"2025-03-10","alt":7.0,"td":"2024-12-10","dlt":3.0,"ti":"2024-12-13","tc":"2029-12-31","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-97},{"t":"GENERAL REQUIREMENT","n":"21","d":"Boom Truck","s":"Awarded","b":910714,"a":2085750,"v":-1175036,"lt":-46.0,"ad":"2025-01-18","aa":"2025-05-08","alt":14.0,"td":"2025-02-01","dlt":-60.0,"ti":"2024-12-03","tc":"2029-12-31","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Negotiated","aging":-110},{"t":"GENERAL REQUIREMENT","n":"22","d":"Steer Skid loader","s":"Awarded","b":573214,"a":500000,"v":73214,"lt":-46.0,"ad":"2025-01-18","aa":"2025-05-08","alt":14.0,"td":"2025-02-01","dlt":-60.0,"ti":"2024-12-03","tc":"2029-06-30","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Negotiated","aging":-110},{"t":"GENERAL REQUIREMENT","n":"23","d":"Tower Crane","s":"Awarded","b":14106689,"a":18271329,"v":-4164640,"lt":21.0,"ad":"2025-02-17","aa":"2025-03-15","alt":14.0,"td":"2025-03-03","dlt":7.0,"ti":"2025-03-10","tc":"2029-04-06","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Negotiated","aging":-26},{"t":"GENERAL REQUIREMENT","n":"24","d":"Mobile Crane","s":"Awarded","b":2448000,"a":2447112,"v":888,"lt":19.0,"ad":"2025-01-22","aa":"2025-05-08","alt":14.0,"td":"2025-02-05","dlt":5.0,"ti":"2025-02-10","tc":"2029-04-06","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-106},{"t":"GENERAL REQUIREMENT","n":"25","d":"Genset","s":"Awarded","b":950893,"a":892857,"v":58036,"lt":17.0,"ad":"2025-01-18","aa":"2025-05-08","alt":14.0,"td":"2025-02-01","dlt":3.0,"ti":"2025-02-04","tc":"2029-04-06","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Negotiated","aging":-110},{"t":"GENERAL REQUIREMENT","n":"26","d":"Preventive Maintenance of Generator Set","s":"Awarded","b":357143,"a":357143,"v":null,"lt":10.0,"ad":"2025-01-25","aa":"2025-07-22","alt":7.0,"td":"2025-02-01","dlt":3.0,"ti":"2025-02-04","tc":"2029-04-06","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-178},{"t":"GENERAL REQUIREMENT","n":"27","d":"Surveying Equipment including Calibration","s":"Awarded","b":278082,"a":93750,"v":184332,"lt":10.0,"ad":"2025-01-25","aa":"2025-03-18","alt":7.0,"td":"2025-02-01","dlt":3.0,"ti":"2025-02-04","tc":"2029-04-06","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Repeat Order","aging":-52},{"t":"GENERAL REQUIREMENT","n":"28","d":"Light Tools and Equipment","s":"Awarded","b":1012219,"a":611470,"v":400749,"lt":10.0,"ad":"2025-01-25","aa":"2025-07-10","alt":7.0,"td":"2025-02-01","dlt":3.0,"ti":"2025-02-04","tc":"2029-04-06","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Negotiated","aging":-166},{"t":"GENERAL REQUIREMENT","n":"29","d":"Service Vehicle","s":"Awarded","b":1030000,"a":52380,"v":977620,"lt":19.0,"ad":"2025-01-18","aa":"2025-10-09","alt":14.0,"td":"2025-02-01","dlt":5.0,"ti":"2025-02-06","tc":"2029-12-31","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Negotiated","aging":-264},{"t":"GENERAL REQUIREMENT","n":"30","d":"Fuel and Oil","s":"Awarded","b":4595545,"a":4590200,"v":5345,"lt":-53.0,"ad":"2025-01-25","aa":"2025-03-15","alt":7.0,"td":"2025-02-01","dlt":-60.0,"ti":"2024-12-03","tc":"2029-12-31","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-49},{"t":"GENERAL REQUIREMENT","n":"31","d":"Falsework Services","s":"Awarded","b":12553429,"a":2436724,"v":10116705,"lt":14.0,"ad":"2025-01-18","aa":"2025-04-21","alt":14.0,"td":"2025-02-01","dlt":0.0,"ti":"2025-02-01","tc":"2029-07-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-93},{"t":"GENERAL REQUIREMENT","n":"32","d":"Personal Protective Equipment and First Aid Support","s":"Awarded","b":1846571,"a":833877,"v":1012695,"lt":8.0,"ad":"2025-01-24","aa":"2025-04-03","alt":7.0,"td":"2025-01-31","dlt":1.0,"ti":"2025-02-01","tc":"2029-01-31","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-69},{"t":"GENERAL REQUIREMENT","n":"33","d":"Structural Design","s":"Awarded","b":1228899,"a":654862,"v":574037,"lt":36.0,"ad":"2024-12-03","aa":"2025-01-24","alt":7.0,"td":"2024-12-10","dlt":29.0,"ti":"2025-01-08","tc":"2029-09-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-52},{"t":"GENERAL REQUIREMENT","n":"34","d":"Structural Design for Tower Crane Foundation","s":"Awarded","b":600000,"a":null,"v":600000,"lt":36.0,"ad":"2024-12-03","aa":"2025-03-15","alt":7.0,"td":"2024-12-10","dlt":29.0,"ti":"2025-01-08","tc":"2029-09-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-102},{"t":"GENERAL REQUIREMENT","n":"35","d":"Architectural Design","s":"Awarded","b":1516409,"a":null,"v":1516409,"lt":9.0,"ad":"2024-12-03","aa":"2024-08-29","alt":7.0,"td":"2024-12-10","dlt":2.0,"ti":"2024-12-12","tc":"2029-09-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":96},{"t":"GENERAL REQUIREMENT","n":"36","d":"Mechanical Design","s":"Awarded","b":594432,"a":142857,"v":451575,"lt":9.0,"ad":"2024-12-03","aa":"2025-01-24","alt":7.0,"td":"2024-12-10","dlt":2.0,"ti":"2024-12-12","tc":"2029-09-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-52},{"t":"GENERAL REQUIREMENT","n":"37","d":"Electrical and Auxiliary Design","s":"Awarded","b":3209934,"a":382135,"v":2827799,"lt":9.0,"ad":"2024-12-03","aa":"2025-01-24","alt":7.0,"td":"2024-12-10","dlt":2.0,"ti":"2024-12-12","tc":"2029-09-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-52},{"t":"GENERAL REQUIREMENT","n":"38","d":"Plumbing and Sanitary Design","s":"Awarded","b":1188865,"a":190156,"v":998709,"lt":9.0,"ad":"2024-12-03","aa":"2025-01-24","alt":7.0,"td":"2024-12-10","dlt":2.0,"ti":"2024-12-12","tc":"2029-09-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-52},{"t":"GENERAL REQUIREMENT","n":"39","d":"Fire Protection Design","s":"Awarded","b":594432,"a":241071,"v":353361,"lt":9.0,"ad":"2024-12-03","aa":"2025-01-24","alt":7.0,"td":"2024-12-10","dlt":2.0,"ti":"2024-12-12","tc":"2029-09-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-52},{"t":"GENERAL REQUIREMENT","n":"40","d":"Sign and Seal of Plans for Building Permits","s":"Awarded","b":729497,"a":295000,"v":434497,"lt":9.0,"ad":"2024-12-03","aa":"2025-01-24","alt":7.0,"td":"2024-12-10","dlt":2.0,"ti":"2024-12-12","tc":"2029-09-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-52},{"t":"GENERAL REQUIREMENT","n":"41","d":"BIM Services","s":"Awarded","b":909845,"a":466429,"v":443417,"lt":9.0,"ad":"2024-12-03","aa":"2025-04-21","alt":7.0,"td":"2024-12-10","dlt":2.0,"ti":"2024-12-12","tc":"2029-09-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-139},{"t":"GENERAL REQUIREMENT","n":"42","d":"Material Testing","s":"Awarded","b":1000000,"a":15911,"v":984089,"lt":13.0,"ad":"2025-03-25","aa":"2025-06-11","alt":7.0,"td":"2025-04-01","dlt":6.0,"ti":"2025-04-07","tc":"2029-08-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Repeat Order","aging":-78},{"t":"SITE WORKS","n":"43","d":"Excavation, Backfilling, Compaction and Hauling","s":"Awarded","b":1678745,"a":2793529,"v":-1114784,"lt":21.0,"ad":"2025-01-18","aa":"2025-03-20","alt":14.0,"td":"2025-02-01","dlt":7.0,"ti":"2025-02-08","tc":"2025-05-24","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-61},{"t":"SITE WORKS","n":"44","d":"Gravel Bedding and Lean Concrete Materials","s":"Awarded","b":404768,"a":410893,"v":-6124,"lt":21.0,"ad":"2025-01-18","aa":"2025-03-20","alt":14.0,"td":"2025-02-01","dlt":7.0,"ti":"2025-02-08","tc":"2025-05-24","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-61},{"t":"SITE WORKS","n":"45","d":"Gravel Bedding and Lean Concrete Labor Works","s":"Awarded","b":155808,"a":33869,"v":121940,"lt":16.0,"ad":"2025-01-18","aa":"2025-03-20","alt":14.0,"td":"2025-02-01","dlt":2.0,"ti":"2025-02-03","tc":"2025-05-19","pr":null,"as2":null,"resp":null,"svc":"Subcon Weekly - JO","proc":"Competitive Bid","aging":-61},{"t":"SITE WORKS","n":"46","d":"Trimming Works","s":"Awarded","b":140703,"a":117499,"v":23203,"lt":16.0,"ad":"2025-01-18","aa":"2025-03-20","alt":14.0,"td":"2025-02-01","dlt":2.0,"ti":"2025-02-03","tc":"2025-05-19","pr":null,"as2":null,"resp":null,"svc":"Subcon Weekly - JO","proc":"Competitive Bid","aging":-61},{"t":"SITE WORKS","n":"47","d":"Soil Poisoning","s":"Awarded","b":75820,"a":63690,"v":12130,"lt":16.0,"ad":"2025-01-18","aa":"2025-04-03","alt":14.0,"td":"2025-02-01","dlt":2.0,"ti":"2025-02-03","tc":"2025-05-19","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-75},{"t":"STRUCTURAL WORKS","n":"48","d":"Rebar Works","s":"Awarded","b":3486875,"a":2850907,"v":635968,"lt":16.0,"ad":"2025-01-28","aa":"2025-03-20","alt":14.0,"td":"2025-02-11","dlt":2.0,"ti":"2025-02-13","tc":"2025-08-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Weekly - JO","proc":"Competitive Bid","aging":-51},{"t":"STRUCTURAL WORKS","n":"49","d":"Rebar Supply","s":"Awarded","b":14997896,"a":35022558,"v":-20024662,"lt":28.0,"ad":"2025-01-28","aa":"2025-03-27","alt":14.0,"td":"2025-02-11","dlt":14.0,"ti":"2025-02-25","tc":"2025-08-31","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Bulk Order","aging":-58},{"t":"STRUCTURAL WORKS","n":"50","d":"Rebar Consumables","s":"Awarded","b":1443841,"a":4298540,"v":-2854699,"lt":14.0,"ad":"2025-02-04","aa":"2025-06-04","alt":7.0,"td":"2025-02-11","dlt":7.0,"ti":"2025-02-18","tc":"2025-08-31","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-120},{"t":"STRUCTURAL WORKS","n":"51","d":"Formworks Labor","s":"Awarded","b":4541835,"a":3963468,"v":578367,"lt":16.0,"ad":"2025-01-28","aa":"2025-03-20","alt":14.0,"td":"2025-02-11","dlt":2.0,"ti":"2025-02-13","tc":"2025-08-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Weekly - JO","proc":"Competitive Bid","aging":-51},{"t":"STRUCTURAL WORKS","n":"52","d":"Formworks Materials","s":"Awarded","b":8138968,"a":17380116,"v":-9241148,"lt":21.0,"ad":"2025-01-28","aa":"2025-03-20","alt":14.0,"td":"2025-02-11","dlt":7.0,"ti":"2025-02-18","tc":"2025-08-31","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Negotiated","aging":-51},{"t":"STRUCTURAL WORKS","n":"53","d":"Formworks Consumables","s":"Awarded","b":2180081,"a":2177096,"v":2985,"lt":14.0,"ad":"2025-02-04","aa":"2025-06-04","alt":7.0,"td":"2025-02-11","dlt":7.0,"ti":"2025-02-18","tc":"2025-08-31","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-120},{"t":"STRUCTURAL WORKS","n":"54","d":"Concreting Works","s":"Awarded","b":444930,"a":318865,"v":126064,"lt":16.0,"ad":"2025-01-28","aa":"2025-03-20","alt":14.0,"td":"2025-02-11","dlt":2.0,"ti":"2025-02-13","tc":"2025-08-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Weekly - JO","proc":"Competitive Bid","aging":-51},{"t":"STRUCTURAL WORKS","n":"55","d":"Concrete Placing","s":"Awarded","b":585691,"a":542039,"v":43652,"lt":16.0,"ad":"2025-01-28","aa":"2025-03-20","alt":14.0,"td":"2025-02-11","dlt":2.0,"ti":"2025-02-13","tc":"2025-08-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Weekly - JO","proc":"Negotiated","aging":-51},{"t":"STRUCTURAL WORKS","n":"56","d":"Services for Concreting Works","s":"Awarded","b":1263361,"a":369729,"v":893632,"lt":21.0,"ad":"2025-01-28","aa":"2025-04-14","alt":14.0,"td":"2025-02-11","dlt":7.0,"ti":"2025-02-18","tc":"2025-08-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Negotiated","aging":-76},{"t":"STRUCTURAL WORKS","n":"57","d":"Ready Mix Concrete","s":"Awarded","b":19016074,"a":17359422,"v":1656652,"lt":21.0,"ad":"2025-01-28","aa":"2025-04-14","alt":14.0,"td":"2025-02-11","dlt":7.0,"ti":"2025-02-18","tc":"2025-08-31","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Bulk Order","aging":-76},{"t":"STRUCTURAL WORKS","n":"58","d":"Concrete Consumables","s":"Awarded","b":360960,"a":824204,"v":-463243,"lt":14.0,"ad":"2025-02-04","aa":"2025-06-04","alt":7.0,"td":"2025-02-11","dlt":7.0,"ti":"2025-02-18","tc":"2025-08-31","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-120},{"t":"ARCHITECTURAL WORKS","n":"59","d":"AAC Blockworks and Plastering Works on AAC","s":"Awarded","b":267437,"a":721164,"v":-453728,"lt":47.0,"ad":"2025-06-01","aa":"2025-11-27","alt":30.0,"td":"2025-07-01","dlt":17.0,"ti":"2025-07-18","tc":"2025-11-30","pr":"WITH PR","as2":"DUE","resp":"PROCUREMENT","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-179},{"t":"ARCHITECTURAL WORKS","n":"60","d":"Precast Interior Wall Materials","s":"Awarded","b":10165617,"a":8326935,"v":1838682,"lt":52.0,"ad":"2025-02-08","aa":"2025-09-24","alt":30.0,"td":"2025-03-10","dlt":22.0,"ti":"2025-04-01","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Negotiated","aging":-228},{"t":"ARCHITECTURAL WORKS","n":"61","d":"Precast Exterior Wall Materials","s":"Awarded","b":5023622,"a":1950284,"v":3073338,"lt":52.0,"ad":"2025-02-08","aa":"2025-09-24","alt":30.0,"td":"2025-03-10","dlt":22.0,"ti":"2025-04-01","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Negotiated","aging":-228},{"t":"ARCHITECTURAL WORKS","n":"62","d":"Precast Toilets","s":"Awarded","b":13145440,"a":11184855,"v":1960585,"lt":52.0,"ad":"2025-02-08","aa":"2026-01-13","alt":30.0,"td":"2025-03-10","dlt":22.0,"ti":"2025-04-01","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Negotiated","aging":-339},{"t":"ARCHITECTURAL WORKS","n":"63","d":"Precast Installation Works","s":"Awarded","b":1253319,"a":963370,"v":289950,"lt":36.0,"ad":"2025-02-24","aa":"2025-03-20","alt":14.0,"td":"2025-03-10","dlt":22.0,"ti":"2025-04-01","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Weekly - JO","proc":"Negotiated","aging":-24},{"t":"ARCHITECTURAL WORKS","n":"64","d":"Straight to Finish Concrete","s":"Awarded","b":486506,"a":404172,"v":82335,"lt":18.0,"ad":"2025-06-27","aa":"2025-07-29","alt":14.0,"td":"2025-07-11","dlt":4.0,"ti":"2025-07-15","tc":"2025-10-11","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-32},{"t":"ARCHITECTURAL WORKS","n":"65","d":"Concrete Topping Materials and Consumables","s":"Awarded","b":790984,"a":927143,"v":-136159,"lt":11.0,"ad":"2025-07-07","aa":"2025-09-19","alt":7.0,"td":"2025-07-14","dlt":4.0,"ti":"2025-07-18","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-74},{"t":"ARCHITECTURAL WORKS","n":"66","d":"Concrete Topping Labor Works","s":"Not Yet Awarded","b":626196,"a":null,"v":626196,"lt":18.0,"ad":"2025-06-30","aa":null,"alt":14.0,"td":"2025-07-14","dlt":4.0,"ti":"2025-07-18","tc":"2025-11-30","pr":"WITHOUT PR","as2":"DUE","resp":"OPERATIONS","svc":"Subcon Weekly - JO","proc":"Competitive Bid","aging":126},{"t":"ARCHITECTURAL WORKS","n":"67","d":"Grinding, Sanding and Mortar Joining Materials and Consumables","s":"Awarded","b":358490,"a":357471,"v":1019,"lt":11.0,"ad":"2025-07-07","aa":"2025-09-19","alt":7.0,"td":"2025-07-14","dlt":4.0,"ti":"2025-07-18","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-74},{"t":"ARCHITECTURAL WORKS","n":"68","d":"Grinding, Sanding and Mortar Joining Labor Works","s":"Awarded","b":179245,"a":297960,"v":-118715,"lt":18.0,"ad":"2025-06-30","aa":"2025-11-27","alt":14.0,"td":"2025-07-14","dlt":4.0,"ti":"2025-07-18","tc":"2025-11-30","pr":"WITH PR","as2":"DUE","resp":"PROCUREMENT","svc":"Subcon Weekly - JO","proc":"Competitive Bid","aging":-150},{"t":"ARCHITECTURAL WORKS","n":"69","d":"Skimcoating Materials and Consumables","s":"Awarded","b":716980,"a":695499,"v":21481,"lt":11.0,"ad":"2025-07-07","aa":"2025-09-19","alt":7.0,"td":"2025-07-14","dlt":4.0,"ti":"2025-07-18","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-74},{"t":"ARCHITECTURAL WORKS","n":"70","d":"Skimcoating Works","s":"Awarded","b":1147168,"a":644368,"v":502800,"lt":18.0,"ad":"2025-06-30","aa":"2025-11-27","alt":14.0,"td":"2025-07-14","dlt":4.0,"ti":"2025-07-18","tc":"2025-11-30","pr":"WITH PR","as2":"DUE","resp":"PROCUREMENT","svc":"Subcon Weekly - JO","proc":"Competitive Bid","aging":-150},{"t":"ARCHITECTURAL WORKS","n":"71","d":"Ceramic Floor and Wall Tiles","s":"Awarded","b":3846708,"a":3389357,"v":457351,"lt":17.0,"ad":"2025-07-14","aa":"2025-08-07","alt":14.0,"td":"2025-07-28","dlt":3.0,"ti":"2025-07-31","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-24},{"t":"ARCHITECTURAL WORKS","n":"72","d":"Tiling Works","s":"Not Yet Awarded","b":2621257,"a":null,"v":2621257,"lt":17.0,"ad":"2025-07-14","aa":null,"alt":14.0,"td":"2025-07-28","dlt":3.0,"ti":"2025-07-31","tc":"2025-11-30","pr":"WITHOUT PR","as2":"DUE","resp":"OPERATIONS","svc":"Subcon Weekly - JO","proc":"Competitive Bid","aging":140},{"t":"ARCHITECTURAL WORKS","n":"73","d":"Tile Works Consumables","s":"Awarded","b":884447,"a":881658,"v":2789,"lt":10.0,"ad":"2025-07-21","aa":"2025-09-19","alt":7.0,"td":"2025-07-28","dlt":3.0,"ti":"2025-07-31","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-60},{"t":"ARCHITECTURAL WORKS","n":"74","d":"Drywall Partition and Board Ceiling","s":"Awarded","b":1126337,"a":873496,"v":252842,"lt":34.0,"ad":"2025-07-02","aa":"2025-10-10","alt":30.0,"td":"2025-08-01","dlt":4.0,"ti":"2025-08-05","tc":"2025-11-30","pr":"WITH PR","as2":"DUE","resp":"PROCUREMENT","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-100},{"t":"ARCHITECTURAL WORKS","n":"75","d":"Pipe Chase Door","s":"Awarded","b":147321,"a":139018,"v":8304,"lt":34.0,"ad":"2025-07-05","aa":"2025-10-10","alt":30.0,"td":"2025-08-04","dlt":4.0,"ti":"2025-08-08","tc":"2025-11-30","pr":"WITH PR","as2":"DUE","resp":"PROCUREMENT","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-97},{"t":"ARCHITECTURAL WORKS","n":"76","d":"Epoxy Tank Lining, Flexible Cementitious , and Polyurethane Membrane Waterproofing (Exposed Type)","s":"Awarded","b":774090,"a":982143,"v":-208053,"lt":21.0,"ad":"2025-06-30","aa":"2025-08-08","alt":14.0,"td":"2025-07-14","dlt":7.0,"ti":"2025-07-21","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-39},{"t":"ARCHITECTURAL WORKS","n":"77","d":"Wooden Doors and Jambs including Hinges","s":"Awarded","b":1652200,"a":1561362,"v":90838,"lt":22.0,"ad":"2025-07-28","aa":"2025-09-17","alt":14.0,"td":"2025-08-11","dlt":8.0,"ti":"2025-08-19","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-51},{"t":"ARCHITECTURAL WORKS","n":"78","d":"PVC Doors and Jambs","s":"Awarded","b":324107,"a":294643,"v":29464,"lt":22.0,"ad":"2025-07-28","aa":"2025-07-23","alt":14.0,"td":"2025-08-11","dlt":8.0,"ti":"2025-08-19","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":5},{"t":"ARCHITECTURAL WORKS","n":"79","d":"Metal Door and Jambs","s":"Awarded","b":375018,"a":417766,"v":-42748,"lt":22.0,"ad":"2025-07-28","aa":"2025-09-08","alt":14.0,"td":"2025-08-11","dlt":8.0,"ti":"2025-08-19","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-42},{"t":"ARCHITECTURAL WORKS","n":"80","d":"Installation of Wood Doors, PVC Doors and Metal Doors including Door Hardwares","s":"Awarded","b":515424,"a":440714,"v":74710,"lt":22.0,"ad":"2025-07-28","aa":"2025-09-03","alt":14.0,"td":"2025-08-11","dlt":8.0,"ti":"2025-08-19","tc":"2025-11-30","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-37},{"t":"ARCHITECTURAL WORKS","n":"81","d":"Door Hardwares for Wooden Doors, PVC Doors and Metal Doors","s":"Awarded","b":646462,"a":575731,"v":70730,"lt":23.0,"ad":"2025-07-27","aa":"2026-01-29","alt":15.0,"td":"2025-08-11","dlt":8.0,"ti":"2025-08-19","tc":"2025-11-30","pr":"WITH PR","as2":"DUE","resp":"PROCUREMENT","svc":"Main Materials - PO","proc":"Competitive Bid","aging":-186},{"t":"ARCHITECTURAL WORKS","n":"82","d":"Miscellaneous Metal Works","s":"Awarded","b":2024316,"a":970143,"v":1054173,"lt":22.0,"ad":"2025-07-27","aa":"2025-11-20","alt":15.0,"td":"2025-08-11","dlt":7.0,"ti":"2025-08-18","tc":"2026-01-31","pr":"WITH PR","as2":"DUE","resp":"PROCUREMENT","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-116},{"t":"ARCHITECTURAL WORKS","n":"83","d":"Exterior Paint for Exterior Walls (Elastomeric)","s":"Awarded","b":534160,"a":2663216,"v":-2129056,"lt":19.0,"ad":"2025-08-28","aa":"2025-09-30","alt":15.0,"td":"2025-09-12","dlt":4.0,"ti":"2025-09-16","tc":"2026-01-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-33},{"t":"ARCHITECTURAL WORKS","n":"84","d":"Interior Painting Works for Walls and Ceiling (Latex)","s":"Awarded","b":5766395,"a":8812456,"v":-3046061,"lt":19.0,"ad":"2025-08-28","aa":"2025-09-30","alt":15.0,"td":"2025-09-12","dlt":4.0,"ti":"2025-09-16","tc":"2026-01-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-33},{"t":"ARCHITECTURAL WORKS","n":"85","d":"Painting Works for Floor Coating, Railings and FE Stairs using Epoxy Paint\n and QDE for Doors and Separator Beam","s":"Awarded","b":141049,"a":82573,"v":58475,"lt":19.0,"ad":"2025-08-28","aa":"2025-09-30","alt":15.0,"td":"2025-09-12","dlt":4.0,"ti":"2025-09-16","tc":"2026-01-31","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-33},{"t":"ARCHITECTURAL WORKS","n":"86","d":"Sealant Materials and Consumables","s":"Awarded","b":1305927,"a":1304858,"v":1069,"lt":12.0,"ad":"2025-07-08","aa":"2025-09-19","alt":7.0,"td":"2025-07-15","dlt":5.0,"ti":"2025-07-20","tc":"2025-10-31","pr":null,"as2":null,"resp":null,"svc":"Consumable Mat'ls - PO","proc":"Repeat Order","aging":-73},{"t":"ARCHITECTURAL WORKS","n":"87","d":"Sealant Application Works","s":"Awarded","b":1123378,"a":1572135,"v":-448757,"lt":20.0,"ad":"2025-06-30","aa":"2025-11-27","alt":15.0,"td":"2025-07-15","dlt":5.0,"ti":"2025-07-20","tc":"2025-10-31","pr":"WITH PR","as2":"DUE","resp":"PROCUREMENT","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-150},{"t":"ARCHITECTURAL WORKS","n":"88","d":"Supply and Installation of Awning and Fixed Windows","s":"Awarded","b":4391400,"a":4318164,"v":73236,"lt":40.0,"ad":"2025-09-15","aa":"2025-09-19","alt":30.0,"td":"2025-10-15","dlt":10.0,"ti":"2025-10-25","tc":"2025-12-27","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-4},{"t":"MEPF & ALLIED SERVICES","n":"89","d":"Mechanical Equipments","s":"Awarded","b":812905,"a":656696,"v":156209,"lt":18.0,"ad":"2025-01-28","aa":"2025-11-15","alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":"WITH PR","as2":"DUE","resp":"PROCUREMENT","svc":"Main Materials - PO","proc":"Competitive Bid","aging":-291},{"t":"MEPF & ALLIED SERVICES","n":"90","d":"Mechanical Works","s":"Awarded","b":1906850,"a":1790945,"v":115905,"lt":34.0,"ad":"2025-01-12","aa":"2026-03-06","alt":30.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":"WITH PR","as2":"DUE","resp":"OPERATIONS","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-418},{"t":"MEPF & ALLIED SERVICES","n":"91","d":"Power System Panel Boards, Switch Boards, Meter Centers, and ECB","s":"Awarded","b":6035487,"a":1405262,"v":4630225,"lt":18.0,"ad":"2025-01-28","aa":"2025-08-01","alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-185},{"t":"MEPF & ALLIED SERVICES","n":"92","d":"FDAS Equipment and Acessories","s":"Awarded","b":1452709,"a":2224866,"v":-772156,"lt":18.0,"ad":"2025-01-28","aa":"2025-09-08","alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-223},{"t":"MEPF & ALLIED SERVICES","n":"93","d":"Electrical Wires","s":"Awarded","b":2439714,"a":2571134,"v":-131420,"lt":18.0,"ad":"2025-01-28","aa":"2025-07-18","alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-171},{"t":"MEPF & ALLIED SERVICES","n":"94","d":"Electrical Conduits","s":"Awarded","b":877847,"a":1930734,"v":-1052887,"lt":18.0,"ad":"2025-01-28","aa":"2025-06-25","alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-148},{"t":"MEPF & ALLIED SERVICES","n":"95","d":"Supply and Installation of Busduct System","s":"Awarded","b":2539699,"a":1419643,"v":1120056,"lt":34.0,"ad":"2025-01-12","aa":"2025-07-17","alt":30.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-186},{"t":"MEPF & ALLIED SERVICES","n":"96","d":"Electrical and Auxiliary Works","s":"Awarded","b":8050413,"a":10044643,"v":-1994230,"lt":34.0,"ad":"2025-01-12","aa":"2025-08-05","alt":30.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-205},{"t":"MEPF & ALLIED SERVICES","n":"97","d":"Plumbing Fixtures","s":"Not Yet Awarded","b":2457903,"a":2457903,"v":null,"lt":18.0,"ad":"2025-01-28","aa":null,"alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":"WITH PR","as2":"DUE","resp":"OPERATIONS","svc":"Main Materials - PO","proc":"Competitive Bid","aging":-27},{"t":"MEPF & ALLIED SERVICES","n":"98","d":"Plumbing Pumps, Controllers and Accessories","s":"Awarded","b":971875,"a":892857,"v":79018,"lt":18.0,"ad":"2025-01-28","aa":"2025-10-08","alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-253},{"t":"MEPF & ALLIED SERVICES","n":"99","d":"Pipes and Fittings","s":"Awarded","b":2636855,"a":707727,"v":1929128,"lt":18.0,"ad":"2025-01-28","aa":"2025-07-17","alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-170},{"t":"MEPF & ALLIED SERVICES","n":"100","d":"Valves and Accessories","s":"Awarded","b":835685,"a":194676,"v":641009,"lt":18.0,"ad":"2025-01-28","aa":"2025-07-17","alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-170},{"t":"MEPF & ALLIED SERVICES","n":"101","d":"Overhead Water Tank","s":"Awarded","b":1250000,"a":714286,"v":535714,"lt":34.0,"ad":"2025-01-12","aa":"2025-07-17","alt":30.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-186},{"t":"MEPF & ALLIED SERVICES","n":"102","d":"Plumbing Works","s":"Awarded","b":2609487,"a":6857563,"v":-4248077,"lt":34.0,"ad":"2025-01-12","aa":"2025-11-27","alt":30.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":"WITH PR","as2":"DUE","resp":"OPERATIONS","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-319},{"t":"MEPF & ALLIED SERVICES","n":"103","d":"Fire Hose Cabinets and Fire Extinguishers","s":"Awarded","b":710340,"a":352789,"v":357551,"lt":18.0,"ad":"2025-01-28","aa":"2025-08-13","alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-197},{"t":"MEPF & ALLIED SERVICES","n":"104","d":"Pipes and Fittings","s":"Awarded","b":1832918,"a":1672426,"v":160492,"lt":18.0,"ad":"2025-01-28","aa":"2025-07-17","alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":null,"as2":null,"resp":null,"svc":"Main Materials - PO","proc":"Competitive Bid","aging":-170},{"t":"MEPF & ALLIED SERVICES","n":"105","d":"Valves and Accessories - fire pro","s":"Awarded","b":842159,"a":null,"v":842159,"lt":18.0,"ad":"2025-01-28","aa":"2025-11-13","alt":14.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":"WITH PR","as2":"DUE","resp":"OPERATIONS","svc":"Main Materials - PO","proc":"Competitive Bid","aging":-289},{"t":"MEPF & ALLIED SERVICES","n":"106","d":"Fire Protection Works","s":"Awarded","b":1724592,"a":2752119,"v":-1027527,"lt":34.0,"ad":"2025-01-12","aa":"2025-11-13","alt":30.0,"td":"2025-02-11","dlt":4.0,"ti":"2025-02-15","tc":"2026-02-09","pr":"WITH PR","as2":"DUE","resp":"OPERATIONS","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-305},{"t":"MEPF & ALLIED SERVICES","n":"107","d":"Elevators","s":"Awarded","b":4258929,"a":2408929,"v":1850000,"lt":127.0,"ad":"2025-05-02","aa":"2025-09-30","alt":120.0,"td":"2025-08-30","dlt":7.0,"ti":"2025-09-06","tc":"2025-11-17","pr":null,"as2":null,"resp":null,"svc":"Subcon Weekly - JO","proc":"Competitive Bid","aging":-151},{"t":"MEPF & ALLIED SERVICES","n":"108","d":"Generators","s":"Awarded","b":1584821,"a":1517857,"v":66964,"lt":70.0,"ad":"2025-07-01","aa":"2026-04-15","alt":60.0,"td":"2025-08-30","dlt":10.0,"ti":"2025-09-09","tc":"2025-11-20","pr":"WITH PR","as2":"DUE","resp":"OPERATIONS","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-288},{"t":"SITE DEVELOPMENT","n":"109","d":"Structural Works for Site Development Works","s":"Awarded","b":4323711,"a":5915990,"v":-1592279,"lt":34.0,"ad":"2025-10-19","aa":"2026-02-20","alt":30.0,"td":"2025-11-18","dlt":4.0,"ti":"2025-11-22","tc":"2026-02-10","pr":"WITHOUT PR","as2":"DUE","resp":"DESIGN","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":-124},{"t":"SITE DEVELOPMENT","n":"110","d":"Architectural Works for Site Development Works","s":"Not Yet Awarded","b":1003140,"a":null,"v":1003140,"lt":34.0,"ad":"2025-11-15","aa":null,"alt":30.0,"td":"2025-12-15","dlt":4.0,"ti":"2025-12-19","tc":"2025-03-19","pr":"WITHOUT PR","as2":"DUE","resp":"DESIGN","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":264},{"t":"SITE DEVELOPMENT","n":"111","d":"Mechanical Works for Site Development Works","s":"Not Yet Awarded","b":21000,"a":null,"v":21000,"lt":40.0,"ad":"2025-03-05","aa":null,"alt":30.0,"td":"2025-04-04","dlt":10.0,"ti":"2025-04-14","tc":"2026-03-31","pr":"WITHOUT PR","as2":"DUE","resp":"DESIGN","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":9},{"t":"SITE DEVELOPMENT","n":"112","d":"Electrical Works for Site Development Works","s":"Not Yet Awarded","b":1140000,"a":null,"v":1140000,"lt":40.0,"ad":"2025-03-05","aa":null,"alt":30.0,"td":"2025-04-04","dlt":10.0,"ti":"2025-04-14","tc":"2026-03-31","pr":"WITHOUT PR","as2":"DUE","resp":"DESIGN","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":9},{"t":"SITE DEVELOPMENT","n":"113","d":"Plumbing Works for Site Development Works","s":"Not Yet Awarded","b":2454171,"a":null,"v":2454171,"lt":40.0,"ad":"2025-03-05","aa":null,"alt":30.0,"td":"2025-04-04","dlt":10.0,"ti":"2025-04-14","tc":"2026-03-31","pr":"WITHOUT PR","as2":"DUE","resp":"DESIGN","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":9},{"t":"SITE DEVELOPMENT","n":"114","d":"Fire Protection Works for Site Development Works","s":"Not Yet Awarded","b":1057978,"a":548469,"v":509508,"lt":40.0,"ad":"2025-03-05","aa":null,"alt":30.0,"td":"2025-04-04","dlt":10.0,"ti":"2025-04-14","tc":"2026-03-31","pr":"WITHOUT PR","as2":"DUE","resp":"DESIGN","svc":"Subcon Monthly - JO","proc":"Competitive Bid","aging":9}];
+
+// Normalize status
+const WPS = RAW_WPS.map(w => ({
+  ...w,
+  status: w.s && w.s.toLowerCase().includes('not yet') ? 'Not Yet Awarded' : (w.s || 'Not Yet Awarded'),
+  budget: w.b || 0,
+  awarded: w.a || 0,
+  variance: w.v || 0,
+}));
+
+// ── Brand colors
+const C = {
+  red:   '#EE3124', redD:  '#C42127', redL: '#FDECEA',
+  dark:  '#282C28', gray:  '#DCDBDB', grayM:'#A8A7A7',
+  green: '#2D9B6F', amber: '#D97706',
+  redA:  'rgba(238,49,36,0.7)', darkA:'rgba(40,44,40,0.75)',
+  greenA:'rgba(45,155,111,0.7)', amberA:'rgba(217,119,6,0.7)',
+};
+
+// ── Helpers
+const fM  = v => v == null ? '—' : '₱' + (v/1e6).toFixed(1) + 'M';
+const fMf = v => v == null ? '—' : '₱' + (v/1e6).toFixed(2) + 'M';
+const fPct= v => v == null ? '—' : (v>=0?'+':'')+v.toFixed(1)+'%';
+const fDate=d => { if(!d)return '—'; const p=d.split('-'); return `${p[2]}/${p[1]}/${p[0].slice(2)}`; };
+const fAging=v => { if(v==null)return '—'; return v>=0?v:v; };
+const agingCls=v => v==null?'':v<-60?'late':v<0?'warn':'ok';
+const statusBadge=s => {
+  if(!s||s==='Not Yet Awarded')return`<span class="badge b-notyet">Not Awarded</span>`;
+  if(s==='Awarded')return`<span class="badge b-awarded">Awarded</span>`;
+  return`<span class="badge b-notstarted">${s}</span>`;
+};
+const submittalBadge=v=>{
+  if(!v)return'<span class="badge b-notyet">Not Submitted</span>';
+  return`<span class="badge b-solicitation">${v}</span>`;
+};
+
+// ── Filtering
+let filtered = [...WPS];
+function applyFilters(){
+  const trade  = document.getElementById('f-trade').value;
+  const status = document.getElementById('f-status').value;
+  const search = document.getElementById('f-search').value.toLowerCase();
+  filtered = WPS.filter(w => {
+    if(trade  && w.t !== trade)  return false;
+    if(status && w.status !== status) return false;
+    if(search && !w.d.toLowerCase().includes(search) && !w.n.toString().includes(search)) return false;
+    return true;
+  });
+  pages = {};
+  renderAll();
+}
+
+// ── Tab switching
+let activeTab = 'projects';
+function switchTab(id){
+  activeTab = id;
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    t.classList.toggle('active', ['projects','backlog','budget','schedule','works'][i]===id);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p=>{
+    p.classList.toggle('active', p.id==='tab-'+id);
+  });
+  renderAll();
+}
+
+// ── Pagination
+const PAGE = 15;
+let pages = {};
+function getPage(key){ return pages[key]||1; }
+function changePage(key,d){
+  const data = getPageData(key);
+  const total = data.length;
+  const maxP = Math.max(1,Math.ceil(total/PAGE));
+  pages[key] = Math.min(maxP, Math.max(1,(pages[key]||1)+d));
+  renderTable(key);
+}
+
+function getPageData(key){
+  if(key==='proj')    return [...filtered].sort((a,b)=>(a.ad||'').localeCompare(b.ad||''));
+  if(key==='backlog') return filtered.filter(w=>w.status!=='Awarded').sort((a,b)=>(a.aging||0)-(b.aging||0));
+  if(key==='sched')   return [...filtered].sort((a,b)=>(a.ad||'').localeCompare(b.ad||''));
+  return filtered;
+}
+
+// ── Destroy/recreate charts
+const charts = {};
+function mkChart(id, cfg){
+  if(charts[id]){ charts[id].destroy(); }
+  const ctx = document.getElementById(id);
+  if(!ctx) return;
+  charts[id] = new Chart(ctx.getContext('2d'), cfg);
+}
+
+// ══ RENDER ALL ══
+function renderAll(){
+  renderKPIs();
+  if(activeTab==='projects')  { renderProjectsTab(); }
+  if(activeTab==='backlog')   { renderBacklogTab(); }
+  if(activeTab==='budget')    { renderBudgetTab(); }
+  if(activeTab==='schedule')  { renderScheduleTab(); }
+  if(activeTab==='works')     { renderWorksTab(); }
+}
+
+// ── Aggregate helpers
+function tradeStats(){
+  const map = {};
+  for(const w of filtered){
+    if(!map[w.t]) map[w.t]={trade:w.t,count:0,awarded_count:0,budget:0,awarded:0};
+    const r=map[w.t];
+    r.count++;
+    r.budget+=w.budget;
+    if(w.status==='Awarded'){r.awarded_count++;r.awarded+=w.awarded;}
+  }
+  return Object.values(map).sort((a,b)=>b.budget-a.budget);
+}
+
+function globalStats(){
+  const awarded  = filtered.filter(w=>w.status==='Awarded');
+  const notYet   = filtered.filter(w=>w.status!=='Awarded');
+  const totalB   = filtered.reduce((s,w)=>s+w.budget,0);
+  const totalA   = awarded.reduce((s,w)=>s+w.awarded,0);
+  const variance = totalB - totalA;
+  const varPct   = totalB ? variance/totalB*100 : 0;
+  const due      = filtered.filter(w=>w.as2==='DUE');
+  const lateAwd  = filtered.filter(w=>w.aging!=null&&w.aging<-30&&w.status!=='Awarded');
+  return {awarded,notYet,totalB,totalA,variance,varPct,due,lateAwd,total:filtered.length};
+}
+
+// ── KPIs
+function renderKPIs(){
+  const s = globalStats();
+  const kpis = {
+    'proj-kpis':[
+      {label:'Budget (BCB)',    val:fM(s.totalB),    cls:'dark',  accent:'dark'},
+      {label:'Awarded Cost',    val:fM(s.totalA),    cls:'red',   accent:'red'},
+      {label:'Variance',        val:fM(s.variance),  cls:s.variance>=0?'green':'red', accent:s.variance>=0?'green':'red'},
+      {label:'% Variance',      val:fPct(s.varPct),  cls:s.varPct>=0?'green':'red',   accent:s.varPct>=0?'green':'red'},
+      {label:'Total WPs',       val:s.total,         cls:'dark',  accent:'dark'},
+      {label:'Awarded WPs',     val:s.awarded.length,cls:'green', accent:'green'},
+      {label:'Not Yet Awarded', val:s.notYet.length, cls:'amber', accent:'amber'},
+      {label:'Due WPs',         val:s.due.length,    cls:s.due.length>0?'red':'green',accent:s.due.length>0?'red':'green'},
+    ],
+    'backlog-kpis':[
+      {label:'Backlog WPs',     val:s.notYet.length, cls:'red',   accent:'red'},
+      {label:'Due for Award',   val:s.due.length,    cls:'amber', accent:'amber'},
+      {label:'Late Awards',     val:s.lateAwd.length,cls:s.lateAwd.length>0?'red':'green',accent:'red'},
+      {label:'Total Budget',    val:fM(s.notYet.reduce((a,w)=>a+w.budget,0)),cls:'dark',accent:'dark'},
+    ],
+    'budget-kpis':[
+      {label:'Budget (BCB)',    val:fM(s.totalB),    cls:'dark',  accent:'dark'},
+      {label:'Awarded Cost',    val:fM(s.totalA),    cls:'red',   accent:'red'},
+      {label:'Variance (₱)',    val:fM(s.variance),  cls:s.variance>=0?'green':'red',accent:s.variance>=0?'green':'red'},
+      {label:'Variance (%)',    val:fPct(s.varPct),  cls:s.varPct>=0?'green':'red',  accent:s.varPct>=0?'green':'red'},
+    ],
+    'sched-kpis':[
+      {label:'Total WPs',          val:s.total,              cls:'dark', accent:'dark'},
+      {label:'Awarded',            val:s.awarded.length,     cls:'green',accent:'green'},
+      {label:'Due but Not Awarded',val:s.due.length,         cls:'amber',accent:'amber'},
+      {label:'Not Due',            val:s.notYet.length-s.due.length,cls:'dark',accent:'dark'},
+      {label:'% Awarded by WP',    val:s.total?Math.round(s.awarded.length/s.total*100)+'%':'0%',cls:'green',accent:'green'},
+      {label:'% Awarded by Value', val:s.totalB?Math.round(s.totalA/s.totalB*100)+'%':'0%',cls:'green',accent:'green'},
+    ],
+    'works-kpis':[
+      {label:'Total Budget (BCB)', val:fM(s.totalB),      cls:'dark', accent:'dark'},
+      {label:'Total Awarded',      val:fM(s.totalA),      cls:'red',  accent:'red'},
+      {label:'Net Variance',       val:fM(s.variance),    cls:s.variance>=0?'green':'red',accent:s.variance>=0?'green':'red'},
+      {label:'Award Rate',         val:s.total?Math.round(s.awarded.length/s.total*100)+'%':'0%',cls:'green',accent:'green'},
+    ],
+  };
+  for(const [id, items] of Object.entries(kpis)){
+    const el = document.getElementById(id);
+    if(!el) continue;
+    el.innerHTML = items.map(k=>`
+      <div class="kpi ${k.accent}">
+        <div class="kpi-label">${k.label}</div>
+        <div class="kpi-value ${k.cls}">${k.val}</div>
+      </div>`).join('');
+  }
+}
+
+// ══ PROJECTS TAB ══
+function renderProjectsTab(){
+  // Budget+Awarded by Period (quarterly)
+  const quarters = {};
+  for(const w of filtered){
+    if(w.ad){
+      const d=new Date(w.ad);
+      const qtr=`Q${Math.ceil((d.getMonth()+1)/3)} ${d.getFullYear()}`;
+      if(!quarters[qtr])quarters[qtr]={b:0,a:0};
+      quarters[qtr].b+=w.budget;
+      if(w.status==='Awarded')quarters[qtr].a+=w.awarded;
+    }
+  }
+  const qKeys=Object.keys(quarters).sort();
+  let cumB=0,cumA=0;
+  const cumBdata=[],cumAdata=[];
+  for(const q of qKeys){cumB+=quarters[q].b;cumA+=quarters[q].a;cumBdata.push(cumB/1e6);cumAdata.push(cumA/1e6);}
+
+  mkChart('c-period',{type:'bar',data:{labels:qKeys,datasets:[
+    {label:'Budget',data:qKeys.map(q=>quarters[q].b/1e6),backgroundColor:C.darkA,borderRadius:3,order:2},
+    {label:'Awarded',data:qKeys.map(q=>quarters[q].a/1e6),backgroundColor:C.redA,borderRadius:3,order:2},
+    {label:'Cum Budget',data:cumBdata,type:'line',borderColor:C.dark,borderWidth:2,pointRadius:2,fill:false,order:1,tension:.3},
+    {label:'Cum Awarded',data:cumAdata,type:'line',borderColor:C.red,borderWidth:2,pointRadius:2,fill:false,order:1,tension:.3,borderDash:[4,3]},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45}},y:{ticks:{font:{size:9},callback:v=>'₱'+v+'M'},grid:{color:'rgba(0,0,0,.05)'}}}}});
+
+  // WP by Trade
+  const ts=tradeStats();
+  mkChart('c-trade',{type:'bar',data:{labels:ts.map(t=>t.trade.replace(' WORKS','').replace(' SERVICES','').replace(' REQUIREMENT','').replace('&','&')),datasets:[
+    {label:'Total',data:ts.map(t=>t.count),backgroundColor:C.darkA,borderRadius:3},
+    {label:'Awarded',data:ts.map(t=>t.awarded_count),backgroundColor:C.redA,borderRadius:3},
+  ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:9}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  // WP Status big numbers
+  const s=globalStats();
+  const awardedByVal=s.totalB?Math.round(s.totalA/s.totalB*100):0;
+  const awardedByWP=s.total?Math.round(s.awarded.length/s.total*100):0;
+  document.getElementById('wp-status-grid').innerHTML=`
+    <div class="ws-box"><div class="ws-num dark">${s.total}</div><div class="ws-label">Total WP</div></div>
+    <div class="ws-box"><div class="ws-num red">${s.awarded.length}</div><div class="ws-label">Awarded WP</div></div>
+    <div class="ws-box"><div class="ws-num amber">${s.due.length}</div><div class="ws-label">WP Due but Not Awarded</div></div>
+    <div class="ws-box"><div class="ws-num dark">${s.notYet.length-s.due.length}</div><div class="ws-label">WP Not Due</div></div>
+    <div class="ws-box" style="grid-column:1/-1;background:var(--red-light)">
+      <div style="display:flex;gap:24px;justify-content:center;padding:4px">
+        <div style="text-align:center"><div class="ws-pct">${awardedByWP}%</div><div class="ws-pct-label">Awarded by WP</div></div>
+        <div style="text-align:center"><div class="ws-pct">${awardedByVal}%</div><div class="ws-pct-label">Awarded by Value</div></div>
+      </div>
+    </div>`;
+
+  renderTable('proj');
+}
+
+function renderTable(key){
+  const data  = getPageData(key);
+  const pg    = getPage(key);
+  const total = data.length;
+  const pages_= Math.max(1,Math.ceil(total/PAGE));
+  const slice = data.slice((pg-1)*PAGE, pg*PAGE);
+  const pgInfoEl = document.getElementById(key+'-pginfo');
+  const prevBtn  = document.getElementById(key+'-prev');
+  const nextBtn  = document.getElementById(key+'-next');
+  if(pgInfoEl) pgInfoEl.textContent=`Page ${pg} of ${pages_} (${total} WPs)`;
+  if(prevBtn) prevBtn.disabled=pg<=1;
+  if(nextBtn) nextBtn.disabled=pg>=pages_;
+
+  const countEl=document.getElementById(key==='proj'?'proj-tbl-count':key==='sched'?'sched-tbl-count':null);
+  if(countEl) countEl.textContent=total+' work packages';
+
+  if(key==='proj'){
+    const tbody=document.getElementById('proj-tbody');
+    const tfoot=document.getElementById('proj-tfoot');
+    tbody.innerHTML=slice.map(w=>`<tr>
+      <td class="td-code" style="font-family:monospace;font-size:10px;color:var(--text-2)">WP-${w.n}</td>
+      <td class="wp-name">${w.d}</td>
+      <td style="font-size:10px;color:var(--text-2)">${w.t.replace(' WORKS','').replace(' SERVICES','')}</td>
+      <td>${statusBadge(w.status)}</td>
+      <td class="num">${fMf(w.budget)}</td>
+      <td class="num">${w.a?fMf(w.awarded):'—'}</td>
+      <td class="num" style="color:${w.variance>=0?'var(--green)':'var(--red)'}">
+        ${w.a?fMf(w.variance):'—'}</td>
+      <td class="num" style="color:${w.variance>=0?'var(--green)':'var(--red)'}">
+        ${w.a&&w.budget?fPct(w.variance/w.budget*100):'—'}</td>
+      <td>${fDate(w.ad)}</td>
+      <td>${fDate(w.aa)}</td>
+      <td class="num aging ${agingCls(w.aging)}">${w.aging!=null?w.aging:'—'}</td>
+      <td>${submittalBadge(w.svc)}</td>
+      <td>${fDate(w.td)}</td>
+    </tr>`).join('');
+    const totB=data.reduce((s,w)=>s+w.budget,0);
+    const totA=data.filter(w=>w.a).reduce((s,w)=>s+w.awarded,0);
+    const totV=totB-totA;
+    tfoot.innerHTML=`<tr><td colspan="4">TOTAL (${total} WPs)</td><td class="num">${fMf(totB)}</td><td class="num">${fMf(totA)}</td>
+      <td class="num">${fMf(totV)}</td><td class="num">${fPct(totB?totV/totB*100:0)}</td>
+      <td colspan="5"></td></tr>`;
+  }
+
+  if(key==='backlog'){
+    const tbody=document.getElementById('backlog-tbody');
+    tbody.innerHTML=slice.map(w=>`<tr>
+      <td class="wp-name"><strong>WP-${w.n}</strong> ${w.d}</td>
+      <td class="num aging ${agingCls(w.aging)}">${w.aging!=null?w.aging:'—'}</td>
+      <td>${fDate(w.ad)}</td>
+      <td class="num">${fMf(w.budget)}</td>
+      <td>${statusBadge(w.status)}</td>
+      <td>${submittalBadge(w.svc)}</td>
+    </tr>`).join('');
+    document.getElementById('backlog-count').textContent=total+' backlog WPs';
+  }
+
+  if(key==='sched'){
+    const tbody=document.getElementById('sched-tbody');
+    const tfoot=document.getElementById('sched-tfoot');
+    tbody.innerHTML=slice.map(w=>`<tr>
+      <td class="td-code" style="font-family:monospace;font-size:10px;color:var(--text-2)">WP-${w.n}</td>
+      <td class="wp-name">${w.d}</td>
+      <td style="font-size:10px;color:var(--text-2)">${w.t.replace(' WORKS','').replace(' SERVICES','')}</td>
+      <td>${fDate(w.ad)}</td>
+      <td>${fDate(w.aa)}</td>
+      <td class="num aging ${agingCls(w.aging)}">${w.aging!=null?w.aging:'—'}</td>
+      <td class="num">${fMf(w.budget)}</td>
+      <td>${statusBadge(w.status)}</td>
+      <td>${submittalBadge(w.svc)}</td>
+      <td>${fDate(w.td)}</td>
+    </tr>`).join('');
+    const totB=data.reduce((s,w)=>s+w.budget,0);
+    tfoot.innerHTML=`<tr><td colspan="6">TOTAL (${total} WPs)</td><td class="num">${fMf(totB)}</td><td colspan="3"></td></tr>`;
+  }
+}
+
+// ══ BACKLOG TAB ══
+function renderBacklogTab(){
+  const backlog=filtered.filter(w=>w.status!=='Awarded');
+  renderTable('backlog');
+
+  // Aging buckets: -60+, -30 to -60, 0 to -30, +30
+  const b60p=backlog.filter(w=>w.aging!=null&&w.aging<=-60).length;
+  const b30_60=backlog.filter(w=>w.aging!=null&&w.aging>-60&&w.aging<=-30).length;
+  const b0_30=backlog.filter(w=>w.aging!=null&&w.aging>-30&&w.aging<=0).length;
+  const b30p=backlog.filter(w=>w.aging!=null&&w.aging>0).length;
+  mkChart('c-aging-bucket',{type:'bar',data:{labels:['-60+ days','−30 to −60','0 to −30','+30 adv'],
+    datasets:[{data:[b60p,b30_60,b0_30,b30p],backgroundColor:[C.red,C.redA,C.amber,C.green],borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{stepSize:1,font:{size:9}},grid:{color:'rgba(0,0,0,.05)'}}}}});
+
+  // WP by aging per trade — stacked bar
+  const trades=[...new Set(backlog.map(w=>w.t))];
+  mkChart('c-aging-trade',{type:'bar',data:{labels:trades.map(t=>t.split(' ')[0]),datasets:[
+    {label:'-60+',data:trades.map(t=>backlog.filter(w=>w.t===t&&w.aging!=null&&w.aging<=-60).length),backgroundColor:C.red,borderRadius:2},
+    {label:'-30~-60',data:trades.map(t=>backlog.filter(w=>w.t===t&&w.aging!=null&&w.aging>-60&&w.aging<=-30).length),backgroundColor:C.redA,borderRadius:2},
+    {label:'0~+30',data:trades.map(t=>backlog.filter(w=>w.t===t&&w.aging!=null&&w.aging>-30&&w.aging<=30).length),backgroundColor:C.amber,borderRadius:2},
+    {label:'+30+',data:trades.map(t=>backlog.filter(w=>w.t===t&&w.aging!=null&&w.aging>30).length),backgroundColor:C.green,borderRadius:2},
+  ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true,grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  // WP by Period — quarterly planned count
+  const qMap={};
+  for(const w of filtered){
+    if(w.ad){const d=new Date(w.ad);const q=`Q${Math.ceil((d.getMonth()+1)/3)}'${String(d.getFullYear()).slice(2)}`;if(!qMap[q])qMap[q]=0;qMap[q]++;}
+  }
+  const qKeys=Object.keys(qMap).sort();let cum=0;const cumD=[];
+  for(const q of qKeys){cum+=qMap[q];cumD.push(cum);}
+  mkChart('c-backlog-period',{type:'bar',data:{labels:qKeys,datasets:[
+    {label:'Planned',data:qKeys.map(q=>qMap[q]),backgroundColor:C.darkA,borderRadius:3,order:2},
+    {label:'Cumulative',data:cumD,type:'line',borderColor:C.dark,borderWidth:2,pointRadius:2,fill:false,order:1,tension:.3},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45}},y:{ticks:{font:{size:9}},grid:{color:'rgba(0,0,0,.05)'}}}}});
+
+  // WP by Status donut
+  const due=filtered.filter(w=>w.as2==='DUE').length;
+  const notDue=filtered.length-due;
+  mkChart('c-bl-status',{type:'doughnut',data:{labels:['Due but Not Awarded','Not Due'],
+    datasets:[{data:[due,notDue],backgroundColor:[C.red,C.dark],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}}}});
+
+  // WP by Submittal — mock (categorize by service type)
+  const submitted=filtered.filter(w=>w.svc&&w.svc.includes('JO')).length;
+  const notSubmit=filtered.filter(w=>!w.svc||w.svc.includes('PO')).length;
+  const approved=filtered.filter(w=>w.status==='Awarded').length;
+  mkChart('c-bl-submittal',{type:'doughnut',data:{labels:['Submitted','Not Submitted','Approved'],
+    datasets:[{data:[submitted,notSubmit,approved],backgroundColor:[C.red,C.dark,C.green],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}}}});
+}
+
+// ══ BUDGET TAB ══
+function renderBudgetTab(){
+  const ts=tradeStats();
+
+  // Budget by Period
+  const qMap={};
+  for(const w of filtered){
+    if(w.ad){const d=new Date(w.ad);const q=`Q${Math.ceil((d.getMonth()+1)/3)}'${String(d.getFullYear()).slice(2)}`;
+      if(!qMap[q])qMap[q]={b:0,a:0};qMap[q].b+=w.budget;if(w.status==='Awarded')qMap[q].a+=w.awarded;}
+  }
+  const qKeys=Object.keys(qMap).sort();
+  let cB=0,cA=0;const cBD=[],cAD=[];
+  for(const q of qKeys){cB+=qMap[q].b;cA+=qMap[q].a;cBD.push(cB/1e6);cAD.push(cA/1e6);}
+  mkChart('c-budget-period',{type:'bar',data:{labels:qKeys,datasets:[
+    {label:'Budget',data:qKeys.map(q=>qMap[q].b/1e6),backgroundColor:C.darkA,borderRadius:3,order:2},
+    {label:'Awarded',data:qKeys.map(q=>qMap[q].a/1e6),backgroundColor:C.redA,borderRadius:3,order:2},
+    {label:'Cum Budget',data:cBD,type:'line',borderColor:C.dark,borderWidth:2,pointRadius:2,fill:false,order:1,tension:.3},
+    {label:'Cum Awarded',data:cAD,type:'line',borderColor:C.red,borderWidth:2,pointRadius:2,fill:false,order:1,tension:.3,borderDash:[4,3]},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45}},y:{ticks:{font:{size:9},callback:v=>'₱'+v+'M'},grid:{color:'rgba(0,0,0,.05)'}}}}});
+
+  // Budget by Trade horizontal bar
+  mkChart('c-budget-trade',{type:'bar',data:{labels:ts.map(t=>t.trade.replace(' WORKS','').replace(' SERVICES','')),datasets:[
+    {label:'Budget',data:ts.map(t=>t.budget/1e6),backgroundColor:C.darkA,borderRadius:3},
+    {label:'Awarded',data:ts.map(t=>t.awarded/1e6),backgroundColor:C.redA,borderRadius:3},
+  ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{font:{size:9},callback:v=>'₱'+v+'M'},grid:{color:'rgba(0,0,0,.05)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+
+  // Budget table grouped by trade
+  const tbody=document.getElementById('budget-tbody');
+  const tfoot=document.getElementById('budget-tfoot');
+  let rows='',totB=0,totA=0;
+  for(const t of ts){
+    const v=t.budget-t.awarded;
+    const vp=t.budget?v/t.budget*100:0;
+    totB+=t.budget;totA+=t.awarded;
+    rows+=`<tr class="group-row"><td colspan="5">${t.trade}</td></tr>`;
+    // Sub-items (WPs in this trade)
+    for(const w of filtered.filter(x=>x.t===t.trade).slice(0,5)){
+      const wv=w.budget-(w.awarded||0);
+      const wvp=w.budget?wv/w.budget*100:0;
+      rows+=`<tr class="subgroup-row">
+        <td style="padding-left:28px">WP-${w.n} ${w.d.slice(0,45)}${w.d.length>45?'…':''}</td>
+        <td class="num">${fMf(w.budget)}</td>
+        <td class="num">${w.a?fMf(w.awarded):'—'}</td>
+        <td class="num" style="color:${wv>=0?'var(--green)':'var(--red)'}">${w.a?fMf(wv):'—'}</td>
+        <td class="num" style="color:${wvp>=0?'var(--green)':'var(--red)'}">${w.a?fPct(wvp):'—'}</td>
+      </tr>`;
+    }
+    rows+=`<tr style="background:#F9F9F9;border-top:1px solid var(--gray)">
+      <td style="font-weight:700;padding-left:16px">Subtotal — ${t.trade}</td>
+      <td class="num" style="font-weight:700">${fMf(t.budget)}</td>
+      <td class="num" style="font-weight:700">${fMf(t.awarded)}</td>
+      <td class="num" style="font-weight:700;color:${v>=0?'var(--green)':'var(--red)'}">${fMf(v)}</td>
+      <td class="num" style="font-weight:700;color:${vp>=0?'var(--green)':'var(--red)'}">${fPct(vp)}</td>
+    </tr>`;
+  }
+  tbody.innerHTML=rows;
+  const totV=totB-totA;
+  tfoot.innerHTML=`<tr><td>TOTAL</td><td class="num">${fMf(totB)}</td><td class="num">${fMf(totA)}</td><td class="num">${fMf(totV)}</td><td class="num">${fPct(totB?totV/totB*100:0)}</td></tr>`;
+}
+
+// ══ SCHEDULE TAB ══
+function renderScheduleTab(){
+  // WP by Period — Planned vs Actual
+  const qPlan={},qActual={};
+  for(const w of filtered){
+    const plan_q=w.ad?`Q${Math.ceil((new Date(w.ad).getMonth()+1)/3)}'${String(new Date(w.ad).getFullYear()).slice(2)}`:null;
+    const act_q=w.aa?`Q${Math.ceil((new Date(w.aa).getMonth()+1)/3)}'${String(new Date(w.aa).getFullYear()).slice(2)}`:null;
+    if(plan_q){if(!qPlan[plan_q])qPlan[plan_q]=0;qPlan[plan_q]++;}
+    if(act_q){if(!qActual[act_q])qActual[act_q]=0;qActual[act_q]++;}
+  }
+  const allQ=[...new Set([...Object.keys(qPlan),...Object.keys(qActual)])].sort();
+  let cP=0,cA=0;const cPD=[],cAD=[];
+  for(const q of allQ){cP+=qPlan[q]||0;cA+=qActual[q]||0;cPD.push(cP);cAD.push(cA);}
+  mkChart('c-sched-period',{type:'bar',data:{labels:allQ,datasets:[
+    {label:'Planned',data:allQ.map(q=>qPlan[q]||0),backgroundColor:C.darkA,borderRadius:3,order:2},
+    {label:'Actual',data:allQ.map(q=>qActual[q]||0),backgroundColor:C.redA,borderRadius:3,order:2},
+    {label:'Cum Planned',data:cPD,type:'line',borderColor:C.dark,borderWidth:2,pointRadius:2,fill:false,order:1,tension:.3},
+    {label:'Cum Actual',data:cAD,type:'line',borderColor:C.red,borderWidth:2,pointRadius:2,fill:false,order:1,tension:.3,borderDash:[4,3]},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45}},y:{ticks:{font:{size:9}},grid:{color:'rgba(0,0,0,.05)'}}}}});
+
+  // WP by Trade
+  const ts=tradeStats();
+  mkChart('c-sched-trade',{type:'bar',data:{labels:ts.map(t=>t.trade.split(' ')[0]),datasets:[
+    {label:'Total',data:ts.map(t=>t.count),backgroundColor:C.darkA,borderRadius:3},
+    {label:'Awarded',data:ts.map(t=>t.awarded_count),backgroundColor:C.redA,borderRadius:3},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9}},grid:{color:'rgba(0,0,0,.05)'}}}}});
+
+  // Status donut
+  const s=globalStats();
+  mkChart('c-sched-status',{type:'doughnut',data:{labels:['Awarded','Due but Not Awarded','Not Due'],
+    datasets:[{data:[s.awarded.length,s.due.length,Math.max(0,s.notYet.length-s.due.length)],
+      backgroundColor:[C.red,C.dark,C.gray],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}}}});
+
+  renderTable('sched');
+}
+
+// ══ WORKS TAB ══
+function renderWorksTab(){
+  const ts=tradeStats();
+
+  // Budget by Period per Trade — stacked
+  const tradeNames=ts.map(t=>t.trade);
+  const qMap={};
+  for(const w of filtered){
+    if(w.ad){const d=new Date(w.ad);const q=`Q${Math.ceil((d.getMonth()+1)/3)}'${String(d.getFullYear()).slice(2)}`;
+      if(!qMap[q])qMap[q]={};if(!qMap[q][w.t])qMap[q][w.t]=0;qMap[q][w.t]+=w.budget/1e6;}
+  }
+  const qKeys=Object.keys(qMap).sort();
+  const tColors=[C.red,C.dark,C.grayM,C.amber,C.green,'#7E22CE'];
+  mkChart('c-works-period',{type:'bar',data:{labels:qKeys,datasets:tradeNames.map((t,i)=>({
+    label:t.split(' ')[0],
+    data:qKeys.map(q=>qMap[q]?qMap[q][t]||0:0),
+    backgroundColor:tColors[i%tColors.length],borderRadius:2}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9},maxRotation:45}},y:{stacked:true,ticks:{font:{size:9},callback:v=>'₱'+v+'M'},grid:{color:'rgba(0,0,0,.05)'}}}}});
+
+  // Budget donut
+  mkChart('c-works-budget-donut',{type:'doughnut',data:{labels:ts.map(t=>t.trade.split(' ')[0]),
+    datasets:[{data:ts.map(t=>t.budget/1e6),backgroundColor:tColors,borderWidth:1,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{font:{size:8},boxWidth:8}}}}});
+
+  // Awarded donut
+  mkChart('c-works-award-donut',{type:'doughnut',data:{labels:ts.map(t=>t.trade.split(' ')[0]),
+    datasets:[{data:ts.map(t=>t.awarded/1e6),backgroundColor:tColors,borderWidth:1,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{font:{size:8},boxWidth:8}}}}});
+
+  // Trade table
+  const tbody=document.getElementById('works-trade-tbody');
+  const tfoot=document.getElementById('works-trade-tfoot');
+  let totB=0,totA=0;
+  tbody.innerHTML=ts.map(t=>{
+    const v=t.budget-t.awarded;const vp=t.budget?v/t.budget*100:0;
+    totB+=t.budget;totA+=t.awarded;
+    return`<tr>
+      <td style="font-weight:600">${t.trade}</td>
+      <td class="num">${fMf(t.budget)}</td>
+      <td class="num">${fMf(t.awarded)}</td>
+      <td class="num" style="color:${v>=0?'var(--green)':'var(--red)'}">${fMf(v)}</td>
+      <td class="num" style="color:${vp>=0?'var(--green)':'var(--red)'}">${fPct(vp)}</td>
+    </tr>`;
+  }).join('');
+  const totV=totB-totA;
+  tfoot.innerHTML=`<tr><td>TOTAL</td><td class="num">${fMf(totB)}</td><td class="num">${fMf(totA)}</td><td class="num">${fMf(totV)}</td><td class="num">${fPct(totB?totV/totB*100:0)}</td></tr>`;
+
+  // Top variance WPs
+  const varWPs=[...filtered].filter(w=>w.a).sort((a,b)=>Math.abs(b.variance)-Math.abs(a.variance)).slice(0,15);
+  document.getElementById('works-var-tbody').innerHTML=varWPs.map(w=>`<tr>
+    <td class="wp-name">WP-${w.n} ${w.d.slice(0,40)}${w.d.length>40?'…':''}</td>
+    <td style="font-size:10px">${w.t.split(' ')[0]}</td>
+    <td class="num">${fMf(w.budget)}</td>
+    <td class="num">${fMf(w.awarded)}</td>
+    <td class="num" style="color:${w.variance>=0?'var(--green)':'var(--red)'};font-weight:700">${fMf(w.variance)}</td>
+  </tr>`).join('');
+}
+
+// ── Init
+renderAll();
+</script>
+</body>
+</html>

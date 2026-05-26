@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>EPC Procurement — Consolidated Dashboard</title>
+  <title>Procurement Dashboard — Megawide Construction</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
   <link rel="stylesheet" href="assets/css/dashboard.css"/>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -12,238 +12,286 @@
   <script src="assets/js/firebase-config.js"></script>
   <script src="assets/js/auth.js"></script>
   <script src="assets/js/db.js"></script>
+  <script src="assets/js/ui.js"></script>
 </head>
 <body>
+
+<!-- Mobile overlay -->
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
 <div class="app-shell">
-  <aside class="sidebar">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <div class="org">EPC · Procurement</div>
-      <div class="app-name">Consolidated<br>Dashboard</div>
+      <img src="assets/img/logo-white.png" alt="Megawide Construction"/>
+      <div class="app-label">Procurement Dashboard</div>
     </div>
+
     <div class="sidebar-section">
       <div class="sidebar-section-label">Overview</div>
-      <a class="nav-item active" href="index.html"><i class="ti ti-layout-dashboard"></i>All Projects</a>
+      <a class="nav-item active" href="index.html">
+        <i class="ti ti-layout-dashboard"></i>Consolidated View
+      </a>
     </div>
+
     <div class="sidebar-section">
       <div class="sidebar-section-label">Projects</div>
       <div id="nav-projects"></div>
     </div>
+
     <div id="sidebar-officer" style="display:none">
       <div class="sidebar-section">
         <div class="sidebar-section-label">My Work</div>
         <a class="nav-item" href="my-wps.html"><i class="ti ti-clipboard-list"></i>My Work Packages</a>
-        <a class="nav-item" href="wp-form.html"><i class="ti ti-plus"></i>Add Work Package</a>
+        <a class="nav-item" href="wp-form.html"><i class="ti ti-circle-plus"></i>Add Work Package</a>
       </div>
     </div>
+
     <div id="sidebar-admin" style="display:none">
       <div class="sidebar-section">
         <div class="sidebar-section-label">Admin</div>
         <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
-        <a class="nav-item" href="review.html"><i class="ti ti-clipboard-check"></i>Review WPs <span class="tbadge" id="pending-badge" style="display:none"></span></a>
+        <a class="nav-item" href="review.html">
+          <i class="ti ti-clipboard-check"></i>Review WPs
+          <span class="nbadge" id="review-badge" style="display:none">0</span>
+        </a>
+        <a class="nav-item" href="wp-form.html"><i class="ti ti-circle-plus"></i>Add Work Package</a>
       </div>
     </div>
-    <div class="sidebar-footer">EPC · PRC WPM Dashboard<br>Powered by GitHub Pages</div>
+
+    <div class="sidebar-footer">
+      Megawide Construction Corporation<br>
+      EPC · Procurement · WPM System
+    </div>
   </aside>
 
+  <!-- ── Main ────────────────────────────────────────────────────── -->
   <div class="main">
     <div class="topbar">
       <div class="topbar-left">
-        <div class="page-title">Portfolio Overview</div>
-        <div class="page-sub" id="page-sub">All projects — consolidated procurement monitoring</div>
+        <button class="btn-menu" id="btn-menu" aria-label="Open menu">
+          <i class="ti ti-menu-2"></i>
+        </button>
+        <div>
+          <div class="page-title">Portfolio Overview</div>
+          <div class="page-sub" id="page-sub">All projects — consolidated procurement monitoring</div>
+        </div>
       </div>
       <div class="topbar-right">
-        <button class="btn" id="btn-export"><i class="ti ti-download"></i>Export CSV</button>
+        <button class="btn" id="btn-export"><i class="ti ti-download"></i><span class="hide-mobile">Export CSV</span></button>
         <div id="user-bar"></div>
       </div>
     </div>
+
     <div class="content">
-      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading dashboard…</span></div>
+      <div id="loading" class="loading-overlay">
+        <div class="spinner"></div>
+        <span>Loading dashboard…</span>
+      </div>
+
       <div id="main-content" style="display:none">
+
+        <!-- KPI Cards -->
         <div class="metrics-grid" id="metrics-grid"></div>
+
+        <!-- Project Cards -->
         <div class="project-cards" id="project-cards"></div>
-        <div class="grid-2" style="margin-bottom:14px">
+
+        <!-- Charts Row 1 -->
+        <div class="grid-2">
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget vs contract by project (₱M)</div>
+            <div class="panel-title">
+              <i class="ti ti-chart-bar"></i>Budget vs Contract by Project (₱M)
+            </div>
             <div class="legend">
-              <span><span class="legend-dot" style="background:#378ADD"></span>Approved budget</span>
-              <span><span class="legend-dot" style="background:#1D9E75"></span>Contract amount</span>
+              <span><span class="legend-dot" style="background:#282C28"></span>Approved budget</span>
+              <span><span class="legend-dot" style="background:#EE3124"></span>Contract amount</span>
             </div>
             <div style="position:relative;height:200px"><canvas id="c-budget"></canvas></div>
           </div>
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-line"></i>Variance trend — portfolio (₱M)</div>
+            <div class="panel-title">
+              <i class="ti ti-chart-line"></i>Variance Trend — Portfolio (₱M)
+            </div>
             <div class="legend">
-              <span><span class="legend-dot" style="background:#1D9E75"></span>Cumulative savings</span>
-              <span><span class="legend-dot" style="background:#E24B4A"></span>Cumulative overrun</span>
-              <span><span class="legend-dot" style="background:#378ADD"></span>Monthly net</span>
+              <span><span class="legend-dot" style="background:#2D9B6F"></span>Cumulative savings</span>
+              <span><span class="legend-dot" style="background:#EE3124"></span>Cumulative overrun</span>
+              <span><span class="legend-dot" style="background:#282C28"></span>Monthly net</span>
             </div>
             <div style="position:relative;height:200px"><canvas id="c-trend"></canvas></div>
           </div>
         </div>
-        <div class="grid-2" style="margin-bottom:14px">
+
+        <!-- Charts Row 2 -->
+        <div class="grid-2">
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Award status by zone</div>
+            <div class="panel-title">
+              <i class="ti ti-chart-bar"></i>Award Status by Zone
+            </div>
             <div class="legend">
-              <span><span class="legend-dot" style="background:#1D9E75"></span>Awarded</span>
-              <span><span class="legend-dot" style="background:#EF9F27"></span>Partially awarded</span>
-              <span><span class="legend-dot" style="background:#B4B2A9"></span>Not yet awarded</span>
+              <span><span class="legend-dot" style="background:#2D9B6F"></span>Awarded</span>
+              <span><span class="legend-dot" style="background:#D97706"></span>Partially awarded</span>
+              <span><span class="legend-dot" style="background:#DCDBDB"></span>Not yet awarded</span>
             </div>
             <div style="position:relative;height:200px"><canvas id="c-status"></canvas></div>
           </div>
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-donut"></i>Award status per project</div>
+            <div class="panel-title"><i class="ti ti-chart-donut"></i>Award Status per Project</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;padding-top:4px" id="donut-grid"></div>
           </div>
         </div>
-        <div class="grid-3" style="margin-bottom:14px">
+
+        <!-- Top Lists -->
+        <div class="grid-3">
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-trending-up" style="color:#1D9E75"></i>Top 5 savings</div>
+            <div class="panel-title"><i class="ti ti-trending-up"></i>Top 5 Savings</div>
             <div class="rank-list" id="rank-gains"></div>
           </div>
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-trophy" style="color:#378ADD"></i>Top 5 by contract value</div>
+            <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
             <div class="rank-list" id="rank-value"></div>
           </div>
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-trending-down" style="color:#E24B4A"></i>Top 5 overbudget</div>
+            <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
             <div class="rank-list" id="rank-losses"></div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-</div>
+
+      </div><!-- /main-content -->
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app-shell -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="assets/js/charts.js"></script>
-<style>.tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}</style>
 <script>
-function buildRankList(id,items,cls,fmtFn){
-  const el=document.getElementById(id);if(!el)return;
-  if(!items.length){el.innerHTML='<div class="empty-state"><i class="ti ti-circle-off"></i>No data</div>';return;}
-  const max=Math.max(...items.map(i=>Math.abs(i.val)),0.01);
-  el.innerHTML=items.map((it,i)=>`<div class="rank-item">
-    <span class="rank-num">${i+1}</span>
-    <div class="rank-body">
-      <div class="rank-name" title="${it.name}">${it.name}</div>
-      <div class="rank-sub">${it.sub}</div>
-      <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${Math.round(Math.abs(it.val)/max*100)}%;background:${it.color}"></div></div>
-    </div>
-    <span class="rank-val ${cls}">${fmtFn(it.val)}</span></div>`).join('');
-}
+  initMobileMenu();
 
-AppAuth.requireLogin(async (user, profile) => {
-  AppAuth.renderUserBar('user-bar', profile);
+  /* Override chart colors to Megawide brand */
+  const MW_RED  = '#EE3124';
+  const MW_DARK = '#282C28';
+  const MW_GREEN = '#2D9B6F';
+  const MW_AMBER = '#D97706';
+  const MW_GRAY  = '#DCDBDB';
 
-  /* Sidebar by role */
-  if (profile.role === 'admin') {
-    document.getElementById('sidebar-admin').style.display = 'block';
-    WPDb.getPendingWPs().then(wps => {
-      if (wps.length > 0) {
-        const b=document.getElementById('pending-badge');
-        b.textContent=wps.length; b.style.display='inline';
-      }
+  AppAuth.requireLogin(async (user, profile) => {
+    renderUserBar('user-bar', profile);
+
+    if (profile.role === 'admin') {
+      document.getElementById('sidebar-admin').style.display = 'block';
+      updatePendingBadge();
+    }
+    if (profile.role === 'procurement_officer') {
+      document.getElementById('sidebar-officer').style.display = 'block';
+    }
+
+    const allProjects = await WPDb.getProjects();
+    const permitted   = AppAuth.getPermittedProjects(profile, allProjects);
+
+    document.getElementById('page-sub').textContent =
+      profile.role === 'admin'
+        ? 'All projects — consolidated procurement monitoring'
+        : 'Your projects: ' + permitted.map(p => p.id).join(', ');
+
+    /* Sidebar project links */
+    const navEl = document.getElementById('nav-projects');
+    permitted.forEach(p => {
+      navEl.innerHTML += `<a class="nav-item" href="project.html?id=${p.id}">
+        <i class="ti ti-building-skyscraper"></i>${p.id}
+        <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${p.name.split('—')[1]?.trim().slice(0,12)||''}</span>
+      </a>`;
     });
-  }
-  if (profile.role === 'procurement_officer') {
-    document.getElementById('sidebar-officer').style.display = 'block';
-  }
 
-  /* Load projects from Firestore */
-  const allProjects = await WPDb.getProjects();
-  const permitted   = AppAuth.getPermittedProjects(profile, allProjects);
+    /* Load approved WPs */
+    const allWPs = [];
+    for (const p of permitted) {
+      const wps = await WPDb.getApprovedWPs(p.id);
+      wps.forEach(w => allWPs.push(w));
+    }
 
-  document.getElementById('page-sub').textContent =
-    profile.role==='admin' ? 'All projects — consolidated procurement monitoring' :
-    `Your projects: ${permitted.map(p=>p.id).join(', ')}`;
+    const allStats = permitted.map(p => computeStats(allWPs.filter(w => w.project_id === p.id)));
+    const global   = computeStats(allWPs);
 
-  /* Sidebar project links */
-  const navEl = document.getElementById('nav-projects');
-  permitted.forEach(p => {
-    navEl.innerHTML += `<a class="nav-item" href="project.html?id=${p.id}"><i class="ti ti-building-skyscraper"></i>${p.id}</a>`;
-  });
+    /* KPI Cards */
+    buildMetrics('metrics-grid', [
+      { lbl:'Total projects',      val:permitted.length,                                         sub:'active',              cls:'',      accent:'dark'  },
+      { lbl:'Total work packages', val:global.total,                                             sub:'approved entries',    cls:'',      accent:'dark'  },
+      { lbl:'Awarded',             val:global.awarded.length,                                    sub:global.awardRate+'% award rate', cls:'green',accent:'green' },
+      { lbl:'Partially awarded',   val:global.partial.length,                                    sub:'',                    cls:'amber', accent:'amber' },
+      { lbl:'Not yet awarded',     val:global.notYet.length,                                     sub:'',                    cls:'red',   accent:'red'   },
+      { lbl:'Total budget',        val:Fmt.money(global.totalBudget, 1),                         sub:'approved ABC',        cls:'',      accent:'dark'  },
+      { lbl:'Total contracted',    val:Fmt.money(global.totalContract, 1),                       sub:'awarded + partial',   cls:'',      accent:'dark'  },
+      { lbl:'Net variance',
+        val:(global.netVariance>=0?'+':'')+Fmt.money(global.netVariance,1),
+        sub:global.netVariance>=0?'net savings':'net overrun',
+        cls:global.netVariance>=0?'green':'red',
+        accent:global.netVariance>=0?'green':'red' },
+    ]);
 
-  /* Load all approved WPs for permitted projects */
-  const allWPs = [];
-  for (const p of permitted) {
-    const wps = await WPDb.getApprovedWPs(p.id);
-    wps.forEach(w => allWPs.push(w));
-  }
-
-  const allStats = permitted.map(p => computeStats(allWPs.filter(w=>w.project_id===p.id)));
-  const global   = computeStats(allWPs);
-
-  /* Metrics */
-  document.getElementById('metrics-grid').innerHTML=[
-    {lbl:'Total projects',       val:permitted.length,                    sub:'active',              cls:'',     accent:'blue'},
-    {lbl:'Total work packages',  val:global.total,                        sub:'approved entries',     cls:'',     accent:'blue'},
-    {lbl:'Awarded',              val:global.awarded.length,               sub:global.awardRate+'% award rate',cls:'green',accent:'green'},
-    {lbl:'Partially awarded',    val:global.partial.length,               sub:'',                    cls:'amber',accent:'amber'},
-    {lbl:'Not yet awarded',      val:global.notYet.length,                sub:'',                    cls:'red',  accent:'red'},
-    {lbl:'Total budget',         val:Fmt.money(global.totalBudget,1),     sub:'approved ABC',        cls:'',     accent:'blue'},
-    {lbl:'Total contracted',     val:Fmt.money(global.totalContract,1),   sub:'awarded + partial',   cls:'',     accent:'blue'},
-    {lbl:'Net variance',         val:(global.netVariance>=0?'+':'')+Fmt.money(global.netVariance,1),
-      sub:global.netVariance>=0?'net savings':'net overrun',
-      cls:global.netVariance>=0?'green':'red',accent:global.netVariance>=0?'green':'red'},
-  ].map(c=>`<div class="metric-card accent-${c.accent}">
-    <div class="metric-label">${c.lbl}</div>
-    <div class="metric-value ${c.cls}">${c.val}</div>
-    ${c.sub?`<div class="metric-sub">${c.sub}</div>`:''}</div>`).join('');
-
-  /* Project cards */
-  const cardsEl=document.getElementById('project-cards');
-  permitted.forEach((p,i)=>{
-    const s=allStats[i];
-    cardsEl.innerHTML+=`<a class="project-card" href="project.html?id=${p.id}">
-      <div class="pc-header"><span class="pc-id">${p.id}</span><span class="pc-status"></span></div>
-      <div class="pc-name">${p.name}</div>
-      <div class="pc-meta">${p.location} · ${p.type}</div>
-      <div class="pc-stats">
-        <div><div class="pc-stat-val green">${s.awarded.length}</div><div class="pc-stat-lbl">Awarded</div></div>
-        <div><div class="pc-stat-val amber">${s.partial.length}</div><div class="pc-stat-lbl">Partial</div></div>
-        <div><div class="pc-stat-val red">${s.notYet.length}</div><div class="pc-stat-lbl">Not yet</div></div>
-      </div>
-      <div class="pc-progress">
+    /* Project Cards */
+    const cardsEl = document.getElementById('project-cards');
+    permitted.forEach((p, i) => {
+      const s = allStats[i];
+      cardsEl.innerHTML += `<a class="project-card" href="project.html?id=${p.id}">
+        <div class="pc-header">
+          <span class="pc-id">${p.id}</span>
+          <span class="pc-status"></span>
+        </div>
+        <div class="pc-name">${p.name}</div>
+        <div class="pc-meta">${p.location} &nbsp;·&nbsp; ${p.type}</div>
+        <div class="pc-stats">
+          <div><div class="pc-stat-val" style="color:var(--green)">${s.awarded.length}</div><div class="pc-stat-lbl">Awarded</div></div>
+          <div><div class="pc-stat-val" style="color:var(--amber)">${s.partial.length}</div><div class="pc-stat-lbl">Partial</div></div>
+          <div><div class="pc-stat-val" style="color:var(--mw-red)">${s.notYet.length}</div><div class="pc-stat-lbl">Not Yet</div></div>
+        </div>
         <div class="pc-progress-label"><span>Award progress</span><span>${s.awardRate}%</span></div>
         <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${s.awardRate}%"></div></div>
-      </div></a>`;
+      </a>`;
+    });
+
+    /* Donut grid */
+    const donutGrid = document.getElementById('donut-grid');
+    permitted.forEach((p, i) => {
+      donutGrid.innerHTML += `<div style="text-align:center">
+        <div style="font-size:10px;font-weight:700;color:var(--mw-dark);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">${p.id}</div>
+        <div style="position:relative;height:100px"><canvas id="c-donut-${p.id}"></canvas></div>
+      </div>`;
+    });
+    permitted.forEach((p, i) => Charts.awardDonut('c-donut-' + p.id, allStats[i]));
+
+    /* Charts */
+    Charts.consolidatedBudget('c-budget', permitted, allStats);
+    Charts.varianceTrend('c-trend', allWPs);
+    Charts.statusByZone('c-status', allWPs);
+
+    /* Top lists */
+    const awarded = allWPs.filter(w => w.contract_amount_php != null);
+    buildRankList('rank-gains',
+      awarded.filter(w => (Calc.variance(w)||0) > 0).sort((a,b) => Calc.variance(b)-Calc.variance(a)).slice(0,5)
+      .map(w => ({ name:w.description, sub:w.wp_no+' · '+w.project_id, val:Calc.variance(w), color:MW_GREEN })),
+      'green', v => '+' + Fmt.money(v));
+    buildRankList('rank-value',
+      [...awarded].sort((a,b) => b.contract_amount_php-a.contract_amount_php).slice(0,5)
+      .map(w => ({ name:w.description, sub:w.wp_no+' · '+(w.contractor||'—'), val:w.contract_amount_php, color:MW_DARK })),
+      'dark', v => Fmt.money(v));
+    buildRankList('rank-losses',
+      awarded.filter(w => (Calc.variance(w)||0) < 0).sort((a,b) => Calc.variance(a)-Calc.variance(b)).slice(0,5)
+      .map(w => ({ name:w.description, sub:w.wp_no+' · '+w.project_id, val:Math.abs(Calc.variance(w)), color:MW_RED })),
+      'red', v => '-' + Fmt.money(v));
+
+    /* Export */
+    document.getElementById('btn-export').addEventListener('click', () => exportCSV(allWPs, 'ALL_PROJECTS'));
+
+    document.getElementById('loading').style.display  = 'none';
+    document.getElementById('main-content').style.display = 'block';
   });
-
-  /* Donuts */
-  const donutGrid=document.getElementById('donut-grid');
-  permitted.forEach((p,i)=>{
-    donutGrid.innerHTML+=`<div style="text-align:center">
-      <div style="font-size:10px;font-weight:600;color:#0C447C;margin-bottom:6px">${p.id}</div>
-      <div style="position:relative;height:100px"><canvas id="c-donut-${p.id}"></canvas></div></div>`;
-  });
-  permitted.forEach((p,i)=>Charts.awardDonut('c-donut-'+p.id, allStats[i]));
-
-  /* Charts */
-  Charts.consolidatedBudget('c-budget', permitted, allStats);
-  Charts.varianceTrend('c-trend', allWPs);
-  Charts.statusByZone('c-status', allWPs);
-
-  /* Top lists */
-  const awarded=allWPs.filter(w=>w.contract_amount_php!=null);
-  buildRankList('rank-gains',
-    awarded.filter(w=>(Calc.variance(w)||0)>0).sort((a,b)=>Calc.variance(b)-Calc.variance(a)).slice(0,5)
-    .map(w=>({name:w.description,sub:w.wp_no+' · '+w.project_id,val:Calc.variance(w),color:'#1D9E75'})),
-    'green',v=>'+'+Fmt.money(v));
-  buildRankList('rank-value',
-    [...awarded].sort((a,b)=>b.contract_amount_php-a.contract_amount_php).slice(0,5)
-    .map(w=>({name:w.description,sub:w.wp_no+' · '+(w.contractor||'—'),val:w.contract_amount_php,color:'#378ADD'})),
-    'blue',v=>Fmt.money(v));
-  buildRankList('rank-losses',
-    awarded.filter(w=>(Calc.variance(w)||0)<0).sort((a,b)=>Calc.variance(a)-Calc.variance(b)).slice(0,5)
-    .map(w=>({name:w.description,sub:w.wp_no+' · '+w.project_id,val:Math.abs(Calc.variance(w)),color:'#E24B4A'})),
-    'red',v=>'-'+Fmt.money(v));
-
-  /* Export */
-  document.getElementById('btn-export').addEventListener('click',()=>exportCSV(allWPs,'ALL_PROJECTS'));
-
-  document.getElementById('loading').style.display='none';
-  document.getElementById('main-content').style.display='block';
-});
 </script>
+
+<style>
+  .hide-mobile { }
+  @media(max-width:480px) { .hide-mobile { display:none; } }
+</style>
+
 </body>
 </html>
