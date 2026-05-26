@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Work Packages — EPC WPM</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css"/>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="assets/js/firebase-config.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/db.js"></script>
+  <style>
+    .wp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+      padding:16px;margin-bottom:10px;box-shadow:var(--shadow);display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+    .wp-card-body{flex:1;min-width:200px}
+    .wp-card-title{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:3px}
+    .wp-card-sub{font-size:11px;color:var(--text-secondary);margin-bottom:8px}
+    .wp-card-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--text-secondary)}
+    .wp-card-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+    .rs-badge{font-size:10px;font-weight:600;padding:3px 10px;border-radius:20px;display:inline-block}
+    .rs-approved{background:#EAF3DE;color:#3B6D11}
+    .rs-pending{background:#FAEEDA;color:#854F0B}
+    .rs-rejected{background:#FCEBEB;color:#A32D2D}
+    .rejection-note{background:#FFF0F0;border:1px solid #FFD0D0;border-radius:8px;
+      padding:8px 12px;font-size:11px;color:#A32D2D;margin-top:8px}
+    .empty{text-align:center;padding:60px 20px;color:var(--text-hint)}
+    .empty i{font-size:48px;display:block;margin-bottom:12px;opacity:.3}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="org">EPC · Procurement</div>
+      <div class="app-name">Consolidated<br>Dashboard</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Dashboard</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">My Work</div>
+      <a class="nav-item active" href="my-wps.html"><i class="ti ti-clipboard-list"></i>My Work Packages</a>
+      <a class="nav-item" href="wp-form.html"><i class="ti ti-plus"></i>Add Work Package</a>
+    </div>
+    <div class="sidebar-footer">EPC · PRC WPM Dashboard</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="page-title">My Work Packages</div>
+        <div class="page-sub">Work packages assigned to you</div>
+      </div>
+      <div class="topbar-right">
+        <a class="btn btn-primary" href="wp-form.html">
+          <i class="ti ti-plus" style="font-size:13px"></i> Add New WP
+        </a>
+        <div id="user-bar"></div>
+      </div>
+    </div>
+    <div class="content">
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading your work packages…</span></div>
+      <div id="main-content" style="display:none">
+
+        <!-- Summary cards -->
+        <div class="metrics-grid" id="metrics-grid" style="margin-bottom:20px"></div>
+
+        <!-- Filter tabs -->
+        <div style="display:flex;gap:2px;background:var(--surface-2);border-radius:10px;padding:3px;width:fit-content;margin-bottom:16px">
+          <button class="col-toggle active" id="tab-all"      onclick="filterTab('all')">All</button>
+          <button class="col-toggle"        id="tab-pending"  onclick="filterTab('pending_review')">Pending Review</button>
+          <button class="col-toggle"        id="tab-approved" onclick="filterTab('approved')">Approved</button>
+          <button class="col-toggle"        id="tab-rejected" onclick="filterTab('rejected')">Rejected</button>
+        </div>
+
+        <div id="wp-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let allWPs = [], activeFilter = 'all';
+
+  AppAuth.requireLogin(async (user, profile) => {
+    AppAuth.renderUserBar('user-bar', profile);
+
+    /* Load assigned WPs */
+    allWPs = await WPDb.getOfficerWPs(user.uid);
+
+    /* Summary */
+    const pending  = allWPs.filter(w=>w.review_status==='pending_review').length;
+    const approved = allWPs.filter(w=>w.review_status==='approved').length;
+    const rejected = allWPs.filter(w=>w.review_status==='rejected').length;
+
+    document.getElementById('metrics-grid').innerHTML=[
+      {lbl:'Total assigned',    val:allWPs.length,  cls:'',     accent:'blue'},
+      {lbl:'Approved',          val:approved,        cls:'green',accent:'green'},
+      {lbl:'Pending review',    val:pending,         cls:'amber',accent:'amber'},
+      {lbl:'Rejected',          val:rejected,        cls:'red',  accent:'red'},
+    ].map(c=>`<div class="metric-card accent-${c.accent}">
+      <div class="metric-label">${c.lbl}</div>
+      <div class="metric-value ${c.cls}">${c.val}</div></div>`).join('');
+
+    renderList();
+    document.getElementById('loading').style.display='none';
+    document.getElementById('main-content').style.display='block';
+  });
+
+  function filterTab(tab) {
+    activeFilter = tab;
+    ['all','pending_review','approved','rejected'].forEach(t => {
+      const id = 'tab-'+(t==='pending_review'?'pending':t==='approved'?'approved':t==='rejected'?'rejected':'all');
+      document.getElementById(id)?.classList.toggle('active', t===tab);
+    });
+    renderList();
+  }
+
+  function renderList() {
+    const filtered = activeFilter==='all' ? allWPs : allWPs.filter(w=>w.review_status===activeFilter);
+    const el = document.getElementById('wp-list');
+    if (!filtered.length) {
+      el.innerHTML=`<div class="empty"><i class="ti ti-clipboard-off"></i>
+        ${activeFilter==='all'?'No work packages assigned to you yet. Contact your admin.':'No '+activeFilter.replace('_',' ')+' work packages.'}</div>`;
+      return;
+    }
+    const rsCls = {approved:'rs-approved',pending_review:'rs-pending',rejected:'rs-rejected'};
+    const rsLbl = {approved:'Approved',pending_review:'Pending Review',rejected:'Rejected'};
+    el.innerHTML = filtered.map(w=>`
+      <div class="wp-card">
+        <div class="wp-card-body">
+          <div class="wp-card-title">${w.description}</div>
+          <div class="wp-card-sub">${w.cost_code} · ${w.wp_no} · ${w.project_id} · ${w.zone}</div>
+          <div class="wp-card-meta">
+            <span><strong>Trade:</strong> ${w.trade||'—'}</span>
+            <span><strong>Status:</strong> ${w.status||'—'}</span>
+            <span><strong>Budget:</strong> ${w.approved_budget_php?'₱'+(w.approved_budget_php/1e6).toFixed(2)+'M':'—'}</span>
+            <span><strong>Contract:</strong> ${w.contract_amount_php?'₱'+(w.contract_amount_php/1e6).toFixed(2)+'M':'—'}</span>
+            <span><strong>Target Completion:</strong> ${w.target_completion_date||'—'}</span>
+          </div>
+          ${w.review_status==='rejected'&&w.rejection_reason?`
+            <div class="rejection-note">
+              <strong><i class="ti ti-alert-circle" style="font-size:12px;vertical-align:middle"></i> Rejection reason:</strong> ${w.rejection_reason}
+            </div>`:''
+          }
+        </div>
+        <div class="wp-card-actions">
+          <span class="rs-badge ${rsCls[w.review_status]||'rs-pending'}">${rsLbl[w.review_status]||w.review_status}</span>
+          <a href="wp-form.html?id=${w.firestore_id}" class="btn">
+            <i class="ti ti-edit" style="font-size:13px"></i>
+            ${w.review_status==='rejected'?'Fix & Resubmit':'Edit'}
+          </a>
+        </div>
+      </div>`).join('');
+  }
+</script>
+</body>
+</html>

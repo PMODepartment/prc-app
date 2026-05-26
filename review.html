@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Review Work Packages — EPC WPM</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css"/>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="assets/js/firebase-config.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/db.js"></script>
+  <style>
+    .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+      padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
+    .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+    .rc-title{font-size:14px;font-weight:600;color:var(--text-primary)}
+    .rc-sub{font-size:11px;color:var(--text-secondary);margin-top:2px}
+    .rc-meta{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+    .rc-meta-item{font-size:11px;color:var(--text-secondary)}
+    .rc-meta-item strong{color:var(--text-primary)}
+    .rc-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;
+      background:var(--surface-2);border-radius:var(--radius-md);padding:14px;margin-bottom:14px}
+    .rc-field{font-size:11px}
+    .rc-field-label{color:var(--text-hint);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+    .rc-field-val{color:var(--text-primary);font-weight:500}
+    .rc-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn-approve{font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid #B8DDA0;
+      background:#EAF3DE;color:#3B6D11;cursor:pointer;font-weight:500;display:flex;align-items:center;gap:5px}
+    .btn-approve:hover{background:#3B6D11;color:#fff}
+    .btn-reject{font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid #F5B8B8;
+      background:#FCEBEB;color:#A32D2D;cursor:pointer;font-weight:500;display:flex;align-items:center;gap:5px}
+    .btn-reject:hover{background:#A32D2D;color:#fff}
+    .btn-view{font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid var(--border-md);
+      background:var(--surface);color:var(--text-secondary);cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:5px}
+    .empty{text-align:center;padding:60px 20px;color:var(--text-hint);font-size:13px}
+    .empty i{font-size:48px;display:block;margin-bottom:12px;opacity:.3}
+    .tab-row{display:flex;gap:2px;background:var(--surface-2);border-radius:10px;padding:3px;
+      width:fit-content;margin-bottom:20px}
+    .tab{font-size:12px;padding:6px 16px;border-radius:8px;border:none;cursor:pointer;font-weight:500;
+      color:var(--text-secondary);background:transparent;transition:all .15s}
+    .tab.active{background:var(--surface);color:var(--text-primary);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+    .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
+    /* Reject modal */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+    .modal-bg.hidden{display:none}
+    .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:440px}
+    .modal h3{font-size:15px;font-weight:600;margin-bottom:8px}
+    .modal p{font-size:12px;color:var(--text-secondary);margin-bottom:14px}
+    .modal textarea{width:100%;font-size:12px;padding:8px 10px;border:1.5px solid var(--border-md);
+      border-radius:var(--radius-md);background:var(--surface-2);color:var(--text-primary);
+      outline:none;resize:vertical;min-height:90px}
+    .modal textarea:focus{border-color:var(--blue-400);background:#fff}
+    .mactions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+    .mactions button{font-size:12px;padding:7px 16px;border-radius:8px;border:1px solid var(--border-md);cursor:pointer;font-weight:500}
+    .mactions .mc{background:var(--red-400);color:#fff;border-color:var(--red-400)}.mactions .mc:hover{background:var(--red-600)}
+    .mactions .mx{background:transparent;color:var(--text-secondary)}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="org">EPC · Procurement</div>
+      <div class="app-name">Consolidated<br>Dashboard</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>All Projects</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Admin</div>
+      <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+      <a class="nav-item active" href="review.html"><i class="ti ti-clipboard-check"></i>Review WPs</a>
+    </div>
+    <div class="sidebar-footer">EPC · PRC WPM Dashboard</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="page-title">Work Package Review</div>
+        <div class="page-sub">Approve or reject submitted work packages</div>
+      </div>
+      <div class="topbar-right"><div id="user-bar"></div></div>
+    </div>
+    <div class="content">
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading submissions…</span></div>
+      <div id="main-content" style="display:none">
+
+        <div class="tab-row">
+          <button class="tab active" id="tab-pending" onclick="switchTab('pending')">
+            Pending Review <span class="tbadge" id="ct-pending">0</span>
+          </button>
+          <button class="tab" id="tab-approved" onclick="switchTab('approved')">
+            Approved <span class="tbadge" id="ct-approved" style="background:var(--green-400)">0</span>
+          </button>
+          <button class="tab" id="tab-rejected" onclick="switchTab('rejected')">
+            Rejected <span class="tbadge" id="ct-rejected" style="background:var(--gray-200);color:#333">0</span>
+          </button>
+        </div>
+
+        <div id="panel-pending"></div>
+        <div id="panel-approved" style="display:none"></div>
+        <div id="panel-rejected" style="display:none"></div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reject modal -->
+<div class="modal-bg hidden" id="modal-reject">
+  <div class="modal">
+    <h3>Reject Work Package</h3>
+    <p>Please provide a reason so the officer knows what to correct.</p>
+    <textarea id="rejection-reason" placeholder="e.g. Budget figure does not match the approved ABC. Please verify and resubmit."></textarea>
+    <div class="mactions">
+      <button class="mx" onclick="closeRejectModal()">Cancel</button>
+      <button class="mc" onclick="confirmReject()"><i class="ti ti-x" style="font-size:13px;vertical-align:middle"></i> Reject</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let adminProfile, allWPs=[], currentTab='pending', rejectingId=null;
+
+  AppAuth.requireAdmin(async (user, profile) => {
+    adminProfile = profile;
+    AppAuth.renderUserBar('user-bar', profile);
+    await loadAll();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+  });
+
+  async function loadAll() {
+    const snap = await DB.collection('work_packages').get();
+    allWPs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a,b) => (a.submitted_at?.toMillis?.()||0) - (b.submitted_at?.toMillis?.()||0));
+    renderAll();
+  }
+
+  function renderAll() {
+    const pending  = allWPs.filter(w => w.review_status === 'pending_review');
+    const approved = allWPs.filter(w => w.review_status === 'approved');
+    const rejected = allWPs.filter(w => w.review_status === 'rejected');
+    document.getElementById('ct-pending').textContent  = pending.length;
+    document.getElementById('ct-approved').textContent = approved.length;
+    document.getElementById('ct-rejected').textContent = rejected.length;
+    renderPanel('panel-pending', pending, 'pending');
+    renderPanel('panel-approved', approved, 'approved');
+    renderPanel('panel-rejected', rejected, 'rejected');
+  }
+
+  function fmtTs(ts) {
+    if (!ts) return '—';
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+  }
+
+  function fmtM(v) { if(v==null)return'—'; return'₱'+(v/1e6).toFixed(2)+'M'; }
+
+  function renderPanel(panelId, wps, type) {
+    const el = document.getElementById(panelId);
+    if (!wps.length) {
+      el.innerHTML = `<div class="empty"><i class="ti ti-${type==='pending'?'clock':type==='approved'?'circle-check':'x-circle'}"></i>No ${type} submissions</div>`;
+      return;
+    }
+    el.innerHTML = wps.map(w => {
+      const v = w.approved_budget_php && w.contract_amount_php ? w.approved_budget_php - w.contract_amount_php : null;
+      const vHtml = v==null?'—':v>=0?`<span style="color:#1D9E75">+₱${(v/1e6).toFixed(2)}M</span>`:`<span style="color:#E24B4A">-₱${(Math.abs(v)/1e6).toFixed(2)}M</span>`;
+      const actionBtns = type === 'pending' ? `
+        <button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve</button>
+        <button class="btn-reject"  onclick="openReject('${w.id}')"><i class="ti ti-x" style="font-size:13px"></i> Reject</button>
+        <a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-eye" style="font-size:13px"></i> View form</a>` :
+        type === 'approved' ? `<a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-eye" style="font-size:13px"></i> View</a>` :
+        `<button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve anyway</button>
+         <a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-eye" style="font-size:13px"></i> View</a>`;
+      return `<div class="review-card">
+        <div class="review-card-header">
+          <div>
+            <div class="rc-title">${w.description}</div>
+            <div class="rc-sub">${w.cost_code} &nbsp;·&nbsp; ${w.wp_no} &nbsp;·&nbsp; ${w.project_id} &nbsp;·&nbsp; ${w.zone}</div>
+          </div>
+          <span class="badge ${w.status==='Awarded'?'badge-awarded':w.status==='Partially Awarded'?'badge-partial':'badge-notyet'}">${w.status}</span>
+        </div>
+        <div class="rc-fields">
+          <div class="rc-field"><div class="rc-field-label">Trade</div><div class="rc-field-val">${w.trade||'—'}</div></div>
+          <div class="rc-field"><div class="rc-field-label">Approved Budget</div><div class="rc-field-val">${fmtM(w.approved_budget_php)}</div></div>
+          <div class="rc-field"><div class="rc-field-label">Contract Amount</div><div class="rc-field-val">${fmtM(w.contract_amount_php)}</div></div>
+          <div class="rc-field"><div class="rc-field-label">Variance</div><div class="rc-field-val">${vHtml}</div></div>
+          <div class="rc-field"><div class="rc-field-label">Awarding Date</div><div class="rc-field-val">${w.awarding_date||'—'}</div></div>
+          <div class="rc-field"><div class="rc-field-label">Actual Awarding</div><div class="rc-field-val">${w.actual_awarding_date||'—'}</div></div>
+          <div class="rc-field"><div class="rc-field-label">Target Completion</div><div class="rc-field-val">${w.target_completion_date||'—'}</div></div>
+          <div class="rc-field"><div class="rc-field-label">Contractor</div><div class="rc-field-val">${w.contractor||'—'}</div></div>
+        </div>
+        <div class="rc-meta">
+          <div class="rc-meta-item"><strong>Submitted by:</strong> ${w.submitted_by_name||'—'}</div>
+          <div class="rc-meta-item"><strong>Submitted:</strong> ${fmtTs(w.submitted_at)}</div>
+          ${w.assigned_officer_name?`<div class="rc-meta-item"><strong>Officer:</strong> ${w.assigned_officer_name}</div>`:''}
+          ${w.rejection_reason?`<div class="rc-meta-item" style="color:var(--red-400)"><strong>Rejected:</strong> ${w.rejection_reason}</div>`:''}
+          ${w.remarks?`<div class="rc-meta-item"><strong>Remarks:</strong> ${w.remarks}</div>`:''}
+        </div>
+        <div class="rc-actions">${actionBtns}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function switchTab(tab) {
+    ['pending','approved','rejected'].forEach(t => {
+      document.getElementById('tab-'+t).classList.toggle('active', t===tab);
+      document.getElementById('panel-'+t).style.display = t===tab ? 'block' : 'none';
+    });
+    currentTab = tab;
+  }
+
+  async function approveWP(id) {
+    if (!confirm('Approve this work package? It will appear on the dashboard immediately.')) return;
+    try {
+      await WPDb.approveWP(id, adminProfile);
+      await loadAll();
+    } catch(e) { alert('Error: '+e.message); }
+  }
+
+  function openReject(id) { rejectingId=id; document.getElementById('modal-reject').classList.remove('hidden'); }
+  function closeRejectModal() { document.getElementById('modal-reject').classList.add('hidden'); rejectingId=null; }
+
+  async function confirmReject() {
+    const reason = document.getElementById('rejection-reason').value.trim();
+    if (!reason) { alert('Please provide a rejection reason.'); return; }
+    try {
+      await WPDb.rejectWP(rejectingId, adminProfile, reason);
+      closeRejectModal();
+      document.getElementById('rejection-reason').value = '';
+      await loadAll();
+    } catch(e) { alert('Error: '+e.message); }
+  }
+</script>
+</body>
+</html>

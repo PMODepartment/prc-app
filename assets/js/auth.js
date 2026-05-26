@@ -23,7 +23,8 @@ const AppAuth = (() => {
     const cred = await Auth.createUserWithEmailAndPassword(email, password);
     await DB.collection('users').doc(cred.user.uid).set({
       uid: cred.user.uid, name, email,
-      role: 'user', status: 'pending', projects: [],
+      role: 'procurement_officer',
+      status: 'pending', projects: [], assigned_wps: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       approvedAt: null, approvedBy: null,
     });
@@ -39,10 +40,7 @@ const AppAuth = (() => {
     return { user: cred.user, profile };
   }
 
-  async function logout() {
-    await Auth.signOut();
-    window.location.href = 'login.html';
-  }
+  async function logout() { await Auth.signOut(); window.location.href = 'login.html'; }
 
   async function getUserProfile(uid) {
     const doc = await DB.collection('users').doc(uid).get();
@@ -58,6 +56,13 @@ const AppAuth = (() => {
     });
   }
 
+  async function getOfficers() {
+    const snap = await DB.collection('users')
+      .where('status','==','approved')
+      .where('role','==','procurement_officer').get();
+    return snap.docs.map(d => d.data());
+  }
+
   async function approveUser(uid, projects, role, adminName) {
     await DB.collection('users').doc(uid).update({
       status: 'approved', projects, role,
@@ -70,8 +75,8 @@ const AppAuth = (() => {
     await DB.collection('users').doc(uid).update({ status: 'rejected' });
   }
 
-  async function updateUser(uid, projects, role) {
-    await DB.collection('users').doc(uid).update({ projects, role });
+  async function updateUser(uid, data) {
+    await DB.collection('users').doc(uid).update(data);
   }
 
   function canAccessProject(profile, projectId) {
@@ -89,13 +94,17 @@ const AppAuth = (() => {
   function renderUserBar(containerId, profile) {
     const el = document.getElementById(containerId);
     if (!el || !profile) return;
+    const roleLabel = {
+      admin: 'Admin',
+      procurement_officer: 'Procurement Officer',
+    }[profile.role] || profile.role;
     const projLabel = profile.role === 'admin' ? 'All projects' :
       (profile.projects && profile.projects.length ? profile.projects.join(', ') : 'None assigned');
     el.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px">
         <div style="text-align:right">
           <div style="font-size:12px;font-weight:600;color:var(--text-primary)">${profile.name}</div>
-          <div style="font-size:10px;color:var(--text-secondary);text-transform:capitalize">${profile.role} · ${projLabel}</div>
+          <div style="font-size:10px;color:var(--text-secondary)">${roleLabel} · ${projLabel}</div>
         </div>
         <div style="width:34px;height:34px;border-radius:50%;background:var(--blue-600);color:#fff;
           display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">
@@ -111,7 +120,8 @@ const AppAuth = (() => {
 
   return {
     requireLogin, requireAdmin, register, login, logout,
-    getUserProfile, getAllUsers, approveUser, rejectUser, updateUser,
+    getUserProfile, getAllUsers, getOfficers,
+    approveUser, rejectUser, updateUser,
     canAccessProject, getPermittedProjects, renderUserBar,
   };
 })();

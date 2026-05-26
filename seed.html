@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Data Seed — EPC WPM</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css"/>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="assets/js/firebase-config.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/db.js"></script>
+  <style>
+    .seed-wrap{max-width:600px;margin:60px auto;padding:0 20px}
+    .seed-card{background:#fff;border-radius:16px;padding:32px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+    .seed-title{font-size:18px;font-weight:600;margin-bottom:8px}
+    .seed-sub{font-size:12px;color:#5A5A6A;margin-bottom:24px;line-height:1.6}
+    .log{background:#F4F6F9;border-radius:10px;padding:16px;font-size:11px;font-family:monospace;
+      height:300px;overflow-y:auto;margin-top:20px;line-height:1.8}
+    .log-ok{color:#1D9E75}.log-err{color:#E24B4A}.log-info{color:#185FA5}
+    .btn-seed{font-size:13px;font-weight:600;padding:10px 24px;background:#185FA5;color:#fff;
+      border:none;border-radius:10px;cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:8px}
+    .btn-seed:hover{background:#0C447C}
+    .btn-seed:disabled{opacity:.5;cursor:default}
+    .progress{height:6px;background:#E6F1FB;border-radius:3px;margin-top:14px;overflow:hidden}
+    .progress-fill{height:100%;background:#185FA5;border-radius:3px;transition:width .3s;width:0%}
+    .notice{background:#FAEEDA;border:1px solid #F5D9A8;border-radius:10px;padding:12px 14px;
+      font-size:12px;color:#854F0B;margin-bottom:20px;display:flex;gap:8px}
+  </style>
+</head>
+<body style="background:#F4F6F9;font-family:'Inter','Segoe UI',system-ui,sans-serif">
+<div class="seed-wrap">
+  <div style="text-align:center;margin-bottom:24px">
+    <div style="font-size:11px;font-weight:600;letter-spacing:.1em;color:#5A5A6A;text-transform:uppercase">EPC · Procurement</div>
+    <div style="font-size:20px;font-weight:700;color:#1A1A1A;margin-top:4px">One-Time Data Import</div>
+  </div>
+  <div class="seed-card">
+    <div class="seed-title">Seed Firestore from JSON files</div>
+    <div class="seed-sub">
+      This page imports your existing work package data from the JSON files into Firestore.<br>
+      <strong>Run this once only.</strong> After seeding, the dashboard will read live from Firestore.
+      Existing records will be skipped automatically (no duplicates).
+    </div>
+    <div class="notice">
+      <i class="ti ti-alert-triangle" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
+      <div>You must be logged in as <strong>admin</strong> to run this. After seeding, delete or restrict access to this page.</div>
+    </div>
+    <button class="btn-seed" id="btn-seed" onclick="runSeed()">
+      <i class="ti ti-database-import" style="font-size:16px"></i> Start Import
+    </button>
+    <div class="progress"><div class="progress-fill" id="prog"></div></div>
+    <div class="log" id="log"><span class="log-info">Ready. Click "Start Import" to begin.</span></div>
+  </div>
+</div>
+<script>
+  const log = (msg, cls='') => {
+    const el = document.getElementById('log');
+    el.innerHTML += `\n<span class="${cls}">${msg}</span>`;
+    el.scrollTop = el.scrollHeight;
+  };
+
+  const setProgress = pct => {
+    document.getElementById('prog').style.width = pct + '%';
+  };
+
+  AppAuth.requireAdmin(async (user, profile) => {
+    log(`Logged in as: ${profile.name} (${profile.role})`, 'log-ok');
+  });
+
+  async function runSeed() {
+    const btn = document.getElementById('btn-seed');
+    btn.disabled = true;
+
+    try {
+      /* Load projects JSON */
+      log('\n--- Loading projects.json ---', 'log-info');
+      const projRes = await fetch('data/projects.json');
+      const projects = await projRes.json();
+      log(`Found ${projects.length} projects`, 'log-ok');
+
+      /* Seed projects into Firestore */
+      for (const p of projects) {
+        await WPDb.saveProject(p);
+        log(`✓ Project saved: ${p.id} — ${p.name}`, 'log-ok');
+      }
+
+      setProgress(20);
+
+      /* Seed work packages for each project */
+      let total = 0, skipped = 0, imported = 0;
+      for (let pi = 0; pi < projects.length; pi++) {
+        const proj = projects[pi];
+        log(`\n--- Loading ${proj.id} work packages ---`, 'log-info');
+        try {
+          const wpRes = await fetch(proj.data_file);
+          const wpData = await wpRes.json();
+          const wps = wpData.work_packages;
+          log(`Found ${wps.length} work packages`, 'log-ok');
+          total += wps.length;
+
+          for (let wi = 0; wi < wps.length; wi++) {
+            const wp = { ...wps[wi], project_id: proj.id };
+            /* Check if already exists */
+            const existing = await DB.collection('work_packages')
+              .where('project_id','==',proj.id)
+              .where('wp_no','==',wp.wp_no).get();
+
+            if (!existing.empty) {
+              log(`  ⟳ Skipped (exists): ${wp.wp_no} — ${wp.description}`, '');
+              skipped++;
+            } else {
+              await WPDb.seedWP(wp);
+              log(`  ✓ Imported: ${wp.wp_no} — ${wp.description}`, 'log-ok');
+              imported++;
+            }
+            setProgress(20 + Math.round(((pi * wps.length + wi + 1) / (projects.length * wps.length)) * 75));
+          }
+        } catch(e) {
+          log(`  ✗ Error loading ${proj.id}: ${e.message}`, 'log-err');
+        }
+      }
+
+      setProgress(100);
+      log(`\n=== IMPORT COMPLETE ===`, 'log-ok');
+      log(`Total: ${total} | Imported: ${imported} | Skipped: ${skipped}`, 'log-ok');
+      log(`\nYou can now go to the dashboard. This page is no longer needed.`, 'log-info');
+      log(`\n→ <a href="index.html" style="color:#185FA5">Go to Dashboard</a>`, 'log-info');
+
+    } catch(e) {
+      log(`\n✗ Fatal error: ${e.message}`, 'log-err');
+      btn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>

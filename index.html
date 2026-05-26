@@ -11,10 +11,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="assets/js/firebase-config.js"></script>
   <script src="assets/js/auth.js"></script>
+  <script src="assets/js/db.js"></script>
 </head>
 <body>
 <div class="app-shell">
-
   <aside class="sidebar">
     <div class="sidebar-logo">
       <div class="org">EPC · Procurement</div>
@@ -28,10 +28,18 @@
       <div class="sidebar-section-label">Projects</div>
       <div id="nav-projects"></div>
     </div>
+    <div id="sidebar-officer" style="display:none">
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">My Work</div>
+        <a class="nav-item" href="my-wps.html"><i class="ti ti-clipboard-list"></i>My Work Packages</a>
+        <a class="nav-item" href="wp-form.html"><i class="ti ti-plus"></i>Add Work Package</a>
+      </div>
+    </div>
     <div id="sidebar-admin" style="display:none">
       <div class="sidebar-section">
         <div class="sidebar-section-label">Admin</div>
         <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+        <a class="nav-item" href="review.html"><i class="ti ti-clipboard-check"></i>Review WPs <span class="tbadge" id="pending-badge" style="display:none"></span></a>
       </div>
     </div>
     <div class="sidebar-footer">EPC · PRC WPM Dashboard<br>Powered by GitHub Pages</div>
@@ -41,7 +49,7 @@
     <div class="topbar">
       <div class="topbar-left">
         <div class="page-title">Portfolio Overview</div>
-        <div class="page-sub">All projects — consolidated procurement monitoring</div>
+        <div class="page-sub" id="page-sub">All projects — consolidated procurement monitoring</div>
       </div>
       <div class="topbar-right">
         <button class="btn" id="btn-export"><i class="ti ti-download"></i>Export CSV</button>
@@ -49,7 +57,7 @@
       </div>
     </div>
     <div class="content">
-      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading…</span></div>
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading dashboard…</span></div>
       <div id="main-content" style="display:none">
         <div class="metrics-grid" id="metrics-grid"></div>
         <div class="project-cards" id="project-cards"></div>
@@ -107,113 +115,135 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="assets/js/data.js"></script>
 <script src="assets/js/charts.js"></script>
+<style>.tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}</style>
 <script>
-  function buildRankList(id, items, cls, fmtFn) {
-    const el=document.getElementById(id); if(!el) return;
-    if (!items.length) { el.innerHTML='<div class="empty-state"><i class="ti ti-circle-off"></i>No data</div>'; return; }
-    const max=Math.max(...items.map(i=>Math.abs(i.val)),0.01);
-    el.innerHTML=items.map((it,i)=>`
-      <div class="rank-item">
-        <span class="rank-num">${i+1}</span>
-        <div class="rank-body">
-          <div class="rank-name" title="${it.name}">${it.name}</div>
-          <div class="rank-sub">${it.sub}</div>
-          <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${Math.round(Math.abs(it.val)/max*100)}%;background:${it.color}"></div></div>
-        </div>
-        <span class="rank-val ${cls}">${fmtFn(it.val)}</span>
-      </div>`).join('');
+function buildRankList(id,items,cls,fmtFn){
+  const el=document.getElementById(id);if(!el)return;
+  if(!items.length){el.innerHTML='<div class="empty-state"><i class="ti ti-circle-off"></i>No data</div>';return;}
+  const max=Math.max(...items.map(i=>Math.abs(i.val)),0.01);
+  el.innerHTML=items.map((it,i)=>`<div class="rank-item">
+    <span class="rank-num">${i+1}</span>
+    <div class="rank-body">
+      <div class="rank-name" title="${it.name}">${it.name}</div>
+      <div class="rank-sub">${it.sub}</div>
+      <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${Math.round(Math.abs(it.val)/max*100)}%;background:${it.color}"></div></div>
+    </div>
+    <span class="rank-val ${cls}">${fmtFn(it.val)}</span></div>`).join('');
+}
+
+AppAuth.requireLogin(async (user, profile) => {
+  AppAuth.renderUserBar('user-bar', profile);
+
+  /* Sidebar by role */
+  if (profile.role === 'admin') {
+    document.getElementById('sidebar-admin').style.display = 'block';
+    WPDb.getPendingWPs().then(wps => {
+      if (wps.length > 0) {
+        const b=document.getElementById('pending-badge');
+        b.textContent=wps.length; b.style.display='inline';
+      }
+    });
+  }
+  if (profile.role === 'procurement_officer') {
+    document.getElementById('sidebar-officer').style.display = 'block';
   }
 
-  AppAuth.requireLogin(async (user, profile) => {
-    AppAuth.renderUserBar('user-bar', profile);
-    if (profile.role === 'admin') document.getElementById('sidebar-admin').style.display = 'block';
+  /* Load projects from Firestore */
+  const allProjects = await WPDb.getProjects();
+  const permitted   = AppAuth.getPermittedProjects(profile, allProjects);
 
-    const { projects: allProjects, packages } = await DataStore.loadAll();
-    const permitted = AppAuth.getPermittedProjects(profile, allProjects);
-    const permittedPackages = permitted.map(p => {
-      const idx = allProjects.findIndex(a => a.id === p.id);
-      return packages[idx].work_packages;
-    });
-    const allStats = permittedPackages.map(wps => computeStats(wps));
-    const flatAll  = permittedPackages.flat();
-    const global   = computeStats(flatAll);
+  document.getElementById('page-sub').textContent =
+    profile.role==='admin' ? 'All projects — consolidated procurement monitoring' :
+    `Your projects: ${permitted.map(p=>p.id).join(', ')}`;
 
-    /* Sidebar project links */
-    const navEl = document.getElementById('nav-projects');
-    permitted.forEach(p => {
-      navEl.innerHTML += `<a class="nav-item" href="project.html?id=${p.id}"><i class="ti ti-building-skyscraper"></i>${p.id}</a>`;
-    });
-
-    /* Metrics */
-    document.getElementById('metrics-grid').innerHTML = [
-      {lbl:'Total projects',        val:permitted.length,                               sub:'active',             cls:'',      accent:'blue'},
-      {lbl:'Total work packages',   val:global.total,                                   sub:'across all projects', cls:'',      accent:'blue'},
-      {lbl:'Awarded',               val:global.awarded.length,                          sub:global.awardRate+'% award rate',cls:'green',accent:'green'},
-      {lbl:'Partially awarded',     val:global.partial.length,                          sub:'',                   cls:'amber', accent:'amber'},
-      {lbl:'Not yet awarded',       val:global.notYet.length,                           sub:'',                   cls:'red',   accent:'red'},
-      {lbl:'Total budget',          val:Fmt.money(global.totalBudget,1),                sub:'approved ABC',       cls:'',      accent:'blue'},
-      {lbl:'Total contracted',      val:Fmt.money(global.totalContract,1),              sub:'awarded + partial',  cls:'',      accent:'blue'},
-      {lbl:'Net variance',          val:(global.netVariance>=0?'+':'')+Fmt.money(global.netVariance,1),
-        sub:global.netVariance>=0?'net savings':'net overrun',
-        cls:global.netVariance>=0?'green':'red', accent:global.netVariance>=0?'green':'red'},
-    ].map(c=>`<div class="metric-card accent-${c.accent}">
-      <div class="metric-label">${c.lbl}</div>
-      <div class="metric-value ${c.cls}">${c.val}</div>
-      ${c.sub?`<div class="metric-sub">${c.sub}</div>`:''}</div>`).join('');
-
-    /* Project cards */
-    const cardsEl = document.getElementById('project-cards');
-    permitted.forEach((p,i) => {
-      const s=allStats[i];
-      cardsEl.innerHTML += `<a class="project-card" href="project.html?id=${p.id}">
-        <div class="pc-header"><span class="pc-id">${p.id}</span><span class="pc-status"></span></div>
-        <div class="pc-name">${p.name}</div>
-        <div class="pc-meta">${p.location} · ${p.type}</div>
-        <div class="pc-stats">
-          <div><div class="pc-stat-val green">${s.awarded.length}</div><div class="pc-stat-lbl">Awarded</div></div>
-          <div><div class="pc-stat-val amber">${s.partial.length}</div><div class="pc-stat-lbl">Partial</div></div>
-          <div><div class="pc-stat-val red">${s.notYet.length}</div><div class="pc-stat-lbl">Not yet</div></div>
-        </div>
-        <div class="pc-progress">
-          <div class="pc-progress-label"><span>Award progress</span><span>${s.awardRate}%</span></div>
-          <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${s.awardRate}%"></div></div>
-        </div></a>`;
-    });
-
-    /* Donut grid */
-    const donutGrid = document.getElementById('donut-grid');
-    permitted.forEach((p,i) => {
-      donutGrid.innerHTML += `<div style="text-align:center">
-        <div style="font-size:10px;font-weight:600;color:#0C447C;margin-bottom:6px">${p.id}</div>
-        <div style="position:relative;height:100px"><canvas id="c-donut-${p.id}"></canvas></div></div>`;
-    });
-    permitted.forEach((p,i) => Charts.awardDonut('c-donut-'+p.id, allStats[i]));
-
-    /* Charts */
-    Charts.consolidatedBudget('c-budget', permitted, allStats);
-    Charts.varianceTrend('c-trend', flatAll);
-    Charts.statusByZone('c-status', flatAll);
-
-    /* Top lists */
-    const awarded = flatAll.filter(w=>w.contract_amount_php!=null);
-    const gains = awarded.filter(w=>(Calc.variance(w)||0)>0).sort((a,b)=>Calc.variance(b)-Calc.variance(a)).slice(0,5)
-      .map(w=>({name:w.description,sub:w.wp_no,val:Calc.variance(w),color:'#1D9E75'}));
-    buildRankList('rank-gains',gains,'green',v=>'+'+Fmt.money(v));
-    const byVal = [...awarded].sort((a,b)=>b.contract_amount_php-a.contract_amount_php).slice(0,5)
-      .map(w=>({name:w.description,sub:w.wp_no+' · '+(w.contractor||'—'),val:w.contract_amount_php,color:'#378ADD'}));
-    buildRankList('rank-value',byVal,'blue',v=>Fmt.money(v));
-    const losses = awarded.filter(w=>(Calc.variance(w)||0)<0).sort((a,b)=>Calc.variance(a)-Calc.variance(b)).slice(0,5)
-      .map(w=>({name:w.description,sub:w.wp_no,val:Math.abs(Calc.variance(w)),color:'#E24B4A'}));
-    buildRankList('rank-losses',losses,'red',v=>'-'+Fmt.money(v));
-
-    /* Export */
-    document.getElementById('btn-export').addEventListener('click',()=>exportCSV(flatAll,'ALL'));
-
-    document.getElementById('loading').style.display='none';
-    document.getElementById('main-content').style.display='block';
+  /* Sidebar project links */
+  const navEl = document.getElementById('nav-projects');
+  permitted.forEach(p => {
+    navEl.innerHTML += `<a class="nav-item" href="project.html?id=${p.id}"><i class="ti ti-building-skyscraper"></i>${p.id}</a>`;
   });
+
+  /* Load all approved WPs for permitted projects */
+  const allWPs = [];
+  for (const p of permitted) {
+    const wps = await WPDb.getApprovedWPs(p.id);
+    wps.forEach(w => allWPs.push(w));
+  }
+
+  const allStats = permitted.map(p => computeStats(allWPs.filter(w=>w.project_id===p.id)));
+  const global   = computeStats(allWPs);
+
+  /* Metrics */
+  document.getElementById('metrics-grid').innerHTML=[
+    {lbl:'Total projects',       val:permitted.length,                    sub:'active',              cls:'',     accent:'blue'},
+    {lbl:'Total work packages',  val:global.total,                        sub:'approved entries',     cls:'',     accent:'blue'},
+    {lbl:'Awarded',              val:global.awarded.length,               sub:global.awardRate+'% award rate',cls:'green',accent:'green'},
+    {lbl:'Partially awarded',    val:global.partial.length,               sub:'',                    cls:'amber',accent:'amber'},
+    {lbl:'Not yet awarded',      val:global.notYet.length,                sub:'',                    cls:'red',  accent:'red'},
+    {lbl:'Total budget',         val:Fmt.money(global.totalBudget,1),     sub:'approved ABC',        cls:'',     accent:'blue'},
+    {lbl:'Total contracted',     val:Fmt.money(global.totalContract,1),   sub:'awarded + partial',   cls:'',     accent:'blue'},
+    {lbl:'Net variance',         val:(global.netVariance>=0?'+':'')+Fmt.money(global.netVariance,1),
+      sub:global.netVariance>=0?'net savings':'net overrun',
+      cls:global.netVariance>=0?'green':'red',accent:global.netVariance>=0?'green':'red'},
+  ].map(c=>`<div class="metric-card accent-${c.accent}">
+    <div class="metric-label">${c.lbl}</div>
+    <div class="metric-value ${c.cls}">${c.val}</div>
+    ${c.sub?`<div class="metric-sub">${c.sub}</div>`:''}</div>`).join('');
+
+  /* Project cards */
+  const cardsEl=document.getElementById('project-cards');
+  permitted.forEach((p,i)=>{
+    const s=allStats[i];
+    cardsEl.innerHTML+=`<a class="project-card" href="project.html?id=${p.id}">
+      <div class="pc-header"><span class="pc-id">${p.id}</span><span class="pc-status"></span></div>
+      <div class="pc-name">${p.name}</div>
+      <div class="pc-meta">${p.location} · ${p.type}</div>
+      <div class="pc-stats">
+        <div><div class="pc-stat-val green">${s.awarded.length}</div><div class="pc-stat-lbl">Awarded</div></div>
+        <div><div class="pc-stat-val amber">${s.partial.length}</div><div class="pc-stat-lbl">Partial</div></div>
+        <div><div class="pc-stat-val red">${s.notYet.length}</div><div class="pc-stat-lbl">Not yet</div></div>
+      </div>
+      <div class="pc-progress">
+        <div class="pc-progress-label"><span>Award progress</span><span>${s.awardRate}%</span></div>
+        <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${s.awardRate}%"></div></div>
+      </div></a>`;
+  });
+
+  /* Donuts */
+  const donutGrid=document.getElementById('donut-grid');
+  permitted.forEach((p,i)=>{
+    donutGrid.innerHTML+=`<div style="text-align:center">
+      <div style="font-size:10px;font-weight:600;color:#0C447C;margin-bottom:6px">${p.id}</div>
+      <div style="position:relative;height:100px"><canvas id="c-donut-${p.id}"></canvas></div></div>`;
+  });
+  permitted.forEach((p,i)=>Charts.awardDonut('c-donut-'+p.id, allStats[i]));
+
+  /* Charts */
+  Charts.consolidatedBudget('c-budget', permitted, allStats);
+  Charts.varianceTrend('c-trend', allWPs);
+  Charts.statusByZone('c-status', allWPs);
+
+  /* Top lists */
+  const awarded=allWPs.filter(w=>w.contract_amount_php!=null);
+  buildRankList('rank-gains',
+    awarded.filter(w=>(Calc.variance(w)||0)>0).sort((a,b)=>Calc.variance(b)-Calc.variance(a)).slice(0,5)
+    .map(w=>({name:w.description,sub:w.wp_no+' · '+w.project_id,val:Calc.variance(w),color:'#1D9E75'})),
+    'green',v=>'+'+Fmt.money(v));
+  buildRankList('rank-value',
+    [...awarded].sort((a,b)=>b.contract_amount_php-a.contract_amount_php).slice(0,5)
+    .map(w=>({name:w.description,sub:w.wp_no+' · '+(w.contractor||'—'),val:w.contract_amount_php,color:'#378ADD'})),
+    'blue',v=>Fmt.money(v));
+  buildRankList('rank-losses',
+    awarded.filter(w=>(Calc.variance(w)||0)<0).sort((a,b)=>Calc.variance(a)-Calc.variance(b)).slice(0,5)
+    .map(w=>({name:w.description,sub:w.wp_no+' · '+w.project_id,val:Math.abs(Calc.variance(w)),color:'#E24B4A'})),
+    'red',v=>'-'+Fmt.money(v));
+
+  /* Export */
+  document.getElementById('btn-export').addEventListener('click',()=>exportCSV(allWPs,'ALL_PROJECTS'));
+
+  document.getElementById('loading').style.display='none';
+  document.getElementById('main-content').style.display='block';
+});
 </script>
 </body>
 </html>

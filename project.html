@@ -11,6 +11,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="assets/js/firebase-config.js"></script>
   <script src="assets/js/auth.js"></script>
+  <script src="assets/js/db.js"></script>
+  <style>
+    .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
+    .assign-sel{font-size:11px;padding:3px 7px;border:1px solid var(--border-md);border-radius:6px;
+      background:var(--surface-2);color:var(--text-primary);cursor:pointer;max-width:150px}
+  </style>
 </head>
 <body>
 <div class="app-shell">
@@ -27,13 +33,22 @@
       <div class="sidebar-section-label">Current project</div>
       <a class="nav-item active" href="#"><i class="ti ti-building-skyscraper"></i><span id="nav-proj-name">Loading…</span></a>
     </div>
+    <div id="sidebar-officer" style="display:none">
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">My Work</div>
+        <a class="nav-item" href="my-wps.html"><i class="ti ti-clipboard-list"></i>My Work Packages</a>
+        <a class="nav-item" id="add-wp-link" href="wp-form.html"><i class="ti ti-plus"></i>Add Work Package</a>
+      </div>
+    </div>
     <div id="sidebar-admin" style="display:none">
       <div class="sidebar-section">
         <div class="sidebar-section-label">Admin</div>
         <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+        <a class="nav-item" href="review.html"><i class="ti ti-clipboard-check"></i>Review WPs <span class="tbadge" id="pending-badge" style="display:none"></span></a>
+        <a class="nav-item" id="add-wp-link-admin" href="wp-form.html"><i class="ti ti-plus"></i>Add Work Package</a>
       </div>
     </div>
-    <div class="sidebar-footer">EPC · PRC WPM Dashboard<br>Powered by GitHub Pages</div>
+    <div class="sidebar-footer">EPC · PRC WPM Dashboard</div>
   </aside>
 
   <div class="main">
@@ -49,10 +64,9 @@
       </div>
     </div>
     <div class="content">
-      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading project data…</span></div>
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading…</span></div>
       <div id="main-content" style="display:none">
 
-        <!-- Filters -->
         <div class="filter-bar">
           <span class="filter-label">Status</span>
           <select id="f-status">
@@ -72,10 +86,8 @@
           <input type="text" id="f-search" placeholder="Search WP / cost code…"/>
         </div>
 
-        <!-- Metrics -->
         <div class="metrics-grid" id="metrics-grid"></div>
 
-        <!-- Charts -->
         <div class="grid-2" style="margin-bottom:14px">
           <div class="panel">
             <div class="panel-title"><i class="ti ti-chart-bar"></i>Award status by zone</div>
@@ -97,7 +109,7 @@
         </div>
         <div class="grid-2" style="margin-bottom:14px">
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-coins"></i>Budget vs contract amount (₱M)</div>
+            <div class="panel-title"><i class="ti ti-coins"></i>Budget vs contract (₱M)</div>
             <div class="legend">
               <span><span class="legend-dot" style="background:#378ADD"></span>Approved budget</span>
               <span><span class="legend-dot" style="background:#1D9E75"></span>Contract amount</span>
@@ -109,13 +121,12 @@
             <div class="legend">
               <span><span class="legend-dot" style="background:#1D9E75"></span>Cumulative savings</span>
               <span><span class="legend-dot" style="background:#E24B4A"></span>Cumulative overrun</span>
-              <span><span class="legend-dot" style="background:#378ADD"></span>Monthly net</span>
             </div>
             <div style="position:relative;height:220px"><canvas id="c-trend"></canvas></div>
           </div>
         </div>
         <div class="panel" style="margin-bottom:14px">
-          <div class="panel-title"><i class="ti ti-calendar-event"></i>Schedule timeline — target milestones</div>
+          <div class="panel-title"><i class="ti ti-calendar-event"></i>Schedule timeline</div>
           <div class="legend">
             <span><span class="legend-dot" style="background:#378ADD"></span>Awarding</span>
             <span><span class="legend-dot" style="background:#EF9F27"></span>Delivery</span>
@@ -125,7 +136,6 @@
           <div style="position:relative;height:260px"><canvas id="c-schedule"></canvas></div>
         </div>
 
-        <!-- Top lists -->
         <div class="grid-3" style="margin-bottom:14px">
           <div class="panel">
             <div class="panel-title"><i class="ti ti-trending-up" style="color:#1D9E75"></i>Top 5 savings</div>
@@ -141,7 +151,7 @@
           </div>
         </div>
 
-        <!-- Table -->
+        <!-- Work Package Register -->
         <div class="panel">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
             <div class="panel-title" style="margin-bottom:0">
@@ -153,6 +163,7 @@
               <button class="col-toggle active" id="tog-identity" onclick="toggleCol('identity')">Identity</button>
               <button class="col-toggle active" id="tog-schedule" onclick="toggleCol('schedule')">Schedule</button>
               <button class="col-toggle active" id="tog-budget"   onclick="toggleCol('budget')">Budget</button>
+              <button class="col-toggle active" id="tog-assign"   onclick="toggleCol('assign')" style="display:none">Officers</button>
             </div>
           </div>
           <div class="table-wrap">
@@ -171,62 +182,117 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="assets/js/data.js"></script>
 <script src="assets/js/charts.js"></script>
 <script>
-const PAGE=10; let allWps=[], projId='', sortCol='cost_code', sortDir=1, curPage=1;
-const colGroups={identity:true,schedule:true,budget:true};
+const PAGE=10; let allWPs=[], projId='', sortCol='cost_code', sortDir=1, curPage=1;
+const colGroups={identity:true,schedule:true,budget:true,assign:false};
+let userProfile, officers=[];
+
 const COLS={
-  identity:[{key:'cost_code',label:'Cost Code',w:'95px'},{key:'wp_no',label:'WP No.',w:'85px'},{key:'description',label:'Work Package',w:'180px'},{key:'zone',label:'Zone',w:'70px'},{key:'trade',label:'Trade',w:'110px'}],
-  schedule:[{key:'lead_time_days',label:'Lead Time (Days)',w:'70px'},{key:'awarding_date',label:'Awarding Date',w:'82px'},{key:'actual_awarding_date',label:'Actual Awarding',w:'82px'},{key:'_alt',label:'Awarding Lead Time',w:'82px'},{key:'target_delivery_date',label:'Target Delivery',w:'82px'},{key:'_dl',label:'Delivery Lead Time',w:'78px'},{key:'target_installation_date',label:"Target Inst'n",w:'82px'},{key:'target_completion_date',label:"Target Comp'n",w:'82px'}],
-  budget:[{key:'approved_budget_php',label:'Approved Budget',w:'98px'},{key:'contract_amount_php',label:'Contract Amount',w:'98px'},{key:'_var',label:'Variance (₱)',w:'88px'},{key:'_varp',label:'Variance (%)',w:'68px'},{key:'status',label:'Status',w:'108px'},{key:'contractor',label:'Contractor',w:'130px'},{key:'remarks',label:'Remarks',w:'150px'}]
+  identity:[
+    {key:'cost_code',label:'Cost Code',w:'95px'},
+    {key:'wp_no',label:'WP No.',w:'85px'},
+    {key:'description',label:'Work Package',w:'180px'},
+    {key:'zone',label:'Zone',w:'70px'},
+    {key:'trade',label:'Trade',w:'110px'},
+  ],
+  schedule:[
+    {key:'lead_time_days',label:'Lead Time (d)',w:'65px'},
+    {key:'awarding_date',label:'Awarding Date',w:'82px'},
+    {key:'actual_awarding_date',label:'Actual Awarding',w:'82px'},
+    {key:'_alt',label:'Award Lead Time',w:'80px'},
+    {key:'target_delivery_date',label:'Target Delivery',w:'82px'},
+    {key:'_dl',label:'Delivery Lead Time',w:'78px'},
+    {key:'target_installation_date',label:"Target Inst'n",w:'82px'},
+    {key:'target_completion_date',label:"Target Comp'n",w:'82px'},
+  ],
+  budget:[
+    {key:'approved_budget_php',label:'Budget',w:'90px'},
+    {key:'contract_amount_php',label:'Contract',w:'90px'},
+    {key:'_var',label:'Variance (₱)',w:'88px'},
+    {key:'_varp',label:'Variance (%)',w:'68px'},
+    {key:'status',label:'Status',w:'108px'},
+    {key:'contractor',label:'Contractor',w:'120px'},
+    {key:'remarks',label:'Remarks',w:'140px'},
+  ],
+  assign:[
+    {key:'_officer',label:'Assigned Officer',w:'150px'},
+    {key:'_actions',label:'Actions',w:'120px'},
+  ],
 };
 
-function getActiveCols() {
-  return [...(colGroups.identity?COLS.identity:[]),...(colGroups.schedule?COLS.schedule:[]),...(colGroups.budget?COLS.budget:[])];
+function getActiveCols(){
+  return[...(colGroups.identity?COLS.identity:[]),...(colGroups.schedule?COLS.schedule:[]),
+    ...(colGroups.budget?COLS.budget:[]),...(colGroups.assign?COLS.assign:[])];
 }
 
-function toggleCol(grp) {
+function toggleCol(grp){
   colGroups[grp]=!colGroups[grp];
   document.getElementById('tog-'+grp).classList.toggle('active',colGroups[grp]);
   buildTable();
 }
 
-function getFiltered() {
+function getFiltered(){
   const st=document.getElementById('f-status').value, tr=document.getElementById('f-trade').value;
   const zn=document.getElementById('f-zone').value, sr=document.getElementById('f-search').value.toLowerCase();
-  return allWps.filter(w=>{
-    if(st!=='all'&&w.status!==st) return false;
-    if(tr!=='all'&&w.trade!==tr)  return false;
-    if(zn!=='all'&&w.zone!==zn)   return false;
-    if(sr&&!w.description.toLowerCase().includes(sr)&&!w.wp_no.toLowerCase().includes(sr)&&!w.cost_code.toLowerCase().includes(sr)) return false;
+  return allWPs.filter(w=>{
+    if(st!=='all'&&w.status!==st)return false;
+    if(tr!=='all'&&w.trade!==tr)return false;
+    if(zn!=='all'&&w.zone!==zn)return false;
+    if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
     return true;
   }).sort((a,b)=>{
-    const keyMap={_alt:'awarding_date',_dl:'target_delivery_date',_var:'approved_budget_php',_varp:'approved_budget_php'};
-    const col=keyMap[sortCol]||sortCol;
-    const va=a[col]??'', vb=b[col]??'';
+    const km={_alt:'awarding_date',_dl:'target_delivery_date',_var:'approved_budget_php',_varp:'approved_budget_php',_officer:'assigned_officer_name',_actions:''};
+    const col=km[sortCol]||sortCol;
+    const va=a[col]??'',vb=b[col]??'';
     return typeof va==='number'?(va-vb)*sortDir:String(va).localeCompare(String(vb))*sortDir;
   });
 }
 
-function buildMetrics(wps) {
+function buildMetrics(wps){
   const s=computeStats(wps);
   document.getElementById('metrics-grid').innerHTML=[
-    {lbl:'Total packages',    val:s.total,                                     sub:'',                      cls:'',     accent:'blue'},
-    {lbl:'Awarded',           val:s.awarded.length,                            sub:s.awardRate+'% award rate',cls:'green',accent:'green'},
-    {lbl:'Partially awarded', val:s.partial.length,                            sub:'',                      cls:'amber',accent:'amber'},
-    {lbl:'Not yet awarded',   val:s.notYet.length,                             sub:'',                      cls:'red',  accent:'red'},
-    {lbl:'Total budget',      val:Fmt.money(s.totalBudget,1),                  sub:'approved ABC',          cls:'',     accent:'blue'},
-    {lbl:'Total contract',    val:Fmt.money(s.totalContract,1),                sub:'awarded + partial',     cls:'',     accent:'blue'},
-    {lbl:'Net variance',      val:(s.netVariance>=0?'+':'')+Fmt.money(s.netVariance,1), sub:s.netVariance>=0?'savings':'overrun',cls:s.netVariance>=0?'green':'red',accent:s.netVariance>=0?'green':'red'},
-    {lbl:'Late awards',       val:s.lateAwards,                                sub:'actual > target',       cls:s.lateAwards>0?'red':'green',accent:s.lateAwards>0?'red':'green'},
+    {lbl:'Total packages',   val:s.total,                                   sub:'',                  cls:'',    accent:'blue'},
+    {lbl:'Awarded',          val:s.awarded.length,                          sub:s.awardRate+'% rate', cls:'green',accent:'green'},
+    {lbl:'Partially awarded',val:s.partial.length,                          sub:'',                  cls:'amber',accent:'amber'},
+    {lbl:'Not yet awarded',  val:s.notYet.length,                           sub:'',                  cls:'red',  accent:'red'},
+    {lbl:'Total budget',     val:Fmt.money(s.totalBudget,1),                sub:'',                  cls:'',    accent:'blue'},
+    {lbl:'Total contract',   val:Fmt.money(s.totalContract,1),              sub:'',                  cls:'',    accent:'blue'},
+    {lbl:'Net variance',     val:(s.netVariance>=0?'+':'')+Fmt.money(s.netVariance,1),
+      sub:s.netVariance>=0?'savings':'overrun',cls:s.netVariance>=0?'green':'red',accent:s.netVariance>=0?'green':'red'},
+    {lbl:'Late awards',      val:s.lateAwards,                              sub:'actual > target',   cls:s.lateAwards>0?'red':'green',accent:s.lateAwards>0?'red':'green'},
   ].map(c=>`<div class="metric-card accent-${c.accent}">
     <div class="metric-label">${c.lbl}</div>
     <div class="metric-value ${c.cls}">${c.val}</div>
     ${c.sub?`<div class="metric-sub">${c.sub}</div>`:''}</div>`).join('');
 }
 
-function buildTable() {
+function buildRankList(id,items,cls,fmtFn){
+  const el=document.getElementById(id);if(!el)return;
+  if(!items.length){el.innerHTML='<div class="empty-state"><i class="ti ti-circle-off"></i>No data</div>';return;}
+  const max=Math.max(...items.map(i=>Math.abs(i.val)),0.01);
+  el.innerHTML=items.map((it,i)=>`<div class="rank-item">
+    <span class="rank-num">${i+1}</span>
+    <div class="rank-body">
+      <div class="rank-name">${it.name}</div><div class="rank-sub">${it.sub}</div>
+      <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${Math.round(Math.abs(it.val)/max*100)}%;background:${it.color}"></div></div>
+    </div>
+    <span class="rank-val ${cls}">${fmtFn(it.val)}</span></div>`).join('');
+}
+
+async function assignOfficer(firestoreId, selectEl){
+  const uid = selectEl.value;
+  if (!uid) return;
+  const officer = officers.find(o=>o.uid===uid);
+  if (!officer) return;
+  try {
+    await WPDb.assignOfficer(firestoreId, uid, officer.name);
+    selectEl.style.borderColor = '#1D9E75';
+    setTimeout(()=>selectEl.style.borderColor='',2000);
+  } catch(e) { alert('Error assigning officer: '+e.message); }
+}
+
+function buildTable(){
   const filtered=getFiltered(), cols=getActiveCols();
   const total=filtered.length, pages=Math.max(1,Math.ceil(total/PAGE));
   curPage=Math.min(curPage,pages);
@@ -240,35 +306,46 @@ function buildTable() {
   const grpRow=document.createElement('tr');
   [{show:colGroups.identity,label:'Identity & Classification',span:COLS.identity.length},
    {show:colGroups.schedule,label:'Procurement Schedule',span:COLS.schedule.length},
-   {show:colGroups.budget,  label:'Budget & Contract',span:COLS.budget.length}].forEach(g=>{
-    if(!g.show) return;
-    const th=document.createElement('th'); th.colSpan=g.span; th.className='group-header'; th.textContent=g.label; grpRow.appendChild(th);
+   {show:colGroups.budget,  label:'Budget & Contract',span:COLS.budget.length},
+   {show:colGroups.assign&&userProfile?.role==='admin',label:'Officer Assignment',span:COLS.assign.length}
+  ].forEach(g=>{
+    if(!g.show)return;
+    const th=document.createElement('th');th.colSpan=g.span;th.className='group-header';th.textContent=g.label;grpRow.appendChild(th);
   });
   thead.appendChild(grpRow);
   const colRow=document.createElement('tr');
   cols.forEach(c=>{
-    const th=document.createElement('th'); th.style.minWidth=c.w;
+    const th=document.createElement('th');th.style.minWidth=c.w;
     th.innerHTML=c.label+(sortCol===c.key?(sortDir===1?' ↑':' ↓'):'');
-    th.addEventListener('click',()=>{ if(sortCol===c.key)sortDir*=-1;else{sortCol=c.key;sortDir=1;} curPage=1; buildTable(); });
+    th.addEventListener('click',()=>{if(sortCol===c.key)sortDir*=-1;else{sortCol=c.key;sortDir=1;}curPage=1;buildTable();});
     colRow.appendChild(th);
   });
   thead.appendChild(colRow);
 
-  const tbody=document.getElementById('tbl-body'); tbody.innerHTML='';
+  const tbody=document.getElementById('tbl-body');tbody.innerHTML='';
   let lastZone=null;
   slice.forEach(w=>{
     if(colGroups.identity&&w.zone!==lastZone){
       lastZone=w.zone;
-      const zr=document.createElement('tr'); zr.className='zone-row';
-      const ztd=document.createElement('td'); ztd.colSpan=cols.length;
+      const zr=document.createElement('tr');zr.className='zone-row';
+      const ztd=document.createElement('td');ztd.colSpan=cols.length;
       ztd.innerHTML='<i class="ti ti-building" style="margin-right:6px;font-size:11px"></i>'+w.zone;
-      zr.appendChild(ztd); tbody.appendChild(zr);
+      zr.appendChild(ztd);tbody.appendChild(zr);
     }
+
+    /* Officer dropdown for admin */
+    const officerHtml = userProfile?.role==='admin' ?
+      `<select class="assign-sel" onchange="assignOfficer('${w.firestore_id}',this)" title="Assign officer">
+        <option value="">— Assign officer —</option>
+        ${officers.map(o=>`<option value="${o.uid}" ${w.assigned_officer_uid===o.uid?'selected':''}>${o.name}</option>`).join('')}
+      </select>` :
+      (w.assigned_officer_name||'<span class="lt-na">Unassigned</span>');
+
     const cellMap={
-      cost_code:`<span class="td-code">${w.cost_code}</span>`,
-      wp_no:`<span class="td-code">${w.wp_no}</span>`,
-      description:`<span class="td-name">${w.description}</span>`,
-      zone:w.zone, trade:w.trade,
+      cost_code:`<span class="td-code">${w.cost_code||'—'}</span>`,
+      wp_no:`<span class="td-code">${w.wp_no||'—'}</span>`,
+      description:`<span class="td-name">${w.description||'—'}</span>`,
+      zone:w.zone||'—', trade:w.trade||'—',
       lead_time_days:(w.lead_time_days??'—')+(w.lead_time_days?'d':''),
       awarding_date:Fmt.date(w.awarding_date),
       actual_awarding_date:Fmt.date(w.actual_awarding_date),
@@ -284,27 +361,16 @@ function buildTable() {
       status:Fmt.badgeHtml(w.status),
       contractor:w.contractor||'<span class="lt-na">—</span>',
       remarks:`<span style="font-size:10px;color:var(--text-secondary)">${w.remarks||'—'}</span>`,
+      _officer:officerHtml,
+      _actions:`<a href="wp-form.html?id=${w.firestore_id}&project=${projId}" class="btn" style="font-size:10px;padding:3px 8px"><i class="ti ti-edit" style="font-size:11px"></i> Edit</a>`,
     };
     const tr=document.createElement('tr');
-    cols.forEach(c=>{ const td=document.createElement('td'); td.innerHTML=cellMap[c.key]??'—'; tr.appendChild(td); });
+    cols.forEach(c=>{const td=document.createElement('td');td.innerHTML=cellMap[c.key]??'—';tr.appendChild(td);});
     tbody.appendChild(tr);
   });
 }
 
 function changePage(d){curPage+=d;buildTable();}
-
-function buildRankList(id,items,cls,fmtFn){
-  const el=document.getElementById(id); if(!el) return;
-  if(!items.length){el.innerHTML='<div class="empty-state"><i class="ti ti-circle-off"></i>No data</div>';return;}
-  const max=Math.max(...items.map(i=>Math.abs(i.val)),0.01);
-  el.innerHTML=items.map((it,i)=>`<div class="rank-item">
-    <span class="rank-num">${i+1}</span>
-    <div class="rank-body">
-      <div class="rank-name">${it.name}</div><div class="rank-sub">${it.sub}</div>
-      <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${Math.round(Math.abs(it.val)/max*100)}%;background:${it.color}"></div></div>
-    </div>
-    <span class="rank-val ${cls}">${fmtFn(it.val)}</span></div>`).join('');
-}
 
 function refresh(){
   const f=getFiltered();
@@ -322,6 +388,7 @@ function refresh(){
 }
 
 AppAuth.requireLogin(async (user, profile) => {
+  userProfile = profile;
   projId = new URLSearchParams(location.search).get('id');
   if (!projId) { location.href='index.html'; return; }
 
@@ -330,29 +397,44 @@ AppAuth.requireLogin(async (user, profile) => {
     document.getElementById('main-content').innerHTML=`<div class="loading-overlay" style="flex-direction:column;gap:12px;padding:60px 20px;text-align:center">
       <i class="ti ti-lock" style="font-size:48px;color:#E24B4A;opacity:.5"></i>
       <p style="font-size:15px;font-weight:600">Access Denied</p>
-      <p style="font-size:12px;color:#5A5A6A">You do not have permission to view project <strong>${projId}</strong>.</p>
+      <p style="font-size:12px;color:#5A5A6A">You do not have permission to view <strong>${projId}</strong>.</p>
       <a href="index.html" class="btn btn-primary" style="margin-top:8px;display:inline-flex"><i class="ti ti-arrow-left"></i>Back</a></div>`;
     document.getElementById('main-content').style.display='block'; return;
   }
 
   AppAuth.renderUserBar('user-bar', profile);
-  if (profile.role==='admin') document.getElementById('sidebar-admin').style.display='block';
 
-  const projects = await DataStore.loadProjects();
-  const meta = projects.find(p=>p.id===projId);
-  const wpData = await DataStore.loadWorkPackages(projId);
-  allWps = wpData.work_packages;
+  if (profile.role==='admin') {
+    document.getElementById('sidebar-admin').style.display='block';
+    document.getElementById('tog-assign').style.display='inline-block';
+    document.getElementById('add-wp-link-admin').href='wp-form.html?project='+projId;
+    WPDb.getPendingWPs().then(wps=>{
+      if(wps.length>0){const b=document.getElementById('pending-badge');b.textContent=wps.length;b.style.display='inline';}
+    });
+    officers = await AppAuth.getOfficers();
+  }
+  if (profile.role==='procurement_officer') {
+    document.getElementById('sidebar-officer').style.display='block';
+    document.getElementById('add-wp-link').href='wp-form.html?project='+projId;
+  }
+
+  /* Load project metadata */
+  const meta = await WPDb.getProject(projId);
+  if (!meta) { location.href='index.html'; return; }
 
   document.title = meta.name+' — WPM';
   document.getElementById('page-title').textContent = meta.name;
   document.getElementById('page-sub').textContent   = meta.location+' · '+meta.type;
-  document.getElementById('rev-badge').textContent  = wpData.rev+' · '+wpData.rev_date;
+  document.getElementById('rev-badge').textContent  = meta.rev+' · '+meta.rev_date;
   document.getElementById('nav-proj-name').textContent = meta.name;
 
+  /* Load approved WPs */
+  allWPs = await WPDb.getApprovedWPs(projId);
+
   /* Populate filters */
-  const trades=[...new Set(allWps.map(w=>w.trade))].sort();
+  const trades=[...new Set(allWPs.map(w=>w.trade))].sort();
   document.getElementById('f-trade').innerHTML='<option value="all">All trades</option>'+trades.map(t=>`<option value="${t}">${t}</option>`).join('');
-  const zones=[...new Set(allWps.map(w=>w.zone))].sort();
+  const zones=[...new Set(allWPs.map(w=>w.zone))].sort();
   document.getElementById('f-zone').innerHTML='<option value="all">All zones</option>'+zones.map(z=>`<option value="${z}">${z}</option>`).join('');
 
   ['f-status','f-trade','f-zone'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{curPage=1;refresh();}));

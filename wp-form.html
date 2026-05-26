@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Work Package Form — EPC WPM</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css"/>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="assets/js/firebase-config.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/db.js"></script>
+  <style>
+    .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+    .form-group{display:flex;flex-direction:column;gap:5px}
+    .form-group label{font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em}
+    .form-group input,.form-group select,.form-group textarea{
+      font-size:12px;padding:8px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);
+      background:var(--surface-2);color:var(--text-primary);outline:none;transition:border-color .15s;width:100%}
+    .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--blue-400);background:#fff}
+    .form-group textarea{resize:vertical;min-height:80px}
+    .form-group .hint{font-size:10px;color:var(--text-hint)}
+    .form-group.full{grid-column:1/-1}
+    .form-section{margin-bottom:24px}
+    .form-section-title{font-size:12px;font-weight:700;color:var(--blue-800);text-transform:uppercase;
+      letter-spacing:.06em;padding-bottom:8px;border-bottom:2px solid var(--blue-50);margin-bottom:16px}
+    .alert{border-radius:var(--radius-md);padding:12px 14px;font-size:12px;margin-bottom:16px;display:flex;align-items:flex-start;gap:8px}
+    .alert-error{background:#FFF0F0;border:1px solid #FFD0D0;color:var(--red-400)}
+    .alert-success{background:#EAF3DE;border:1px solid #B8DDA0;color:#3B6D11}
+    .alert.hidden{display:none!important}
+    .form-actions{display:flex;gap:10px;flex-wrap:wrap;padding-top:16px;border-top:1px solid var(--border)}
+    .status-info{background:var(--blue-50);border:1px solid var(--blue-100);border-radius:var(--radius-md);
+      padding:12px 14px;font-size:12px;color:var(--blue-800);margin-bottom:20px;display:flex;gap:10px;align-items:flex-start}
+    .rejection-box{background:#FFF0F0;border:1px solid #FFD0D0;border-radius:var(--radius-md);
+      padding:12px 14px;font-size:12px;color:var(--red-600);margin-bottom:20px}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="org">EPC · Procurement</div>
+      <div class="app-name">Consolidated<br>Dashboard</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Navigation</div>
+      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Dashboard</a>
+      <a class="nav-item" id="nav-project-link" href="index.html"><i class="ti ti-building-skyscraper"></i><span id="nav-project-name">Project</span></a>
+      <a class="nav-item active" href="#"><i class="ti ti-forms"></i>WP Form</a>
+    </div>
+    <div id="sidebar-admin" style="display:none">
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Admin</div>
+        <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+        <a class="nav-item" href="review.html"><i class="ti ti-clipboard-check"></i>Review WPs <span class="tbadge" id="pending-badge" style="display:none"></span></a>
+      </div>
+    </div>
+    <div class="sidebar-footer">EPC · PRC WPM Dashboard</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="page-title" id="page-title">Work Package Form</div>
+        <div class="page-sub" id="page-sub">Add or edit a work package</div>
+      </div>
+      <div class="topbar-right"><div id="user-bar"></div></div>
+    </div>
+    <div class="content">
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading…</span></div>
+      <div id="main-content" style="display:none">
+
+        <div class="status-info" id="status-info" style="display:none">
+          <i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
+          <div id="status-info-text"></div>
+        </div>
+
+        <div class="rejection-box hidden" id="rejection-box">
+          <strong><i class="ti ti-x" style="font-size:13px;vertical-align:middle"></i> Rejected</strong>
+          <div id="rejection-reason" style="margin-top:4px"></div>
+        </div>
+
+        <div class="alert alert-error hidden" id="alert">
+          <i class="ti ti-alert-circle" style="flex-shrink:0"></i><span id="alert-text"></span>
+        </div>
+        <div class="alert alert-success hidden" id="success">
+          <i class="ti ti-circle-check" style="flex-shrink:0"></i><span id="success-text"></span>
+        </div>
+
+        <div class="panel">
+          <!-- Identity -->
+          <div class="form-section">
+            <div class="form-section-title"><i class="ti ti-id-badge" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Identity & Classification</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Cost Code No. *</label>
+                <input type="text" id="f-cost-code" placeholder="e.g. CC-002-004"/>
+              </div>
+              <div class="form-group">
+                <label>WP No. *</label>
+                <input type="text" id="f-wp-no" placeholder="e.g. WP-T1-004"/>
+              </div>
+              <div class="form-group full">
+                <label>Work Package Description *</label>
+                <input type="text" id="f-description" placeholder="e.g. Structural Steel Framework"/>
+              </div>
+              <div class="form-group">
+                <label>Project *</label>
+                <select id="f-project"><option value="">Select project…</option></select>
+              </div>
+              <div class="form-group">
+                <label>Zone *</label>
+                <input type="text" id="f-zone" placeholder="e.g. Tower 1, Gen Req"/>
+              </div>
+              <div class="form-group">
+                <label>Trade / Discipline *</label>
+                <select id="f-trade">
+                  <option value="">Select trade…</option>
+                  <option>Civil Works</option><option>Structural Steel</option>
+                  <option>Concrete Works</option><option>Waterproofing</option>
+                  <option>Mechanical</option><option>Electrical</option>
+                  <option>Plumbing</option><option>HVAC</option>
+                  <option>Facade</option><option>Finishes</option>
+                  <option>Landscaping</option><option>Fire Protection</option>
+                  <option>Elevators</option><option>Fit-out</option>
+                  <option>General Requirements</option><option>Specialty</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Schedule -->
+          <div class="form-section">
+            <div class="form-section-title"><i class="ti ti-calendar" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Procurement Schedule</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Lead Time (Days) *</label>
+                <input type="number" id="f-lead-time" placeholder="e.g. 90" min="0"/>
+              </div>
+              <div class="form-group">
+                <label>Awarding Date (Planned) *</label>
+                <input type="date" id="f-awarding-date"/>
+              </div>
+              <div class="form-group">
+                <label>Actual Awarding Date</label>
+                <input type="date" id="f-actual-awarding-date"/>
+                <span class="hint">Leave blank if not yet awarded</span>
+              </div>
+              <div class="form-group">
+                <label>Target Delivery Date *</label>
+                <input type="date" id="f-target-delivery"/>
+              </div>
+              <div class="form-group">
+                <label>Target Installation Date</label>
+                <input type="date" id="f-target-installation"/>
+                <span class="hint">Leave blank if not applicable</span>
+              </div>
+              <div class="form-group">
+                <label>Target Completion Date *</label>
+                <input type="date" id="f-target-completion"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- Budget -->
+          <div class="form-section">
+            <div class="form-section-title"><i class="ti ti-coins" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Budget & Contract</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Approved Budget / ABC (₱) *</label>
+                <input type="number" id="f-budget" placeholder="e.g. 185000000" min="0"/>
+                <span class="hint" id="budget-display"></span>
+              </div>
+              <div class="form-group">
+                <label>Contract Amount (₱)</label>
+                <input type="number" id="f-contract" placeholder="Leave blank if not yet awarded" min="0"/>
+                <span class="hint" id="contract-display"></span>
+              </div>
+              <div class="form-group" id="variance-group" style="display:none">
+                <label>Variance (computed)</label>
+                <div id="variance-display" style="font-size:14px;font-weight:600;padding:8px 0"></div>
+              </div>
+              <div class="form-group">
+                <label>Procurement Status *</label>
+                <select id="f-status">
+                  <option value="Not Yet Awarded">Not Yet Awarded</option>
+                  <option value="Partially Awarded">Partially Awarded</option>
+                  <option value="Awarded">Awarded</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Contractor / Supplier</label>
+                <input type="text" id="f-contractor" placeholder="Leave blank if not yet awarded"/>
+              </div>
+              <div class="form-group full">
+                <label>Remarks / Notes</label>
+                <textarea id="f-remarks" placeholder="Issues, escalations, scope changes, etc."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="form-actions">
+            <button class="btn btn-primary" id="btn-submit" onclick="submitForm()">
+              <i class="ti ti-send" style="font-size:13px"></i>
+              <span id="btn-submit-text">Submit for Review</span>
+            </button>
+            <button class="btn" onclick="history.back()">
+              <i class="ti ti-arrow-left" style="font-size:13px"></i> Cancel
+            </button>
+            <div id="save-spinner" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary)">
+              <div class="spinner" style="width:18px;height:18px;border-width:2px"></div> Saving…
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const editId = params.get('id');   // firestore_id of WP being edited
+  const projId = params.get('project'); // pre-fill project
+  let userProfile, existingWP, allProjects;
+
+  /* Format money helper */
+  function fmtPeso(v) {
+    if (!v) return '';
+    return '₱' + Number(v).toLocaleString('en-PH') + ' (₱' + (v/1e6).toFixed(2) + 'M)';
+  }
+
+  /* Live variance display */
+  function updateVariance() {
+    const b = parseFloat(document.getElementById('f-budget').value);
+    const c = parseFloat(document.getElementById('f-contract').value);
+    document.getElementById('budget-display').textContent = b ? fmtPeso(b) : '';
+    document.getElementById('contract-display').textContent = c ? fmtPeso(c) : '';
+    if (b && c) {
+      const v = b - c;
+      const vg = document.getElementById('variance-group');
+      const vd = document.getElementById('variance-display');
+      vg.style.display = 'flex';
+      const cls = v >= 0 ? 'color:#1D9E75' : 'color:#E24B4A';
+      vd.innerHTML = `<span style="${cls}">${v >= 0 ? '+' : ''}₱${(v/1e6).toFixed(2)}M (${v >= 0 ? '+' : ''}${(v/b*100).toFixed(1)}%)</span>`;
+    } else {
+      document.getElementById('variance-group').style.display = 'none';
+    }
+  }
+
+  ['f-budget','f-contract'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateVariance);
+  });
+
+  AppAuth.requireLogin(async (user, profile) => {
+    userProfile = profile;
+    AppAuth.renderUserBar('user-bar', profile);
+    if (profile.role === 'admin') {
+      document.getElementById('sidebar-admin').style.display = 'block';
+      /* Show pending count */
+      WPDb.getPendingWPs().then(wps => {
+        if (wps.length > 0) {
+          const b = document.getElementById('pending-badge');
+          b.textContent = wps.length; b.style.display = 'inline';
+        }
+      });
+    }
+
+    /* Load projects */
+    allProjects = await WPDb.getProjects();
+    const permitted = AppAuth.getPermittedProjects(profile, allProjects);
+    const projSel = document.getElementById('f-project');
+    permitted.forEach(p => {
+      projSel.innerHTML += `<option value="${p.id}">${p.id} — ${p.name}</option>`;
+    });
+    if (projId) projSel.value = projId;
+
+    /* Load existing WP if editing */
+    if (editId) {
+      existingWP = await WPDb.getWP(editId);
+      if (!existingWP) { alert('Work package not found.'); history.back(); return; }
+
+      /* Check permission — officer must be assigned */
+      if (profile.role !== 'admin' && existingWP.assigned_officer_uid !== profile.uid) {
+        alert('You are not assigned to this work package.');
+        history.back(); return;
+      }
+
+      document.getElementById('page-title').textContent = 'Edit Work Package';
+      document.getElementById('page-sub').textContent = existingWP.wp_no + ' — ' + existingWP.description;
+      document.getElementById('btn-submit-text').textContent = 'Submit Update for Review';
+
+      /* Show review status */
+      if (existingWP.review_status === 'rejected') {
+        const rb = document.getElementById('rejection-box');
+        rb.classList.remove('hidden');
+        document.getElementById('rejection-reason').textContent = 'Reason: ' + (existingWP.rejection_reason || 'No reason provided');
+      } else if (existingWP.review_status === 'pending_review') {
+        const si = document.getElementById('status-info');
+        si.style.display = 'flex';
+        document.getElementById('status-info-text').textContent = 'This work package is currently pending admin review. You can update it and resubmit.';
+      }
+
+      /* Fill form */
+      const fill = (id, val) => { const el=document.getElementById(id); if(el&&val!=null) el.value=val; };
+      fill('f-cost-code', existingWP.cost_code);
+      fill('f-wp-no', existingWP.wp_no);
+      fill('f-description', existingWP.description);
+      fill('f-project', existingWP.project_id);
+      fill('f-zone', existingWP.zone);
+      fill('f-trade', existingWP.trade);
+      fill('f-lead-time', existingWP.lead_time_days);
+      fill('f-awarding-date', existingWP.awarding_date);
+      fill('f-actual-awarding-date', existingWP.actual_awarding_date);
+      fill('f-target-delivery', existingWP.target_delivery_date);
+      fill('f-target-installation', existingWP.target_installation_date);
+      fill('f-target-completion', existingWP.target_completion_date);
+      fill('f-budget', existingWP.approved_budget_php);
+      fill('f-contract', existingWP.contract_amount_php);
+      fill('f-status', existingWP.status);
+      fill('f-contractor', existingWP.contractor);
+      fill('f-remarks', existingWP.remarks);
+      updateVariance();
+
+      /* Update sidebar project link */
+      document.getElementById('nav-project-name').textContent = existingWP.project_id;
+      document.getElementById('nav-project-link').href = 'project.html?id=' + existingWP.project_id;
+    }
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+  });
+
+  function getVal(id) { return document.getElementById(id).value.trim(); }
+  function getNum(id) { const v=parseFloat(document.getElementById(id).value); return isNaN(v)?null:v; }
+
+  async function submitForm() {
+    const alertEl = document.getElementById('alert');
+    const successEl = document.getElementById('success');
+    alertEl.className = 'alert alert-error hidden';
+    successEl.className = 'alert alert-success hidden';
+
+    const showErr = msg => { document.getElementById('alert-text').textContent=msg; alertEl.className='alert alert-error'; };
+
+    /* Validate required fields */
+    if (!getVal('f-cost-code'))      return showErr('Cost Code No. is required.');
+    if (!getVal('f-wp-no'))          return showErr('WP No. is required.');
+    if (!getVal('f-description'))    return showErr('Work Package Description is required.');
+    if (!getVal('f-project'))        return showErr('Please select a project.');
+    if (!getVal('f-zone'))           return showErr('Zone is required.');
+    if (!getVal('f-trade'))          return showErr('Trade is required.');
+    if (!getVal('f-lead-time'))      return showErr('Lead Time (Days) is required.');
+    if (!getVal('f-awarding-date'))  return showErr('Awarding Date is required.');
+    if (!getVal('f-target-delivery'))return showErr('Target Delivery Date is required.');
+    if (!getVal('f-target-completion'))return showErr('Target Completion Date is required.');
+    if (!getNum('f-budget'))         return showErr('Approved Budget is required.');
+
+    const data = {
+      cost_code:                getVal('f-cost-code'),
+      wp_no:                    getVal('f-wp-no'),
+      description:              getVal('f-description'),
+      project_id:               getVal('f-project'),
+      zone:                     getVal('f-zone'),
+      trade:                    getVal('f-trade'),
+      lead_time_days:           getNum('f-lead-time'),
+      awarding_date:            getVal('f-awarding-date') || null,
+      actual_awarding_date:     getVal('f-actual-awarding-date') || null,
+      target_delivery_date:     getVal('f-target-delivery') || null,
+      target_installation_date: getVal('f-target-installation') || null,
+      target_completion_date:   getVal('f-target-completion') || null,
+      approved_budget_php:      getNum('f-budget'),
+      contract_amount_php:      getNum('f-contract'),
+      status:                   getVal('f-status'),
+      contractor:               getVal('f-contractor') || null,
+      remarks:                  getVal('f-remarks') || '',
+    };
+
+    const btn = document.getElementById('btn-submit');
+    const spinner = document.getElementById('save-spinner');
+    btn.disabled = true; spinner.style.display = 'flex';
+
+    try {
+      if (editId && existingWP) {
+        await WPDb.updateWP(editId, data, userProfile);
+        document.getElementById('success-text').textContent = 'Work package updated and submitted for admin review.';
+      } else {
+        await WPDb.submitWP(data, userProfile);
+        document.getElementById('success-text').textContent = 'Work package submitted for admin review successfully.';
+      }
+      successEl.className = 'alert alert-success';
+      successEl.scrollIntoView({ behavior:'smooth' });
+      /* Clear form if new */
+      if (!editId) {
+        ['f-cost-code','f-wp-no','f-description','f-zone','f-actual-awarding-date',
+         'f-target-installation','f-contract','f-contractor','f-remarks'].forEach(id=>{
+          document.getElementById(id).value='';
+        });
+        updateVariance();
+      }
+    } catch(e) {
+      showErr('Error saving: ' + e.message);
+    }
+
+    btn.disabled = false; spinner.style.display = 'none';
+  }
+</script>
+<style>
+  .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
+</style>
+</body>
+</html>
