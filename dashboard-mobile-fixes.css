@@ -1,0 +1,222 @@
+/* ============================================================
+   dashboard-mobile-fixes.css
+   Append this to the bottom of assets/css/dashboard.css
+   OR add <link rel="stylesheet" href="assets/css/dashboard-mobile-fixes.css">
+   after your main stylesheet link.
+   ============================================================ */
+
+/* ── LOGO: no black box bleed-through ── */
+.sidebar-logo,
+.nav-logo,
+.header-logo {
+  background: transparent !important;
+}
+.sidebar-logo img,
+.nav-logo img,
+.header-logo img {
+  background: transparent;
+  mix-blend-mode: normal;
+  max-height: 36px;
+  width: auto;
+  display: block;
+}
+/* Logo on dark sidebar (#231F20 bg) — use logo-white.png */
+/* Logo on light header (#fff bg) — use logo-full-color.png via JS class swap below */
+
+/* ── TOPBAR: prevent user name overflow on mobile ── */
+.topbar,
+.page-header,
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+.topbar-user-info,
+.user-display-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: calc(100vw - 120px);
+}
+.topbar-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── KPI CARDS: 2-col on tablet, 1-col on phone ── */
+.kpi-grid,
+.stats-grid,
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+@media (max-width: 480px) {
+  .kpi-grid,
+  .stats-grid,
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── MODALS: always fully visible, button never clipped ── */
+.modal-backdrop,
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal,
+.modal-container,
+.modal-card {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 440px;
+
+  /* KEY: flex column so footer always stays at bottom */
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 88vh;
+  overflow: hidden !important; /* clip but don't scroll the whole modal */
+}
+.modal-header {
+  flex-shrink: 0;
+  padding: 20px 20px 0;
+}
+.modal-body,
+.modal-content,
+.modal-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 20px;
+}
+.modal-footer,
+.modal-actions {
+  flex-shrink: 0 !important; /* NEVER hidden */
+  padding: 12px 20px 20px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  gap: 10px;
+}
+
+/* ── TABLES: horizontal scroll wrapper ── */
+.table-container,
+.table-scroll,
+.wp-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.wp-table,
+.data-table,
+table.register {
+  min-width: 700px;
+  width: 100%;
+}
+
+/* ── FILTER BAR: wrap filters on mobile ── */
+.filter-bar,
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.filter-bar select,
+.filter-bar input[type="text"],
+.filter-bar input[type="search"] {
+  min-width: 0;
+  flex: 1 1 140px;
+}
+
+/* ── EXPORT / ACTION BUTTONS: icon-only on small screens ── */
+@media (max-width: 520px) {
+  .btn-export-text,
+  .export-label {
+    display: none;
+  }
+  .btn-export::before {
+    content: "↓"; /* fallback icon if Tabler not loaded */
+  }
+}
+
+/* ── REV BADGE: no wrap ── */
+.rev-badge,
+.version-badge {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── STEP TRACKER: horizontal scroll on mobile ── */
+.step-tracker,
+.procurement-steps {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+.step-tracker-inner {
+  min-width: 600px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+/* ── CHARTS: ensure minimum height so they don't collapse ── */
+.chart-container canvas,
+.chart-wrapper canvas {
+  min-height: 180px;
+}
+
+/* ── SIDEBAR: overlay mode on mobile ── */
+@media (max-width: 768px) {
+  .sidebar,
+  .nav-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 260px;
+    z-index: 500;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: 4px 0 20px rgba(0,0,0,.15);
+  }
+  .sidebar.open,
+  .nav-sidebar.open {
+    transform: translateX(0);
+  }
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 499;
+  }
+  .sidebar-overlay.visible {
+    display: block;
+  }
+  .main-content,
+  .dashboard-content {
+    margin-left: 0 !important;
+  }
+}
+
+/* ── PENDING PAGE: fix logo on yellow/cream card ── */
+.pending-card .logo-wrap,
+.approval-card .logo-wrap {
+  background: #231F20;
+  border-radius: 8px;
+  padding: 8px 14px;
+  display: inline-flex;
+}
+.pending-card .logo-wrap img {
+  height: 30px;
+}

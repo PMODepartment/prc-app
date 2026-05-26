@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Select Project — Megawide EPC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      font-family: 'Montserrat', sans-serif;
+      background: #F4F4F4;
+    }
+
+    /* ── Page layout ── */
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 40px 16px 60px;
+    }
+
+    /* ── Header ── */
+    .top-bar {
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 40px;
+    }
+    .logo-wrap {
+      background: #231F20;
+      border-radius: 8px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+    }
+    .logo-wrap img {
+      height: 28px;
+      width: auto;
+      display: block;
+    }
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 24px;
+      padding: 6px 12px 6px 6px;
+      font-size: 13px;
+      color: #231F20;
+    }
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #EE3124;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .logout-btn {
+      background: none;
+      border: none;
+      font-size: 12px;
+      color: #888;
+      cursor: pointer;
+      margin-left: 4px;
+      font-family: 'Montserrat', sans-serif;
+    }
+    .logout-btn:hover { color: #EE3124; }
+
+    /* ── Heading ── */
+    .heading {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .heading h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #231F20;
+      margin-bottom: 6px;
+    }
+    .heading p {
+      font-size: 14px;
+      color: #888;
+    }
+
+    /* ── Project cards grid ── */
+    .cards {
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* ── Consolidated card (special) ── */
+    .card-consolidated {
+      background: #231F20;
+      border-radius: 12px;
+      padding: 20px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+      text-decoration: none;
+    }
+    .card-consolidated:hover {
+      background: #333;
+      transform: translateY(-1px);
+    }
+    .card-consolidated .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .card-consolidated .card-sub {
+      font-size: 12px;
+      color: rgba(255,255,255,.55);
+      margin-top: 2px;
+    }
+    .card-consolidated .card-arrow {
+      color: rgba(255,255,255,.5);
+      font-size: 18px;
+    }
+    .card-consolidated .badge-all {
+      background: rgba(238,49,36,.85);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    /* ── Regular project card ── */
+    .card-project {
+      background: #fff;
+      border: 1px solid #ebebeb;
+      border-radius: 12px;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: border-color .15s, box-shadow .15s, transform .1s;
+      text-decoration: none;
+    }
+    .card-project:hover {
+      border-color: #EE3124;
+      box-shadow: 0 2px 12px rgba(238,49,36,.08);
+      transform: translateY(-1px);
+    }
+    .card-left { flex: 1; }
+    .card-id {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      background: #EE3124;
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #231F20;
+    }
+    .card-sub {
+      font-size: 12px;
+      color: #888;
+      margin-top: 2px;
+    }
+    .card-stats {
+      display: flex;
+      gap: 16px;
+      margin-right: 16px;
+      text-align: center;
+    }
+    .stat-item { }
+    .stat-val {
+      font-size: 16px;
+      font-weight: 700;
+      color: #231F20;
+    }
+    .stat-lbl {
+      font-size: 10px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .card-arrow {
+      color: #ccc;
+      font-size: 18px;
+    }
+    .card-project:hover .card-arrow { color: #EE3124; }
+
+    /* ── Empty / loading states ── */
+    .loading {
+      text-align: center;
+      padding: 40px 0;
+      color: #888;
+      font-size: 14px;
+    }
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid #e5e5e5;
+      border-top-color: #EE3124;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Section separator ── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: #bbb;
+      margin: 16px 0 8px;
+    }
+
+    /* Mobile: hide stats on very small screens */
+    @media (max-width: 400px) {
+      .card-stats { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- Top bar: logo + user -->
+    <div class="top-bar">
+      <div class="logo-wrap">
+        <img src="assets/img/logo-white.png" alt="Megawide Construction">
+      </div>
+      <div class="user-chip">
+        <div class="user-avatar" id="userInitial">F</div>
+        <span id="userName">Loading…</span>
+        <button class="logout-btn" onclick="logout()">Sign out</button>
+      </div>
+    </div>
+
+    <!-- Heading -->
+    <div class="heading">
+      <h1>Select a Project</h1>
+      <p>Choose which project dashboard to open.</p>
+    </div>
+
+    <!-- Cards -->
+    <div class="cards" id="cardContainer">
+      <div class="loading">
+        <div class="spinner"></div>
+        Loading your projects…
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { requireAuth, canAccessConsolidated, logout as authLogout } from './assets/js/auth.js';
+    import { getAllProjects, getProjectKPIs } from './assets/js/db.js';
+
+    window.logout = authLogout;
+
+    async function init() {
+      const user = await requireAuth();
+      if (!user) return;
+
+      // Set user chip
+      document.getElementById('userName').textContent = user.name || user.email;
+      document.getElementById('userInitial').textContent = (user.name || user.email)[0].toUpperCase();
+
+      const container = document.getElementById('cardContainer');
+      container.innerHTML = '';
+
+      // ── Consolidated view (admins / super admins) ──
+      if (canAccessConsolidated(user)) {
+        const consolidatedCard = document.createElement('a');
+        consolidatedCard.href = 'index.html?view=consolidated';
+        consolidatedCard.className = 'card-consolidated';
+        consolidatedCard.innerHTML = `
+          <div>
+            <div class="card-title">
+              Portfolio Overview
+              <span class="badge-all">ALL PROJECTS</span>
+            </div>
+            <div class="card-sub">Consolidated view — all projects &amp; work packages</div>
+          </div>
+          <div class="card-arrow">→</div>
+        `;
+        container.appendChild(consolidatedCard);
+      }
+
+      // ── Per-project cards ──
+      const { data: allProjects } = await getAllProjects();
+      if (!allProjects?.length) {
+        container.innerHTML += '<div style="text-align:center;color:#888;padding:24px;font-size:14px">No projects found.</div>';
+        return;
+      }
+
+      // Filter to user's assigned projects (super_admin sees all)
+      const visibleProjects = user.role === 'super_admin'
+        ? allProjects
+        : allProjects.filter(p => user.projects?.includes(p.id));
+
+      if (!visibleProjects.length) {
+        container.innerHTML += '<div style="text-align:center;color:#888;padding:24px;font-size:14px">No projects assigned yet. Contact your administrator.</div>';
+        return;
+      }
+
+      if (canAccessConsolidated(user)) {
+        const sep = document.createElement('div');
+        sep.className = 'section-label';
+        sep.textContent = 'Individual Projects';
+        container.appendChild(sep);
+      }
+
+      // Load KPIs for each project in parallel
+      const kpiResults = await Promise.all(
+        visibleProjects.map(p => getProjectKPIs(p.id))
+      );
+
+      visibleProjects.forEach((project, i) => {
+        const kpis = kpiResults[i].data;
+        const card = document.createElement('a');
+        card.href = `project.html?id=${project.id}`;
+        card.className = 'card-project';
+        card.innerHTML = `
+          <div class="card-left">
+            <div class="card-id">${project.id}</div>
+            <div class="card-title">${project.name}</div>
+            <div class="card-sub">${project.location || ''}</div>
+          </div>
+          ${kpis ? `
+            <div class="card-stats">
+              <div class="stat-item">
+                <div class="stat-val">${kpis.totalPackages}</div>
+                <div class="stat-lbl">WPs</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-val" style="color:#2D9B6F">${kpis.awarded}</div>
+                <div class="stat-lbl">Awarded</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-val" style="color:${kpis.variance >= 0 ? '#2D9B6F' : '#EE3124'}">
+                  ${kpis.variance >= 0 ? '+' : ''}${(kpis.variancePct).toFixed(1)}%
+                </div>
+                <div class="stat-lbl">Variance</div>
+              </div>
+            </div>
+          ` : ''}
+          <div class="card-arrow">→</div>
+        `;
+        container.appendChild(card);
+      });
+
+      // If only one project and no consolidated access, go directly
+      if (visibleProjects.length === 1 && !canAccessConsolidated(user)) {
+        window.location.href = `project.html?id=${visibleProjects[0].id}`;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
