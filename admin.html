@@ -4,500 +4,824 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>User Management — Megawide EPC</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
   <link rel="stylesheet" href="assets/css/dashboard.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/db.js"></script>
+  <script src="assets/js/ui.js"></script>
   <style>
-    /* ── Modal fix: was overflowing and hiding the Approve button ── */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-    }
-    .modal {
-      background: #fff;
-      border-radius: 12px;
-      width: 100%;
-      max-width: 420px;
-      /* KEY FIX: flex column + max-height so button is always visible */
-      display: flex;
-      flex-direction: column;
-      max-height: 90vh;
-      overflow: hidden;
-    }
-    .modal-header {
-      padding: 20px 20px 0;
-      flex-shrink: 0;
-    }
-    .modal-body {
-      padding: 16px 20px;
-      overflow-y: auto;          /* scroll if many projects */
-      flex: 1;
-    }
-    .modal-footer {
-      padding: 12px 20px 20px;
-      flex-shrink: 0;            /* NEVER pushed off screen */
-      border-top: 1px solid #f0f0f0;
-      display: flex;
-      gap: 10px;
-    }
-    .modal-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #231F20;
-      margin: 0 0 4px;
-    }
-    .modal-subtitle {
-      font-size: 13px;
-      color: #888;
-      margin: 0 0 16px;
-    }
-    .modal-field-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: .06em;
-      color: #888;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-    .project-checkboxes {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      margin-bottom: 16px;
-    }
-    .project-checkbox-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 10px;
-      border: 1px solid #e5e5e5;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: border-color .15s;
-    }
-    .project-checkbox-item:hover { border-color: #EE3124; }
-    .project-checkbox-item input[type="checkbox"] {
-      width: 16px; height: 16px;
-      accent-color: #EE3124;
-      cursor: pointer;
-    }
-    .project-checkbox-item label {
-      font-size: 14px;
-      font-weight: 500;
-      color: #231F20;
-      cursor: pointer;
-    }
-    .role-select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #e5e5e5;
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: 'Montserrat', sans-serif;
-      color: #231F20;
-      background: #fff;
-      appearance: auto;
-    }
-    .btn-approve {
-      flex: 1;
-      padding: 10px;
-      background: #EE3124;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      font-family: 'Montserrat', sans-serif;
-      cursor: pointer;
-      transition: background .15s;
-    }
-    .btn-approve:hover { background: #C42127; }
-    .btn-cancel {
-      padding: 10px 16px;
-      background: transparent;
-      color: #666;
-      border: 1px solid #e5e5e5;
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: 'Montserrat', sans-serif;
-      cursor: pointer;
-      transition: border-color .15s;
-    }
-    .btn-cancel:hover { border-color: #999; }
-
-    /* ── KPI cards: single column on mobile ── */
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-    @media (max-width: 480px) {
-      .kpi-grid { grid-template-columns: 1fr; }
-    }
-    .kpi-card {
-      background: #fff;
-      border: 1px solid #f0f0f0;
-      border-radius: 12px;
-      padding: 16px 18px;
-    }
-    .kpi-value {
-      font-size: 28px;
-      font-weight: 700;
-      color: #231F20;
-      line-height: 1;
-    }
-    .kpi-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: #888;
-      margin-top: 4px;
-    }
-
-    /* ── User table: scrollable on mobile ── */
-    .table-wrapper {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .user-table {
-      width: 100%;
-      min-width: 560px;
-      border-collapse: collapse;
-    }
-    .user-table th {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: #888;
-      padding: 10px 12px;
-      text-align: left;
-      border-bottom: 1px solid #f0f0f0;
-    }
-    .user-table td {
-      padding: 12px;
-      font-size: 14px;
-      color: #231F20;
-      border-bottom: 1px solid #f5f5f5;
-    }
-    .user-table tr:last-child td { border-bottom: none; }
-    .user-table tr:hover td { background: #fafafa; }
-    .action-btn {
-      padding: 5px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      font-family: 'Montserrat', sans-serif;
-      transition: opacity .15s;
-    }
-    .action-btn:hover { opacity: .8; }
-    .btn-approve-row { background: #EE3124; color: #fff; }
-    .btn-reject-row { background: #f5f5f5; color: #666; }
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .badge-pending { background: #FEF3C7; color: #92400E; }
-    .badge-approved { background: #D1FAE5; color: #065F46; }
-    .badge-rejected { background: #FEE2E2; color: #991B1B; }
-
-    /* ── Tab toggles ── */
-    .tab-row { display: flex; gap: 4px; margin-bottom: 16px; }
-    .tab-btn {
-      padding: 7px 16px;
-      border: 1px solid #e5e5e5;
-      border-radius: 8px;
-      background: transparent;
-      font-size: 13px;
-      font-weight: 500;
-      font-family: 'Montserrat', sans-serif;
-      cursor: pointer;
-      color: #888;
-      transition: all .15s;
-    }
-    .tab-btn.active {
-      background: #231F20;
-      border-color: #231F20;
-      color: #fff;
-    }
-
-    /* ── Page layout ── */
-    .page-content { padding: 20px; max-width: 800px; }
-    .section-card {
-      background: #fff;
-      border: 1px solid #f0f0f0;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-    .hidden { display: none !important; }
-    .user-info { font-size: 14px; color: #231F20; }
-    .user-email { font-size: 12px; color: #888; }
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
+    .modal{background:#fff;border-radius:12px;width:100%;max-width:420px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden}
+    .modal-header{padding:20px 20px 0;flex-shrink:0}
+    .modal-body{padding:16px 20px;overflow-y:auto;flex:1}
+    .modal-footer{padding:12px 20px 20px;flex-shrink:0;border-top:1px solid #f0f0f0;display:flex;gap:10px}
+    .modal-title{font-size:16px;font-weight:600;color:#231F20;margin:0 0 4px}
+    .modal-subtitle{font-size:13px;color:#888;margin:0 0 16px}
+    .modal-field-label{font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px}
+    .project-checkboxes{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+    .project-checkbox-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e5e5e5;border-radius:8px;cursor:pointer;transition:border-color .15s}
+    .project-checkbox-item:hover{border-color:#EE3124}
+    .project-checkbox-item input[type="checkbox"]{width:16px;height:16px;accent-color:#EE3124;cursor:pointer}
+    .project-checkbox-item label{font-size:14px;font-weight:500;color:#231F20;cursor:pointer}
+    .role-select{width:100%;padding:10px 12px;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:'Montserrat',sans-serif;color:#231F20;background:#fff}
+    .btn-approve{flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer}
+    .btn-approve:hover{background:#C42127}
+    .btn-cancel{padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;cursor:pointer}
+    .kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px}
+    @media(max-width:480px){.kpi-grid{grid-template-columns:1fr}}
+    .kpi-card{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:16px 18px}
+    .kpi-value{font-size:28px;font-weight:700;color:#231F20;line-height:1}
+    .kpi-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;margin-top:4px}
+    .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .user-table{width:100%;min-width:560px;border-collapse:collapse}
+    .user-table th{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;padding:10px 12px;text-align:left;border-bottom:1px solid #f0f0f0}
+    .user-table td{padding:12px;font-size:14px;color:#231F20;border-bottom:1px solid #f5f5f5}
+    .user-table tr:last-child td{border-bottom:none}
+    .user-table tr:hover td{background:#fafafa}
+    .action-btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:opacity .15s}
+    .action-btn:hover{opacity:.8}
+    .btn-approve-row{background:#EE3124;color:#fff}
+    .btn-reject-row{background:#f5f5f5;color:#666}
+    .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+    .badge-pending{background:#FEF3C7;color:#92400E}
+    .badge-approved{background:#D1FAE5;color:#065F46}
+    .badge-rejected{background:#FEE2E2;color:#991B1B}
+    .tab-row{display:flex;gap:4px;margin-bottom:16px}
+    .tab-btn{padding:7px 16px;border:1px solid #e5e5e5;border-radius:8px;background:transparent;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;color:#888;transition:all .15s}
+    .tab-btn.active{background:#231F20;border-color:#231F20;color:#fff}
+    .page-content{padding:20px;max-width:900px}
+    .section-card{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:20px;margin-bottom:20px}
+    .hidden{display:none!important}
+    .sidebar-logo img{background:transparent!important;height:36px;width:auto;object-fit:contain;max-width:140px}
   </style>
 </head>
 <body>
-  <!-- Your existing nav/sidebar here -->
-
-  <div class="page-content">
-
-    <!-- KPI Cards -->
-    <div class="kpi-grid" id="kpiGrid">
-      <div class="kpi-card">
-        <div class="kpi-value" id="kpiTotal">—</div>
-        <div class="kpi-label">Total Registrations</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-value" id="kpiPending">—</div>
-        <div class="kpi-label">Pending Approval</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-value" id="kpiApproved">—</div>
-        <div class="kpi-label">Approved Users</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-value" id="kpiRejected">—</div>
-        <div class="kpi-label">Rejected</div>
-      </div>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <img src="data:image/png;base64,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" alt="Megawide Construction"/>
+      <div class="app-label">Procurement Dashboard</div>
     </div>
-
-    <!-- Tab row -->
-    <div class="tab-row">
-      <button class="tab-btn active" id="tabPending" onclick="switchTab('pending')">Pending</button>
-      <button class="tab-btn" id="tabAll" onclick="switchTab('all')">All Users</button>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <a class="nav-item" href="index.html?view=consolidated"><i class="ti ti-layout-dashboard"></i>All Projects</a>
     </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Admin</div>
+      <a class="nav-item active" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+      <a class="nav-item" href="review.html"><i class="ti ti-clipboard-check"></i>Review WPs</a>
+      <button class="nav-item" onclick="openAddWPModal(null)" style="width:100%;text-align:left;background:transparent;border:none;cursor:pointer;font-family:inherit;color:rgba(255,255,255,0.7);font-size:13px;padding:8px 12px;border-radius:8px;display:flex;align-items:center;gap:8px"><i class="ti ti-circle-plus"></i>Add Work Package</button>
+      <button class="nav-item" onclick="openNewProjectModal()" style="width:100%;text-align:left;background:transparent;border:none;cursor:pointer;font-family:inherit;color:rgba(255,255,255,0.7);font-size:13px;padding:8px 12px;border-radius:8px;display:flex;align-items:center;gap:8px;transition:.15s" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='transparent'">
+        <i class="ti ti-folder-plus" style="font-size:16px"></i>New Project
+      </button>
+    </div>
+    <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
+  </aside>
 
-    <!-- User list card -->
-    <div class="section-card">
-      <div class="table-wrapper">
-        <table class="user-table" id="userTable">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Registered</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="userTableBody">
-            <tr><td colspan="6" style="text-align:center;color:#888;padding:24px">Loading…</td></tr>
-          </tbody>
-        </table>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
+        <div class="page-title">User Management</div>
+      </div>
+      <div class="topbar-right"><div id="user-bar"></div></div>
+    </div>
+    <div class="content">
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading users…</span></div>
+      <div id="main-content" style="display:none">
+        <div class="page-content">
+          <div class="kpi-grid" id="kpiGrid">
+            <div class="kpi-card"><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-label">Total Registrations</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiPending">—</div><div class="kpi-label">Pending Approval</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiApproved">—</div><div class="kpi-label">Approved Users</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiRejected">—</div><div class="kpi-label">Rejected</div></div>
+          </div>
+          <div class="tab-row">
+            <button class="tab-btn active" id="tabAll" onclick="switchTab('all')">All Users</button>
+            <button class="tab-btn" id="tabPending" onclick="switchTab('pending')">
+              Pending <span id="pending-count" style="display:none;background:#EE3124;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px"></span>
+            </button>
+          </div>
+          <div class="section-card">
+            <!-- Search + Bulk Assign Bar -->
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+              <div style="position:relative;flex:1;min-width:200px">
+                <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#aaa;font-size:14px;pointer-events:none"></i>
+                <input id="user-search" type="text" placeholder="Search by name or email…" oninput="filterAndRender()"
+                  style="width:100%;padding:8px 12px 8px 34px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+              </div>
+              <div id="bulk-bar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;background:#FFF0EE;border:1.5px solid #EE3124;border-radius:10px;padding:8px 12px">
+                <span id="selected-count" style="font-size:12px;font-weight:600;color:#EE3124;white-space:nowrap"></span>
+                <span style="font-size:12px;color:#888">→</span>
+                <select id="bulk-project-select" style="font-size:12px;padding:6px 10px;border:1px solid #e5e5e5;border-radius:7px;font-family:inherit;background:#fff;color:#231F20;min-width:160px">
+                  <option value="">Assign to project…</option>
+                </select>
+                <select id="bulk-role-select" style="font-size:12px;padding:6px 10px;border:1px solid #e5e5e5;border-radius:7px;font-family:inherit;background:#fff;color:#231F20">
+                  <option value="">Set role…</option>
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                  <option value="super_admin">Super Admin</option>
+                </select>
+                <button onclick="applyBulkActions()" style="padding:6px 14px;background:#EE3124;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">Apply</button>
+                <button onclick="clearSelection()" style="padding:6px 10px;background:transparent;color:#888;border:1px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;cursor:pointer">✕ Clear</button>
+              </div>
+            </div>
+            <div class="table-wrapper">
+              <table class="user-table" id="userTable">
+                <thead>
+                  <tr><th>#</th><th>Name / Email</th><th>Role</th><th>Projects</th><th>Status</th><th>Registered</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="userTableBody">
+                  <tr><td colspan="7" style="text-align:center;color:#888;padding:24px">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- ── APPROVE MODAL ── -->
-  <div class="modal-overlay hidden" id="approveModal">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Approve Registration</div>
-        <div class="modal-subtitle">Assign projects and role for this user, then confirm approval.</div>
-      </div>
-
-      <div class="modal-body">
-        <!-- User info -->
-        <div class="modal-field-label">User</div>
-        <div style="margin-bottom:16px">
-          <div class="user-info" id="modalUserName">—</div>
-          <div class="user-email" id="modalUserEmail">—</div>
-        </div>
-
-        <!-- Project checkboxes -->
-        <div class="modal-field-label">Assign Projects</div>
-        <div class="project-checkboxes" id="modalProjectList">
-          <!-- populated by JS -->
-        </div>
-
-        <!-- Role selector -->
-        <div class="modal-field-label">Role</div>
-        <select class="role-select" id="modalRoleSelect">
-          <option value="user">User — assigned projects only</option>
-          <option value="admin">Admin — assigned projects + user management</option>
-          <option value="super_admin">Super Admin — all projects + full control</option>
-        </select>
-      </div>
-
-      <!-- FOOTER: always visible, never clipped -->
-      <div class="modal-footer">
-        <button class="btn-approve" id="btnConfirmApprove" onclick="confirmApprove()">
-          ✓ Approve &amp; Assign
-        </button>
-        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+<!-- Approve Modal -->
+<div class="modal-overlay hidden" id="approveModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Approve User</div>
+      <div class="modal-subtitle">
+        <strong id="modalUserName"></strong> &mdash; <span id="modalUserEmail"></span>
       </div>
     </div>
+    <div class="modal-body">
+      <div class="modal-field-label">Role</div>
+      <select class="role-select" id="modalRoleSelect" style="margin-bottom:16px">
+        <option value="user">User — assigned projects only, view &amp; update WPs</option>
+        <option value="admin">Admin — assigned projects + user management</option>
+        <option value="super_admin">Super Admin — all projects + full control</option>
+      </select>
+      <div class="modal-field-label">Assign Projects</div>
+      <div class="project-checkboxes" id="modalProjectList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-approve" id="btnConfirmApprove" onclick="confirmApprove()">✓ Approve &amp; Assign</button>
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+    </div>
   </div>
+</div>
 
-  <script type="module">
-    // ── Firebase / Supabase imports go here ──
-    // import { db, auth } from './assets/js/firebase-config.js';
-    // OR for Supabase: import { supabase } from './assets/js/supabase-config.js';
 
-    let currentTab = 'pending';
-    let pendingUserId = null;
-    let allProjects = [];
 
-    // Expose functions to global scope for onclick handlers
-    window.switchTab = function(tab) {
-      currentTab = tab;
-      document.getElementById('tabPending').classList.toggle('active', tab === 'pending');
-      document.getElementById('tabAll').classList.toggle('active', tab === 'all');
-      loadUsers(tab);
-    };
-
-    window.openApproveModal = function(userId, name, email) {
-      pendingUserId = userId;
-      document.getElementById('modalUserName').textContent = name;
-      document.getElementById('modalUserEmail').textContent = email;
-
-      // Populate project checkboxes
-      const list = document.getElementById('modalProjectList');
-      list.innerHTML = allProjects.map(p => `
-        <div class="project-checkbox-item">
-          <input type="checkbox" id="proj_${p.id}" value="${p.id}">
-          <label for="proj_${p.id}">${p.name || p.id}</label>
+<!-- New Project Modal -->
+<div class="modal-overlay hidden" id="newProjectModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Create New Project</div>
+      <div class="modal-subtitle">Add a new project to the dashboard</div>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;gap:14px">
+        <div>
+          <div class="modal-field-label">Project ID <span style="color:#EE3124">*</span></div>
+          <input id="np-id" type="text" placeholder="e.g. AVR102" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+          <div style="font-size:11px;color:#aaa;margin-top:4px">Short unique code. Letters and numbers only. Cannot be changed later.</div>
         </div>
-      `).join('');
+        <div>
+          <div class="modal-field-label">Project Name <span style="color:#EE3124">*</span></div>
+          <input id="np-name" type="text" placeholder="e.g. Avesta Residences Tower 2" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none">
+        </div>
+        <div>
+          <div class="modal-field-label">Location</div>
+          <input id="np-location" type="text" placeholder="e.g. Quezon City" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none">
+        </div>
+        <div>
+          <div class="modal-field-label">Description</div>
+          <textarea id="np-description" placeholder="Brief project description..." rows="2" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;resize:vertical"></textarea>
+        </div>
+        <div>
+          <div class="modal-field-label">Budget BCB (₱)</div>
+          <input id="np-budget" type="number" placeholder="e.g. 274900000" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none">
+        </div>
+        <div>
+          <div class="modal-field-label">Assign Users (optional)</div>
+          <div id="np-user-list" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto"></div>
+          <div style="font-size:11px;color:#aaa;margin-top:6px">Selected users will be assigned to this project immediately.</div>
+        </div>
+      </div>
+      <div id="np-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:14px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-approve" id="btn-create-project" onclick="confirmCreateProject()">
+        <i class="ti ti-plus" style="font-size:14px;margin-right:4px"></i> Create Project
+      </button>
+      <button class="btn-cancel" onclick="closeNewProjectModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 
-      document.getElementById('approveModal').classList.remove('hidden');
-    };
+<script>
+  let currentTab = 'all';
+  let allUsers = [], allProjects = [];
+  let selectedUserIds = new Set();
+  let lastClickedIdx = null;
+  let filteredUsers = [];
 
-    window.closeModal = function() {
-      document.getElementById('approveModal').classList.add('hidden');
-      pendingUserId = null;
-    };
+  initMobileMenu();
 
-    window.confirmApprove = async function() {
-      if (!pendingUserId) return;
+  // ── Tab switch ───────────────────────────────────────────────
+  window.switchTab = function(tab) {
+    currentTab = tab;
+    document.getElementById('tabPending').classList.toggle('active', tab === 'pending');
+    document.getElementById('tabAll').classList.toggle('active', tab === 'all');
+    selectedUserIds.clear();
+    filterAndRender();
+  };
 
-      const selectedProjects = [...document.querySelectorAll('#modalProjectList input:checked')]
-        .map(cb => cb.value);
-      const role = document.getElementById('modalRoleSelect').value;
+  // ── Filter + render ──────────────────────────────────────────
+  window.filterAndRender = function() {
+    const q = ((document.getElementById('user-search') || {}).value || '').toLowerCase().trim();
+    const base = currentTab === 'pending'
+      ? allUsers.filter(u => u.status === 'pending')
+      : allUsers;
+    filteredUsers = q
+      ? base.filter(u => (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q))
+      : base;
+    renderUsers();
+  };
 
-      const btn = document.getElementById('btnConfirmApprove');
-      btn.textContent = 'Approving…';
-      btn.disabled = true;
-
-      try {
-        // ── Firebase version ──
-        // await updateDoc(doc(db, 'users', pendingUserId), {
-        //   status: 'approved',
-        //   role,
-        //   projects: selectedProjects,
-        // });
-
-        // ── Supabase version ──
-        // await supabase.from('users').update({
-        //   status: 'approved', role, projects: selectedProjects
-        // }).eq('id', pendingUserId);
-
-        closeModal();
-        loadUsers(currentTab);
-        updateKPIs();
-      } catch (err) {
-        console.error('Approve failed:', err);
-        btn.textContent = '✓ Approve & Assign';
-        btn.disabled = false;
-      }
-    };
-
-    async function loadProjects() {
-      try {
-        // Firebase: const snap = await getDocs(collection(db, 'projects'));
-        // allProjects = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        // Supabase: const { data } = await supabase.from('projects').select('id, name');
-        // allProjects = data || [];
-
-        // Fallback for now:
-        allProjects = [{ id: 'AVR101', name: 'AVR101 — Avesta Residences T1' }];
-      } catch (err) {
-        console.error('Load projects failed:', err);
-      }
+  // ── Render table ─────────────────────────────────────────────
+  function renderUsers() {
+    const tbody = document.getElementById('userTableBody');
+    if (!filteredUsers.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:24px">No users found</td></tr>';
+      document.getElementById('selected-count').textContent = '';
+      return;
+    }
+    const selCount = selectedUserIds.size;
+    const bulkBar = document.getElementById('bulk-bar');
+    if (bulkBar) {
+      bulkBar.style.display = selCount > 0 ? 'flex' : 'none';
+      document.getElementById('selected-count').textContent = selCount > 0 ? `${selCount} user${selCount>1?'s':''} selected` : '';
     }
 
-    async function loadUsers(filter) {
-      const tbody = document.getElementById('userTableBody');
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;padding:24px">Loading…</td></tr>';
+    tbody.innerHTML = filteredUsers.map((u, visIdx) => {
+      const isSelected = selectedUserIds.has(u.id);
+      const assignedProjs = (u.projects||[]).join(', ') || '\u2014';
+      const rowStyle = isSelected ? 'background:#FFF0EE;' : '';
 
-      try {
-        // Firebase:
-        // let q = collection(db, 'users');
-        // if (filter === 'pending') q = query(q, where('status', '==', 'pending'));
-        // const snap = await getDocs(q);
-        // const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (u.status === 'pending') {
+        return `<tr style="${rowStyle}" data-idx="${visIdx}" onclick="handleRowClick(event,${visIdx},'${u.id}')">
+          <td><input type="checkbox" ${isSelected?'checked':''} onclick="event.stopPropagation();toggleSelect('${u.id}',${visIdx},event)" style="accent-color:#EE3124;width:15px;height:15px;cursor:pointer"></td>
+          <td><div style="font-size:13px;font-weight:500">${u.name||'\u2014'}</div><div style="font-size:11px;color:#aaa">${u.email}</div></td>
+          <td><span style="font-size:11px;color:#888">pending</span></td>
+          <td>\u2014</td>
+          <td><span class="badge badge-pending">pending</span></td>
+          <td style="color:#888;font-size:12px">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'}):'\u2014'}</td>
+          <td>
+            <button class="action-btn btn-approve-row" onclick="event.stopPropagation();openApproveModal('${u.id}','${(u.name||'').replace(/'/g,"\\'")}','${u.email}')">Approve</button>
+            <button class="action-btn btn-reject-row" onclick="event.stopPropagation();rejectUser('${u.id}')" style="margin-left:6px">Reject</button>
+          </td>
+        </tr>`;
+      }
+      return `<tr style="${rowStyle}" data-idx="${visIdx}" onclick="handleRowClick(event,${visIdx},'${u.id}')">
+        <td><input type="checkbox" ${isSelected?'checked':''} onclick="event.stopPropagation();toggleSelect('${u.id}',${visIdx},event)" style="accent-color:#EE3124;width:15px;height:15px;cursor:pointer"></td>
+        <td><div style="font-size:13px;font-weight:500">${u.name||'\u2014'}</div><div style="font-size:11px;color:#aaa">${u.email}</div></td>
+        <td>
+          <select onclick="event.stopPropagation()" onchange="saveUserRole('${u.id}',this.value)" style="font-size:12px;padding:4px 8px;border:1px solid #e5e5e5;border-radius:6px;background:#fff;color:#231F20;font-family:inherit;cursor:pointer">
+            <option value="user" ${u.role==='user'?'selected':''}>User</option>
+            <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+            <option value="super_admin" ${u.role==='super_admin'?'selected':''}>Super Admin</option>
+          </select>
+        </td>
+        <td>
+          <div style="font-size:11px;color:#888;margin-bottom:4px">${assignedProjs}</div>
+          <button onclick="event.stopPropagation();openProjectModal('${u.id}')" style="font-size:11px;padding:3px 8px;border:1px solid #e5e5e5;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit">Edit projects</button>
+        </td>
+        <td><span class="badge badge-${u.status}">${u.status}</span></td>
+        <td style="color:#888;font-size:12px">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'}):'\u2014'}</td>
+        <td>
+          <button class="action-btn btn-reject-row" onclick="event.stopPropagation();revokeUser('${u.id}')" style="font-size:11px">Revoke</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
 
-        // Supabase:
-        // let q = supabase.from('users').select('*');
-        // if (filter === 'pending') q = q.eq('status', 'pending');
-        // const { data: users } = await q.order('created_at', { ascending: false });
-
-        // Placeholder:
-        const users = [];
-
-        if (!users.length) {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;padding:24px">No users found</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = users.map((u, i) => `
-          <tr>
-            <td>${i + 1}</td>
-            <td>
-              <div class="user-info">${u.name || '—'}</div>
-            </td>
-            <td><div class="user-email">${u.email}</div></td>
-            <td><span class="badge badge-${u.role === 'super_admin' ? 'approved' : u.role === 'admin' ? 'approved' : 'pending'}">${u.role || 'user'}</span></td>
-            <td style="color:#888;font-size:12px">${u.created_at ? new Date(u.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }) : '—'}</td>
-            <td>
-              ${u.status === 'pending' ? `
-                <button class="action-btn btn-approve-row" onclick="openApproveModal('${u.id}', '${u.name}', '${u.email}')">Approve</button>
-              ` : `
-                <span class="badge badge-${u.status}">${u.status}</span>
-              `}
-            </td>
-          </tr>
-        `).join('');
-
-      } catch (err) {
-        console.error('Load users failed:', err);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#c00;padding:24px">Error loading users</td></tr>';
+  // ── Excel-style row selection (click, shift-click, ctrl-click) ──
+  window.handleRowClick = function(e, visIdx, userId) {
+    if (e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'A') return;
+    if (e.shiftKey && lastClickedIdx !== null) {
+      const lo = Math.min(lastClickedIdx, visIdx);
+      const hi = Math.max(lastClickedIdx, visIdx);
+      for (let i = lo; i <= hi; i++) {
+        if (filteredUsers[i]) selectedUserIds.add(filteredUsers[i].id);
+      }
+    } else if (e.ctrlKey || e.metaKey) {
+      if (selectedUserIds.has(userId)) selectedUserIds.delete(userId);
+      else selectedUserIds.add(userId);
+    } else {
+      // Single click: toggle if already selected, else select only this
+      if (selectedUserIds.has(userId) && selectedUserIds.size === 1) {
+        selectedUserIds.clear();
+      } else {
+        selectedUserIds.clear();
+        selectedUserIds.add(userId);
       }
     }
+    lastClickedIdx = visIdx;
+    renderUsers();
+  };
 
-    async function updateKPIs() {
-      try {
-        // Firebase: run count queries per status
-        // Supabase: SELECT status, COUNT(*) FROM users GROUP BY status
-        // For now update based on loaded data
-      } catch (err) {
-        console.error('KPI update failed:', err);
-      }
+  window.toggleSelect = function(userId, visIdx, e) {
+    if (selectedUserIds.has(userId)) selectedUserIds.delete(userId);
+    else selectedUserIds.add(userId);
+    lastClickedIdx = visIdx;
+    renderUsers();
+  };
+
+  // ── Bulk actions ─────────────────────────────────────────────
+  window.clearSelection = function() {
+    selectedUserIds.clear();
+    lastClickedIdx = null;
+    renderUsers();
+  };
+
+  window.applyBulkActions = async function() {
+    if (!selectedUserIds.size) { alert('Select at least one user first.'); return; }
+    const projId = document.getElementById('bulk-project-select').value;
+    const role = document.getElementById('bulk-role-select').value;
+    if (!projId && !role) { alert('Choose a project or role to bulk-assign.'); return; }
+    const count = selectedUserIds.size;
+    if (!confirm(`Apply to ${count} user(s)?`)) return;
+    for (const uid of selectedUserIds) {
+      const user = allUsers.find(u => u.id === uid);
+      if (!user) continue;
+      const updates = {};
+      if (role) updates.role = role;
+      if (projId) updates.projects = [...new Set([...(user.projects||[]), projId])];
+      await WPDb.updateUser(uid, updates);
     }
+    selectedUserIds.clear();
+    await loadData();
+  };
 
-    // Init
-    await loadProjects();
-    await loadUsers('pending');
-    await updateKPIs();
+  // ── KPIs ─────────────────────────────────────────────────────
+  function updateKPIs() {
+    document.getElementById('kpiTotal').textContent = allUsers.length;
+    const pendingCt = allUsers.filter(u=>u.status==='pending').length;
+    document.getElementById('kpiPending').textContent = pendingCt;
+    document.getElementById('kpiApproved').textContent = allUsers.filter(u=>u.status==='approved').length;
+    document.getElementById('kpiRejected').textContent = allUsers.filter(u=>u.status==='rejected').length;
+    const badge = document.getElementById('pending-count');
+    if (badge) { badge.textContent = pendingCt > 0 ? pendingCt : ''; badge.style.display = pendingCt > 0 ? 'inline' : 'none'; }
+  }
 
-    // Close modal on overlay click
-    document.getElementById('approveModal').addEventListener('click', function(e) {
-      if (e.target === this) closeModal();
+  // ── Data loading ──────────────────────────────────────────────
+  async function loadData() {
+    try {
+      [allUsers, allProjects] = await Promise.all([WPDb.getAllUsers(), WPDb.getProjects()]);
+      updateKPIs();
+
+      // Populate bulk project select
+      const bps = document.getElementById('bulk-project-select');
+      if (bps) {
+        bps.innerHTML = '<option value="">Bulk assign project\u2026</option>' +
+          allProjects.map(p=>`<option value="${p.id}">${p.name||p.id}</option>`).join('');
+      }
+      filterAndRender();
+    } catch(err) {
+      console.error('Load failed:', err);
+      document.getElementById('userTableBody').innerHTML =
+        '<tr><td colspan="8" style="text-align:center;color:#c00;padding:24px">Error loading users: ' + err.message + '</td></tr>';
+    }
+  }
+
+  // ── Approve modal ─────────────────────────────────────────────
+  let pendingUserId = null;
+  let editingUserId = null;
+
+  window.openApproveModal = function(userId, name, email) {
+    pendingUserId = userId;
+    document.getElementById('modalUserName').textContent = name;
+    document.getElementById('modalUserEmail').textContent = email;
+    buildProjectCheckboxes('modalProjectList', []);
+    document.getElementById('approveModal').classList.remove('hidden');
+  };
+
+  window.closeModal = function() {
+    document.getElementById('approveModal').classList.add('hidden');
+    pendingUserId = null;
+  };
+
+  window.confirmApprove = async function() {
+    if (!pendingUserId) return;
+    const selectedProjects = [...document.querySelectorAll('#modalProjectList input:checked')].map(cb => cb.value);
+    const role = document.getElementById('modalRoleSelect').value;
+    const btn = document.getElementById('btnConfirmApprove');
+    btn.textContent = 'Approving\u2026'; btn.disabled = true;
+    try {
+      await WPDb.updateUser(pendingUserId, { status: 'approved', role, projects: selectedProjects });
+      closeModal();
+      await loadData();
+    } catch(err) {
+      alert('Error: ' + err.message);
+      btn.textContent = '\u2713 Approve & Assign'; btn.disabled = false;
+    }
+  };
+
+  window.openProjectModal = function(userId) {
+    editingUserId = userId;
+    const user = allUsers.find(u=>u.id===userId);
+    if (!user) return;
+    buildProjectCheckboxes('modalProjectList', user.projects||[]);
+    document.getElementById('modalUserName').textContent = user.name||user.email;
+    document.getElementById('modalUserEmail').textContent = 'Edit project assignments';
+    document.getElementById('modalRoleSelect').value = user.role||'user';
+    document.getElementById('btnConfirmApprove').textContent = 'Save Changes';
+    document.getElementById('btnConfirmApprove').onclick = confirmEditUser;
+    document.getElementById('approveModal').classList.remove('hidden');
+  };
+
+  async function confirmEditUser() {
+    if (!editingUserId) return;
+    const selectedProjects = [...document.querySelectorAll('#modalProjectList input:checked')].map(cb => cb.value);
+    const role = document.getElementById('modalRoleSelect').value;
+    const btn = document.getElementById('btnConfirmApprove');
+    btn.textContent = 'Saving\u2026'; btn.disabled = true;
+    try {
+      await WPDb.updateUser(editingUserId, { role, projects: selectedProjects });
+      closeModal();
+      await loadData();
+    } catch(err) {
+      alert('Error: ' + err.message);
+      btn.textContent = 'Save Changes'; btn.disabled = false;
+    }
+  }
+
+  // ── Searchable project checkbox list builder ──────────────────
+  function buildProjectCheckboxes(containerId, checkedIds) {
+    const container = document.getElementById(containerId);
+    // Add search input + project list
+    container.innerHTML = `
+      <div style="position:relative;margin-bottom:8px">
+        <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:13px"></i>
+        <input type="text" placeholder="Search projects\u2026" oninput="filterProjectCheckboxes(this.value,'${containerId}')"
+          style="width:100%;padding:6px 10px 6px 28px;border:1px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none">
+      </div>
+      <div id="${containerId}-list" style="display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto">
+        ${allProjects.map(p=>`
+          <div class="project-checkbox-item" onclick="this.querySelector('input').click()">
+            <input type="checkbox" id="p_${containerId}_${p.id}" value="${p.id}" ${checkedIds.includes(p.id)?'checked':''}>
+            <label for="p_${containerId}_${p.id}" onclick="event.preventDefault()">${p.name||p.id} <span style="font-size:10px;color:#bbb">${p.id}</span></label>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  window.filterProjectCheckboxes = function(q, containerId) {
+    const list = document.getElementById(containerId+'-list');
+    if (!list) return;
+    list.querySelectorAll('.project-checkbox-item').forEach(item => {
+      const label = item.querySelector('label');
+      item.style.display = label && label.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
     });
-  </script>
+  };
+
+  window.rejectUser = async function(userId) {
+    if (!confirm('Reject this user?')) return;
+    await WPDb.updateUser(userId, { status: 'rejected' });
+    await loadData();
+  };
+
+  window.revokeUser = async function(userId) {
+    if (!confirm('Revoke this user\'s access?')) return;
+    await WPDb.updateUser(userId, { status: 'rejected' });
+    await loadData();
+  };
+
+  window.saveUserRole = async function(userId, role) {
+    await WPDb.updateUser(userId, { role });
+    await loadData();
+  };
+
+  // ── New Project modal ─────────────────────────────────────────
+  window.openNewProjectModal = async function() {
+    // Populate user list with searchable checkboxes
+    const approved = allUsers.filter(u=>u.status==='approved');
+    const list = document.getElementById('np-user-list');
+    list.innerHTML = `
+      <div style="position:relative;margin-bottom:8px">
+        <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:13px"></i>
+        <input type="text" placeholder="Search users\u2026" oninput="filterNpUsers(this.value)"
+          style="width:100%;padding:6px 10px 6px 28px;border:1px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none">
+      </div>
+      <div id="np-user-rows" style="display:flex;flex-direction:column;gap:5px;max-height:200px;overflow-y:auto">
+        ${approved.length ? approved.map((u,i)=>`
+          <div class="project-checkbox-item npu-row" data-idx="${i}" onclick="handleNpUserClick(event,${i},'npu_${u.id}')" style="cursor:pointer">
+            <input type="checkbox" id="npu_${u.id}" value="${u.id}" onclick="event.stopPropagation();toggleNpUser(event,${i},'npu_${u.id}')">
+            <label onclick="event.preventDefault()" style="flex:1;cursor:pointer">${u.name||u.email}
+              <span style="font-size:10px;color:#aaa;text-transform:capitalize">(${(u.role||'user').replace('_',' ')})</span>
+            </label>
+          </div>`).join('') : '<div style="color:#aaa;font-size:12px">No approved users</div>'}
+      </div>`;
+
+    document.getElementById('newProjectModal').classList.remove('hidden');
+    document.getElementById('np-id').focus();
+  };
+
+  let npLastIdx = null;
+  window.handleNpUserClick = function(e, idx, cbId) {
+    if (e.target.tagName === 'INPUT') return;
+    const cb = document.getElementById(cbId);
+    if (!cb) return;
+    const rows = [...document.querySelectorAll('.npu-row')];
+    if (e.shiftKey && npLastIdx !== null) {
+      const lo = Math.min(npLastIdx, idx), hi = Math.max(npLastIdx, idx);
+      rows.slice(lo, hi+1).forEach(row => {
+        const input = row.querySelector('input[type=checkbox]');
+        if (input) input.checked = true;
+      });
+    } else if (e.ctrlKey || e.metaKey) {
+      cb.checked = !cb.checked;
+    } else {
+      cb.checked = !cb.checked;
+    }
+    npLastIdx = idx;
+  };
+  window.toggleNpUser = function(e, idx) { npLastIdx = idx; };
+  window.filterNpUsers = function(q) {
+    document.querySelectorAll('.npu-row').forEach(row => {
+      row.style.display = row.querySelector('label').textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+    });
+  };
+
+  window.closeNewProjectModal = function() {
+    document.getElementById('newProjectModal').classList.add('hidden');
+    ['np-id','np-name','np-location','np-description','np-budget'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    document.getElementById('np-error').style.display='none';
+  };
+
+  window.confirmCreateProject = async function() {
+    const id = document.getElementById('np-id').value.trim();
+    const name = document.getElementById('np-name').value.trim();
+    const location = document.getElementById('np-location').value.trim();
+    const description = document.getElementById('np-description').value.trim();
+    const budget = parseFloat(document.getElementById('np-budget').value)||null;
+    const errEl = document.getElementById('np-error');
+    if (!id||!name){ errEl.textContent='Project ID and Name are required.'; errEl.style.display='block'; return; }
+    if (!/^[A-Z0-9]+$/.test(id)){ errEl.textContent='Project ID must be letters/numbers only (e.g. AVR102).'; errEl.style.display='block'; return; }
+
+    const selectedUsers = [...document.querySelectorAll('#np-user-rows input:checked')].map(cb=>cb.value);
+    const btn = document.getElementById('btn-create-project');
+    btn.textContent='Creating\u2026'; btn.disabled=true; errEl.style.display='none';
+    try {
+      await WPDb.createProject({ id, name, location, description, budget_bcb:budget, status:'active' });
+      for (const uid of selectedUsers) {
+        const user = allUsers.find(u=>u.id===uid);
+        if (user) await WPDb.updateUser(uid, { projects:[...new Set([...(user.projects||[]),id])] });
+      }
+      closeNewProjectModal();
+      await loadData();
+      const t=document.createElement('div');
+      t.innerHTML=`<div style="position:fixed;bottom:24px;right:24px;background:#2D9B6F;color:#fff;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:9999">\u2713 Project ${id} created</div>`;
+      document.body.appendChild(t); setTimeout(()=>t.remove(),3000);
+    } catch(err) {
+      errEl.textContent = (err.message.includes('duplicate')||err.message.includes('unique'))
+        ? `Project ID "${id}" already exists. Choose a different ID.`
+        : 'Error: '+err.message;
+      errEl.style.display='block';
+      btn.textContent='Create Project'; btn.disabled=false;
+    }
+  };
+
+  // ── Close modals on overlay click ─────────────────────────────
+  document.getElementById('approveModal').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+
+
+// Warn if New Project form has content and user navigates away
+let newProjectDirty = false;
+['np-id','np-name','np-location','np-description','np-budget'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', () => { newProjectDirty = el.value.trim() !== ''; });
+});
+window.addEventListener('beforeunload', function(e) {
+  const modalOpen = !document.getElementById('newProjectModal')?.classList.contains('hidden');
+  if (modalOpen && newProjectDirty) {
+    e.preventDefault(); e.returnValue = 'You have unsaved project data. Leave anyway?';
+    return e.returnValue;
+  }
+});
+
+  // ── Init ──────────────────────────────────────────────────────
+  AppAuth.requireAdmin(async (user, profile) => {
+    renderUserBar('user-bar', profile);
+    await loadData();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+    // Auto-open New Project modal AFTER data is loaded
+    if (sessionStorage.getItem('openNewProject') === '1') {
+      sessionStorage.removeItem('openNewProject');
+      // Small delay to ensure DOM and data are fully ready
+      await new Promise(r => setTimeout(r, 100));
+      if (typeof window.openNewProjectModal === 'function') {
+        window.openNewProjectModal();
+      }
+    }
+  });
+</script>
+
+<!-- ── Quick-Add Work Package Modal (shared across all pages) ── -->
+<div id="wp-quick-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.45);overflow-y:auto">
+  <div style="min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:20px 12px">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:680px;box-shadow:0 20px 60px rgba(0,0,0,.2);margin:auto">
+      <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f0f0;padding-bottom:16px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#231F20" id="wqm-title">Add Work Package</div>
+          <div style="font-size:12px;color:#aaa;margin-top:2px" id="wqm-subtitle">Fill in the required fields</div>
+        </div>
+        <button onclick="closeAddWPModal()" style="background:none;border:none;cursor:pointer;padding:4px;color:#aaa;font-size:20px;line-height:1">&times;</button>
+      </div>
+      <div style="padding:20px 24px">
+        <div id="wqm-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px"></div>
+        <div id="wqm-success" style="display:none;background:#D1FAE5;color:#065F46;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px"></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Cost Code *</label>
+            <input id="wqm-cost-code" type="text" placeholder="e.g. 03-001" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">WP No. *</label>
+            <input id="wqm-wp-no" type="text" placeholder="e.g. WP-115" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div style="grid-column:1/-1">
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Description *</label>
+            <input id="wqm-description" type="text" placeholder="Work Package description" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Zone <span style="font-size:10px;font-weight:400;color:#bbb">(optional)</span></label>
+            <input id="wqm-zone" type="text" placeholder="e.g. Tower 1" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Trade / Discipline *</label>
+            <select id="wqm-trade" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+              <option value="">Select trade…</option>
+              <option>Architectural Works</option>
+              <option>Civil Works</option>
+              <option>Electrical Works</option>
+              <option>General Requirement</option>
+              <option>MEPF &amp; Allied Services</option>
+              <option>Site Development</option>
+              <option>Site Works</option>
+              <option>Structural Works</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Planned Award Date *</label>
+            <input id="wqm-award-date" type="date" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Target Completion *</label>
+            <input id="wqm-completion" type="date" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Budget BCB (₱) *</label>
+            <input id="wqm-budget" type="number" step="0.01" placeholder="e.g. 2500000" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Award Status</label>
+            <select id="wqm-award-status" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+              <option value="Not Yet Awarded">Not Yet Awarded</option>
+              <option value="Partially Awarded">Partially Awarded</option>
+              <option value="Awarded">Awarded</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;flex-wrap:wrap">
+          <button id="wqm-save-btn" onclick="saveQuickWP()" style="padding:10px 20px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">
+            <i class="ti ti-plus"></i> <span id="wqm-btn-text">Add Work Package</span>
+          </button>
+          <a id="wqm-full-form-link" href="wp-form.html" style="padding:10px 16px;background:#f5f5f5;color:#666;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;text-decoration:none;display:flex;align-items:center;gap:5px">
+            <i class="ti ti-external-link"></i> Full Form
+          </a>
+          <button onclick="closeAddWPModal()" style="padding:10px 16px;background:transparent;color:#888;border:1px solid #e5e5e5;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;margin-left:auto">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let _wqmProjectId = null;
+let _wqmDirty = false;
+
+window.openAddWPModal = function(projectId) {
+  _wqmProjectId = projectId || null;
+  _wqmDirty = false;
+  // Clear fields
+  ['wqm-cost-code','wqm-wp-no','wqm-description','wqm-zone','wqm-award-date','wqm-completion','wqm-budget'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  const trade = document.getElementById('wqm-trade'); if(trade) trade.value = '';
+  const status = document.getElementById('wqm-award-status'); if(status) status.value = 'Not Yet Awarded';
+  document.getElementById('wqm-error').style.display = 'none';
+  document.getElementById('wqm-success').style.display = 'none';
+  document.getElementById('wqm-btn-text').textContent = 'Add Work Package';
+  document.getElementById('wqm-save-btn').disabled = false;
+  // Update full-form link with project
+  const fullLink = document.getElementById('wqm-full-form-link');
+  if(fullLink && projectId) fullLink.href = 'wp-form.html?project=' + projectId;
+  // Subtitle
+  document.getElementById('wqm-subtitle').textContent = projectId ? 'Project: ' + projectId : 'Fill in the required fields';
+  // Track dirty
+  document.querySelectorAll('#wp-quick-modal input,#wp-quick-modal select').forEach(el => {
+    el.addEventListener('input', () => { _wqmDirty = true; });
+    el.addEventListener('change', () => { _wqmDirty = true; });
+  });
+  document.getElementById('wp-quick-modal').style.display = 'block';
+};
+
+window.closeAddWPModal = function() {
+  if (_wqmDirty) {
+    if (!confirm('Discard unsaved work package?')) return;
+  }
+  document.getElementById('wp-quick-modal').style.display = 'none';
+  _wqmDirty = false;
+};
+
+// Close on overlay click
+document.getElementById('wp-quick-modal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeAddWPModal();
+});
+
+window.saveQuickWP = async function() {
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const n = id => parseFloat(document.getElementById(id)?.value) || null;
+  const errEl = document.getElementById('wqm-error');
+  const sucEl = document.getElementById('wqm-success');
+  errEl.style.display = 'none'; sucEl.style.display = 'none';
+
+  if (!v('wqm-cost-code')) { errEl.textContent='Cost Code is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-wp-no')) { errEl.textContent='WP No. is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-description')) { errEl.textContent='Description is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-trade')) { errEl.textContent='Trade is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-award-date')) { errEl.textContent='Planned Award Date is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-completion')) { errEl.textContent='Target Completion is required.'; errEl.style.display='block'; return; }
+  if (!n('wqm-budget')) { errEl.textContent='Budget BCB is required.'; errEl.style.display='block'; return; }
+  if (!_wqmProjectId) { errEl.textContent='No project selected.'; errEl.style.display='block'; return; }
+
+  const btn = document.getElementById('wqm-save-btn');
+  document.getElementById('wqm-btn-text').textContent = 'Saving…';
+  btn.disabled = true;
+
+  const data = {
+    project_id: _wqmProjectId,
+    cost_code: v('wqm-cost-code'), wp_no: v('wqm-wp-no'),
+    description: v('wqm-description'), zone: v('wqm-zone') || null,
+    trade: v('wqm-trade'), awarding_date: v('wqm-award-date') || null,
+    target_completion: v('wqm-completion') || null,
+    approved_budget_bcb: n('wqm-budget'), award_status: v('wqm-award-status'),
+    awarding_lead_time: 0,
+  };
+
+  try {
+    // Get current user profile to decide direct-save vs review queue
+    const sb = await getSB();
+    const { data: { user } } = await sb.auth.getUser();
+    const { data: prof } = await sb.from('users').select('role').eq('id', user?.id).single();
+    const role = prof?.role || 'user';
+
+    const newWP = await WPDb.submitWP(data, { id: user?.id });
+    if (['admin','super_admin'].includes(role) && newWP?.id) {
+      await WPDb.approveWP(newWP.id);
+    }
+
+    _wqmDirty = false;
+    sucEl.textContent = ['admin','super_admin'].includes(role)
+      ? 'Work package added and approved.'
+      : 'Work package submitted for review.';
+    sucEl.style.display = 'block';
+
+    document.getElementById('wqm-btn-text').textContent = 'Add Another';
+    btn.disabled = false;
+
+    // Reset form for another entry
+    ['wqm-cost-code','wqm-wp-no','wqm-description','wqm-zone','wqm-budget'].forEach(id => {
+      const el = document.getElementById(id); if(el) el.value = '';
+    });
+    _wqmDirty = false;
+
+    // Reload page data if available
+    if (typeof loadData === 'function') setTimeout(loadData, 500);
+    if (typeof renderOverview === 'function') setTimeout(renderOverview, 800);
+
+  } catch(err) {
+    errEl.textContent = 'Error: ' + err.message;
+    errEl.style.display = 'block';
+    document.getElementById('wqm-btn-text').textContent = 'Add Work Package';
+    btn.disabled = false;
+  }
+};
+</script>
+
 </body>
 </html>

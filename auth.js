@@ -1,113 +1,72 @@
 /**
- * auth.js — Supabase auth + role guard
- * Replaces the Firebase auth.js
- *
- * Usage: import { requireAuth, requireRole } from './auth.js';
+ * auth.js — Supabase replacement
+ * Keeps AppAuth API identical to the old Firebase version
+ * so index.html, project.html etc need ZERO changes.
  */
 
-import supabase from './supabase-config.js';
-import { getCurrentUser } from './db.js';
+const _SB_URL = 'https://cayjeqeleenizbdzrums.supabase.co';
+const _SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw';
 
-// ── Session state (module-level cache) ────────────────────────
-let _currentUser = null;
-let _session = null;
-
-export function getUser() { return _currentUser; }
-export function getSession() { return _session; }
-
-export async function initAuth() {
-  const { data: { session } } = await supabase.auth.getSession();
-  _session = session;
-  if (session) {
-    _currentUser = await getCurrentUser();
-  }
-  return { session, user: _currentUser };
+// Bootstrap Supabase — loaded via CDN since pages use legacy non-module scripts
+let _sb = null;
+async function getSB() {
+  if (_sb) return _sb;
+  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+  _sb = createClient(_SB_URL, _SB_KEY);
+  return _sb;
 }
 
-// ── Page guards ───────────────────────────────────────────────
+const AppAuth = (() => {
 
-/**
- * Call at top of every protected page.
- * Redirects to login if not authenticated.
- * Redirects to pending.html if registration not yet approved.
- */
-export async function requireAuth() {
-  const { session, user } = await initAuth();
-  if (!session) {
+  async function requireLogin(onReady) {
+    const sb = await getSB();
+    const { data: { session } } = await sb.auth.getSession();
+
+    if (!session) { window.location.href = 'login.html'; return; }
+
+    const { data: profile } = await sb
+      .from('users').select('*').eq('id', session.user.id).single();
+
+    if (!profile || profile.status !== 'approved') {
+      await sb.auth.signOut();
+      window.location.href = 'login.html'; return;
+    }
+
+    // Expose globally for other scripts
+    window.__sb = sb;
+    window.__profile = profile;
+    window.__session = session;
+
+    onReady(session.user, profile);
+  }
+
+  async function requireAdmin(onReady) {
+    requireLogin((user, profile) => {
+      if (!['admin', 'super_admin'].includes(profile.role)) {
+        window.location.href = 'index.html'; return;
+      }
+      onReady(user, profile);
+    });
+  }
+
+  async function logout() {
+    const sb = await getSB();
+    await sb.auth.signOut();
     window.location.href = 'login.html';
-    return null;
   }
-  if (!user || user.status === 'pending') {
-    window.location.href = 'pending.html';
-    return null;
+
+  function getPermittedProjects(profile, allProjects) {
+    if (['admin', 'super_admin'].includes(profile.role)) return allProjects;
+    return allProjects.filter(p => (profile.projects || []).includes(p.id));
   }
-  if (user.status === 'rejected') {
-    window.location.href = 'login.html?rejected=1';
-    return null;
+
+  function isAdmin(profile) {
+    return ['admin', 'super_admin'].includes(profile?.role);
   }
-  return user;
-}
 
-/**
- * Require a minimum role. Hierarchy: super_admin > admin > user.
- * Returns user or redirects to 403-equivalent.
- */
-export async function requireRole(minRole = 'user') {
-  const user = await requireAuth();
-  if (!user) return null;
-
-  const hierarchy = { user: 0, admin: 1, super_admin: 2 };
-  const userLevel = hierarchy[user.role] ?? 0;
-  const requiredLevel = hierarchy[minRole] ?? 0;
-
-  if (userLevel < requiredLevel) {
-    // Redirect to dashboard with access denied message
-    window.location.href = 'index.html?error=access_denied';
-    return null;
+  function isSuperAdmin(profile) {
+    return profile?.role === 'super_admin';
   }
-  return user;
-}
 
-export function isSuperAdmin(user) {
-  return user?.role === 'super_admin';
-}
-
-export function isAdmin(user) {
-  return user?.role === 'admin' || user?.role === 'super_admin';
-}
-
-export function canManageUsers(user) {
-  return isAdmin(user);
-}
-
-export function canCreateProjects(user) {
-  return isSuperAdmin(user);
-}
-
-export function canAccessProject(user, projectId) {
-  if (!user) return false;
-  if (isSuperAdmin(user)) return true;
-  if (isAdmin(user)) return true; // admins see all for now; can be tightened to user.projects
-  return user.projects?.includes(projectId);
-}
-
-export function canAccessConsolidated(user) {
-  // Consolidated view: admins and super admins (or users explicitly granted 'CONSOLIDATED')
-  return isAdmin(user) || user?.projects?.includes('CONSOLIDATED');
-}
-
-// ── Logout ────────────────────────────────────────────────────
-export async function logout() {
-  await supabase.auth.signOut();
-  sessionStorage.clear();
-  window.location.href = 'login.html';
-}
-
-// ── Auth state listener ───────────────────────────────────────
-export function watchAuth(callback) {
-  return supabase.auth.onAuthStateChange(async (_event, session) => {
-    _session = session;
-    _currentUser = session ? await getCurrentUser() : null;
-    callback({ session, user: _currentUser });
-  });
-}
+  return { requireLogin, requireAdmin, logout, getPermittedProjects, isAdmin, isSuperAdmin };
+})();

@@ -1,157 +1,259 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Request Access — Megawide Procurement Dashboard</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register — Megawide EPC Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{
-      --mw-red:#EE3124;--mw-red-dark:#C42127;--mw-red-light:#FDECEA;--mw-red-mid:#F9C8C5;
-      --mw-black:#231F20;
-      --bg:#F5F5F5;--surface:#fff;--border:rgba(0,0,0,0.10);--border-md:rgba(0,0,0,0.15);
-      --text-primary:#231F20;--text-secondary:#5A5858;--text-hint:#9B9999;
-      --radius-md:8px;--radius-lg:12px;--radius-xl:16px;
-      --green:#2D9B6F;--green-light:#E8F5EE;
-      --font:'Montserrat','Segoe UI',system-ui,sans-serif;
+    html,body{height:100%;font-family:'Montserrat',sans-serif;background:#fff}
+    .page{display:flex;min-height:100vh}
+
+    /* ── Left brand panel ── */
+    .brand{width:380px;flex-shrink:0;background:#231F20;display:flex;flex-direction:column;justify-content:space-between;padding:48px;position:relative;overflow:hidden}
+    .brand::before{content:'';position:absolute;bottom:-100px;left:-100px;width:320px;height:320px;border-radius:50%;background:#EE3124;opacity:.15;pointer-events:none}
+    .brand-logo{height:36px;max-width:260px;width:auto;display:block;background:transparent;object-fit:contain}
+    .brand-text h1{font-size:26px;font-weight:700;color:#fff;line-height:1.3;margin-bottom:8px}
+    .brand-text h1 span{color:#EE3124}
+    .brand-text p{font-size:12px;color:rgba(255,255,255,.4);line-height:1.6}
+
+    /* ── Right form panel ── */
+    .form-wrap{flex:1;display:flex;flex-direction:column;justify-content:center;padding:48px 56px;background:#fff;overflow-y:auto}
+    .form-title{font-size:22px;font-weight:700;color:#231F20;margin-bottom:4px}
+    .form-sub{font-size:13px;color:#999;margin-bottom:28px;line-height:1.5}
+
+    /* ── Form layout ── */
+    .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .field{margin-bottom:16px}
+    .field label{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;margin-bottom:6px}
+    .field input{width:100%;padding:11px 14px;border:1.5px solid #e8e8e8;border-radius:8px;font-size:14px;font-family:'Montserrat',sans-serif;color:#231F20;background:#fff;outline:none;transition:border-color .15s}
+    .field input:focus{border-color:#EE3124}
+    .field input.error-field{border-color:#EE3124;background:#fff8f8}
+    .field-hint{font-size:11px;color:#bbb;margin-top:4px}
+    .field-error{font-size:11px;color:#EE3124;margin-top:4px;display:none}
+    .field-error.visible{display:block}
+
+    /* Password wrapper with show/hide toggle */
+    .pw-wrap{position:relative}
+    .pw-wrap input{padding-right:40px}
+    .pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#bbb;font-size:16px;padding:0;line-height:1}
+    .pw-toggle:hover{color:#888}
+
+    /* Password strength bar */
+    .strength-bar{height:3px;border-radius:2px;background:#f0f0f0;margin-top:6px;overflow:hidden}
+    .strength-fill{height:100%;border-radius:2px;width:0%;transition:width .3s,background .3s}
+
+    /* Submit button */
+    .btn-primary{width:100%;padding:13px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;font-family:'Montserrat',sans-serif;cursor:pointer;transition:background .15s;margin-top:4px}
+    .btn-primary:hover{background:#C42127}
+    .btn-primary:disabled{background:#e8a09b;cursor:default}
+
+    /* Messages */
+    .msg{font-size:13px;padding:10px 14px;border-radius:8px;margin-bottom:14px;line-height:1.5;display:none}
+    .msg.error{background:#FEE2E2;color:#991B1B;display:block}
+    .msg.success{background:#D1FAE5;color:#065F46;display:block}
+
+    /* Footer */
+    .form-footer{text-align:center;margin-top:18px;font-size:13px;color:#999}
+    .form-footer a{color:#EE3124;text-decoration:none;font-weight:600}
+
+    /* Mobile */
+    @media(max-width:760px){
+      .page{flex-direction:column}
+      .brand{width:100%;padding:32px 24px 28px;flex:none;min-height:160px}
+      .brand-text h1{font-size:20px}
+      .form-wrap{padding:32px 24px}
+      .field-row{grid-template-columns:1fr}
     }
-    html,body{height:100%;font-family:var(--font)}
-    body{background:var(--mw-black);display:flex;align-items:stretch;min-height:100vh}
-    .brand-panel{width:38%;flex-shrink:0;background:var(--mw-red);display:flex;flex-direction:column;justify-content:space-between;padding:40px 48px;position:relative;overflow:hidden}
-    .brand-panel::before{content:'';position:absolute;bottom:-80px;right:-80px;width:320px;height:320px;border-radius:50%;background:rgba(0,0,0,0.12)}
-    .brand-logo img{width:160px;height:auto;position:relative;z-index:1}
-    .brand-tagline{position:relative;z-index:1}
-    .brand-tagline h1{font-size:24px;font-weight:800;color:#fff;line-height:1.3;margin-bottom:10px}
-    .brand-tagline p{font-size:12px;color:rgba(255,255,255,0.75);line-height:1.6;font-weight:500}
-    .brand-footer{font-size:10px;color:rgba(255,255,255,0.4);font-weight:600;letter-spacing:.08em;text-transform:uppercase;position:relative;z-index:1}
-    .form-panel{flex:1;background:var(--surface);display:flex;align-items:center;justify-content:center;padding:40px 48px;overflow-y:auto}
-    .form-wrap{width:100%;max-width:420px}
-    .form-title{font-size:20px;font-weight:800;color:var(--text-primary);margin-bottom:4px}
-    .form-sub{font-size:12px;color:var(--text-secondary);margin-bottom:24px;font-weight:500;line-height:1.6}
-    .field{margin-bottom:14px}
-    .field label{display:block;font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
-    .iw{position:relative}
-    .iw i.ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--text-hint);pointer-events:none}
-    .field input{width:100%;padding:10px 12px 10px 36px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:13px;color:var(--text-primary);background:var(--bg);outline:none;transition:border-color .15s;font-family:var(--font)}
-    .field input:focus{border-color:var(--mw-red);box-shadow:0 0 0 3px rgba(238,49,36,0.10);background:#fff}
-    .pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-hint);font-size:15px;padding:0;display:flex;align-items:center}
-    .hint{font-size:10px;color:var(--text-hint);margin-top:4px;font-weight:500}
-    .alert{border-radius:var(--radius-md);padding:10px 14px;font-size:12px;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px;font-weight:500}
-    .alert-error{background:var(--mw-red-light);border:1.5px solid var(--mw-red-mid);color:var(--mw-red-dark)}
-    .hidden{display:none!important}
-    .btn-submit{width:100%;padding:12px;background:var(--mw-red);color:#fff;border:none;border-radius:var(--radius-md);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px;transition:background .15s}
-    .btn-submit:hover{background:var(--mw-red-dark)}
-    .btn-submit:disabled{opacity:.6;cursor:default}
-    .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
-    .btn-submit.loading .spinner{display:block}
-    .btn-submit.loading .btn-text{display:none}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .divider{display:flex;align-items:center;gap:10px;margin:18px 0;color:var(--text-hint);font-size:11px;font-weight:600}
-    .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border-md)}
-    .link-btn{display:block;text-align:center;font-size:12px;font-weight:700;color:var(--mw-red);text-decoration:none}
-    .link-btn:hover{text-decoration:underline}
-    .success-screen{display:none;text-align:center;padding:24px 0}
-    .success-screen .icon{font-size:52px;color:var(--green);margin-bottom:16px;display:block}
-    .success-screen h3{font-size:18px;font-weight:800;margin-bottom:8px}
-    .success-screen p{font-size:12px;color:var(--text-secondary);line-height:1.7;font-weight:500}
-    @media(max-width:640px){.brand-panel{display:none}.form-panel{padding:28px 20px}}
   </style>
 </head>
 <body>
-  <div class="brand-panel">
-    <div class="brand-logo"><img src="assets/img/logo-white.png" alt="Megawide Construction"/></div>
-    <div class="brand-tagline">
-      <h1>Request Access</h1>
-      <p>Submit your registration. The admin will review and assign your project access.</p>
-    </div>
-    <div class="brand-footer">Megawide Construction Corporation</div>
-  </div>
-  <div class="form-panel">
-    <div class="form-wrap">
-      <div id="form-screen">
-        <div class="form-title">Create your account</div>
-        <div class="form-sub">Fill in your details. You'll be able to log in once the admin approves your request and assigns your projects.</div>
-        <div class="alert alert-error hidden" id="alert">
-          <i class="ti ti-alert-circle" style="flex-shrink:0;margin-top:1px"></i>
-          <span id="alert-text"></span>
-        </div>
-        <div class="field">
-          <label>Full Name</label>
-          <div class="iw"><i class="ti ti-user ico"></i><input type="text" id="name" placeholder="e.g. Juan dela Cruz"/></div>
-        </div>
-        <div class="field">
-          <label>Email Address</label>
-          <div class="iw"><i class="ti ti-mail ico"></i><input type="email" id="email" placeholder="you@megawide.com.ph"/></div>
-          <div class="hint">Use your company email address.</div>
-        </div>
-        <div class="field">
-          <label>Password</label>
-          <div class="iw">
-            <i class="ti ti-lock ico"></i>
-            <input type="password" id="password" placeholder="At least 8 characters"/>
-            <button class="pw-toggle" id="pw-toggle" type="button" tabindex="-1"><i class="ti ti-eye" id="pw-icon"></i></button>
-          </div>
-          <div class="hint">Minimum 8 characters.</div>
-        </div>
-        <div class="field">
-          <label>Confirm Password</label>
-          <div class="iw"><i class="ti ti-lock-check ico"></i><input type="password" id="confirm-password" placeholder="Repeat your password"/></div>
-        </div>
-        <button class="btn-submit" id="btn-register">
-          <div class="spinner"></div>
-          <span class="btn-text"><i class="ti ti-user-plus" style="font-size:14px;vertical-align:middle"></i> &nbsp;Submit Registration</span>
-        </button>
-        <div class="divider">Already have an account?</div>
-        <a class="link-btn" href="login.html"><i class="ti ti-login" style="font-size:13px;vertical-align:middle"></i> &nbsp;Sign in</a>
-      </div>
-      <div class="success-screen" id="success-screen">
-        <i class="ti ti-circle-check icon"></i>
-        <h3>Registration submitted!</h3>
-        <p>Your request has been sent to the administrator.<br><br>You can log in once your access has been approved and projects are assigned to you.</p>
-        <br>
-        <a href="login.html" style="font-size:12px;color:var(--mw-red);font-weight:700;text-decoration:none">
-          <i class="ti ti-arrow-left" style="font-size:13px;vertical-align:middle"></i> Back to Sign In
-        </a>
-      </div>
+<div class="page">
+
+  <!-- Left: branding -->
+  <div class="brand">
+    <img class="brand-logo" src="data:image/png;base64,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" alt="Megawide Construction">
+    <div class="brand-text">
+      <h1>Request<br><span>Access</span></h1>
+      <p>Submit your registration. The admin will review your request and assign your project access.</p>
     </div>
   </div>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="assets/js/firebase-config.js"></script>
-<script src="assets/js/auth.js"></script>
-<script>
-  document.getElementById('pw-toggle').addEventListener('click',()=>{
-    const inp=document.getElementById('password'),ico=document.getElementById('pw-icon');
-    inp.type=inp.type==='password'?'text':'password';ico.className=inp.type==='password'?'ti ti-eye':'ti ti-eye-off';
-  });
-  async function doRegister(){
-    const btn=document.getElementById('btn-register'),alertEl=document.getElementById('alert'),alertTx=document.getElementById('alert-text');
-    const name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim();
-    const pw=document.getElementById('password').value,pw2=document.getElementById('confirm-password').value;
-    const showErr=msg=>{alertTx.textContent=msg;alertEl.className='alert alert-error';};
-    alertEl.className='alert alert-error hidden';
-    if(!name)return showErr('Please enter your full name.');
-    if(!email)return showErr('Please enter your email address.');
-    if(pw.length<8)return showErr('Password must be at least 8 characters.');
-    if(pw!==pw2)return showErr('Passwords do not match.');
-    btn.disabled=true;btn.classList.add('loading');
-    try{
-      await AppAuth.register(name,email,pw);
-      document.getElementById('form-screen').style.display='none';
-      document.getElementById('success-screen').style.display='block';
-    }catch(e){
-      let msg=e.message;
-      if(msg.includes('email-already-in-use'))msg='This email is already registered. Try signing in.';
-      if(msg.includes('invalid-email'))msg='Please enter a valid email address.';
-      showErr(msg);
-    }
-    btn.disabled=false;btn.classList.remove('loading');
+
+  <!-- Right: form -->
+  <div class="form-wrap">
+    <div class="form-title">Create your account</div>
+    <div class="form-sub">Fill in your details. You'll be able to log in once the admin approves your request and assigns your projects.</div>
+
+    <div class="msg" id="msgBox"></div>
+
+    <!-- First Name + Last Name side by side -->
+    <div class="field-row">
+      <div class="field">
+        <label>First Name</label>
+        <input type="text" id="firstName" placeholder="e.g. Juan" autocomplete="given-name">
+        <div class="field-error" id="errFirstName">Please enter your first name.</div>
+      </div>
+      <div class="field">
+        <label>Last Name</label>
+        <input type="text" id="lastName" placeholder="e.g. dela Cruz" autocomplete="family-name">
+        <div class="field-error" id="errLastName">Please enter your last name.</div>
+      </div>
+    </div>
+
+    <!-- Email -->
+    <div class="field">
+      <label>Email Address</label>
+      <input type="email" id="email" placeholder="you@megawide.com.ph" autocomplete="email">
+      <div class="field-hint">Use your company email address.</div>
+      <div class="field-error" id="errEmail">Please enter a valid email address.</div>
+    </div>
+
+    <!-- Password -->
+    <div class="field">
+      <label>Password</label>
+      <div class="pw-wrap">
+        <input type="password" id="password" placeholder="At least 8 characters" autocomplete="new-password">
+        <button class="pw-toggle" type="button" onclick="togglePw('password',this)" tabindex="-1">👁</button>
+      </div>
+      <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+      <div class="field-hint" id="strengthLabel">Minimum 8 characters.</div>
+      <div class="field-error" id="errPassword">Password must be at least 8 characters.</div>
+    </div>
+
+    <!-- Confirm Password -->
+    <div class="field">
+      <label>Confirm Password</label>
+      <div class="pw-wrap">
+        <input type="password" id="confirmPassword" placeholder="Repeat your password" autocomplete="new-password">
+        <button class="pw-toggle" type="button" onclick="togglePw('confirmPassword',this)" tabindex="-1">👁</button>
+      </div>
+      <div class="field-error" id="errConfirm">Passwords do not match.</div>
+    </div>
+
+    <button class="btn-primary" id="btnRegister">Submit Registration</button>
+
+    <div class="form-footer">Already have an account? <a href="login.html">Sign in</a></div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const sb = createClient(
+  'https://cayjeqeleenizbdzrums.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw'
+);
+
+// ── Password show/hide ─────────────────────────────────────────
+window.togglePw = function(id, btn) {
+  const input = document.getElementById(id);
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  btn.textContent = isHidden ? '🙈' : '👁';
+};
+
+// ── Password strength meter ────────────────────────────────────
+document.getElementById('password').addEventListener('input', function() {
+  const val = this.value;
+  const fill = document.getElementById('strengthFill');
+  const label = document.getElementById('strengthLabel');
+  let score = 0;
+  if (val.length >= 8)  score++;
+  if (val.length >= 12) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+  const levels = [
+    { pct: '0%',   color: '#f0f0f0', text: 'Minimum 8 characters.' },
+    { pct: '25%',  color: '#EE3124', text: 'Weak' },
+    { pct: '50%',  color: '#D97706', text: 'Fair' },
+    { pct: '75%',  color: '#2D9B6F', text: 'Good' },
+    { pct: '100%', color: '#15803D', text: 'Strong' },
+  ];
+  const lvl = levels[Math.min(score, 4)];
+  fill.style.width = lvl.pct;
+  fill.style.background = lvl.color;
+  label.textContent = val.length ? lvl.text : 'Minimum 8 characters.';
+});
+
+// ── Validation helpers ─────────────────────────────────────────
+function showErr(id, show) {
+  document.getElementById(id).classList.toggle('visible', show);
+  const inputId = id.replace('err','').replace(/^./, c => c.toLowerCase());
+  const mapping = { firstName:'firstName', lastName:'lastName', email:'email', password:'password', confirm:'confirmPassword' };
+  const inp = document.getElementById(mapping[inputId] || inputId);
+  if (inp) inp.classList.toggle('error-field', show);
+}
+function clearAllErrors() {
+  ['errFirstName','errLastName','errEmail','errPassword','errConfirm'].forEach(id => showErr(id, false));
+  const box = document.getElementById('msgBox');
+  box.className = 'msg'; box.textContent = '';
+}
+
+// ── Submit ─────────────────────────────────────────────────────
+document.getElementById('btnRegister').addEventListener('click', handleRegister);
+document.getElementById('confirmPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleRegister();
+});
+
+async function handleRegister() {
+  clearAllErrors();
+  const firstName  = document.getElementById('firstName').value.trim();
+  const lastName   = document.getElementById('lastName').value.trim();
+  const email      = document.getElementById('email').value.trim();
+  const password   = document.getElementById('password').value;
+  const confirm    = document.getElementById('confirmPassword').value;
+  const btn        = document.getElementById('btnRegister');
+
+  // Validate
+  let hasError = false;
+  if (!firstName) { showErr('errFirstName', true); hasError = true; }
+  if (!lastName)  { showErr('errLastName',  true); hasError = true; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showErr('errEmail', true); hasError = true; }
+  if (password.length < 8) { showErr('errPassword', true); hasError = true; }
+  if (password !== confirm) { showErr('errConfirm', true); hasError = true; }
+  if (hasError) return;
+
+  btn.textContent = 'Submitting…';
+  btn.disabled = true;
+
+  const fullName = firstName + ' ' + lastName;
+
+  // Create Supabase auth user
+  const { data, error } = await sb.auth.signUp({ email, password });
+  if (error) {
+    const box = document.getElementById('msgBox');
+    box.textContent = error.message.includes('already registered')
+      ? 'This email is already registered. Try signing in instead.'
+      : error.message;
+    box.className = 'msg error';
+    btn.textContent = 'Submit Registration';
+    btn.disabled = false;
+    return;
   }
-  document.getElementById('btn-register').addEventListener('click',doRegister);
-  document.getElementById('confirm-password').addEventListener('keydown',e=>{if(e.key==='Enter')doRegister();});
+
+  // Insert into users table
+  const { error: profileError } = await sb.from('users').insert({
+    id:     data.user.id,
+    name:   fullName,
+    email:  email,
+    role:   'user',
+    status: 'pending',
+    projects: [],
+  });
+
+  if (profileError) {
+    console.error('Profile insert error:', profileError);
+  }
+
+  // Sign out immediately — they need admin approval first
+  await sb.auth.signOut();
+
+  // Show success and redirect
+  window.location.href = 'pending.html';
+}
 </script>
 </body>
 </html>

@@ -6,51 +6,91 @@
   <title>Project — EPC WPM Dashboard</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
   <link rel="stylesheet" href="assets/css/dashboard.css"/>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="assets/js/firebase-config.js"></script>
   <script src="assets/js/auth.js"></script>
   <script src="assets/js/ui.js"></script>
   <script src="assets/js/db.js"></script>
   <style>
+    /* ── Power BI style tab nav ── */
+    .view-tabs {display:flex;gap:2px;background:#f5f5f5;border-radius:12px;padding:4px;margin-bottom:20px;flex-wrap:wrap}
+    .view-tab {font-size:12px;font-weight:600;padding:7px 18px;border-radius:9px;border:none;cursor:pointer;
+      color:#888;background:transparent;transition:all .15s;font-family:inherit;white-space:nowrap}
+    .view-tab.active {background:#fff;color:#231F20;box-shadow:0 1px 6px rgba(0,0,0,.1)}
+    .view-tab i {font-size:13px;margin-right:5px;vertical-align:middle}
+    /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
-    .assign-sel{font-size:11px;padding:3px 7px;border:1px solid var(--border-md);border-radius:6px;
-      background:var(--surface-2);color:var(--text-primary);cursor:pointer;max-width:150px}
+    .assign-sel{font-size:11px;padding:3px 7px;border:1px solid var(--border-md);border-radius:6px;background:var(--surface-2);color:var(--text-primary);cursor:pointer;max-width:150px}
+    .sidebar-logo img{background:transparent!important;height:36px;width:auto;object-fit:contain;max-width:140px}
+    /* ── Backlog severity colors ── */
+    .aging-critical {color:#EE3124;font-weight:700}
+    .aging-warning {color:#D97706;font-weight:600}
+    .aging-ok {color:#2D9B6F;font-weight:600}
+    /* ── Budget table ── */
+    .budget-table {width:100%;border-collapse:collapse;font-size:12px}
+    .budget-table th {font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#888;font-weight:600;padding:8px 10px;text-align:left;border-bottom:2px solid #f0f0f0}
+    .budget-table td {padding:9px 10px;border-bottom:1px solid #f5f5f5;color:#231F20}
+    .budget-table tr:last-child td {border-bottom:none;font-weight:700;background:#fafafa}
+    .budget-table tr:hover td {background:#fafafa}
+    /* ── Schedule timeline ── */
+    .sched-row {display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:12px}
+    .sched-wp {width:60px;font-weight:600;color:#231F20;flex-shrink:0}
+    .sched-bar-wrap {flex:1;height:10px;background:#f0f0f0;border-radius:5px;position:relative;overflow:hidden}
+    .sched-bar {height:100%;border-radius:5px;position:absolute}
+    /* ── Works analysis ── */
+    .works-summary {display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px}
+    .works-kpi {background:#fff;border:1px solid #f0f0f0;border-radius:10px;padding:14px;text-align:center}
+    .works-kpi-val {font-size:22px;font-weight:700;color:#231F20}
+    .works-kpi-lbl {font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
   </style>
 </head>
 <body>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
 <div class="app-shell">
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <img src="assets/img/logo-white.png" alt="Megawide Construction"/>
+      <img src="data:image/png;base64,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" alt="Megawide Construction"/>
       <div class="app-label">Procurement Dashboard</div>
     </div>
-    <div class="sidebar-section">
+
+    <div class="sidebar-section" id="sidebar-overview" style="display:none">
       <div class="sidebar-section-label">Overview</div>
-      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>All Projects</a>
+      <a class="nav-item" href="index.html?view=consolidated"><i class="ti ti-layout-dashboard"></i>All Projects</a>
     </div>
+
     <div class="sidebar-section">
-      <div class="sidebar-section-label">Current project</div>
-      <a class="nav-item active" href="#"><i class="ti ti-building-skyscraper"></i><span id="nav-proj-name">Loading…</span></a>
+      <div class="sidebar-section-label">Current Project</div>
+      <a class="nav-item active" href="#" id="nav-proj-link">
+        <i class="ti ti-building-skyscraper"></i>
+        <span id="nav-proj-name">—</span>
+      </a>
     </div>
-    <div id="sidebar-officer" style="display:none">
-      <div class="sidebar-section">
-        <div class="sidebar-section-label">My Work</div>
-        <a class="nav-item" href="my-wps.html"><i class="ti ti-clipboard-list"></i>My Work Packages</a>
-        <a class="nav-item" id="add-wp-link" href="wp-form.html"><i class="ti ti-plus"></i>Add Work Package</a>
-      </div>
-    </div>
+
     <div id="sidebar-admin" style="display:none">
       <div class="sidebar-section">
         <div class="sidebar-section-label">Admin</div>
         <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
-        <a class="nav-item" href="review.html"><i class="ti ti-clipboard-check"></i>Review WPs <span class="tbadge" id="pending-badge" style="display:none"></span></a>
-        <a class="nav-item" id="add-wp-link-admin" href="wp-form.html"><i class="ti ti-plus"></i>Add Work Package</a>
+        <a class="nav-item" href="review.html">
+          <i class="ti ti-clipboard-check"></i>Review WPs
+          <span class="nbadge" id="review-badge" style="display:none">0</span>
+        </a>
+        <button class="nav-item" onclick="openAddWPModal(projId)" style="width:100%;text-align:left;background:transparent;border:none;cursor:pointer;font-family:inherit;color:rgba(255,255,255,0.7);font-size:13px;padding:8px 12px;border-radius:8px;display:flex;align-items:center;gap:8px"><i class="ti ti-circle-plus"></i>Add Work Package</button>
+        <button class="nav-item" onclick="openNewProjectModal()" style="width:100%;text-align:left;background:transparent;border:none;cursor:pointer;font-family:inherit;color:rgba(255,255,255,0.7);font-size:13px;padding:8px 12px;border-radius:8px;display:flex;align-items:center;gap:8px"><i class="ti ti-folder-plus"></i>New Project</button>
+        <button class="nav-item" id="btn-archive-project" onclick="archiveCurrentProject()" style="display:none;width:100%;text-align:left;background:transparent;border:none;cursor:pointer;font-family:inherit;color:rgba(255,200,100,0.85);font-size:13px;padding:8px 12px;border-radius:8px;align-items:center;gap:8px"><i class="ti ti-archive"></i><span id="archive-btn-label">Archive Project</span></button>
       </div>
     </div>
+
+    <div id="sidebar-officer" style="display:none">
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Work Packages</div>
+        <button class="nav-item" onclick="openAddWPModal(projId)" style="width:100%;text-align:left;background:transparent;border:none;cursor:pointer;font-family:inherit;color:rgba(255,255,255,0.7);font-size:13px;padding:8px 12px;border-radius:8px;display:flex;align-items:center;gap:8px"><i class="ti ti-circle-plus"></i>Add Work Package</button>
+        <a class="nav-item" id="nav-my-wps-link" href="my-wps.html"><i class="ti ti-clipboard-list"></i>All WPs</a>
+      </div>
+    </div>
+    <div class="sidebar-section" id="sidebar-my-projects" style="display:none">
+      <a class="nav-item" href="login.html" style="font-size:12px;opacity:.7">
+        <i class="ti ti-switch-horizontal"></i>Switch Project
+      </a>
+    </div>
+
     <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
 
@@ -58,242 +98,526 @@
     <div class="topbar">
       <div class="topbar-left">
         <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
-        <div class="page-title" id="page-title">Loading…</div>
-        <div class="page-sub" id="page-sub"></div>
+        <div>
+          <div class="page-title" id="page-title">Loading…</div>
+          <div class="page-sub" id="page-sub" style="font-size:11px;color:#888;margin-top:1px"></div>
+        </div>
       </div>
       <div class="topbar-right">
-        <span class="rev-badge" id="rev-badge"></span>
-        <button class="btn" id="btn-export"><i class="ti ti-download"></i>Export CSV</button>
+        <button class="btn" id="btn-export"><i class="ti ti-download"></i><span class="hide-mobile">Export CSV</span></button>
         <div id="user-bar"></div>
       </div>
     </div>
+
     <div class="content">
-      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading…</span></div>
+      <div id="loading" class="loading-overlay">
+        <div class="spinner"></div><span>Loading project…</span>
+      </div>
+
       <div id="main-content" style="display:none">
-
-        <div class="filter-bar">
-          <span class="filter-label">Status</span>
-          <select id="f-status">
-            <option value="all">All statuses</option>
-            <option value="Awarded">Awarded</option>
-            <option value="Partially Awarded">Partially Awarded</option>
-            <option value="Not Yet Awarded">Not Yet Awarded</option>
-          </select>
-          <div class="filter-sep"></div>
-          <span class="filter-label">Trade</span>
-          <select id="f-trade"><option value="all">All trades</option></select>
-          <div class="filter-sep"></div>
-          <span class="filter-label">Zone</span>
-          <select id="f-zone"><option value="all">All zones</option></select>
-          <div class="filter-sep"></div>
-          <span class="filter-label"><i class="ti ti-search" style="font-size:12px"></i></span>
-          <input type="text" id="f-search" placeholder="Search WP / cost code…"/>
-        </div>
-
+        <!-- KPI row -->
         <div class="metrics-grid" id="metrics-grid"></div>
 
-        <div class="grid-2" style="margin-bottom:14px">
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Award status by zone</div>
-            <div class="legend">
-              <span><span class="legend-dot" style="background:#1D9E75"></span>Awarded</span>
-              <span><span class="legend-dot" style="background:#EF9F27"></span>Partially awarded</span>
-              <span><span class="legend-dot" style="background:#B4B2A9"></span>Not yet awarded</span>
-            </div>
-            <div style="position:relative;height:180px"><canvas id="c-status"></canvas></div>
-          </div>
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-clock"></i>Awarding lead time (days)</div>
-            <div class="legend">
-              <span><span class="legend-dot" style="background:#1D9E75"></span>Early / on time</span>
-              <span><span class="legend-dot" style="background:#E24B4A"></span>Late</span>
-            </div>
-            <div style="position:relative;height:180px"><canvas id="c-leadtime"></canvas></div>
-          </div>
-        </div>
-        <div class="grid-2" style="margin-bottom:14px">
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-coins"></i>Budget vs contract (₱M)</div>
-            <div class="legend">
-              <span><span class="legend-dot" style="background:#378ADD"></span>Approved budget</span>
-              <span><span class="legend-dot" style="background:#1D9E75"></span>Contract amount</span>
-            </div>
-            <div style="position:relative;height:220px"><canvas id="c-budget"></canvas></div>
-          </div>
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-line"></i>Variance trend (₱M)</div>
-            <div class="legend">
-              <span><span class="legend-dot" style="background:#1D9E75"></span>Cumulative savings</span>
-              <span><span class="legend-dot" style="background:#E24B4A"></span>Cumulative overrun</span>
-            </div>
-            <div style="position:relative;height:220px"><canvas id="c-trend"></canvas></div>
-          </div>
-        </div>
-        <div class="panel" style="margin-bottom:14px">
-          <div class="panel-title"><i class="ti ti-calendar-event"></i>Schedule timeline</div>
-          <div class="legend">
-            <span><span class="legend-dot" style="background:#378ADD"></span>Awarding</span>
-            <span><span class="legend-dot" style="background:#EF9F27"></span>Delivery</span>
-            <span><span class="legend-dot" style="background:#1D9E75"></span>Installation</span>
-            <span><span class="legend-dot" style="background:#534AB7"></span>Completion</span>
-          </div>
-          <div style="position:relative;height:260px"><canvas id="c-schedule"></canvas></div>
+        <!-- Power BI style view tabs -->
+        <div class="view-tabs" id="view-tabs">
+          <button class="view-tab active" data-view="overview" onclick="switchView('overview')">
+            <i class="ti ti-layout-dashboard"></i>Overview
+          </button>
+          <button class="view-tab" data-view="backlog" onclick="switchView('backlog')">
+            <i class="ti ti-clock"></i>Backlog
+          </button>
+          <button class="view-tab" data-view="budget" onclick="switchView('budget')">
+            <i class="ti ti-report-money"></i>Budget
+          </button>
+          <button class="view-tab" data-view="schedule" onclick="switchView('schedule')">
+            <i class="ti ti-calendar"></i>Schedule
+          </button>
+          <button class="view-tab" data-view="works" onclick="switchView('works')">
+            <i class="ti ti-tool"></i>Works
+          </button>
+          <button class="view-tab" data-view="table" onclick="switchView('table')">
+            <i class="ti ti-table"></i>WP List
+          </button>
         </div>
 
-        <div class="grid-3" style="margin-bottom:14px">
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-trending-up" style="color:#1D9E75"></i>Top 5 savings</div>
-            <div class="rank-list" id="rank-gains"></div>
+        <!-- ══ OVERVIEW VIEW ══ -->
+        <div id="view-overview">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Award Status by Zone</div>
+              <div style="position:relative;height:200px"><canvas id="c-status"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-clock"></i>Awarding Lead Time (Days)</div>
+              <div style="position:relative;height:200px"><canvas id="c-leadtime"></canvas></div>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget vs Contract (₱M)</div>
+              <div style="position:relative;height:220px"><canvas id="c-budget"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-line"></i>Variance Trend (₱M)</div>
+              <div style="position:relative;height:220px"><canvas id="c-trend"></canvas></div>
+            </div>
           </div>
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-trophy" style="color:#378ADD"></i>Top 5 by contract value</div>
-            <div class="rank-list" id="rank-value"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-trending-down" style="color:#E24B4A"></i>Top 5 overbudget</div>
-            <div class="rank-list" id="rank-losses"></div>
+            <div class="panel-title"><i class="ti ti-calendar"></i>Schedule Timeline</div>
+            <div style="position:relative;height:200px"><canvas id="c-schedule"></canvas></div>
           </div>
         </div>
 
-        <!-- Work Package Register -->
-        <div class="panel">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-            <div class="panel-title" style="margin-bottom:0">
-              <i class="ti ti-table"></i>Work package register
-              <span style="font-size:9px;color:var(--text-hint);font-weight:400;margin-left:6px" id="row-count"></span>
+        <!-- ══ BACKLOG VIEW ══ -->
+        <div id="view-backlog" style="display:none">
+          <div class="grid-2" style="margin-bottom:20px">
+            <div class="panel" style="text-align:center">
+              <div id="backlog-kpi-due" style="font-size:42px;font-weight:700;color:#EE3124">0</div>
+              <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">WPs Due but Not Awarded</div>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-              <span style="font-size:10px;color:var(--text-secondary)">Show:</span>
-              <button class="col-toggle active" id="tog-identity" onclick="toggleCol('identity')">Identity</button>
-              <button class="col-toggle active" id="tog-schedule" onclick="toggleCol('schedule')">Schedule</button>
-              <button class="col-toggle active" id="tog-budget"   onclick="toggleCol('budget')">Budget</button>
-              <button class="col-toggle active" id="tog-assign"   onclick="toggleCol('assign')" style="display:none">Officers</button>
+            <div class="panel" style="text-align:center">
+              <div id="backlog-kpi-upcoming" style="font-size:42px;font-weight:700;color:#D97706">0</div>
+              <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Due in Next 30 Days</div>
             </div>
           </div>
-          <div class="table-wrap">
-            <table class="data-table"><thead id="tbl-head"></thead><tbody id="tbl-body"></tbody></table>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Backlog by Trade</div>
+              <div style="position:relative;height:220px"><canvas id="c-backlog-trade"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>WP by Procurement Status</div>
+              <div style="position:relative;height:220px"><canvas id="c-proc-status"></canvas></div>
+            </div>
           </div>
-          <div class="pager">
-            <button id="btn-prev" onclick="changePage(-1)" disabled>‹ Prev</button>
-            <span id="pg-info"></span>
-            <button id="btn-next" onclick="changePage(1)">Next ›</button>
+          <div class="panel">
+            <div class="panel-title"><i class="ti ti-list"></i>Backlog — Not Yet Awarded WPs</div>
+            <div style="overflow-x:auto">
+              <table class="budget-table" id="backlog-table">
+                <thead><tr>
+                  <th>WP No.</th><th>Description</th><th>Trade</th>
+                  <th>Planned Award</th><th>Aging (d)</th><th>Budget (₱M)</th><th>Status</th>
+                </tr></thead>
+                <tbody id="backlog-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-      </div>
-    </div>
-  </div>
-</div>
+        <!-- ══ BUDGET VIEW ══ -->
+        <div id="view-budget" style="display:none">
+          <div class="grid-3" style="margin-bottom:20px">
+            <div class="panel" style="text-align:center">
+              <div id="bud-total" style="font-size:28px;font-weight:700;color:#231F20">—</div>
+              <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Budget BCB</div>
+            </div>
+            <div class="panel" style="text-align:center">
+              <div id="bud-awarded" style="font-size:28px;font-weight:700;color:#231F20">—</div>
+              <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Awarded Cost</div>
+            </div>
+            <div class="panel" style="text-align:center">
+              <div id="bud-variance" style="font-size:28px;font-weight:700">—</div>
+              <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Variance</div>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget &amp; Awarded by Trade (₱M)</div>
+              <div style="position:relative;height:240px"><canvas id="c-bud-trade"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Award Rate by Trade</div>
+              <div style="position:relative;height:240px"><canvas id="c-bud-rate"></canvas></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><i class="ti ti-table"></i>Budget &amp; Awarded by Trade</div>
+            <div style="overflow-x:auto">
+              <table class="budget-table" id="budget-table">
+                <thead><tr>
+                  <th>Trade</th><th>WP Count</th><th>Budget BCB (₱M)</th>
+                  <th>Awarded (₱M)</th><th>Variance (₱M)</th><th>% Var</th><th>Award Rate</th>
+                </tr></thead>
+                <tbody id="budget-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ SCHEDULE VIEW ══ -->
+        <div id="view-schedule" style="display:none">
+          <div class="grid-2" style="margin-bottom:20px">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>WPs by Planned Award Period</div>
+              <div style="position:relative;height:220px"><canvas id="c-sched-period"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-clock"></i>Lead Time Distribution</div>
+              <div style="position:relative;height:220px"><canvas id="c-sched-leadtime"></canvas></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><i class="ti ti-list"></i>Schedule — All WPs</div>
+            <div style="overflow-x:auto">
+              <table class="budget-table" id="sched-table">
+                <thead><tr>
+                  <th>WP No.</th><th>Description</th><th>Trade</th>
+                  <th>Planned Award</th><th>Actual Award</th><th>Lead Time</th>
+                  <th>Target Delivery</th><th>Target Completion</th><th>Status</th>
+                </tr></thead>
+                <tbody id="sched-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ WORKS VIEW ══ -->
+        <div id="view-works" style="display:none">
+          <div class="works-summary" id="works-summary"></div>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>WPs by Trade</div>
+              <div style="position:relative;height:220px"><canvas id="c-works-donut"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Awarded WPs by Trade</div>
+              <div style="position:relative;height:220px"><canvas id="c-works-bar"></canvas></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><i class="ti ti-table"></i>Works by Trade &amp; Status</div>
+            <div style="overflow-x:auto">
+              <table class="budget-table" id="works-table">
+                <thead><tr>
+                  <th>Trade</th><th>Total WPs</th><th>Awarded</th><th>Not Yet</th><th>Award Rate</th><th>Budget (₱M)</th><th>Awarded (₱M)</th>
+                </tr></thead>
+                <tbody id="works-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ WP LIST VIEW ══ -->
+        <div id="view-table" style="display:none">
+          <div class="filter-row">
+            <select id="f-status" class="filter-sel">
+              <option value="all">All statuses</option>
+              <option value="Awarded">Awarded</option>
+              <option value="Partially Awarded">Partially Awarded</option>
+              <option value="Not Yet Awarded">Not Yet Awarded</option>
+            </select>
+            <select id="f-trade" class="filter-sel"><option value="all">All trades</option></select>
+            <select id="f-zone" class="filter-sel"><option value="all">All zones</option></select>
+            <div class="search-wrap">
+              <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#aaa;font-size:14px"></i>
+              <input id="f-search" class="filter-search" type="text" placeholder="Search WP / cost code…"/>
+            </div>
+          </div>
+
+          <div class="panel" style="padding:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #f0f0f0">
+              <span id="row-count" style="font-size:12px;font-weight:600;color:#888"></span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <button class="btn-sm" onclick="toggleCol('identity')">Identity</button>
+                <button class="btn-sm" onclick="toggleCol('schedule')">Schedule</button>
+                <button class="btn-sm" onclick="toggleCol('budget')">Budget</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="data-table">
+                <thead id="tbl-head"></thead>
+                <tbody id="tbl-body"></tbody>
+              </table>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid #f0f0f0">
+              <button class="btn" id="btn-prev" onclick="changePage(-1)">← Prev</button>
+              <span id="pg-info" style="font-size:12px;color:#888"></span>
+              <button class="btn" id="btn-next" onclick="changePage(1)">Next →</button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /main-content -->
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app-shell -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="assets/js/charts.js"></script>
 <script>
-const PAGE=10; let allWPs=[], projId='', sortCol='cost_code', sortDir=1, curPage=1;
-const colGroups={identity:true,schedule:true,budget:true,assign:false};
-let userProfile, officers=[];
+const PAGE=15;
+let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
+const colGroups={identity:true,schedule:true,budget:true};
+let userProfile=null;
+let currentView='overview';
 
 const COLS={
   identity:[
-    {key:'cost_code',label:'Cost Code',w:'95px'},
-    {key:'wp_no',label:'WP No.',w:'85px'},
-    {key:'description',label:'Work Package',w:'180px'},
+    {key:'cost_code',label:'Cost Code',w:'90px'},
+    {key:'wp_no',label:'WP No.',w:'80px'},
+    {key:'description',label:'Work Package',w:'200px'},
     {key:'zone',label:'Zone',w:'70px'},
     {key:'trade',label:'Trade',w:'110px'},
   ],
   schedule:[
-    {key:'lead_time_days',label:'Lead Time (d)',w:'65px'},
-    {key:'awarding_date',label:'Awarding Date',w:'82px'},
-    {key:'actual_awarding_date',label:'Actual Awarding',w:'82px'},
-    {key:'_alt',label:'Award Lead Time',w:'80px'},
-    {key:'target_delivery_date',label:'Target Delivery',w:'82px'},
-    {key:'_dl',label:'Delivery Lead Time',w:'78px'},
-    {key:'target_installation_date',label:"Target Inst'n",w:'82px'},
-    {key:'target_completion_date',label:"Target Comp'n",w:'82px'},
+    {key:'awarding_date',label:'Planned Award',w:'100px'},
+    {key:'actual_awarding_date',label:'Actual Award',w:'100px'},
+    {key:'awarding_lead_time',label:'Aging (d)',w:'70px'},
+    {key:'target_delivery',label:'Target Delivery',w:'100px'},
+    {key:'target_completion',label:'Target Comp.',w:'100px'},
   ],
   budget:[
-    {key:'approved_budget_php',label:'Budget',w:'90px'},
-    {key:'contract_amount_php',label:'Contract',w:'90px'},
-    {key:'_var',label:'Variance (₱)',w:'88px'},
-    {key:'_varp',label:'Variance (%)',w:'68px'},
-    {key:'status',label:'Status',w:'108px'},
-    {key:'contractor',label:'Contractor',w:'120px'},
+    {key:'approved_budget_bcb',label:'Budget BCB',w:'100px'},
+    {key:'total_awarded',label:'Total Awarded',w:'100px'},
+    {key:'variance',label:'Variance (₱)',w:'100px'},
+    {key:'award_status',label:'Award Status',w:'120px'},
+    {key:'contractor',label:'Contractor',w:'130px'},
     {key:'remarks',label:'Remarks',w:'140px'},
-  ],
-  assign:[
-    {key:'_officer',label:'Assigned Officer',w:'150px'},
-    {key:'_actions',label:'Actions',w:'120px'},
   ],
 };
 
-function getActiveCols(){
-  return[...(colGroups.identity?COLS.identity:[]),...(colGroups.schedule?COLS.schedule:[]),
-    ...(colGroups.budget?COLS.budget:[]),...(colGroups.assign?COLS.assign:[])];
+function getActiveCols(){ return [...(colGroups.identity?COLS.identity:[]),...(colGroups.schedule?COLS.schedule:[]),...(colGroups.budget?COLS.budget:[])]; }
+function toggleCol(grp){ colGroups[grp]=!colGroups[grp]; buildTable(); }
+
+function fmt(n){ if(n==null)return'—'; return'₱'+(Math.abs(n)/1e6).toFixed(2)+'M'; }
+function fmtDate(d){ if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'});}catch{return d;} }
+function statusBadge(s){
+  const c={Awarded:'#2D9B6F','Partially Awarded':'#D97706','Not Yet Awarded':'#EE3124'}[s]||'#999';
+  return '<span style="font-size:10px;font-weight:600;color:'+c+'">'+( s||'—')+'</span>';
 }
 
-function toggleCol(grp){
-  colGroups[grp]=!colGroups[grp];
-  document.getElementById('tog-'+grp).classList.toggle('active',colGroups[grp]);
-  buildTable();
+function switchView(v) {
+  currentView = v;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
+  ['overview','backlog','budget','schedule','works','table'].forEach(id => {
+    const el = document.getElementById('view-'+id);
+    if(el) el.style.display = id === v ? '' : 'none';
+  });
+  // Render charts for the newly active view
+  if(v==='overview') renderOverview();
+  else if(v==='backlog') renderBacklog();
+  else if(v==='budget') renderBudget();
+  else if(v==='schedule') renderSchedule();
+  else if(v==='works') renderWorks();
+  else if(v==='table') buildTable();
 }
 
 function getFiltered(){
-  const st=document.getElementById('f-status').value, tr=document.getElementById('f-trade').value;
-  const zn=document.getElementById('f-zone').value, sr=document.getElementById('f-search').value.toLowerCase();
+  const st=document.getElementById('f-status').value;
+  const tr=document.getElementById('f-trade').value;
+  const zn=document.getElementById('f-zone').value;
+  const sr=(document.getElementById('f-search').value||'').toLowerCase();
   return allWPs.filter(w=>{
-    if(st!=='all'&&w.status!==st)return false;
+    if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
     if(zn!=='all'&&w.zone!==zn)return false;
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
     return true;
   }).sort((a,b)=>{
-    const km={_alt:'awarding_date',_dl:'target_delivery_date',_var:'approved_budget_php',_varp:'approved_budget_php',_officer:'assigned_officer_name',_actions:''};
-    const col=km[sortCol]||sortCol;
-    const va=a[col]??'',vb=b[col]??'';
+    const va=a[sortCol]??'', vb=b[sortCol]??'';
     return typeof va==='number'?(va-vb)*sortDir:String(va).localeCompare(String(vb))*sortDir;
   });
 }
 
 function buildMetrics(wps){
-  const s=computeStats(wps);
+  const total=wps.length;
+  const awarded=wps.filter(w=>w.award_status==='Awarded').length;
+  const notYet=wps.filter(w=>w.award_status==='Not Yet Awarded').length;
+  const totalBudget=wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const totalAwarded=wps.reduce((s,w)=>s+(w.total_awarded||0),0);
+  const netVar=totalBudget-totalAwarded;
+  const today=new Date();
+  const late=wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
   document.getElementById('metrics-grid').innerHTML=[
-    {lbl:'Total packages',   val:s.total,                                   sub:'',                  cls:'',    accent:'blue'},
-    {lbl:'Awarded',          val:s.awarded.length,                          sub:s.awardRate+'% rate', cls:'green',accent:'green'},
-    {lbl:'Partially awarded',val:s.partial.length,                          sub:'',                  cls:'amber',accent:'amber'},
-    {lbl:'Not yet awarded',  val:s.notYet.length,                           sub:'',                  cls:'red',  accent:'red'},
-    {lbl:'Total budget',     val:Fmt.money(s.totalBudget,1),                sub:'',                  cls:'',    accent:'blue'},
-    {lbl:'Total contract',   val:Fmt.money(s.totalContract,1),              sub:'',                  cls:'',    accent:'blue'},
-    {lbl:'Net variance',     val:(s.netVariance>=0?'+':'')+Fmt.money(s.netVariance,1),
-      sub:s.netVariance>=0?'savings':'overrun',cls:s.netVariance>=0?'green':'red',accent:s.netVariance>=0?'green':'red'},
-    {lbl:'Late awards',      val:s.lateAwards,                              sub:'actual > target',   cls:s.lateAwards>0?'red':'green',accent:s.lateAwards>0?'red':'green'},
-  ].map(c=>`<div class="metric-card accent-${c.accent}">
-    <div class="metric-label">${c.lbl}</div>
-    <div class="metric-value ${c.cls}">${c.val}</div>
-    ${c.sub?`<div class="metric-sub">${c.sub}</div>`:''}</div>`).join('');
+    {lbl:'Total packages',val:total,sub:'',cls:''},
+    {lbl:'Awarded',val:awarded,sub:total?Math.round(awarded/total*100)+'% rate':'',cls:'green'},
+    {lbl:'Not yet awarded',val:notYet,sub:'',cls:'red'},
+    {lbl:'Total budget',val:fmt(totalBudget),sub:'BCB',cls:''},
+    {lbl:'Total awarded',val:fmt(totalAwarded),sub:'contract value',cls:''},
+    {lbl:'Net variance',val:(netVar>=0?'+':'')+fmt(netVar),sub:netVar>=0?'savings':'overrun',cls:netVar>=0?'green':'red'},
+    {lbl:'Late awards',val:late,sub:'actual > target',cls:late>0?'red':'green'},
+  ].map(c=>'<div class="metric-card"><div class="metric-label">'+c.lbl+'</div><div class="metric-value '+c.cls+'">'+c.val+'</div>'+(c.sub?'<div class="metric-sub">'+c.sub+'</div>':'')+'</div>').join('');
 }
 
-function buildRankList(id,items,cls,fmtFn){
-  const el=document.getElementById(id);if(!el)return;
-  if(!items.length){el.innerHTML='<div class="empty-state"><i class="ti ti-circle-off"></i>No data</div>';return;}
-  const max=Math.max(...items.map(i=>Math.abs(i.val)),0.01);
-  el.innerHTML=items.map((it,i)=>`<div class="rank-item">
-    <span class="rank-num">${i+1}</span>
-    <div class="rank-body">
-      <div class="rank-name">${it.name}</div><div class="rank-sub">${it.sub}</div>
-      <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${Math.round(Math.abs(it.val)/max*100)}%;background:${it.color}"></div></div>
-    </div>
-    <span class="rank-val ${cls}">${fmtFn(it.val)}</span></div>`).join('');
+function renderOverview(){
+  const f = getFiltered();
+  Charts.statusByZone('c-status',f);
+  Charts.awardingLeadTime('c-leadtime',f);
+  Charts.budgetVsContract('c-budget',f);
+  Charts.varianceTrend('c-trend',f);
+  Charts.scheduleTimeline('c-schedule',f);
 }
 
-async function assignOfficer(firestoreId, selectEl){
-  const uid = selectEl.value;
-  if (!uid) return;
-  const officer = officers.find(o=>o.uid===uid);
-  if (!officer) return;
-  try {
-    await WPDb.assignOfficer(firestoreId, uid, officer.name);
-    selectEl.style.borderColor = '#1D9E75';
-    setTimeout(()=>selectEl.style.borderColor='',2000);
-  } catch(e) { alert('Error assigning officer: '+e.message); }
+function renderBacklog(){
+  const today = new Date();
+  const in30 = new Date(today); in30.setDate(in30.getDate()+30);
+  const notAwarded = allWPs.filter(w=>w.award_status!=='Awarded');
+  const pastDue = notAwarded.filter(w=>w.awarding_date&&new Date(w.awarding_date)<today);
+  const upcoming = notAwarded.filter(w=>w.awarding_date&&new Date(w.awarding_date)>=today&&new Date(w.awarding_date)<=in30);
+  document.getElementById('backlog-kpi-due').textContent = pastDue.length;
+  document.getElementById('backlog-kpi-upcoming').textContent = upcoming.length;
+
+  // Backlog by trade chart
+  const trades = [...new Set(notAwarded.map(w=>w.trade).filter(Boolean))].sort();
+  Charts.budgetByTrade('c-backlog-trade', notAwarded, trades);
+
+  // Procurement status chart
+  const statuses = [...new Set(allWPs.map(w=>w.procurement_status).filter(Boolean))].sort();
+  const statusCounts = statuses.map(s=>allWPs.filter(w=>w.procurement_status===s).length);
+  if(window.__chartBacklogProc) window.__chartBacklogProc.destroy();
+  const ctx2 = document.getElementById('c-proc-status');
+  if(ctx2) window.__chartBacklogProc = new Chart(ctx2.getContext('2d'),{
+    type:'bar',
+    data:{labels:statuses,datasets:[{data:statusCounts,backgroundColor:'rgba(40,44,40,0.6)',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{ticks:{stepSize:1,font:{size:9}},grid:{color:'rgba(0,0,0,.05)'}}}}
+  });
+
+  // Backlog table
+  const sorted = [...notAwarded].sort((a,b)=>{
+    if(!a.awarding_date) return 1;
+    if(!b.awarding_date) return -1;
+    return new Date(a.awarding_date)-new Date(b.awarding_date);
+  });
+  document.getElementById('backlog-tbody').innerHTML = sorted.map(w=>{
+    const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/(1000*86400)) : null;
+    const agingClass = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
+    return `<tr>
+      <td><span class="td-code">${w.wp_no}</span></td>
+      <td>${w.description||'—'}</td>
+      <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
+      <td>${fmtDate(w.awarding_date)}</td>
+      <td class="${agingClass}">${aging!=null?aging+'d':'—'}</td>
+      <td>${fmt(w.approved_budget_bcb)}</td>
+      <td>${statusBadge(w.award_status)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+}
+
+function renderBudget(){
+  const stats = computeStats(allWPs);
+  const v = stats.variance;
+  document.getElementById('bud-total').textContent = fmt(stats.totalBudget);
+  document.getElementById('bud-awarded').textContent = fmt(stats.totalContract);
+  const varEl = document.getElementById('bud-variance');
+  varEl.textContent = (v>=0?'+':'')+fmt(v);
+  varEl.style.color = v>=0?'#2D9B6F':'#EE3124';
+
+  const trades = [...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
+  Charts.budgetByTrade('c-bud-trade', allWPs, trades);
+  Charts.awardRateByTrade('c-bud-rate', allWPs, trades);
+
+  // Budget table by trade
+  const rows = trades.map(t=>{
+    const tWPs = allWPs.filter(w=>w.trade===t);
+    const budget = tWPs.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    const awarded = tWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
+    const variance = budget-awarded;
+    const awardCount = tWPs.filter(w=>w.award_status==='Awarded').length;
+    return {t, count:tWPs.length, budget, awarded, variance, awardRate:tWPs.length?Math.round(awardCount/tWPs.length*100):0};
+  });
+  const totBudget = rows.reduce((s,r)=>s+r.budget,0);
+  const totAwarded = rows.reduce((s,r)=>s+r.awarded,0);
+  const totVariance = totBudget-totAwarded;
+
+  document.getElementById('budget-tbody').innerHTML = [
+    ...rows.map(r=>`<tr>
+      <td>${r.t}</td><td>${r.count}</td>
+      <td>${(r.budget/1e6).toFixed(1)} M</td>
+      <td>${(r.awarded/1e6).toFixed(1)} M</td>
+      <td style="color:${r.variance>=0?'#2D9B6F':'#EE3124'};font-weight:600">${r.variance>=0?'+':''}{}{}</td>
+      <td style="color:${r.variance>=0?'#2D9B6F':'#EE3124'}">${r.budget?((r.variance/r.budget)*100).toFixed(1)+'%':'—'}</td>
+      <td>${r.awardRate}%</td>
+    </tr>`.replace('}{}{}', (r.variance/1e6).toFixed(1)+' M')),
+    `<tr>
+      <td>Total</td><td>${allWPs.length}</td>
+      <td>${(totBudget/1e6).toFixed(1)} M</td>
+      <td>${(totAwarded/1e6).toFixed(1)} M</td>
+      <td style="color:${totVariance>=0?'#2D9B6F':'#EE3124'};font-weight:700">${totVariance>=0?'+':''}{}{}</td>
+      <td style="color:${totVariance>=0?'#2D9B6F':'#EE3124'}">${totBudget?((totVariance/totBudget)*100).toFixed(1)+'%':'—'}</td>
+      <td>—</td>
+    </tr>`.replace('}{}{}', (totVariance/1e6).toFixed(1)+' M')
+  ].join('');
+}
+
+function renderSchedule(){
+  // Period chart: count WPs by awarding month
+  const awarded = [...allWPs].filter(w=>w.awarding_date);
+  const months = [...new Set(awarded.map(w=>w.awarding_date.slice(0,7)))].sort();
+  const planned = months.map(m=>allWPs.filter(w=>w.awarding_date?.slice(0,7)===m).length);
+  const actual  = months.map(m=>allWPs.filter(w=>w.actual_awarding_date?.slice(0,7)===m).length);
+  const labels  = months.map(m=>new Date(m+'-01').toLocaleDateString('en-PH',{month:'short',year:'2-digit'}));
+
+  if(window.__chartSchedPeriod) window.__chartSchedPeriod.destroy();
+  const c1 = document.getElementById('c-sched-period');
+  if(c1) window.__chartSchedPeriod = new Chart(c1.getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Planned',data:planned,backgroundColor:'rgba(40,44,40,0.45)',borderRadius:3},
+      {label:'Actual',data:actual,backgroundColor:'rgba(45,155,111,0.7)',borderRadius:3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9}},grid:{color:'rgba(0,0,0,.05)'}}}}
+  });
+
+  Charts.awardingLeadTime('c-sched-leadtime', allWPs);
+
+  // Schedule table
+  const sorted = [...allWPs].sort((a,b)=>{
+    if(!a.awarding_date) return 1; if(!b.awarding_date) return -1;
+    return new Date(a.awarding_date)-new Date(b.awarding_date);
+  });
+  document.getElementById('sched-tbody').innerHTML = sorted.map(w=>`<tr>
+    <td><span class="td-code">${w.wp_no}</span></td>
+    <td style="font-size:12px">${w.description||'—'}</td>
+    <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
+    <td>${fmtDate(w.awarding_date)}</td>
+    <td>${fmtDate(w.actual_awarding_date)}</td>
+    <td>${w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—'}</td>
+    <td>${fmtDate(w.target_delivery)}</td>
+    <td>${fmtDate(w.target_completion)}</td>
+    <td>${statusBadge(w.award_status)}</td>
+  </tr>`).join('');
+}
+
+function renderWorks(){
+  const trades = [...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
+  const rows = trades.map(t=>{
+    const tWPs = allWPs.filter(w=>w.trade===t);
+    const aw = tWPs.filter(w=>w.award_status==='Awarded').length;
+    const ny = tWPs.filter(w=>w.award_status!=='Awarded').length;
+    const budget = tWPs.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    const awarded = tWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
+    return {t, total:tWPs.length, aw, ny, rate:tWPs.length?Math.round(aw/tWPs.length*100):0, budget, awarded};
+  });
+
+  // Summary cards
+  document.getElementById('works-summary').innerHTML = [
+    {lbl:'Total WPs',val:allWPs.length},
+    {lbl:'Awarded',val:allWPs.filter(w=>w.award_status==='Awarded').length},
+    {lbl:'Not Yet Awarded',val:allWPs.filter(w=>w.award_status!=='Awarded').length},
+    {lbl:'Trades',val:trades.length},
+  ].map(k=>`<div class="works-kpi"><div class="works-kpi-val">${k.val}</div><div class="works-kpi-lbl">${k.lbl}</div></div>`).join('');
+
+  // Donut: WPs by trade
+  if(window.__chartWorksDonut) window.__chartWorksDonut.destroy();
+  const c1 = document.getElementById('c-works-donut');
+  if(c1) window.__chartWorksDonut = new Chart(c1.getContext('2d'),{
+    type:'doughnut',
+    data:{labels:trades,datasets:[{data:rows.map(r=>r.total),backgroundColor:['#EE3124','#282C28','#2D9B6F','#D97706','#DCDBDB','#5A5858','#C42127','#3B6D11','#92400E'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'right',labels:{font:{size:10}}}}}
+  });
+
+  // Bar: awarded by trade
+  Charts.awardRateByTrade('c-works-bar', allWPs, trades);
+
+  // Table
+  document.getElementById('works-tbody').innerHTML = rows.map(r=>`<tr>
+    <td>${r.t}</td><td>${r.total}</td>
+    <td style="color:#2D9B6F;font-weight:600">${r.aw}</td>
+    <td style="color:#EE3124;font-weight:600">${r.ny}</td>
+    <td>${r.rate}%</td>
+    <td>${(r.budget/1e6).toFixed(1)} M</td>
+    <td>${(r.awarded/1e6).toFixed(1)} M</td>
+  </tr>`).join('');
 }
 
 function buildTable(){
@@ -305,152 +629,353 @@ function buildTable(){
   document.getElementById('pg-info').textContent='Page '+curPage+' of '+pages;
   document.getElementById('btn-prev').disabled=curPage<=1;
   document.getElementById('btn-next').disabled=curPage>=pages;
-
   const thead=document.getElementById('tbl-head'); thead.innerHTML='';
-  const grpRow=document.createElement('tr');
-  [{show:colGroups.identity,label:'Identity & Classification',span:COLS.identity.length},
-   {show:colGroups.schedule,label:'Procurement Schedule',span:COLS.schedule.length},
-   {show:colGroups.budget,  label:'Budget & Contract',span:COLS.budget.length},
-   {show:colGroups.assign&&userProfile?.role==='admin',label:'Officer Assignment',span:COLS.assign.length}
-  ].forEach(g=>{
-    if(!g.show)return;
-    const th=document.createElement('th');th.colSpan=g.span;th.className='group-header';th.textContent=g.label;grpRow.appendChild(th);
-  });
-  thead.appendChild(grpRow);
   const colRow=document.createElement('tr');
   cols.forEach(c=>{
-    const th=document.createElement('th');th.style.minWidth=c.w;
+    const th=document.createElement('th'); th.style.minWidth=c.w;
     th.innerHTML=c.label+(sortCol===c.key?(sortDir===1?' ↑':' ↓'):'');
+    th.style.cursor='pointer';
     th.addEventListener('click',()=>{if(sortCol===c.key)sortDir*=-1;else{sortCol=c.key;sortDir=1;}curPage=1;buildTable();});
     colRow.appendChild(th);
   });
   thead.appendChild(colRow);
-
-  const tbody=document.getElementById('tbl-body');tbody.innerHTML='';
-  let lastZone=null;
+  const tbody=document.getElementById('tbl-body'); tbody.innerHTML='';
   slice.forEach(w=>{
-    if(colGroups.identity&&w.zone!==lastZone){
-      lastZone=w.zone;
-      const zr=document.createElement('tr');zr.className='zone-row';
-      const ztd=document.createElement('td');ztd.colSpan=cols.length;
-      ztd.innerHTML='<i class="ti ti-building" style="margin-right:6px;font-size:11px"></i>'+w.zone;
-      zr.appendChild(ztd);tbody.appendChild(zr);
-    }
-
-    /* Officer dropdown for admin */
-    const officerHtml = userProfile?.role==='admin' ?
-      `<select class="assign-sel" onchange="assignOfficer('${w.firestore_id}',this)" title="Assign officer">
-        <option value="">— Assign officer —</option>
-        ${officers.map(o=>`<option value="${o.uid}" ${w.assigned_officer_uid===o.uid?'selected':''}>${o.name}</option>`).join('')}
-      </select>` :
-      (w.assigned_officer_name||'<span class="lt-na">Unassigned</span>');
-
     const cellMap={
-      cost_code:`<span class="td-code">${w.cost_code||'—'}</span>`,
-      wp_no:`<span class="td-code">${w.wp_no||'—'}</span>`,
-      description:`<span class="td-name">${w.description||'—'}</span>`,
+      cost_code:'<span class="td-code">'+(w.cost_code||'—')+'</span>',
+      wp_no:'<span class="td-code">'+(w.wp_no||'—')+'</span>',
+      description:'<span class="td-name">'+(w.description||'—')+'</span>',
       zone:w.zone||'—', trade:w.trade||'—',
-      lead_time_days:(w.lead_time_days??'—')+(w.lead_time_days?'d':''),
-      awarding_date:Fmt.date(w.awarding_date),
-      actual_awarding_date:Fmt.date(w.actual_awarding_date),
-      _alt:Fmt.leadTimeHtml(Calc.awardingLeadTime(w)),
-      target_delivery_date:Fmt.date(w.target_delivery_date),
-      _dl:Fmt.deliveryHtml(Calc.deliveryLeadTime(w)),
-      target_installation_date:Fmt.date(w.target_installation_date),
-      target_completion_date:Fmt.date(w.target_completion_date),
-      approved_budget_php:Fmt.money(w.approved_budget_php),
-      contract_amount_php:Fmt.money(w.contract_amount_php),
-      _var:Fmt.varianceHtml(Calc.variance(w)),
-      _varp:Fmt.variancePctHtml(Calc.variancePct(w)),
-      status:Fmt.badgeHtml(w.status),
-      contractor:w.contractor||'<span class="lt-na">—</span>',
-      remarks:`<span style="font-size:10px;color:var(--text-secondary)">${w.remarks||'—'}</span>`,
-      _officer:officerHtml,
-      _actions:`<a href="wp-form.html?id=${w.firestore_id}&project=${projId}" class="btn" style="font-size:10px;padding:3px 8px"><i class="ti ti-edit" style="font-size:11px"></i> Edit</a>`,
+      awarding_date:fmtDate(w.awarding_date),
+      actual_awarding_date:fmtDate(w.actual_awarding_date),
+      awarding_lead_time:w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—',
+      target_delivery:fmtDate(w.target_delivery),
+      target_completion:fmtDate(w.target_completion),
+      approved_budget_bcb:fmt(w.approved_budget_bcb),
+      total_awarded:fmt(w.total_awarded),
+      variance:w.variance!=null?'<span style="color:'+(w.variance>=0?'#2D9B6F':'#EE3124')+';font-weight:600">'+(w.variance>=0?'+':'')+fmt(w.variance)+'</span>':'—',
+      award_status:statusBadge(w.award_status),
+      contractor:w.contractor||'<span style="color:#bbb">—</span>',
+      remarks:'<span style="font-size:10px;color:#888">'+(w.remarks||'—')+'</span>',
     };
     const tr=document.createElement('tr');
     cols.forEach(c=>{const td=document.createElement('td');td.innerHTML=cellMap[c.key]??'—';tr.appendChild(td);});
+    // Edit button cell
+    const tdEdit=document.createElement('td');
+    tdEdit.innerHTML=`<a href="wp-form.html?id=${w.id}&project=${w.project_id}" style="font-size:11px;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
+    tr.appendChild(tdEdit);
     tbody.appendChild(tr);
   });
 }
 
 function changePage(d){curPage+=d;buildTable();}
 
-function refresh(){
-  const f=getFiltered();
-  buildMetrics(f);
-  Charts.statusByZone('c-status',f);
-  Charts.awardingLeadTime('c-leadtime',f);
-  Charts.budgetVsContract('c-budget',f);
-  Charts.varianceTrend('c-trend',f);
-  Charts.scheduleTimeline('c-schedule',f);
-  const aw=f.filter(w=>w.contract_amount_php!=null);
-  buildRankList('rank-gains',aw.filter(w=>(Calc.variance(w)||0)>0).sort((a,b)=>Calc.variance(b)-Calc.variance(a)).slice(0,5).map(w=>({name:w.description,sub:w.wp_no,val:Calc.variance(w),color:'#1D9E75'})),'green',v=>'+'+Fmt.money(v));
-  buildRankList('rank-value',[...aw].sort((a,b)=>b.contract_amount_php-a.contract_amount_php).slice(0,5).map(w=>({name:w.description,sub:w.wp_no+' · '+(w.contractor||'—'),val:w.contract_amount_php,color:'#378ADD'})),'blue',v=>Fmt.money(v));
-  buildRankList('rank-losses',aw.filter(w=>(Calc.variance(w)||0)<0).sort((a,b)=>Calc.variance(a)-Calc.variance(b)).slice(0,5).map(w=>({name:w.description,sub:w.wp_no,val:Math.abs(Calc.variance(w)),color:'#E24B4A'})),'red',v=>'-'+Fmt.money(v));
-  buildTable();
-}
+if(typeof initMobileMenu==='function') initMobileMenu();
 
-initMobileMenu();
-
-  AppAuth.requireLogin(async (user, profile) => {
+AppAuth.requireLogin(async (user, profile) => {
   userProfile = profile;
   projId = new URLSearchParams(location.search).get('id');
-  if (!projId) { location.href='index.html'; return; }
+  if (!projId) { location.href='login.html'; return; }
 
   if (!AppAuth.canAccessProject(profile, projId)) {
-    document.getElementById('loading').style.display='none';
-    document.getElementById('main-content').innerHTML=`<div class="loading-overlay" style="flex-direction:column;gap:12px;padding:60px 20px;text-align:center">
-      <i class="ti ti-lock" style="font-size:48px;color:#E24B4A;opacity:.5"></i>
-      <p style="font-size:15px;font-weight:600">Access Denied</p>
-      <p style="font-size:12px;color:#5A5A6A">You do not have permission to view <strong>${projId}</strong>.</p>
-      <a href="index.html" class="btn btn-primary" style="margin-top:8px;display:inline-flex"><i class="ti ti-arrow-left"></i>Back</a></div>`;
-    document.getElementById('main-content').style.display='block'; return;
+    document.getElementById('loading').innerHTML='<div style="text-align:center;padding:40px"><p style="color:#EE3124;font-size:15px;font-weight:600">Access Denied</p><p style="color:#888;font-size:13px">You do not have access to project '+projId+'</p><a href="login.html" style="color:#EE3124">← Back</a></div>';
+    return;
   }
 
-  AppAuth.renderUserBar('user-bar', profile);
-
-  if (profile.role==='admin') {
+  const isAdmin = ['admin','super_admin'].includes(profile.role);
+  if(isAdmin) {
+    document.getElementById('sidebar-overview').style.display='block';
     document.getElementById('sidebar-admin').style.display='block';
-    document.getElementById('tog-assign').style.display='inline-block';
-    document.getElementById('add-wp-link-admin').href='wp-form.html?project='+projId;
-    WPDb.getPendingWPs().then(wps=>{
-      if(wps.length>0){const b=document.getElementById('pending-badge');b.textContent=wps.length;b.style.display='inline';}
-    });
-    officers = await AppAuth.getOfficers();
-  }
-  if (profile.role==='procurement_officer') {
+    updatePendingBadge();
+    const addLink = document.getElementById('add-wp-link-admin');
+    if(addLink) addLink.href='wp-form.html?project='+projId;
+  } else {
     document.getElementById('sidebar-officer').style.display='block';
-    document.getElementById('add-wp-link').href='wp-form.html?project='+projId;
+    const addLink = document.getElementById('add-wp-link');
+    if(addLink) addLink.href='wp-form.html?project='+projId;
+    // Fix All WPs link to include project context
+    const myWpsLink = document.getElementById('nav-my-wps-link');
+    if(myWpsLink) myWpsLink.href='my-wps.html?project='+projId;
+    // Show "Switch Project" only for users with multiple projects
+    const allProjs = await WPDb.getProjects();
+    const myProjs = allProjs.filter(p=>(profile.projects||[]).includes(p.id));
+    if(myProjs.length > 1) {
+      document.getElementById('sidebar-my-projects').style.display='block';
+    }
   }
 
-  /* Load project metadata */
-  const meta = await WPDb.getProject(projId);
-  if (!meta) { location.href='index.html'; return; }
+  if(typeof renderUserBar==='function') renderUserBar('user-bar', profile);
 
-  document.title = meta.name+' — WPM';
-  document.getElementById('page-title').textContent = meta.name;
-  document.getElementById('page-sub').textContent   = meta.location+' · '+meta.type;
-  document.getElementById('rev-badge').textContent  = meta.rev+' · '+meta.rev_date;
-  document.getElementById('nav-proj-name').textContent = meta.name;
+  // Load data in parallel
+  const [meta, wps] = await Promise.all([WPDb.getProject(projId), WPDb.getAllWPs(projId)]);
+  allWPs = wps;
 
-  /* Load approved WPs */
-  allWPs = await WPDb.getApprovedWPs(projId);
+  if (meta) {
+    document.title = meta.id+' — '+meta.name+' — WPM';
+    document.getElementById('page-title').textContent = meta.id+' — '+meta.name.split('—')[0].trim();
+    document.getElementById('page-sub').textContent = (meta.location||'')+(meta.description?' · '+meta.description:'');
+    document.getElementById('nav-proj-name').textContent = meta.id;
+    document.getElementById('nav-proj-link').href = 'project.html?id='+meta.id;
+    // Show archive button for admins; toggle label based on current status
+    if(isAdmin) {
+      const archBtn = document.getElementById('btn-archive-project');
+      const archLabel = document.getElementById('archive-btn-label');
+      if(archBtn && archLabel) {
+        archBtn.style.display = 'flex';
+        if(meta.status === 'archived') {
+          archLabel.textContent = 'Unarchive Project';
+          archBtn.style.color = 'rgba(100,200,100,0.9)';
+          // Show archived banner
+          const banner = document.createElement('div');
+          banner.style.cssText='background:#FFF3CD;border:1px solid #FFC107;border-radius:8px;padding:10px 14px;font-size:12px;color:#856404;margin-bottom:16px;display:flex;align-items:center;gap:8px';
+          banner.innerHTML='<i class="ti ti-archive" style="font-size:16px"></i><strong>Archived Project</strong> — This project has been archived. Data is read-only.';
+          document.getElementById('main-content')?.prepend(banner);
+        } else {
+          archLabel.textContent = 'Archive Project';
+        }
+      }
+    }
+  }
 
-  /* Populate filters */
-  const trades=[...new Set(allWPs.map(w=>w.trade))].sort();
-  document.getElementById('f-trade').innerHTML='<option value="all">All trades</option>'+trades.map(t=>`<option value="${t}">${t}</option>`).join('');
-  const zones=[...new Set(allWPs.map(w=>w.zone))].sort();
-  document.getElementById('f-zone').innerHTML='<option value="all">All zones</option>'+zones.map(z=>`<option value="${z}">${z}</option>`).join('');
+  buildMetrics(allWPs);
 
-  ['f-status','f-trade','f-zone'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{curPage=1;refresh();}));
-  document.getElementById('f-search').addEventListener('input',()=>{curPage=1;refresh();});
-  document.getElementById('btn-export').addEventListener('click',()=>exportCSV(getFiltered(),projId));
+  // Populate filters
+  const trades=[...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
+  document.getElementById('f-trade').innerHTML='<option value="all">All trades</option>'+trades.map(t=>'<option value="'+t+'">'+t+'</option>').join('');
+  const zones=[...new Set(allWPs.map(w=>w.zone).filter(Boolean))].sort();
+  document.getElementById('f-zone').innerHTML='<option value="all">All zones</option>'+zones.map(z=>'<option value="'+z+'">'+z+'</option>').join('');
 
-  document.getElementById('loading').style.display='none';
-  document.getElementById('main-content').style.display='block';
-  refresh();
+  ['f-status','f-trade','f-zone'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change',()=>{curPage=1; if(currentView==='table')buildTable(); else if(currentView==='overview')renderOverview();});
+  });
+  const srch = document.getElementById('f-search');
+  if(srch) srch.addEventListener('input',()=>{curPage=1; if(currentView==='table')buildTable();});
+
+  document.getElementById('btn-export').addEventListener('click', () => exportCSV(allWPs, projId));
+
+  window.archiveCurrentProject = async function() {
+    const meta = await WPDb.getProject(projId);
+    const isArchived = meta?.status === 'archived';
+    const action = isArchived ? 'unarchive' : 'archive';
+    if (!confirm(`${action.charAt(0).toUpperCase()+action.slice(1)} project ${projId}? ${isArchived?'It will become active again.':'Archived projects are still accessible by assigned users.'}`)) return;
+    try {
+      if (isArchived) await WPDb.unarchiveProject(projId);
+      else await WPDb.archiveProject(projId);
+      location.reload();
+    } catch(e) { alert('Error: '+e.message); }
+  };
+
+  // Render default view
+  renderOverview();
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
 });
 </script>
+
+<style>
+  .hide-mobile { }
+  @media(max-width:480px) { .hide-mobile { display:none; } }
+  .btn-sm {
+    font-size:10px;font-weight:600;padding:4px 10px;border:1px solid #e5e5e5;
+    border-radius:6px;background:#fff;color:#666;cursor:pointer;font-family:inherit;
+  }
+  .btn-sm:hover { border-color:#231F20;color:#231F20; }
+</style>
+
+<!-- ── Quick-Add Work Package Modal (shared across all pages) ── -->
+<div id="wp-quick-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.45);overflow-y:auto">
+  <div style="min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:20px 12px">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:680px;box-shadow:0 20px 60px rgba(0,0,0,.2);margin:auto">
+      <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f0f0;padding-bottom:16px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#231F20" id="wqm-title">Add Work Package</div>
+          <div style="font-size:12px;color:#aaa;margin-top:2px" id="wqm-subtitle">Fill in the required fields</div>
+        </div>
+        <button onclick="closeAddWPModal()" style="background:none;border:none;cursor:pointer;padding:4px;color:#aaa;font-size:20px;line-height:1">&times;</button>
+      </div>
+      <div style="padding:20px 24px">
+        <div id="wqm-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px"></div>
+        <div id="wqm-success" style="display:none;background:#D1FAE5;color:#065F46;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px"></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Cost Code *</label>
+            <input id="wqm-cost-code" type="text" placeholder="e.g. 03-001" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">WP No. *</label>
+            <input id="wqm-wp-no" type="text" placeholder="e.g. WP-115" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div style="grid-column:1/-1">
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Description *</label>
+            <input id="wqm-description" type="text" placeholder="Work Package description" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Zone <span style="font-size:10px;font-weight:400;color:#bbb">(optional)</span></label>
+            <input id="wqm-zone" type="text" placeholder="e.g. Tower 1" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Trade / Discipline *</label>
+            <select id="wqm-trade" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+              <option value="">Select trade…</option>
+              <option>Architectural Works</option>
+              <option>Civil Works</option>
+              <option>Electrical Works</option>
+              <option>General Requirement</option>
+              <option>MEPF &amp; Allied Services</option>
+              <option>Site Development</option>
+              <option>Site Works</option>
+              <option>Structural Works</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Planned Award Date *</label>
+            <input id="wqm-award-date" type="date" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Target Completion *</label>
+            <input id="wqm-completion" type="date" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Budget BCB (₱) *</label>
+            <input id="wqm-budget" type="number" step="0.01" placeholder="e.g. 2500000" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Award Status</label>
+            <select id="wqm-award-status" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+              <option value="Not Yet Awarded">Not Yet Awarded</option>
+              <option value="Partially Awarded">Partially Awarded</option>
+              <option value="Awarded">Awarded</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;flex-wrap:wrap">
+          <button id="wqm-save-btn" onclick="saveQuickWP()" style="padding:10px 20px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">
+            <i class="ti ti-plus"></i> <span id="wqm-btn-text">Add Work Package</span>
+          </button>
+          <a id="wqm-full-form-link" href="wp-form.html" style="padding:10px 16px;background:#f5f5f5;color:#666;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;text-decoration:none;display:flex;align-items:center;gap:5px">
+            <i class="ti ti-external-link"></i> Full Form
+          </a>
+          <button onclick="closeAddWPModal()" style="padding:10px 16px;background:transparent;color:#888;border:1px solid #e5e5e5;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;margin-left:auto">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let _wqmProjectId = null;
+let _wqmDirty = false;
+
+window.openAddWPModal = function(projectId) {
+  _wqmProjectId = projectId || null;
+  _wqmDirty = false;
+  // Clear fields
+  ['wqm-cost-code','wqm-wp-no','wqm-description','wqm-zone','wqm-award-date','wqm-completion','wqm-budget'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  const trade = document.getElementById('wqm-trade'); if(trade) trade.value = '';
+  const status = document.getElementById('wqm-award-status'); if(status) status.value = 'Not Yet Awarded';
+  document.getElementById('wqm-error').style.display = 'none';
+  document.getElementById('wqm-success').style.display = 'none';
+  document.getElementById('wqm-btn-text').textContent = 'Add Work Package';
+  document.getElementById('wqm-save-btn').disabled = false;
+  // Update full-form link with project
+  const fullLink = document.getElementById('wqm-full-form-link');
+  if(fullLink && projectId) fullLink.href = 'wp-form.html?project=' + projectId;
+  // Subtitle
+  document.getElementById('wqm-subtitle').textContent = projectId ? 'Project: ' + projectId : 'Fill in the required fields';
+  // Track dirty
+  document.querySelectorAll('#wp-quick-modal input,#wp-quick-modal select').forEach(el => {
+    el.addEventListener('input', () => { _wqmDirty = true; });
+    el.addEventListener('change', () => { _wqmDirty = true; });
+  });
+  document.getElementById('wp-quick-modal').style.display = 'block';
+};
+
+window.closeAddWPModal = function() {
+  if (_wqmDirty) {
+    if (!confirm('Discard unsaved work package?')) return;
+  }
+  document.getElementById('wp-quick-modal').style.display = 'none';
+  _wqmDirty = false;
+};
+
+// Close on overlay click
+document.getElementById('wp-quick-modal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeAddWPModal();
+});
+
+window.saveQuickWP = async function() {
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const n = id => parseFloat(document.getElementById(id)?.value) || null;
+  const errEl = document.getElementById('wqm-error');
+  const sucEl = document.getElementById('wqm-success');
+  errEl.style.display = 'none'; sucEl.style.display = 'none';
+
+  if (!v('wqm-cost-code')) { errEl.textContent='Cost Code is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-wp-no')) { errEl.textContent='WP No. is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-description')) { errEl.textContent='Description is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-trade')) { errEl.textContent='Trade is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-award-date')) { errEl.textContent='Planned Award Date is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-completion')) { errEl.textContent='Target Completion is required.'; errEl.style.display='block'; return; }
+  if (!n('wqm-budget')) { errEl.textContent='Budget BCB is required.'; errEl.style.display='block'; return; }
+  if (!_wqmProjectId) { errEl.textContent='No project selected.'; errEl.style.display='block'; return; }
+
+  const btn = document.getElementById('wqm-save-btn');
+  document.getElementById('wqm-btn-text').textContent = 'Saving…';
+  btn.disabled = true;
+
+  const data = {
+    project_id: _wqmProjectId,
+    cost_code: v('wqm-cost-code'), wp_no: v('wqm-wp-no'),
+    description: v('wqm-description'), zone: v('wqm-zone') || null,
+    trade: v('wqm-trade'), awarding_date: v('wqm-award-date') || null,
+    target_completion: v('wqm-completion') || null,
+    approved_budget_bcb: n('wqm-budget'), award_status: v('wqm-award-status'),
+    awarding_lead_time: 0,
+  };
+
+  try {
+    // Get current user profile to decide direct-save vs review queue
+    const sb = await getSB();
+    const { data: { user } } = await sb.auth.getUser();
+    const { data: prof } = await sb.from('users').select('role').eq('id', user?.id).single();
+    const role = prof?.role || 'user';
+
+    const newWP = await WPDb.submitWP(data, { id: user?.id });
+    if (['admin','super_admin'].includes(role) && newWP?.id) {
+      await WPDb.approveWP(newWP.id);
+    }
+
+    _wqmDirty = false;
+    sucEl.textContent = ['admin','super_admin'].includes(role)
+      ? 'Work package added and approved.'
+      : 'Work package submitted for review.';
+    sucEl.style.display = 'block';
+
+    document.getElementById('wqm-btn-text').textContent = 'Add Another';
+    btn.disabled = false;
+
+    // Reset form for another entry
+    ['wqm-cost-code','wqm-wp-no','wqm-description','wqm-zone','wqm-budget'].forEach(id => {
+      const el = document.getElementById(id); if(el) el.value = '';
+    });
+    _wqmDirty = false;
+
+    // Reload page data if available
+    if (typeof loadData === 'function') setTimeout(loadData, 500);
+    if (typeof renderOverview === 'function') setTimeout(renderOverview, 800);
+
+  } catch(err) {
+    errEl.textContent = 'Error: ' + err.message;
+    errEl.style.display = 'block';
+    document.getElementById('wqm-btn-text').textContent = 'Add Work Package';
+    btn.disabled = false;
+  }
+};
+</script>
+
 </body>
 </html>

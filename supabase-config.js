@@ -1,18 +1,7 @@
-/**
- * supabase-config.js
- * Replace firebase-config.js with this file.
- * 
- * SETUP STEPS:
- * 1. Go to https://supabase.com → New Project → note your Project URL and anon key
- * 2. Replace the two constants below with your real values
- * 3. Run the SQL schema in /data/supabase-schema.sql in the Supabase SQL Editor
- * 4. Enable Email/Password auth in Authentication → Providers
- */
-
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';  // ← replace
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE';              // ← replace
+const SUPABASE_URL = 'https://cayjeqeleenizbdzrums.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 export default supabase;

@@ -1,297 +1,328 @@
-/* db.js — Firestore data operations */
+﻿
+/* â”€â”€ WPDb â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const WPDb = (() => {
-
-  /* ── Projects ─────────────────────────────────────────────────────── */
-  async function getProjects() {
-    const snap = await DB.collection('projects').orderBy('id').get();
-    return snap.docs.map(d => d.data());
+  function mapWP(w) {
+    if (!w) return null;
+    return {
+      ...w,
+      firestoreId: w.id,
+      approved_budget_bcb: w.approved_budget_bcb ?? null,
+      budget_bcb: w.approved_budget_bcb ?? null,
+      total_awarded: w.total_awarded ?? 0,
+      contract_amount_php: w.total_awarded ?? 0,
+      award_status: w.award_status || 'Not Yet Awarded',
+    };
   }
-
-  async function getProject(id) {
-    const doc = await DB.collection('projects').doc(id).get();
-    return doc.exists ? doc.data() : null;
+  function unmap(w) {
+    const d = { ...w };
+    if (d.budget_bcb && !d.approved_budget_bcb) d.approved_budget_bcb = d.budget_bcb;
+    delete d.firestoreId; delete d.budget_bcb; delete d.contract_amount_php; delete d.id;
+    return d;
   }
-
-  async function saveProject(data) {
-    await DB.collection('projects').doc(data.id).set(data, { merge: true });
-  }
-
-  /* ── Work Packages ────────────────────────────────────────────────── */
-
-  /* Get all approved WPs for a project (for dashboard) */
-  async function getApprovedWPs(projectId) {
-    const snap = await DB.collection('work_packages')
-      .where('project_id', '==', projectId)
-      .where('review_status', '==', 'approved')
-      .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a,b) => (a.cost_code||'').localeCompare(b.cost_code||''));
-  }
-
-  /* Get all approved WPs across all projects */
-  async function getAllApprovedWPs() {
-    const snap = await DB.collection('work_packages')
-      .where('review_status', '==', 'approved')
-      .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a,b) => (a.cost_code||'').localeCompare(b.cost_code||''));
-  }
-
-  /* Get all pending WPs (for admin review) */
-  async function getPendingWPs() {
-    const snap = await DB.collection('work_packages')
-      .where('review_status', '==', 'pending_review')
-      .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a,b) => {
-        const ta = a.submitted_at?.toMillis?.() || 0;
-        const tb = b.submitted_at?.toMillis?.() || 0;
-        return ta - tb;
-      });
-  }
-
-  /* Get WPs assigned to a specific officer */
-  async function getOfficerWPs(uid) {
-    const snap = await DB.collection('work_packages')
-      .where('assigned_officer_uid', '==', uid)
-      .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a,b) => (a.cost_code||'').localeCompare(b.cost_code||''));
-  }
-
-  /* Get a single WP */
-  async function getWP(id) {
-    const doc = await DB.collection('work_packages').doc(id).get();
-    return doc.exists ? { id: doc.id, ...doc.data() } : null;
-  }
-
-  /* Get all WPs for a project (admin view — all review statuses) */
-  async function getProjectWPs(projectId) {
-    const snap = await DB.collection('work_packages')
-      .where('project_id', '==', projectId)
-      .get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a,b) => (a.cost_code||'').localeCompare(b.cost_code||''));
-  }
-
-  /* Submit new WP (officer) — starts as pending_review */
-  async function submitWP(data, submitterProfile) {
-    const ref = DB.collection('work_packages').doc();
-    await ref.set({
-      ...data,
-      firestore_id:         ref.id,
-      review_status:        'pending_review',
-      submitted_by_uid:     submitterProfile.uid,
-      submitted_by_name:    submitterProfile.name,
-      submitted_at:         firebase.firestore.FieldValue.serverTimestamp(),
-      approved_by_uid:      null,
-      approved_by_name:     null,
-      approved_at:          null,
-      rejected_by_uid:      null,
-      rejected_by_name:     null,
-      rejected_at:          null,
-      rejection_reason:     null,
-      last_updated_at:      firebase.firestore.FieldValue.serverTimestamp(),
-    });
-    return ref.id;
-  }
-
-  /* Update existing WP (officer edit) — back to pending_review */
-  async function updateWP(firestoreId, data, submitterProfile) {
-    await DB.collection('work_packages').doc(firestoreId).update({
-      ...data,
-      review_status:     'pending_review',
-      submitted_by_uid:  submitterProfile.uid,
-      submitted_by_name: submitterProfile.name,
-      submitted_at:      firebase.firestore.FieldValue.serverTimestamp(),
-      last_updated_at:   firebase.firestore.FieldValue.serverTimestamp(),
-      approved_by_uid:   null,
-      approved_by_name:  null,
-      approved_at:       null,
-      rejection_reason:  null,
-    });
-  }
-
-  /* Approve WP (admin) */
-  async function approveWP(firestoreId, adminProfile) {
-    await DB.collection('work_packages').doc(firestoreId).update({
-      review_status:    'approved',
-      approved_by_uid:  adminProfile.uid,
-      approved_by_name: adminProfile.name,
-      approved_at:      firebase.firestore.FieldValue.serverTimestamp(),
-      rejected_by_uid:  null,
-      rejected_by_name: null,
-      rejected_at:      null,
-      rejection_reason: null,
-      last_updated_at:  firebase.firestore.FieldValue.serverTimestamp(),
-    });
-  }
-
-  /* Reject WP (admin) */
-  async function rejectWP(firestoreId, adminProfile, reason) {
-    await DB.collection('work_packages').doc(firestoreId).update({
-      review_status:    'rejected',
-      rejected_by_uid:  adminProfile.uid,
-      rejected_by_name: adminProfile.name,
-      rejected_at:      firebase.firestore.FieldValue.serverTimestamp(),
-      rejection_reason: reason,
-      last_updated_at:  firebase.firestore.FieldValue.serverTimestamp(),
-    });
-  }
-
-  /* Assign officer to WP (admin) */
-  async function assignOfficer(firestoreId, officerUid, officerName) {
-    await DB.collection('work_packages').doc(firestoreId).update({
-      assigned_officer_uid:  officerUid,
-      assigned_officer_name: officerName,
-      last_updated_at:       firebase.firestore.FieldValue.serverTimestamp(),
-    });
-    /* Also update officer's assigned_wps list */
-    const wp = await getWP(firestoreId);
-    if (wp && officerUid) {
-      await DB.collection('users').doc(officerUid).update({
-        assigned_wps: firebase.firestore.FieldValue.arrayUnion(firestoreId),
-      });
-    }
-  }
-
-  /* Seed WP from JSON (one-time import) — marks as approved directly */
-  async function seedWP(data) {
-    const existing = await DB.collection('work_packages')
-      .where('project_id', '==', data.project_id)
-      .where('wp_no', '==', data.wp_no)
-      .get();
-    if (!existing.empty) return; // skip if already exists
-    const ref = DB.collection('work_packages').doc();
-    await ref.set({
-      ...data,
-      firestore_id:         ref.id,
-      review_status:        'approved',
-      submitted_by_uid:     'seed',
-      submitted_by_name:    'Data Import',
-      submitted_at:         firebase.firestore.FieldValue.serverTimestamp(),
-      approved_by_uid:      'seed',
-      approved_by_name:     'Data Import',
-      approved_at:          firebase.firestore.FieldValue.serverTimestamp(),
-      rejected_by_uid:      null,
-      rejected_by_name:     null,
-      rejected_at:          null,
-      rejection_reason:     null,
-      assigned_officer_uid:  null,
-      assigned_officer_name: null,
-      last_updated_at:      firebase.firestore.FieldValue.serverTimestamp(),
-    });
-  }
-
-  return {
-    getProjects, getProject, saveProject,
-    getApprovedWPs, getAllApprovedWPs, getPendingWPs,
-    getOfficerWPs, getWP, getProjectWPs,
-    submitWP, updateWP, approveWP, rejectWP,
-    assignOfficer, seedWP,
-  };
+  async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
+  async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
+  async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
+  async function getApprovedWPs(pid) { const sb=await getSB(); let q=sb.from('work_packages').select('*').eq('review_status','approved'); if(pid) q=q.eq('project_id',pid); const {data}=await q.order('wp_no'); return (data||[]).map(mapWP); }
+  async function getAllWPs(pid) { const sb=await getSB(); let q=sb.from('work_packages').select('*'); if(pid) q=q.eq('project_id',pid); const {data}=await q.order('wp_no'); return (data||[]).map(mapWP); }
+  async function getAllApprovedWPs() { return getApprovedWPs(null); }
+  async function getPendingWPs() { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('review_status','pending_review').order('created_at',{ascending:false}); return (data||[]).map(mapWP); }
+  async function getAllWPsForAdmin() { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').order('created_at',{ascending:false}); return (data||[]).map(mapWP); }
+  async function getOfficerWPs(uid) { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('assigned_officer',uid).order('wp_no'); return (data||[]).map(mapWP); }
+  async function getWP(id) { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('id',id).single(); return mapWP(data); }
+  async function getProjectWPs(pid) { return getAllWPs(pid); }
+  async function submitWP(d,p) { const sb=await getSB(); const {data}=await sb.from('work_packages').insert({...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null}).select().single(); return data; }
+  async function updateWP(id,d) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({...unmap(d),review_status:'pending_review'}).eq('id',id).select().single(); return data; }
+  async function updateWPDirect(id,d) { const sb=await getSB(); const {data}=await sb.from('work_packages').update(unmap(d)).eq('id',id).select().single(); return data; }
+  async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
+  async function createProject(d) { const sb=await getSB(); const {data,error}=await sb.from('projects').insert(d).select().single(); if(error) throw error; return data; }
+  async function approveWP(id) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({review_status:'approved'}).eq('id',id).select().single(); return data; }
+  async function rejectWP(id,_,reason) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({review_status:'rejected',review_notes:reason}).eq('id',id).select().single(); return data; }
+  async function assignOfficer(id,uid) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({assigned_officer:uid}).eq('id',id).select().single(); return data; }
+  async function getAllUsers() { const sb=await getSB(); const {data}=await sb.from('users').select('*').order('created_at',{ascending:false}); return data||[]; }
+  async function updateUser(id,updates) { const sb=await getSB(); const {data}=await sb.from('users').update(updates).eq('id',id).select().single(); return data; }
+  async function archiveProject(id) { const sb=await getSB(); const {error}=await sb.from('projects').update({status:'archived'}).eq('id',id); if(error) throw error; }
+  async function unarchiveProject(id) { const sb=await getSB(); const {error}=await sb.from('projects').update({status:'active'}).eq('id',id); if(error) throw error; }
+  async function seedWP(d) { return submitWP(d,null); }
+  return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getAllApprovedWPs,getPendingWPs,getAllWPsForAdmin,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,getAllUsers,updateUser,archiveProject,unarchiveProject,seedWP };
 })();
 
-/* ── Computed fields ──────────────────────────────────────────────────── */
-const Calc = {
-  awardingLeadTime(wp) {
-    if (!wp.actual_awarding_date || !wp.awarding_date) return null;
-    return Math.round((new Date(wp.actual_awarding_date) - new Date(wp.awarding_date)) / 86400000);
-  },
-  deliveryLeadTime(wp) {
-    if (!wp.target_delivery_date || !wp.actual_awarding_date) return null;
-    return Math.round((new Date(wp.target_delivery_date) - new Date(wp.actual_awarding_date)) / 86400000);
-  },
-  variance(wp) {
-    if (wp.approved_budget_php == null || wp.contract_amount_php == null) return null;
-    return wp.approved_budget_php - wp.contract_amount_php;
-  },
-  variancePct(wp) {
-    const v = Calc.variance(wp);
-    if (v == null || !wp.approved_budget_php) return null;
-    return (v / wp.approved_budget_php) * 100;
-  },
-};
-
-/* ── Formatters ───────────────────────────────────────────────────────── */
-const Fmt = {
-  date(d) {
-    if (!d) return '—';
-    return new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { month:'short', day:'numeric', year:'2-digit' });
-  },
-  money(v, dec=2) {
-    if (v == null) return '—';
-    return '₱' + (v/1e6).toFixed(dec) + 'M';
-  },
-  badgeHtml(status) {
-    const map = { 'Awarded':'badge-awarded', 'Partially Awarded':'badge-partial', 'Not Yet Awarded':'badge-notyet' };
-    return `<span class="badge ${map[status]||'badge-notyet'}">${status}</span>`;
-  },
-  reviewBadge(rs) {
-    const map = { approved:'badge-awarded', pending_review:'badge-partial', rejected:'badge-notyet' };
-    const lbl = { approved:'Approved', pending_review:'Pending Review', rejected:'Rejected' };
-    return `<span class="badge ${map[rs]||'badge-notyet'}">${lbl[rs]||rs}</span>`;
-  },
-  leadTimeHtml(v) {
-    if (v==null) return '<span class="lt-na">—</span>';
-    if (v>0)  return `<span class="lt-late">+${v}d late</span>`;
-    if (v<0)  return `<span class="lt-early">${Math.abs(v)}d early</span>`;
-    return `<span class="lt-early">On time</span>`;
-  },
-  deliveryHtml(v) {
-    if (v==null) return '<span class="lt-na">—</span>';
-    if (v<0)  return `<span class="lt-late">${Math.abs(v)}d overdue</span>`;
-    return `<span class="lt-early">${v}d remaining</span>`;
-  },
-  varianceHtml(v) {
-    if (v==null) return '<span class="lt-na">—</span>';
-    const m=(Math.abs(v)/1e6).toFixed(2);
-    if (v>0) return `<span class="lt-early">+₱${m}M</span>`;
-    if (v<0) return `<span class="lt-late">-₱${m}M</span>`;
-    return '<span>₱0M</span>';
-  },
-  variancePctHtml(v) {
-    if (v==null) return '<span class="lt-na">—</span>';
-    if (v>0) return `<span class="lt-early">+${v.toFixed(1)}%</span>`;
-    if (v<0) return `<span class="lt-late">${v.toFixed(1)}%</span>`;
-    return '<span>0%</span>';
-  },
-};
-
-/* ── Stats ────────────────────────────────────────────────────────────── */
+/* â”€â”€ Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function computeStats(wps) {
-  const awarded  = wps.filter(w => w.status === 'Awarded');
-  const partial  = wps.filter(w => w.status === 'Partially Awarded');
-  const notYet   = wps.filter(w => w.status === 'Not Yet Awarded');
-  const hasCon   = wps.filter(w => w.contract_amount_php != null);
-  const totalBudget   = wps.reduce((s,w)=>s+(w.approved_budget_php||0),0);
-  const totalContract = hasCon.reduce((s,w)=>s+w.contract_amount_php,0);
-  const netVariance   = hasCon.reduce((s,w)=>s+(Calc.variance(w)||0),0);
-  const lateAwards    = wps.filter(w=>(Calc.awardingLeadTime(w)||0)>0).length;
-  const awardRate     = wps.length ? Math.round(awarded.length/wps.length*100) : 0;
-  return { awarded, partial, notYet, hasCon, totalBudget, totalContract, netVariance, lateAwards, awardRate, total:wps.length };
+  const total=wps.length;
+  const awarded=wps.filter(w=>w.award_status==='Awarded').length;
+  const partial=wps.filter(w=>w.award_status==='Partially Awarded').length;
+  const notAwarded=wps.filter(w=>!['Awarded','Partially Awarded'].includes(w.award_status)).length;
+  const totalBudget=wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const totalContract=wps.reduce((s,w)=>s+(w.total_awarded||0),0);
+  const variance=totalBudget-totalContract;
+  const today=new Date();
+  const late=wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+  return {total,awarded,partial,notAwarded,totalBudget,totalContract,variance,late,awardRate:total?Math.round(awarded/total*100):0};
 }
 
-/* ── CSV Export ───────────────────────────────────────────────────────── */
+/* â”€â”€ Formatting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+const Fmt = {
+  money(v, decimals=2) {
+    if (v==null||isNaN(v)) return '\u2014';
+    return '\u20B1'+(Math.abs(v)/1e6).toFixed(decimals)+'M';
+  },
+  date(d) {
+    if (!d) return '\u2014';
+    try { return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'}); }
+    catch { return d; }
+  }
+};
+
+const Calc = {
+  variance(w) { return (w.approved_budget_bcb??0)-(w.total_awarded??0); }
+};
+
+/* â”€â”€ CSV Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function exportCSV(wps, label) {
-  const headers = ['Cost Code','WP No.','Description','Zone','Trade',
-    'Lead Time (Days)','Awarding Date','Actual Awarding Date','Awarding Lead Time (Days)',
-    'Target Delivery','Delivery Lead Time (Days)',"Target Inst'n","Target Comp'n",
-    'Approved Budget (PHP)','Contract Amount (PHP)','Variance (PHP)','Variance (%)','Status','Contractor','Remarks','Review Status','Assigned Officer'];
-  const rows = wps.map(w => {
-    const v=Calc.variance(w), vp=Calc.variancePct(w);
-    return [w.cost_code,w.wp_no,`"${w.description}"`,w.zone,w.trade,
-      w.lead_time_days??'',w.awarding_date??'',w.actual_awarding_date??'',
-      Calc.awardingLeadTime(w)??'',w.target_delivery_date??'',
-      Calc.deliveryLeadTime(w)??'',w.target_installation_date??'',w.target_completion_date??'',
-      w.approved_budget_php??'',w.contract_amount_php??'',
-      v??'',vp!=null?vp.toFixed(2):'',
-      w.status,w.contractor??'',w.remarks??'',
-      w.review_status??'',w.assigned_officer_name??''].join(',');
+  // Sort by project then WP number for clean consolidated output
+  const sorted = [...wps].sort((a,b) => {
+    const pCmp = (a.project_id||'').localeCompare(b.project_id||'');
+    if (pCmp !== 0) return pCmp;
+    // Natural sort WP numbers (WP-1 < WP-10 < WP-100)
+    const na = parseInt((a.wp_no||'').replace(/\D/g,''))||0;
+    const nb = parseInt((b.wp_no||'').replace(/\D/g,''))||0;
+    return na - nb;
   });
-  const csv=[headers.join(','),...rows].join('\n');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download=`WPM_${label}_${new Date().toISOString().slice(0,10)}.csv`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+
+  const h = ['Project','WP No','Cost Code','Description','Zone','Trade',
+    'Procurement Status','Award Status','Planned Award','Actual Award',
+    'Lead Time (d)','Target Delivery','Target Completion',
+    'Budget BCB (PHP)','Total Awarded (PHP)','Variance (PHP)',
+    'Contractor','PO/JO Count','PO/JO Numbers','Remarks'];
+
+  const cell = v => `"${(v??'').toString().replace(/"/g,'""')}"`;
+  const rows = sorted.map(w => [
+    w.project_id, w.wp_no, w.cost_code, w.description, w.zone, w.trade,
+    w.procurement_status, w.award_status, w.awarding_date, w.actual_awarding_date,
+    w.awarding_lead_time, w.target_delivery, w.target_completion,
+    w.approved_budget_bcb, w.total_awarded, w.variance,
+    w.contractor, w.po_jo_count, w.po_jo_numbers, w.remarks
+  ].map(cell).join(','));
+
+  // BOM + header + data â€” BOM ensures Excel opens UTF-8 correctly (handles â‚± etc)
+  const BOM = '\uFEFF';
+  const csv = BOM + [h.join(','), ...rows].join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${label||'wps'}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
+
+/* â”€â”€ User bar â€” avatar only, role in dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+function renderUserBar(id, profile) {
+  const el = document.getElementById(id);
+  if (!el || !profile) return;
+  const initials = (profile.name||profile.email||'U').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+  el.innerHTML = `
+    <div style="position:relative">
+      <button id="avatar-btn" onclick="toggleUserMenu()" title="${profile.name||profile.email}" style="
+        width:36px;height:36px;border-radius:50%;background:#EE3124;color:#fff;
+        border:none;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;
+        display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initials}</button>
+      <div id="user-menu" style="
+        display:none;position:absolute;right:0;top:44px;
+        background:#fff;border:1px solid #f0f0f0;border-radius:12px;
+        box-shadow:0 8px 32px rgba(0,0,0,.12);width:220px;z-index:9999;overflow:hidden;">
+        <div style="padding:14px 16px;border-bottom:1px solid #f5f5f5;">
+          <div style="font-size:13px;font-weight:600;color:#231F20">${profile.name||profile.email}</div>
+          <div style="font-size:11px;color:#888;margin-top:2px;text-transform:capitalize">${(profile.role||'').replace(/_/g,' ')}</div>
+        </div>
+        <a href="login.html" onclick="event.preventDefault();AppAuth.logout()" style="
+          display:flex;align-items:center;gap:8px;padding:12px 16px;
+          font-size:13px;color:#EE3124;font-weight:600;text-decoration:none;
+          font-family:inherit;cursor:pointer;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>Sign out
+        </a>
+      </div>
+    </div>`;
+}
+window.toggleUserMenu = function() {
+  const m = document.getElementById('user-menu');
+  if (m) m.style.display = m.style.display==='none' ? 'block' : 'none';
+};
+document.addEventListener('click', function(e) {
+  const btn = document.getElementById('avatar-btn');
+  const menu = document.getElementById('user-menu');
+  if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target))
+    menu.style.display = 'none';
+});
+
+/* â”€â”€ Metrics & Rank helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+function buildMetrics(containerId, items) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = items.map(c=>`
+    <div class="metric-card ${c.accent?'metric-accent-'+c.accent:''}">
+      <div class="metric-label">${c.lbl}</div>
+      <div class="metric-value ${c.cls||''}">${c.val}</div>
+      ${c.sub?`<div class="metric-sub">${c.sub}</div>`:''}
+    </div>`).join('');
+}
+
+function buildRankList(id, items, colorClass, fmtVal) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:12px;padding:8px 0">No data</div>'; return; }
+  el.innerHTML = items.map((item,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5">
+      <span style="font-size:11px;color:#aaa;font-weight:600;width:16px">${i+1}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;color:#231F20;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
+        <div style="font-size:10px;color:#888">${item.sub}</div>
+      </div>
+      <span style="font-size:12px;font-weight:700;color:${item.color};white-space:nowrap">${fmtVal(item.val)}</span>
+    </div>`).join('');
+}
+
+function updatePendingBadge() {
+  WPDb.getPendingWPs().then(wps=>{
+    const badge=document.getElementById('review-badge');
+    if (badge) { badge.textContent=wps.length; badge.style.display=wps.length>0?'inline-block':'none'; }
+  }).catch(()=>{});
+}
+
+/* â”€â”€ Global New Project Modal (overridden by admin.html's own version) â”€â”€ */
+(function() {
+  let _gnpUsers = [];
+
+  function _gnpGetOrCreate() {
+    let m = document.getElementById('gnp-global-modal');
+    if (m) return m;
+    m = document.createElement('div');
+    m.id = 'gnp-global-modal';
+    m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:3000;align-items:center;justify-content:center;padding:16px';
+    m.innerHTML = `
+      <div style="background:#fff;border-radius:12px;width:100%;max-width:460px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+        <div style="padding:20px 20px 0;flex-shrink:0">
+          <div style="font-size:16px;font-weight:700;color:#231F20;margin-bottom:4px">New Project</div>
+          <div style="font-size:13px;color:#888;margin-bottom:16px">Create a new EPC project and assign users</div>
+        </div>
+        <div style="padding:0 20px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Project ID *</div>
+            <input id="gnp-id" type="text" placeholder="e.g. AVR102" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Project Name *</div>
+            <input id="gnp-name" type="text" placeholder="e.g. Avesta Residences Tower 2"
+              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Location</div>
+            <input id="gnp-location" type="text" placeholder="e.g. Quezon City"
+              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Description</div>
+            <input id="gnp-description" type="text" placeholder="Optional project description"
+              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Budget BCB (â‚±)</div>
+            <input id="gnp-budget" type="number" placeholder="e.g. 274900000"
+              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Assign Users (optional)</div>
+            <div id="gnp-user-list"><div style="color:#aaa;font-size:12px">Loadingâ€¦</div></div>
+          </div>
+          <div id="gnp-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 12px;font-size:13px"></div>
+        </div>
+        <div style="padding:12px 20px 20px;flex-shrink:0;border-top:1px solid #f0f0f0;display:flex;gap:10px">
+          <button onclick="window._gnpConfirm()" id="gnp-create-btn"
+            style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">
+            <i class="ti ti-plus" style="font-size:14px;margin-right:4px;vertical-align:middle"></i> Create Project
+          </button>
+          <button onclick="window._gnpClose()"
+            style="padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;cursor:pointer">Cancel</button>
+        </div>
+      </div>`;
+    m.addEventListener('click', e => { if(e.target===m) window._gnpClose(); });
+    document.body.appendChild(m);
+    return m;
+  }
+
+  window._gnpClose = function() {
+    const m = document.getElementById('gnp-global-modal');
+    if (m) m.style.display = 'none';
+    ['gnp-id','gnp-name','gnp-location','gnp-description','gnp-budget'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    const err=document.getElementById('gnp-error'); if(err) err.style.display='none';
+  };
+
+  window._gnpConfirm = async function() {
+    const v = id => (document.getElementById(id)?.value||'').trim();
+    const id = v('gnp-id'), name = v('gnp-name');
+    const errEl = document.getElementById('gnp-error');
+    if (!id||!name) { errEl.textContent='Project ID and Name are required.'; errEl.style.display='block'; return; }
+    if (!/^[A-Z0-9]+$/.test(id)) { errEl.textContent='Project ID must be letters/numbers only (e.g. AVR102).'; errEl.style.display='block'; return; }
+    const budget = parseFloat(document.getElementById('gnp-budget')?.value)||null;
+    const selectedUsers = [...document.querySelectorAll('#gnp-user-rows input:checked')].map(cb=>cb.value);
+    const btn = document.getElementById('gnp-create-btn');
+    btn.textContent='Creatingâ€¦'; btn.disabled=true; errEl.style.display='none';
+    try {
+      await WPDb.createProject({id, name, location:v('gnp-location'), description:v('gnp-description'), budget_bcb:budget, status:'active'});
+      for (const uid of selectedUsers) {
+        const user = _gnpUsers.find(u=>u.id===uid);
+        if (user) await WPDb.updateUser(uid, {projects:[...new Set([...(user.projects||[]),id])]});
+      }
+      window._gnpClose();
+      const toast = document.createElement('div');
+      toast.innerHTML=`<div style="position:fixed;bottom:24px;right:24px;background:#2D9B6F;color:#fff;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:9999">âœ“ Project ${id} created</div>`;
+      document.body.appendChild(toast); setTimeout(()=>toast.remove(),3000);
+      if (typeof loadData==='function') setTimeout(loadData,500);
+      if (typeof loadAll==='function') setTimeout(loadAll,500);
+      if (typeof renderOverview==='function') setTimeout(renderOverview,600);
+    } catch(err) {
+      errEl.textContent=(err.message.includes('duplicate')||err.message.includes('unique'))
+        ?`Project ID "${id}" already exists.`:'Error: '+err.message;
+      errEl.style.display='block';
+      const b=document.getElementById('gnp-create-btn'); b.innerHTML='<i class="ti ti-plus" style="font-size:14px;margin-right:4px;vertical-align:middle"></i> Create Project'; b.disabled=false;
+    }
+  };
+
+  window.openNewProjectModal = async function() {
+    const modal = _gnpGetOrCreate();
+    modal.style.display = 'flex';
+    const list = document.getElementById('gnp-user-list');
+    if (list) list.innerHTML = '<div style="color:#aaa;font-size:12px">Loadingâ€¦</div>';
+    try {
+      _gnpUsers = await WPDb.getAllUsers();
+      const approved = _gnpUsers.filter(u=>u.status==='approved');
+      if (list) {
+        list.innerHTML = `
+          <div style="position:relative;margin-bottom:8px">
+            <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:13px"></i>
+            <input type="text" placeholder="Search usersâ€¦" oninput="document.querySelectorAll('.gnpu-row').forEach(r=>r.style.display=r.textContent.toLowerCase().includes(this.value.toLowerCase())?'':'none')"
+              style="width:100%;padding:6px 10px 6px 28px;border:1px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+          <div id="gnp-user-rows" style="display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto">
+            ${approved.length?approved.map(u=>`
+              <div class="gnpu-row" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e5e5e5;border-radius:8px;cursor:pointer" onclick="this.querySelector('input').click()">
+                <input type="checkbox" value="${u.id}" onclick="event.stopPropagation()" style="width:16px;height:16px;accent-color:#EE3124;cursor:pointer">
+                <label onclick="event.preventDefault()" style="cursor:pointer;font-size:13px;pointer-events:none">${u.name||u.email} <span style="font-size:10px;color:#aaa">(${(u.role||'user').replace(/_/g,' ')})</span></label>
+              </div>`).join(''):'<div style="color:#aaa;font-size:12px">No approved users</div>'}
+          </div>`;
+      }
+    } catch(e) {
+      if (list) list.innerHTML = '<div style="color:#c00;font-size:12px">Could not load users.</div>';
+    }
+    document.getElementById('gnp-id')?.focus();
+  };
+})();

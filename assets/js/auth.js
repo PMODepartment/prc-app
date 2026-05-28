@@ -1,127 +1,22 @@
-/* auth.js — Firebase Auth + Firestore user management */
+﻿const _SB_URL = 'https://cayjeqeleenizbdzrums.supabase.co';
+const _SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw';
+const _sbPromise = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(({ createClient }) => { window.__sb = createClient(_SB_URL, _SB_KEY); return window.__sb; });
+async function getSB() { if (window.__sb) return window.__sb; return _sbPromise; }
 const AppAuth = (() => {
-
-  function requireLogin(onReady) {
-    Auth.onAuthStateChanged(async user => {
-      if (!user) { window.location.href = 'login.html'; return; }
-      const profile = await getUserProfile(user.uid);
-      if (!profile) { await Auth.signOut(); window.location.href = 'login.html'; return; }
-      if (profile.status === 'pending')  { window.location.href = 'pending.html'; return; }
-      if (profile.status === 'rejected') { window.location.href = 'login.html'; return; }
-      onReady(user, profile);
-    });
+  async function requireLogin(onReady) {
+    const sb = await getSB();
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.href = 'login.html'; return; }
+    const { data: profile } = await sb.from('users').select('*').eq('id', session.user.id).single();
+    if (!profile || profile.status !== 'approved') { await sb.auth.signOut(); window.location.href = 'login.html'; return; }
+    window.__profile = profile; window.__session = session;
+    onReady(session.user, profile);
   }
-
-  function requireAdmin(onReady) {
-    requireLogin((user, profile) => {
-      if (profile.role !== 'admin') { window.location.href = 'index.html'; return; }
-      onReady(user, profile);
-    });
-  }
-
-  async function register(name, email, password) {
-    const cred = await Auth.createUserWithEmailAndPassword(email, password);
-    await DB.collection('users').doc(cred.user.uid).set({
-      uid: cred.user.uid, name, email,
-      role: 'procurement_officer',
-      status: 'pending', projects: [], assigned_wps: [],
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      approvedAt: null, approvedBy: null,
-    });
-    await Auth.signOut();
-  }
-
-  async function login(email, password) {
-    const cred    = await Auth.signInWithEmailAndPassword(email, password);
-    const profile = await getUserProfile(cred.user.uid);
-    if (!profile)                      throw new Error('User profile not found.');
-    if (profile.status === 'pending')  throw new Error('Your account is pending admin approval.');
-    if (profile.status === 'rejected') throw new Error('Your registration was not approved.');
-    return { user: cred.user, profile };
-  }
-
-  async function logout() { await Auth.signOut(); window.location.href = 'login.html'; }
-
-  async function getUserProfile(uid) {
-    const doc = await DB.collection('users').doc(uid).get();
-    return doc.exists ? doc.data() : null;
-  }
-
-  async function getAllUsers() {
-    const snap = await DB.collection('users').get();
-    return snap.docs.map(d => d.data()).sort((a,b) => {
-      const ta = a.createdAt?.toMillis?.() || 0;
-      const tb = b.createdAt?.toMillis?.() || 0;
-      return tb - ta;
-    });
-  }
-
-  async function getOfficers() {
-    const snap = await DB.collection('users')
-      .where('status','==','approved')
-      .where('role','==','procurement_officer').get();
-    return snap.docs.map(d => d.data());
-  }
-
-  async function approveUser(uid, projects, role, adminName) {
-    await DB.collection('users').doc(uid).update({
-      status: 'approved', projects, role,
-      approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      approvedBy: adminName,
-    });
-  }
-
-  async function rejectUser(uid) {
-    await DB.collection('users').doc(uid).update({ status: 'rejected' });
-  }
-
-  async function updateUser(uid, data) {
-    await DB.collection('users').doc(uid).update(data);
-  }
-
-  function canAccessProject(profile, projectId) {
-    if (!profile) return false;
-    if (profile.role === 'admin') return true;
-    return profile.projects && profile.projects.includes(projectId);
-  }
-
-  function getPermittedProjects(profile, allProjects) {
-    if (!profile) return [];
-    if (profile.role === 'admin') return allProjects;
-    return allProjects.filter(p => profile.projects && profile.projects.includes(p.id));
-  }
-
-  function renderUserBar(containerId, profile) {
-    const el = document.getElementById(containerId);
-    if (!el || !profile) return;
-    const roleLabel = {
-      admin: 'Admin',
-      procurement_officer: 'Procurement Officer',
-    }[profile.role] || profile.role;
-    const projLabel = profile.role === 'admin' ? 'All projects' :
-      (profile.projects && profile.projects.length ? profile.projects.join(', ') : 'None assigned');
-    el.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="text-align:right">
-          <div style="font-size:12px;font-weight:600;color:var(--text-primary)">${profile.name}</div>
-          <div style="font-size:10px;color:var(--text-secondary)">${roleLabel} · ${projLabel}</div>
-        </div>
-        <div style="width:34px;height:34px;border-radius:50%;background:var(--blue-600);color:#fff;
-          display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">
-          ${profile.name.charAt(0).toUpperCase()}
-        </div>
-        <button onclick="AppAuth.logout()" title="Sign out"
-          style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border-md);
-          background:var(--surface);color:var(--text-secondary);cursor:pointer">
-          <i class="ti ti-logout" style="font-size:13px;vertical-align:middle"></i>
-        </button>
-      </div>`;
-  }
-
-  return {
-    requireLogin, requireAdmin, register, login, logout,
-    getUserProfile, getAllUsers, getOfficers,
-    approveUser, rejectUser, updateUser,
-    canAccessProject, getPermittedProjects, renderUserBar,
-  };
+  async function requireAdmin(onReady) { requireLogin((user, profile) => { if (!['admin','super_admin'].includes(profile.role)) { window.location.href = 'index.html'; return; } onReady(user, profile); }); }
+  async function logout() { const sb = await getSB(); await sb.auth.signOut(); window.location.href = 'login.html'; }
+  function getPermittedProjects(profile, allProjects) { if (['admin','super_admin'].includes(profile.role)) return allProjects; return allProjects.filter(p => (profile.projects||[]).includes(p.id)); }
+  function canAccessProject(profile, projectId) { if (['admin','super_admin'].includes(profile.role)) return true; return (profile.projects||[]).includes(projectId); }
+  function isAdmin(p) { return ['admin','super_admin'].includes(p?.role); }
+  function isSuperAdmin(p) { return p?.role === 'super_admin'; }
+  return { requireLogin, requireAdmin, logout, getPermittedProjects, canAccessProject, isAdmin, isSuperAdmin };
 })();

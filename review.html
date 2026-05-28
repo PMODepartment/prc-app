@@ -6,77 +6,64 @@
   <title>Review Work Packages — EPC WPM</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
   <link rel="stylesheet" href="assets/css/dashboard.css"/>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="assets/js/firebase-config.js"></script>
   <script src="assets/js/auth.js"></script>
   <script src="assets/js/ui.js"></script>
   <script src="assets/js/db.js"></script>
   <style>
-    .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
-      padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
+    .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
     .rc-title{font-size:14px;font-weight:600;color:var(--text-primary)}
     .rc-sub{font-size:11px;color:var(--text-secondary);margin-top:2px}
-    .rc-meta{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-    .rc-meta-item{font-size:11px;color:var(--text-secondary)}
-    .rc-meta-item strong{color:var(--text-primary)}
-    .rc-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;
-      background:var(--surface-2);border-radius:var(--radius-md);padding:14px;margin-bottom:14px}
+    .rc-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;background:var(--surface-2);border-radius:var(--radius-md);padding:14px;margin-bottom:14px}
     .rc-field{font-size:11px}
     .rc-field-label{color:var(--text-hint);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
     .rc-field-val{color:var(--text-primary);font-weight:500}
     .rc-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .btn-approve{font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid #B8DDA0;
-      background:#EAF3DE;color:#3B6D11;cursor:pointer;font-weight:500;display:flex;align-items:center;gap:5px}
+    .btn-approve{font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid #B8DDA0;background:#EAF3DE;color:#3B6D11;cursor:pointer;font-weight:500;display:flex;align-items:center;gap:5px}
     .btn-approve:hover{background:#3B6D11;color:#fff}
-    .btn-reject{font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid #F5B8B8;
-      background:#FCEBEB;color:#A32D2D;cursor:pointer;font-weight:500;display:flex;align-items:center;gap:5px}
+    .btn-reject{font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid #F5B8B8;background:#FCEBEB;color:#A32D2D;cursor:pointer;font-weight:500;display:flex;align-items:center;gap:5px}
     .btn-reject:hover{background:#A32D2D;color:#fff}
-    .btn-view{font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid var(--border-md);
-      background:var(--surface);color:var(--text-secondary);cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:5px}
+    .btn-view{font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid var(--border-md);background:var(--surface);color:var(--text-secondary);cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:5px}
     .empty{text-align:center;padding:60px 20px;color:var(--text-hint);font-size:13px}
     .empty i{font-size:48px;display:block;margin-bottom:12px;opacity:.3}
-    .tab-row{display:flex;gap:2px;background:var(--surface-2);border-radius:10px;padding:3px;
-      width:fit-content;margin-bottom:20px}
-    .tab{font-size:12px;padding:6px 16px;border-radius:8px;border:none;cursor:pointer;font-weight:500;
-      color:var(--text-secondary);background:transparent;transition:all .15s}
+    .tab-row{display:flex;gap:2px;background:var(--surface-2);border-radius:10px;padding:3px;width:fit-content;margin-bottom:20px}
+    .tab{font-size:12px;padding:6px 16px;border-radius:8px;border:none;cursor:pointer;font-weight:500;color:var(--text-secondary);background:transparent;transition:all .15s}
     .tab.active{background:var(--surface);color:var(--text-primary);box-shadow:0 1px 4px rgba(0,0,0,.08)}
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
-    /* Reject modal */
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
     .modal-bg.hidden{display:none}
     .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:440px}
     .modal h3{font-size:15px;font-weight:600;margin-bottom:8px}
-    .modal p{font-size:12px;color:var(--text-secondary);margin-bottom:14px}
-    .modal textarea{width:100%;font-size:12px;padding:8px 10px;border:1.5px solid var(--border-md);
-      border-radius:var(--radius-md);background:var(--surface-2);color:var(--text-primary);
-      outline:none;resize:vertical;min-height:90px}
-    .modal textarea:focus{border-color:var(--blue-400);background:#fff}
+    .modal textarea{width:100%;font-size:12px;padding:8px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);background:var(--surface-2);color:var(--text-primary);outline:none;resize:vertical;min-height:90px}
     .mactions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
     .mactions button{font-size:12px;padding:7px 16px;border-radius:8px;border:1px solid var(--border-md);cursor:pointer;font-weight:500}
-    .mactions .mc{background:var(--red-400);color:#fff;border-color:var(--red-400)}.mactions .mc:hover{background:var(--red-600)}
+    .mactions .mc{background:var(--red-400,#EE3124);color:#fff;border-color:var(--red-400,#EE3124)}
     .mactions .mx{background:transparent;color:var(--text-secondary)}
+    .sidebar-logo img{background:transparent!important;height:36px;width:auto;object-fit:contain;max-width:140px}
   </style>
 </head>
 <body>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
 <div class="app-shell">
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <img src="assets/img/logo-white.png" alt="Megawide Construction"/>
+      <img src="data:image/png;base64,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" alt="Megawide Construction"/>
       <div class="app-label">Procurement Dashboard</div>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-section-label">Overview</div>
-      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>All Projects</a>
+      <a class="nav-item" href="index.html?view=consolidated"><i class="ti ti-layout-dashboard"></i>All Projects</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Projects</div>
+      <div id="nav-projects-review"></div>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-section-label">Admin</div>
       <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
       <a class="nav-item active" href="review.html"><i class="ti ti-clipboard-check"></i>Review WPs</a>
+      <button class="nav-item" onclick="openAddWPModal(null)" style="width:100%;text-align:left;background:transparent;border:none;cursor:pointer;font-family:inherit;color:rgba(255,255,255,0.7);font-size:13px;padding:8px 12px;border-radius:8px;display:flex;align-items:center;gap:8px"><i class="ti ti-circle-plus"></i>Add Work Package</button>
+      <button class="nav-item" onclick="openNewProjectModal()" style="width:100%;text-align:left;background:transparent;border:none;cursor:pointer;font-family:inherit;color:rgba(255,255,255,0.7);font-size:13px;padding:8px 12px;border-radius:8px;display:flex;align-items:center;gap:8px"><i class="ti ti-folder-plus"></i>New Project</button>
     </div>
     <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
@@ -86,41 +73,37 @@
       <div class="topbar-left">
         <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
         <div class="page-title">Work Package Review</div>
-        <div class="page-sub">Approve or reject submitted work packages</div>
+        <div class="page-sub" style="font-size:11px;color:#888;margin-left:8px">Approve or reject submitted work packages</div>
       </div>
       <div class="topbar-right"><div id="user-bar"></div></div>
     </div>
     <div class="content">
       <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading submissions…</span></div>
       <div id="main-content" style="display:none">
-
         <div class="tab-row">
           <button class="tab active" id="tab-pending" onclick="switchTab('pending')">
             Pending Review <span class="tbadge" id="ct-pending">0</span>
           </button>
           <button class="tab" id="tab-approved" onclick="switchTab('approved')">
-            Approved <span class="tbadge" id="ct-approved" style="background:var(--green-400)">0</span>
+            Approved <span class="tbadge" id="ct-approved" style="background:#2D9B6F">0</span>
           </button>
           <button class="tab" id="tab-rejected" onclick="switchTab('rejected')">
-            Rejected <span class="tbadge" id="ct-rejected" style="background:var(--gray-200);color:#333">0</span>
+            Rejected <span class="tbadge" id="ct-rejected" style="background:#888">0</span>
           </button>
         </div>
-
         <div id="panel-pending"></div>
         <div id="panel-approved" style="display:none"></div>
         <div id="panel-rejected" style="display:none"></div>
-
       </div>
     </div>
   </div>
 </div>
 
-<!-- Reject modal -->
 <div class="modal-bg hidden" id="modal-reject">
   <div class="modal">
     <h3>Reject Work Package</h3>
-    <p>Please provide a reason so the officer knows what to correct.</p>
-    <textarea id="rejection-reason" placeholder="e.g. Budget figure does not match the approved ABC. Please verify and resubmit."></textarea>
+    <p style="font-size:12px;color:#888;margin-bottom:14px">Please provide a reason so the officer knows what to correct.</p>
+    <textarea id="rejection-reason" placeholder="e.g. Budget figure does not match the approved BCB. Please verify and resubmit."></textarea>
     <div class="mactions">
       <button class="mx" onclick="closeRejectModal()">Cancel</button>
       <button class="mc" onclick="confirmReject()"><i class="ti ti-x" style="font-size:13px;vertical-align:middle"></i> Reject</button>
@@ -130,21 +113,27 @@
 
 <script>
   let adminProfile, allWPs=[], currentTab='pending', rejectingId=null;
-
   initMobileMenu();
 
   AppAuth.requireAdmin(async (user, profile) => {
     adminProfile = profile;
-    AppAuth.renderUserBar('user-bar', profile);
+    renderUserBar('user-bar', profile);
     await loadAll();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
   });
 
   async function loadAll() {
-    const snap = await DB.collection('work_packages').get();
-    allWPs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a,b) => (a.submitted_at?.toMillis?.()||0) - (b.submitted_at?.toMillis?.()||0));
+    const [wps, projects] = await Promise.all([WPDb.getAllWPsForAdmin(), WPDb.getProjects()]);
+    allWPs = wps;
+    // Populate sidebar project list
+    const navEl = document.getElementById('nav-projects-review');
+    if (navEl) {
+      navEl.innerHTML = projects.filter(p=>p.status!=='archived').map(p =>
+        `<a class="nav-item" href="project.html?id=${p.id}"><i class="ti ti-building-skyscraper"></i>${p.id}
+         <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name||'').slice(0,12)}</span></a>`
+      ).join('');
+    }
     renderAll();
   }
 
@@ -160,13 +149,8 @@
     renderPanel('panel-rejected', rejected, 'rejected');
   }
 
-  function fmtTs(ts) {
-    if (!ts) return '—';
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit',hour:'2-digit',minute:'2-digit'});
-  }
-
   function fmtM(v) { if(v==null)return'—'; return'₱'+(v/1e6).toFixed(2)+'M'; }
+  function fmtDate(d) { if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'});}catch{return d;} }
 
   function renderPanel(panelId, wps, type) {
     const el = document.getElementById(panelId);
@@ -175,39 +159,33 @@
       return;
     }
     el.innerHTML = wps.map(w => {
-      const v = w.approved_budget_php && w.contract_amount_php ? w.approved_budget_php - w.contract_amount_php : null;
-      const vHtml = v==null?'—':v>=0?`<span style="color:#1D9E75">+₱${(v/1e6).toFixed(2)}M</span>`:`<span style="color:#E24B4A">-₱${(Math.abs(v)/1e6).toFixed(2)}M</span>`;
+      const budget = w.approved_budget_bcb;
+      const awarded = w.total_awarded;
+      const v = (budget != null && awarded != null) ? budget - awarded : null;
+      const vHtml = v==null?'—':v>=0?`<span style="color:#1D9E75">+${fmtM(v)}</span>`:`<span style="color:#E24B4A">-${fmtM(Math.abs(v))}</span>`;
       const actionBtns = type === 'pending' ? `
         <button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve</button>
-        <button class="btn-reject"  onclick="openReject('${w.id}')"><i class="ti ti-x" style="font-size:13px"></i> Reject</button>
-        <a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-eye" style="font-size:13px"></i> View form</a>` :
+        <button class="btn-reject" onclick="openReject('${w.id}')"><i class="ti ti-x" style="font-size:13px"></i> Reject</button>
+        <a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-eye" style="font-size:13px"></i> View</a>` :
         type === 'approved' ? `<a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-eye" style="font-size:13px"></i> View</a>` :
-        `<button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve anyway</button>
+        `<button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve</button>
          <a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-eye" style="font-size:13px"></i> View</a>`;
       return `<div class="review-card">
         <div class="review-card-header">
           <div>
             <div class="rc-title">${w.description}</div>
-            <div class="rc-sub">${w.cost_code} &nbsp;·&nbsp; ${w.wp_no} &nbsp;·&nbsp; ${w.project_id} &nbsp;·&nbsp; ${w.zone}</div>
+            <div class="rc-sub">${w.cost_code||''} &nbsp;·&nbsp; ${w.wp_no||''} &nbsp;·&nbsp; ${w.project_id||''} &nbsp;·&nbsp; ${w.zone||''}</div>
           </div>
-          <span class="badge ${w.status==='Awarded'?'badge-awarded':w.status==='Partially Awarded'?'badge-partial':'badge-notyet'}">${w.status}</span>
+          <span style="font-size:10px;font-weight:600;color:${w.award_status==='Awarded'?'#2D9B6F':w.award_status==='Partially Awarded'?'#D97706':'#EE3124'}">${w.award_status||'—'}</span>
         </div>
         <div class="rc-fields">
           <div class="rc-field"><div class="rc-field-label">Trade</div><div class="rc-field-val">${w.trade||'—'}</div></div>
-          <div class="rc-field"><div class="rc-field-label">Approved Budget</div><div class="rc-field-val">${fmtM(w.approved_budget_php)}</div></div>
-          <div class="rc-field"><div class="rc-field-label">Contract Amount</div><div class="rc-field-val">${fmtM(w.contract_amount_php)}</div></div>
+          <div class="rc-field"><div class="rc-field-label">Budget BCB</div><div class="rc-field-val">${fmtM(w.approved_budget_bcb)}</div></div>
+          <div class="rc-field"><div class="rc-field-label">Total Awarded</div><div class="rc-field-val">${fmtM(w.total_awarded)}</div></div>
           <div class="rc-field"><div class="rc-field-label">Variance</div><div class="rc-field-val">${vHtml}</div></div>
-          <div class="rc-field"><div class="rc-field-label">Awarding Date</div><div class="rc-field-val">${w.awarding_date||'—'}</div></div>
-          <div class="rc-field"><div class="rc-field-label">Actual Awarding</div><div class="rc-field-val">${w.actual_awarding_date||'—'}</div></div>
-          <div class="rc-field"><div class="rc-field-label">Target Completion</div><div class="rc-field-val">${w.target_completion_date||'—'}</div></div>
-          <div class="rc-field"><div class="rc-field-label">Contractor</div><div class="rc-field-val">${w.contractor||'—'}</div></div>
-        </div>
-        <div class="rc-meta">
-          <div class="rc-meta-item"><strong>Submitted by:</strong> ${w.submitted_by_name||'—'}</div>
-          <div class="rc-meta-item"><strong>Submitted:</strong> ${fmtTs(w.submitted_at)}</div>
-          ${w.assigned_officer_name?`<div class="rc-meta-item"><strong>Officer:</strong> ${w.assigned_officer_name}</div>`:''}
-          ${w.rejection_reason?`<div class="rc-meta-item" style="color:var(--red-400)"><strong>Rejected:</strong> ${w.rejection_reason}</div>`:''}
-          ${w.remarks?`<div class="rc-meta-item"><strong>Remarks:</strong> ${w.remarks}</div>`:''}
+          <div class="rc-field"><div class="rc-field-label">Planned Award</div><div class="rc-field-val">${fmtDate(w.awarding_date)}</div></div>
+          <div class="rc-field"><div class="rc-field-label">Submitted</div><div class="rc-field-val">${w.created_at?new Date(w.created_at).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'}):'—'}</div></div>
+          ${w.review_notes?`<div class="rc-field" style="grid-column:1/-1"><div class="rc-field-label">Review Notes</div><div class="rc-field-val" style="color:#E24B4A">${w.review_notes}</div></div>`:''}
         </div>
         <div class="rc-actions">${actionBtns}</div>
       </div>`;
@@ -215,34 +193,233 @@
   }
 
   function switchTab(tab) {
+    currentTab = tab;
     ['pending','approved','rejected'].forEach(t => {
       document.getElementById('tab-'+t).classList.toggle('active', t===tab);
-      document.getElementById('panel-'+t).style.display = t===tab ? 'block' : 'none';
+      document.getElementById('panel-'+t).style.display = t===tab?'':'none';
     });
-    currentTab = tab;
   }
 
   async function approveWP(id) {
-    if (!confirm('Approve this work package? It will appear on the dashboard immediately.')) return;
     try {
-      await WPDb.approveWP(id, adminProfile);
+      await WPDb.approveWP(id);
       await loadAll();
-    } catch(e) { alert('Error: '+e.message); }
+    } catch(e) { alert('Error: ' + e.message); }
   }
 
-  function openReject(id) { rejectingId=id; document.getElementById('modal-reject').classList.remove('hidden'); }
-  function closeRejectModal() { document.getElementById('modal-reject').classList.add('hidden'); rejectingId=null; }
-
+  function openReject(id) {
+    rejectingId = id;
+    document.getElementById('rejection-reason').value = '';
+    document.getElementById('modal-reject').classList.remove('hidden');
+  }
+  function closeRejectModal() {
+    document.getElementById('modal-reject').classList.add('hidden');
+    rejectingId = null;
+  }
   async function confirmReject() {
+    if (!rejectingId) return;
     const reason = document.getElementById('rejection-reason').value.trim();
     if (!reason) { alert('Please provide a rejection reason.'); return; }
     try {
-      await WPDb.rejectWP(rejectingId, adminProfile, reason);
+      await WPDb.rejectWP(rejectingId, null, reason);
       closeRejectModal();
-      document.getElementById('rejection-reason').value = '';
       await loadAll();
-    } catch(e) { alert('Error: '+e.message); }
+    } catch(e) { alert('Error: ' + e.message); }
   }
 </script>
+
+<!-- ── Quick-Add Work Package Modal (shared across all pages) ── -->
+<div id="wp-quick-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.45);overflow-y:auto">
+  <div style="min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:20px 12px">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:680px;box-shadow:0 20px 60px rgba(0,0,0,.2);margin:auto">
+      <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f0f0;padding-bottom:16px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#231F20" id="wqm-title">Add Work Package</div>
+          <div style="font-size:12px;color:#aaa;margin-top:2px" id="wqm-subtitle">Fill in the required fields</div>
+        </div>
+        <button onclick="closeAddWPModal()" style="background:none;border:none;cursor:pointer;padding:4px;color:#aaa;font-size:20px;line-height:1">&times;</button>
+      </div>
+      <div style="padding:20px 24px">
+        <div id="wqm-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px"></div>
+        <div id="wqm-success" style="display:none;background:#D1FAE5;color:#065F46;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px"></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Cost Code *</label>
+            <input id="wqm-cost-code" type="text" placeholder="e.g. 03-001" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">WP No. *</label>
+            <input id="wqm-wp-no" type="text" placeholder="e.g. WP-115" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div style="grid-column:1/-1">
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Description *</label>
+            <input id="wqm-description" type="text" placeholder="Work Package description" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Zone <span style="font-size:10px;font-weight:400;color:#bbb">(optional)</span></label>
+            <input id="wqm-zone" type="text" placeholder="e.g. Tower 1" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Trade / Discipline *</label>
+            <select id="wqm-trade" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+              <option value="">Select trade…</option>
+              <option>Architectural Works</option>
+              <option>Civil Works</option>
+              <option>Electrical Works</option>
+              <option>General Requirement</option>
+              <option>MEPF &amp; Allied Services</option>
+              <option>Site Development</option>
+              <option>Site Works</option>
+              <option>Structural Works</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Planned Award Date *</label>
+            <input id="wqm-award-date" type="date" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Target Completion *</label>
+            <input id="wqm-completion" type="date" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Budget BCB (₱) *</label>
+            <input id="wqm-budget" type="number" step="0.01" placeholder="e.g. 2500000" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Award Status</label>
+            <select id="wqm-award-status" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+              <option value="Not Yet Awarded">Not Yet Awarded</option>
+              <option value="Partially Awarded">Partially Awarded</option>
+              <option value="Awarded">Awarded</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;flex-wrap:wrap">
+          <button id="wqm-save-btn" onclick="saveQuickWP()" style="padding:10px 20px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">
+            <i class="ti ti-plus"></i> <span id="wqm-btn-text">Add Work Package</span>
+          </button>
+          <a id="wqm-full-form-link" href="wp-form.html" style="padding:10px 16px;background:#f5f5f5;color:#666;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;text-decoration:none;display:flex;align-items:center;gap:5px">
+            <i class="ti ti-external-link"></i> Full Form
+          </a>
+          <button onclick="closeAddWPModal()" style="padding:10px 16px;background:transparent;color:#888;border:1px solid #e5e5e5;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;margin-left:auto">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let _wqmProjectId = null;
+let _wqmDirty = false;
+
+window.openAddWPModal = function(projectId) {
+  _wqmProjectId = projectId || null;
+  _wqmDirty = false;
+  // Clear fields
+  ['wqm-cost-code','wqm-wp-no','wqm-description','wqm-zone','wqm-award-date','wqm-completion','wqm-budget'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  const trade = document.getElementById('wqm-trade'); if(trade) trade.value = '';
+  const status = document.getElementById('wqm-award-status'); if(status) status.value = 'Not Yet Awarded';
+  document.getElementById('wqm-error').style.display = 'none';
+  document.getElementById('wqm-success').style.display = 'none';
+  document.getElementById('wqm-btn-text').textContent = 'Add Work Package';
+  document.getElementById('wqm-save-btn').disabled = false;
+  // Update full-form link with project
+  const fullLink = document.getElementById('wqm-full-form-link');
+  if(fullLink && projectId) fullLink.href = 'wp-form.html?project=' + projectId;
+  // Subtitle
+  document.getElementById('wqm-subtitle').textContent = projectId ? 'Project: ' + projectId : 'Fill in the required fields';
+  // Track dirty
+  document.querySelectorAll('#wp-quick-modal input,#wp-quick-modal select').forEach(el => {
+    el.addEventListener('input', () => { _wqmDirty = true; });
+    el.addEventListener('change', () => { _wqmDirty = true; });
+  });
+  document.getElementById('wp-quick-modal').style.display = 'block';
+};
+
+window.closeAddWPModal = function() {
+  if (_wqmDirty) {
+    if (!confirm('Discard unsaved work package?')) return;
+  }
+  document.getElementById('wp-quick-modal').style.display = 'none';
+  _wqmDirty = false;
+};
+
+// Close on overlay click
+document.getElementById('wp-quick-modal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeAddWPModal();
+});
+
+window.saveQuickWP = async function() {
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const n = id => parseFloat(document.getElementById(id)?.value) || null;
+  const errEl = document.getElementById('wqm-error');
+  const sucEl = document.getElementById('wqm-success');
+  errEl.style.display = 'none'; sucEl.style.display = 'none';
+
+  if (!v('wqm-cost-code')) { errEl.textContent='Cost Code is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-wp-no')) { errEl.textContent='WP No. is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-description')) { errEl.textContent='Description is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-trade')) { errEl.textContent='Trade is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-award-date')) { errEl.textContent='Planned Award Date is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-completion')) { errEl.textContent='Target Completion is required.'; errEl.style.display='block'; return; }
+  if (!n('wqm-budget')) { errEl.textContent='Budget BCB is required.'; errEl.style.display='block'; return; }
+  if (!_wqmProjectId) { errEl.textContent='No project selected.'; errEl.style.display='block'; return; }
+
+  const btn = document.getElementById('wqm-save-btn');
+  document.getElementById('wqm-btn-text').textContent = 'Saving…';
+  btn.disabled = true;
+
+  const data = {
+    project_id: _wqmProjectId,
+    cost_code: v('wqm-cost-code'), wp_no: v('wqm-wp-no'),
+    description: v('wqm-description'), zone: v('wqm-zone') || null,
+    trade: v('wqm-trade'), awarding_date: v('wqm-award-date') || null,
+    target_completion: v('wqm-completion') || null,
+    approved_budget_bcb: n('wqm-budget'), award_status: v('wqm-award-status'),
+    awarding_lead_time: 0,
+  };
+
+  try {
+    // Get current user profile to decide direct-save vs review queue
+    const sb = await getSB();
+    const { data: { user } } = await sb.auth.getUser();
+    const { data: prof } = await sb.from('users').select('role').eq('id', user?.id).single();
+    const role = prof?.role || 'user';
+
+    const newWP = await WPDb.submitWP(data, { id: user?.id });
+    if (['admin','super_admin'].includes(role) && newWP?.id) {
+      await WPDb.approveWP(newWP.id);
+    }
+
+    _wqmDirty = false;
+    sucEl.textContent = ['admin','super_admin'].includes(role)
+      ? 'Work package added and approved.'
+      : 'Work package submitted for review.';
+    sucEl.style.display = 'block';
+
+    document.getElementById('wqm-btn-text').textContent = 'Add Another';
+    btn.disabled = false;
+
+    // Reset form for another entry
+    ['wqm-cost-code','wqm-wp-no','wqm-description','wqm-zone','wqm-budget'].forEach(id => {
+      const el = document.getElementById(id); if(el) el.value = '';
+    });
+    _wqmDirty = false;
+
+    // Reload page data if available
+    if (typeof loadData === 'function') setTimeout(loadData, 500);
+    if (typeof renderOverview === 'function') setTimeout(renderOverview, 800);
+
+  } catch(err) {
+    errEl.textContent = 'Error: ' + err.message;
+    errEl.style.display = 'block';
+    document.getElementById('wqm-btn-text').textContent = 'Add Work Package';
+    btn.disabled = false;
+  }
+};
+</script>
+
 </body>
 </html>
