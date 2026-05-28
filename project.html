@@ -299,29 +299,24 @@
 
         <!-- ══ WP LIST VIEW ══ -->
         <div id="view-table" style="display:none">
-          <div class="filter-row">
-            <select id="f-status" class="filter-sel">
+          <div class="filter-bar" style="flex-wrap:nowrap;margin-bottom:12px">
+            <select id="f-status" style="flex-shrink:0">
               <option value="all">All statuses</option>
               <option value="Awarded">Awarded</option>
               <option value="Partially Awarded">Partially Awarded</option>
               <option value="Not Yet Awarded">Not Yet Awarded</option>
             </select>
-            <select id="f-trade" class="filter-sel"><option value="all">All trades</option></select>
-            <select id="f-zone" class="filter-sel"><option value="all">All zones</option></select>
-            <div class="search-wrap">
-              <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#aaa;font-size:14px"></i>
-              <input id="f-search" class="filter-search" type="text" placeholder="Search WP / cost code…"/>
+            <select id="f-trade" style="flex-shrink:0"><option value="all">All trades</option></select>
+            <select id="f-zone" style="flex-shrink:0"><option value="all">All zones</option></select>
+            <div style="position:relative;flex:1;min-width:140px">
+              <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#aaa;font-size:13px;pointer-events:none"></i>
+              <input id="f-search" type="text" placeholder="Search WP / cost code…" style="width:100%;padding:6px 10px 6px 30px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;outline:none;background:var(--surface-2);color:var(--text-primary)"/>
             </div>
           </div>
 
           <div class="panel" style="padding:0">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #f0f0f0">
+            <div style="display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #f0f0f0">
               <span id="row-count" style="font-size:12px;font-weight:600;color:#888"></span>
-              <div style="display:flex;gap:6px;align-items:center">
-                <button class="btn-sm" onclick="toggleCol('identity')">Identity</button>
-                <button class="btn-sm" onclick="toggleCol('schedule')">Schedule</button>
-                <button class="btn-sm" onclick="toggleCol('budget')">Budget</button>
-              </div>
             </div>
             <div style="overflow-x:auto">
               <table class="data-table">
@@ -379,7 +374,7 @@ const COLS={
 function getActiveCols(){ return [...(colGroups.identity?COLS.identity:[]),...(colGroups.schedule?COLS.schedule:[]),...(colGroups.budget?COLS.budget:[])]; }
 function toggleCol(grp){ colGroups[grp]=!colGroups[grp]; buildTable(); }
 
-function fmt(n){ if(n==null)return'—'; return'₱'+(Math.abs(n)/1e6).toFixed(2)+'M'; }
+function fmt(n){ if(n==null)return'—'; return'₱'+(Math.abs(n)/1e6).toFixed(1)+'M'; }
 function fmtDate(d){ if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'});}catch{return d;} }
 function statusBadge(s){
   const c={Awarded:'#2D9B6F','Partially Awarded':'#D97706','Not Yet Awarded':'#EE3124'}[s]||'#999';
@@ -712,8 +707,9 @@ AppAuth.requireLogin(async (user, profile) => {
   allWPs = wps;
 
   if (meta) {
-    document.title = meta.id+' — '+meta.name+' — WPM';
-    document.getElementById('page-title').textContent = meta.id+' — '+meta.name.split('—')[0].trim();
+    const _dispName = (meta.name && meta.name !== meta.id) ? meta.name.split('—')[0].trim() : '';
+    document.title = _dispName ? meta.id+' — '+_dispName+' — WPM' : meta.id+' — WPM';
+    document.getElementById('page-title').textContent = _dispName ? meta.id+' — '+_dispName : meta.id;
     document.getElementById('page-sub').textContent = (meta.location||'')+(meta.description?' · '+meta.description:'');
     document.getElementById('nav-proj-name').textContent = meta.id;
     document.getElementById('nav-proj-link').href = 'project.html?id='+meta.id;
