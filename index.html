@@ -38,7 +38,6 @@
       <div class="sidebar-section">
         <div class="sidebar-section-label">Admin</div>
         <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
-        <a class="nav-item" href="review.html"><i class="ti ti-clipboard-check"></i>Review WPs <span class="nbadge" id="review-badge" style="display:none">0</span></a>
         <button class="nav-item" onclick="openNewProjectModal()"><i class="ti ti-folder-plus"></i>New Project</button>
       </div>
     </div>
@@ -73,6 +72,14 @@
       </div>
 
       <div id="main-content" style="display:none">
+
+        <!-- Project Filter Selector -->
+        <div id="project-filter-wrap" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:#fff;border:1px solid #f0f0f0;border-radius:10px">
+          <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888;white-space:nowrap">Filter projects:</span>
+          <div id="project-pills" style="display:flex;gap:6px;flex-wrap:wrap;flex:1"></div>
+          <button onclick="selectAllPills()" style="font-size:11px;padding:3px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;color:#666">All</button>
+          <button onclick="clearPills()" style="font-size:11px;padding:3px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;color:#666">None</button>
+        </div>
 
         <!-- KPI Cards -->
         <div class="metrics-grid" id="metrics-grid"></div>
@@ -159,16 +166,8 @@
     // Users cannot access consolidated view - redirect to their project
     if (profile.role === 'user') {
       const projects = profile.projects || [];
-      if (projects.length === 1) {
-        location.href = 'project.html?id=' + projects[0];
-        return;
-      } else if (projects.length > 1) {
-        location.href = 'login.html';
-        return;
-      } else {
-        location.href = 'login.html';
-        return;
-      }
+      if (projects.length === 1) { location.href = 'project.html?id=' + projects[0]; return; }
+      location.href = 'login.html'; return;
     }
 
     window.__wpmRole = profile.role;
@@ -179,149 +178,148 @@
       updatePendingBadge();
     }
 
-    // Load data in parallel for speed
-    const [allProjects] = await Promise.all([WPDb.getProjects()]);
-    const permitted = AppAuth.getPermittedProjects(profile, allProjects);
+    const [allProjectsRaw] = await Promise.all([WPDb.getProjects()]);
+    const permitted = AppAuth.getPermittedProjects(profile, allProjectsRaw);
 
-    document.getElementById('page-sub').textContent =
-      ['admin','super_admin'].includes(profile.role)
-        ? 'Consolidated'
-        : 'Your projects: ' + permitted.map(p => p.id).join(', ');
+    document.getElementById('page-sub').textContent = 'Consolidated';
 
     // Sidebar project links
     const navEl = document.getElementById('nav-projects');
     permitted.forEach(p => {
       navEl.innerHTML += `<a class="nav-item" href="project.html?id=${p.id}">
         <i class="ti ti-building-skyscraper"></i>${p.id}
-        <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name||'').split('—')[1]?.trim().slice(0,12)||''}</span>
+        <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name&&p.name!==p.id?p.name:'').split('—')[0].trim().slice(0,12)}</span>
       </a>`;
     });
 
-    // Load all WPs in parallel across projects
+    // Load all WPs
     const wpArrays = await Promise.all(permitted.map(p => WPDb.getApprovedWPs(p.id)));
-    const allWPs = wpArrays.flat();
+    const _allWPs = wpArrays.flat();
 
-    const allStats = permitted.map(p => computeStats(allWPs.filter(w => w.project_id === p.id)));
-    const global   = computeStats(allWPs);
+    // Project filter state
+    let _activeIds = new Set(permitted.map(p => p.id));
 
-    // KPI Cards
-    buildMetrics('metrics-grid', [
-      { lbl:'Total projects',      val:permitted.length,                     sub:'active',                      cls:'',      accent:'dark'  },
-      { lbl:'Total work packages', val:global.total,                         sub:'approved entries',             cls:'',      accent:'dark'  },
-      { lbl:'Awarded',             val:global.awarded,                       sub:global.awardRate+'% award rate',cls:'green', accent:'green' },
-      { lbl:'Not yet awarded',     val:global.notAwarded,                    sub:global.late+' past target date',cls:'red',   accent:'red'   },
-      { lbl:'Total budget',        val:Fmt.money(global.totalBudget, 1),     sub:'approved BCB',                 cls:'',      accent:'dark'  },
-      { lbl:'Total contracted',    val:Fmt.money(global.totalContract, 1),   sub:'awarded amount',               cls:'',      accent:'dark'  },
-      { lbl:'Net variance',
-        val:(global.variance>=0?'+':'')+Fmt.money(global.variance,1),
-        sub:global.variance>=0?'net savings':'net overrun',
-        cls:global.variance>=0?'green':'red',
-        accent:global.variance>=0?'green':'red' },
-      { lbl:'Late awards',         val:global.late,                          sub:'past planned award date',      cls:global.late>0?'red':'green', accent:global.late>0?'red':'dark' },
-    ]);
-
-    // Project Cards — split active vs archived
-    const activePermitted = permitted.filter(p => p.status !== 'archived');
-    const archivedPermitted = permitted.filter(p => p.status === 'archived');
-    const cardsEl = document.getElementById('project-cards');
-    activePermitted.forEach((p, i) => {
-      const s = allStats[permitted.indexOf(p)];
+    function renderProjectCard(p, s, extraStyle='') {
       const budgetM = s.totalBudget ? '₱'+(s.totalBudget/1e6).toFixed(1)+'M' : '—';
       const contractM = s.totalContract ? '₱'+(s.totalContract/1e6).toFixed(1)+'M' : '—';
-      cardsEl.innerHTML += `<a class="project-card" href="project.html?id=${p.id}">
-        <div class="pc-header">
-          <span class="pc-id">${p.id}</span>
-          <span class="pc-status-badge" style="background:${p.status==='inactive'?'#f0f0f0':'#EAF3DE'};color:${p.status==='inactive'?'#888':'#3B6D11'}">${p.status==='inactive'?'INACTIVE':'ACTIVE'}</span>
-        </div>
-        <div class="pc-name">${p.name||p.id}</div>
+      const badge = p.status==='archived' ? 'background:#f0f0f0;color:#888' : p.status==='inactive' ? 'background:#f0f0f0;color:#888' : 'background:#EAF3DE;color:#3B6D11';
+      const label = p.status==='archived' ? 'ARCHIVED' : p.status==='inactive' ? 'INACTIVE' : 'ACTIVE';
+      return `<a class="project-card" href="project.html?id=${p.id}" style="${extraStyle}">
+        <div class="pc-header"><span class="pc-id">${p.id}</span><span class="pc-status-badge" style="${badge}">${label}</span></div>
+        <div class="pc-name">${p.name&&p.name!==p.id?p.id+' — '+p.name.split('—')[0].trim():p.id}</div>
         <div class="pc-meta">${p.location||''}</div>
         <div class="pc-stats">
           <div><div class="pc-stat-val" style="color:var(--green)">${s.awarded}</div><div class="pc-stat-lbl">Awarded</div></div>
           <div><div class="pc-stat-val" style="color:var(--amber)">${s.partial}</div><div class="pc-stat-lbl">Partial</div></div>
           <div><div class="pc-stat-val" style="color:var(--mw-red)">${s.notAwarded}</div><div class="pc-stat-lbl">Not Yet</div></div>
         </div>
-        <div style="display:flex;gap:12px;margin:8px 0 4px;font-size:11px">
+        <div style="display:flex;gap:10px;margin:8px 0 4px;font-size:11px;flex-wrap:wrap">
           <span style="color:#888">Budget: <strong style="color:#231F20">${budgetM}</strong></span>
           <span style="color:#888">Awarded: <strong style="color:#2D9B6F">${contractM}</strong></span>
         </div>
         <div class="pc-spacer"></div>
         <div class="pc-progress-label"><span>Award progress</span><span>${s.awardRate}%</span></div>
-        <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${s.awardRate}%"></div></div>
+        <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${s.awardRate}%;${p.status==='archived'?'background:#aaa':''}"></div></div>
       </a>`;
-    });
-
-    // Archived projects section
-    if (archivedPermitted.length > 0) {
-      const archiveSection = document.createElement('div');
-      archiveSection.style.cssText = 'margin-top:24px';
-      archiveSection.innerHTML = `
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer" onclick="document.getElementById('archived-cards').style.display=document.getElementById('archived-cards').style.display==='none'?'grid':'none'">
-          <span style="font-size:13px;font-weight:600;color:#888"><i class="ti ti-archive" style="font-size:14px;vertical-align:middle;margin-right:4px"></i>Archived Projects (${archivedPermitted.length})</span>
-          <span style="font-size:10px;color:#aaa">click to expand</span>
-        </div>
-        <div id="archived-cards" class="project-cards" style="display:none"></div>`;
-      document.getElementById('project-cards').after(archiveSection);
-      const archiveCardsEl = document.getElementById('archived-cards');
-      archivedPermitted.forEach(p => {
-        const s = allStats[permitted.indexOf(p)];
-        const budgetM = s.totalBudget ? '₱'+(s.totalBudget/1e6).toFixed(1)+'M' : '—';
-        archiveCardsEl.innerHTML += `<a class="project-card" href="project.html?id=${p.id}" style="opacity:.75;border:1px dashed #ccc">
-          <div class="pc-header">
-            <span class="pc-id">${p.id}</span>
-            <span class="pc-status-badge" style="background:#f0f0f0;color:#888">ARCHIVED</span>
-          </div>
-          <div class="pc-name">${p.name||p.id}</div>
-          <div class="pc-meta">${p.location||''}</div>
-          <div class="pc-stats">
-            <div><div class="pc-stat-val" style="color:var(--green)">${s.awarded}</div><div class="pc-stat-lbl">Awarded</div></div>
-            <div><div class="pc-stat-val" style="color:var(--amber)">${s.partial}</div><div class="pc-stat-lbl">Partial</div></div>
-            <div><div class="pc-stat-val" style="color:var(--mw-red)">${s.notAwarded}</div><div class="pc-stat-lbl">Not Yet</div></div>
-          </div>
-          <div style="font-size:11px;margin:8px 0 4px;color:#888">Budget: <strong style="color:#231F20">${budgetM}</strong></div>
-          <div class="pc-spacer"></div>
-          <div class="pc-progress-label"><span>Award progress</span><span>${s.awardRate}%</span></div>
-          <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${s.awardRate}%;background:#aaa"></div></div>
-        </a>`;
-      });
     }
 
-    // Donut grid
-    const donutGrid = document.getElementById('donut-grid');
-    permitted.forEach((p, i) => {
-      donutGrid.innerHTML += `<div style="text-align:center">
-        <div style="font-size:10px;font-weight:700;color:var(--mw-dark);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">${p.id}</div>
-        <div style="position:relative;height:100px"><canvas id="c-donut-${p.id}"></canvas></div>
-      </div>`;
-    });
-    permitted.forEach((p, i) => Charts.awardDonut('c-donut-' + p.id, allStats[i]));
+    function renderAll() {
+      const sel = [..._activeIds];
+      const filt = permitted.filter(p => sel.includes(p.id));
+      const filtWPs = _allWPs.filter(w => sel.includes(w.project_id));
+      const allStats = filt.map(p => computeStats(filtWPs.filter(w => w.project_id === p.id)));
+      const global = computeStats(filtWPs);
 
-    // Charts
-    Charts.consolidatedBudget('c-budget', permitted, allStats);
-    Charts.varianceTrend('c-trend', allWPs);
-    Charts.statusByZone('c-status', allWPs);
+      // Metrics
+      buildMetrics('metrics-grid', [
+        { lbl:'Total projects',      val:filt.filter(p=>p.status!=='archived').length, sub:'active',                          cls:'',      accent:'dark' },
+        { lbl:'Total work packages', val:global.total,                                  sub:'approved entries',                 cls:'',      accent:'dark' },
+        { lbl:'Awarded',             val:global.awarded,                                sub:global.awardRate+'% award rate',    cls:'green', accent:'green' },
+        { lbl:'Not yet awarded',     val:global.notAwarded,                             sub:global.late+' past target date',    cls:'red',   accent:'red' },
+        { lbl:'Total budget',        val:Fmt.money(global.totalBudget,1),               sub:'approved BCB',                     cls:'',      accent:'dark' },
+        { lbl:'Total contracted',    val:Fmt.money(global.totalContract,1),             sub:'awarded amount',                   cls:'',      accent:'dark' },
+        { lbl:'Net variance',
+          val:(global.variance>=0?'+':'')+Fmt.money(global.variance,1),
+          sub:global.variance>=0?'net savings':'net overrun',
+          cls:global.variance>=0?'green':'red', accent:global.variance>=0?'green':'red' },
+        { lbl:'Late awards', val:global.late, sub:'past planned award date', cls:global.late>0?'red':'green', accent:global.late>0?'red':'dark' },
+      ]);
 
-    // Budget by Trade
-    const trades = [...new Set(allWPs.map(w => w.trade).filter(Boolean))].sort();
-    Charts.budgetByTrade('c-budget-trade', allWPs, trades);
-    Charts.awardRateByTrade('c-award-trade', allWPs, trades);
+      // Project Cards
+      const cardsEl = document.getElementById('project-cards');
+      cardsEl.innerHTML = '';
+      filt.filter(p=>p.status!=='archived').forEach(p => {
+        cardsEl.innerHTML += renderProjectCard(p, allStats[filt.indexOf(p)]);
+      });
+      // Archived section
+      const archFilt = filt.filter(p=>p.status==='archived');
+      const existingArch = document.getElementById('archived-section');
+      if (existingArch) existingArch.remove();
+      if (archFilt.length > 0) {
+        const archSec = document.createElement('div');
+        archSec.id = 'archived-section';
+        archSec.style.marginTop = '20px';
+        archSec.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer" onclick="const c=document.getElementById('archived-cards-inner');c.style.display=c.style.display==='none'?'grid':'none'">
+          <span style="font-size:12px;font-weight:600;color:#888"><i class="ti ti-archive" style="font-size:13px;vertical-align:middle;margin-right:4px"></i>Archived (${archFilt.length})</span>
+          <span style="font-size:10px;color:#aaa">click to expand</span>
+        </div><div id="archived-cards-inner" class="project-cards" style="display:none"></div>`;
+        cardsEl.after(archSec);
+        const ac = document.getElementById('archived-cards-inner');
+        archFilt.forEach(p => { ac.innerHTML += renderProjectCard(p, allStats[filt.indexOf(p)], 'opacity:.75;border:1px dashed #ccc'); });
+      }
 
-    // Top lists
-    const withBudget = allWPs.filter(w => w.approved_budget_bcb != null);
-    buildRankList('rank-gains',
-      withBudget.filter(w => (w.variance||0) > 0).sort((a,b) => (b.variance||0)-(a.variance||0)).slice(0,5)
-      .map(w => ({ name:w.description, sub:w.wp_no+' · '+(w.project_id||''), val:w.variance, color:'#2D9B6F' })),
-      'green', v => '+' + Fmt.money(v));
-    buildRankList('rank-value',
-      [...allWPs].filter(w => w.total_awarded > 0).sort((a,b) => (b.total_awarded||0)-(a.total_awarded||0)).slice(0,5)
-      .map(w => ({ name:w.description, sub:w.wp_no+' · '+(w.contractor||'—'), val:w.total_awarded, color:'#282C28' })),
-      'dark', v => Fmt.money(v));
-    buildRankList('rank-losses',
-      withBudget.filter(w => (w.variance||0) < 0).sort((a,b) => (a.variance||0)-(b.variance||0)).slice(0,5)
-      .map(w => ({ name:w.description, sub:w.wp_no+' · '+(w.project_id||''), val:Math.abs(w.variance), color:'#EE3124' })),
-      'red', v => '-' + Fmt.money(v));
+      // Destroy + re-render charts
+      ['c-budget','c-trend','c-status','c-budget-trade','c-award-trade'].forEach(id => {
+        try { const c = Chart.getChart(document.getElementById(id)); if(c) c.destroy(); } catch(e){}
+      });
+      filt.forEach(p => { try { const c=Chart.getChart(document.getElementById('c-donut-'+p.id)); if(c) c.destroy(); } catch(e){} });
 
-    // Export
-    document.getElementById('btn-export').addEventListener('click', () => exportCSV(allWPs, 'ALL_PROJECTS'));
+      Charts.consolidatedBudget('c-budget', filt, allStats);
+      Charts.varianceTrend('c-trend', filtWPs);
+      Charts.statusByZone('c-status', filtWPs);
+      const trades = [...new Set(filtWPs.map(w=>w.trade).filter(Boolean))].sort();
+      Charts.budgetByTrade('c-budget-trade', filtWPs, trades);
+      Charts.awardRateByTrade('c-award-trade', filtWPs, trades);
+
+      // Donuts
+      const donutGrid = document.getElementById('donut-grid');
+      donutGrid.innerHTML = '';
+      filt.forEach(p => {
+        donutGrid.innerHTML += `<div style="text-align:center">
+          <div style="font-size:10px;font-weight:700;color:var(--mw-dark);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">${p.id}</div>
+          <div style="position:relative;height:100px"><canvas id="c-donut-${p.id}"></canvas></div>
+        </div>`;
+      });
+      filt.forEach((p,i) => Charts.awardDonut('c-donut-'+p.id, allStats[i]));
+
+      // Rank lists
+      const withBudget = filtWPs.filter(w=>w.approved_budget_bcb!=null);
+      buildRankList('rank-gains', withBudget.filter(w=>(w.variance||0)>0).sort((a,b)=>(b.variance||0)-(a.variance||0)).slice(0,5).map(w=>({name:w.description,sub:w.wp_no+' · '+(w.project_id||''),val:w.variance,color:'#2D9B6F'})),'green',v=>'+'+Fmt.money(v));
+      buildRankList('rank-value', filtWPs.filter(w=>w.total_awarded>0).sort((a,b)=>(b.total_awarded||0)-(a.total_awarded||0)).slice(0,5).map(w=>({name:w.description,sub:w.wp_no+' · '+(w.contractor||'—'),val:w.total_awarded,color:'#282C28'})),'dark',v=>Fmt.money(v));
+      buildRankList('rank-losses', withBudget.filter(w=>(w.variance||0)<0).sort((a,b)=>(a.variance||0)-(b.variance||0)).slice(0,5).map(w=>({name:w.description,sub:w.wp_no+' · '+(w.project_id||''),val:Math.abs(w.variance),color:'#EE3124'})),'red',v=>'-'+Fmt.money(v));
+    }
+
+    // Project pills
+    window.toggleProjectPill = function(id) {
+      if (_activeIds.has(id)) { if (_activeIds.size > 1) _activeIds.delete(id); }
+      else _activeIds.add(id);
+      renderPills(); renderAll();
+    };
+    window.selectAllPills = function() { permitted.forEach(p=>_activeIds.add(p.id)); renderPills(); renderAll(); };
+    window.clearPills = function() { const first=permitted[0]; _activeIds=new Set(first?[first.id]:[]); renderPills(); renderAll(); };
+
+    function renderPills() {
+      document.getElementById('project-pills').innerHTML = permitted.map(p => {
+        const on = _activeIds.has(p.id);
+        const dispName = p.name && p.name !== p.id ? p.id : p.id;
+        return `<button onclick="toggleProjectPill('${p.id}')" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;border:1.5px solid ${on?'var(--mw-red)':'#ddd'};background:${on?'var(--mw-red)':'#fff'};color:${on?'#fff':'#888'}">${dispName}</button>`;
+      }).join('');
+    }
+
+    renderPills();
+    renderAll();
+
+    document.getElementById('btn-export').addEventListener('click', () => exportCSV(_allWPs.filter(w=>[..._activeIds].includes(w.project_id)), 'ALL_PROJECTS'));
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';

@@ -74,7 +74,9 @@
         </a>
         <a class="nav-item" id="add-wp-link-admin" href="wp-form.html"><i class="ti ti-circle-plus"></i>Add Work Package</a>
         <button class="nav-item" onclick="openNewProjectModal()"><i class="ti ti-folder-plus"></i>New Project</button>
+        <button class="nav-item" id="btn-edit-project" onclick="openEditProjectModal()" style="display:none"><i class="ti ti-edit"></i>Edit Project</button>
         <button class="nav-item" id="btn-archive-project" onclick="archiveCurrentProject()" style="display:none;color:rgba(255,200,100,0.85)"><i class="ti ti-archive"></i><span id="archive-btn-label">Archive Project</span></button>
+        <button class="nav-item" id="btn-delete-project" onclick="deleteCurrentProject()" style="display:none;color:rgba(238,49,36,0.85)"><i class="ti ti-trash"></i>Delete Project</button>
       </div>
     </div>
 
@@ -685,6 +687,8 @@ AppAuth.requireLogin(async (user, profile) => {
     updatePendingBadge();
     const addLink = document.getElementById('add-wp-link-admin');
     if(addLink) addLink.href='wp-form.html?project='+projId;
+    const editBtn=document.getElementById('btn-edit-project'); if(editBtn) editBtn.style.display='flex';
+    const delBtn=document.getElementById('btn-delete-project'); if(delBtn) delBtn.style.display='flex';
   } else {
     document.getElementById('sidebar-officer').style.display='block';
     const addLink = document.getElementById('add-wp-link');
@@ -768,6 +772,54 @@ AppAuth.requireLogin(async (user, profile) => {
       else await WPDb.archiveProject(projId);
       location.reload();
     } catch(e) { alert('Error: '+e.message); }
+  };
+
+  window.openEditProjectModal = async function() {
+    const meta = await WPDb.getProject(projId);
+    if (!meta) return;
+    document.getElementById('ep-id-disp').textContent = meta.id;
+    document.getElementById('ep-name').value = meta.name !== meta.id ? (meta.name||'') : '';
+    document.getElementById('ep-location').value = meta.location || '';
+    document.getElementById('ep-description').value = meta.description || '';
+    document.getElementById('ep-budget').value = meta.budget_bcb || '';
+    document.getElementById('ep-error').style.display = 'none';
+    document.getElementById('ep-modal').style.display = 'flex';
+    document.getElementById('ep-name').focus();
+  };
+  window.closeEditProjectModal = function() {
+    document.getElementById('ep-modal').style.display = 'none';
+  };
+  window.saveEditProject = async function() {
+    const name = document.getElementById('ep-name').value.trim();
+    const errEl = document.getElementById('ep-error');
+    if (!name) { errEl.textContent='Project Name is required.'; errEl.style.display='block'; return; }
+    const btn = document.getElementById('ep-save-btn');
+    btn.textContent='Saving…'; btn.disabled=true; errEl.style.display='none';
+    try {
+      await WPDb.updateProject(projId, {
+        name,
+        location: document.getElementById('ep-location').value.trim()||null,
+        description: document.getElementById('ep-description').value.trim()||null,
+        budget_bcb: parseFloat(document.getElementById('ep-budget').value)||null,
+      });
+      closeEditProjectModal();
+      location.reload();
+    } catch(e) {
+      errEl.textContent='Error: '+e.message; errEl.style.display='block';
+      btn.textContent='Save Changes'; btn.disabled=false;
+    }
+  };
+
+  window.deleteCurrentProject = async function() {
+    const wpCount = allWPs.length;
+    let msg = `Permanently delete project ${projId}?`;
+    if (wpCount > 0) msg += `\n\nWARNING: This will also delete all ${wpCount} work package(s). This cannot be undone.`;
+    if (!confirm(msg)) return;
+    if (wpCount > 0 && !confirm(`Confirm: delete ${projId} and ${wpCount} WP(s) permanently?`)) return;
+    try {
+      await WPDb.deleteProject(projId);
+      location.href = 'index.html?view=consolidated';
+    } catch(e) { alert('Error deleting project: '+e.message); }
   };
 
   // Render default view
@@ -979,6 +1031,39 @@ window.saveQuickWP = async function() {
   }
 };
 </script>
+
+<!-- ── Edit Project Modal ── -->
+<div id="ep-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeEditProjectModal()">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <div style="padding:20px 20px 0">
+      <div style="font-size:16px;font-weight:700;color:#231F20;margin-bottom:4px">Edit Project — <span id="ep-id-disp" style="color:var(--mw-red)"></span></div>
+      <div style="font-size:12px;color:#888;margin-bottom:16px">Update project details. Project ID cannot be changed.</div>
+    </div>
+    <div style="padding:0 20px 16px;display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:6px">Project Name *</div>
+        <input id="ep-name" type="text" placeholder="e.g. Avesta Residences Tower 1" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:6px">Location</div>
+        <input id="ep-location" type="text" placeholder="e.g. Quezon City" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:6px">Description</div>
+        <input id="ep-description" type="text" placeholder="Optional description" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:6px">Budget BCB (₱)</div>
+        <input id="ep-budget" type="number" placeholder="e.g. 274900000" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div id="ep-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 12px;font-size:13px"></div>
+    </div>
+    <div style="padding:12px 20px 20px;border-top:1px solid #f0f0f0;display:flex;gap:10px">
+      <button id="ep-save-btn" onclick="saveEditProject()" style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Save Changes</button>
+      <button onclick="closeEditProjectModal()" style="padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
