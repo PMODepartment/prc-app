@@ -69,6 +69,10 @@
       <a class="nav-item" href="index.html?view=consolidated"><i class="ti ti-layout-dashboard"></i>All Projects</a>
     </div>
     <div class="sidebar-section">
+      <div class="sidebar-section-label">Projects</div>
+      <div id="nav-projects-admin"></div>
+    </div>
+    <div class="sidebar-section">
       <div class="sidebar-section-label">Admin</div>
       <a class="nav-item active" href="admin.html"><i class="ti ti-users"></i>User Management</a>
       <a class="nav-item" href="wp-form.html"><i class="ti ti-circle-plus"></i>Add Work Package</a>
@@ -182,7 +186,7 @@
     <div class="modal-body">
       <div style="display:grid;gap:14px">
         <div>
-          <div class="modal-field-label">Project ID <span style="color:#EE3124">*</span></div>
+          <div class="modal-field-label">Project Code <span style="color:#EE3124">*</span></div>
           <input id="np-id" type="text" placeholder="e.g. AVR102" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
           <div style="font-size:11px;color:#aaa;margin-top:4px">Short unique code. Letters and numbers only. Cannot be changed later.</div>
         </div>
@@ -378,6 +382,11 @@
   async function loadData() {
     try {
       [allUsers, allProjects] = await Promise.all([WPDb.getAllUsers(), WPDb.getProjects()]);
+      // Populate sidebar project links
+      const navProj = document.getElementById('nav-projects-admin');
+      if (navProj) navProj.innerHTML = allProjects.filter(p=>p.status!=='archived').map(p=>
+        `<a class="nav-item" href="project.html?id=${p.id}"><i class="ti ti-building-skyscraper"></i>${p.id}<span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name&&p.name!==p.id?p.name:'').slice(0,10)}</span></a>`
+      ).join('');
       updateKPIs();
 
       // Populate bulk project select
@@ -567,8 +576,8 @@
     const description = document.getElementById('np-description').value.trim();
     const budget = parseFloat(document.getElementById('np-budget').value)||null;
     const errEl = document.getElementById('np-error');
-    if (!id||!name){ errEl.textContent='Project ID and Name are required.'; errEl.style.display='block'; return; }
-    if (!/^[A-Z0-9]+$/.test(id)){ errEl.textContent='Project ID must be letters/numbers only (e.g. AVR102).'; errEl.style.display='block'; return; }
+    if (!id||!name){ errEl.textContent='Project Code and Name are required.'; errEl.style.display='block'; return; }
+    if (!/^[A-Z0-9]+$/.test(id)){ errEl.textContent='Project Code must be letters/numbers only (e.g. AVR102).'; errEl.style.display='block'; return; }
 
     const selectedUsers = [...document.querySelectorAll('#np-user-rows input:checked')].map(cb=>cb.value);
     const btn = document.getElementById('btn-create-project');
@@ -586,7 +595,7 @@
       document.body.appendChild(t); setTimeout(()=>t.remove(),3000);
     } catch(err) {
       errEl.textContent = (err.message.includes('duplicate')||err.message.includes('unique'))
-        ? `Project ID "${id}" already exists. Choose a different ID.`
+        ? `Project Code "${id}" already exists. Choose a different ID.`
         : 'Error: '+err.message;
       errEl.style.display='block';
       btn.textContent='Create Project'; btn.disabled=false;

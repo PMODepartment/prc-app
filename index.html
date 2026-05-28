@@ -25,7 +25,7 @@
     <div class="sidebar-section">
       <div class="sidebar-section-label">Overview</div>
       <a class="nav-item active" href="index.html?view=consolidated">
-        <i class="ti ti-layout-dashboard"></i>Consolidated View
+        <i class="ti ti-layout-dashboard"></i>All Projects
       </a>
     </div>
 
@@ -73,12 +73,24 @@
 
       <div id="main-content" style="display:none">
 
-        <!-- Project Filter Selector -->
-        <div id="project-filter-wrap" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:#fff;border:1px solid #f0f0f0;border-radius:10px">
-          <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888;white-space:nowrap">Filter projects:</span>
-          <div id="project-pills" style="display:flex;gap:6px;flex-wrap:wrap;flex:1"></div>
-          <button onclick="selectAllPills()" style="font-size:11px;padding:3px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;color:#666">All</button>
-          <button onclick="clearPills()" style="font-size:11px;padding:3px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;color:#666">None</button>
+        <!-- Project Filter — collapsible dropdown with search for 250+ projects -->
+        <div id="proj-filter-wrap" style="position:relative;margin-bottom:16px;user-select:none">
+          <button id="proj-filter-btn" onclick="toggleProjFilter()" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid #e5e5e5;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;font-size:13px;color:#444;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+            <i class="ti ti-filter" style="font-size:14px;color:#888"></i>
+            <span id="proj-filter-label">All projects</span>
+            <i class="ti ti-chevron-down" id="proj-filter-chevron" style="font-size:12px;margin-left:8px;color:#aaa;transition:transform .2s"></i>
+          </button>
+          <div id="proj-filter-panel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.1);min-width:300px;max-width:380px;overflow:hidden">
+            <div style="padding:10px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px">
+              <div style="position:relative;flex:1">
+                <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:12px;pointer-events:none"></i>
+                <input id="proj-filter-search" type="text" placeholder="Search projects…" oninput="filterProjDropdown()" style="width:100%;padding:6px 8px 6px 26px;border:1.5px solid #e5e5e5;border-radius:6px;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box">
+              </div>
+              <button onclick="selectAllPills()" style="font-size:10px;padding:4px 8px;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit;color:#666;white-space:nowrap">All</button>
+              <button onclick="clearPills()" style="font-size:10px;padding:4px 8px;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit;color:#666;white-space:nowrap">None</button>
+            </div>
+            <div id="proj-filter-list" style="max-height:280px;overflow-y:auto"></div>
+          </div>
         </div>
 
         <!-- KPI Cards -->
@@ -208,6 +220,7 @@
         <div class="pc-header"><span class="pc-id">${p.id}</span><span class="pc-status-badge" style="${badge}">${label}</span></div>
         <div class="pc-name">${p.name&&p.name!==p.id?p.id+' — '+p.name.split('—')[0].trim():p.id}</div>
         <div class="pc-meta">${p.location||''}</div>
+        <div class="pc-spacer"></div>
         <div class="pc-stats">
           <div><div class="pc-stat-val" style="color:var(--green)">${s.awarded}</div><div class="pc-stat-lbl">Awarded</div></div>
           <div><div class="pc-stat-val" style="color:var(--amber)">${s.partial}</div><div class="pc-stat-lbl">Partial</div></div>
@@ -217,7 +230,6 @@
           <span style="color:#888">Budget: <strong style="color:#231F20">${budgetM}</strong></span>
           <span style="color:#888">Awarded: <strong style="color:#2D9B6F">${contractM}</strong></span>
         </div>
-        <div class="pc-spacer"></div>
         <div class="pc-progress-label"><span>Award progress</span><span>${s.awardRate}%</span></div>
         <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${s.awardRate}%;${p.status==='archived'?'background:#aaa':''}"></div></div>
       </a>`;
@@ -230,16 +242,16 @@
       const allStats = filt.map(p => computeStats(filtWPs.filter(w => w.project_id === p.id)));
       const global = computeStats(filtWPs);
 
-      // Metrics
+      // Metrics — use full unabbreviated numbers for money values
       buildMetrics('metrics-grid', [
         { lbl:'Total projects',      val:filt.filter(p=>p.status!=='archived').length, sub:'active',                          cls:'',      accent:'dark' },
         { lbl:'Total work packages', val:global.total,                                  sub:'approved entries',                 cls:'',      accent:'dark' },
         { lbl:'Awarded',             val:global.awarded,                                sub:global.awardRate+'% award rate',    cls:'green', accent:'green' },
         { lbl:'Not yet awarded',     val:global.notAwarded,                             sub:global.late+' past target date',    cls:'red',   accent:'red' },
-        { lbl:'Total budget',        val:Fmt.money(global.totalBudget,1),               sub:'approved BCB',                     cls:'',      accent:'dark' },
-        { lbl:'Total contracted',    val:Fmt.money(global.totalContract,1),             sub:'awarded amount',                   cls:'',      accent:'dark' },
+        { lbl:'Total budget',        val:Fmt.moneyFull(global.totalBudget),             sub:'approved BCB',                     cls:'',      accent:'dark' },
+        { lbl:'Total contracted',    val:Fmt.moneyFull(global.totalContract),           sub:'awarded amount',                   cls:'',      accent:'dark' },
         { lbl:'Net variance',
-          val:(global.variance>=0?'+':'')+Fmt.money(global.variance,1),
+          val:(global.variance>=0?'+':'')+Fmt.moneyFull(global.variance),
           sub:global.variance>=0?'net savings':'net overrun',
           cls:global.variance>=0?'green':'red', accent:global.variance>=0?'green':'red' },
         { lbl:'Late awards', val:global.late, sub:'past planned award date', cls:global.late>0?'red':'green', accent:global.late>0?'red':'dark' },
@@ -300,23 +312,71 @@
     }
 
     // Project pills
+    // Filter functions
     window.toggleProjectPill = function(id) {
       if (_activeIds.has(id)) { if (_activeIds.size > 1) _activeIds.delete(id); }
       else _activeIds.add(id);
-      renderPills(); renderAll();
+      updateFilterLabel(); renderFilterList(); renderAll();
     };
-    window.selectAllPills = function() { permitted.forEach(p=>_activeIds.add(p.id)); renderPills(); renderAll(); };
-    window.clearPills = function() { const first=permitted[0]; _activeIds=new Set(first?[first.id]:[]); renderPills(); renderAll(); };
+    window.selectAllPills = function() { permitted.forEach(p=>_activeIds.add(p.id)); updateFilterLabel(); renderFilterList(); renderAll(); };
+    window.clearPills = function() { const first=permitted[0]; _activeIds=new Set(first?[first.id]:[]); updateFilterLabel(); renderFilterList(); renderAll(); };
+    window.toggleProjFilter = function() {
+      const panel = document.getElementById('proj-filter-panel');
+      const chevron = document.getElementById('proj-filter-chevron');
+      const open = panel.style.display !== 'none';
+      panel.style.display = open ? 'none' : 'block';
+      chevron.style.transform = open ? '' : 'rotate(180deg)';
+      if (!open) document.getElementById('proj-filter-search').focus();
+    };
+    window.filterProjDropdown = function() {
+      const q = (document.getElementById('proj-filter-search')?.value||'').toLowerCase();
+      document.querySelectorAll('.pf-row').forEach(row => {
+        row.style.display = row.dataset.search.includes(q) ? '' : 'none';
+      });
+    };
+    // Close filter panel when clicking outside
+    document.addEventListener('click', function(e) {
+      const wrap = document.getElementById('proj-filter-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        const panel = document.getElementById('proj-filter-panel');
+        const chevron = document.getElementById('proj-filter-chevron');
+        if (panel) { panel.style.display='none'; }
+        if (chevron) chevron.style.transform='';
+      }
+    });
 
-    function renderPills() {
-      document.getElementById('project-pills').innerHTML = permitted.map(p => {
+    function updateFilterLabel() {
+      const lbl = document.getElementById('proj-filter-label');
+      if (!lbl) return;
+      const sel = _activeIds.size;
+      const total = permitted.length;
+      lbl.textContent = sel === total ? 'All projects' : `${sel} of ${total} projects selected`;
+    }
+
+    function renderFilterList() {
+      const list = document.getElementById('proj-filter-list');
+      if (!list) return;
+      list.innerHTML = permitted.map(p => {
         const on = _activeIds.has(p.id);
-        const dispName = p.name && p.name !== p.id ? p.id : p.id;
-        return `<button onclick="toggleProjectPill('${p.id}')" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;border:1.5px solid ${on?'var(--mw-red)':'#ddd'};background:${on?'var(--mw-red)':'#fff'};color:${on?'#fff':'#888'}">${dispName}</button>`;
+        const label = p.name && p.name !== p.id ? `${p.id} — ${p.name.split('—')[0].trim()}` : p.id;
+        const search = label.toLowerCase();
+        return `<div class="pf-row" data-search="${search}" onclick="toggleProjectPill('${p.id}')"
+          style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;transition:background .1s"
+          onmouseover="this.style.background='#f8f8f8'" onmouseout="this.style.background=''">
+          <div style="width:16px;height:16px;border-radius:3px;flex-shrink:0;border:2px solid ${on?'var(--mw-red)':'#ccc'};background:${on?'var(--mw-red)':'#fff'};display:flex;align-items:center;justify-content:center">
+            ${on?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':''}
+          </div>
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:600;color:#231F20">${p.id}</div>
+            ${p.name&&p.name!==p.id?`<div style="font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>`:''}
+          </div>
+          <div style="margin-left:auto;font-size:10px;padding:2px 6px;border-radius:8px;background:${p.status==='archived'?'#f0f0f0':p.status==='inactive'?'#f0f0f0':'#EAF3DE'};color:${p.status==='archived'||p.status==='inactive'?'#888':'#3B6D11'}">${p.status==='archived'?'ARCHIVED':p.status==='inactive'?'INACTIVE':'ACTIVE'}</div>
+        </div>`;
       }).join('');
     }
 
-    renderPills();
+    renderFilterList();
+    updateFilterLabel();
     renderAll();
 
     document.getElementById('btn-export').addEventListener('click', () => exportCSV(_allWPs.filter(w=>[..._activeIds].includes(w.project_id)), 'ALL_PROJECTS'));

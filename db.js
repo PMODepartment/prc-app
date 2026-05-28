@@ -68,6 +68,10 @@ const Fmt = {
     if (v==null||isNaN(v)) return '\u2014';
     return '\u20B1'+(Math.abs(v)/1e6).toFixed(decimals)+'M';
   },
+  moneyFull(v) {
+    if (v==null||isNaN(v)) return '\u2014';
+    return '\u20B1'+Math.round(Math.abs(v)).toLocaleString('en-US');
+  },
   date(d) {
     if (!d) return '\u2014';
     try { return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'}); }
@@ -215,7 +219,7 @@ function updatePendingBadge() {
         </div>
         <div style="padding:0 20px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px">
           <div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Project ID *</div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Project Code * <span style="font-size:9px;font-weight:400;text-transform:none">(letters/numbers only, e.g. AVR102)</span></div>
             <input id="gnp-id" type="text" placeholder="e.g. AVR102" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
               style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
@@ -272,8 +276,8 @@ function updatePendingBadge() {
     const v = id => (document.getElementById(id)?.value||'').trim();
     const id = v('gnp-id'), name = v('gnp-name');
     const errEl = document.getElementById('gnp-error');
-    if (!id||!name) { errEl.textContent='Project ID and Name are required.'; errEl.style.display='block'; return; }
-    if (!/^[A-Z0-9]+$/.test(id)) { errEl.textContent='Project ID must be letters/numbers only (e.g. AVR102).'; errEl.style.display='block'; return; }
+    if (!id||!name) { errEl.textContent='Project Code and Name are required.'; errEl.style.display='block'; return; }
+    if (!/^[A-Z0-9]+$/.test(id)) { errEl.textContent='Project Code must be letters/numbers only (e.g. AVR102).'; errEl.style.display='block'; return; }
     const budget = parseFloat(document.getElementById('gnp-budget')?.value)||null;
     const selectedUsers = [...document.querySelectorAll('#gnp-user-rows input:checked')].map(cb=>cb.value);
     const btn = document.getElementById('gnp-create-btn');
@@ -293,7 +297,7 @@ function updatePendingBadge() {
       if (typeof renderOverview==='function') setTimeout(renderOverview,600);
     } catch(err) {
       errEl.textContent=(err.message.includes('duplicate')||err.message.includes('unique'))
-        ?`Project ID "${id}" already exists.`:'Error: '+err.message;
+        ?`Project Code "${id}" already exists.`:'Error: '+err.message;
       errEl.style.display='block';
       const b=document.getElementById('gnp-create-btn'); b.innerHTML='<i class="ti ti-plus" style="font-size:14px;margin-right:4px;vertical-align:middle"></i> Create Project'; b.disabled=false;
     }

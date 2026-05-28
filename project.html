@@ -688,7 +688,8 @@ AppAuth.requireLogin(async (user, profile) => {
     const addLink = document.getElementById('add-wp-link-admin');
     if(addLink) addLink.href='wp-form.html?project='+projId;
     const editBtn=document.getElementById('btn-edit-project'); if(editBtn) editBtn.style.display='flex';
-    const delBtn=document.getElementById('btn-delete-project'); if(delBtn) delBtn.style.display='flex';
+    // Delete only for super_admin
+    if(profile.role==='super_admin') { const delBtn=document.getElementById('btn-delete-project'); if(delBtn) delBtn.style.display='flex'; }
   } else {
     document.getElementById('sidebar-officer').style.display='block';
     const addLink = document.getElementById('add-wp-link');
@@ -810,17 +811,36 @@ AppAuth.requireLogin(async (user, profile) => {
     }
   };
 
-  window.deleteCurrentProject = async function() {
+  window.openDeleteProjectModal = function() {
     const wpCount = allWPs.length;
-    let msg = `Permanently delete project ${projId}?`;
-    if (wpCount > 0) msg += `\n\nWARNING: This will also delete all ${wpCount} work package(s). This cannot be undone.`;
-    if (!confirm(msg)) return;
-    if (wpCount > 0 && !confirm(`Confirm: delete ${projId} and ${wpCount} WP(s) permanently?`)) return;
+    document.getElementById('dp-project-code').textContent = projId;
+    document.getElementById('dp-wp-count').textContent = wpCount > 0
+      ? `⚠ This will permanently delete ${wpCount} work package(s) as well.`
+      : 'This project has no work packages.';
+    document.getElementById('dp-input').value = '';
+    document.getElementById('dp-error').style.display = 'none';
+    document.getElementById('dp-confirm-btn').disabled = true;
+    document.getElementById('dp-modal').style.display = 'flex';
+    document.getElementById('dp-input').focus();
+  };
+  window.closeDeleteProjectModal = function() {
+    document.getElementById('dp-modal').style.display = 'none';
+  };
+  window.confirmDeleteProject = async function() {
+    const typed = document.getElementById('dp-input').value.trim();
+    const errEl = document.getElementById('dp-error');
+    if (typed !== projId) { errEl.textContent = `Entered code does not match. Type exactly: ${projId}`; errEl.style.display='block'; return; }
+    const btn = document.getElementById('dp-confirm-btn');
+    btn.textContent='Deleting…'; btn.disabled=true; errEl.style.display='none';
     try {
       await WPDb.deleteProject(projId);
       location.href = 'index.html?view=consolidated';
-    } catch(e) { alert('Error deleting project: '+e.message); }
+    } catch(e) {
+      errEl.textContent = 'Error: '+e.message; errEl.style.display='block';
+      btn.textContent='Delete Project'; btn.disabled=false;
+    }
   };
+  window.deleteCurrentProject = window.openDeleteProjectModal;
 
   // Render default view
   renderOverview();
@@ -1032,12 +1052,38 @@ window.saveQuickWP = async function() {
 };
 </script>
 
+<!-- ── Delete Project Confirmation Modal ── -->
+<div id="dp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeDeleteProjectModal()">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="padding:20px 20px 16px;border-bottom:1px solid #fee2e2;background:#fff8f8;border-radius:12px 12px 0 0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-alert-triangle" style="font-size:22px;color:#EE3124"></i>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#231F20">Delete Project</div>
+          <div style="font-size:12px;color:#EE3124;font-weight:600">This action is permanent and cannot be undone.</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:20px">
+      <p style="font-size:13px;color:#444;margin:0 0 10px">You are about to permanently delete project <strong id="dp-project-code" style="color:#EE3124"></strong>.</p>
+      <p id="dp-wp-count" style="font-size:12px;color:#D97706;font-weight:600;margin:0 0 16px"></p>
+      <div style="font-size:12px;color:#666;margin-bottom:8px">To confirm, type the Project Code exactly as shown:</div>
+      <input id="dp-input" type="text" placeholder="Type project code to confirm" oninput="const b=document.getElementById('dp-confirm-btn');const ok=this.value.trim()===projId;b.disabled=!ok;b.style.opacity=ok?'1':'0.5';b.style.cursor=ok?'pointer':'not-allowed'" style="width:100%;padding:10px 12px;border:1.5px solid #EE3124;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      <div id="dp-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:6px;padding:8px 10px;font-size:12px;margin-top:8px"></div>
+    </div>
+    <div style="padding:0 20px 20px;display:flex;gap:10px">
+      <button id="dp-confirm-btn" onclick="confirmDeleteProject()" disabled style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;opacity:.6" onenabled="this.style.opacity='1'" onmouseover="if(!this.disabled)this.style.opacity='.85'" onmouseout="if(!this.disabled)this.style.opacity='1'">Delete Project</button>
+      <button onclick="closeDeleteProjectModal()" style="padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Edit Project Modal ── -->
 <div id="ep-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeEditProjectModal()">
   <div style="background:#fff;border-radius:12px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
     <div style="padding:20px 20px 0">
       <div style="font-size:16px;font-weight:700;color:#231F20;margin-bottom:4px">Edit Project — <span id="ep-id-disp" style="color:var(--mw-red)"></span></div>
-      <div style="font-size:12px;color:#888;margin-bottom:16px">Update project details. Project ID cannot be changed.</div>
+      <div style="font-size:12px;color:#888;margin-bottom:16px">Update project details. Project Code cannot be changed.</div>
     </div>
     <div style="padding:0 20px 16px;display:flex;flex-direction:column;gap:14px">
       <div>
