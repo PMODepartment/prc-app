@@ -175,6 +175,7 @@
       }
     }
 
+    window.__wpmRole = profile.role;
     renderUserBar('user-bar', profile);
 
     if (['admin','super_admin'].includes(profile.role)) {
@@ -468,8 +469,8 @@ window.saveQuickWP = async function() {
   if (!v('wqm-wp-no')) { errEl.textContent='WP No. is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-description')) { errEl.textContent='Description is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-trade')) { errEl.textContent='Trade is required.'; errEl.style.display='block'; return; }
-  if (!v('wqm-award-date')) { errEl.textContent='Planned Award Date is required.'; errEl.style.display='block'; return; }
-  if (!v('wqm-completion')) { errEl.textContent='Target Completion is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-award-date')) { const _de=document.getElementById('wqm-award-date'); errEl.textContent=_de&&_de.validity.badInput?'Planned Award Date: invalid date — use the calendar picker.':'Planned Award Date is required.'; errEl.style.display='block'; return; }
+  if (!v('wqm-completion')) { const _de=document.getElementById('wqm-completion'); errEl.textContent=_de&&_de.validity.badInput?'Target Completion: invalid date — use the calendar picker.':'Target Completion is required.'; errEl.style.display='block'; return; }
   if (!n('wqm-budget')) { errEl.textContent='Budget BCB is required.'; errEl.style.display='block'; return; }
   if (!_wqmProjectId) { errEl.textContent='No project selected.'; errEl.style.display='block'; return; }
 
@@ -488,11 +489,9 @@ window.saveQuickWP = async function() {
   };
 
   try {
-    // Get current user profile to decide direct-save vs review queue
+    const role = window.__wpmRole || 'user';
     const sb = await getSB();
     const { data: { user } } = await sb.auth.getUser();
-    const { data: prof } = await sb.from('users').select('role').eq('id', user?.id).single();
-    const role = prof?.role || 'user';
 
     const newWP = await WPDb.submitWP(data, { id: user?.id });
     if (['admin','super_admin'].includes(role) && newWP?.id) {
@@ -514,9 +513,10 @@ window.saveQuickWP = async function() {
     });
     _wqmDirty = false;
 
-    // Reload page data if available
-    if (typeof loadData === 'function') setTimeout(loadData, 500);
-    if (typeof renderOverview === 'function') setTimeout(renderOverview, 800);
+    // Reload page data
+    if (typeof window.__wpmReloadFn === 'function') setTimeout(window.__wpmReloadFn, 500);
+    else if (typeof loadData === 'function') setTimeout(loadData, 500);
+    else if (typeof renderOverview === 'function') setTimeout(renderOverview, 800);
 
   } catch(err) {
     errEl.textContent = 'Error: ' + err.message;
