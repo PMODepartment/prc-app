@@ -265,6 +265,11 @@ document.addEventListener('input', function(e) { if (e.target.closest && e.targe
 AppAuth.requireLogin(async (user, profile) => {
     userProfile = profile;
     renderUserBar('user-bar', profile);
+    // Set button label for new WPs based on role — admins skip review queue
+    if (!editId) {
+      document.getElementById('btn-submit-text').textContent =
+        ['admin','super_admin'].includes(profile.role) ? 'Save Work Package' : 'Submit for Review';
+    }
     // Fix dashboard link: users should never land on consolidated view
     if (profile.role === 'user') {
       const pid = projId || (profile.projects||[])[0];
@@ -306,7 +311,8 @@ AppAuth.requireLogin(async (user, profile) => {
 
       document.getElementById('page-title').textContent = 'Edit Work Package';
       document.getElementById('page-sub').textContent = existingWP.wp_no + ' — ' + existingWP.description;
-      document.getElementById('btn-submit-text').textContent = 'Submit Update for Review';
+      document.getElementById('btn-submit-text').textContent =
+        ['admin','super_admin'].includes(profile.role) ? 'Save Changes' : 'Submit Update for Review';
 
       /* Show review status */
       if (existingWP.review_status === 'rejected') {
@@ -410,21 +416,24 @@ AppAuth.requireLogin(async (user, profile) => {
     btn.disabled = true; spinner.style.display = 'flex';
 
     try {
+      const isAdmin = ['admin','super_admin'].includes(userProfile.role);
       if (editId && existingWP) {
-        if (['admin','super_admin'].includes(userProfile.role)) {
+        if (isAdmin) {
           await WPDb.updateWPDirect(editId, data);
+          document.getElementById('success-text').textContent = 'Work package updated.';
         } else {
           await WPDb.updateWP(editId, data, userProfile);
+          document.getElementById('success-text').textContent = 'Update submitted for review.';
         }
-        document.getElementById('success-text').textContent = 'Work package updated and submitted for admin review.';
       } else {
-        if (['admin','super_admin'].includes(userProfile.role)) {
+        if (isAdmin) {
           const newWP = await WPDb.submitWP(data, userProfile);
           if (newWP?.id) await WPDb.approveWP(newWP.id);
+          document.getElementById('success-text').textContent = 'Work package saved and approved.';
         } else {
           await WPDb.submitWP(data, userProfile);
+          document.getElementById('success-text').textContent = 'Work package submitted for review.';
         }
-        document.getElementById('success-text').textContent = 'Work package submitted for admin review successfully.';
       }
       successEl.className = 'alert alert-success';
       successEl.scrollIntoView({ behavior:'smooth' });
