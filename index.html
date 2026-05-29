@@ -23,14 +23,17 @@
     </div>
 
     <div class="sidebar-section">
-      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-section-label">Portfolio</div>
       <a class="nav-item active" href="index.html?view=consolidated">
-        <i class="ti ti-layout-dashboard"></i>All Projects
+        <i class="ti ti-layout-dashboard"></i>Portfolio Overview
       </a>
+      <div style="margin:4px 12px 2px;padding:5px 8px;background:rgba(255,255,255,.06);border-radius:6px;font-size:9px;color:rgba(255,255,255,.38);letter-spacing:.05em;text-transform:uppercase;line-height:1.6;border-left:2px solid rgba(238,49,36,.5)">
+        Read-only view<br>Select a project below<br>to manage work packages
+      </div>
     </div>
 
     <div class="sidebar-section">
-      <div class="sidebar-section-label">Projects</div>
+      <div class="sidebar-section-label">Open a Project</div>
       <div id="nav-projects"></div>
     </div>
 
@@ -56,7 +59,11 @@
         </button>
         <div>
           <div class="page-title">Portfolio Overview</div>
-          <div class="page-sub" id="page-sub">Loading…</div>
+          <div class="page-sub" id="page-sub" style="font-size:11px;color:#888"></div>
+        </div>
+        <!-- Read-only badge -->
+        <div style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:20px;font-size:10px;font-weight:700;color:#92400E;letter-spacing:.04em;flex-shrink:0">
+          <i class="ti ti-eye" style="font-size:11px"></i> READ-ONLY
         </div>
       </div>
       <div class="topbar-right">
@@ -72,6 +79,16 @@
       </div>
 
       <div id="main-content" style="display:none">
+
+        <!-- Consolidated view notice -->
+        <div style="display:flex;align-items:flex-start;gap:10px;background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#78350F;line-height:1.5">
+          <i class="ti ti-info-circle" style="font-size:18px;flex-shrink:0;margin-top:1px;color:#D97706"></i>
+          <div>
+            <strong>Portfolio view is read-only.</strong>
+            Work packages and projects cannot be added, edited, or deleted from this view.
+            Click any project card (or use the <strong>Open a Project</strong> sidebar list) to enter that project's dashboard and manage its work packages.
+          </div>
+        </div>
 
         <!-- Project Filter — collapsible dropdown with search for 250+ projects -->
         <div id="proj-filter-wrap" style="position:relative;margin-bottom:16px;user-select:none">
@@ -235,7 +252,7 @@
     const [allProjectsRaw] = await Promise.all([WPDb.getProjects()]);
     const permitted = AppAuth.getPermittedProjects(profile, allProjectsRaw);
 
-    document.getElementById('page-sub').textContent = 'Consolidated';
+    document.getElementById('page-sub').textContent = permitted.length + ' project(s) · Read-only';
 
     // Sidebar project links
     const navEl = document.getElementById('nav-projects');
@@ -511,198 +528,6 @@
   .hide-mobile { }
   @media(max-width:480px) { .hide-mobile { display:none; } }
 </style>
-
-<!-- ── Quick-Add Work Package Modal (shared across all pages) ── -->
-<div id="wp-quick-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.45);overflow-y:auto">
-  <div style="min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:20px 12px">
-    <div style="background:#fff;border-radius:16px;width:100%;max-width:680px;box-shadow:0 20px 60px rgba(0,0,0,.2);margin:auto">
-      <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f0f0;padding-bottom:16px">
-        <div>
-          <div style="font-size:16px;font-weight:700;color:#231F20" id="wqm-title">Add Work Package</div>
-          <div style="font-size:12px;color:#aaa;margin-top:2px" id="wqm-subtitle">Fill in the required fields</div>
-        </div>
-        <button onclick="closeAddWPModal()" style="background:none;border:none;cursor:pointer;padding:4px;color:#aaa;font-size:20px;line-height:1">&times;</button>
-      </div>
-      <div style="padding:20px 24px">
-        <div id="wqm-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px"></div>
-        <div id="wqm-success" style="display:none;background:#D1FAE5;color:#065F46;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px"></div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Cost Code *</label>
-            <input id="wqm-cost-code" type="text" placeholder="e.g. 03-001" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">WP No. *</label>
-            <input id="wqm-wp-no" type="text" placeholder="e.g. WP-115" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
-          </div>
-          <div style="grid-column:1/-1">
-            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Description *</label>
-            <input id="wqm-description" type="text" placeholder="Work Package description" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Zone <span style="font-size:10px;font-weight:400;color:#bbb">(optional)</span></label>
-            <input id="wqm-zone" type="text" placeholder="e.g. Tower 1" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Trade / Discipline *</label>
-            <select id="wqm-trade" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;outline:none">
-              <option value="">Select trade…</option>
-              <option>Architectural Works</option>
-              <option>Civil Works</option>
-              <option>Electrical Works</option>
-              <option>General Requirement</option>
-              <option>MEPF &amp; Allied Services</option>
-              <option>Site Development</option>
-              <option>Site Works</option>
-              <option>Structural Works</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Planned Award Date *</label>
-            <input id="wqm-award-date" type="date" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Target Completion *</label>
-            <input id="wqm-completion" type="date" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Budget BCB (₱) *</label>
-            <input id="wqm-budget" type="number" step="0.01" placeholder="e.g. 2500000" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Award Status</label>
-            <select id="wqm-award-status" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;outline:none">
-              <option value="Not Yet Awarded">Not Yet Awarded</option>
-              <option value="Partially Awarded">Partially Awarded</option>
-              <option value="Awarded">Awarded</option>
-            </select>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;flex-wrap:wrap">
-          <button id="wqm-save-btn" onclick="saveQuickWP()" style="padding:10px 20px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">
-            <i class="ti ti-plus"></i> <span id="wqm-btn-text">Add Work Package</span>
-          </button>
-          <a id="wqm-full-form-link" href="wp-form.html" style="padding:10px 16px;background:#f5f5f5;color:#666;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;text-decoration:none;display:flex;align-items:center;gap:5px">
-            <i class="ti ti-external-link"></i> Full Form
-          </a>
-          <button onclick="closeAddWPModal()" style="padding:10px 16px;background:transparent;color:#888;border:1px solid #e5e5e5;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;margin-left:auto">Cancel</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-let _wqmProjectId = null;
-let _wqmDirty = false;
-
-window.openAddWPModal = function(projectId) {
-  _wqmProjectId = projectId || null;
-  _wqmDirty = false;
-  // Clear fields
-  ['wqm-cost-code','wqm-wp-no','wqm-description','wqm-zone','wqm-award-date','wqm-completion','wqm-budget'].forEach(id => {
-    const el = document.getElementById(id); if(el) el.value = '';
-  });
-  const trade = document.getElementById('wqm-trade'); if(trade) trade.value = '';
-  const status = document.getElementById('wqm-award-status'); if(status) status.value = 'Not Yet Awarded';
-  document.getElementById('wqm-error').style.display = 'none';
-  document.getElementById('wqm-success').style.display = 'none';
-  document.getElementById('wqm-btn-text').textContent = 'Add Work Package';
-  document.getElementById('wqm-save-btn').disabled = false;
-  // Update full-form link with project
-  const fullLink = document.getElementById('wqm-full-form-link');
-  if(fullLink && projectId) fullLink.href = 'wp-form.html?project=' + projectId;
-  // Subtitle
-  document.getElementById('wqm-subtitle').textContent = projectId ? 'Project: ' + projectId : 'Fill in the required fields';
-  // Track dirty
-  document.querySelectorAll('#wp-quick-modal input,#wp-quick-modal select').forEach(el => {
-    el.addEventListener('input', () => { _wqmDirty = true; });
-    el.addEventListener('change', () => { _wqmDirty = true; });
-  });
-  document.getElementById('wp-quick-modal').style.display = 'block';
-};
-
-window.closeAddWPModal = function() {
-  if (_wqmDirty) {
-    if (!confirm('Discard unsaved work package?')) return;
-  }
-  document.getElementById('wp-quick-modal').style.display = 'none';
-  _wqmDirty = false;
-};
-
-// Close on overlay click
-document.getElementById('wp-quick-modal')?.addEventListener('click', function(e) {
-  if (e.target === this) closeAddWPModal();
-});
-
-window.saveQuickWP = async function() {
-  const v = id => (document.getElementById(id)?.value || '').trim();
-  const n = id => parseFloat(document.getElementById(id)?.value) || null;
-  const errEl = document.getElementById('wqm-error');
-  const sucEl = document.getElementById('wqm-success');
-  errEl.style.display = 'none'; sucEl.style.display = 'none';
-
-  if (!v('wqm-cost-code')) { errEl.textContent='Cost Code is required.'; errEl.style.display='block'; return; }
-  if (!v('wqm-wp-no')) { errEl.textContent='WP No. is required.'; errEl.style.display='block'; return; }
-  if (!v('wqm-description')) { errEl.textContent='Description is required.'; errEl.style.display='block'; return; }
-  if (!v('wqm-trade')) { errEl.textContent='Trade is required.'; errEl.style.display='block'; return; }
-  if (!v('wqm-award-date')) { const _de=document.getElementById('wqm-award-date'); errEl.textContent=_de&&_de.validity.badInput?'Planned Award Date: invalid date — use the calendar picker.':'Planned Award Date is required.'; errEl.style.display='block'; return; }
-  if (!v('wqm-completion')) { const _de=document.getElementById('wqm-completion'); errEl.textContent=_de&&_de.validity.badInput?'Target Completion: invalid date — use the calendar picker.':'Target Completion is required.'; errEl.style.display='block'; return; }
-  if (!n('wqm-budget')) { errEl.textContent='Budget BCB is required.'; errEl.style.display='block'; return; }
-  if (!_wqmProjectId) { errEl.textContent='No project selected.'; errEl.style.display='block'; return; }
-
-  const btn = document.getElementById('wqm-save-btn');
-  document.getElementById('wqm-btn-text').textContent = 'Saving…';
-  btn.disabled = true;
-
-  const data = {
-    project_id: _wqmProjectId,
-    cost_code: v('wqm-cost-code'), wp_no: v('wqm-wp-no'),
-    description: v('wqm-description'), zone: v('wqm-zone') || null,
-    trade: v('wqm-trade'), awarding_date: v('wqm-award-date') || null,
-    target_completion: v('wqm-completion') || null,
-    approved_budget_bcb: n('wqm-budget'), award_status: v('wqm-award-status'),
-    awarding_lead_time: 0,
-  };
-
-  try {
-    const role = window.__wpmRole || 'user';
-    const sb = await getSB();
-    const { data: { user } } = await sb.auth.getUser();
-
-    const newWP = await WPDb.submitWP(data, { id: user?.id });
-    if (['admin','super_admin'].includes(role) && newWP?.id) {
-      await WPDb.approveWP(newWP.id);
-    }
-
-    _wqmDirty = false;
-    sucEl.textContent = ['admin','super_admin'].includes(role)
-      ? 'Work package added and approved.'
-      : 'Work package submitted for review.';
-    sucEl.style.display = 'block';
-
-    document.getElementById('wqm-btn-text').textContent = 'Add Another';
-    btn.disabled = false;
-
-    // Reset form for another entry
-    ['wqm-cost-code','wqm-wp-no','wqm-description','wqm-zone','wqm-budget'].forEach(id => {
-      const el = document.getElementById(id); if(el) el.value = '';
-    });
-    _wqmDirty = false;
-
-    // Reload page data
-    if (typeof window.__wpmReloadFn === 'function') setTimeout(window.__wpmReloadFn, 500);
-    else if (typeof loadData === 'function') setTimeout(loadData, 500);
-    else if (typeof renderOverview === 'function') setTimeout(renderOverview, 800);
-
-  } catch(err) {
-    errEl.textContent = 'Error: ' + err.message;
-    errEl.style.display = 'block';
-    document.getElementById('wqm-btn-text').textContent = 'Add Work Package';
-    btn.disabled = false;
-  }
-};
-</script>
 
 </body>
 </html>

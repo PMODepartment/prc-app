@@ -270,6 +270,17 @@ document.addEventListener('input', function(e) { if (e.target.closest && e.targe
 
 AppAuth.requireLogin(async (user, profile) => {
     userProfile = profile;
+    // Guard: wp-form requires a project context
+    if (!editId && !projId) {
+      // No project selected — redirect to login to pick one
+      document.getElementById('loading').innerHTML =
+        '<div style="text-align:center;padding:40px">' +
+        '<p style="font-size:15px;font-weight:600;color:#EE3124;margin-bottom:8px">No project selected</p>' +
+        '<p style="font-size:13px;color:#888;margin-bottom:20px">Work packages must be added within a specific project. Please select a project first.</p>' +
+        '<a href="login.html" style="padding:10px 20px;background:#EE3124;color:#fff;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none">← Select a Project</a>' +
+        '</div>';
+      return;
+    }
     renderUserBar('user-bar', profile);
     // Set button label for new WPs based on role — admins skip review queue
     if (!editId) {
