@@ -144,10 +144,19 @@
             <div class="table-wrapper">
               <table class="user-table" id="userTable">
                 <thead>
-                  <tr><th>#</th><th>Name / Email</th><th>Role</th><th>Projects</th><th>Status</th><th>Registered</th><th>Actions</th></tr>
+                  <tr>
+                    <th>#</th>
+                    <th>Name / Email</th>
+                    <th>Role</th>
+                    <th>Projects</th>
+                    <th id="col-admin-head" style="display:none">Assigned Admin</th>
+                    <th>Status</th>
+                    <th>Registered</th>
+                    <th>Actions</th>
+                  </tr>
                 </thead>
                 <tbody id="userTableBody">
-                  <tr><td colspan="7" style="text-align:center;color:#888;padding:24px">Loading…</td></tr>
+                  <tr><td colspan="8" style="text-align:center;color:#888;padding:24px">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -172,8 +181,16 @@
       <select class="role-select" id="modalRoleSelect" style="margin-bottom:16px">
         <option value="user">User — assigned projects only, view &amp; update WPs</option>
         <option value="admin">Admin — assigned projects + user management</option>
-        <option value="super_admin">Super Admin — all projects + full control</option>
+        <option value="super_admin" id="opt-super-admin">Super Admin — all projects + full control</option>
       </select>
+      <!-- Assign to Admin — super_admin only -->
+      <div id="assign-admin-wrap" style="display:none;margin-bottom:16px">
+        <div class="modal-field-label">Assign to Admin</div>
+        <select class="role-select" id="modalAdminSelect">
+          <option value="">No admin assigned (unmanaged)</option>
+        </select>
+        <div style="font-size:10px;color:#aaa;margin-top:4px">The selected admin will be responsible for managing this user.</div>
+      </div>
       <div class="modal-field-label">Assign Projects</div>
       <div class="project-checkboxes" id="modalProjectList"></div>
     </div>
@@ -235,7 +252,8 @@
 
 <script>
   let currentTab = 'all';
-  let allUsers = [], allProjects = [];
+  let allUsers = [], allProjects = [], allAdmins = [];
+  let currentProfile = null; // logged-in admin profile
   let selectedUserIds = new Set();
   let lastClickedIdx = null;
   let filteredUsers = [];
@@ -278,10 +296,16 @@
       document.getElementById('selected-count').textContent = selCount > 0 ? `${selCount} user${selCount>1?'s':''} selected` : '';
     }
 
+    const isSuperAdmin = currentProfile?.role === 'super_admin';
+
     tbody.innerHTML = filteredUsers.map((u, visIdx) => {
       const isSelected = selectedUserIds.has(u.id);
       const assignedProjs = (u.projects||[]).join(', ') || '\u2014';
       const rowStyle = isSelected ? 'background:#FFF0EE;' : '';
+      const assignedAdminName = isSuperAdmin
+        ? (allAdmins.find(a=>a.id===u.assigned_admin)?.name || allAdmins.find(a=>a.id===u.assigned_admin)?.email || '<span style="color:#bbb">\u2014</span>')
+        : '';
+      const adminCell = isSuperAdmin ? `<td style="font-size:11px;color:#888">${assignedAdminName}</td>` : '';
 
       if (u.status === 'pending') {
         return `<tr style="${rowStyle}" data-idx="${visIdx}" onclick="handleRowClick(event,${visIdx},'${u.id}')">
@@ -289,31 +313,41 @@
           <td><div style="font-size:13px;font-weight:500">${u.name||'\u2014'}</div><div style="font-size:11px;color:#aaa">${u.email}</div></td>
           <td><span style="font-size:11px;color:#888">pending</span></td>
           <td>\u2014</td>
+          ${adminCell}
           <td><span class="badge badge-pending">pending</span></td>
-          <td style="color:#888;font-size:12px">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'}):'\u2014'}</td>
+          <td style="color:#888;font-size:12px">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{day:'2-digit',month:'short',year:'numeric'}):'\u2014'}</td>
           <td>
             <button class="action-btn btn-approve-row" onclick="event.stopPropagation();openApproveModal('${u.id}','${(u.name||'').replace(/'/g,"\\'")}','${u.email}')">Approve</button>
             <button class="action-btn btn-reject-row" onclick="event.stopPropagation();rejectUser('${u.id}')" style="margin-left:6px">Reject</button>
           </td>
         </tr>`;
       }
+
+      // Role options: admin can only set user/admin; super_admin can set all
+      const roleOptions = isSuperAdmin
+        ? `<option value="user" ${u.role==='user'?'selected':''}>User</option>
+           <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+           <option value="super_admin" ${u.role==='super_admin'?'selected':''}>Super Admin</option>`
+        : `<option value="user" ${u.role==='user'?'selected':''}>User</option>
+           <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>`;
+
       return `<tr style="${rowStyle}" data-idx="${visIdx}" onclick="handleRowClick(event,${visIdx},'${u.id}')">
         <td><input type="checkbox" ${isSelected?'checked':''} onclick="event.stopPropagation();toggleSelect('${u.id}',${visIdx},event)" style="accent-color:#EE3124;width:15px;height:15px;cursor:pointer"></td>
         <td><div style="font-size:13px;font-weight:500">${u.name||'\u2014'}</div><div style="font-size:11px;color:#aaa">${u.email}</div></td>
         <td>
           <select onclick="event.stopPropagation()" onchange="saveUserRole('${u.id}',this.value)" style="font-size:12px;padding:4px 8px;border:1px solid #e5e5e5;border-radius:6px;background:#fff;color:#231F20;font-family:inherit;cursor:pointer">
-            <option value="user" ${u.role==='user'?'selected':''}>User</option>
-            <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
-            <option value="super_admin" ${u.role==='super_admin'?'selected':''}>Super Admin</option>
+            ${roleOptions}
           </select>
         </td>
         <td>
           <div style="font-size:11px;color:#888;margin-bottom:4px">${assignedProjs}</div>
           <button onclick="event.stopPropagation();openProjectModal('${u.id}')" style="font-size:11px;padding:3px 8px;border:1px solid #e5e5e5;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit">Edit projects</button>
         </td>
+        ${adminCell}
         <td><span class="badge badge-${u.status}">${u.status}</span></td>
-        <td style="color:#888;font-size:12px">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'}):'\u2014'}</td>
+        <td style="color:#888;font-size:12px">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{day:'2-digit',month:'short',year:'numeric'}):'\u2014'}</td>
         <td>
+          ${isSuperAdmin ? `<button class="action-btn" onclick="event.stopPropagation();openReassignModal('${u.id}')" style="font-size:11px;background:#EFF6FF;color:#1D4ED8;margin-right:4px">Reassign</button>` : ''}
           <button class="action-btn btn-reject-row" onclick="event.stopPropagation();revokeUser('${u.id}')" style="font-size:11px">Revoke</button>
         </td>
       </tr>`;
@@ -391,7 +425,11 @@
   // ── Data loading ──────────────────────────────────────────────
   async function loadData() {
     try {
-      [allUsers, allProjects] = await Promise.all([WPDb.getAllUsers(), WPDb.getProjects()]);
+      [allUsers, allProjects, allAdmins] = await Promise.all([
+        WPDb.getUsersForAdmin(currentProfile),
+        WPDb.getProjects(),
+        WPDb.getAdminUsers()
+      ]);
       // Populate sidebar project links (with search when > 8 projects)
       const activeProjects = allProjects.filter(p=>p.status!=='archived');
       window._sidebarProjects = activeProjects;
@@ -421,17 +459,39 @@
   let pendingUserId = null;
   let editingUserId = null;
 
+  function populateAdminDropdown(selectedAdminId) {
+    const sel = document.getElementById('modalAdminSelect');
+    if (!sel) return;
+    const options = allAdmins
+      .filter(a => a.role === 'admin') // only regular admins, not super_admin
+      .map(a => `<option value="${a.id}" ${a.id === selectedAdminId ? 'selected' : ''}>${a.name || a.email}</option>`)
+      .join('');
+    sel.innerHTML = '<option value="">No admin assigned (unmanaged)</option>' + options;
+    if (selectedAdminId) sel.value = selectedAdminId;
+  }
+
   window.openApproveModal = function(userId, name, email) {
     pendingUserId = userId;
     document.getElementById('modalUserName').textContent = name;
     document.getElementById('modalUserEmail').textContent = email;
+    document.getElementById('modalRoleSelect').value = 'user';
+    document.getElementById('btnConfirmApprove').textContent = '\u2713 Approve & Assign';
+    document.getElementById('btnConfirmApprove').onclick = confirmApprove;
     buildProjectCheckboxes('modalProjectList', []);
+    // For admin approving: auto-assign to themselves
+    if (currentProfile?.role === 'admin') {
+      const wrap = document.getElementById('assign-admin-wrap');
+      if (wrap) wrap.style.display = 'none';
+    } else {
+      populateAdminDropdown(null);
+    }
     document.getElementById('approveModal').classList.remove('hidden');
   };
 
   window.closeModal = function() {
     document.getElementById('approveModal').classList.add('hidden');
     pendingUserId = null;
+    editingUserId = null;
   };
 
   window.confirmApprove = async function() {
@@ -441,7 +501,15 @@
     const btn = document.getElementById('btnConfirmApprove');
     btn.textContent = 'Approving\u2026'; btn.disabled = true;
     try {
-      await WPDb.updateUser(pendingUserId, { status: 'approved', role, projects: selectedProjects });
+      const updates = { status: 'approved', role, projects: selectedProjects };
+      // Assign admin: super_admin picks from dropdown; admin assigns to themselves
+      if (currentProfile?.role === 'super_admin') {
+        const adminId = document.getElementById('modalAdminSelect')?.value || null;
+        updates.assigned_admin = adminId || null;
+      } else if (currentProfile?.role === 'admin') {
+        updates.assigned_admin = currentProfile.id;
+      }
+      await WPDb.updateUser(pendingUserId, updates);
       closeModal();
       await loadData();
     } catch(err) {
@@ -456,11 +524,19 @@
     if (!user) return;
     buildProjectCheckboxes('modalProjectList', user.projects||[]);
     document.getElementById('modalUserName').textContent = user.name||user.email;
-    document.getElementById('modalUserEmail').textContent = 'Edit project assignments';
+    document.getElementById('modalUserEmail').textContent = 'Edit role & project assignments';
     document.getElementById('modalRoleSelect').value = user.role||'user';
     document.getElementById('btnConfirmApprove').textContent = 'Save Changes';
     document.getElementById('btnConfirmApprove').onclick = confirmEditUser;
+    if (currentProfile?.role === 'super_admin') {
+      document.getElementById('assign-admin-wrap').style.display = 'block';
+      populateAdminDropdown(user.assigned_admin);
+    }
     document.getElementById('approveModal').classList.remove('hidden');
+  };
+
+  window.openReassignModal = function(userId) {
+    openProjectModal(userId);
   };
 
   async function confirmEditUser() {
@@ -470,7 +546,12 @@
     const btn = document.getElementById('btnConfirmApprove');
     btn.textContent = 'Saving\u2026'; btn.disabled = true;
     try {
-      await WPDb.updateUser(editingUserId, { role, projects: selectedProjects });
+      const updates = { role, projects: selectedProjects };
+      if (currentProfile?.role === 'super_admin') {
+        const adminId = document.getElementById('modalAdminSelect')?.value || null;
+        updates.assigned_admin = adminId || null;
+      }
+      await WPDb.updateUser(editingUserId, updates);
       closeModal();
       await loadData();
     } catch(err) {
@@ -637,19 +718,41 @@ window.addEventListener('beforeunload', function(e) {
   // ── Sidebar project search ────────────────────────────────────
   function renderSidebarProjects(q) {
     const navProj = document.getElementById('nav-projects-admin');
-    if (!navProj || !window._sidebarProjects) return;
-    const filtered = q
+    if (!navProj || !window._sidebarProjects || !currentProfile) return;
+    const uid = currentProfile.id;
+    const { pinned, rest } = SidebarPrefs.sortProjects(uid, window._sidebarProjects);
+    const all = q
       ? window._sidebarProjects.filter(p=>p.id.toLowerCase().includes(q)||((p.name||'').toLowerCase().includes(q)))
-      : window._sidebarProjects;
-    const MAX_SHOW = 8;
-    const shown = filtered.slice(0, MAX_SHOW);
-    navProj.innerHTML = shown.map(p=>
-      `<a class="nav-item" href="project.html?id=${p.id}"><i class="ti ti-building-skyscraper"></i>${p.id}
-       <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name&&p.name!==p.id?p.name:'').slice(0,10)}</span></a>`
-    ).join('') + (filtered.length > MAX_SHOW
-      ? `<div style="font-size:10px;color:rgba(255,255,255,.35);padding:4px 12px">${filtered.length - MAX_SHOW} more — search above</div>`
-      : '');
+      : null;
+
+    if (all) {
+      // Search mode: show filtered results flat
+      const MAX_SHOW = 8;
+      const shown = all.slice(0, MAX_SHOW);
+      navProj.innerHTML = shown.map(p => SidebarPrefs.projectLink(uid, p)).join('') +
+        (all.length > MAX_SHOW ? `<div style="font-size:10px;color:rgba(255,255,255,.35);padding:4px 12px">${all.length - MAX_SHOW} more — refine search</div>` : '');
+    } else {
+      // Normal mode: pinned first, then rest (up to 5)
+      const MAX_REST = 5;
+      let html = '';
+      if (pinned.length) {
+        html += `<div style="font-size:9px;color:rgba(255,255,255,.3);padding:2px 12px 4px;letter-spacing:.06em;text-transform:uppercase">Pinned</div>`;
+        html += pinned.map(p => SidebarPrefs.projectLink(uid, p)).join('');
+        if (rest.length) html += `<div style="height:1px;background:rgba(255,255,255,.08);margin:4px 12px"></div>`;
+      }
+      const shownRest = rest.slice(0, MAX_REST);
+      html += shownRest.map(p => SidebarPrefs.projectLink(uid, p)).join('');
+      if (rest.length > MAX_REST) {
+        html += `<div style="font-size:10px;color:rgba(255,255,255,.35);padding:4px 12px">${rest.length - MAX_REST} more — search above</div>`;
+      }
+      navProj.innerHTML = html || '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:4px 12px">No projects</div>';
+    }
   }
+
+  // Allow sidebar to re-render after pin toggle
+  window.__sidebarRefresh = () => renderSidebarProjects(
+    document.getElementById('sidebar-proj-search')?.value?.toLowerCase().trim() || ''
+  );
 
   window.filterSidebarProjects = function(q) {
     renderSidebarProjects(q.toLowerCase().trim());
@@ -657,8 +760,24 @@ window.addEventListener('beforeunload', function(e) {
 
   // ── Init ──────────────────────────────────────────────────────
   AppAuth.requireAdmin(async (user, profile) => {
+    currentProfile = profile;
     window.__wpmRole = profile.role;
     renderUserBar('user-bar', profile);
+    // Show "Assigned Admin" column only for super_admin
+    if (profile.role === 'super_admin') {
+      document.getElementById('col-admin-head').style.display = '';
+    }
+    // Restrict bulk role options for admin role
+    if (profile.role === 'admin') {
+      const superOpt = document.querySelector('#bulk-role-select option[value="super_admin"]');
+      if (superOpt) superOpt.remove();
+      const superModalOpt = document.getElementById('opt-super-admin');
+      if (superModalOpt) superModalOpt.remove();
+    }
+    // Show assign-to-admin section in modal for super_admin
+    if (profile.role === 'super_admin') {
+      document.getElementById('assign-admin-wrap').style.display = 'block';
+    }
     await loadData();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';

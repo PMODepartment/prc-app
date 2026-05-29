@@ -39,13 +39,23 @@ const WPDb = (() => {
   async function rejectWP(id,_,reason) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({review_status:'rejected',review_notes:reason}).eq('id',id).select().single(); return data; }
   async function assignOfficer(id,uid) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({assigned_officer:uid}).eq('id',id).select().single(); return data; }
   async function getAllUsers() { const sb=await getSB(); const {data}=await sb.from('users').select('*').order('created_at',{ascending:false}); return data||[]; }
+  async function getUsersForAdmin(profile) {
+    const all = await getAllUsers();
+    if (profile.role === 'super_admin') return all;
+    // admin: see users explicitly assigned to them, plus unassigned pending users
+    return all.filter(u =>
+      u.assigned_admin === profile.id ||
+      (u.assigned_admin == null && u.status === 'pending')
+    );
+  }
+  async function getAdminUsers() { const sb=await getSB(); const {data}=await sb.from('users').select('id,name,email,role').in('role',['admin','super_admin']).eq('status','approved').order('name'); return data||[]; }
   async function updateUser(id,updates) { const sb=await getSB(); const {data}=await sb.from('users').update(updates).eq('id',id).select().single(); return data; }
   async function archiveProject(id) { const sb=await getSB(); const {error}=await sb.from('projects').update({status:'archived'}).eq('id',id); if(error) throw error; }
   async function unarchiveProject(id) { const sb=await getSB(); const {error}=await sb.from('projects').update({status:'active'}).eq('id',id); if(error) throw error; }
   async function updateProject(id,data) { const sb=await getSB(); const {data:d,error}=await sb.from('projects').update(data).eq('id',id).select().single(); if(error) throw error; return d; }
   async function deleteProject(id) { const sb=await getSB(); await sb.from('work_packages').delete().eq('project_id',id); const {error}=await sb.from('projects').delete().eq('id',id); if(error) throw error; }
   async function seedWP(d) { return submitWP(d,null); }
-  return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getAllApprovedWPs,getPendingWPs,getAllWPsForAdmin,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,getAllUsers,updateUser,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
+  return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getAllApprovedWPs,getPendingWPs,getAllWPsForAdmin,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,getAllUsers,getUsersForAdmin,getAdminUsers,updateUser,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
 })();
 
 /* â”€â”€ Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
