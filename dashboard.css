@@ -81,22 +81,28 @@ body {
 }
 
 .sidebar-logo {
-  padding: 20px 20px 18px;
+  padding: 18px 20px 16px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   background: var(--mw-black);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .sidebar-logo img {
-  width: 140px;
-  height: auto;
+  height: 40px;
+  width: auto;
+  max-width: 160px;
   display: block;
+  object-fit: contain;
+  object-position: left center;
+  background: transparent !important;
 }
 .sidebar-logo .app-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .12em;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
   color: var(--mw-red);
   text-transform: uppercase;
-  margin-top: 10px;
 }
 
 .sidebar-section { padding: 16px 12px 4px; }
@@ -116,9 +122,10 @@ body {
   gap: 10px;
   padding: 9px 12px;
   border-radius: var(--radius-md);
-  color: rgba(255,255,255,0.6);
-  font-size: 12px;
+  color: rgba(255,255,255,0.65);
+  font-size: 13px;
   font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
   transition: all .15s;
   text-decoration: none;
@@ -127,6 +134,9 @@ body {
   width: 100%;
   text-align: left;
   position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .nav-item:hover {
   background: rgba(255,255,255,0.06);
@@ -301,10 +311,12 @@ body {
 /* ── Metric Cards ──────────────────────────────────────────────────── */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin-bottom: 20px;
 }
+@media(max-width:900px){.metrics-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.metrics-grid{grid-template-columns:1fr}}
 .metric-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -313,7 +325,8 @@ body {
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 .metric-card::before {
   content: '';
@@ -333,19 +346,20 @@ body {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: .06em;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  min-height: 26px;
 }
 .metric-value {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--text-primary);
-  line-height: 1.1;
-  letter-spacing: -.5px;
-  word-break: break-all;
+  line-height: 1.2;
+  letter-spacing: -.3px;
   overflow-wrap: break-word;
-  min-width: 0;
+  word-break: break-word;
+  flex: 1;
 }
-.metric-sub { font-size: 10px; color: var(--text-hint); margin-top: 5px; }
+.metric-sub { font-size: 10px; color: var(--text-hint); margin-top: 6px; }
 .metric-value.red    { color: var(--mw-red); }
 .metric-value.green  { color: var(--green); }
 .metric-value.amber  { color: var(--amber); }
@@ -548,7 +562,8 @@ body {
   box-shadow: var(--shadow-sm);
   text-decoration: none;
   color: inherit;
-  display: block;
+  display: flex;
+  flex-direction: column;
   position: relative;
   overflow: hidden;
 }
@@ -574,13 +589,15 @@ body {
   border-radius: 20px;
   letter-spacing: .04em;
 }
-.pc-status { width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-top: 5px; }
+.pc-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-top: 5px; flex-shrink: 0; }
+.pc-status-badge { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 10px; line-height: 1.4; flex-shrink: 0; }
 .pc-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; color: var(--text-primary); }
 .pc-meta { font-size: 10px; color: var(--text-secondary); margin-bottom: 14px; }
 .pc-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 14px; }
 .pc-stat-val { font-size: 20px; font-weight: 800; letter-spacing: -.5px; }
 .pc-stat-lbl { font-size: 9px; color: var(--text-hint); margin-top: 1px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.pc-progress-label { display: flex; justify-content: space-between; font-size: 10px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; }
+.pc-spacer { flex: 1; min-height: 8px; }
+.pc-progress-label { display: flex; justify-content: space-between; font-size: 10px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; margin-top: 8px; }
 .pc-progress-bar { height: 6px; background: var(--mw-gray); border-radius: 3px; overflow: hidden; }
 .pc-progress-fill { height: 100%; background: var(--mw-red); border-radius: 3px; transition: width .4s; }
 
@@ -998,4 +1015,74 @@ body {
   .metrics-grid { grid-template-columns: 1fr; }
   .srow { grid-template-columns: 1fr; }
   .rc-fields { grid-template-columns: 1fr; }
+}
+
+/* ── Touch-friendly button sizing (mobile) ─────────────────────────── */
+@media (max-width: 767px) {
+  /* Ensure nav items are touch-friendly (≥44px tap target) */
+  .nav-item { min-height: 44px; }
+
+  /* Form inputs & selects touch-friendly */
+  .form-group input,
+  .form-group select,
+  .form-group textarea { min-height: 44px; font-size: 16px; } /* 16px prevents iOS zoom */
+
+  /* Action buttons */
+  .btn { min-height: 44px; padding: 10px 16px; }
+  .btn-primary { min-height: 44px; }
+
+  /* Table actions on mobile */
+  .action-btn { min-height: 36px; padding: 8px 12px; }
+
+  /* Pager buttons */
+  .pager button { min-height: 44px; }
+
+  /* Filter selects */
+  .filter-bar select { min-height: 40px; font-size: 14px; }
+  .filter-bar input[type=text] { min-height: 40px; font-size: 14px; width: 100%; }
+  .filter-bar { flex-direction: column; align-items: stretch; }
+
+  /* View tabs — sticky frozen panel on mobile */
+  .view-tabs {
+    position: sticky;
+    top: 56px; /* mobile topbar height */
+    z-index: 20;
+    background: var(--bg);
+    margin: 0 -14px;
+    padding: 6px 14px 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 2px 6px rgba(0,0,0,.06);
+  }
+  .view-tab { flex-shrink: 0; min-height: 40px; }
+
+  /* KPI user management grid */
+  .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Make table wrapper work on mobile */
+  .table-wrapper, .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Topbar export button text hidden on mobile */
+  .hide-mobile { display: none !important; }
+
+  /* Modal full-width on mobile */
+  .modal-bg { padding: 10px; align-items: flex-end; }
+  .modal { border-radius: var(--radius-lg) var(--radius-lg) 0 0; max-height: 90vh; overflow-y: auto; }
+
+  /* CSV import modal */
+  #csv-import-modal > div { border-radius: var(--radius-lg); margin: 10px; }
+
+  /* Quick WP modal */
+  #wp-quick-modal > div > div { border-radius: var(--radius-lg); }
+
+  /* Charts container responsive */
+  canvas { max-width: 100% !important; }
+
+  /* Section cards full width */
+  .section-card { padding: 14px; }
+
+  /* Sidebar section labels uppercase spacing */
+  .sidebar-section-label { letter-spacing: .08em; }
 }
