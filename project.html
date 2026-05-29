@@ -95,11 +95,11 @@
       </div>
     </div>
 
-    <!-- Switch Project — admin/super_admin only -->
+    <!-- Navigate — all users see Switch Project; admins also see All Projects -->
     <div id="sidebar-switch" style="display:none">
       <div class="sidebar-section">
         <div class="sidebar-section-label">Navigate</div>
-        <a class="nav-item" href="index.html?view=consolidated"><i class="ti ti-layout-grid"></i>All Projects</a>
+        <a class="nav-item" id="nav-all-projects-link" href="index.html?view=consolidated" style="display:none"><i class="ti ti-layout-grid"></i>All Projects</a>
         <a class="nav-item" href="login.html"><i class="ti ti-switch-horizontal"></i>Switch Project</a>
       </div>
       <!-- Recent / pinned projects quick-jump -->
@@ -733,8 +733,10 @@ AppAuth.requireLogin(async (user, profile) => {
   }
 
   const isAdmin = ['admin','super_admin'].includes(profile.role);
-  // Work Packages section always visible in project context
+
+  // Work Packages and Navigate sections — always visible for all roles
   document.getElementById('sidebar-workpkgs').style.display='block';
+  document.getElementById('sidebar-switch').style.display='block';
   const addLink = document.getElementById('add-wp-link');
   if(addLink) addLink.href='wp-form.html?project='+projId;
   const myWpsLink = document.getElementById('nav-my-wps-link');
@@ -744,13 +746,14 @@ AppAuth.requireLogin(async (user, profile) => {
     document.getElementById('sidebar-overview').style.display='block';
     document.getElementById('sidebar-projects').style.display='block';
     document.getElementById('sidebar-admin').style.display='block';
-    document.getElementById('sidebar-switch').style.display='block';
+    // Admins can also navigate to consolidated view
+    const allProjLink = document.getElementById('nav-all-projects-link');
+    if(allProjLink) allProjLink.style.display='flex';
     const reviewLink = document.getElementById('review-wps-link');
     if(reviewLink) reviewLink.style.display='flex';
     updatePendingBadge();
     const editBtn=document.getElementById('btn-edit-project'); if(editBtn) editBtn.style.display='flex';
     if(profile.role==='super_admin') { const delBtn=document.getElementById('btn-delete-project'); if(delBtn) delBtn.style.display='flex'; }
-    // Track recently visited project
     trackRecentProject(projId);
     renderRecentProjects();
   }
