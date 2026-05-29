@@ -27,9 +27,10 @@
     .btn-approve{flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer}
     .btn-approve:hover{background:#C42127}
     .btn-cancel{padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;cursor:pointer}
-    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
-    @media(max-width:768px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:480px){.kpi-grid{grid-template-columns:1fr}}
+    .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
+    @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:540px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:360px){.kpi-grid{grid-template-columns:1fr}}
     .kpi-card{background:#fff;border:1px solid #f0f0f0;border-radius:10px;padding:14px 16px}
     .kpi-value{font-size:22px;font-weight:700;color:#231F20;line-height:1}
     .kpi-label{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;margin-top:4px}
@@ -108,10 +109,11 @@
       <div id="main-content" style="display:none">
         <div class="page-content">
           <div class="kpi-grid" id="kpiGrid">
-            <div class="kpi-card"><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-label">Total Registrations</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-label">Total Users</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiPending">—</div><div class="kpi-label">Pending Approval</div></div>
-            <div class="kpi-card"><div class="kpi-value" id="kpiApproved">—</div><div class="kpi-label">Approved Users</div></div>
-            <div class="kpi-card"><div class="kpi-value" id="kpiRejected">—</div><div class="kpi-label">Rejected</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiApproved" style="color:#2D9B6F">—</div><div class="kpi-label">Active (≤7 days)</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiInactive" style="color:#D97706">—</div><div class="kpi-label">Inactive (7+ days)</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiRejected" style="color:#6B7280">—</div><div class="kpi-label">Revoked</div></div>
           </div>
           <div class="tab-row">
             <button class="tab-btn active" id="tabAll" onclick="switchTab('all')">All Users</button>
@@ -152,7 +154,7 @@
                     <th>Role</th>
                     <th>Assigned Projects</th>
                     <th id="col-admin-head" style="display:none">Admin</th>
-                    <th>Status</th>
+                    <th>Activity</th>
                     <th>Registered</th>
                     <th>Actions</th>
                   </tr>
@@ -342,7 +344,7 @@
           <td><span style="font-size:11px;color:#888;font-style:italic">pending</span></td>
           <td>\u2014</td>
           ${adminCell}
-          <td><span class="badge badge-pending">Pending</span></td>
+          <td>${activityBadge(u)}</td>
           <td style="color:#888;font-size:11px;white-space:nowrap">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{day:'2-digit',month:'short',year:'numeric'}):'\u2014'}</td>
           <td style="white-space:nowrap">
             <button class="action-btn btn-approve-row" onclick="event.stopPropagation();openApproveModal('${u.id}','${(u.name||'').replace(/'/g,"\\'")}','${u.email}')">Approve</button>
@@ -368,7 +370,7 @@
           <button onclick="event.stopPropagation();openProjectModal('${u.id}')" style="font-size:10px;padding:2px 7px;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit;color:#555">Edit</button>
         </td>
         ${adminCell}
-        <td><span class="badge badge-${u.status}" style="white-space:nowrap">${u.status==='approved'?'Active':u.status==='rejected'?'Revoked':u.status}</span></td>
+        <td style="min-width:110px">${activityBadge(u)}${activitySub(u)}</td>
         <td style="color:#888;font-size:11px;white-space:nowrap">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{day:'2-digit',month:'short',year:'numeric'}):'\u2014'}</td>
         <td>
           ${isSuperAdmin ? `<button class="action-btn" onclick="event.stopPropagation();openReassignModal('${u.id}')" style="font-size:11px;background:#EFF6FF;color:#1D4ED8;margin-right:4px">Reassign</button>` : ''}
@@ -440,8 +442,12 @@
     document.getElementById('kpiTotal').textContent = allUsers.length;
     const pendingCt = allUsers.filter(u=>u.status==='pending').length;
     document.getElementById('kpiPending').textContent = pendingCt;
-    document.getElementById('kpiApproved').textContent = allUsers.filter(u=>u.status==='approved').length;
-    document.getElementById('kpiRejected').textContent = allUsers.filter(u=>u.status==='rejected').length;
+    const approved = allUsers.filter(u=>u.status==='approved');
+    const activeCt   = approved.filter(u=>workingDaysSince(u.last_login)<=7).length;
+    const inactiveCt = approved.filter(u=>workingDaysSince(u.last_login)>7).length;
+    document.getElementById('kpiApproved').textContent  = activeCt;
+    document.getElementById('kpiInactive').textContent  = inactiveCt;
+    document.getElementById('kpiRejected').textContent  = allUsers.filter(u=>u.status==='rejected').length;
     const badge = document.getElementById('pending-count');
     if (badge) { badge.textContent = pendingCt > 0 ? pendingCt : ''; badge.style.display = pendingCt > 0 ? 'inline' : 'none'; }
   }
@@ -642,6 +648,46 @@
     if (role === 'super_admin') return base + 'background:#EDE9FE;color:#5B21B6';
     if (role === 'admin')       return base + 'background:#D1FAE5;color:#065F46';
     return base + 'background:#E0F2FE;color:#0369A1';
+  }
+
+  // ── Activity status (last_login + working days) ──────────────
+  function workingDaysSince(dateStr) {
+    if (!dateStr) return Infinity;
+    const start = new Date(dateStr);
+    const end   = new Date();
+    let count = 0, cur = new Date(start);
+    while (cur < end) {
+      cur.setDate(cur.getDate() + 1);
+      const d = cur.getDay();
+      if (d !== 0 && d !== 6) count++; // skip Sun=0, Sat=6
+    }
+    return count;
+  }
+
+  function activityBadge(u) {
+    if (u.status === 'rejected') {
+      return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#F3F4F6;color:#6B7280;white-space:nowrap">Revoked</span>';
+    }
+    if (u.status === 'pending') {
+      return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#FEF3C7;color:#92400E;white-space:nowrap">Pending</span>';
+    }
+    const days = workingDaysSince(u.last_login);
+    if (days <= 7) {
+      return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#D1FAE5;color:#065F46;white-space:nowrap">Active</span>';
+    }
+    if (days === Infinity) {
+      return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#FEF3C7;color:#92400E;white-space:nowrap">Never logged in</span>';
+    }
+    return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#FEF9C3;color:#854D0E;white-space:nowrap">Inactive</span>';
+  }
+
+  function activitySub(u) {
+    if (!u.last_login) return '<div style="font-size:9px;color:#bbb;margin-top:1px">No login recorded</div>';
+    const d = new Date(u.last_login);
+    const label = d.toLocaleDateString('en-PH', {day:'2-digit', month:'short', year:'numeric'});
+    const days = workingDaysSince(u.last_login);
+    const ago = days === 0 ? 'today' : days === 1 ? '1 working day ago' : `${days} working days ago`;
+    return `<div style="font-size:9px;color:#aaa;margin-top:2px">Last login: ${label} · ${ago}</div>`;
   }
 
   // ── Project pills with truncation ────────────────────────────

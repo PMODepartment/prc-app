@@ -220,6 +220,8 @@ async function handleSignIn() {
   if (!profile) { showMsg('msgBox', 'Account not found. Please register first.'); await sb.auth.signOut(); btn.textContent = 'Sign In'; btn.disabled = false; return; }
   if (profile.status === 'pending') { window.location.href = 'pending.html'; return; }
   if (profile.status === 'rejected') { showMsg('msgBox', 'Your registration was not approved. Please contact your administrator.'); await sb.auth.signOut(); btn.textContent = 'Sign In'; btn.disabled = false; return; }
+  // Record last login time (non-blocking)
+  sb.from('users').update({ last_login: new Date().toISOString() }).eq('id', data.user.id).then(() => {});
   showProjectPicker(profile);
 }
 
