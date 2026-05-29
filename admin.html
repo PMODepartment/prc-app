@@ -203,6 +203,33 @@
 
 
 
+<!-- Change Role Modal -->
+<div class="modal-overlay hidden" id="changeRoleModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title">Change Role</div>
+      <div class="modal-subtitle">
+        <strong id="crm-name"></strong><br>
+        <span id="crm-email" style="font-size:12px;color:#aaa"></span>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field-label" style="margin-bottom:6px">Current role</div>
+      <div id="crm-current-role" style="font-size:13px;font-weight:600;color:#231F20;margin-bottom:16px;padding:8px 12px;background:#f9f9f9;border-radius:8px"></div>
+      <div class="modal-field-label" style="margin-bottom:6px">New role</div>
+      <select class="role-select" id="crm-role-select">
+        <option value="user">User — view &amp; update assigned WPs</option>
+        <option value="admin">Admin — manage assigned projects &amp; users</option>
+        <option value="super_admin" id="crm-opt-super">Super Admin — full access</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-approve" id="crm-save-btn" onclick="confirmRoleChange()">Save Role</button>
+      <button class="btn-cancel" onclick="closeRoleModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- New Project Modal -->
 <div class="modal-overlay hidden" id="newProjectModal">
   <div class="modal" style="max-width:480px">
@@ -323,23 +350,14 @@
         </tr>`;
       }
 
-      // Role options: admin can only set user/admin; super_admin can set all
-      const roleOptions = isSuperAdmin
-        ? `<option value="user" ${u.role==='user'?'selected':''}>User</option>
-           <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
-           <option value="super_admin" ${u.role==='super_admin'?'selected':''}>Super Admin</option>`
-        : `<option value="user" ${u.role==='user'?'selected':''}>User</option>
-           <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>`;
 
       return `<tr style="${rowStyle}" data-idx="${visIdx}" onclick="handleRowClick(event,${visIdx},'${u.id}')">
         <td><input type="checkbox" ${isSelected?'checked':''} onclick="event.stopPropagation();toggleSelect('${u.id}',${visIdx},event)" style="accent-color:#EE3124;width:15px;height:15px;cursor:pointer"></td>
         <td><div style="font-size:13px;font-weight:500">${u.name||'\u2014'}</div><div style="font-size:11px;color:#aaa">${u.email}</div></td>
         <td>
-          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-            <select id="role-sel-${u.id}" onclick="event.stopPropagation()" style="font-size:12px;padding:4px 8px;border:1px solid #e5e5e5;border-radius:6px;background:#fff;color:#231F20;font-family:inherit;cursor:pointer">
-              ${roleOptions}
-            </select>
-            <button onclick="event.stopPropagation();saveUserRole('${u.id}',document.getElementById('role-sel-${u.id}').value)" style="font-size:11px;padding:4px 9px;background:#231F20;color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:inherit;font-weight:600">Save</button>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="${roleStyle(u.role)}">${roleLabel(u.role)}</span>
+            <button onclick="event.stopPropagation();openRoleModal('${u.id}')" style="font-size:11px;padding:3px 8px;border:1px solid #e5e5e5;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit;color:#231F20">Change</button>
           </div>
         </td>
         <td>
@@ -611,6 +629,60 @@
     await WPDb.updateUser(userId, { role });
     await loadData();
   };
+
+  // ── Role badge helpers ────────────────────────────────────────
+  function roleLabel(role) {
+    return role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : 'User';
+  }
+  function roleStyle(role) {
+    const base = 'font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-block;';
+    if (role === 'super_admin') return base + 'background:#EDE9FE;color:#5B21B6';
+    if (role === 'admin')       return base + 'background:#D1FAE5;color:#065F46';
+    return base + 'background:#E0F2FE;color:#0369A1';
+  }
+
+  // ── Change Role modal ─────────────────────────────────────────
+  let changingRoleUserId = null;
+
+  window.openRoleModal = function(userId) {
+    const u = allUsers.find(x => x.id === userId);
+    if (!u) return;
+    changingRoleUserId = userId;
+    document.getElementById('crm-name').textContent  = u.name || u.email;
+    document.getElementById('crm-email').textContent = u.email;
+    document.getElementById('crm-current-role').textContent = roleLabel(u.role);
+    const sel = document.getElementById('crm-role-select');
+    sel.value = u.role || 'user';
+    // Restrict to user/admin for admin managers
+    const superOpt = document.getElementById('crm-opt-super');
+    if (superOpt) superOpt.style.display = (currentProfile?.role === 'super_admin') ? '' : 'none';
+    document.getElementById('changeRoleModal').classList.remove('hidden');
+  };
+
+  window.closeRoleModal = function() {
+    document.getElementById('changeRoleModal').classList.add('hidden');
+    changingRoleUserId = null;
+  };
+
+  window.confirmRoleChange = async function() {
+    if (!changingRoleUserId) return;
+    const role = document.getElementById('crm-role-select').value;
+    const btn  = document.getElementById('crm-save-btn');
+    btn.textContent = 'Saving…'; btn.disabled = true;
+    try {
+      await WPDb.updateUser(changingRoleUserId, { role });
+      closeRoleModal();
+      await loadData();
+    } catch(err) {
+      alert('Error: ' + err.message);
+      btn.textContent = 'Save Role'; btn.disabled = false;
+    }
+  };
+
+  // Close role modal on overlay click
+  document.getElementById('changeRoleModal').addEventListener('click', function(e) {
+    if (e.target === this) closeRoleModal();
+  });
 
   // ── New Project modal ─────────────────────────────────────────
   window.openNewProjectModal = async function() {
