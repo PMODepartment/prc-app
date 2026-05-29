@@ -39,13 +39,9 @@
       <div class="app-label">Procurement Dashboard</div>
     </div>
     <div class="sidebar-section">
-      <div class="sidebar-section-label">Overview</div>
-      <a class="nav-item" id="nav-dashboard-link" href="index.html?view=consolidated"><i class="ti ti-layout-dashboard"></i>All Projects</a>
-    </div>
-    <div class="sidebar-section">
       <div class="sidebar-section-label">Current Project</div>
-      <a class="nav-item" id="nav-project-link" href="index.html"><i class="ti ti-arrow-back-up"></i>Back to <span id="nav-project-name">Project</span></a>
-      <a class="nav-item" href="login.html"><i class="ti ti-switch-horizontal"></i>Switch Project</a>
+      <a class="nav-item" id="nav-project-link" href="#"><i class="ti ti-arrow-back-up"></i>Back to <span id="nav-project-name">Project</span></a>
+      <a class="nav-item" href="login.html" style="opacity:.75;font-size:12px"><i class="ti ti-switch-horizontal"></i>Switch Project</a>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-section-label">Work Packages</div>
@@ -287,13 +283,12 @@ AppAuth.requireLogin(async (user, profile) => {
       document.getElementById('btn-submit-text').textContent =
         ['admin','super_admin'].includes(profile.role) ? 'Save Work Package' : 'Submit for Review';
     }
-    // Fix dashboard link: users should never land on consolidated view
-    if (profile.role === 'user') {
-      const pid = projId || (profile.projects||[])[0];
-      if (pid) {
-        const dl = document.getElementById('nav-dashboard-link');
-        if (dl) dl.href = 'project.html?id=' + pid;
-      }
+    // Set "Back to Project" link immediately from URL param (new WP flow)
+    if (projId) {
+      const pl = document.getElementById('nav-project-link');
+      const pn = document.getElementById('nav-project-name');
+      if (pl) pl.href = 'project.html?id=' + projId;
+      if (pn) pn.textContent = projId;
     }
     if (['admin','super_admin'].includes(profile.role)) {
       document.getElementById('sidebar-admin').style.display = 'block';
