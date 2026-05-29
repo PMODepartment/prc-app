@@ -195,7 +195,7 @@
       <div class="project-checkboxes" id="modalProjectList"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn-approve" id="btnConfirmApprove" onclick="confirmApprove()">✓ Approve &amp; Assign</button>
+      <button class="btn-approve" id="btnConfirmApprove" onclick="handleModalSave()">✓ Approve &amp; Assign</button>
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
     </div>
   </div>
@@ -335,9 +335,12 @@
         <td><input type="checkbox" ${isSelected?'checked':''} onclick="event.stopPropagation();toggleSelect('${u.id}',${visIdx},event)" style="accent-color:#EE3124;width:15px;height:15px;cursor:pointer"></td>
         <td><div style="font-size:13px;font-weight:500">${u.name||'\u2014'}</div><div style="font-size:11px;color:#aaa">${u.email}</div></td>
         <td>
-          <select onclick="event.stopPropagation()" onchange="saveUserRole('${u.id}',this.value)" style="font-size:12px;padding:4px 8px;border:1px solid #e5e5e5;border-radius:6px;background:#fff;color:#231F20;font-family:inherit;cursor:pointer">
-            ${roleOptions}
-          </select>
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+            <select id="role-sel-${u.id}" onclick="event.stopPropagation()" style="font-size:12px;padding:4px 8px;border:1px solid #e5e5e5;border-radius:6px;background:#fff;color:#231F20;font-family:inherit;cursor:pointer">
+              ${roleOptions}
+            </select>
+            <button onclick="event.stopPropagation();saveUserRole('${u.id}',document.getElementById('role-sel-${u.id}').value)" style="font-size:11px;padding:4px 9px;background:#231F20;color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:inherit;font-weight:600">Save</button>
+          </div>
         </td>
         <td>
           <div style="font-size:11px;color:#888;margin-bottom:4px">${assignedProjs}</div>
@@ -476,7 +479,6 @@
     document.getElementById('modalUserEmail').textContent = email;
     document.getElementById('modalRoleSelect').value = 'user';
     document.getElementById('btnConfirmApprove').textContent = '\u2713 Approve & Assign';
-    document.getElementById('btnConfirmApprove').onclick = confirmApprove;
     buildProjectCheckboxes('modalProjectList', []);
     // For admin approving: auto-assign to themselves
     if (currentProfile?.role === 'admin') {
@@ -486,6 +488,12 @@
       populateAdminDropdown(null);
     }
     document.getElementById('approveModal').classList.remove('hidden');
+  };
+
+  // Unified save handler — decides based on which modal mode is active
+  window.handleModalSave = function() {
+    if (editingUserId) confirmEditUser();
+    else if (pendingUserId) confirmApprove();
   };
 
   window.closeModal = function() {
@@ -527,7 +535,6 @@
     document.getElementById('modalUserEmail').textContent = 'Edit role & project assignments';
     document.getElementById('modalRoleSelect').value = user.role||'user';
     document.getElementById('btnConfirmApprove').textContent = 'Save Changes';
-    document.getElementById('btnConfirmApprove').onclick = confirmEditUser;
     if (currentProfile?.role === 'super_admin') {
       document.getElementById('assign-admin-wrap').style.display = 'block';
       populateAdminDropdown(user.assigned_admin);
