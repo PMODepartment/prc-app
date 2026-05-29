@@ -242,13 +242,17 @@ async function showProjectPicker(profile) {
   const visible = isAdmin ? (projects || []) : (projects || []).filter(p => (profile.projects || []).includes(p.id));
 
   allItems = [];
-  // Only admins/super_admins get the consolidated view option
-  if (isAdmin) allItems.push({ value: 'consolidated', id: 'ALL PROJECTS', name: 'Portfolio — Consolidated View', sub: 'All projects & work packages', consolidated: true });
+  // Portfolio overview: admins always; users get it when assigned to 2+ projects
+  const showPortfolio = isAdmin || visible.length >= 2;
+  if (showPortfolio) {
+    const sub = isAdmin ? 'All projects & work packages' : `Your ${visible.length} assigned projects`;
+    allItems.push({ value: 'consolidated', id: 'ALL PROJECTS', name: 'Portfolio — Consolidated View', sub, consolidated: true });
+  }
   visible.forEach(p => allItems.push({ value: p.id, id: p.id, name: p.name || p.id, sub: p.location || '', consolidated: false }));
 
-  // User role with exactly 1 project: skip picker, go directly
-  if (!isAdmin && allItems.length === 1) {
-    window.location.href = `project.html?id=${allItems[0].value}`;
+  // User with exactly 1 project: skip picker, go directly
+  if (!isAdmin && visible.length === 1) {
+    window.location.href = `project.html?id=${visible[0].id}`;
     return;
   }
   if (allItems.length > 5) document.getElementById('searchWrap').style.display = 'block';
