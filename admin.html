@@ -34,12 +34,14 @@
     .kpi-value{font-size:22px;font-weight:700;color:#231F20;line-height:1}
     .kpi-label{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;margin-top:4px}
     .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch}
-    .user-table{width:100%;min-width:560px;border-collapse:collapse}
-    .user-table th{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;padding:10px 12px;text-align:left;border-bottom:1px solid #f0f0f0}
-    .user-table td{padding:12px;font-size:14px;color:#231F20;border-bottom:1px solid #f5f5f5}
+    .user-table{width:100%;min-width:600px;border-collapse:collapse;table-layout:auto}
+    .user-table th{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#999;padding:9px 10px;text-align:left;border-bottom:2px solid #f0f0f0;background:#fafafa;white-space:nowrap}
+    .user-table td{padding:10px 10px;font-size:13px;color:#231F20;border-bottom:1px solid #f5f5f5;vertical-align:middle}
     .user-table tr:last-child td{border-bottom:none}
     .user-table tr:hover td{background:#fafafa}
-    .action-btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:opacity .15s}
+    /* checkbox col — fixed narrow width */
+    .user-table td:first-child,.user-table th:first-child{width:36px;padding-right:4px}
+    .action-btn{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:opacity .15s}
     .action-btn:hover{opacity:.8}
     .btn-approve-row{background:#EE3124;color:#fff}
     .btn-reject-row{background:#f5f5f5;color:#666}
@@ -145,11 +147,11 @@
               <table class="user-table" id="userTable">
                 <thead>
                   <tr>
-                    <th>#</th>
-                    <th>Name / Email</th>
+                    <th></th>
+                    <th>User</th>
                     <th>Role</th>
-                    <th>Projects</th>
-                    <th id="col-admin-head" style="display:none">Assigned Admin</th>
+                    <th>Assigned Projects</th>
+                    <th id="col-admin-head" style="display:none">Admin</th>
                     <th>Status</th>
                     <th>Registered</th>
                     <th>Actions</th>
@@ -327,7 +329,6 @@
 
     tbody.innerHTML = filteredUsers.map((u, visIdx) => {
       const isSelected = selectedUserIds.has(u.id);
-      const assignedProjs = (u.projects||[]).join(', ') || '\u2014';
       const rowStyle = isSelected ? 'background:#FFF0EE;' : '';
       const assignedAdminName = isSuperAdmin
         ? (allAdmins.find(a=>a.id===u.assigned_admin)?.name || allAdmins.find(a=>a.id===u.assigned_admin)?.email || '<span style="color:#bbb">\u2014</span>')
@@ -337,36 +338,38 @@
       if (u.status === 'pending') {
         return `<tr style="${rowStyle}" data-idx="${visIdx}" onclick="handleRowClick(event,${visIdx},'${u.id}')">
           <td><input type="checkbox" ${isSelected?'checked':''} onclick="event.stopPropagation();toggleSelect('${u.id}',${visIdx},event)" style="accent-color:#EE3124;width:15px;height:15px;cursor:pointer"></td>
-          <td><div style="font-size:13px;font-weight:500">${u.name||'\u2014'}</div><div style="font-size:11px;color:#aaa">${u.email}</div></td>
-          <td><span style="font-size:11px;color:#888">pending</span></td>
+          <td><div style="font-size:13px;font-weight:600;color:#231F20">${u.name||'<span style="color:#bbb">\u2014</span>'}</div><div style="font-size:11px;color:#aaa;margin-top:1px">${u.email}</div></td>
+          <td><span style="font-size:11px;color:#888;font-style:italic">pending</span></td>
           <td>\u2014</td>
           ${adminCell}
-          <td><span class="badge badge-pending">pending</span></td>
-          <td style="color:#888;font-size:12px">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{day:'2-digit',month:'short',year:'numeric'}):'\u2014'}</td>
-          <td>
+          <td><span class="badge badge-pending">Pending</span></td>
+          <td style="color:#888;font-size:11px;white-space:nowrap">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{day:'2-digit',month:'short',year:'numeric'}):'\u2014'}</td>
+          <td style="white-space:nowrap">
             <button class="action-btn btn-approve-row" onclick="event.stopPropagation();openApproveModal('${u.id}','${(u.name||'').replace(/'/g,"\\'")}','${u.email}')">Approve</button>
-            <button class="action-btn btn-reject-row" onclick="event.stopPropagation();rejectUser('${u.id}')" style="margin-left:6px">Reject</button>
+            <button class="action-btn btn-reject-row" onclick="event.stopPropagation();rejectUser('${u.id}')" style="margin-left:4px">Reject</button>
           </td>
         </tr>`;
       }
 
-
       return `<tr style="${rowStyle}" data-idx="${visIdx}" onclick="handleRowClick(event,${visIdx},'${u.id}')">
         <td><input type="checkbox" ${isSelected?'checked':''} onclick="event.stopPropagation();toggleSelect('${u.id}',${visIdx},event)" style="accent-color:#EE3124;width:15px;height:15px;cursor:pointer"></td>
-        <td><div style="font-size:13px;font-weight:500">${u.name||'\u2014'}</div><div style="font-size:11px;color:#aaa">${u.email}</div></td>
-        <td>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <td style="min-width:160px">
+          <div style="font-size:13px;font-weight:600;color:#231F20">${u.name||'<span style="color:#bbb">\u2014</span>'}</div>
+          <div style="font-size:11px;color:#aaa;margin-top:1px">${u.email}</div>
+        </td>
+        <td style="white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:5px">
             <span style="${roleStyle(u.role)}">${roleLabel(u.role)}</span>
-            <button onclick="event.stopPropagation();openRoleModal('${u.id}')" style="font-size:11px;padding:3px 8px;border:1px solid #e5e5e5;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit;color:#231F20">Change</button>
+            <button onclick="event.stopPropagation();openRoleModal('${u.id}')" title="Change role" style="font-size:10px;padding:2px 7px;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit;color:#555;flex-shrink:0">Change</button>
           </div>
         </td>
-        <td>
-          <div style="font-size:11px;color:#888;margin-bottom:4px">${assignedProjs}</div>
-          <button onclick="event.stopPropagation();openProjectModal('${u.id}')" style="font-size:11px;padding:3px 8px;border:1px solid #e5e5e5;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit">Edit projects</button>
+        <td style="min-width:120px;max-width:200px">
+          <div style="margin-bottom:4px">${projectPills(u.projects)}</div>
+          <button onclick="event.stopPropagation();openProjectModal('${u.id}')" style="font-size:10px;padding:2px 7px;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;font-family:inherit;color:#555">Edit</button>
         </td>
         ${adminCell}
-        <td><span class="badge badge-${u.status}">${u.status}</span></td>
-        <td style="color:#888;font-size:12px">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{day:'2-digit',month:'short',year:'numeric'}):'\u2014'}</td>
+        <td><span class="badge badge-${u.status}" style="white-space:nowrap">${u.status==='approved'?'Active':u.status==='rejected'?'Revoked':u.status}</span></td>
+        <td style="color:#888;font-size:11px;white-space:nowrap">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{day:'2-digit',month:'short',year:'numeric'}):'\u2014'}</td>
         <td>
           ${isSuperAdmin ? `<button class="action-btn" onclick="event.stopPropagation();openReassignModal('${u.id}')" style="font-size:11px;background:#EFF6FF;color:#1D4ED8;margin-right:4px">Reassign</button>` : ''}
           <button class="action-btn btn-reject-row" onclick="event.stopPropagation();revokeUser('${u.id}')" style="font-size:11px">Revoke</button>
@@ -635,10 +638,25 @@
     return role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : 'User';
   }
   function roleStyle(role) {
-    const base = 'font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-block;';
+    const base = 'font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-block;white-space:nowrap;';
     if (role === 'super_admin') return base + 'background:#EDE9FE;color:#5B21B6';
     if (role === 'admin')       return base + 'background:#D1FAE5;color:#065F46';
     return base + 'background:#E0F2FE;color:#0369A1';
+  }
+
+  // ── Project pills with truncation ────────────────────────────
+  function projectPills(projects) {
+    if (!projects || !projects.length) return '<span style="color:#bbb;font-size:11px">—</span>';
+    const MAX = 3;
+    const shown = projects.slice(0, MAX);
+    const extra = projects.length - MAX;
+    const pills = shown.map(p =>
+      `<span style="display:inline-block;font-size:10px;font-weight:700;background:#EE3124;color:#fff;padding:1px 7px;border-radius:4px;letter-spacing:.03em">${p}</span>`
+    ).join('');
+    const more = extra > 0
+      ? `<span style="display:inline-block;font-size:10px;font-weight:600;background:#f0f0f0;color:#666;padding:1px 7px;border-radius:4px" title="${projects.slice(MAX).join(', ')}">+${extra} more</span>`
+      : '';
+    return `<div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">${pills}${more}</div>`;
   }
 
   // ── Change Role modal ─────────────────────────────────────────
