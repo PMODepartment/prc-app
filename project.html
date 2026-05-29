@@ -62,6 +62,10 @@
         <i class="ti ti-building-skyscraper"></i>
         <span id="nav-proj-name">—</span>
       </a>
+      <!-- Switch Project always visible for every role — no JS toggle needed -->
+      <a class="nav-item" href="login.html" style="opacity:.75;font-size:12px">
+        <i class="ti ti-switch-horizontal"></i>Switch Project
+      </a>
     </div>
 
     <div id="sidebar-projects" style="display:none">
@@ -95,12 +99,11 @@
       </div>
     </div>
 
-    <!-- Navigate — all users see Switch Project; admins also see All Projects -->
+    <!-- Navigate — admin/super_admin only (All Projects + Recent) -->
     <div id="sidebar-switch" style="display:none">
       <div class="sidebar-section">
         <div class="sidebar-section-label">Navigate</div>
-        <a class="nav-item" id="nav-all-projects-link" href="index.html?view=consolidated" style="display:none"><i class="ti ti-layout-grid"></i>All Projects</a>
-        <a class="nav-item" href="login.html"><i class="ti ti-switch-horizontal"></i>Switch Project</a>
+        <a class="nav-item" id="nav-all-projects-link" href="index.html?view=consolidated"><i class="ti ti-layout-grid"></i>All Projects</a>
       </div>
       <!-- Recent / pinned projects quick-jump -->
       <div class="sidebar-section" id="recent-projects-section" style="display:none">
@@ -734,9 +737,8 @@ AppAuth.requireLogin(async (user, profile) => {
 
   const isAdmin = ['admin','super_admin'].includes(profile.role);
 
-  // Work Packages and Navigate sections — always visible for all roles
+  // Work Packages section always visible for all roles
   document.getElementById('sidebar-workpkgs').style.display='block';
-  document.getElementById('sidebar-switch').style.display='block';
   const addLink = document.getElementById('add-wp-link');
   if(addLink) addLink.href='wp-form.html?project='+projId;
   const myWpsLink = document.getElementById('nav-my-wps-link');
@@ -746,9 +748,8 @@ AppAuth.requireLogin(async (user, profile) => {
     document.getElementById('sidebar-overview').style.display='block';
     document.getElementById('sidebar-projects').style.display='block';
     document.getElementById('sidebar-admin').style.display='block';
-    // Admins can also navigate to consolidated view
-    const allProjLink = document.getElementById('nav-all-projects-link');
-    if(allProjLink) allProjLink.style.display='flex';
+    // Admins get the Navigate section with All Projects + Recent
+    document.getElementById('sidebar-switch').style.display='block';
     const reviewLink = document.getElementById('review-wps-link');
     if(reviewLink) reviewLink.style.display='flex';
     updatePendingBadge();
