@@ -80,6 +80,16 @@
     <div class="content">
       <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading submissions…</span></div>
       <div id="main-content" style="display:none">
+
+        <!-- Project context bar -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Project</label>
+          <select id="proj-select" onchange="changeProject(this.value)" style="font-size:13px;padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-family:inherit;background:#fff;color:#231F20;min-width:220px;cursor:pointer">
+            <option value="ALL">All Projects (Consolidated)</option>
+          </select>
+          <span id="proj-context-badge" style="display:none;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:#EE3124;color:#fff"></span>
+        </div>
+
         <div class="tab-row">
           <button class="tab active" id="tab-pending" onclick="switchTab('pending')">
             Pending Review <span class="tbadge" id="ct-pending">0</span>
@@ -113,30 +123,63 @@
 
 <script>
   let adminProfile, allWPs=[], currentTab='pending', rejectingId=null;
+  let allProjects=[], currentProjId='ALL';
   initMobileMenu();
 
   AppAuth.requireAdmin(async (user, profile) => {
     adminProfile = profile;
     window.__wpmRole = profile.role;
     renderUserBar('user-bar', profile);
+    // Read project from URL param
+    currentProjId = new URLSearchParams(location.search).get('project') || 'ALL';
     await loadAll();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
   });
 
   async function loadAll() {
-    const [wps, projects] = await Promise.all([WPDb.getAllWPsForAdmin(), WPDb.getProjects()]);
-    allWPs = wps;
+    allProjects = await WPDb.getProjects();
+    // Build project selector
+    const sel = document.getElementById('proj-select');
+    if (sel) {
+      sel.innerHTML = '<option value="ALL">All Projects (Consolidated)</option>' +
+        allProjects.filter(p=>p.status!=='archived')
+          .map(p=>`<option value="${p.id}" ${p.id===currentProjId?'selected':''}>${p.id} — ${p.name||p.id}</option>`)
+          .join('');
+      sel.value = currentProjId;
+    }
+    // Load WPs based on context
+    if (currentProjId !== 'ALL') {
+      allWPs = await WPDb.getAllWPs(currentProjId);
+      const badge = document.getElementById('proj-context-badge');
+      if (badge) { badge.textContent = currentProjId; badge.style.display = 'inline'; }
+      // Update page subtitle
+      const sub = document.querySelector('.page-sub');
+      const proj = allProjects.find(p=>p.id===currentProjId);
+      if (sub) sub.textContent = (proj?.name||currentProjId)+' — Approve or reject work packages';
+    } else {
+      allWPs = await WPDb.getAllWPsForAdmin();
+      const badge = document.getElementById('proj-context-badge');
+      if (badge) badge.style.display = 'none';
+    }
     // Populate sidebar project list
     const navEl = document.getElementById('nav-projects-review');
     if (navEl) {
-      navEl.innerHTML = projects.filter(p=>p.status!=='archived').map(p =>
-        `<a class="nav-item" href="project.html?id=${p.id}"><i class="ti ti-building-skyscraper"></i>${p.id}
-         <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name||'').slice(0,12)}</span></a>`
+      navEl.innerHTML = allProjects.filter(p=>p.status!=='archived').map(p =>
+        `<a class="nav-item ${p.id===currentProjId?'active':''}" href="review.html?project=${p.id}">
+          <i class="ti ti-building-skyscraper"></i>${p.id}
+          <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name||'').slice(0,12)}</span>
+        </a>`
       ).join('');
     }
     renderAll();
   }
+
+  window.changeProject = function(val) {
+    currentProjId = val;
+    const url = val === 'ALL' ? 'review.html' : `review.html?project=${val}`;
+    location.href = url;
+  };
 
   function renderAll() {
     const pending  = allWPs.filter(w => w.review_status === 'pending_review');

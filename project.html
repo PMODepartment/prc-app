@@ -95,6 +95,23 @@
       </div>
     </div>
 
+    <!-- Switch Project — admin/super_admin only -->
+    <div id="sidebar-switch" style="display:none">
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Navigate</div>
+        <a class="nav-item" href="index.html?view=consolidated"><i class="ti ti-layout-grid"></i>All Projects</a>
+        <a class="nav-item" href="login.html"><i class="ti ti-switch-horizontal"></i>Switch Project</a>
+      </div>
+      <!-- Recent / pinned projects quick-jump -->
+      <div class="sidebar-section" id="recent-projects-section" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 8px;margin-bottom:4px">
+          <div class="sidebar-section-label" style="margin-bottom:0">Recent</div>
+          <button onclick="clearRecentProjects()" style="font-size:9px;color:rgba(255,255,255,.3);background:none;border:none;cursor:pointer;padding:0">clear</button>
+        </div>
+        <div id="recent-projects-list"></div>
+      </div>
+    </div>
+
     <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
 
@@ -169,6 +186,21 @@
           <div class="panel">
             <div class="panel-title"><i class="ti ti-calendar"></i>Schedule Timeline</div>
             <div style="position:relative;height:200px"><canvas id="c-schedule"></canvas></div>
+          </div>
+          <!-- ── Top 5 Rank Lists ── -->
+          <div class="grid-3">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
+              <div class="rank-list" id="rank-value"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-trending-up"></i>Top 5 Savings</div>
+              <div class="rank-list" id="rank-gains"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
+              <div class="rank-list" id="rank-losses"></div>
+            </div>
           </div>
         </div>
 
@@ -445,6 +477,24 @@ function renderOverview(){
   Charts.budgetVsContract('c-budget',f);
   Charts.varianceTrend('c-trend',f);
   Charts.scheduleTimeline('c-schedule',f);
+  renderTop5(f);
+}
+
+function renderTop5(wps){
+  const withBoth = wps.filter(w=>w.approved_budget_bcb>0&&w.total_awarded>0);
+  const variance = w => (w.approved_budget_bcb||0)-(w.total_awarded||0);
+  buildRankList('rank-value',
+    [...wps].filter(w=>w.total_awarded>0).sort((a,b)=>(b.total_awarded||0)-(a.total_awarded||0)).slice(0,5)
+      .map(w=>({name:w.description,sub:w.wp_no+(w.contractor?' · '+w.contractor:''),val:w.total_awarded,color:'#282C28'})),
+    'dark', v=>Fmt.money(v));
+  buildRankList('rank-gains',
+    withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
+      .map(w=>({name:w.description,sub:w.wp_no+' · '+w.trade,val:variance(w),color:'#2D9B6F'})),
+    'green', v=>'+'+Fmt.money(v));
+  buildRankList('rank-losses',
+    withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
+      .map(w=>({name:w.description,sub:w.wp_no+' · '+w.trade,val:Math.abs(variance(w)),color:'#EE3124'})),
+    'red', v=>'-'+Fmt.money(v));
 }
 
 function renderBacklog(){
@@ -694,11 +744,15 @@ AppAuth.requireLogin(async (user, profile) => {
     document.getElementById('sidebar-overview').style.display='block';
     document.getElementById('sidebar-projects').style.display='block';
     document.getElementById('sidebar-admin').style.display='block';
+    document.getElementById('sidebar-switch').style.display='block';
     const reviewLink = document.getElementById('review-wps-link');
     if(reviewLink) reviewLink.style.display='flex';
     updatePendingBadge();
     const editBtn=document.getElementById('btn-edit-project'); if(editBtn) editBtn.style.display='flex';
     if(profile.role==='super_admin') { const delBtn=document.getElementById('btn-delete-project'); if(delBtn) delBtn.style.display='flex'; }
+    // Track recently visited project
+    trackRecentProject(projId);
+    renderRecentProjects();
   }
 
   if(typeof renderUserBar==='function') renderUserBar('user-bar', profile);
@@ -1012,6 +1066,40 @@ AppAuth.requireLogin(async (user, profile) => {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('main-content').style.display = 'block';
 });
+
+// ── Recent projects (localStorage) ────────────────────────────────
+const RECENT_KEY = 'wpm_recent_projects';
+const MAX_RECENT = 5;
+
+function trackRecentProject(id) {
+  if (!id) return;
+  let recent = getRecentProjects().filter(r => r !== id);
+  recent.unshift(id);
+  if (recent.length > MAX_RECENT) recent = recent.slice(0, MAX_RECENT);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch(e){}
+}
+
+function getRecentProjects() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch(e){ return []; }
+}
+
+window.clearRecentProjects = function() {
+  try { localStorage.removeItem(RECENT_KEY); } catch(e){}
+  renderRecentProjects();
+};
+
+function renderRecentProjects() {
+  const recent = getRecentProjects().filter(id => id !== projId);
+  const sec = document.getElementById('recent-projects-section');
+  const list = document.getElementById('recent-projects-list');
+  if (!sec || !list) return;
+  if (!recent.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  list.innerHTML = recent.map(id => `
+    <a class="nav-item" href="project.html?id=${id}" style="font-size:12px;opacity:.8">
+      <i class="ti ti-history" style="font-size:14px"></i>${id}
+    </a>`).join('');
+}
 </script>
 
 <style>

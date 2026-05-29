@@ -69,14 +69,26 @@
     </div>
     <div class="sidebar-section">
       <div class="sidebar-section-label">Projects</div>
+      <!-- Searchable project list -->
+      <div id="sidebar-proj-search-wrap" style="padding:0 4px 6px;display:none">
+        <div style="position:relative">
+          <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.3);font-size:12px;pointer-events:none"></i>
+          <input id="sidebar-proj-search" type="text" placeholder="Search projects…" oninput="filterSidebarProjects(this.value)"
+            style="width:100%;padding:6px 8px 6px 28px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:11px;color:#fff;font-family:inherit;outline:none">
+        </div>
+      </div>
       <div id="nav-projects-admin"></div>
-      <button class="nav-item" onclick="openNewProjectModal()" style="width:100%;text-align:left;background:transparent;border:none;cursor:pointer;font-family:inherit;color:rgba(255,255,255,0.7);font-size:13px;padding:8px 12px;border-radius:8px;display:flex;align-items:center;gap:8px;transition:.15s" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='transparent'">
-        <i class="ti ti-folder-plus" style="font-size:16px"></i>New Project
+      <button class="nav-item" onclick="openNewProjectModal()">
+        <i class="ti ti-folder-plus"></i>New Project
       </button>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-section-label">Admin</div>
       <a class="nav-item active" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Navigate</div>
+      <a class="nav-item" href="login.html"><i class="ti ti-switch-horizontal"></i>Switch Project</a>
     </div>
     <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
@@ -380,11 +392,15 @@
   async function loadData() {
     try {
       [allUsers, allProjects] = await Promise.all([WPDb.getAllUsers(), WPDb.getProjects()]);
-      // Populate sidebar project links
+      // Populate sidebar project links (with search when > 8 projects)
+      const activeProjects = allProjects.filter(p=>p.status!=='archived');
+      window._sidebarProjects = activeProjects;
       const navProj = document.getElementById('nav-projects-admin');
-      if (navProj) navProj.innerHTML = allProjects.filter(p=>p.status!=='archived').map(p=>
-        `<a class="nav-item" href="project.html?id=${p.id}"><i class="ti ti-building-skyscraper"></i>${p.id}<span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name&&p.name!==p.id?p.name:'').slice(0,10)}</span></a>`
-      ).join('');
+      if (navProj) renderSidebarProjects('');
+      if (activeProjects.length > 8) {
+        const sw = document.getElementById('sidebar-proj-search-wrap');
+        if (sw) sw.style.display = 'block';
+      }
       updateKPIs();
 
       // Populate bulk project select
@@ -617,6 +633,27 @@ window.addEventListener('beforeunload', function(e) {
     return e.returnValue;
   }
 });
+
+  // ── Sidebar project search ────────────────────────────────────
+  function renderSidebarProjects(q) {
+    const navProj = document.getElementById('nav-projects-admin');
+    if (!navProj || !window._sidebarProjects) return;
+    const filtered = q
+      ? window._sidebarProjects.filter(p=>p.id.toLowerCase().includes(q)||((p.name||'').toLowerCase().includes(q)))
+      : window._sidebarProjects;
+    const MAX_SHOW = 8;
+    const shown = filtered.slice(0, MAX_SHOW);
+    navProj.innerHTML = shown.map(p=>
+      `<a class="nav-item" href="project.html?id=${p.id}"><i class="ti ti-building-skyscraper"></i>${p.id}
+       <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name&&p.name!==p.id?p.name:'').slice(0,10)}</span></a>`
+    ).join('') + (filtered.length > MAX_SHOW
+      ? `<div style="font-size:10px;color:rgba(255,255,255,.35);padding:4px 12px">${filtered.length - MAX_SHOW} more — search above</div>`
+      : '');
+  }
+
+  window.filterSidebarProjects = function(q) {
+    renderSidebarProjects(q.toLowerCase().trim());
+  };
 
   // ── Init ──────────────────────────────────────────────────────
   AppAuth.requireAdmin(async (user, profile) => {
