@@ -120,22 +120,18 @@ Current Project
 
 Work Packages
   ├─ Add Work Package
-  ├─ Review WPs (admin only, with pending badge)
-  ├─ All WPs
-  ├─ CSV Template
-  └─ Import from CSV
+  └─ Review WPs (admin only, with pending badge)
 
 Claims (EOT)
   ├─ Add Claim (→ claim-form.html?project=ID)
-  ├─ Claims Register (→ project.html?tab=claims)
-  ├─ CSV Template (downloadClaimsCSVTemplate)
-  └─ Import from CSV (openClaimsCSVModal)
+  └─ Claims Register (→ project.html?tab=claims)
 
 Change Orders
   ├─ Add Change Order (→ claim-form.html?project=ID&section=change-order)
-  ├─ Change Orders (→ project.html?tab=change-orders)
-  ├─ CSV Template (downloadCOsCSVTemplate)
-  └─ Import from CSV (openCOsCSVModal)
+  └─ Change Orders (→ project.html?tab=change-orders)
+
+Tools
+  └─ Download Template → opens picker modal (WP / Claims / Change Orders)
 
 Admin (admin only)
   ├─ Portfolio Overview (→ index.html?view=consolidated)
@@ -199,6 +195,24 @@ Six-tab layout matching Power BI format:
 **Read-only:** Consolidated view is read-only (no add/edit). Export button hidden on mobile. READ-ONLY badge hidden on mobile via `.topbar-badge-readonly { display: none }` — do NOT add `display:inline-flex` as inline style or the media query cannot override it.
 
 ---
+
+## Template Picker Modal (shared pattern across pages)
+
+A single "Download Template" button in the sidebar Tools section opens a picker modal with three styled cards:
+- **Work Packages** — downloads `WPM_Import_Template.csv` via `downloadCSVTemplate()`
+- **Claims (EOT)** — downloads `Claims_Import_Template.csv` via `downloadClaimsCSVTemplate()`
+- **Change Orders** — downloads `ChangeOrders_Import_Template.csv` via `downloadCOsCSVTemplate()`
+
+Present on: `project.html` (`#template-picker-modal`), `wp-form.html` (`#template-picker-modal`), `claim-form.html` (`#template-picker-modal`). All three download functions must be defined on each page that hosts the modal.
+
+`openTemplatePickerModal()` / `closeTemplatePickerModal()` — toggle `display:flex/none`.
+
+## CSV Import — moved into forms
+
+CSV import is no longer in the sidebar. Each form has a **bulk import banner** at the top of the content area:
+
+- **`wp-form.html`** — banner with Template + Import CSV buttons; `openWPImportModal()` opens `#wp-import-modal`; after import redirects to `project.html?id=<pid>`
+- **`claim-form.html`** — banner label updates to "Claims" or "Change Orders" based on `isCO`; Import CSV button calls `openClaimsCSVModal()` or `openCOsCSVModal()` accordingly
 
 ## CSV Import Feature (project.html)
 
