@@ -54,15 +54,15 @@
       <div class="sidebar-section-label">Claims (EOT)</div>
       <a class="nav-item" id="sb-new-claim-link" href="#"><i class="ti ti-file-plus"></i>New Claim</a>
       <a class="nav-item" id="cl-register-link" href="project.html"><i class="ti ti-file-invoice"></i>Claims Register</a>
-      <button class="nav-item" onclick="downloadClaimsCSVTemplate()"><i class="ti ti-download"></i>CSV Template</button>
-      <button class="nav-item" onclick="openClaimsCSVModal()"><i class="ti ti-upload"></i>Import from CSV</button>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-section-label">Change Orders</div>
       <a class="nav-item" id="sb-new-co-link" href="#"><i class="ti ti-file-plus"></i>New Change Order</a>
       <a class="nav-item" id="co-register-link" href="project.html"><i class="ti ti-file-description"></i>Change Orders</a>
-      <button class="nav-item" onclick="downloadCOsCSVTemplate()"><i class="ti ti-download"></i>CSV Template</button>
-      <button class="nav-item" onclick="openCOsCSVModal()"><i class="ti ti-upload"></i>Import from CSV</button>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Tools</div>
+      <button class="nav-item" onclick="openTemplatePickerModal()"><i class="ti ti-download"></i>Download Template</button>
     </div>
     <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
@@ -83,6 +83,19 @@
       <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading…</span></div>
       <div id="main-content" style="display:none">
         <div class="panel">
+
+          <!-- Bulk Import banner -->
+          <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <i class="ti ti-table-import" style="font-size:20px;color:#2563EB;flex-shrink:0"></i>
+            <div style="flex:1;min-width:180px">
+              <div style="font-size:12px;font-weight:700;color:#1e40af" id="import-banner-title">Bulk Import Claims via CSV</div>
+              <div style="font-size:11px;color:#3b82f6;margin-top:1px">Upload a CSV file to add multiple records at once.</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-shrink:0">
+              <button onclick="openTemplatePickerModal()" style="font-size:11px;font-weight:600;padding:6px 12px;border:1.5px solid #BFDBFE;border-radius:7px;background:#fff;color:#1e40af;cursor:pointer;font-family:inherit"><i class="ti ti-download" style="font-size:11px"></i> Template</button>
+              <button id="import-banner-btn" onclick="isCO ? openCOsCSVModal() : openClaimsCSVModal()" style="font-size:11px;font-weight:600;padding:6px 12px;border:none;border-radius:7px;background:#2563EB;color:#fff;cursor:pointer;font-family:inherit"><i class="ti ti-upload" style="font-size:11px"></i> Import CSV</button>
+            </div>
+          </div>
 
           <div id="rejection-box" class="rejection-box hidden">
             <strong><i class="ti ti-x"></i> Claim Rejected</strong>
@@ -223,6 +236,14 @@
     document.getElementById('sb-new-claim-link').classList.add('active');
   }
 
+  // Update bulk import banner label to match section
+  const bannerTitle = document.getElementById('import-banner-title');
+  if (bannerTitle) bannerTitle.textContent = isCO ? 'Bulk Import Change Orders via CSV' : 'Bulk Import Claims via CSV';
+
+  // Template picker
+  window.openTemplatePickerModal  = () => document.getElementById('template-picker-modal').style.display = 'flex';
+  window.closeTemplatePickerModal = () => document.getElementById('template-picker-modal').style.display = 'none';
+
   // Lock claim type dropdown based on section
   const claimTypeEl = document.getElementById('f-claim-type');
   if (isCO) {
@@ -359,6 +380,16 @@
     if (!v) return null;
     try { const d = new Date(v); return isNaN(d) ? null : d.toISOString().split('T')[0]; } catch { return null; }
   }
+
+  window.downloadCSVTemplate = function() {
+    const h = ['Cost Code','WP No.','Description','Zone','Trade',
+      'Planned Award Date','Actual Award Date','Target Delivery Date','Target Completion Date','Target Installation Date',
+      'Lead Time (Days)','Budget BCB (PHP)','Total Awarded (PHP)','Procurement Status','Award Status',
+      'Contractor','PO/JO Count','PO/JO Numbers','Remarks'];
+    const r1 = ['03-001','WP-001','Mobilization/Demobilization','','GENERAL REQUIREMENT','05/31/2026','','06/07/2026','06/30/2026','','7','500000','','Not Yet Awarded','Not Yet Awarded','','','',''];
+    const r2 = ['03-002','WP-002','Tower Foundation Works','Tower 1','STRUCTURAL WORKS','06/15/2026','07/01/2026','07/08/2026','08/31/2026','09/15/2026','14','2000000','1850000','Awarded','Awarded','ABC Construction Inc.','1','JO-2026-001',''];
+    downloadCSVBlob([h,r1,r2].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n'), 'WPM_Import_Template.csv');
+  };
 
   window.downloadClaimsCSVTemplate = function() {
     const h = ['Claim No.','Party','Description','Linked WP No.','Contractor / Client Name','Date Filed','Amount Claimed (PHP)','Basis / Grounds','Status','Remarks'];
@@ -525,6 +556,45 @@
     }
   }
 </script>
+
+<!-- ── Template Picker Modal ── -->
+<div id="template-picker-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeTemplatePickerModal()">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden">
+    <div style="padding:20px 20px 16px;border-bottom:1px solid #f0f0f0">
+      <div style="font-size:15px;font-weight:700;color:#231F20">Download CSV Template</div>
+      <div style="font-size:12px;color:#888;margin-top:2px">Select which template you need</div>
+    </div>
+    <div style="padding:14px 20px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border:1.5px solid #e5e5e5;border-radius:10px;cursor:pointer" onmouseenter="this.style.borderColor='#EE3124'" onmouseleave="this.style.borderColor='#e5e5e5'" onclick="downloadCSVTemplate();closeTemplatePickerModal()">
+        <div style="width:36px;height:36px;background:#EFF6FF;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-clipboard-list" style="font-size:18px;color:#2563EB"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:#231F20">Work Packages</div>
+          <div style="font-size:11px;color:#888;margin-top:1px">Cost code, WP no., trade, budget, dates, contractor…</div>
+        </div>
+        <i class="ti ti-download" style="font-size:16px;color:#aaa;flex-shrink:0"></i>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border:1.5px solid #e5e5e5;border-radius:10px;cursor:pointer" onmouseenter="this.style.borderColor='#EE3124'" onmouseleave="this.style.borderColor='#e5e5e5'" onclick="downloadClaimsCSVTemplate();closeTemplatePickerModal()">
+        <div style="width:36px;height:36px;background:#FFFBEB;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-file-invoice" style="font-size:18px;color:#D97706"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:#231F20">Claims (EOT)</div>
+          <div style="font-size:11px;color:#888;margin-top:1px">Claim no., party, description, amount, basis…</div>
+        </div>
+        <i class="ti ti-download" style="font-size:16px;color:#aaa;flex-shrink:0"></i>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border:1.5px solid #e5e5e5;border-radius:10px;cursor:pointer" onmouseenter="this.style.borderColor='#EE3124'" onmouseleave="this.style.borderColor='#e5e5e5'" onclick="downloadCOsCSVTemplate();closeTemplatePickerModal()">
+        <div style="width:36px;height:36px;background:#F0FDF4;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-file-description" style="font-size:18px;color:#16A34A"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:#231F20">Change Orders</div>
+          <div style="font-size:11px;color:#888;margin-top:1px">CO no., party, description, amount, basis…</div>
+        </div>
+        <i class="ti ti-download" style="font-size:16px;color:#aaa;flex-shrink:0"></i>
+      </div>
+    </div>
+    <div style="padding:0 20px 18px;display:flex;justify-content:flex-end">
+      <button onclick="closeTemplatePickerModal()" style="padding:8px 18px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── Claims CSV Import Modal ── -->
 <div id="claims-csv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeClaimsCSVModal()">

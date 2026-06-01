@@ -48,6 +48,10 @@
       <a class="nav-item active" href="#"><i class="ti ti-forms"></i>WP Form</a>
       <a class="nav-item" id="review-link-form" href="review.html" style="display:none"><i class="ti ti-clipboard-check"></i>Review WPs <span class="tbadge" id="pending-badge" style="display:none"></span></a>
     </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Tools</div>
+      <button class="nav-item" onclick="openTemplatePickerModal()"><i class="ti ti-download"></i>Download Template</button>
+    </div>
     <div id="sidebar-admin" style="display:none">
       <div class="sidebar-section">
         <div class="sidebar-section-label">Admin</div>
@@ -84,6 +88,19 @@
         </div>
         <div class="alert alert-success hidden" id="success">
           <i class="ti ti-circle-check" style="flex-shrink:0"></i><span id="success-text"></span>
+        </div>
+
+        <!-- Bulk Import banner -->
+        <div id="import-banner" style="display:none;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <i class="ti ti-table-import" style="font-size:20px;color:#2563EB;flex-shrink:0"></i>
+          <div style="flex:1;min-width:180px">
+            <div style="font-size:12px;font-weight:700;color:#1e40af">Bulk Import via CSV</div>
+            <div style="font-size:11px;color:#3b82f6;margin-top:1px">Upload a CSV file to import multiple work packages at once.</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            <button onclick="downloadCSVTemplate()" style="font-size:11px;font-weight:600;padding:6px 12px;border:1.5px solid #BFDBFE;border-radius:7px;background:#fff;color:#1e40af;cursor:pointer;font-family:inherit"><i class="ti ti-download" style="font-size:11px"></i> Template</button>
+            <button onclick="openWPImportModal()" style="font-size:11px;font-weight:600;padding:6px 12px;border:none;border-radius:7px;background:#2563EB;color:#fff;cursor:pointer;font-family:inherit"><i class="ti ti-upload" style="font-size:11px"></i> Import CSV</button>
+          </div>
         </div>
 
         <div class="panel">
@@ -755,6 +772,183 @@ AppAuth.requireLogin(async (user, profile) => {
 
     btn.disabled = false; spinner.style.display = 'none';
   }
+
+  // ── CSV helpers ───────────────────────────────────────────────────────
+  function _downloadBlob(csv, filename) {
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  window.downloadCSVTemplate = function() {
+    const headers = ['Cost Code','WP No.','Description','Zone','Trade',
+      'Planned Award Date','Actual Award Date','Target Delivery Date','Target Completion Date','Target Installation Date',
+      'Lead Time (Days)','Budget BCB (PHP)','Total Awarded (PHP)',
+      'Procurement Status','Award Status','Contractor','PO/JO Count','PO/JO Numbers','Remarks'];
+    const ex1 = ['03-001','WP-001','Mobilization/Demobilization','','GENERAL REQUIREMENT',
+      '05/31/2026','','06/07/2026','06/30/2026','','7','500000','','Not Yet Awarded','Not Yet Awarded','','','',''];
+    const ex2 = ['03-002','WP-002','Tower Foundation Works','Tower 1','STRUCTURAL WORKS',
+      '06/15/2026','07/01/2026','07/08/2026','08/31/2026','09/15/2026','14','2000000','1850000',
+      'Awarded','Awarded','ABC Construction Inc.','1','JO-2026-001',''];
+    _downloadBlob([headers,ex1,ex2].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n'), 'WPM_Import_Template.csv');
+  };
+
+  window.downloadClaimsCSVTemplate = function() {
+    const h = ['Claim No.','Party','Description','Linked WP No.','Contractor / Client Name','Date Filed','Amount Claimed (PHP)','Basis / Grounds','Status','Remarks'];
+    const r1 = ['CLM-001','Client','Extension of time due to design changes','WP-42','ABC Corp','05/15/2026','500000','Contract clause 12.3','Filed',''];
+    const r2 = ['CLM-002','Vendor','Additional material costs','WP-15','XYZ Steel','06/01/2026','250000','Force majeure','Under Review',''];
+    _downloadBlob([h,r1,r2].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n'), 'Claims_Import_Template.csv');
+  };
+
+  window.downloadCOsCSVTemplate = function() {
+    const h = ['CO No.','Party','Description','Linked WP No.','Contractor / Client Name','Date Filed','Amount Claimed (PHP)','Basis / Grounds','Status','Remarks'];
+    const r1 = ['CO-001','Client','Additional scope — perimeter fencing','WP-07','Project Owner','05/20/2026','1200000','Variation order','Filed',''];
+    const r2 = ['CO-002','Vendor','Scope increase — additional piling','WP-03','DEF Foundation Inc.','06/01/2026','800000','Unforeseen soil conditions','Under Review',''];
+    _downloadBlob([h,r1,r2].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n'), 'ChangeOrders_Import_Template.csv');
+  };
+
+  // Template picker
+  window.openTemplatePickerModal  = () => document.getElementById('template-picker-modal').style.display = 'flex';
+  window.closeTemplatePickerModal = () => document.getElementById('template-picker-modal').style.display = 'none';
+
+  // WP CSV import
+  let _wpCsvData = null;
+  window.openWPImportModal = function() {
+    _wpCsvData = null;
+    document.getElementById('wp-csv-file').value = '';
+    document.getElementById('wp-csv-status').textContent = '';
+    document.getElementById('wp-csv-error').style.display = 'none';
+    const btn = document.getElementById('wp-csv-btn'); btn.disabled = true; btn.style.opacity = '.5';
+    document.getElementById('wp-import-modal').style.display = 'flex';
+  };
+  window.closeWPImportModal = function() {
+    document.getElementById('wp-import-modal').style.display = 'none';
+    _wpCsvData = null;
+  };
+  window.handleWPCsvFile = function(file) {
+    if (!file) return;
+    const errEl = document.getElementById('wp-csv-error');
+    if (!file.name.endsWith('.csv')) { errEl.textContent = 'Please select a CSV file.'; errEl.style.display = 'block'; return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const lines = e.target.result.trim().split('\n');
+        if (lines.length < 2) throw new Error('CSV must have a header row and at least one data row.');
+        _wpCsvData = lines;
+        document.getElementById('wp-csv-status').textContent = `✓ Ready to import ${lines.length - 1} work package(s)`;
+        errEl.style.display = 'none';
+        const btn = document.getElementById('wp-csv-btn'); btn.disabled = false; btn.style.opacity = '1';
+      } catch(err) { errEl.textContent = 'Error: ' + err.message; errEl.style.display = 'block'; _wpCsvData = null; }
+    };
+    reader.readAsText(file);
+  };
+  window.importWPsFromCSV = async function() {
+    if (!_wpCsvData) return;
+    const btn = document.getElementById('wp-csv-btn');
+    const errEl = document.getElementById('wp-csv-error');
+    btn.textContent = 'Importing…'; btn.disabled = true; errEl.style.display = 'none';
+    function parseRow(line) {
+      const cells = []; let cur = '', inQ = false;
+      for (const ch of line) { if (ch==='"') inQ=!inQ; else if (ch===','&&!inQ){cells.push(cur.trim());cur='';}else cur+=ch; }
+      cells.push(cur.trim()); return cells;
+    }
+    function pDate(v) { if(!v) return null; try{const d=new Date(v);return isNaN(d)?null:d.toISOString().split('T')[0];}catch{return null;} }
+    try {
+      const pid = new URLSearchParams(location.search).get('project');
+      if (!pid) throw new Error('No project in URL. Open this form from a project page.');
+      const sb = await getSB();
+      const userId = (await sb.auth.getUser()).data.user.id;
+      const role = window.__wpmRole || 'user';
+      const rows = _wpCsvData.slice(1).map(parseRow).filter(r => r[2]);
+      for (const r of rows) {
+        const isNew = r.length >= 15;
+        const wpData = isNew ? {
+          project_id:r[0]||pid, cost_code:r[0], wp_no:r[1], description:r[2], zone:r[3]||null, trade:r[4],
+          awarding_date:pDate(r[5]), actual_awarding_date:pDate(r[6]), target_delivery:pDate(r[7]),
+          target_completion:pDate(r[8]), target_installation:pDate(r[9]),
+          awarding_lead_time:parseInt(r[10])||null, approved_budget_bcb:parseFloat(r[11])||0,
+          total_awarded:parseFloat(r[12])||null, procurement_status:r[13]||'Not Yet Awarded',
+          award_status:r[14]||'Not Yet Awarded', contractor:r[15]||null,
+          po_jo_count:parseInt(r[16])||null, po_jo_numbers:r[17]||null, remarks:r[18]||''
+        } : {
+          project_id:pid, cost_code:r[0], wp_no:r[1], description:r[2], zone:r[3]||null, trade:r[4],
+          awarding_date:pDate(r[5]), target_completion:pDate(r[6]),
+          approved_budget_bcb:parseFloat(r[7])||0, award_status:r[8]||'Not Yet Awarded',
+          contractor:r[9]||null, remarks:r[10]||''
+        };
+        wpData.project_id = pid;
+        const newWP = await WPDb.submitWP(wpData, { id: userId });
+        if (['admin','super_admin'].includes(role) && newWP?.id) await WPDb.approveWP(newWP.id);
+      }
+      document.getElementById('wp-csv-status').textContent = `✓ Imported ${rows.length} work package(s) successfully`;
+      setTimeout(() => { closeWPImportModal(); location.href = 'project.html?id=' + pid; }, 1400);
+    } catch(err) {
+      errEl.textContent = 'Import error: ' + err.message; errEl.style.display = 'block';
+      btn.textContent = 'Import'; btn.disabled = false;
+    }
+  };
 </script>
+
+<!-- ── Template Picker Modal ── -->
+<div id="template-picker-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeTemplatePickerModal()">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden">
+    <div style="padding:20px 20px 16px;border-bottom:1px solid #f0f0f0">
+      <div style="font-size:15px;font-weight:700;color:#231F20">Download CSV Template</div>
+      <div style="font-size:12px;color:#888;margin-top:2px">Select which template you need</div>
+    </div>
+    <div style="padding:14px 20px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border:1.5px solid #e5e5e5;border-radius:10px;cursor:pointer" onmouseenter="this.style.borderColor='#EE3124'" onmouseleave="this.style.borderColor='#e5e5e5'" onclick="downloadCSVTemplate();closeTemplatePickerModal()">
+        <div style="width:36px;height:36px;background:#EFF6FF;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-clipboard-list" style="font-size:18px;color:#2563EB"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:#231F20">Work Packages</div>
+          <div style="font-size:11px;color:#888;margin-top:1px">Cost code, WP no., trade, budget, dates, contractor…</div>
+        </div>
+        <i class="ti ti-download" style="font-size:16px;color:#aaa;flex-shrink:0"></i>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border:1.5px solid #e5e5e5;border-radius:10px;cursor:pointer" onmouseenter="this.style.borderColor='#EE3124'" onmouseleave="this.style.borderColor='#e5e5e5'" onclick="downloadClaimsCSVTemplate();closeTemplatePickerModal()">
+        <div style="width:36px;height:36px;background:#FFFBEB;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-file-invoice" style="font-size:18px;color:#D97706"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:#231F20">Claims (EOT)</div>
+          <div style="font-size:11px;color:#888;margin-top:1px">Claim no., party, description, amount, basis…</div>
+        </div>
+        <i class="ti ti-download" style="font-size:16px;color:#aaa;flex-shrink:0"></i>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border:1.5px solid #e5e5e5;border-radius:10px;cursor:pointer" onmouseenter="this.style.borderColor='#EE3124'" onmouseleave="this.style.borderColor='#e5e5e5'" onclick="downloadCOsCSVTemplate();closeTemplatePickerModal()">
+        <div style="width:36px;height:36px;background:#F0FDF4;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-file-description" style="font-size:18px;color:#16A34A"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:#231F20">Change Orders</div>
+          <div style="font-size:11px;color:#888;margin-top:1px">CO no., party, description, amount, basis…</div>
+        </div>
+        <i class="ti ti-download" style="font-size:16px;color:#aaa;flex-shrink:0"></i>
+      </div>
+    </div>
+    <div style="padding:0 20px 18px;display:flex;justify-content:flex-end">
+      <button onclick="closeTemplatePickerModal()" style="padding:8px 18px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── WP CSV Import Modal ── -->
+<div id="wp-import-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeWPImportModal()">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:500px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <div style="padding:20px 20px 16px">
+      <div style="font-size:15px;font-weight:700;color:#231F20;margin-bottom:3px">Import Work Packages</div>
+      <div style="font-size:12px;color:#888;margin-bottom:14px">Upload a CSV file. <button onclick="downloadCSVTemplate()" style="background:none;border:none;color:#2563EB;font-size:12px;cursor:pointer;padding:0;font-family:inherit;text-decoration:underline">Download template</button></div>
+      <div style="border:2px dashed #e5e5e5;border-radius:10px;padding:20px;text-align:center;cursor:pointer" onclick="document.getElementById('wp-csv-file').click()">
+        <i class="ti ti-cloud-upload" style="font-size:28px;color:#888;display:block;margin-bottom:6px"></i>
+        <div style="font-size:13px;color:#333;font-weight:600">Click to upload or drag file here</div>
+        <div style="font-size:11px;color:#888;margin-top:3px">CSV files only</div>
+      </div>
+      <input type="file" id="wp-csv-file" accept=".csv" style="display:none" onchange="handleWPCsvFile(this.files[0])">
+      <div id="wp-csv-status" style="margin-top:10px;font-size:12px;color:#166534"></div>
+      <div id="wp-csv-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 12px;font-size:12px;margin-top:10px"></div>
+    </div>
+    <div style="padding:0 20px 20px;display:flex;gap:10px">
+      <button id="wp-csv-btn" onclick="importWPsFromCSV()" disabled style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;opacity:.5">Import</button>
+      <button onclick="closeWPImportModal()" style="padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
