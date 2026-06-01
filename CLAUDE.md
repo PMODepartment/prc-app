@@ -257,7 +257,7 @@ Optional field on each Work Package (`claim_tag` column in `work_packages`). Set
 
 ## Claims & Change Orders register (HIDDEN — independent feature, not yet active)
 
-The full Claims & Change Orders register (`claims` table, `claim-form.html`, `view-claims-register` tab) is built but hidden. To re-enable: remove `style="display:none"` from the sidebar section and tab button in `project.html`.
+The full Claims & Change Orders register (`claims` table, `claim-form.html`, `view-claims-register` tab) is built but hidden. To re-enable: remove `style="display:none"` from the sidebar section and tab button in `project.html`, and the Claims tab button in `index.html`.
 
 ### Data Model (claims table)
 
