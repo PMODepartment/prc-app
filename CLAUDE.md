@@ -61,9 +61,11 @@ WPDb.archiveProject(id)       // sets status='archived'
 WPDb.unarchiveProject(id)
 WPDb.deleteProject(id)        // also deletes all WPs
 
-WPDb.getApprovedWPs(pid)      // approved WPs for project
-WPDb.getAllWPs(pid)            // all WPs regardless of status
-WPDb.getPendingWPs()          // pending_review WPs (admin)
+WPDb.getApprovedWPs(pid)                  // approved WPs for one project
+WPDb.getAllApprovedWPs()                  // all approved WPs (admin — single query, all projects)
+WPDb.getApprovedWPsForProjects(ids)       // approved WPs for array of project IDs (single .in() query — used by consolidated dashboard)
+WPDb.getAllWPs(pid)                       // all WPs regardless of status
+WPDb.getPendingWPs()                      // pending_review WPs (admin)
 WPDb.submitWP(data, user)     // inserts with review_status='pending_review'
 WPDb.updateWP(id, data)       // update (resets to pending_review)
 WPDb.updateWPDirect(id, data) // update without status change
