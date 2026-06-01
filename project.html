@@ -80,25 +80,11 @@
       </div>
     </div>
 
-    <!-- Admin section — all global admin links in one place -->
+    <!-- Admin section -->
     <div id="sidebar-admin" style="display:none">
       <div class="sidebar-section">
         <div class="sidebar-section-label">Admin</div>
-        <a class="nav-item" href="index.html?view=consolidated" id="nav-all-projects-link"><i class="ti ti-layout-grid"></i>Portfolio Overview</a>
         <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
-      </div>
-      <!-- Pinned projects -->
-      <div class="sidebar-section" id="pinned-projects-section" style="display:none">
-        <div class="sidebar-section-label">Pinned</div>
-        <div id="pinned-projects-list"></div>
-      </div>
-      <!-- Recently visited projects -->
-      <div class="sidebar-section" id="recent-projects-section" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 8px;margin-bottom:4px">
-          <div class="sidebar-section-label" style="margin-bottom:0">Recent Projects</div>
-          <button onclick="clearRecentProjects()" style="font-size:9px;color:rgba(255,255,255,.3);background:none;border:none;cursor:pointer;padding:0">clear</button>
-        </div>
-        <div id="recent-projects-list"></div>
       </div>
     </div>
 
@@ -922,8 +908,6 @@ AppAuth.requireLogin(async (user, profile) => {
     updatePendingBadge();
     const editBtn=document.getElementById('btn-edit-project'); if(editBtn) editBtn.style.display='flex';
     if(profile.role==='super_admin') { const delBtn=document.getElementById('btn-delete-project'); if(delBtn) delBtn.style.display='flex'; }
-    trackRecentProject(projId);
-    renderRecentProjects();
   }
 
   if(typeof renderUserBar==='function') renderUserBar('user-bar', profile);
@@ -1238,60 +1222,7 @@ AppAuth.requireLogin(async (user, profile) => {
   document.getElementById('main-content').style.display = 'block';
 });
 
-// ── Recent projects (localStorage) ────────────────────────────────
-const RECENT_KEY = 'wpm_recent_projects';
-const MAX_RECENT = 5;
 
-function trackRecentProject(id) {
-  if (!id) return;
-  let recent = getRecentProjects().filter(r => r !== id);
-  recent.unshift(id);
-  if (recent.length > MAX_RECENT) recent = recent.slice(0, MAX_RECENT);
-  try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch(e){}
-}
-
-function getRecentProjects() {
-  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch(e){ return []; }
-}
-
-window.clearRecentProjects = function() {
-  try { localStorage.removeItem(RECENT_KEY); } catch(e){}
-  renderRecentProjects();
-};
-
-function renderRecentProjects() {
-  const userId = window.__profile && window.__profile.id;
-  const recent = getRecentProjects().filter(id => id !== projId);
-  const sec = document.getElementById('recent-projects-section');
-  const list = document.getElementById('recent-projects-list');
-  const pinnedSec = document.getElementById('pinned-projects-section');
-  const pinnedList = document.getElementById('pinned-projects-list');
-
-  // Render pinned projects (excluding current)
-  if (userId && pinnedSec && pinnedList) {
-    const pinned = SidebarPrefs.getPinned(userId).filter(id => id !== projId);
-    if (pinned.length) {
-      pinnedSec.style.display = 'block';
-      pinnedList.innerHTML = pinned.map(id => SidebarPrefs.projectLink(userId, {id})).join('');
-    } else {
-      pinnedSec.style.display = 'none';
-    }
-  }
-
-  if (!sec || !list) return;
-  // Only show recent projects that aren't pinned
-  const pinnedSet = userId ? new Set(SidebarPrefs.getPinned(userId)) : new Set();
-  const unpinnedRecent = recent.filter(id => !pinnedSet.has(id));
-  if (!unpinnedRecent.length) { sec.style.display = 'none'; return; }
-  sec.style.display = 'block';
-  list.innerHTML = userId
-    ? unpinnedRecent.map(id => SidebarPrefs.projectLink(userId, {id})).join('')
-    : unpinnedRecent.map(id => `
-        <a class="nav-item" href="project.html?id=${id}" style="font-size:12px;opacity:.8">
-          <i class="ti ti-history" style="font-size:14px"></i>${id}
-        </a>`).join('');
-}
-window.__sidebarRefresh = renderRecentProjects;
 </script>
 
 <style>
