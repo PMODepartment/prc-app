@@ -61,8 +61,8 @@
           <div class="page-title">Portfolio Overview</div>
           <div class="page-sub" id="page-sub" style="font-size:11px;color:#888"></div>
         </div>
-        <!-- Read-only badge -->
-        <div style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:20px;font-size:10px;font-weight:700;color:#92400E;letter-spacing:.04em;flex-shrink:0">
+        <!-- Read-only badge (hidden on mobile — notice banner already covers it) -->
+        <div class="topbar-badge-readonly" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:20px;font-size:10px;font-weight:700;color:#92400E;letter-spacing:.04em;flex-shrink:0">
           <i class="ti ti-eye" style="font-size:11px"></i> READ-ONLY
         </div>
       </div>
@@ -80,24 +80,14 @@
 
       <div id="main-content" style="display:none">
 
-        <!-- Consolidated view notice -->
-        <div style="display:flex;align-items:flex-start;gap:10px;background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#78350F;line-height:1.5">
-          <i class="ti ti-info-circle" style="font-size:18px;flex-shrink:0;margin-top:1px;color:#D97706"></i>
-          <div>
-            <strong>Portfolio view is read-only.</strong>
-            Work packages and projects cannot be added, edited, or deleted from this view.
-            Click any project card (or use the <strong>Open a Project</strong> sidebar list) to enter that project's dashboard and manage its work packages.
-          </div>
-        </div>
-
-        <!-- Project Filter — collapsible dropdown with search for 250+ projects -->
-        <div id="proj-filter-wrap" style="position:relative;margin-bottom:16px;user-select:none">
+        <!-- Project Filter — always visible above tabs -->
+        <div id="proj-filter-wrap" style="position:relative;margin-bottom:12px;user-select:none">
           <button id="proj-filter-btn" onclick="toggleProjFilter()" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid #e5e5e5;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;font-size:13px;color:#444;box-shadow:0 1px 3px rgba(0,0,0,.06)">
             <i class="ti ti-filter" style="font-size:14px;color:#888"></i>
             <span id="proj-filter-label">All projects</span>
             <i class="ti ti-chevron-down" id="proj-filter-chevron" style="font-size:12px;margin-left:8px;color:#aaa;transition:transform .2s"></i>
           </button>
-          <div id="proj-filter-panel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.1);min-width:300px;max-width:380px;overflow:hidden">
+          <div id="proj-filter-panel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.1);min-width:300px;max-width:90vw;overflow:hidden">
             <div style="padding:10px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px">
               <div style="position:relative;flex:1">
                 <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:12px;pointer-events:none"></i>
@@ -110,110 +100,216 @@
           </div>
         </div>
 
-        <!-- KPI Cards -->
-        <div class="metrics-grid" id="metrics-grid"></div>
-
-        <!-- View toggle: Cards vs Table -->
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <button id="btn-view-cards" onclick="setProjectView('cards')" class="btn" style="background:#231F20;color:#fff;border-color:#231F20">
-            <i class="ti ti-layout-grid"></i> Cards
-          </button>
-          <button id="btn-view-table" onclick="setProjectView('table')" class="btn">
-            <i class="ti ti-table"></i> Table
-          </button>
-          <span id="proj-count-label" style="font-size:11px;color:#888;margin-left:4px"></span>
+        <!-- Tab bar -->
+        <div class="view-tabs" id="view-tabs">
+          <button class="view-tab active" onclick="switchTab('overview')"><i class="ti ti-layout-dashboard"></i>Overview</button>
+          <button class="view-tab" onclick="switchTab('backlog')"><i class="ti ti-clock"></i>Backlog</button>
+          <button class="view-tab" onclick="switchTab('budget')"><i class="ti ti-report-money"></i>Budget</button>
+          <button class="view-tab" onclick="switchTab('schedule')"><i class="ti ti-calendar"></i>Schedule</button>
+          <button class="view-tab" onclick="switchTab('works')"><i class="ti ti-tool"></i>Works</button>
+          <button class="view-tab" onclick="switchTab('wplist')"><i class="ti ti-table"></i>WP List</button>
         </div>
 
-        <!-- Project Cards -->
-        <div class="project-cards" id="project-cards"></div>
+        <!-- ══ OVERVIEW TAB ══ -->
+        <div id="tab-overview">
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:11px;color:#78350F;line-height:1.5">
+            <i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0;margin-top:1px;color:#D97706"></i>
+            <div><strong>Portfolio view is read-only.</strong> Click any project card to enter its dashboard and manage work packages.</div>
+          </div>
+          <div class="metrics-grid" id="metrics-grid"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <button id="btn-view-cards" onclick="setProjectView('cards')" class="btn" style="background:#231F20;color:#fff;border-color:#231F20"><i class="ti ti-layout-grid"></i><span class="hide-mobile"> Cards</span></button>
+            <button id="btn-view-table" onclick="setProjectView('table')" class="btn"><i class="ti ti-table"></i><span class="hide-mobile"> Table</span></button>
+            <span id="proj-count-label" style="font-size:11px;color:#888;margin-left:4px"></span>
+          </div>
+          <div class="project-cards" id="project-cards"></div>
+          <div id="project-table-wrap" style="display:none;margin-bottom:14px">
+            <div class="panel" style="padding:0;overflow:hidden">
+              <div style="padding:10px 14px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <input id="proj-table-search" type="text" placeholder="Search projects…" oninput="filterProjectTable()" style="padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none;width:200px">
+                <select id="proj-table-status" onchange="filterProjectTable()" style="padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff">
+                  <option value="all">All statuses</option><option value="active">Active</option><option value="archived">Archived</option>
+                </select>
+              </div>
+              <div style="overflow-x:auto">
+                <table class="data-table" id="proj-data-table" style="font-size:12px">
+                  <thead><tr>
+                    <th onclick="sortProjTable('id')" style="cursor:pointer">Code ↕</th>
+                    <th onclick="sortProjTable('name')" style="cursor:pointer">Name ↕</th>
+                    <th class="hide-mobile">Location</th>
+                    <th onclick="sortProjTable('wps')" style="cursor:pointer">WPs ↕</th>
+                    <th onclick="sortProjTable('awarded')" style="cursor:pointer">Awarded ↕</th>
+                    <th onclick="sortProjTable('rate')" style="cursor:pointer">Rate ↕</th>
+                    <th onclick="sortProjTable('budget')" style="cursor:pointer" class="hide-mobile">Budget ↕</th>
+                    <th>Status</th><th></th>
+                  </tr></thead>
+                  <tbody id="proj-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Period</div>
+              <div style="position:relative;height:220px"><canvas id="c-ov-period"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+              <div style="position:relative;height:220px"><canvas id="c-ov-status"></canvas></div>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar-mid"></i>Work Package by Trade</div>
+              <div style="position:relative;height:260px"><canvas id="c-ov-trade"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget and Awarded by Trade (₱M)</div>
+              <div style="position:relative;height:260px"><canvas id="c-ov-bud-trade"></canvas></div>
+            </div>
+          </div>
+        </div>
 
-        <!-- Project Table (hidden by default) -->
-        <div id="project-table-wrap" style="display:none;margin-bottom:20px">
+        <!-- ══ BACKLOG TAB ══ -->
+        <div id="tab-backlog" style="display:none">
+          <div class="grid-2" style="margin-bottom:14px">
+            <div class="panel" style="text-align:center">
+              <div id="bl-kpi-due" style="font-size:40px;font-weight:800;color:#EE3124">—</div>
+              <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:4px">WPs Due but Not Awarded</div>
+            </div>
+            <div class="panel" style="text-align:center">
+              <div id="bl-kpi-upcoming" style="font-size:40px;font-weight:800;color:#D97706">—</div>
+              <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Due in Next 30 Days</div>
+            </div>
+          </div>
+          <div class="grid-2" style="margin-bottom:14px">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Aging Bucket</div>
+              <div style="position:relative;height:180px"><canvas id="c-bl-aging"></canvas></div>
+              <div class="panel-title" style="margin-top:16px"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+              <div style="position:relative;height:180px"><canvas id="c-bl-status"></canvas></div>
+            </div>
+            <div class="panel" style="padding:0;overflow:hidden">
+              <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0">
+                <div class="panel-title" style="margin:0"><i class="ti ti-list"></i>Backlog — Not Awarded WPs</div>
+              </div>
+              <div style="overflow-x:auto;max-height:400px;overflow-y:auto">
+                <table class="data-table" id="bl-table" style="font-size:11px">
+                  <thead><tr><th>Project</th><th>WP No.</th><th>Description</th><th>Aging (d)</th><th>Planned Award</th><th>Budget BCB</th></tr></thead>
+                  <tbody id="bl-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Period</div>
+              <div style="position:relative;height:220px"><canvas id="c-bl-period"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>WP by Submittal Status</div>
+              <div style="position:relative;height:220px"><canvas id="c-bl-submittal"></canvas></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ BUDGET TAB ══ -->
+        <div id="tab-budget" style="display:none">
+          <div class="metrics-grid" id="budget-metrics" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px"></div>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Period</div>
+              <div style="position:relative;height:240px"><canvas id="c-bud-period"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget and Awarded by Trade (₱M)</div>
+              <div style="position:relative;height:240px"><canvas id="c-bud-trade"></canvas></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ SCHEDULE TAB ══ -->
+        <div id="tab-schedule" style="display:none">
+          <div class="grid-2" style="margin-bottom:14px">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Period (Planned vs Actual)</div>
+              <div style="position:relative;height:240px"><canvas id="c-sch-period"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar-mid"></i>Work Package by Trade</div>
+              <div style="position:relative;height:240px"><canvas id="c-sch-trade"></canvas></div>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+              <div style="position:relative;height:220px"><canvas id="c-sch-status"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-table"></i>Schedule Summary</div>
+              <div style="overflow-x:auto">
+                <table class="data-table" id="sch-table" style="font-size:11px">
+                  <thead><tr><th>Project</th><th>Total WP</th><th>Awarded</th><th>Due Not Awd</th><th>Not Due</th><th>% Awarded</th></tr></thead>
+                  <tbody id="sch-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ WORKS TAB ══ -->
+        <div id="tab-works" style="display:none">
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) by Period per Trade</div>
+            <div style="position:relative;height:260px"><canvas id="c-wk-period"></canvas></div>
+          </div>
+          <div class="grid-3" style="margin-bottom:14px">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Budget by Trade</div>
+              <div style="position:relative;height:200px"><canvas id="c-wk-bud"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Awarded by Trade</div>
+              <div style="position:relative;height:200px"><canvas id="c-wk-awd"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>WP Count by Trade</div>
+              <div style="position:relative;height:200px"><canvas id="c-wk-count"></canvas></div>
+            </div>
+          </div>
           <div class="panel" style="padding:0;overflow:hidden">
-            <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              <input id="proj-table-search" type="text" placeholder="Search projects…" oninput="filterProjectTable()"
-                style="padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none;width:220px">
-              <select id="proj-table-status" onchange="filterProjectTable()" style="padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff">
-                <option value="all">All statuses</option>
-                <option value="active">Active</option>
-                <option value="archived">Archived</option>
-              </select>
+            <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0">
+              <div class="panel-title" style="margin:0"><i class="ti ti-table"></i>Budget Summary by Trade</div>
             </div>
             <div style="overflow-x:auto">
-              <table class="data-table" id="proj-data-table" style="font-size:12px">
-                <thead><tr>
-                  <th onclick="sortProjTable('id')" style="cursor:pointer">Code ↕</th>
-                  <th onclick="sortProjTable('name')" style="cursor:pointer">Name ↕</th>
-                  <th>Location</th>
-                  <th onclick="sortProjTable('wps')" style="cursor:pointer">WPs ↕</th>
-                  <th onclick="sortProjTable('awarded')" style="cursor:pointer">Awarded ↕</th>
-                  <th onclick="sortProjTable('rate')" style="cursor:pointer">Rate ↕</th>
-                  <th onclick="sortProjTable('budget')" style="cursor:pointer">Budget ↕</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr></thead>
-                <tbody id="proj-table-body"></tbody>
+              <table class="data-table" id="wk-table" style="font-size:11px">
+                <thead><tr><th>Trade</th><th>Total WP</th><th>Budget BCB</th><th>Awarded</th><th>Variance</th><th>% Awd</th></tr></thead>
+                <tbody id="wk-tbody"></tbody>
               </table>
             </div>
           </div>
         </div>
 
-        <!-- Charts Row 1: Budget/Awarded by Period + WP Status donut -->
-        <div class="grid-2">
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Period</div>
-            <div class="legend">
-              <span><span class="legend-dot" style="background:#282C28"></span>Budget BCB</span>
-              <span><span class="legend-dot" style="background:#EE3124"></span>Awarded</span>
-              <span><span class="legend-dot" style="background:#555"></span>Cumul. Budget</span>
-              <span><span class="legend-dot" style="background:#EE3124;opacity:.5"></span>Cumul. Awarded</span>
+        <!-- ══ WP LIST TAB ══ -->
+        <div id="tab-wplist" style="display:none">
+          <div class="panel" style="padding:0;overflow:hidden">
+            <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <div class="panel-title" style="margin:0"><i class="ti ti-table"></i>Work Package Monitoring</div>
+              <input id="wp-mon-search" type="text" placeholder="Search WPs…" oninput="filterWPTable()"
+                style="margin-left:auto;padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none;width:180px">
             </div>
-            <div style="position:relative;height:220px"><canvas id="c-period"></canvas></div>
-          </div>
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
-            <div style="position:relative;height:220px"><canvas id="c-wp-status-ov"></canvas></div>
-          </div>
-        </div>
-
-        <!-- Charts Row 2: WP by Trade + Budget by Trade -->
-        <div class="grid-2">
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-bar-mid"></i>Work Package by Trade</div>
-            <div class="legend">
-              <span><span class="legend-dot" style="background:#282C28"></span>Total WP</span>
-              <span><span class="legend-dot" style="background:#EE3124"></span>Awarded WP</span>
+            <div style="overflow-x:auto">
+              <table class="data-table" id="wp-mon-table" style="font-size:11px;min-width:900px">
+                <thead><tr>
+                  <th>Project</th><th>WP No.</th><th>Description</th><th>Status</th>
+                  <th>Budget</th><th>Awarded</th><th>Variance</th><th>%Var</th>
+                  <th>Planned Award</th><th>Actual Award</th><th>Aging</th><th>Submittal</th>
+                </tr></thead>
+                <tbody id="wp-mon-body"></tbody>
+              </table>
             </div>
-            <div style="position:relative;height:260px"><canvas id="c-wp-trade"></canvas></div>
+            <div id="wp-mon-pager" style="padding:8px 16px;font-size:11px;color:#888;display:flex;align-items:center;gap:8px"></div>
           </div>
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget and Awarded by Trade (₱M)</div>
-            <div class="legend">
-              <span><span class="legend-dot" style="background:#282C28"></span>Budget BCB</span>
-              <span><span class="legend-dot" style="background:#EE3124"></span>Awarded</span>
-            </div>
-            <div style="position:relative;height:260px"><canvas id="c-bud-trade"></canvas></div>
-          </div>
-        </div>
-
-        <!-- WP Monitoring Table -->
-        <div class="panel" style="padding:0;overflow:hidden">
-          <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <div class="panel-title" style="margin:0"><i class="ti ti-table"></i>Work Package Monitoring</div>
-            <input id="wp-mon-search" type="text" placeholder="Search WPs…" oninput="filterWPTable()"
-              style="margin-left:auto;padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none;width:180px">
-          </div>
-          <div style="overflow-x:auto">
-            <table class="data-table" id="wp-mon-table" style="font-size:11px;min-width:900px">
-              <thead><tr>
-                <th>Project</th><th>WP No.</th><th>Description</th><th>Status</th>
-                <th>Budget</th><th>Awarded</th><th>Variance</th><th>%Var</th>
-                <th>Planned Award</th><th>Actual Award</th><th>Aging</th><th>Submittal</th>
-              </tr></thead>
-              <tbody id="wp-mon-body"></tbody>
-            </table>
-          </div>
-          <div id="wp-mon-pager" style="padding:8px 16px;font-size:11px;color:#888;display:flex;align-items:center;gap:8px"></div>
         </div>
 
       </div><!-- /main-content -->
@@ -291,7 +387,143 @@
       </a>`;
     }
 
-    // ── WP monitoring table helpers ───────────────────────────────
+    // ── Tab switching ─────────────────────────────────────────────
+    const ALL_TABS = ['overview','backlog','budget','schedule','works','wplist'];
+    let _activeTab = 'overview';
+    window.switchTab = function(tab) {
+      _activeTab = tab;
+      ALL_TABS.forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        if (el) el.style.display = t === tab ? '' : 'none';
+      });
+      document.querySelectorAll('#view-tabs .view-tab').forEach((btn, i) => {
+        btn.classList.toggle('active', ALL_TABS[i] === tab);
+      });
+      // Lazy-render charts when tab first becomes visible
+      if (!_rendered[tab] && _lastWPs) { _renderTab(tab, _lastWPs, _lastFilt, _lastStats); _rendered[tab] = true; }
+    };
+
+    const _rendered = {};
+    let _lastWPs = null, _lastFilt = null, _lastStats = null;
+
+    function _destroyCharts(ids) {
+      ids.forEach(id => { try { const c = Chart.getChart(document.getElementById(id)); if(c) c.destroy(); } catch(e){} });
+    }
+
+    function _renderTab(tab, wps, filt, allStats) {
+      const now = new Date();
+      if (tab === 'overview') {
+        _destroyCharts(['c-ov-period','c-ov-status','c-ov-trade','c-ov-bud-trade']);
+        Charts.budgetAwardedByPeriod('c-ov-period', wps);
+        Charts.wpStatusDonut('c-ov-status', wps);
+        Charts.wpByTrade('c-ov-trade', wps);
+        Charts.budgetByTradeHBar('c-ov-bud-trade', wps);
+      } else if (tab === 'backlog') {
+        const notAwarded = wps.filter(w => w.award_status !== 'Awarded');
+        const due = notAwarded.filter(w => w.awarding_date && new Date(w.awarding_date) <= now);
+        const soon = notAwarded.filter(w => w.awarding_date && new Date(w.awarding_date) > now && (new Date(w.awarding_date)-now)/86400000 <= 30);
+        const el1 = document.getElementById('bl-kpi-due'), el2 = document.getElementById('bl-kpi-upcoming');
+        if (el1) el1.textContent = due.length;
+        if (el2) el2.textContent = soon.length;
+        _destroyCharts(['c-bl-aging','c-bl-status','c-bl-period','c-bl-submittal']);
+        Charts.wpAgingBuckets('c-bl-aging', notAwarded, '');
+        Charts.wpStatusDonut('c-bl-status', wps);
+        Charts.wpByPeriodQuarterly('c-bl-period', wps);
+        Charts.wpSubmittalDonut('c-bl-submittal', wps);
+        // Backlog table
+        const sorted = [...notAwarded].sort((a,b) => {
+          const ag = w => w.awarding_date ? Math.floor((now-new Date(w.awarding_date))/86400000) : -9999;
+          return ag(b) - ag(a);
+        });
+        const tbody = document.getElementById('bl-tbody');
+        if (tbody) tbody.innerHTML = sorted.slice(0,100).map(w => {
+          const aging = w.awarding_date ? Math.floor((now-new Date(w.awarding_date))/86400000) : null;
+          const agStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : '';
+          return `<tr>
+            <td style="font-weight:600">${w.project_id||'—'}</td>
+            <td>${w.wp_no||'—'}</td>
+            <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.description||'—'}</td>
+            <td style="${agStyle}">${aging!=null?(aging>0?'+'+aging+'d':aging===0?'today':aging+'d'):'—'}</td>
+            <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
+            <td>${w.approved_budget_bcb?Fmt.money(w.approved_budget_bcb):'—'}</td>
+          </tr>`;
+        }).join('');
+      } else if (tab === 'budget') {
+        const totalBCB = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+        const totalAwd = wps.reduce((s,w)=>s+(w.total_awarded||0),0);
+        const ctc = wps.filter(w=>w.award_status!=='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+        const eac = totalAwd + ctc;
+        const variance = totalBCB - eac;
+        const pctVar = totalBCB ? ((variance/totalBCB)*100).toFixed(1) : '0.0';
+        buildMetrics('budget-metrics', [
+          { lbl:'Budget BCB',       val:Fmt.moneyFull(totalBCB), sub:'approved BCB',           cls:'', accent:'dark' },
+          { lbl:'Awarded Cost',     val:Fmt.moneyFull(totalAwd), sub:'total awarded',          cls:'green', accent:'green' },
+          { lbl:'Cost to Complete', val:Fmt.moneyFull(ctc),      sub:'remaining budget',       cls:'', accent:'dark' },
+          { lbl:'EAC',              val:Fmt.moneyFull(eac),      sub:'estimate at completion', cls:'', accent:'dark' },
+          { lbl:'Variance',         val:(variance>=0?'+':'')+Fmt.moneyFull(variance), sub:variance>=0?'net savings':'net overrun', cls:variance>=0?'green':'red', accent:variance>=0?'green':'red' },
+          { lbl:'% Variance',       val:(parseFloat(pctVar)>=0?'+':'')+pctVar+'%',   sub:'budget vs EAC', cls:parseFloat(pctVar)>=0?'green':'red', accent:parseFloat(pctVar)>=0?'green':'red' },
+        ]);
+        _destroyCharts(['c-bud-period','c-bud-trade']);
+        Charts.budgetAwardedByPeriod('c-bud-period', wps);
+        Charts.budgetByTradeHBar('c-bud-trade', wps);
+      } else if (tab === 'schedule') {
+        _destroyCharts(['c-sch-period','c-sch-trade','c-sch-status']);
+        Charts.wpByPeriodQuarterly('c-sch-period', wps);
+        Charts.wpByTrade('c-sch-trade', wps);
+        Charts.wpStatusDonut('c-sch-status', wps);
+        // Schedule summary table
+        const tbody = document.getElementById('sch-tbody');
+        if (tbody) tbody.innerHTML = filt.map((p,i) => {
+          const s = allStats[i];
+          const pWps = wps.filter(w=>w.project_id===p.id);
+          const due = pWps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<=now).length;
+          const notDue = pWps.filter(w=>w.award_status!=='Awarded'&&(!w.awarding_date||new Date(w.awarding_date)>now)).length;
+          return `<tr>
+            <td><span style="font-size:10px;font-weight:700;background:#EE3124;color:#fff;padding:2px 7px;border-radius:4px">${p.id}</span></td>
+            <td style="text-align:center">${pWps.length}</td>
+            <td style="text-align:center;color:#2D9B6F;font-weight:600">${s.awarded}</td>
+            <td style="text-align:center;color:#EE3124;font-weight:600">${due}</td>
+            <td style="text-align:center;color:#888">${notDue}</td>
+            <td style="text-align:center;font-weight:700">${s.awardRate}%</td>
+          </tr>`;
+        }).join('');
+      } else if (tab === 'works') {
+        _destroyCharts(['c-wk-period','c-wk-bud','c-wk-awd','c-wk-count']);
+        Charts.budgetByPeriodPerTrade('c-wk-period', wps);
+        Charts.budgetByTradeDonut('c-wk-bud', wps);
+        Charts.awardedByTradeDonut('c-wk-awd', wps);
+        // WP count by trade donut
+        const trades = [...new Set(wps.map(w=>w.trade).filter(Boolean))].sort();
+        const counts = trades.map(t => wps.filter(w=>w.trade===t).length);
+        const ctx = document.getElementById('c-wk-count');
+        if (ctx) {
+          const existing = Chart.getChart(ctx); if(existing) existing.destroy();
+          new Chart(ctx, { type:'doughnut', data:{labels:trades, datasets:[{data:counts, backgroundColor:['#282C28','#EE3124','#D97706','#2D9B6F','#6366F1','#0EA5E9','#F97316','#EC4899'],borderWidth:2}]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},padding:8}}}}});
+        }
+        // Works summary table
+        const tbody = document.getElementById('wk-tbody');
+        if (tbody) tbody.innerHTML = trades.map(t => {
+          const tWps = wps.filter(w=>w.trade===t);
+          const bud = tWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+          const awd = tWps.reduce((s,w)=>s+(w.total_awarded||0),0);
+          const vari = bud-awd;
+          const pct = bud?((awd/bud)*100).toFixed(1):'0.0';
+          return `<tr>
+            <td style="font-weight:600">${t}</td>
+            <td style="text-align:center">${tWps.length}</td>
+            <td style="text-align:right">${bud?Fmt.money(bud):'—'}</td>
+            <td style="text-align:right;color:#2D9B6F">${awd?Fmt.money(awd):'—'}</td>
+            <td style="text-align:right;${vari>=0?'color:#2D9B6F':'color:#EE3124'}">${bud?(vari>=0?'+':'')+Fmt.money(vari):'—'}</td>
+            <td style="text-align:center;font-weight:700">${pct}%</td>
+          </tr>`;
+        }).join('');
+      } else if (tab === 'wplist') {
+        _wpMonPage = 1;
+        filterWPTable();
+      }
+    }
+
+    // ── WP monitoring table ───────────────────────────────────────
     let _wpMonData = [], _wpMonPage = 1;
     const WP_MON_PER_PAGE = 50;
 
@@ -305,8 +537,7 @@
     function wpAging(w) {
       const ref = w.actual_awarding_date || (w.award_status === 'Awarded' ? null : w.awarding_date);
       if (!ref) return null;
-      const diff = Math.floor((new Date() - new Date(ref)) / 86400000);
-      return diff;
+      return Math.floor((new Date() - new Date(ref)) / 86400000);
     }
 
     window.filterWPTable = function() {
@@ -337,7 +568,7 @@
         return `<tr>
           <td style="font-weight:600;color:#444">${w.project_id||'—'}</td>
           <td>${w.wp_no||'—'}</td>
-          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(w.description||'').replace(/"/g,'&quot;')}">${w.description||'—'}</td>
+          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(w.description||'').replace(/"/g,'&quot;')}">${w.description||'—'}</td>
           <td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${statusColor}22;color:${statusColor}">${w.award_status||'—'}</span></td>
           <td style="text-align:right">${bud?Fmt.money(bud):'—'}</td>
           <td style="text-align:right">${awd?Fmt.money(awd):'—'}</td>
@@ -353,7 +584,7 @@
         const total = rows.length;
         const totalPages = Math.ceil(total / WP_MON_PER_PAGE);
         pager.innerHTML = total === 0 ? 'No work packages' :
-          `Showing ${start+1}–${Math.min(start+WP_MON_PER_PAGE, total)} of ${total}` +
+          `Showing ${start+1}–${Math.min(start+WP_MON_PER_PAGE,total)} of ${total}` +
           (totalPages > 1 ? ` &nbsp;
             <button onclick="_wpMonPage=Math.max(1,_wpMonPage-1);filterWPTable()" style="padding:2px 8px;border:1px solid #ddd;border-radius:5px;cursor:pointer;background:#fff;font-size:11px">‹</button>
             <button onclick="_wpMonPage=Math.min(${totalPages},_wpMonPage+1);filterWPTable()" style="padding:2px 8px;border:1px solid #ddd;border-radius:5px;cursor:pointer;background:#fff;font-size:11px">›</button>` : '');
@@ -365,9 +596,14 @@
       const filt = permitted.filter(p => sel.includes(p.id));
       const filtWPs = _allWPs.filter(w => sel.includes(w.project_id));
       const allStats = filt.map(p => computeStats(filtWPs.filter(w => w.project_id === p.id)));
-      const global = computeStats(filtWPs);
 
-      // Compute Power BI KPIs
+      // Cache for lazy tab rendering
+      _lastWPs = filtWPs; _lastFilt = filt; _lastStats = allStats;
+      // Reset rendered flags so filter changes re-render all tabs
+      ALL_TABS.forEach(t => { _rendered[t] = false; });
+
+      // Shared KPIs (Overview)
+      const now        = new Date();
       const awarded    = filtWPs.filter(w => w.award_status === 'Awarded');
       const totalBCB   = filtWPs.reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
       const totalAwd   = filtWPs.reduce((s,w) => s + (w.total_awarded||0), 0);
@@ -375,25 +611,24 @@
       const eac        = totalAwd + ctc;
       const variance   = totalBCB - eac;
       const pctVar     = totalBCB ? ((variance / totalBCB) * 100).toFixed(1) : '0.0';
-      const now        = new Date();
       const dueNotAwd  = filtWPs.filter(w => w.award_status !== 'Awarded' && w.awarding_date && new Date(w.awarding_date) <= now).length;
       const notDue     = filtWPs.filter(w => w.award_status !== 'Awarded' && (!w.awarding_date || new Date(w.awarding_date) > now)).length;
       const pctAwdWP   = filtWPs.length ? ((awarded.length / filtWPs.length) * 100).toFixed(1) : '0.0';
       const pctAwdVal  = totalBCB ? ((totalAwd / totalBCB) * 100).toFixed(1) : '0.0';
 
       buildMetrics('metrics-grid', [
-        { lbl:'Budget BCB',          val:Fmt.moneyFull(totalBCB),   sub:'approved BCB',             cls:'', accent:'dark' },
-        { lbl:'Awarded Cost',        val:Fmt.moneyFull(totalAwd),   sub:'total awarded',            cls:'green', accent:'green' },
-        { lbl:'Cost to Complete',    val:Fmt.moneyFull(ctc),        sub:'remaining budget',         cls:'', accent:'dark' },
-        { lbl:'EAC',                 val:Fmt.moneyFull(eac),        sub:'estimate at completion',   cls:'', accent:'dark' },
-        { lbl:'Variance',            val:(variance>=0?'+':'')+Fmt.moneyFull(variance), sub:variance>=0?'net savings':'net overrun', cls:variance>=0?'green':'red', accent:variance>=0?'green':'red' },
-        { lbl:'% Variance',          val:(parseFloat(pctVar)>=0?'+':'')+pctVar+'%', sub:'budget vs EAC', cls:parseFloat(pctVar)>=0?'green':'red', accent:parseFloat(pctVar)>=0?'green':'red' },
-        { lbl:'Total WP',            val:filtWPs.length,            sub:'work packages',            cls:'', accent:'dark' },
-        { lbl:'Awarded WP',          val:awarded.length,            sub:'fully awarded',            cls:'green', accent:'green' },
-        { lbl:'Due Not Awarded',     val:dueNotAwd,                 sub:'past target date',         cls:dueNotAwd>0?'red':'green', accent:dueNotAwd>0?'red':'dark' },
-        { lbl:'WP Not Due',          val:notDue,                    sub:'future target date',       cls:'', accent:'dark' },
-        { lbl:'% Awarded by WP',     val:pctAwdWP+'%',             sub:'count-based',              cls:'', accent:'dark' },
-        { lbl:'% Awarded by Value',  val:pctAwdVal+'%',            sub:'value-based',              cls:'', accent:'dark' },
+        { lbl:'Budget BCB',         val:Fmt.moneyFull(totalBCB),   sub:'approved BCB',             cls:'', accent:'dark' },
+        { lbl:'Awarded Cost',       val:Fmt.moneyFull(totalAwd),   sub:'total awarded',            cls:'green', accent:'green' },
+        { lbl:'Cost to Complete',   val:Fmt.moneyFull(ctc),        sub:'remaining budget',         cls:'', accent:'dark' },
+        { lbl:'EAC',                val:Fmt.moneyFull(eac),        sub:'estimate at completion',   cls:'', accent:'dark' },
+        { lbl:'Variance',           val:(variance>=0?'+':'')+Fmt.moneyFull(variance), sub:variance>=0?'net savings':'net overrun', cls:variance>=0?'green':'red', accent:variance>=0?'green':'red' },
+        { lbl:'% Variance',         val:(parseFloat(pctVar)>=0?'+':'')+pctVar+'%', sub:'budget vs EAC', cls:parseFloat(pctVar)>=0?'green':'red', accent:parseFloat(pctVar)>=0?'green':'red' },
+        { lbl:'Total WP',           val:filtWPs.length,            sub:'work packages',            cls:'', accent:'dark' },
+        { lbl:'Awarded WP',         val:awarded.length,            sub:'fully awarded',            cls:'green', accent:'green' },
+        { lbl:'Due Not Awarded',    val:dueNotAwd,                 sub:'past target date',         cls:dueNotAwd>0?'red':'green', accent:dueNotAwd>0?'red':'dark' },
+        { lbl:'WP Not Due',         val:notDue,                    sub:'future target date',       cls:'', accent:'dark' },
+        { lbl:'% Awarded by WP',    val:pctAwdWP+'%',             sub:'count-based',              cls:'', accent:'dark' },
+        { lbl:'% Awarded by Value', val:pctAwdVal+'%',            sub:'value-based',              cls:'', accent:'dark' },
       ]);
 
       // Project Cards
@@ -402,14 +637,13 @@
       filt.filter(p=>p.status!=='archived').forEach(p => {
         cardsEl.innerHTML += renderProjectCard(p, allStats[filt.indexOf(p)]);
       });
-      // Archived section
       const archFilt = filt.filter(p=>p.status==='archived');
       const existingArch = document.getElementById('archived-section');
       if (existingArch) existingArch.remove();
       if (archFilt.length > 0) {
         const archSec = document.createElement('div');
         archSec.id = 'archived-section';
-        archSec.style.marginTop = '20px';
+        archSec.style.marginTop = '16px';
         archSec.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer" onclick="const c=document.getElementById('archived-cards-inner');c.style.display=c.style.display==='none'?'grid':'none'">
           <span style="font-size:12px;font-weight:600;color:#888"><i class="ti ti-archive" style="font-size:13px;vertical-align:middle;margin-right:4px"></i>Archived (${archFilt.length})</span>
           <span style="font-size:10px;color:#aaa">click to expand</span>
@@ -419,28 +653,21 @@
         archFilt.forEach(p => { ac.innerHTML += renderProjectCard(p, allStats[filt.indexOf(p)], 'opacity:.75;border:1px dashed #ccc'); });
       }
 
-      // Destroy + re-render charts
-      ['c-period','c-wp-status-ov','c-wp-trade','c-bud-trade'].forEach(id => {
-        try { const c = Chart.getChart(document.getElementById(id)); if(c) c.destroy(); } catch(e){}
-      });
-
-      Charts.budgetAwardedByPeriod('c-period', filtWPs);
-      Charts.wpStatusDonut('c-wp-status-ov', filtWPs);
-      Charts.wpByTrade('c-wp-trade', filtWPs);
-      Charts.budgetByTradeHBar('c-bud-trade', filtWPs);
-
-      // WP monitoring table
-      _wpMonData = [...filtWPs].sort((a,b) => {
-        const ag = d => { const r=d.actual_awarding_date||(d.award_status==='Awarded'?null:d.awarding_date); return r?Math.floor((new Date()-new Date(r))/86400000):-Infinity; };
-        return ag(b) - ag(a);
-      });
-      filterWPTable();
-
-      // Update project count label + render table if active
+      // Count label + project table
       const countLabel = document.getElementById('proj-count-label');
       if (countLabel) countLabel.textContent = filt.filter(p=>p.status!=='archived').length + ' active project(s)';
       _tableData = filt.map((p,i)=>({p, s:allStats[i]}));
       if (document.getElementById('project-table-wrap')?.style.display !== 'none') renderProjectTable();
+
+      // WP monitoring data (for WP List tab)
+      _wpMonData = [...filtWPs].sort((a,b) => {
+        const ag = d => { const r=d.actual_awarding_date||(d.award_status==='Awarded'?null:d.awarding_date); return r?Math.floor((new Date()-new Date(r))/86400000):-Infinity; };
+        return ag(b) - ag(a);
+      });
+
+      // Render the currently active tab immediately
+      _renderTab(_activeTab, filtWPs, filt, allStats);
+      _rendered[_activeTab] = true;
     }
 
     // ── Project table view ───────────────────────────────────────────
