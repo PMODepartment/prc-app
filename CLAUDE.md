@@ -48,7 +48,7 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 ### Tables
 - **`projects`** — `id` (text PK e.g. 'AVR101'), name, location, status, budget_bcb, start_date, end_date
 - **`users`** — `id` (UUID FK → auth.users), email, role (`super_admin|admin|user`), status (`pending|approved|rejected`), projects (text[]), last_login (timestamptz)
-- **`work_packages`** — all WP fields; `review_status` (`pending_review|approved|rejected`); see schema for full column list
+- **`work_packages`** — all WP fields; `review_status` (`pending_review|approved|rejected`); `claim_tag` (text, nullable) — optional tag values: `Extension of Time (EOT)|Material Escalation|Labor Escalation|Change Order`; see schema for full column list
 - **`claims`** — `id`, `project_id`, `claim_no`, `claim_type` (`Extension of Time (EOT)|Material Escalation|Labor Escalation|Change Order`), `party` (`Client|Vendor`), `description`, `wp_no`, `contractor`, `date_filed`, `amount_claimed`, `basis`, `status` (`Draft|Filed|Under Review|Approved|Partially Approved|Rejected|Withdrawn`), `approved_amount`, `date_resolved`, `review_status` (`pending_review|approved|rejected`), `review_notes`, `remarks`, `submitted_by` (UUID FK → auth.users), `created_at`, `updated_at`
 
 ### WPDb API (db.js)
@@ -246,7 +246,23 @@ CSV import is no longer in the sidebar. Each form has a **bulk import banner** a
 
 ---
 
-## Claims & Change Orders (project.html + claim-form.html)
+## WP Claim / Change Order Tag (wp-form.html + project.html WP List)
+
+Optional field on each Work Package (`claim_tag` column in `work_packages`). Set via dropdown in `wp-form.html` after Remarks.
+
+**Values:** `Extension of Time (EOT)` | `Material Escalation` | `Labor Escalation` | `Change Order` | null (none)
+
+- Displayed as a color-coded badge in the WP List tab (`claimTagBadge()` helper)
+- EOT → blue, Material Escalation → orange, Labor Escalation → amber, Change Order → green
+- **DB migration required:** `ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS claim_tag text DEFAULT NULL;`
+
+---
+
+## Claims & Change Orders register (HIDDEN — independent feature, not yet active)
+
+The full Claims & Change Orders register (`claims` table, `claim-form.html`, `view-claims-register` tab) is built but hidden. To re-enable: remove `style="display:none"` from the sidebar section and tab button in `project.html`.
+
+### Data Model (claims table)
 
 ### Data Model
 Claims and Change Orders share the `claims` Supabase table, distinguished by `claim_type`:
