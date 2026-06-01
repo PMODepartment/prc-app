@@ -153,33 +153,49 @@
           </button>
         </div>
 
-        <!-- ══ OVERVIEW VIEW ══ -->
+        <!-- ══ OVERVIEW VIEW (mirrors Power BI "Projects" page) ══ -->
         <div id="view-overview">
+          <!-- Row 1: Budget/Period chart + WP by Trade -->
           <div class="grid-2">
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Award Status by Zone</div>
-              <div style="position:relative;height:200px"><canvas id="c-status"></canvas></div>
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Period</div>
+              <div style="position:relative;height:240px"><canvas id="c-period"></canvas></div>
             </div>
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-clock"></i>Awarding Lead Time (Days)</div>
-              <div style="position:relative;height:200px"><canvas id="c-leadtime"></canvas></div>
+              <div class="panel-title"><i class="ti ti-list"></i>Work Package by Trade</div>
+              <div style="position:relative;height:240px"><canvas id="c-wp-trade"></canvas></div>
             </div>
           </div>
-          <div class="grid-2">
+          <!-- Row 2: WP Status donut + Variance Trend + Budget vs Contract -->
+          <div class="grid-3">
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget vs Contract (₱M)</div>
-              <div style="position:relative;height:220px"><canvas id="c-budget"></canvas></div>
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+              <div style="position:relative;height:200px"><canvas id="c-wp-status-ov"></canvas></div>
             </div>
             <div class="panel">
               <div class="panel-title"><i class="ti ti-chart-line"></i>Variance Trend (₱M)</div>
-              <div style="position:relative;height:220px"><canvas id="c-trend"></canvas></div>
+              <div style="position:relative;height:200px"><canvas id="c-trend"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget vs Contract (₱M)</div>
+              <div style="position:relative;height:200px"><canvas id="c-budget"></canvas></div>
             </div>
           </div>
+          <!-- Row 3: Work Package Monitoring table -->
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-calendar"></i>Schedule Timeline</div>
-            <div style="position:relative;height:200px"><canvas id="c-schedule"></canvas></div>
+            <div class="panel-title"><i class="ti ti-table"></i>Work Package Monitoring</div>
+            <div style="overflow-x:auto">
+              <table class="budget-table" id="monitoring-table">
+                <thead><tr>
+                  <th>WP No.</th><th>Description</th><th>Status</th>
+                  <th>Budget (BCB)</th><th>Awarded</th><th>Variance</th><th>% Var</th>
+                  <th>Planned Award</th><th>Actual Award</th><th>Aging</th><th>Submittal</th><th>Delivery</th>
+                </tr></thead>
+                <tbody id="monitoring-tbody"></tbody>
+              </table>
+            </div>
           </div>
-          <!-- ── Top 5 Rank Lists ── -->
+          <!-- Row 4: Top 5 Rank Lists -->
           <div class="grid-3">
             <div class="panel">
               <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
@@ -196,70 +212,106 @@
           </div>
         </div>
 
-        <!-- ══ BACKLOG VIEW ══ -->
+        <!-- ══ BACKLOG VIEW (mirrors Power BI "Backlog" page) ══ -->
         <div id="view-backlog" style="display:none">
-          <div class="grid-2" style="margin-bottom:20px">
-            <div class="panel" style="text-align:center">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap">
+            <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em">WORK PACKAGES — NOT AWARDED ONLY</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+              <label style="font-size:11px;color:#888;font-weight:600">Budget Filter:</label>
+              <input id="backlog-min-budget" type="number" placeholder="Min ₱M" style="width:80px;font-size:11px;padding:4px 8px;border:1.5px solid var(--border-md);border-radius:6px;background:var(--surface-2)">
+              <span style="font-size:11px;color:#aaa">—</span>
+              <input id="backlog-max-budget" type="number" placeholder="Max ₱M" style="width:80px;font-size:11px;padding:4px 8px;border:1.5px solid var(--border-md);border-radius:6px;background:var(--surface-2)">
+              <button class="btn" onclick="renderBacklog()" style="font-size:11px;padding:4px 10px">Apply</button>
+            </div>
+          </div>
+          <!-- KPI strip -->
+          <div class="grid-2" style="margin-bottom:16px">
+            <div class="panel" style="text-align:center;padding:18px">
               <div id="backlog-kpi-due" style="font-size:42px;font-weight:700;color:#EE3124">0</div>
               <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">WPs Due but Not Awarded</div>
             </div>
-            <div class="panel" style="text-align:center">
+            <div class="panel" style="text-align:center;padding:18px">
               <div id="backlog-kpi-upcoming" style="font-size:42px;font-weight:700;color:#D97706">0</div>
               <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Due in Next 30 Days</div>
             </div>
           </div>
-          <div class="grid-2">
+          <!-- Row 1: Backlog table + Aging chart -->
+          <div class="grid-2" style="margin-bottom:16px">
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Backlog by Trade</div>
-              <div style="position:relative;height:220px"><canvas id="c-backlog-trade"></canvas></div>
+              <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog</div>
+              <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
+                <table class="budget-table" id="backlog-table">
+                  <thead><tr>
+                    <th>Work Package</th><th>Aging (d)</th><th>Planned Award</th>
+                    <th>Budget (BCB)</th><th>Status</th><th>Submittal</th>
+                  </tr></thead>
+                  <tbody id="backlog-tbody"></tbody>
+                </table>
+              </div>
             </div>
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>WP by Procurement Status</div>
-              <div style="position:relative;height:220px"><canvas id="c-proc-status"></canvas></div>
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Aging</div>
+              <div style="position:relative;height:160px"><canvas id="c-backlog-aging"></canvas></div>
+              <div class="panel-title" style="margin-top:16px"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+              <div style="position:relative;height:160px"><canvas id="c-wp-status-bl"></canvas></div>
             </div>
           </div>
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-list"></i>Backlog — Not Yet Awarded WPs</div>
-            <div style="overflow-x:auto">
-              <table class="budget-table" id="backlog-table">
-                <thead><tr>
-                  <th>WP No.</th><th>Description</th><th>Trade</th>
-                  <th>Planned Award</th><th>Aging (d)</th><th>Budget (₱M)</th><th>Status</th>
-                </tr></thead>
-                <tbody id="backlog-tbody"></tbody>
-              </table>
+          <!-- Row 2: Period chart + Submittal donut -->
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Period</div>
+              <div style="position:relative;height:220px"><canvas id="c-backlog-period"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Submittal Status</div>
+              <div style="position:relative;height:220px"><canvas id="c-backlog-submittal"></canvas></div>
             </div>
           </div>
         </div>
 
-        <!-- ══ BUDGET VIEW ══ -->
+        <!-- ══ BUDGET VIEW (mirrors Power BI "Budget Variance Analysis" page) ══ -->
         <div id="view-budget" style="display:none">
-          <div class="grid-3" style="margin-bottom:20px">
-            <div class="panel" style="text-align:center">
-              <div id="bud-total" style="font-size:28px;font-weight:700;color:#231F20">—</div>
-              <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Budget BCB</div>
+          <!-- KPI row: 3+3 grid matching Power BI layout -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+            <div class="panel" style="text-align:center;padding:16px">
+              <div id="bud-total" style="font-size:26px;font-weight:700;color:#231F20">—</div>
+              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Budget (BCB)</div>
             </div>
-            <div class="panel" style="text-align:center">
-              <div id="bud-awarded" style="font-size:28px;font-weight:700;color:#231F20">—</div>
-              <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Awarded Cost</div>
+            <div class="panel" style="text-align:center;padding:16px">
+              <div id="bud-awarded" style="font-size:26px;font-weight:700;color:#231F20">—</div>
+              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Awarded Cost</div>
             </div>
-            <div class="panel" style="text-align:center">
-              <div id="bud-variance" style="font-size:28px;font-weight:700">—</div>
-              <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Variance</div>
+            <div class="panel" style="text-align:center;padding:16px">
+              <div id="bud-ctc" style="font-size:26px;font-weight:700;color:#231F20">—</div>
+              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Cost to Complete</div>
+            </div>
+            <div class="panel" style="text-align:center;padding:16px">
+              <div id="bud-eac" style="font-size:26px;font-weight:700;color:#231F20">—</div>
+              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Estimate at Completion</div>
+            </div>
+            <div class="panel" style="text-align:center;padding:16px">
+              <div id="bud-variance" style="font-size:26px;font-weight:700">—</div>
+              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Variance</div>
+            </div>
+            <div class="panel" style="text-align:center;padding:16px">
+              <div id="bud-pct-var" style="font-size:26px;font-weight:700">—</div>
+              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Percent Variance</div>
             </div>
           </div>
+          <!-- Charts row -->
           <div class="grid-2">
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget &amp; Awarded by Trade (₱M)</div>
-              <div style="position:relative;height:240px"><canvas id="c-bud-trade"></canvas></div>
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Period</div>
+              <div style="position:relative;height:240px"><canvas id="c-bud-period"></canvas></div>
             </div>
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Award Rate by Trade</div>
-              <div style="position:relative;height:240px"><canvas id="c-bud-rate"></canvas></div>
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Trade</div>
+              <div style="position:relative;height:240px"><canvas id="c-bud-trade"></canvas></div>
             </div>
           </div>
+          <!-- Budget table -->
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-table"></i>Budget &amp; Awarded by Trade</div>
+            <div class="panel-title"><i class="ti ti-table"></i>Budget (BCB) and Awarded by Trade</div>
             <div style="overflow-x:auto">
               <table class="budget-table" id="budget-table">
                 <thead><tr>
@@ -272,26 +324,39 @@
           </div>
         </div>
 
-        <!-- ══ SCHEDULE VIEW ══ -->
+        <!-- ══ SCHEDULE VIEW (mirrors Power BI "Procurement Schedule" page) ══ -->
         <div id="view-schedule" style="display:none">
-          <div class="grid-2" style="margin-bottom:20px">
+          <!-- Row 1: Period chart + Trade chart -->
+          <div class="grid-2">
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>WPs by Planned Award Period</div>
-              <div style="position:relative;height:220px"><canvas id="c-sched-period"></canvas></div>
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Period</div>
+              <div style="position:relative;height:240px"><canvas id="c-sched-period"></canvas></div>
             </div>
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-clock"></i>Lead Time Distribution</div>
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Trade</div>
+              <div style="position:relative;height:240px"><canvas id="c-sched-trade"></canvas></div>
+            </div>
+          </div>
+          <!-- Row 2: Status donut + Lead Time -->
+          <div class="grid-2" style="margin-top:0">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+              <div style="position:relative;height:220px"><canvas id="c-sched-status"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-clock"></i>Lead Time Distribution (Days)</div>
               <div style="position:relative;height:220px"><canvas id="c-sched-leadtime"></canvas></div>
             </div>
           </div>
+          <!-- Schedule table -->
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-list"></i>Schedule — All WPs</div>
+            <div class="panel-title"><i class="ti ti-table"></i>Work Package Schedule</div>
             <div style="overflow-x:auto">
               <table class="budget-table" id="sched-table">
                 <thead><tr>
                   <th>WP No.</th><th>Description</th><th>Trade</th>
-                  <th>Planned Award</th><th>Actual Award</th><th>Lead Time</th>
-                  <th>Target Delivery</th><th>Target Completion</th><th>Status</th>
+                  <th>Planned Award</th><th>Actual Award</th><th>Aging (d)</th>
+                  <th>Budget (BCB)</th><th>Status</th><th>Submittal</th><th>Target Delivery</th>
                 </tr></thead>
                 <tbody id="sched-tbody"></tbody>
               </table>
@@ -299,25 +364,46 @@
           </div>
         </div>
 
-        <!-- ══ WORKS VIEW ══ -->
+        <!-- ══ WORKS VIEW (mirrors Power BI "Works Analysis" page) ══ -->
         <div id="view-works" style="display:none">
           <div class="works-summary" id="works-summary"></div>
-          <div class="grid-2">
+          <!-- Row 1: Stacked period chart -->
+          <div class="panel">
+            <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) by Period per Trade</div>
+            <div style="position:relative;height:260px"><canvas id="c-works-period"></canvas></div>
+          </div>
+          <!-- Row 2: Three donuts matching Power BI -->
+          <div class="grid-3">
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>WPs by Trade</div>
-              <div style="position:relative;height:220px"><canvas id="c-works-donut"></canvas></div>
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Budget (BCB) by Trade</div>
+              <div style="position:relative;height:200px"><canvas id="c-works-bud-donut"></canvas></div>
             </div>
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Awarded WPs by Trade</div>
-              <div style="position:relative;height:220px"><canvas id="c-works-bar"></canvas></div>
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Awarded by Trade</div>
+              <div style="position:relative;height:200px"><canvas id="c-works-awd-donut"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Packages by Trade</div>
+              <div style="position:relative;height:200px"><canvas id="c-works-donut"></canvas></div>
             </div>
           </div>
+          <!-- Row 3: Budget by Period per Scope (pivot table) -->
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-table"></i>Works by Trade &amp; Status</div>
+            <div class="panel-title"><i class="ti ti-table"></i>Budget (BCB) by Period per Trade</div>
+            <div style="overflow-x:auto">
+              <table class="budget-table" id="works-pivot-table">
+                <thead id="works-pivot-head"></thead>
+                <tbody id="works-pivot-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <!-- Row 4: Budget and Awarded by Trade table -->
+          <div class="panel">
+            <div class="panel-title"><i class="ti ti-table"></i>Budget (BCB) and Awarded by Trade</div>
             <div style="overflow-x:auto">
               <table class="budget-table" id="works-table">
                 <thead><tr>
-                  <th>Trade</th><th>Total WPs</th><th>Awarded</th><th>Not Yet</th><th>Award Rate</th><th>Budget (₱M)</th><th>Awarded (₱M)</th>
+                  <th>Trade</th><th>Total WPs</th><th>Awarded</th><th>Not Yet</th><th>Award Rate</th><th>Budget BCB (₱M)</th><th>Awarded (₱M)</th><th>Variance (₱M)</th>
                 </tr></thead>
                 <tbody id="works-tbody"></tbody>
               </table>
@@ -442,33 +528,75 @@ function getFiltered(){
   });
 }
 
+function submittalLabel(w){
+  if(w.review_status==='approved') return 'Approved';
+  if(w.review_status==='pending_review') return 'Submitted';
+  if(w.review_status==='rejected') return 'Rejected';
+  return 'Not Submitted';
+}
+
 function buildMetrics(wps){
   const total=wps.length;
   const awarded=wps.filter(w=>w.award_status==='Awarded').length;
-  const notYet=wps.filter(w=>w.award_status==='Not Yet Awarded').length;
   const totalBudget=wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   const totalAwarded=wps.reduce((s,w)=>s+(w.total_awarded||0),0);
-  const netVar=totalBudget-totalAwarded;
+  const costToComplete=wps.filter(w=>w.award_status!=='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const eac=totalAwarded+costToComplete;
+  const variance=totalBudget-eac;
+  const pctVar=totalBudget?((variance/totalBudget)*100):0;
   const today=new Date();
-  const late=wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+  const dueNotAwarded=wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+  const notDue=wps.filter(w=>w.award_status!=='Awarded'&&(!w.awarding_date||new Date(w.awarding_date)>=today)).length;
+  const pctByWP=total?Math.round(awarded/total*100):0;
+  const pctByVal=totalBudget?Math.round(totalAwarded/totalBudget*100):0;
   document.getElementById('metrics-grid').innerHTML=[
-    {lbl:'Total packages',val:total,sub:'',cls:''},
-    {lbl:'Awarded',val:awarded,sub:total?Math.round(awarded/total*100)+'% rate':'',cls:'green'},
-    {lbl:'Not yet awarded',val:notYet,sub:'',cls:'red'},
-    {lbl:'Total budget',val:fmt(totalBudget),sub:'BCB',cls:''},
-    {lbl:'Total awarded',val:fmt(totalAwarded),sub:'contract value',cls:''},
-    {lbl:'Net variance',val:(netVar>=0?'+':'')+fmt(netVar),sub:netVar>=0?'savings':'overrun',cls:netVar>=0?'green':'red'},
-    {lbl:'Late awards',val:late,sub:'actual > target',cls:late>0?'red':'green'},
-  ].map(c=>'<div class="metric-card"><div class="metric-label">'+c.lbl+'</div><div class="metric-value '+c.cls+'">'+c.val+'</div>'+(c.sub?'<div class="metric-sub">'+c.sub+'</div>':'')+'</div>').join('');
+    {lbl:'Budget (BCB)',val:fmt(totalBudget),cls:''},
+    {lbl:'Awarded Cost',val:fmt(totalAwarded),cls:''},
+    {lbl:'Cost to Complete',val:fmt(costToComplete),cls:''},
+    {lbl:'Est. at Completion',val:fmt(eac),cls:''},
+    {lbl:'Variance',val:(variance>=0?'+':'')+fmt(variance),cls:variance>=0?'green':'red'},
+    {lbl:'% Variance',val:(pctVar>=0?'+':'')+pctVar.toFixed(1)+'%',cls:pctVar>=0?'green':'red'},
+    {lbl:'Total WP',val:total,cls:''},
+    {lbl:'Awarded WP',val:awarded,cls:'green'},
+    {lbl:'Due Not Awarded',val:dueNotAwarded,cls:dueNotAwarded>0?'red':''},
+    {lbl:'WP Not Due',val:notDue,cls:''},
+    {lbl:'% Awarded by WP',val:pctByWP+'%',cls:''},
+    {lbl:'% Awarded by Value',val:pctByVal+'%',cls:''},
+  ].map(c=>'<div class="metric-card"><div class="metric-label">'+c.lbl+'</div><div class="metric-value '+c.cls+'">'+c.val+'</div></div>').join('');
 }
 
 function renderOverview(){
   const f = getFiltered();
-  Charts.statusByZone('c-status',f);
-  Charts.awardingLeadTime('c-leadtime',f);
-  Charts.budgetVsContract('c-budget',f);
-  Charts.varianceTrend('c-trend',f);
-  Charts.scheduleTimeline('c-schedule',f);
+  // Power BI "Projects" page charts
+  Charts.budgetAwardedByPeriod('c-period', f);
+  Charts.wpByTrade('c-wp-trade', f);
+  Charts.wpStatusDonut('c-wp-status-ov', f);
+  Charts.varianceTrend('c-trend', f);
+  Charts.budgetVsContract('c-budget', f);
+  // WP Monitoring table
+  const today = new Date();
+  const sorted = [...f].sort((a,b)=>{ if(!a.awarding_date)return 1; if(!b.awarding_date)return -1; return new Date(a.awarding_date)-new Date(b.awarding_date); });
+  document.getElementById('monitoring-tbody').innerHTML = sorted.map(w=>{
+    const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
+    const agCls = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
+    const bud = w.approved_budget_bcb||0, awd = w.total_awarded||0, vari = bud-awd;
+    const pctV = bud ? ((vari/bud)*100).toFixed(1)+'%' : '—';
+    const submittal = submittalLabel(w);
+    return `<tr>
+      <td><span class="td-code">${w.wp_no||'—'}</span></td>
+      <td style="font-size:11px;max-width:200px">${w.description||'—'}</td>
+      <td>${statusBadge(w.award_status)}</td>
+      <td style="text-align:right">${(bud/1e6).toFixed(1)} M</td>
+      <td style="text-align:right">${awd>0?(awd/1e6).toFixed(1)+' M':'—'}</td>
+      <td style="text-align:right;color:${vari>=0?'#2D9B6F':'#EE3124'};font-weight:600">${vari>=0?'+':''}${(vari/1e6).toFixed(1)} M</td>
+      <td style="color:${vari>=0?'#2D9B6F':'#EE3124'}">${pctV}</td>
+      <td>${fmtDate(w.awarding_date)}</td>
+      <td>${fmtDate(w.actual_awarding_date)}</td>
+      <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
+      <td style="font-size:11px;color:#555">${submittal}</td>
+      <td>${fmtDate(w.target_delivery)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="12" style="text-align:center;color:#aaa;padding:20px">No data</td></tr>';
   renderTop5(f);
 }
 
@@ -492,172 +620,188 @@ function renderTop5(wps){
 function renderBacklog(){
   const today = new Date();
   const in30 = new Date(today); in30.setDate(in30.getDate()+30);
-  const notAwarded = allWPs.filter(w=>w.award_status!=='Awarded');
+  const minBud = parseFloat(document.getElementById('backlog-min-budget')?.value||0)*1e6||0;
+  const maxBud = parseFloat(document.getElementById('backlog-max-budget')?.value||0)*1e6||Infinity;
+  let notAwarded = allWPs.filter(w=>w.award_status!=='Awarded');
+  if(minBud>0||maxBud<Infinity) notAwarded=notAwarded.filter(w=>(w.approved_budget_bcb||0)>=minBud&&(w.approved_budget_bcb||0)<=maxBud);
+
   const pastDue = notAwarded.filter(w=>w.awarding_date&&new Date(w.awarding_date)<today);
   const upcoming = notAwarded.filter(w=>w.awarding_date&&new Date(w.awarding_date)>=today&&new Date(w.awarding_date)<=in30);
   document.getElementById('backlog-kpi-due').textContent = pastDue.length;
   document.getElementById('backlog-kpi-upcoming').textContent = upcoming.length;
 
-  // Backlog by trade chart
-  const trades = [...new Set(notAwarded.map(w=>w.trade).filter(Boolean))].sort();
-  Charts.budgetByTrade('c-backlog-trade', notAwarded, trades);
+  // Charts: Aging buckets, Period, Status donut, Submittal donut
+  Charts.wpAgingBuckets('c-backlog-aging', notAwarded, projId||'Project');
+  Charts.wpByPeriodQuarterly('c-backlog-period', notAwarded);
+  Charts.wpStatusDonut('c-wp-status-bl', notAwarded);
+  Charts.wpSubmittalDonut('c-backlog-submittal', allWPs);
 
-  // Procurement status chart
-  const statuses = [...new Set(allWPs.map(w=>w.procurement_status).filter(Boolean))].sort();
-  const statusCounts = statuses.map(s=>allWPs.filter(w=>w.procurement_status===s).length);
-  if(window.__chartBacklogProc) window.__chartBacklogProc.destroy();
-  const ctx2 = document.getElementById('c-proc-status');
-  if(ctx2) window.__chartBacklogProc = new Chart(ctx2.getContext('2d'),{
-    type:'bar',
-    data:{labels:statuses,datasets:[{data:statusCounts,backgroundColor:'rgba(40,44,40,0.6)',borderRadius:4}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{ticks:{stepSize:1,font:{size:9}},grid:{color:'rgba(0,0,0,.05)'}}}}
-  });
-
-  // Backlog table
+  // Backlog table — sorted by aging descending (most overdue first), matching Power BI
   const sorted = [...notAwarded].sort((a,b)=>{
-    if(!a.awarding_date) return 1;
-    if(!b.awarding_date) return -1;
-    return new Date(a.awarding_date)-new Date(b.awarding_date);
+    const agA = a.awarding_date ? (today-new Date(a.awarding_date)) : -Infinity;
+    const agB = b.awarding_date ? (today-new Date(b.awarding_date)) : -Infinity;
+    return agB - agA;
   });
   document.getElementById('backlog-tbody').innerHTML = sorted.map(w=>{
-    const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/(1000*86400)) : null;
-    const agingClass = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
+    const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
+    const agCls = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
     return `<tr>
-      <td><span class="td-code">${w.wp_no}</span></td>
-      <td>${w.description||'—'}</td>
-      <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
+      <td style="font-size:11px;max-width:200px">${w.description||w.wp_no||'—'}</td>
+      <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
       <td>${fmtDate(w.awarding_date)}</td>
-      <td class="${agingClass}">${aging!=null?aging+'d':'—'}</td>
-      <td>${fmt(w.approved_budget_bcb)}</td>
+      <td style="text-align:right">${(( w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
       <td>${statusBadge(w.award_status)}</td>
+      <td style="font-size:11px;color:#555">${submittalLabel(w)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
 }
 
 function renderBudget(){
-  const stats = computeStats(allWPs);
-  const v = stats.variance;
-  document.getElementById('bud-total').textContent = fmt(stats.totalBudget);
-  document.getElementById('bud-awarded').textContent = fmt(stats.totalContract);
-  const varEl = document.getElementById('bud-variance');
-  varEl.textContent = (v>=0?'+':'')+fmt(v);
-  varEl.style.color = v>=0?'#2D9B6F':'#EE3124';
+  const totalBudget=allWPs.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const totalAwarded=allWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
+  const costToComplete=allWPs.filter(w=>w.award_status!=='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const eac=totalAwarded+costToComplete;
+  const variance=totalBudget-eac;
+  const pctVar=totalBudget?((variance/totalBudget)*100):0;
 
-  const trades = [...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
-  Charts.budgetByTrade('c-bud-trade', allWPs, trades);
-  Charts.awardRateByTrade('c-bud-rate', allWPs, trades);
+  document.getElementById('bud-total').textContent = fmt(totalBudget);
+  document.getElementById('bud-awarded').textContent = fmt(totalAwarded);
+  document.getElementById('bud-ctc').textContent = fmt(costToComplete);
+  document.getElementById('bud-eac').textContent = fmt(eac);
+  const varEl=document.getElementById('bud-variance');
+  varEl.textContent=(variance>=0?'+':'')+fmt(variance);
+  varEl.style.color=variance>=0?'#2D9B6F':'#EE3124';
+  const pctEl=document.getElementById('bud-pct-var');
+  pctEl.textContent=(pctVar>=0?'+':'')+pctVar.toFixed(2)+'%';
+  pctEl.style.color=pctVar>=0?'#2D9B6F':'#EE3124';
 
-  // Budget table by trade
-  const rows = trades.map(t=>{
-    const tWPs = allWPs.filter(w=>w.trade===t);
-    const budget = tWPs.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-    const awarded = tWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
-    const variance = budget-awarded;
-    const awardCount = tWPs.filter(w=>w.award_status==='Awarded').length;
-    return {t, count:tWPs.length, budget, awarded, variance, awardRate:tWPs.length?Math.round(awardCount/tWPs.length*100):0};
+  Charts.budgetAwardedByPeriod('c-bud-period', allWPs);
+  Charts.budgetByTradeHBar('c-bud-trade', allWPs);
+
+  const trades=[...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
+  const rows=trades.map(t=>{
+    const tWPs=allWPs.filter(w=>w.trade===t);
+    const budget=tWPs.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    const awarded=tWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
+    const variance=budget-awarded;
+    const awardCount=tWPs.filter(w=>w.award_status==='Awarded').length;
+    return {t,count:tWPs.length,budget,awarded,variance,awardRate:tWPs.length?Math.round(awardCount/tWPs.length*100):0};
   });
-  const totBudget = rows.reduce((s,r)=>s+r.budget,0);
-  const totAwarded = rows.reduce((s,r)=>s+r.awarded,0);
-  const totVariance = totBudget-totAwarded;
-
-  document.getElementById('budget-tbody').innerHTML = [
+  const totBudget=rows.reduce((s,r)=>s+r.budget,0);
+  const totAwarded=rows.reduce((s,r)=>s+r.awarded,0);
+  const totVar=totBudget-totAwarded;
+  document.getElementById('budget-tbody').innerHTML=[
     ...rows.map(r=>`<tr>
       <td>${r.t}</td><td>${r.count}</td>
-      <td>${(r.budget/1e6).toFixed(1)} M</td>
-      <td>${(r.awarded/1e6).toFixed(1)} M</td>
-      <td style="color:${r.variance>=0?'#2D9B6F':'#EE3124'};font-weight:600">${r.variance>=0?'+':''}{}{}</td>
+      <td style="text-align:right">${(r.budget/1e6).toFixed(1)} M</td>
+      <td style="text-align:right">${(r.awarded/1e6).toFixed(1)} M</td>
+      <td style="text-align:right;color:${r.variance>=0?'#2D9B6F':'#EE3124'};font-weight:600">${r.variance>=0?'+':''}${(r.variance/1e6).toFixed(1)} M</td>
       <td style="color:${r.variance>=0?'#2D9B6F':'#EE3124'}">${r.budget?((r.variance/r.budget)*100).toFixed(1)+'%':'—'}</td>
       <td>${r.awardRate}%</td>
-    </tr>`.replace('}{}{}', (r.variance/1e6).toFixed(1)+' M')),
+    </tr>`),
     `<tr class="total-row">
       <td>TOTAL</td><td>${allWPs.length}</td>
-      <td>${(totBudget/1e6).toFixed(1)} M</td>
-      <td>${(totAwarded/1e6).toFixed(1)} M</td>
-      <td style="color:${totVariance>=0?'#2D9B6F':'#EE3124'}">${totVariance>=0?'+':''}{}{}</td>
-      <td style="color:${totVariance>=0?'#2D9B6F':'#EE3124'}">${totBudget?((totVariance/totBudget)*100).toFixed(1)+'%':'—'}</td>
+      <td style="text-align:right">${(totBudget/1e6).toFixed(1)} M</td>
+      <td style="text-align:right">${(totAwarded/1e6).toFixed(1)} M</td>
+      <td style="text-align:right;color:${totVar>=0?'#2D9B6F':'#EE3124'}">${totVar>=0?'+':''}${(totVar/1e6).toFixed(1)} M</td>
+      <td style="color:${totVar>=0?'#2D9B6F':'#EE3124'}">${totBudget?((totVar/totBudget)*100).toFixed(1)+'%':'—'}</td>
       <td>—</td>
-    </tr>`.replace('}{}{}', (totVariance/1e6).toFixed(1)+' M')
+    </tr>`
   ].join('');
 }
 
 function renderSchedule(){
-  // Period chart: count WPs by awarding month
-  const awarded = [...allWPs].filter(w=>w.awarding_date);
-  const months = [...new Set(awarded.map(w=>w.awarding_date.slice(0,7)))].sort();
-  const planned = months.map(m=>allWPs.filter(w=>w.awarding_date?.slice(0,7)===m).length);
-  const actual  = months.map(m=>allWPs.filter(w=>w.actual_awarding_date?.slice(0,7)===m).length);
-  const labels  = months.map(m=>new Date(m+'-01').toLocaleDateString('en-PH',{month:'short',year:'2-digit'}));
-
-  if(window.__chartSchedPeriod) window.__chartSchedPeriod.destroy();
-  const c1 = document.getElementById('c-sched-period');
-  if(c1) window.__chartSchedPeriod = new Chart(c1.getContext('2d'),{
-    type:'bar',
-    data:{labels,datasets:[
-      {label:'Planned',data:planned,backgroundColor:'rgba(40,44,40,0.45)',borderRadius:3},
-      {label:'Actual',data:actual,backgroundColor:'rgba(45,155,111,0.7)',borderRadius:3}
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9}},grid:{color:'rgba(0,0,0,.05)'}}}}
-  });
-
+  // Quarterly period chart with cumulative lines (matches Power BI Schedule page)
+  Charts.wpByPeriodQuarterly('c-sched-period', allWPs);
+  Charts.wpByTrade('c-sched-trade', allWPs);
+  Charts.wpStatusDonut('c-sched-status', allWPs);
   Charts.awardingLeadTime('c-sched-leadtime', allWPs);
 
-  // Schedule table
-  const sorted = [...allWPs].sort((a,b)=>{
-    if(!a.awarding_date) return 1; if(!b.awarding_date) return -1;
+  const today=new Date();
+  const sorted=[...allWPs].sort((a,b)=>{
+    if(!a.awarding_date)return 1; if(!b.awarding_date)return -1;
     return new Date(a.awarding_date)-new Date(b.awarding_date);
   });
-  document.getElementById('sched-tbody').innerHTML = sorted.map(w=>`<tr>
-    <td><span class="td-code">${w.wp_no}</span></td>
-    <td style="font-size:12px">${w.description||'—'}</td>
-    <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
-    <td>${fmtDate(w.awarding_date)}</td>
-    <td>${fmtDate(w.actual_awarding_date)}</td>
-    <td>${w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—'}</td>
-    <td>${fmtDate(w.target_delivery)}</td>
-    <td>${fmtDate(w.target_completion)}</td>
-    <td>${statusBadge(w.award_status)}</td>
-  </tr>`).join('');
+  document.getElementById('sched-tbody').innerHTML=sorted.map(w=>{
+    const aging=w.awarding_date?Math.round((today-new Date(w.awarding_date))/86400000):null;
+    const agCls=aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
+    return `<tr>
+      <td><span class="td-code">${w.wp_no||'—'}</span></td>
+      <td style="font-size:11px;max-width:180px">${w.description||'—'}</td>
+      <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
+      <td>${fmtDate(w.awarding_date)}</td>
+      <td>${fmtDate(w.actual_awarding_date)}</td>
+      <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
+      <td style="text-align:right">${((w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
+      <td>${statusBadge(w.award_status)}</td>
+      <td style="font-size:11px;color:#555">${submittalLabel(w)}</td>
+      <td>${fmtDate(w.target_delivery)}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderWorks(){
-  const trades = [...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
-  const rows = trades.map(t=>{
-    const tWPs = allWPs.filter(w=>w.trade===t);
-    const aw = tWPs.filter(w=>w.award_status==='Awarded').length;
-    const ny = tWPs.filter(w=>w.award_status!=='Awarded').length;
-    const budget = tWPs.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-    const awarded = tWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
-    return {t, total:tWPs.length, aw, ny, rate:tWPs.length?Math.round(aw/tWPs.length*100):0, budget, awarded};
+  const trades=[...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
+  const rows=trades.map(t=>{
+    const tWPs=allWPs.filter(w=>w.trade===t);
+    const aw=tWPs.filter(w=>w.award_status==='Awarded').length;
+    const ny=tWPs.filter(w=>w.award_status!=='Awarded').length;
+    const budget=tWPs.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    const awarded=tWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
+    return {t,total:tWPs.length,aw,ny,rate:tWPs.length?Math.round(aw/tWPs.length*100):0,budget,awarded,variance:budget-awarded};
   });
 
-  // Summary cards
-  document.getElementById('works-summary').innerHTML = [
+  // Summary KPI strip
+  document.getElementById('works-summary').innerHTML=[
     {lbl:'Total WPs',val:allWPs.length},
     {lbl:'Awarded',val:allWPs.filter(w=>w.award_status==='Awarded').length},
     {lbl:'Not Yet Awarded',val:allWPs.filter(w=>w.award_status!=='Awarded').length},
     {lbl:'Trades',val:trades.length},
   ].map(k=>`<div class="works-kpi"><div class="works-kpi-val">${k.val}</div><div class="works-kpi-lbl">${k.lbl}</div></div>`).join('');
 
-  // Donut: WPs by trade
+  // Charts matching Power BI Works page
+  Charts.budgetByPeriodPerTrade('c-works-period', allWPs);
+  Charts.budgetByTradeDonut('c-works-bud-donut', allWPs);
+  Charts.awardedByTradeDonut('c-works-awd-donut', allWPs);
+
+  // WP count by trade donut
+  const COLORS=['#EE3124','#282C28','#2D9B6F','#D97706','#DCDBDB','#5A5858','#C42127','#3B6D11','#92400E','#6B7280'];
   if(window.__chartWorksDonut) window.__chartWorksDonut.destroy();
-  const c1 = document.getElementById('c-works-donut');
-  if(c1) window.__chartWorksDonut = new Chart(c1.getContext('2d'),{
+  const c1=document.getElementById('c-works-donut');
+  if(c1) window.__chartWorksDonut=new Chart(c1.getContext('2d'),{
     type:'doughnut',
-    data:{labels:trades,datasets:[{data:rows.map(r=>r.total),backgroundColor:['#EE3124','#282C28','#2D9B6F','#D97706','#DCDBDB','#5A5858','#C42127','#3B6D11','#92400E'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'right',labels:{font:{size:10}}}}}
+    data:{labels:rows.map(r=>r.t),datasets:[{data:rows.map(r=>r.total),backgroundColor:COLORS,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}}}}
   });
 
-  // Bar: awarded by trade
-  Charts.awardRateByTrade('c-works-bar', allWPs, trades);
+  // Pivot table: Budget by Period per Trade
+  function getQKey(d){const q=Math.ceil((d.getMonth()+1)/3);return `${d.getFullYear()}-${q}`;}
+  function qLabel(k){const[y,q]=k.split('-');return `Q${q} '${y.slice(2)}`;}
+  const qSet=new Set(); allWPs.forEach(w=>{if(w.awarding_date)qSet.add(getQKey(new Date(w.awarding_date)));});
+  const quarters=[...qSet].sort();
+  const pivotHead=document.getElementById('works-pivot-head');
+  pivotHead.innerHTML=`<tr><th>Trade</th>${quarters.map(q=>`<th style="text-align:right">${qLabel(q)}</th>`).join('')}<th style="text-align:right">Total</th></tr>`;
+  const pivotBody=document.getElementById('works-pivot-tbody');
+  pivotBody.innerHTML=[
+    ...rows.map(r=>{
+      const qVals=quarters.map(qk=>allWPs.filter(w=>w.trade===r.t&&w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
+      return `<tr><td>${r.t}</td>${qVals.map(v=>`<td style="text-align:right">${v>0?v.toFixed(1)+' M':'—'}</td>`).join('')}<td style="text-align:right;font-weight:600">${(r.budget/1e6).toFixed(1)} M</td></tr>`;
+    }),
+    `<tr class="total-row"><td>TOTAL</td>${quarters.map(qk=>{
+      const v=allWPs.filter(w=>w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6;
+      return `<td style="text-align:right">${v>0?v.toFixed(1)+' M':'—'}</td>`;
+    }).join('')}<td style="text-align:right">${(rows.reduce((s,r)=>s+r.budget,0)/1e6).toFixed(1)} M</td></tr>`
+  ].join('');
 
-  // Table
-  document.getElementById('works-tbody').innerHTML = rows.map(r=>`<tr>
+  // Trade summary table
+  document.getElementById('works-tbody').innerHTML=rows.map(r=>`<tr>
     <td>${r.t}</td><td>${r.total}</td>
     <td style="color:#2D9B6F;font-weight:600">${r.aw}</td>
     <td style="color:#EE3124;font-weight:600">${r.ny}</td>
     <td>${r.rate}%</td>
-    <td>${(r.budget/1e6).toFixed(1)} M</td>
-    <td>${(r.awarded/1e6).toFixed(1)} M</td>
+    <td style="text-align:right">${(r.budget/1e6).toFixed(1)} M</td>
+    <td style="text-align:right">${(r.awarded/1e6).toFixed(1)} M</td>
+    <td style="text-align:right;color:${r.variance>=0?'#2D9B6F':'#EE3124'};font-weight:600">${r.variance>=0?'+':''}${(r.variance/1e6).toFixed(1)} M</td>
   </tr>`).join('');
 }
 
@@ -718,6 +862,9 @@ AppAuth.requireLogin(async (user, profile) => {
   window.__wpmRole = profile.role;
   projId = new URLSearchParams(location.search).get('id');
   if (!projId) { location.href='login.html'; return; }
+
+  // Track navigation context — user is in a specific project
+  sessionStorage.setItem('wpm_nav_ctx', projId);
 
   if (!AppAuth.canAccessProject(profile, projId)) {
     document.getElementById('loading').innerHTML='<div style="text-align:center;padding:40px"><p style="color:#EE3124;font-size:15px;font-weight:600">Access Denied</p><p style="color:#888;font-size:13px">You do not have access to project '+projId+'</p><a href="login.html" style="color:#EE3124">← Back</a></div>';
