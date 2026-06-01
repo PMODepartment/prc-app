@@ -129,6 +129,46 @@ create table if not exists work_packages (
   updated_at            timestamptz default now()
 );
 
+-- ── CLAIMS REGISTER ──────────────────────────────────────────
+create table if not exists claims (
+  id                uuid primary key default gen_random_uuid(),
+  project_id        text not null references projects(id) on delete cascade,
+
+  claim_no          text,           -- e.g. CLM-001
+  claim_type        text not null,  -- Extension of Time (EOT) | Change Order
+  party             text not null,  -- Client | Vendor
+  description       text not null,
+  wp_no             text,           -- optional link to work package
+  contractor        text,           -- vendor/contractor name
+
+  date_filed        date,
+  amount_claimed    numeric(18,2),
+  basis             text,           -- basis/grounds for claim
+
+  status            text default 'Draft',  -- Draft | Filed | Under Review | Approved | Partially Approved | Rejected | Withdrawn
+  date_resolved     date,
+  approved_amount   numeric(18,2),
+
+  remarks           text,
+
+  -- Review workflow (same as WPs)
+  review_status     text default 'pending_review'
+                      check (review_status in ('pending_review','approved','rejected')),
+  review_notes      text,
+  submitted_by      uuid references users(id),
+
+  created_at        timestamptz default now(),
+  updated_at        timestamptz default now()
+);
+
+create index if not exists idx_claims_project on claims(project_id);
+create index if not exists idx_claims_review on claims(review_status);
+create index if not exists idx_claims_type on claims(claim_type);
+create index if not exists idx_claims_party on claims(party);
+
+create trigger trg_claims_updated before update on claims
+  for each row execute function update_updated_at();
+
 -- ── INDEXES for fast dashboard queries ───────────────────────
 create index if not exists idx_wp_project on work_packages(project_id);
 create index if not exists idx_wp_award_status on work_packages(award_status);

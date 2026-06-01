@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Claims Register — EPC WPM Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css"/>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/ui.js"></script>
+  <script src="assets/js/db.js"></script>
+  <style>
+    .form-section { margin-bottom: 24px; }
+    .form-section-title { font-size:12px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.06em;padding-bottom:8px;border-bottom:2px solid #dbeafe;margin-bottom:16px }
+    .form-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px }
+    .form-group { display:flex;flex-direction:column;gap:5px }
+    .form-group.full { grid-column:1/-1 }
+    .form-group label { font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.04em }
+    .form-group input,.form-group select,.form-group textarea { font-size:12px;padding:8px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);background:var(--surface-2);color:var(--text-primary);outline:none;transition:border-color .15s;width:100% }
+    .form-group input:focus,.form-group select:focus,.form-group textarea:focus { border-color:#5B9DEA;background:#fff }
+    .form-group textarea { resize:vertical;min-height:80px }
+    .hint { font-size:10px;color:var(--text-hint) }
+    .form-actions { display:flex;gap:10px;align-items:center;padding-top:20px;border-top:1px solid var(--border) }
+    .alert { padding:10px 14px;border-radius:var(--radius-md);font-size:12px;font-weight:500;margin-bottom:16px }
+    .alert-error { background:#FEF2F2;border:1px solid #FECACA;color:#991B1B }
+    .alert-success { background:#F0FDF4;border:1px solid #BBF7D0;color:#166534 }
+    .hidden { display:none }
+    .status-info { background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--radius-md);padding:12px 14px;font-size:12px;color:#1e40af;margin-bottom:20px;display:flex;gap:10px;align-items:flex-start }
+    .rejection-box { background:#FEF2F2;border:1.5px solid #FECACA;border-radius:var(--radius-md);padding:12px 14px;font-size:12px;color:#991B1B;margin-bottom:20px }
+    .rejection-box strong { display:block;margin-bottom:4px }
+    .amount-display { font-size:11px;color:var(--mw-red);font-weight:600 }
+    @media(max-width:600px) { .form-grid { grid-template-columns:1fr } }
+  </style>
+</head>
+<body>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <img src="assets/img/megawide-logo.png" alt="Megawide Construction"/>
+      <div class="app-label">Procurement Dashboard</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Current Project</div>
+      <a class="nav-item" id="nav-project-link" href="project.html">
+        <i class="ti ti-building-skyscraper"></i>
+        <span id="nav-project-name">—</span>
+      </a>
+      <a class="nav-item" href="login.html" style="opacity:.75;font-size:12px">
+        <i class="ti ti-switch-horizontal"></i>Switch Project
+      </a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Claims</div>
+      <a class="nav-item active" href="#"><i class="ti ti-file-invoice"></i>New Claim</a>
+    </div>
+    <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
+        <div>
+          <div class="page-title" id="page-title">New Claim</div>
+          <div class="page-sub" id="page-sub"></div>
+        </div>
+      </div>
+      <div class="topbar-right"><div id="user-bar"></div></div>
+    </div>
+
+    <div class="content">
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading…</span></div>
+      <div id="main-content" style="display:none">
+        <div class="panel">
+
+          <div id="rejection-box" class="rejection-box hidden">
+            <strong><i class="ti ti-x"></i> Claim Rejected</strong>
+            <span id="rejection-reason"></span>
+          </div>
+          <div class="status-info" id="status-info" style="display:none">
+            <i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
+            <div id="status-info-text"></div>
+          </div>
+
+          <div id="alert" class="alert alert-error hidden"><span id="alert-text"></span></div>
+          <div id="success" class="alert alert-success hidden"><span id="success-text"></span></div>
+
+          <!-- Claim Identity -->
+          <div class="form-section">
+            <div class="form-section-title"><i class="ti ti-file-invoice" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Claim Details</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Project *</label>
+                <select id="f-project"><option value="">Select project…</option></select>
+              </div>
+              <div class="form-group">
+                <label>Claim No.</label>
+                <input type="text" id="f-claim-no" placeholder="Auto-generated if blank, e.g. CLM-001"/>
+              </div>
+              <div class="form-group">
+                <label>Claim Type *</label>
+                <select id="f-claim-type">
+                  <option value="">— Select —</option>
+                  <option value="Extension of Time (EOT)">Extension of Time (EOT)</option>
+                  <option value="Change Order">Change Order (Additional Works)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Party *</label>
+                <select id="f-party">
+                  <option value="">— Select —</option>
+                  <option value="Client">Client</option>
+                  <option value="Vendor">Vendor</option>
+                </select>
+              </div>
+              <div class="form-group full">
+                <label>Description *</label>
+                <textarea id="f-description" rows="3" placeholder="Describe the claim — what is being claimed and why…"></textarea>
+              </div>
+              <div class="form-group">
+                <label>Linked WP No. <span style="font-size:10px;color:#aaa;font-weight:400">(optional)</span></label>
+                <input type="text" id="f-wp-no" placeholder="e.g. WP-42"/>
+              </div>
+              <div class="form-group">
+                <label>Contractor / Client Name</label>
+                <input type="text" id="f-contractor" placeholder="Vendor or client entity name"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- Claim Financials -->
+          <div class="form-section">
+            <div class="form-section-title"><i class="ti ti-coins" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Financial & Schedule</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Date Filed</label>
+                <input type="date" id="f-date-filed"/>
+              </div>
+              <div class="form-group">
+                <label>Amount Claimed (₱)</label>
+                <input type="number" id="f-amount-claimed" placeholder="0" min="0" oninput="updateAmountDisplay()"/>
+                <span class="hint amount-display" id="amount-display"></span>
+              </div>
+              <div class="form-group full">
+                <label>Basis / Grounds for Claim</label>
+                <textarea id="f-basis" rows="2" placeholder="Contract clause, event, or circumstance supporting the claim…"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status & Remarks -->
+          <div class="form-section">
+            <div class="form-section-title"><i class="ti ti-clipboard-list" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Status & Remarks</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Claim Status</label>
+                <select id="f-status">
+                  <option value="Draft">Draft</option>
+                  <option value="Filed">Filed</option>
+                  <option value="Under Review">Under Review</option>
+                  <option value="Withdrawn">Withdrawn</option>
+                </select>
+              </div>
+              <div class="form-group full">
+                <label>Remarks / Notes</label>
+                <textarea id="f-remarks" rows="2" placeholder="Additional notes, escalation flags, correspondence references…"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="form-actions">
+            <button class="btn btn-primary" id="btn-submit" onclick="submitForm()">
+              <i class="ti ti-send" style="font-size:13px"></i>
+              <span id="btn-submit-text">Submit for Review</span>
+            </button>
+            <button class="btn" onclick="history.back()">
+              <i class="ti ti-arrow-left" style="font-size:13px"></i> Cancel
+            </button>
+            <div id="save-spinner" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary)">
+              <div class="spinner" style="width:18px;height:18px;border-width:2px"></div> Saving…
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const params  = new URLSearchParams(location.search);
+  const editId  = params.get('id');
+  const projId  = params.get('project');
+  let userProfile, existingClaim, allProjects;
+  initMobileMenu();
+
+  function fmtPeso(v) {
+    if (!v) return '';
+    return '₱' + Number(v).toLocaleString('en-PH') + ' (₱' + (v/1e6).toFixed(2) + 'M)';
+  }
+  function updateAmountDisplay() {
+    const v = parseFloat(document.getElementById('f-amount-claimed').value);
+    document.getElementById('amount-display').textContent = v ? fmtPeso(v) : '';
+  }
+
+  AppAuth.requireLogin(async (user, profile) => {
+    userProfile = profile;
+    window.__wpmRole = profile.role;
+    renderUserBar('user-bar', profile);
+
+    const isAdmin = AppAuth.isAdmin(profile);
+    const sb = await getSB();
+
+    // Load projects for selector
+    allProjects = await WPDb.getProjects();
+    const permitted = AppAuth.getPermittedProjects(profile, allProjects).filter(p => p.status !== 'archived');
+    const projSel = document.getElementById('f-project');
+    projSel.innerHTML = '<option value="">Select project…</option>' +
+      permitted.map(p => `<option value="${p.id}">${p.id} — ${p.name || p.id}</option>`).join('');
+
+    if (projId) {
+      projSel.value = projId;
+      const proj = allProjects.find(p => p.id === projId);
+      document.getElementById('page-sub').textContent = proj?.name || projId;
+      document.getElementById('nav-project-name').textContent = projId;
+      document.getElementById('nav-project-link').href = 'project.html?id=' + projId + '#claims';
+    }
+
+    // Edit mode
+    if (editId) {
+      const { data: claim } = await sb.from('claims').select('*').eq('id', editId).single();
+      if (!claim) { alert('Claim not found.'); history.back(); return; }
+      existingClaim = claim;
+
+      document.getElementById('page-title').textContent = 'Edit Claim';
+      document.getElementById('page-sub').textContent   = claim.claim_no || claim.id.slice(0,8);
+      document.getElementById('btn-submit-text').textContent = isAdmin ? 'Save Changes' : 'Submit Update for Review';
+
+      // Show review status banners
+      if (claim.review_status === 'rejected') {
+        const rb = document.getElementById('rejection-box');
+        rb.classList.remove('hidden');
+        document.getElementById('rejection-reason').textContent = ' Reason: ' + (claim.review_notes || 'No reason provided.');
+      } else if (claim.review_status === 'pending_review') {
+        const si = document.getElementById('status-info');
+        si.style.display = 'flex';
+        document.getElementById('status-info-text').textContent = 'This claim is pending admin review. You can update and resubmit.';
+      } else if (claim.review_status === 'approved' && !isAdmin) {
+        const si = document.getElementById('status-info');
+        si.style.display = 'flex';
+        si.style.background = '#EAF3DE'; si.style.borderColor = '#B8DDA0'; si.style.color = '#3B6D11';
+        document.getElementById('status-info-text').textContent = 'This claim is approved. Your edits will be submitted for re-review.';
+      }
+
+      // Fill form
+      const fill = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+      fill('f-project', claim.project_id);
+      fill('f-claim-no', claim.claim_no);
+      fill('f-claim-type', claim.claim_type);
+      fill('f-party', claim.party);
+      fill('f-description', claim.description);
+      fill('f-wp-no', claim.wp_no);
+      fill('f-contractor', claim.contractor);
+      fill('f-date-filed', claim.date_filed);
+      fill('f-amount-claimed', claim.amount_claimed);
+      fill('f-basis', claim.basis);
+      fill('f-status', claim.status);
+      fill('f-remarks', claim.remarks);
+      updateAmountDisplay();
+
+      document.getElementById('nav-project-name').textContent = claim.project_id;
+      document.getElementById('nav-project-link').href = 'project.html?id=' + claim.project_id + '#claims';
+    }
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+  });
+
+  function getVal(id) { return document.getElementById(id).value.trim(); }
+  function getNum(id) { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? null : v; }
+
+  async function submitForm() {
+    const alertEl   = document.getElementById('alert');
+    const successEl = document.getElementById('success');
+    alertEl.className   = 'alert alert-error hidden';
+    successEl.className = 'alert alert-success hidden';
+    const showErr = msg => { document.getElementById('alert-text').textContent = msg; alertEl.className = 'alert alert-error'; alertEl.scrollIntoView({behavior:'smooth'}); };
+
+    if (!getVal('f-project'))    return showErr('Project is required.');
+    if (!getVal('f-claim-type')) return showErr('Claim Type is required.');
+    if (!getVal('f-party'))      return showErr('Party (Client / Vendor) is required.');
+    if (!getVal('f-description'))return showErr('Description is required.');
+
+    const isAdmin = AppAuth.isAdmin(userProfile);
+    const sb = await getSB();
+    const { data: { user } } = await sb.auth.getUser();
+
+    const data = {
+      project_id:     getVal('f-project'),
+      claim_no:       getVal('f-claim-no') || null,
+      claim_type:     getVal('f-claim-type'),
+      party:          getVal('f-party'),
+      description:    getVal('f-description'),
+      wp_no:          getVal('f-wp-no') || null,
+      contractor:     getVal('f-contractor') || null,
+      date_filed:     getVal('f-date-filed') || null,
+      amount_claimed: getNum('f-amount-claimed'),
+      basis:          getVal('f-basis') || null,
+      status:         getVal('f-status'),
+      remarks:        getVal('f-remarks') || null,
+      submitted_by:   user.id,
+    };
+
+    const btn = document.getElementById('btn-submit');
+    const spinner = document.getElementById('save-spinner');
+    btn.disabled = true; spinner.style.display = 'flex';
+
+    try {
+      if (editId && existingClaim) {
+        if (isAdmin) {
+          await sb.from('claims').update({ ...data, review_status: 'approved', updated_at: new Date().toISOString() }).eq('id', editId);
+          document.getElementById('success-text').textContent = 'Claim updated.';
+        } else {
+          await sb.from('claims').update({ ...data, review_status: 'pending_review', updated_at: new Date().toISOString() }).eq('id', editId);
+          document.getElementById('success-text').textContent = 'Update submitted for review.';
+        }
+      } else {
+        const { data: inserted } = await sb.from('claims').insert({
+          ...data,
+          review_status: isAdmin ? 'approved' : 'pending_review',
+        }).select().single();
+        // Auto-generate claim_no if blank
+        if (!data.claim_no && inserted) {
+          const seq = String(inserted.created_at).slice(0,10).replace(/-/g,'');
+          const num = 'CLM-' + String(Math.floor(Math.random()*900)+100);
+          await sb.from('claims').update({ claim_no: num }).eq('id', inserted.id);
+        }
+        document.getElementById('success-text').textContent = isAdmin ? 'Claim added.' : 'Claim submitted for review.';
+      }
+      successEl.className = 'alert alert-success';
+      successEl.scrollIntoView({behavior:'smooth'});
+      setTimeout(() => {
+        const pid = getVal('f-project');
+        location.href = pid ? 'project.html?id=' + pid : history.back();
+      }, 1400);
+    } catch (err) {
+      showErr('Error: ' + (err.message || 'Unknown error'));
+    } finally {
+      btn.disabled = false; spinner.style.display = 'none';
+    }
+  }
+</script>
+</body>
+</html>
