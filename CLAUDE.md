@@ -434,7 +434,7 @@ git push origin main
 ## Development Notes
 
 - No npm, no bundler, no TypeScript — pure vanilla JS loaded via `<script src="...">` tags
-- Supabase client loaded via CDN ESM: `import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm')`
+- Supabase client loaded via CDN UMD single bundle (`supabase.min.js` from jsDelivr), preloaded in `<head>` and loaded as `<script>` before `auth.js` in body. UMD avoids the 6-sub-module ESM waterfall.
 - All pages use `AppAuth.requireLogin()` or `AppAuth.requireAdmin()` as the entry point — never access DB directly without auth check
 - `WPDb.mapWP()` normalizes field aliases (e.g., `budget_bcb` ↔ `approved_budget_bcb`, `contract_amount_php` ↔ `total_awarded`)
 - `Fmt.money(v)` formats as `₱X.XXM`; `Fmt.moneyFull(v)` formats as `₱1,234,567`; `Fmt.date(d)` formats as `May 29, '26`
