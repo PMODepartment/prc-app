@@ -86,12 +86,17 @@
       <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading submissions…</span></div>
       <div id="main-content" style="display:none">
 
-        <!-- Filter bar: Project + Trade + Search -->
+        <!-- Filter bar: Project (consolidated only) + Trade + Search -->
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-          <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Project</label>
-          <select id="proj-select" onchange="changeProject(this.value)" style="font-size:13px;padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-family:inherit;background:#fff;color:#231F20;min-width:180px;cursor:pointer">
-            <option value="ALL">All Projects</option>
-          </select>
+          <!-- Project filter — hidden when viewing a single project (would bypass dashboard selector) -->
+          <span id="proj-filter-wrap" style="display:flex;align-items:center;gap:8px">
+            <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Project</label>
+            <select id="proj-select" onchange="changeProject(this.value)" style="font-size:13px;padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-family:inherit;background:#fff;color:#231F20;min-width:180px;cursor:pointer">
+              <option value="ALL">All Projects</option>
+            </select>
+          </span>
+          <!-- Project badge shown in per-project context instead of filter -->
+          <span id="proj-context-badge" style="display:none;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;background:#EE3124;color:#fff"></span>
           <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Trade</label>
           <select id="trade-filter" onchange="applyFilters()" style="font-size:13px;padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-family:inherit;background:#fff;color:#231F20;min-width:150px;cursor:pointer">
             <option value="ALL">All Trades</option>
@@ -101,7 +106,6 @@
             <input id="review-search" type="text" placeholder="Search WP No. or description…" oninput="applyFilters()"
               style="width:100%;padding:7px 12px 7px 32px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
           </div>
-          <span id="proj-context-badge" style="display:none;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:#EE3124;color:#fff"></span>
         </div>
 
         <div class="tab-row">
@@ -167,8 +171,11 @@
     // Load WPs based on context
     if (currentProjId !== 'ALL') {
       allWPs = await WPDb.getAllWPs(currentProjId);
+      // Show project badge, hide the project filter dropdown (prevents bypassing dashboard selector)
       const badge = document.getElementById('proj-context-badge');
       if (badge) { badge.textContent = currentProjId; badge.style.display = 'inline'; }
+      const filterWrap = document.getElementById('proj-filter-wrap');
+      if (filterWrap) filterWrap.style.display = 'none';
       // Update page subtitle
       const sub = document.querySelector('.page-sub');
       const proj = allProjects.find(p=>p.id===currentProjId);
@@ -177,6 +184,9 @@
       allWPs = await WPDb.getAllWPsForAdmin();
       const badge = document.getElementById('proj-context-badge');
       if (badge) badge.style.display = 'none';
+      // Show project filter in consolidated context
+      const filterWrap = document.getElementById('proj-filter-wrap');
+      if (filterWrap) filterWrap.style.display = 'flex';
     }
     // Nav context — hide project list and show back link when coming from a project
     const navCtx = sessionStorage.getItem('wpm_nav_ctx');
