@@ -96,11 +96,15 @@ create table if not exists work_packages (
   submittal_type        text default 'Not Required',   -- Not Required | Submitted | Approved
 
   -- Payment Terms
-  payment_terms_days    integer,
-  dp_percent            numeric(5,2),
-  retention_percent     numeric(5,2),
+  payment_terms_days    integer,          -- e.g. 7 | 15 | 30 | 45 | 60
+  dp_percent            numeric(5,4),     -- e.g. 0.15 = 15%
+  dp_terms              text,             -- e.g. One-time
+  dp_notes              text,             -- e.g. No DP | Progress Billing | 15% DP, 30 Days
+  dp_release_date       date,
+  dp_amount             numeric(18,2),
+  retention_percent     numeric(5,4),     -- e.g. 0.10 = 10%
+  retention_amount      numeric(18,2),
   retention_period      text,
-  dp_terms              text,
 
   -- Review workflow
   review_status         text default 'approved'  -- approved | pending_review | rejected
