@@ -52,14 +52,13 @@
   --font: 'Montserrat', 'Gotham', 'Segoe UI', system-ui, sans-serif;
 }
 
-html { font-size: 14px; -webkit-text-size-adjust: 100%; overflow-x: clip; }
+html { font-size: 14px; -webkit-text-size-adjust: 100%; }
 body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text-primary);
   line-height: 1.5;
   min-height: 100vh;
-  overflow-x: clip;
 }
 
 /* ── App Shell ─────────────────────────────────────────────────────── */
@@ -993,10 +992,8 @@ body {
   .sidebar-overlay.show { display: block; }
   .btn-menu { display: flex; }
 
-  .main { margin-left: 0; overflow-x: clip; }
-
-  /* clip prevents horizontal scroll without killing position:sticky (unlike overflow:hidden) */
-  .content { overflow-x: clip; }
+  .main { margin-left: 0; }
+  /* No overflow-x on .main/.content — any overflow value on a parent kills position:sticky in Safari */
 
   /* Topbar: compact on mobile, no overflow */
   .topbar {
@@ -1124,22 +1121,19 @@ body {
   /* Quick WP modal */
   #wp-quick-modal > div > div { border-radius: var(--radius-lg); }
 
-  /* Charts container responsive */
+  /* Charts: clamp to container, never exceed it */
   canvas { max-width: 100% !important; width: 100% !important; }
 
-  /* Tables scroll horizontally within their container, never push the page */
-  .data-table, .budget-table, table { max-width: 100%; }
-  .table-wrapper, .table-wrap, [style*="overflow-x:auto"], [style*="overflow-x: auto"] {
-    max-width: 100%;
-  }
+  /* Panels and grids must not exceed viewport */
+  .panel { min-width: 0; max-width: 100%; }
+  .grid-2 > *, .grid-3 > * { min-width: 0; }
+
+  /* Tables scroll within their own wrapper, not the page */
+  .data-table, .budget-table { display: block; max-width: 100%; overflow-x: auto; }
 
   /* Section cards full width */
   .section-card { padding: 14px; }
 
   /* Sidebar section labels uppercase spacing */
   .sidebar-section-label { letter-spacing: .08em; }
-
-  /* Global horizontal overflow guard */
-  * { max-width: 100%; box-sizing: border-box; }
-  img, svg, canvas { max-width: 100% !important; }
 }
