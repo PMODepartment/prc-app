@@ -295,10 +295,24 @@
         <!-- ══ WP LIST TAB ══ -->
         <div id="tab-wplist" style="display:none">
           <div class="panel" style="padding:0;overflow:hidden">
-            <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              <div class="panel-title" style="margin:0"><i class="ti ti-table"></i>Work Package Monitoring</div>
-              <input id="wp-mon-search" type="text" placeholder="Search WPs…" oninput="filterWPTable()"
-                style="margin-left:auto;padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none;width:180px">
+            <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <div class="panel-title" style="margin:0;flex-shrink:0"><i class="ti ti-table"></i>Work Package Monitoring</div>
+              <select id="wp-mon-trade" onchange="filterWPTable()"
+                style="padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;background:#fff;cursor:pointer;min-width:130px">
+                <option value="">All Trades</option>
+              </select>
+              <select id="wp-mon-status" onchange="filterWPTable()"
+                style="padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;background:#fff;cursor:pointer">
+                <option value="">All Statuses</option>
+                <option value="Awarded">Awarded</option>
+                <option value="Partially Awarded">Partially Awarded</option>
+                <option value="Not Yet Awarded">Not Yet Awarded</option>
+              </select>
+              <div style="position:relative;margin-left:auto">
+                <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:12px;pointer-events:none"></i>
+                <input id="wp-mon-search" type="text" placeholder="Search WP No. or description…" oninput="filterWPTable()"
+                  style="padding:6px 10px 6px 26px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none;width:210px">
+              </div>
             </div>
             <div style="overflow-x:auto">
               <table class="data-table" id="wp-mon-table" style="font-size:11px;min-width:900px">
@@ -543,15 +557,31 @@
     }
 
     window.filterWPTable = function() {
-      const q = (document.getElementById('wp-mon-search')?.value || '').toLowerCase();
-      const filtered = q ? _wpMonData.filter(w =>
-        (w.wp_no||'').toLowerCase().includes(q) ||
-        (w.description||'').toLowerCase().includes(q) ||
-        (w.project_id||'').toLowerCase().includes(q)
-      ) : _wpMonData;
+      const q      = (document.getElementById('wp-mon-search')?.value || '').toLowerCase().trim();
+      const trade  = document.getElementById('wp-mon-trade')?.value  || '';
+      const status = document.getElementById('wp-mon-status')?.value || '';
+      const filtered = _wpMonData.filter(w => {
+        if (trade  && w.trade        !== trade)  return false;
+        if (status && w.award_status !== status) return false;
+        if (q && !(
+          (w.wp_no||'').toLowerCase().includes(q) ||
+          (w.description||'').toLowerCase().includes(q) ||
+          (w.project_id||'').toLowerCase().includes(q)
+        )) return false;
+        return true;
+      });
       _wpMonPage = 1;
       renderWPMonTable(filtered);
     };
+
+    function populateWPMonTradeFilter() {
+      const sel = document.getElementById('wp-mon-trade');
+      if (!sel || !_wpMonData) return;
+      const trades = [...new Set(_wpMonData.map(w => w.trade).filter(Boolean))].sort();
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">All Trades</option>' +
+        trades.map(t => `<option value="${t}" ${t===cur?'selected':''}>${t}</option>`).join('');
+    }
 
     function renderWPMonTable(rows) {
       const tbody = document.getElementById('wp-mon-body');
@@ -666,6 +696,7 @@
         const ag = d => { const r=d.actual_awarding_date||(d.award_status==='Awarded'?null:d.awarding_date); return r?Math.floor((new Date()-new Date(r))/86400000):-Infinity; };
         return ag(b) - ag(a);
       });
+      populateWPMonTradeFilter();
 
       // Render the currently active tab immediately
       _renderTab(_activeTab, filtWPs, filt, allStats);
