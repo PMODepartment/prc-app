@@ -47,7 +47,7 @@ const Calc = {
 const Fmt = {
   date(d) {
     if (!d) return '—';
-    return new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: '2-digit' });
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
   },
   money(v, dec = 2) {
     if (v == null) return '—';

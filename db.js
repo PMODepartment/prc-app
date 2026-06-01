@@ -74,7 +74,7 @@ const Fmt = {
   },
   date(d) {
     if (!d) return '\u2014';
-    try { return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'}); }
+    try { return new Date(d).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}); }
     catch { return d; }
   }
 };

@@ -89,10 +89,20 @@ create table if not exists work_packages (
                           else null end
                         ) stored,
 
-  -- Submittals
+  -- Approval Matrix
+  approver              text,             -- Approver initials/name
+  support_team          text,             -- Support person initials/name
+
+  -- Insurance Bonds
+  surety_bond           text default 'No',       -- Yes | No
+  performance_bond      text default 'No',       -- Yes | No
+  warranty_bond         text default 'No',       -- Yes | No
+
+  -- Material / Subcon Submittals
   requires_approval     boolean default false,
   approver_name         text,
   approval_date         date,
+  submittal_document_type text,           -- Methodology | Technical Data Sheet | Sample | Mock-up | Swatch Board
   submittal_type        text default 'Not Required',   -- Not Required | Submitted | Approved
 
   -- Payment Terms
