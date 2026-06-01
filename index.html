@@ -791,38 +791,72 @@
       }).join('');
     }
 
-    // Project pills
-    // Filter functions
-    window.toggleProjectPill = function(id) {
+    // ── Project filter ────────────────────────────────────────────
+    let _filterDirty = false; // track if selection changed while panel is open
+
+    window.toggleProjectPill = function(id, el) {
+      // Toggle selection
       if (_activeIds.has(id)) { if (_activeIds.size > 1) _activeIds.delete(id); }
       else _activeIds.add(id);
-      updateFilterLabel(); renderFilterList(); renderAll();
+      _filterDirty = true;
+
+      // Update just this row's checkbox — no full re-render, panel stays open
+      const on = _activeIds.has(id);
+      const box = el.querySelector('.pf-checkbox');
+      if (box) {
+        box.style.borderColor = on ? 'var(--mw-red)' : '#ccc';
+        box.style.background  = on ? 'var(--mw-red)' : '#fff';
+        box.innerHTML = on ? '<i class="ti ti-check" style="font-size:10px;color:#fff"></i>' : '';
+      }
+      updateFilterLabel();
     };
-    window.selectAllPills = function() { permitted.forEach(p=>_activeIds.add(p.id)); updateFilterLabel(); renderFilterList(); renderAll(); };
-    window.clearPills = function() { const first=permitted[0]; _activeIds=new Set(first?[first.id]:[]); updateFilterLabel(); renderFilterList(); renderAll(); };
+
+    window.selectAllPills = function() {
+      permitted.forEach(p => _activeIds.add(p.id));
+      _filterDirty = true;
+      updateFilterLabel(); renderFilterList();
+    };
+    window.clearPills = function() {
+      const first = permitted[0];
+      _activeIds = new Set(first ? [first.id] : []);
+      _filterDirty = true;
+      updateFilterLabel(); renderFilterList();
+    };
+
+    function closeProjFilter() {
+      const panel   = document.getElementById('proj-filter-panel');
+      const chevron = document.getElementById('proj-filter-chevron');
+      if (panel)   panel.style.display = 'none';
+      if (chevron) chevron.style.transform = '';
+      // Apply data refresh only when panel actually closes
+      if (_filterDirty) { _filterDirty = false; renderAll(); }
+    }
+
     window.toggleProjFilter = function() {
       const panel = document.getElementById('proj-filter-panel');
-      const chevron = document.getElementById('proj-filter-chevron');
-      const open = panel.style.display !== 'none';
-      panel.style.display = open ? 'none' : 'block';
-      chevron.style.transform = open ? '' : 'rotate(180deg)';
-      if (!open) document.getElementById('proj-filter-search').focus();
+      const open  = panel.style.display !== 'none';
+      if (open) { closeProjFilter(); }
+      else {
+        panel.style.display = 'block';
+        document.getElementById('proj-filter-chevron').style.transform = 'rotate(180deg)';
+        document.getElementById('proj-filter-search').focus();
+      }
     };
+
     window.filterProjDropdown = function() {
-      const q = (document.getElementById('proj-filter-search')?.value||'').toLowerCase();
+      const q = (document.getElementById('proj-filter-search')?.value || '').toLowerCase();
       document.querySelectorAll('.pf-row').forEach(row => {
         row.style.display = row.dataset.search.includes(q) ? '' : 'none';
       });
     };
-    // Close filter panel when clicking outside
+
+    // Close filter panel when clicking outside — use composedPath to handle removed nodes
     document.addEventListener('click', function(e) {
       const wrap = document.getElementById('proj-filter-wrap');
-      if (wrap && !wrap.contains(e.target)) {
-        const panel = document.getElementById('proj-filter-panel');
-        const chevron = document.getElementById('proj-filter-chevron');
-        if (panel) { panel.style.display='none'; }
-        if (chevron) chevron.style.transform='';
-      }
+      if (!wrap) return;
+      const path = e.composedPath ? e.composedPath() : [];
+      const inside = path.includes(wrap) || wrap.contains(e.target);
+      if (!inside) closeProjFilter();
     });
 
     function updateFilterLabel() {
@@ -840,17 +874,20 @@
         const on = _activeIds.has(p.id);
         const label = p.name && p.name !== p.id ? `${p.id} — ${p.name.split('—')[0].trim()}` : p.id;
         const search = label.toLowerCase();
-        return `<div class="pf-row" data-search="${search}" onclick="toggleProjectPill('${p.id}')"
+        const statusBg    = p.status === 'archived' || p.status === 'inactive' ? '#f0f0f0' : '#EAF3DE';
+        const statusColor = p.status === 'archived' || p.status === 'inactive' ? '#888' : '#3B6D11';
+        const statusLabel = p.status === 'archived' ? 'ARCHIVED' : p.status === 'inactive' ? 'INACTIVE' : 'ACTIVE';
+        return `<div class="pf-row" data-search="${search}" onclick="toggleProjectPill('${p.id}',this)"
           style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;transition:background .1s"
           onmouseover="this.style.background='#f8f8f8'" onmouseout="this.style.background=''">
-          <div style="width:16px;height:16px;border-radius:3px;flex-shrink:0;border:2px solid ${on?'var(--mw-red)':'#ccc'};background:${on?'var(--mw-red)':'#fff'};display:flex;align-items:center;justify-content:center">
-            ${on?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':''}
+          <div class="pf-checkbox" style="width:16px;height:16px;border-radius:3px;flex-shrink:0;border:2px solid ${on?'var(--mw-red)':'#ccc'};background:${on?'var(--mw-red)':'#fff'};display:flex;align-items:center;justify-content:center">
+            ${on ? '<i class="ti ti-check" style="font-size:10px;color:#fff"></i>' : ''}
           </div>
           <div style="min-width:0">
             <div style="font-size:13px;font-weight:600;color:#231F20">${p.id}</div>
-            ${p.name&&p.name!==p.id?`<div style="font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>`:''}
+            ${p.name && p.name !== p.id ? `<div style="font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>` : ''}
           </div>
-          <div style="margin-left:auto;font-size:10px;padding:2px 6px;border-radius:8px;background:${p.status==='archived'?'#f0f0f0':p.status==='inactive'?'#f0f0f0':'#EAF3DE'};color:${p.status==='archived'||p.status==='inactive'?'#888':'#3B6D11'}">${p.status==='archived'?'ARCHIVED':p.status==='inactive'?'INACTIVE':'ACTIVE'}</div>
+          <div style="margin-left:auto;font-size:10px;padding:2px 6px;border-radius:8px;background:${statusBg};color:${statusColor}">${statusLabel}</div>
         </div>`;
       }).join('');
     }
