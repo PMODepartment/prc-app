@@ -52,13 +52,14 @@
   --font: 'Montserrat', 'Gotham', 'Segoe UI', system-ui, sans-serif;
 }
 
-html { font-size: 14px; -webkit-text-size-adjust: 100%; }
+html { font-size: 14px; -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text-primary);
   line-height: 1.5;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 /* ── App Shell ─────────────────────────────────────────────────────── */
@@ -992,17 +993,21 @@ body {
   .sidebar-overlay.show { display: block; }
   .btn-menu { display: flex; }
 
-  .main { margin-left: 0; }
+  .main { margin-left: 0; overflow-x: hidden; }
+
+  /* Prevent any child from causing horizontal scroll */
+  .content { overflow-x: hidden; }
 
   /* Topbar: compact on mobile, no overflow */
   .topbar {
     padding: 0 10px;
     height: 52px;
     gap: 6px;
+    overflow: hidden;
   }
-  .topbar-left { gap: 8px; flex: 1; min-width: 0; }
-  .topbar-right { gap: 6px; }
-  .page-title { font-size: 13px; }
+  .topbar-left { gap: 8px; flex: 1; min-width: 0; overflow: hidden; }
+  .topbar-right { gap: 6px; flex-shrink: 0; }
+  .page-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .page-sub { display: none; }               /* hide subtitle — saves topbar space */
   .topbar-badge-readonly { display: none; }  /* hide READ-ONLY pill — notice banner covers it */
 
@@ -1120,11 +1125,21 @@ body {
   #wp-quick-modal > div > div { border-radius: var(--radius-lg); }
 
   /* Charts container responsive */
-  canvas { max-width: 100% !important; }
+  canvas { max-width: 100% !important; width: 100% !important; }
+
+  /* Tables scroll horizontally within their container, never push the page */
+  .data-table, .budget-table, table { max-width: 100%; }
+  .table-wrapper, .table-wrap, [style*="overflow-x:auto"], [style*="overflow-x: auto"] {
+    max-width: 100%;
+  }
 
   /* Section cards full width */
   .section-card { padding: 14px; }
 
   /* Sidebar section labels uppercase spacing */
   .sidebar-section-label { letter-spacing: .08em; }
+
+  /* Global horizontal overflow guard */
+  * { max-width: 100%; box-sizing: border-box; }
+  img, svg, canvas { max-width: 100% !important; }
 }
