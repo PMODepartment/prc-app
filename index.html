@@ -324,7 +324,7 @@
                 <tbody id="wp-mon-body"></tbody>
               </table>
             </div>
-            <div id="wp-mon-pager" style="padding:8px 16px;font-size:11px;color:#888;display:flex;align-items:center;gap:8px"></div>
+            <div id="wp-mon-pager" style="padding:10px 16px;font-size:11px;color:#888;display:flex;align-items:center;gap:8px;border-top:1px solid #f0f0f0"></div>
           </div>
         </div>
 
@@ -540,7 +540,7 @@
     }
 
     // ── WP monitoring table ───────────────────────────────────────
-    let _wpMonData = [], _wpMonPage = 1;
+    let _wpMonData = [], _wpMonFiltered = [], _wpMonPage = 1;
     const WP_MON_PER_PAGE = 50;
 
     function submittalLabel(w) {
@@ -560,7 +560,7 @@
       const q      = (document.getElementById('wp-mon-search')?.value || '').toLowerCase().trim();
       const trade  = document.getElementById('wp-mon-trade')?.value  || '';
       const status = document.getElementById('wp-mon-status')?.value || '';
-      const filtered = _wpMonData.filter(w => {
+      _wpMonFiltered = _wpMonData.filter(w => {
         if (trade  && w.trade        !== trade)  return false;
         if (status && w.award_status !== status) return false;
         if (q && !(
@@ -571,7 +571,16 @@
         return true;
       });
       _wpMonPage = 1;
-      renderWPMonTable(filtered);
+      renderWPMonTable(_wpMonFiltered);
+    };
+
+    // Global page navigation — accessible from inline onclick
+    window.wpMonPrev = function() {
+      if (_wpMonPage > 1) { _wpMonPage--; renderWPMonTable(_wpMonFiltered); }
+    };
+    window.wpMonNext = function() {
+      const totalPages = Math.ceil(_wpMonFiltered.length / WP_MON_PER_PAGE);
+      if (_wpMonPage < totalPages) { _wpMonPage++; renderWPMonTable(_wpMonFiltered); }
     };
 
     function populateWPMonTradeFilter() {
@@ -615,11 +624,17 @@
       if (pager) {
         const total = rows.length;
         const totalPages = Math.ceil(total / WP_MON_PER_PAGE);
-        pager.innerHTML = total === 0 ? 'No work packages' :
-          `Showing ${start+1}–${Math.min(start+WP_MON_PER_PAGE,total)} of ${total}` +
-          (totalPages > 1 ? ` &nbsp;
-            <button onclick="_wpMonPage=Math.max(1,_wpMonPage-1);filterWPTable()" style="padding:2px 8px;border:1px solid #ddd;border-radius:5px;cursor:pointer;background:#fff;font-size:11px">‹</button>
-            <button onclick="_wpMonPage=Math.min(${totalPages},_wpMonPage+1);filterWPTable()" style="padding:2px 8px;border:1px solid #ddd;border-radius:5px;cursor:pointer;background:#fff;font-size:11px">›</button>` : '');
+        const btnStyle = 'padding:4px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;font-size:11px;font-family:inherit';
+        const prevDisabled = _wpMonPage <= 1 ? 'opacity:.4;cursor:default;' : '';
+        const nextDisabled = _wpMonPage >= totalPages ? 'opacity:.4;cursor:default;' : '';
+        pager.innerHTML = total === 0 ? '<span>No work packages found</span>' :
+          `<span>Showing ${start+1}–${Math.min(start+WP_MON_PER_PAGE,total)} of ${total}</span>` +
+          (totalPages > 1 ? `
+            <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
+              <span style="font-size:11px;color:#888">Page ${_wpMonPage} of ${totalPages}</span>
+              <button onclick="wpMonPrev()" style="${btnStyle}${prevDisabled}">‹ Prev</button>
+              <button onclick="wpMonNext()" style="${btnStyle}${nextDisabled}">Next ›</button>
+            </span>` : '');
       }
     }
 
