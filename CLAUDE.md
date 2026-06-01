@@ -32,8 +32,9 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 | `forgot-password.html` | public | Password reset |
 | `project-selector.html` | user | Project picker — shown after login; admins also see Portfolio Overview card |
 | `index.html` | user | Portfolio Overview — consolidated dashboard with 6 tabs |
-| `project.html` | user | Single project dashboard (tabs: Overview, Backlog, Budget, Schedule, Works, WP List) |
+| `project.html` | user | Single project dashboard (tabs: Overview, Backlog, Budget, Schedule, Works, WP List, Claims, Change Orders) |
 | `wp-form.html` | user | Add / edit work package |
+| `claim-form.html` | user | Add / edit claim or change order (`?section=change-order` for CO mode) |
 | `my-wps.html` | user | Officer's WP list |
 | `review.html` | admin | Approve / reject pending WPs |
 | `admin.html` | admin | User management + project management |
@@ -48,6 +49,7 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 - **`projects`** — `id` (text PK e.g. 'AVR101'), name, location, status, budget_bcb, start_date, end_date
 - **`users`** — `id` (UUID FK → auth.users), email, role (`super_admin|admin|user`), status (`pending|approved|rejected`), projects (text[]), last_login (timestamptz)
 - **`work_packages`** — all WP fields; `review_status` (`pending_review|approved|rejected`); see schema for full column list
+- **`claims`** — `id`, `project_id`, `claim_no`, `claim_type` (`Extension of Time (EOT)|Change Order`), `party` (`Client|Vendor`), `description`, `wp_no`, `contractor`, `date_filed`, `amount_claimed`, `basis`, `status` (`Draft|Filed|Under Review|Approved|Partially Approved|Rejected|Withdrawn`), `approved_amount`, `date_resolved`, `review_status` (`pending_review|approved|rejected`), `review_notes`, `remarks`, `submitted_by` (UUID FK → auth.users), `created_at`, `updated_at`
 
 ### WPDb API (db.js)
 ```js
@@ -95,6 +97,8 @@ WPDb.updateLastLogin(userId)  // writes current timestamp to users.last_login
 
 - Admins and super_admins see all projects; users see only projects in their `profile.projects[]` array
 - When admin submits a WP via CSV import or form, it auto-approves (`WPDb.approveWP()` called after `WPDb.submitWP()`)
+- When admin submits a Claim or Change Order (form or CSV), `review_status` is set directly to `'approved'`; users get `'pending_review'`
+- Admin new claims/COs default to `status: 'Filed'`; user submissions default to `status: 'Draft'`
 - Project assignment is per-user, stored as `text[]` in `users.projects`
 
 ---
@@ -120,6 +124,18 @@ Work Packages
   ├─ All WPs
   ├─ CSV Template
   └─ Import from CSV
+
+Claims (EOT)
+  ├─ Add Claim (→ claim-form.html?project=ID)
+  ├─ Claims Register (→ project.html?tab=claims)
+  ├─ CSV Template (downloadClaimsCSVTemplate)
+  └─ Import from CSV (openClaimsCSVModal)
+
+Change Orders
+  ├─ Add Change Order (→ claim-form.html?project=ID&section=change-order)
+  ├─ Change Orders (→ project.html?tab=change-orders)
+  ├─ CSV Template (downloadCOsCSVTemplate)
+  └─ Import from CSV (openCOsCSVModal)
 
 Admin (admin only)
   ├─ Portfolio Overview (→ index.html?view=consolidated)
@@ -186,19 +202,74 @@ Six-tab layout matching Power BI format:
 
 ## CSV Import Feature (project.html)
 
-### Template Download
-`downloadCSVTemplate()` — generates a CSV blob with headers + 2 example rows and triggers download.
+### Work Packages CSV
+`downloadCSVTemplate()` — generates `WPM_Import_Template.csv` with headers + 2 example rows.
 
-**Headers:** Cost Code, WP No., Description, Zone, Trade, Planned Award Date, Target Completion, Budget BCB, Award Status, Contractor, Remarks
+**Headers:** Cost Code, WP No., Description, Zone, Trade, Planned Award Date, Actual Award Date, Target Delivery Date, Target Completion Date, Target Installation Date, Lead Time (Days), Budget BCB (PHP), Total Awarded (PHP), Procurement Status, Award Status, Contractor, PO/JO Count, PO/JO Numbers, Remarks
 
-### Import Modal
-`openCSVImportModal()` / `closeCSVImportModal()` — opens a fixed overlay modal (`#csv-import-modal`) with drag-drop file upload.
+`openCSVImportModal()` / `closeCSVImportModal()` — modal `#csv-import-modal`.
 
 `handleCSVFile(file)` — reads via FileReader, validates CSV, shows row count preview.
 
-`importWPsFromCSV()` — parses rows, calls `WPDb.submitWP()` per row, then `WPDb.approveWP()` if user is admin/super_admin.
+`importWPsFromCSV()` — parses rows, calls `WPDb.submitWP()` per row, then `WPDb.approveWP()` if admin/super_admin.
 
 **Date parsing:** Uses `new Date(value).toISOString().split('T')[0]` — accepts MM/DD/YYYY or YYYY-MM-DD.
+
+### Claims CSV
+`downloadClaimsCSVTemplate()` — generates `Claims_Import_Template.csv`.
+
+**Headers:** Claim No., Party, Description, Linked WP No., Contractor / Client Name, Date Filed, Amount Claimed (PHP), Basis / Grounds, Status, Remarks
+
+`openClaimsCSVModal()` / `closeClaimsCSVModal()` — modal `#claims-csv-modal`.
+
+`handleClaimsCSVFile(file)` / `importClaimsFromCSV()` — inserts rows with `claim_type = 'Extension of Time (EOT)'`; admin → `review_status: 'approved'`, user → `'pending_review'`.
+
+### Change Orders CSV
+`downloadCOsCSVTemplate()` — generates `ChangeOrders_Import_Template.csv`.
+
+**Headers:** CO No., Party, Description, Linked WP No., Contractor / Client Name, Date Filed, Amount Claimed (PHP), Basis / Grounds, Status, Remarks
+
+`openCOsCSVModal()` / `closeCOsCSVModal()` — modal `#cos-csv-modal`.
+
+`handleCOsCSVFile(file)` / `importCOsFromCSV()` — inserts rows with `claim_type = 'Change Order'`; same admin/user review logic.
+
+---
+
+## Claims & Change Orders (project.html + claim-form.html)
+
+### Data Model
+Claims and Change Orders share the `claims` Supabase table, distinguished by `claim_type`:
+- `claim_type = 'Extension of Time (EOT)'` → appears in the **Claims** tab
+- `claim_type = 'Change Order'` → appears in the **Change Orders** tab
+
+### claim-form.html
+- URL param `?section=change-order` switches the form to Change Order mode (`isCO = true`)
+- `?project=ID` pre-selects the project; `?id=UUID` enters edit mode
+- Admin/super_admin submissions: `review_status = 'approved'`, default `status = 'Filed'`, button = "Add Claim" / "Add Change Order"
+- User submissions: `review_status = 'pending_review'`, default `status = 'Draft'`, button = "Submit Claim for Review"
+- Claim status options: Draft, Filed, Under Review, Approved, Partially Approved, Rejected, Withdrawn
+- `claim_type` dropdown is hidden on the form — locked automatically by the `section` param
+
+### project.html — Claims tab (`view-claims`)
+- KPI strip: Total Claims, Client Claims, Vendor Claims, Total Claimed, Approved Amount, Pending Review
+- Filters: Party, Status, search
+- Table columns: Claim No., Type, Party, Description, Linked WP, Contractor, Date Filed, Claimed (₱M), Status, Approved (₱M), Actions
+- Admin actions per row: Edit, Approve (✓), Reject (✗), Delete
+- `renderClaimsKPIs()` / `renderClaimsView()` — driven by `allClaims` array (filtered to non-CO records)
+- `approveClaim(id)` — prompts for approved amount, sets `review_status: 'approved'`, `status: 'Approved'`
+- `rejectClaim(id, reason)` — sets `review_status: 'rejected'`, `status: 'Rejected'`, saves `review_notes`
+- Pending badge: `#claims-pending-badge` (sidebar) + `#claims-tab-badge` (tab)
+
+### project.html — Change Orders tab (`view-change-orders`)
+- Same structure as Claims tab but filtered to `claim_type === 'Change Order'`
+- KPI strip: Total Change Orders, Client COs, Vendor COs, Total Claimed, Approved Amount, Pending Review
+- Table columns: CO No., Party, Description, Linked WP, Contractor, Date Filed, Claimed (₱M), Status, Approved (₱M), Actions
+- `renderCOKPIs()` / `renderChangeOrdersView()` — driven by `allClaims` filtered to CO records
+- Reuses `approveClaim` / `rejectClaim` / `deleteClaim` functions
+- Pending badge: `#co-pending-badge` (sidebar) + `#co-tab-badge` (tab)
+
+### loadClaims()
+Fetches all `claims` for the project from Supabase, populates `allClaims[]`, updates all badges, and calls `renderClaimsKPIs()` + `renderClaimsView()`. Called once on page load and after any approve/reject/delete action.
 
 ---
 

@@ -50,10 +50,10 @@
         <i class="ti ti-switch-horizontal"></i>Switch Project
       </a>
     </div>
-    <div class="sidebar-section">
-      <div class="sidebar-section-label">Claims</div>
-      <a class="nav-item active" href="#"><i class="ti ti-file-plus"></i>New Claim</a>
-      <a class="nav-item" id="cl-register-link" href="project.html"><i class="ti ti-file-invoice"></i>Claims Register</a>
+    <div class="sidebar-section" id="sb-claims-section">
+      <div class="sidebar-section-label" id="sb-section-label">Claims</div>
+      <a class="nav-item active" id="sb-new-link" href="#"><i class="ti ti-file-plus"></i><span id="sb-new-label">New Claim</span></a>
+      <a class="nav-item" id="cl-register-link" href="project.html"><i class="ti ti-file-invoice"></i><span id="sb-register-label">Claims Register</span></a>
     </div>
     <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
@@ -160,6 +160,9 @@
                   <option value="Draft">Draft</option>
                   <option value="Filed">Filed</option>
                   <option value="Under Review">Under Review</option>
+                  <option value="Approved">Approved</option>
+                  <option value="Partially Approved">Partially Approved</option>
+                  <option value="Rejected">Rejected</option>
                   <option value="Withdrawn">Withdrawn</option>
                 </select>
               </div>
@@ -190,11 +193,34 @@
 </div>
 
 <script>
-  const params  = new URLSearchParams(location.search);
-  const editId  = params.get('id');
-  const projId  = params.get('project');
+  const params   = new URLSearchParams(location.search);
+  const editId   = params.get('id');
+  const projId   = params.get('project');
+  const section  = params.get('section') || 'claim'; // 'claim' | 'change-order'
+  const isCO     = section === 'change-order';
   let userProfile, existingClaim, allProjects;
   initMobileMenu();
+
+  // Configure form for section
+  const sectionLabel  = isCO ? 'Change Orders' : 'Claims';
+  const newLabel      = isCO ? 'New Change Order' : 'New Claim';
+  const registerLabel = isCO ? 'Change Orders Register' : 'Claims Register';
+  const tabParam      = isCO ? 'change-orders' : 'claims';
+  document.title = newLabel + ' — EPC WPM Dashboard';
+  document.getElementById('page-title').textContent = newLabel;
+  document.getElementById('sb-section-label').textContent = sectionLabel;
+  document.getElementById('sb-new-label').textContent     = newLabel;
+  document.getElementById('sb-register-label').textContent= registerLabel;
+
+  // Lock claim type dropdown based on section
+  const claimTypeEl = document.getElementById('f-claim-type');
+  if (isCO) {
+    claimTypeEl.value = 'Change Order';
+    claimTypeEl.closest('.form-group').style.display = 'none'; // hide — locked to Change Order
+  } else {
+    claimTypeEl.value = 'Extension of Time (EOT)';
+    claimTypeEl.closest('.form-group').style.display = 'none'; // hide — locked to EOT/Claim
+  }
 
   function fmtPeso(v) {
     if (!v) return '';
@@ -220,6 +246,16 @@
     projSel.innerHTML = '<option value="">Select project…</option>' +
       permitted.map(p => `<option value="${p.id}">${p.id} — ${p.name || p.id}</option>`).join('');
 
+    // Set button label and defaults for new claim based on role
+    if (!editId) {
+      document.getElementById('btn-submit-text').textContent = isAdmin
+        ? (isCO ? 'Add Change Order' : 'Add Claim')
+        : (isCO ? 'Submit Change Order for Review' : 'Submit Claim for Review');
+      if (isAdmin) {
+        document.getElementById('f-status').value = 'Filed';
+      }
+    }
+
     if (projId) {
       projSel.value = projId;
       const proj = allProjects.find(p => p.id === projId);
@@ -227,7 +263,7 @@
       document.getElementById('nav-project-name').textContent = projId;
       document.getElementById('nav-project-link').href = 'project.html?id=' + projId;
       const regLink = document.getElementById('cl-register-link');
-      if (regLink) regLink.href = 'project.html?id=' + projId + '&tab=claims';
+      if (regLink) regLink.href = 'project.html?id=' + projId + '&tab=' + tabParam;
     }
 
     // Edit mode
@@ -236,7 +272,8 @@
       if (!claim) { alert('Claim not found.'); history.back(); return; }
       existingClaim = claim;
 
-      document.getElementById('page-title').textContent = 'Edit Claim';
+      const editLabel = isCO ? 'Edit Change Order' : 'Edit Claim';
+      document.getElementById('page-title').textContent = editLabel;
       document.getElementById('page-sub').textContent   = claim.claim_no || claim.id.slice(0,8);
       document.getElementById('btn-submit-text').textContent = isAdmin ? 'Save Changes' : 'Submit Update for Review';
 
@@ -347,7 +384,7 @@
       successEl.scrollIntoView({behavior:'smooth'});
       setTimeout(() => {
         const pid = getVal('f-project');
-        location.href = pid ? 'project.html?id=' + pid + '&tab=claims' : 'javascript:history.back()';
+        location.href = pid ? 'project.html?id=' + pid + '&tab=' + tabParam : 'javascript:history.back()';
       }, 1400);
     } catch (err) {
       showErr('Error: ' + (err.message || 'Unknown error'));

@@ -79,12 +79,24 @@
         <button class="nav-item" onclick="openCSVImportModal()"><i class="ti ti-upload"></i>Import from CSV</button>
       </div>
       <div class="sidebar-section">
-        <div class="sidebar-section-label">Claims</div>
+        <div class="sidebar-section-label">Claims (EOT)</div>
         <a class="nav-item" id="add-claim-link" href="claim-form.html"><i class="ti ti-file-plus"></i>Add Claim</a>
         <a class="nav-item" id="claims-register-link" href="project.html">
           <i class="ti ti-file-invoice"></i>Claims Register
           <span class="nbadge" id="claims-pending-badge" style="display:none;background:#D97706">0</span>
         </a>
+        <button class="nav-item" onclick="downloadClaimsCSVTemplate()"><i class="ti ti-download"></i>CSV Template</button>
+        <button class="nav-item" onclick="openClaimsCSVModal()"><i class="ti ti-upload"></i>Import from CSV</button>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Change Orders</div>
+        <a class="nav-item" id="add-co-link" href="claim-form.html"><i class="ti ti-file-plus"></i>Add Change Order</a>
+        <a class="nav-item" id="co-register-link" href="project.html">
+          <i class="ti ti-file-description"></i>Change Orders
+          <span class="nbadge" id="co-pending-badge" style="display:none;background:#D97706">0</span>
+        </a>
+        <button class="nav-item" onclick="downloadCOsCSVTemplate()"><i class="ti ti-download"></i>CSV Template</button>
+        <button class="nav-item" onclick="openCOsCSVModal()"><i class="ti ti-upload"></i>Import from CSV</button>
       </div>
     </div>
 
@@ -146,6 +158,10 @@
           <button class="view-tab" data-view="claims" onclick="switchView('claims')">
             <i class="ti ti-file-invoice"></i>Claims
             <span class="tbadge" id="claims-tab-badge" style="display:none;background:#D97706">0</span>
+          </button>
+          <button class="view-tab" data-view="change-orders" onclick="switchView('change-orders')">
+            <i class="ti ti-file-description"></i>Change Orders
+            <span class="tbadge" id="co-tab-badge" style="display:none;background:#D97706">0</span>
           </button>
         </div>
 
@@ -450,11 +466,6 @@
 
           <!-- Filter + Add button -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-            <select id="cl-filter-type" onchange="renderClaimsView()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
-              <option value="">All Types</option>
-              <option value="Extension of Time (EOT)">Extension of Time (EOT)</option>
-              <option value="Change Order">Change Order</option>
-            </select>
             <select id="cl-filter-party" onchange="renderClaimsView()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
               <option value="">All Parties</option>
               <option value="Client">Client</option>
@@ -474,6 +485,8 @@
             <a id="cl-add-btn" href="claim-form.html" class="btn btn-primary" style="white-space:nowrap;flex-shrink:0">
               <i class="ti ti-plus"></i> Add Claim
             </a>
+            <button class="btn" onclick="downloadClaimsCSVTemplate()" style="white-space:nowrap;flex-shrink:0"><i class="ti ti-download"></i><span class="hide-mobile">Template</span></button>
+            <button class="btn" onclick="openClaimsCSVModal()" style="white-space:nowrap;flex-shrink:0"><i class="ti ti-upload"></i><span class="hide-mobile">Import CSV</span></button>
           </div>
 
           <!-- Claims table -->
@@ -504,6 +517,62 @@
           </div>
 
         </div><!-- /view-claims -->
+
+        <!-- ══ CHANGE ORDERS VIEW ══ -->
+        <div id="view-change-orders" style="display:none">
+
+          <div class="metrics-grid" id="co-kpi-grid" style="margin-bottom:14px"></div>
+
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <select id="co-filter-party" onchange="renderChangeOrdersView()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
+              <option value="">All Parties</option>
+              <option value="Client">Client</option>
+              <option value="Vendor">Vendor</option>
+            </select>
+            <select id="co-filter-status" onchange="renderChangeOrdersView()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
+              <option value="">All Statuses</option>
+              <option>Draft</option><option>Filed</option><option>Under Review</option>
+              <option>Approved</option><option>Partially Approved</option>
+              <option>Rejected</option><option>Withdrawn</option>
+            </select>
+            <div style="position:relative;flex:1;min-width:150px">
+              <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#bbb;font-size:12px;pointer-events:none"></i>
+              <input id="co-search" type="text" placeholder="Search change orders…" oninput="renderChangeOrdersView()"
+                style="width:100%;padding:6px 10px 6px 28px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;outline:none;background:var(--surface-2);box-sizing:border-box"/>
+            </div>
+            <a id="co-add-btn" href="claim-form.html" class="btn btn-primary" style="white-space:nowrap;flex-shrink:0">
+              <i class="ti ti-plus"></i> Add Change Order
+            </a>
+            <button class="btn" onclick="downloadCOsCSVTemplate()" style="white-space:nowrap;flex-shrink:0"><i class="ti ti-download"></i><span class="hide-mobile">Template</span></button>
+            <button class="btn" onclick="openCOsCSVModal()" style="white-space:nowrap;flex-shrink:0"><i class="ti ti-upload"></i><span class="hide-mobile">Import CSV</span></button>
+          </div>
+
+          <div class="panel" style="padding:0;overflow:hidden">
+            <div style="overflow-x:auto">
+              <table class="budget-table" id="co-table" style="min-width:860px">
+                <thead>
+                  <tr>
+                    <th>CO No.</th>
+                    <th>Party</th>
+                    <th style="min-width:200px">Description</th>
+                    <th>Linked WP</th>
+                    <th>Contractor</th>
+                    <th>Date Filed</th>
+                    <th style="text-align:right">Claimed (&#x20B1;M)</th>
+                    <th>Status</th>
+                    <th style="text-align:right">Approved (&#x20B1;M)</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="co-tbody">
+                  <tr><td colspan="10" style="text-align:center;color:#aaa;padding:30px">Loading change orders…</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="co-pager" style="padding:10px 16px;font-size:11px;color:#888;border-top:1px solid #f0f0f0"></div>
+          </div>
+
+        </div><!-- /view-change-orders -->
 
       </div><!-- /main-content -->
     </div><!-- /content -->
@@ -596,7 +665,7 @@ function deliveryBadge(s){
 function switchView(v) {
   currentView = v;
   document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
-  ['overview','backlog','budget','schedule','works','table','claims'].forEach(id => {
+  ['overview','backlog','budget','schedule','works','table','claims','change-orders'].forEach(id => {
     const el = document.getElementById('view-'+id);
     if(el) el.style.display = id === v ? '' : 'none';
   });
@@ -607,6 +676,7 @@ function switchView(v) {
   else if(v==='works') renderWorks();
   else if(v==='table') buildTable();
   else if(v==='claims') { renderClaimsKPIs(); renderClaimsView(); }
+  else if(v==='change-orders') { renderCOKPIs(); renderChangeOrdersView(); }
 }
 
 function getFiltered(){
@@ -988,12 +1058,22 @@ async function loadClaims() {
   const { data } = await sb.from('claims').select('*').eq('project_id', projId).order('created_at', { ascending: false });
   allClaims = data || [];
 
-  // Update badges
-  const pending = allClaims.filter(c => c.review_status === 'pending_review').length;
-  const pb = document.getElementById('claims-pending-badge');
-  const tb = document.getElementById('claims-tab-badge');
-  if (pb) { pb.textContent = pending; pb.style.display = pending ? 'inline' : 'none'; }
-  if (tb) { tb.textContent = pending; tb.style.display = pending ? 'inline' : 'none'; }
+  const claims  = allClaims.filter(c => c.claim_type !== 'Change Order');
+  const cos     = allClaims.filter(c => c.claim_type === 'Change Order');
+  const clPend  = claims.filter(c => c.review_status === 'pending_review').length;
+  const coPend  = cos.filter(c => c.review_status === 'pending_review').length;
+
+  // Claims badges
+  const pb  = document.getElementById('claims-pending-badge');
+  const tb  = document.getElementById('claims-tab-badge');
+  if (pb) { pb.textContent = clPend; pb.style.display = clPend ? 'inline' : 'none'; }
+  if (tb) { tb.textContent = clPend; tb.style.display = clPend ? 'inline' : 'none'; }
+
+  // Change Orders badges
+  const cpb = document.getElementById('co-pending-badge');
+  const ctb = document.getElementById('co-tab-badge');
+  if (cpb) { cpb.textContent = coPend; cpb.style.display = coPend ? 'inline' : 'none'; }
+  if (ctb) { ctb.textContent = coPend; ctb.style.display = coPend ? 'inline' : 'none'; }
 
   renderClaimsKPIs();
   renderClaimsView();
@@ -1024,14 +1104,13 @@ function renderClaimsKPIs() {
 }
 
 window.renderClaimsView = function() {
-  const type   = document.getElementById('cl-filter-type')?.value || '';
   const party  = document.getElementById('cl-filter-party')?.value || '';
   const status = document.getElementById('cl-filter-status')?.value || '';
   const q      = (document.getElementById('cl-search')?.value || '').toLowerCase().trim();
   const isAdmin = userProfile && ['admin','super_admin'].includes(userProfile.role);
 
-  let rows = allClaims.filter(c => {
-    if (type   && c.claim_type !== type)   return false;
+  // Claims tab = everything EXCEPT Change Orders
+  let rows = allClaims.filter(c => c.claim_type !== 'Change Order').filter(c => {
     if (party  && c.party      !== party)  return false;
     if (status && c.status     !== status) return false;
     if (q && !((c.claim_no||'').toLowerCase().includes(q) ||
@@ -1094,8 +1173,103 @@ window.renderClaimsView = function() {
 
 window.claimsPrev = function() { if (_claimsPage > 1) { _claimsPage--; renderClaimsView(); } };
 window.claimsNext = function() {
-  const pages = Math.ceil(allClaims.length / CLAIMS_PER_PAGE);
+  const pages = Math.ceil(allClaims.filter(c=>c.claim_type!=='Change Order').length / CLAIMS_PER_PAGE);
   if (_claimsPage < pages) { _claimsPage++; renderClaimsView(); }
+};
+
+// ── CHANGE ORDERS ─────────────────────────────────────────────────────
+let _coPage = 1;
+
+function renderCOKPIs() {
+  const grid = document.getElementById('co-kpi-grid');
+  if (!grid) return;
+  const cos     = allClaims.filter(c => c.claim_type === 'Change Order');
+  const client  = cos.filter(c => c.party === 'Client').length;
+  const vendor  = cos.filter(c => c.party === 'Vendor').length;
+  const pending = cos.filter(c => c.review_status === 'pending_review').length;
+  const claimed = cos.reduce((s,c) => s + (c.amount_claimed||0), 0);
+  const approved= cos.filter(c => ['Approved','Partially Approved'].includes(c.status))
+                     .reduce((s,c) => s + (c.approved_amount||0), 0);
+  grid.innerHTML = [
+    { label:'Total Change Orders', val:cos.length, cls:'' },
+    { label:'Client COs',          val:client,     cls:'' },
+    { label:'Vendor COs',          val:vendor,     cls:'' },
+    { label:'Total Claimed',       val:'₱'+(claimed/1e6).toFixed(2)+'M', cls:'' },
+    { label:'Approved Amount',     val:'₱'+(approved/1e6).toFixed(2)+'M', cls:'green' },
+    { label:'Pending Review',      val:pending, cls:pending?'red':'' },
+  ].map(k=>`<div class="metric-card"><div class="metric-value ${k.cls}">${k.val}</div><div class="metric-label">${k.label}</div></div>`).join('');
+}
+
+window.renderChangeOrdersView = function() {
+  const party  = document.getElementById('co-filter-party')?.value  || '';
+  const status = document.getElementById('co-filter-status')?.value || '';
+  const q      = (document.getElementById('co-search')?.value || '').toLowerCase().trim();
+  const isAdmin = userProfile && ['admin','super_admin'].includes(userProfile.role);
+
+  let rows = allClaims.filter(c => c.claim_type === 'Change Order').filter(c => {
+    if (party  && c.party  !== party)  return false;
+    if (status && c.status !== status) return false;
+    if (q && !((c.claim_no||'').toLowerCase().includes(q) ||
+               (c.description||'').toLowerCase().includes(q) ||
+               (c.contractor||'').toLowerCase().includes(q) ||
+               (c.wp_no||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+
+  const total = rows.length;
+  const pages = Math.max(1, Math.ceil(total / CLAIMS_PER_PAGE));
+  _coPage = Math.min(_coPage, pages);
+  const page = rows.slice((_coPage-1)*CLAIMS_PER_PAGE, _coPage*CLAIMS_PER_PAGE);
+
+  const tbody = document.getElementById('co-tbody');
+  if (!tbody) return;
+
+  if (!page.length) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#aaa;padding:30px">No change orders found.</td></tr>`;
+  } else {
+    tbody.innerHTML = page.map(c => {
+      const pendingStyle = c.review_status === 'pending_review' ? 'background:#FFFBEB;' : '';
+      const actions = isAdmin
+        ? `<div style="display:flex;gap:6px;align-items:center">
+            <a href="claim-form.html?id=${c.id}&project=${c.project_id}&section=change-order" style="font-size:11px;color:#2563EB;font-weight:600;text-decoration:none">Edit</a>
+            ${c.review_status === 'pending_review' ? `
+              <button onclick="approveClaim('${c.id}')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid #BBF7D0;background:#F0FDF4;color:#15803D;cursor:pointer;font-family:inherit">✓</button>
+              <button onclick="openRejectClaim('${c.id}')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer;font-family:inherit">✗</button>` : ''}
+            <button onclick="deleteClaim('${c.id}')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit">Del</button>
+          </div>`
+        : `<a href="claim-form.html?id=${c.id}&project=${c.project_id}&section=change-order" style="font-size:11px;color:#2563EB;font-weight:600;text-decoration:none">Edit</a>`;
+      return `<tr style="${pendingStyle}">
+        <td style="font-weight:600;font-size:11px">${c.claim_no||'—'}</td>
+        <td>${claimPartyBadge(c.party)}</td>
+        <td style="font-size:11px;max-width:220px" title="${(c.description||'').replace(/"/g,'&quot;')}">${(c.description||'—').slice(0,60)}${(c.description||'').length>60?'…':''}</td>
+        <td style="font-size:11px;color:#888">${c.wp_no||'—'}</td>
+        <td style="font-size:11px">${c.contractor||'—'}</td>
+        <td style="font-size:11px;white-space:nowrap">${fmtDate(c.date_filed)}</td>
+        <td style="text-align:right;font-weight:600">${c.amount_claimed ? '₱'+(c.amount_claimed/1e6).toFixed(2)+'M' : '—'}</td>
+        <td>${claimStatusBadge(c.status)}</td>
+        <td style="text-align:right;color:#2D9B6F;font-weight:600">${c.approved_amount ? '₱'+(c.approved_amount/1e6).toFixed(2)+'M' : '—'}</td>
+        <td>${actions}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const pager = document.getElementById('co-pager');
+  if (pager) {
+    const btnStyle = 'padding:4px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;font-size:11px;font-family:inherit';
+    pager.innerHTML = total === 0 ? '' :
+      `<span>${total} change order${total!==1?'s':''}</span>` +
+      (pages > 1 ? `<span style="margin-left:auto;display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:#888">Page ${_coPage} of ${pages}</span>
+        <button onclick="coPrev()" style="${btnStyle}${_coPage<=1?';opacity:.4;cursor:default':''}">‹ Prev</button>
+        <button onclick="coNext()" style="${btnStyle}${_coPage>=pages?';opacity:.4;cursor:default':''}">Next ›</button>
+      </span>` : '');
+  }
+};
+
+window.coPrev = function() { if (_coPage > 1) { _coPage--; renderChangeOrdersView(); } };
+window.coNext = function() {
+  const pages = Math.ceil(allClaims.filter(c=>c.claim_type==='Change Order').length / CLAIMS_PER_PAGE);
+  if (_coPage < pages) { _coPage++; renderChangeOrdersView(); }
 };
 
 window.approveClaim = async function(id) {
@@ -1171,11 +1345,19 @@ AppAuth.requireLogin(async (user, profile) => {
 
   if(typeof renderUserBar==='function') renderUserBar('user-bar', profile);
 
-  // Update claims sidebar links with project ID
+  // Update claims / change orders sidebar links with project ID
   const addClaimLink = document.getElementById('add-claim-link');
-  if (addClaimLink) addClaimLink.href = 'claim-form.html?project=' + projId;
+  if (addClaimLink) addClaimLink.href = 'claim-form.html?project=' + projId + '&section=claim';
   const claimsRegLink = document.getElementById('claims-register-link');
   if (claimsRegLink) claimsRegLink.href = 'project.html?id=' + projId + '&tab=claims';
+  const addCoLink = document.getElementById('add-co-link');
+  if (addCoLink) addCoLink.href = 'claim-form.html?project=' + projId + '&section=change-order';
+  const coRegLink = document.getElementById('co-register-link');
+  if (coRegLink) coRegLink.href = 'project.html?id=' + projId + '&tab=change-orders';
+  const coAddBtn = document.getElementById('co-add-btn');
+  if (coAddBtn) coAddBtn.href = 'claim-form.html?project=' + projId + '&section=change-order';
+  const clAddBtn = document.getElementById('cl-add-btn');
+  if (clAddBtn) clAddBtn.href = 'claim-form.html?project=' + projId + '&section=claim';
 
   // Load data in parallel (WPs + Claims)
   const [meta, wps] = await Promise.all([WPDb.getProject(projId), WPDb.getAllWPs(projId)]);
@@ -1481,6 +1663,180 @@ AppAuth.requireLogin(async (user, profile) => {
     }
   };
 
+  // ── Claims CSV ────────────────────────────────────────────────────────
+  let claimsCSVFileData = null;
+  let cosCSVFileData = null;
+
+  function parseCSVRowGeneric(rawLine) {
+    const cells = []; let cur = '', inQ = false;
+    for (let i = 0; i < rawLine.length; i++) {
+      const ch = rawLine[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cells.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cells.push(cur.trim());
+    return cells;
+  }
+  function parseCSVDateGeneric(v) {
+    if (!v) return null;
+    try { const d = new Date(v); return isNaN(d) ? null : d.toISOString().split('T')[0]; } catch { return null; }
+  }
+  function downloadCSVBlob(csv, filename) {
+    const blob = new Blob(['﻿' + csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  window.downloadClaimsCSVTemplate = function() {
+    const headers = ['Claim No.','Party','Description','Linked WP No.','Contractor / Client Name','Date Filed','Amount Claimed (PHP)','Basis / Grounds','Status','Remarks'];
+    const ex1 = ['CLM-001','Client','Extension of time due to design changes','WP-42','ABC Corp','05/15/2026','500000','Contract clause 12.3 — owner-caused delay','Filed','Pending resolution'];
+    const ex2 = ['CLM-002','Vendor','Additional material costs — steel price escalation','WP-15','XYZ Steel','06/01/2026','250000','Force majeure — global supply chain disruption','Under Review',''];
+    downloadCSVBlob([headers, ex1, ex2].map(r => r.map(v => `"${v}"`).join(',')).join('\n'), 'Claims_Import_Template.csv');
+  };
+
+  window.downloadCOsCSVTemplate = function() {
+    const headers = ['CO No.','Party','Description','Linked WP No.','Contractor / Client Name','Date Filed','Amount Claimed (PHP)','Basis / Grounds','Status','Remarks'];
+    const ex1 = ['CO-001','Client','Additional scope — perimeter fencing extension','WP-07','Client - Project Owner','05/20/2026','1200000','Variation order per owner instruction','Filed','Awaiting approval'];
+    const ex2 = ['CO-002','Vendor','Scope increase — additional piling works','WP-03','DEF Foundation Inc.','06/01/2026','800000','Unforeseen soil conditions per geotech report','Under Review',''];
+    downloadCSVBlob([headers, ex1, ex2].map(r => r.map(v => `"${v}"`).join(',')).join('\n'), 'ChangeOrders_Import_Template.csv');
+  };
+
+  window.openClaimsCSVModal = function() {
+    claimsCSVFileData = null;
+    document.getElementById('claims-csv-file').value = '';
+    document.getElementById('claims-csv-status').textContent = '';
+    document.getElementById('claims-csv-error').style.display = 'none';
+    const btn = document.getElementById('claims-csv-import-btn'); btn.disabled = true; btn.style.opacity = '.5';
+    document.getElementById('claims-csv-modal').style.display = 'flex';
+  };
+  window.closeClaimsCSVModal = function() {
+    document.getElementById('claims-csv-modal').style.display = 'none';
+    claimsCSVFileData = null;
+  };
+  window.handleClaimsCSVFile = function(file) {
+    if (!file) return;
+    if (!file.name.endsWith('.csv')) { showClaimsCSVError('Please select a CSV file.'); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const lines = e.target.result.trim().split('\n');
+        if (lines.length < 2) throw new Error('CSV must have headers and at least one row.');
+        claimsCSVFileData = lines;
+        document.getElementById('claims-csv-status').textContent = `✓ Ready to import ${lines.length - 1} claim(s)`;
+        document.getElementById('claims-csv-error').style.display = 'none';
+        const btn = document.getElementById('claims-csv-import-btn'); btn.disabled = false; btn.style.opacity = '1';
+      } catch(err) { showClaimsCSVError(err.message); claimsCSVFileData = null; }
+    };
+    reader.readAsText(file);
+  };
+  function showClaimsCSVError(msg) {
+    const el = document.getElementById('claims-csv-error'); el.textContent = msg; el.style.display = 'block';
+  }
+  window.importClaimsFromCSV = async function() {
+    if (!claimsCSVFileData) return;
+    const btn = document.getElementById('claims-csv-import-btn');
+    btn.textContent = 'Importing…'; btn.disabled = true;
+    document.getElementById('claims-csv-error').style.display = 'none';
+    try {
+      const isAdmin = ['admin','super_admin'].includes(window.__wpmRole || '');
+      const sb = await getSB();
+      const userId = (await sb.auth.getUser()).data.user.id;
+      const rows = claimsCSVFileData.slice(1).map(l => parseCSVRowGeneric(l)).filter(r => r[2]);
+      for (const r of rows) {
+        await sb.from('claims').insert({
+          project_id: projId,
+          claim_no: r[0] || null,
+          claim_type: 'Extension of Time (EOT)',
+          party: r[1] || null,
+          description: r[2],
+          wp_no: r[3] || null,
+          contractor: r[4] || null,
+          date_filed: parseCSVDateGeneric(r[5]),
+          amount_claimed: parseFloat(r[6]) || null,
+          basis: r[7] || null,
+          status: r[8] || 'Filed',
+          remarks: r[9] || null,
+          submitted_by: userId,
+          review_status: isAdmin ? 'approved' : 'pending_review',
+        });
+      }
+      document.getElementById('claims-csv-status').textContent = `✓ Imported ${rows.length} claim(s) successfully`;
+      setTimeout(() => { closeClaimsCSVModal(); loadClaims(); }, 1400);
+    } catch(err) {
+      showClaimsCSVError('Import error: ' + err.message);
+      btn.textContent = 'Import'; btn.disabled = false;
+    }
+  };
+
+  window.openCOsCSVModal = function() {
+    cosCSVFileData = null;
+    document.getElementById('cos-csv-file').value = '';
+    document.getElementById('cos-csv-status').textContent = '';
+    document.getElementById('cos-csv-error').style.display = 'none';
+    const btn = document.getElementById('cos-csv-import-btn'); btn.disabled = true; btn.style.opacity = '.5';
+    document.getElementById('cos-csv-modal').style.display = 'flex';
+  };
+  window.closeCOsCSVModal = function() {
+    document.getElementById('cos-csv-modal').style.display = 'none';
+    cosCSVFileData = null;
+  };
+  window.handleCOsCSVFile = function(file) {
+    if (!file) return;
+    if (!file.name.endsWith('.csv')) { showCOsCSVError('Please select a CSV file.'); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const lines = e.target.result.trim().split('\n');
+        if (lines.length < 2) throw new Error('CSV must have headers and at least one row.');
+        cosCSVFileData = lines;
+        document.getElementById('cos-csv-status').textContent = `✓ Ready to import ${lines.length - 1} change order(s)`;
+        document.getElementById('cos-csv-error').style.display = 'none';
+        const btn = document.getElementById('cos-csv-import-btn'); btn.disabled = false; btn.style.opacity = '1';
+      } catch(err) { showCOsCSVError(err.message); cosCSVFileData = null; }
+    };
+    reader.readAsText(file);
+  };
+  function showCOsCSVError(msg) {
+    const el = document.getElementById('cos-csv-error'); el.textContent = msg; el.style.display = 'block';
+  }
+  window.importCOsFromCSV = async function() {
+    if (!cosCSVFileData) return;
+    const btn = document.getElementById('cos-csv-import-btn');
+    btn.textContent = 'Importing…'; btn.disabled = true;
+    document.getElementById('cos-csv-error').style.display = 'none';
+    try {
+      const isAdmin = ['admin','super_admin'].includes(window.__wpmRole || '');
+      const sb = await getSB();
+      const userId = (await sb.auth.getUser()).data.user.id;
+      const rows = cosCSVFileData.slice(1).map(l => parseCSVRowGeneric(l)).filter(r => r[2]);
+      for (const r of rows) {
+        await sb.from('claims').insert({
+          project_id: projId,
+          claim_no: r[0] || null,
+          claim_type: 'Change Order',
+          party: r[1] || null,
+          description: r[2],
+          wp_no: r[3] || null,
+          contractor: r[4] || null,
+          date_filed: parseCSVDateGeneric(r[5]),
+          amount_claimed: parseFloat(r[6]) || null,
+          basis: r[7] || null,
+          status: r[8] || 'Filed',
+          remarks: r[9] || null,
+          submitted_by: userId,
+          review_status: isAdmin ? 'approved' : 'pending_review',
+        });
+      }
+      document.getElementById('cos-csv-status').textContent = `✓ Imported ${rows.length} change order(s) successfully`;
+      setTimeout(() => { closeCOsCSVModal(); loadClaims(); }, 1400);
+    } catch(err) {
+      showCOsCSVError('Import error: ' + err.message);
+      btn.textContent = 'Import'; btn.disabled = false;
+    }
+  };
+
   // Render default view
   document.getElementById('loading').style.display = 'none';
   document.getElementById('main-content').style.display = 'block';
@@ -1751,6 +2107,54 @@ window.saveQuickWP = async function() {
     <div style="padding:12px 20px 20px;border-top:1px solid #f0f0f0;display:flex;gap:10px">
       <button id="ep-save-btn" onclick="saveEditProject()" style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Save Changes</button>
       <button onclick="closeEditProjectModal()" style="padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Claims CSV Import Modal ── -->
+<div id="claims-csv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeClaimsCSVModal()">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <div style="padding:20px 20px 0">
+      <div style="font-size:16px;font-weight:700;color:#231F20;margin-bottom:4px">Import Claims</div>
+      <div style="font-size:12px;color:#888;margin-bottom:16px">Upload a CSV file. Download the template for the correct format.</div>
+    </div>
+    <div style="padding:0 20px 16px">
+      <div style="border:2px dashed #e5e5e5;border-radius:10px;padding:20px;text-align:center;cursor:pointer" onclick="document.getElementById('claims-csv-file').click()">
+        <i class="ti ti-cloud-upload" style="font-size:32px;color:#888;display:block;margin-bottom:8px"></i>
+        <div style="font-size:13px;color:#333;font-weight:600">Click to upload or drag file here</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">CSV files only</div>
+      </div>
+      <input type="file" id="claims-csv-file" accept=".csv" style="display:none" onchange="handleClaimsCSVFile(this.files[0])">
+      <div id="claims-csv-status" style="margin-top:12px;font-size:12px;color:#666"></div>
+      <div id="claims-csv-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 12px;font-size:12px;margin-top:12px"></div>
+    </div>
+    <div style="padding:0 20px 20px;border-top:1px solid #f0f0f0;display:flex;gap:10px">
+      <button id="claims-csv-import-btn" onclick="importClaimsFromCSV()" disabled style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;opacity:.5">Import</button>
+      <button onclick="closeClaimsCSVModal()" style="padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Change Orders CSV Import Modal ── -->
+<div id="cos-csv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeCOsCSVModal()">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <div style="padding:20px 20px 0">
+      <div style="font-size:16px;font-weight:700;color:#231F20;margin-bottom:4px">Import Change Orders</div>
+      <div style="font-size:12px;color:#888;margin-bottom:16px">Upload a CSV file. Download the template for the correct format.</div>
+    </div>
+    <div style="padding:0 20px 16px">
+      <div style="border:2px dashed #e5e5e5;border-radius:10px;padding:20px;text-align:center;cursor:pointer" onclick="document.getElementById('cos-csv-file').click()">
+        <i class="ti ti-cloud-upload" style="font-size:32px;color:#888;display:block;margin-bottom:8px"></i>
+        <div style="font-size:13px;color:#333;font-weight:600">Click to upload or drag file here</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">CSV files only</div>
+      </div>
+      <input type="file" id="cos-csv-file" accept=".csv" style="display:none" onchange="handleCOsCSVFile(this.files[0])">
+      <div id="cos-csv-status" style="margin-top:12px;font-size:12px;color:#666"></div>
+      <div id="cos-csv-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 12px;font-size:12px;margin-top:12px"></div>
+    </div>
+    <div style="padding:0 20px 20px;border-top:1px solid #f0f0f0;display:flex;gap:10px">
+      <button id="cos-csv-import-btn" onclick="importCOsFromCSV()" disabled style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;opacity:.5">Import</button>
+      <button onclick="closeCOsCSVModal()" style="padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;cursor:pointer">Cancel</button>
     </div>
   </div>
 </div>
