@@ -139,16 +139,13 @@ Admin (admin only)
 
 **`admin.html`** — consolidated context (wpm_nav_ctx === 'consolidated')
 ```
-Overview
-  └─ Portfolio Overview (→ index.html?view=consolidated)
-
 Projects
   ├─ [searchable project list]
   └─ New Project
 
 Admin
   ├─ User Management (active)
-  └─ Select Project (→ project-selector.html)
+  └─ Portfolio Overview (→ index.html)
 ```
 
 **`admin.html`** — project context (wpm_nav_ctx = project ID)
@@ -158,7 +155,7 @@ Current Project
 
 Admin
   ├─ User Management (active)
-  └─ Select Project (→ project-selector.html)
+  └─ Portfolio Overview (→ index.html)
 ```
 
 **Key rules:**
