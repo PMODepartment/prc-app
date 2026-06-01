@@ -49,7 +49,7 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 - **`projects`** — `id` (text PK e.g. 'AVR101'), name, location, status, budget_bcb, start_date, end_date
 - **`users`** — `id` (UUID FK → auth.users), email, role (`super_admin|admin|user`), status (`pending|approved|rejected`), projects (text[]), last_login (timestamptz)
 - **`work_packages`** — all WP fields; `review_status` (`pending_review|approved|rejected`); see schema for full column list
-- **`claims`** — `id`, `project_id`, `claim_no`, `claim_type` (`Extension of Time (EOT)|Change Order`), `party` (`Client|Vendor`), `description`, `wp_no`, `contractor`, `date_filed`, `amount_claimed`, `basis`, `status` (`Draft|Filed|Under Review|Approved|Partially Approved|Rejected|Withdrawn`), `approved_amount`, `date_resolved`, `review_status` (`pending_review|approved|rejected`), `review_notes`, `remarks`, `submitted_by` (UUID FK → auth.users), `created_at`, `updated_at`
+- **`claims`** — `id`, `project_id`, `claim_no`, `claim_type` (`Extension of Time (EOT)|Material Escalation|Labor Escalation|Change Order`), `party` (`Client|Vendor`), `description`, `wp_no`, `contractor`, `date_filed`, `amount_claimed`, `basis`, `status` (`Draft|Filed|Under Review|Approved|Partially Approved|Rejected|Withdrawn`), `approved_amount`, `date_resolved`, `review_status` (`pending_review|approved|rejected`), `review_notes`, `remarks`, `submitted_by` (UUID FK → auth.users), `created_at`, `updated_at`
 
 ### WPDb API (db.js)
 ```js
@@ -263,7 +263,8 @@ Claims and Change Orders share the `claims` Supabase table, distinguished by `cl
 - Admin/super_admin submissions: `review_status = 'approved'`, default `status = 'Filed'`, button = "Add Claim" / "Add Change Order"
 - User submissions: `review_status = 'pending_review'`, default `status = 'Draft'`, button = "Submit Claim for Review"
 - Claim status options: Draft, Filed, Under Review, Approved, Partially Approved, Rejected, Withdrawn
-- `claim_type` dropdown is hidden on the form — locked automatically by the `section` param
+- `claim_type` dropdown is **visible** for Claims mode (user selects: EOT / Material Escalation / Labor Escalation); **hidden + locked** to 'Change Order' in CO mode
+- Section title updates: "Claim Details" for claims, "Change Order Details" for CO
 - Sidebar shows Work Packages, Claims (EOT), Change Orders, and Tools sections regardless of mode
 - Work Packages section: Add Work Package (→ `wp-form.html?project=ID`) + Review WPs (admin only, → `review.html?project=ID`)
 - Active link highlighted based on `isCO`
