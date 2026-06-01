@@ -249,6 +249,10 @@ Claims and Change Orders share the `claims` Supabase table, distinguished by `cl
 - User submissions: `review_status = 'pending_review'`, default `status = 'Draft'`, button = "Submit Claim for Review"
 - Claim status options: Draft, Filed, Under Review, Approved, Partially Approved, Rejected, Withdrawn
 - `claim_type` dropdown is hidden on the form — locked automatically by the `section` param
+- Sidebar shows **both** Claims (EOT) and Change Orders sections regardless of mode; active link is highlighted based on `isCO`
+- `updateSidebarLinks(pid)` wires all sidebar hrefs with project ID — called on both new and edit modes
+- CSV Template and Import from CSV buttons in sidebar for both sections; import modals (`#claims-csv-modal`, `#cos-csv-modal`) embedded in the page with inline Download template links
+- `downloadClaimsCSVTemplate()`, `downloadCOsCSVTemplate()`, `importClaimsFromCSV()`, `importCOsFromCSV()` all available on this page
 
 ### project.html — Claims tab (`view-claims`)
 - KPI strip: Total Claims, Client Claims, Vendor Claims, Total Claimed, Approved Amount, Pending Review
