@@ -25,6 +25,7 @@ const WPDb = (() => {
   async function getApprovedWPs(pid) { const sb=await getSB(); let q=sb.from('work_packages').select('*').eq('review_status','approved'); if(pid) q=q.eq('project_id',pid); const {data}=await q.order('wp_no'); return (data||[]).map(mapWP); }
   async function getAllWPs(pid) { const sb=await getSB(); let q=sb.from('work_packages').select('*'); if(pid) q=q.eq('project_id',pid); const {data}=await q.order('wp_no'); return (data||[]).map(mapWP); }
   async function getAllApprovedWPs() { return getApprovedWPs(null); }
+  async function getApprovedWPsForProjects(ids) { if(!ids||!ids.length) return []; const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('review_status','approved').in('project_id',ids).order('wp_no'); return (data||[]).map(mapWP); }
   async function getPendingWPs() { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('review_status','pending_review').order('created_at',{ascending:false}); return (data||[]).map(mapWP); }
   async function getAllWPsForAdmin() { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').order('created_at',{ascending:false}); return (data||[]).map(mapWP); }
   async function getOfficerWPs(uid) { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('assigned_officer',uid).order('wp_no'); return (data||[]).map(mapWP); }
@@ -76,7 +77,7 @@ const WPDb = (() => {
   async function updateProject(id,data) { const sb=await getSB(); const {data:d,error}=await sb.from('projects').update(data).eq('id',id).select().single(); if(error) throw error; return d; }
   async function deleteProject(id) { const sb=await getSB(); await sb.from('work_packages').delete().eq('project_id',id); const {error}=await sb.from('projects').delete().eq('id',id); if(error) throw error; }
   async function seedWP(d) { return submitWP(d,null); }
-  return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getAllApprovedWPs,getPendingWPs,getAllWPsForAdmin,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,getAllUsers,getUsersForAdmin,getAdminUsers,updateUser,updateLastLogin,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
+  return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getAllApprovedWPs,getApprovedWPsForProjects,getPendingWPs,getAllWPsForAdmin,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,getAllUsers,getUsersForAdmin,getAdminUsers,updateUser,updateLastLogin,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
 })();
 
 /* â”€â”€ Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */

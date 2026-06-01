@@ -449,13 +449,11 @@
     renderIndexNav();
     window.__sidebarRefresh = renderIndexNav;
 
-    // Load all WPs + all Claims in parallel
-    const [wpArrays, claimsResult] = await Promise.all([
-      Promise.all(permitted.map(p => WPDb.getApprovedWPs(p.id))),
-      (async () => { const sb = await getSB(); const { data } = await sb.from('claims').select('*').order('created_at', { ascending: false }); return data || []; })()
-    ]);
-    const _allWPs = wpArrays.flat();
-    let _allClaims = claimsResult;
+    // Single query for all WPs (replaces N per-project queries — major mobile perf win)
+    const _allWPs = AppAuth.isAdmin(profile)
+      ? await WPDb.getAllApprovedWPs()
+      : await WPDb.getApprovedWPsForProjects(permitted.map(p => p.id));
+    let _allClaims = []; // Claims register hidden — skip fetch
 
     // Project filter state
     let _activeIds = new Set(permitted.map(p => p.id));
