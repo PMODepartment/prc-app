@@ -81,10 +81,10 @@
       <div class="sidebar-section">
         <div class="sidebar-section-label">Claims</div>
         <a class="nav-item" id="add-claim-link" href="claim-form.html"><i class="ti ti-file-plus"></i>Add Claim</a>
-        <button class="nav-item" onclick="switchView('claims')">
+        <a class="nav-item" id="claims-register-link" href="project.html">
           <i class="ti ti-file-invoice"></i>Claims Register
           <span class="nbadge" id="claims-pending-badge" style="display:none;background:#D97706">0</span>
-        </button>
+        </a>
       </div>
     </div>
 
@@ -1171,9 +1171,11 @@ AppAuth.requireLogin(async (user, profile) => {
 
   if(typeof renderUserBar==='function') renderUserBar('user-bar', profile);
 
-  // Update add-claim link with project
+  // Update claims sidebar links with project ID
   const addClaimLink = document.getElementById('add-claim-link');
   if (addClaimLink) addClaimLink.href = 'claim-form.html?project=' + projId;
+  const claimsRegLink = document.getElementById('claims-register-link');
+  if (claimsRegLink) claimsRegLink.href = 'project.html?id=' + projId + '&tab=claims';
 
   // Load data in parallel (WPs + Claims)
   const [meta, wps] = await Promise.all([WPDb.getProject(projId), WPDb.getAllWPs(projId)]);
@@ -1480,10 +1482,13 @@ AppAuth.requireLogin(async (user, profile) => {
   };
 
   // Render default view
-  renderOverview();
-
   document.getElementById('loading').style.display = 'none';
   document.getElementById('main-content').style.display = 'block';
+
+  // Auto-switch to tab specified in URL (e.g. ?tab=claims)
+  const tabParam = new URLSearchParams(location.search).get('tab');
+  if (tabParam) switchView(tabParam);
+  else renderOverview();
 });
 
 
