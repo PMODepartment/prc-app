@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>Project — EPC WPM Dashboard</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
   <link rel="stylesheet" href="assets/css/dashboard.css"/>
@@ -93,6 +93,11 @@
         <div class="sidebar-section-label">Admin</div>
         <a class="nav-item" href="index.html?view=consolidated" id="nav-all-projects-link"><i class="ti ti-layout-grid"></i>Portfolio Overview</a>
         <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+      </div>
+      <!-- Pinned projects -->
+      <div class="sidebar-section" id="pinned-projects-section" style="display:none">
+        <div class="sidebar-section-label">Pinned</div>
+        <div id="pinned-projects-list"></div>
       </div>
       <!-- Recently visited projects -->
       <div class="sidebar-section" id="recent-projects-section" style="display:none">
@@ -1226,17 +1231,38 @@ window.clearRecentProjects = function() {
 };
 
 function renderRecentProjects() {
+  const userId = window.__profile && window.__profile.id;
   const recent = getRecentProjects().filter(id => id !== projId);
   const sec = document.getElementById('recent-projects-section');
   const list = document.getElementById('recent-projects-list');
+  const pinnedSec = document.getElementById('pinned-projects-section');
+  const pinnedList = document.getElementById('pinned-projects-list');
+
+  // Render pinned projects (excluding current)
+  if (userId && pinnedSec && pinnedList) {
+    const pinned = SidebarPrefs.getPinned(userId).filter(id => id !== projId);
+    if (pinned.length) {
+      pinnedSec.style.display = 'block';
+      pinnedList.innerHTML = pinned.map(id => SidebarPrefs.projectLink(userId, {id})).join('');
+    } else {
+      pinnedSec.style.display = 'none';
+    }
+  }
+
   if (!sec || !list) return;
-  if (!recent.length) { sec.style.display = 'none'; return; }
+  // Only show recent projects that aren't pinned
+  const pinnedSet = userId ? new Set(SidebarPrefs.getPinned(userId)) : new Set();
+  const unpinnedRecent = recent.filter(id => !pinnedSet.has(id));
+  if (!unpinnedRecent.length) { sec.style.display = 'none'; return; }
   sec.style.display = 'block';
-  list.innerHTML = recent.map(id => `
-    <a class="nav-item" href="project.html?id=${id}" style="font-size:12px;opacity:.8">
-      <i class="ti ti-history" style="font-size:14px"></i>${id}
-    </a>`).join('');
+  list.innerHTML = userId
+    ? unpinnedRecent.map(id => SidebarPrefs.projectLink(userId, {id})).join('')
+    : unpinnedRecent.map(id => `
+        <a class="nav-item" href="project.html?id=${id}" style="font-size:12px;opacity:.8">
+          <i class="ti ti-history" style="font-size:14px"></i>${id}
+        </a>`).join('');
 }
+window.__sidebarRefresh = renderRecentProjects;
 </script>
 
 <style>

@@ -96,13 +96,15 @@ const SidebarPrefs = (() => {
       return { pinned: pinnedList, rest };
     },
 
-    /* Build the HTML for a project nav link with a pin toggle icon */
-    projectLink(userId, p, extra = '') {
+    /* Build the HTML for a project nav link with a pin toggle icon.
+       href: full URL override; if omitted, defaults to project.html?id={p.id} */
+    projectLink(userId, p, extra = '', href = null) {
       const pinned = this.isPinned(userId, p.id);
       const label  = (p.name && p.name !== p.id) ? p.name.split('—')[0].trim().slice(0, 14) : '';
+      const linkHref = href || `project.html?id=${p.id}${extra}`;
       return `
         <div class="sidebar-proj-row" style="display:flex;align-items:center;gap:2px">
-          <a class="nav-item" style="flex:1;min-width:0" href="project.html?id=${p.id}${extra}">
+          <a class="nav-item" style="flex:1;min-width:0" href="${linkHref}">
             <i class="ti ti-building-skyscraper"></i>${p.id}
             ${label ? `<span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400;flex-shrink:0">${label}</span>` : ''}
           </a>

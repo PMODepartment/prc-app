@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>User Management — Megawide EPC</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
   <link rel="stylesheet" href="assets/css/dashboard.css">
@@ -66,11 +66,16 @@
       <img src="assets/img/megawide-logo.png" alt="Megawide Construction"/>
       <div class="app-label">Procurement Dashboard</div>
     </div>
-    <div class="sidebar-section">
+    <!-- Back-to-project link: shown when accessed from a project context -->
+    <div id="nav-back-section" class="sidebar-section" style="display:none">
+      <div class="sidebar-section-label">Current Project</div>
+      <a class="nav-item" id="nav-back-link" href="#"><i class="ti ti-arrow-back-up"></i>Back to <span id="nav-back-name">Project</span></a>
+    </div>
+    <div class="sidebar-section" id="nav-overview-section">
       <div class="sidebar-section-label">Overview</div>
       <a class="nav-item" href="index.html?view=consolidated"><i class="ti ti-layout-dashboard"></i>All Projects</a>
     </div>
-    <div class="sidebar-section">
+    <div class="sidebar-section" id="nav-projects-section">
       <div class="sidebar-section-label">Projects</div>
       <!-- Searchable project list -->
       <div id="sidebar-proj-search-wrap" style="padding:0 4px 6px;display:none">
@@ -443,8 +448,13 @@
     const pendingCt = allUsers.filter(u=>u.status==='pending').length;
     document.getElementById('kpiPending').textContent = pendingCt;
     const approved = allUsers.filter(u=>u.status==='approved');
-    const activeCt   = approved.filter(u=>workingDaysSince(u.last_login)<=7).length;
-    const inactiveCt = approved.filter(u=>workingDaysSince(u.last_login)>7).length;
+    const trackingEnabled = approved.some(u => u.last_login !== undefined);
+    const activeCt   = trackingEnabled
+      ? approved.filter(u => u.last_login !== undefined && u.last_login !== null && workingDaysSince(u.last_login) <= 7).length
+      : approved.length; // no tracking → all approved count as active
+    const inactiveCt = trackingEnabled
+      ? approved.filter(u => u.last_login === null || (u.last_login !== undefined && workingDaysSince(u.last_login) > 7)).length
+      : 0;
     document.getElementById('kpiApproved').textContent  = activeCt;
     document.getElementById('kpiInactive').textContent  = inactiveCt;
     document.getElementById('kpiRejected').textContent  = allUsers.filter(u=>u.status==='rejected').length;
@@ -664,6 +674,10 @@
     return count;
   }
 
+  // last_login === undefined  → column doesn't exist in DB yet (migration not run) → degrade gracefully
+  // last_login === null       → column exists, user never logged in
+  // last_login has a value   → calculate working days
+
   function activityBadge(u) {
     if (u.status === 'rejected') {
       return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#F3F4F6;color:#6B7280;white-space:nowrap">Revoked</span>';
@@ -671,18 +685,23 @@
     if (u.status === 'pending') {
       return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#FEF3C7;color:#92400E;white-space:nowrap">Pending</span>';
     }
+    // Column not in DB yet — fall back to approved = Active
+    if (u.last_login === undefined) {
+      return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#D1FAE5;color:#065F46;white-space:nowrap">Active</span>';
+    }
+    // Column exists but user has never logged in yet — treat same as approved
+    if (u.last_login === null) {
+      return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#D1FAE5;color:#065F46;white-space:nowrap">Approved</span>';
+    }
     const days = workingDaysSince(u.last_login);
     if (days <= 7) {
       return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#D1FAE5;color:#065F46;white-space:nowrap">Active</span>';
-    }
-    if (days === Infinity) {
-      return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#FEF3C7;color:#92400E;white-space:nowrap">Never logged in</span>';
     }
     return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#FEF9C3;color:#854D0E;white-space:nowrap">Inactive</span>';
   }
 
   function activitySub(u) {
-    if (!u.last_login) return '<div style="font-size:9px;color:#bbb;margin-top:1px">No login recorded</div>';
+    if (u.last_login === undefined || u.last_login === null) return '';
     const d = new Date(u.last_login);
     const label = d.toLocaleDateString('en-PH', {day:'2-digit', month:'short', year:'numeric'});
     const days = workingDaysSince(u.last_login);
@@ -859,43 +878,33 @@ window.addEventListener('beforeunload', function(e) {
 });
 
   // ── Sidebar project search ────────────────────────────────────
+  function plainProjectLink(p) {
+    const label = (p.name && p.name !== p.id) ? p.name.split('—')[0].trim().slice(0, 14) : '';
+    return `<a class="nav-item" href="project.html?id=${p.id}">
+      <i class="ti ti-building-skyscraper"></i>${p.id}
+      ${label ? `<span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400;flex-shrink:0">${label}</span>` : ''}
+    </a>`;
+  }
+
   function renderSidebarProjects(q) {
     const navProj = document.getElementById('nav-projects-admin');
-    if (!navProj || !window._sidebarProjects || !currentProfile) return;
-    const uid = currentProfile.id;
-    const { pinned, rest } = SidebarPrefs.sortProjects(uid, window._sidebarProjects);
+    if (!navProj || !window._sidebarProjects) return;
     const all = q
       ? window._sidebarProjects.filter(p=>p.id.toLowerCase().includes(q)||((p.name||'').toLowerCase().includes(q)))
       : null;
 
     if (all) {
-      // Search mode: show filtered results flat
       const MAX_SHOW = 8;
-      const shown = all.slice(0, MAX_SHOW);
-      navProj.innerHTML = shown.map(p => SidebarPrefs.projectLink(uid, p)).join('') +
+      navProj.innerHTML = all.slice(0, MAX_SHOW).map(plainProjectLink).join('') +
         (all.length > MAX_SHOW ? `<div style="font-size:10px;color:rgba(255,255,255,.35);padding:4px 12px">${all.length - MAX_SHOW} more — refine search</div>` : '');
     } else {
-      // Normal mode: pinned first, then rest (up to 5)
+      const sorted = [...window._sidebarProjects].sort((a,b)=>a.id.localeCompare(b.id));
       const MAX_REST = 5;
-      let html = '';
-      if (pinned.length) {
-        html += `<div style="font-size:9px;color:rgba(255,255,255,.3);padding:2px 12px 4px;letter-spacing:.06em;text-transform:uppercase">Pinned</div>`;
-        html += pinned.map(p => SidebarPrefs.projectLink(uid, p)).join('');
-        if (rest.length) html += `<div style="height:1px;background:rgba(255,255,255,.08);margin:4px 12px"></div>`;
-      }
-      const shownRest = rest.slice(0, MAX_REST);
-      html += shownRest.map(p => SidebarPrefs.projectLink(uid, p)).join('');
-      if (rest.length > MAX_REST) {
-        html += `<div style="font-size:10px;color:rgba(255,255,255,.35);padding:4px 12px">${rest.length - MAX_REST} more — search above</div>`;
-      }
-      navProj.innerHTML = html || '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:4px 12px">No projects</div>';
+      navProj.innerHTML = sorted.slice(0, MAX_REST).map(plainProjectLink).join('') +
+        (sorted.length > MAX_REST ? `<div style="font-size:10px;color:rgba(255,255,255,.35);padding:4px 12px">${sorted.length - MAX_REST} more — search above</div>` : '') ||
+        '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:4px 12px">No projects</div>';
     }
   }
-
-  // Allow sidebar to re-render after pin toggle
-  window.__sidebarRefresh = () => renderSidebarProjects(
-    document.getElementById('sidebar-proj-search')?.value?.toLowerCase().trim() || ''
-  );
 
   window.filterSidebarProjects = function(q) {
     renderSidebarProjects(q.toLowerCase().trim());
@@ -906,6 +915,24 @@ window.addEventListener('beforeunload', function(e) {
     currentProfile = profile;
     window.__wpmRole = profile.role;
     renderUserBar('user-bar', profile);
+
+    // Navigation context: adapt sidebar based on how user entered the dashboard
+    const navCtx = sessionStorage.getItem('wpm_nav_ctx');
+    if (navCtx && navCtx !== 'consolidated') {
+      // Project-specific login: show Back to Project, hide full project list
+      const backSec      = document.getElementById('nav-back-section');
+      const backLink     = document.getElementById('nav-back-link');
+      const backName     = document.getElementById('nav-back-name');
+      const overviewSec  = document.getElementById('nav-overview-section');
+      const projectsSec  = document.getElementById('nav-projects-section');
+      if (backSec)     { backSec.style.display = 'block'; }
+      if (backLink)    { backLink.href = 'project.html?id=' + navCtx; }
+      if (backName)    { backName.textContent = navCtx; }
+      if (overviewSec) { overviewSec.style.display = 'none'; }
+      if (projectsSec) { projectsSec.style.display = 'none'; } // hide project list — not needed in project context
+    }
+    // Consolidated context: full project list already visible by default
+
     // Show "Assigned Admin" column only for super_admin
     if (profile.role === 'super_admin') {
       document.getElementById('col-admin-head').style.display = '';

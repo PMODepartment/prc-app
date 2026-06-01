@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>Review Work Packages — EPC WPM</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
   <link rel="stylesheet" href="assets/css/dashboard.css"/>
@@ -49,11 +49,16 @@
       <img src="assets/img/megawide-logo.png" alt="Megawide Construction"/>
       <div class="app-label">Procurement Dashboard</div>
     </div>
-    <div class="sidebar-section">
+    <div class="sidebar-section" id="nav-overview-section">
       <div class="sidebar-section-label">Overview</div>
       <a class="nav-item" href="index.html?view=consolidated"><i class="ti ti-layout-dashboard"></i>All Projects</a>
     </div>
-    <div class="sidebar-section">
+    <!-- Back to project (shown when entering from project context) -->
+    <div class="sidebar-section" id="nav-back-section" style="display:none">
+      <div class="sidebar-section-label">Current Project</div>
+      <a class="nav-item" id="nav-back-link" href="project.html"><i class="ti ti-arrow-left"></i>Back to <span id="nav-back-name">Project</span></a>
+    </div>
+    <div class="sidebar-section" id="nav-projects-section">
       <div class="sidebar-section-label">Projects</div>
       <div id="nav-projects-review"></div>
     </div>
@@ -132,6 +137,8 @@
     renderUserBar('user-bar', profile);
     // Read project from URL param
     currentProjId = new URLSearchParams(location.search).get('project') || 'ALL';
+    // Track navigation context — reviewing a specific project or all
+    sessionStorage.setItem('wpm_nav_ctx', currentProjId !== 'ALL' ? currentProjId : 'consolidated');
     await loadAll();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
@@ -162,15 +169,42 @@
       const badge = document.getElementById('proj-context-badge');
       if (badge) badge.style.display = 'none';
     }
-    // Populate sidebar project list
+    // Nav context — hide project list and show back link when coming from a project
+    const navCtx = sessionStorage.getItem('wpm_nav_ctx');
+    if (navCtx && navCtx !== 'consolidated') {
+      const backSec     = document.getElementById('nav-back-section');
+      const backLink    = document.getElementById('nav-back-link');
+      const backName    = document.getElementById('nav-back-name');
+      const overviewSec = document.getElementById('nav-overview-section');
+      const projectsSec = document.getElementById('nav-projects-section');
+      if (backSec)     backSec.style.display = 'block';
+      if (backLink)    backLink.href = 'project.html?id=' + navCtx;
+      if (backName)    backName.textContent = navCtx;
+      if (overviewSec) overviewSec.style.display = 'none';
+      if (projectsSec) projectsSec.style.display = 'none';
+    }
+    // Populate sidebar project list with pin buttons
+    const userId = window.__profile && window.__profile.id;
     const navEl = document.getElementById('nav-projects-review');
     if (navEl) {
-      navEl.innerHTML = allProjects.filter(p=>p.status!=='archived').map(p =>
-        `<a class="nav-item ${p.id===currentProjId?'active':''}" href="review.html?project=${p.id}">
-          <i class="ti ti-building-skyscraper"></i>${p.id}
-          <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name||'').slice(0,12)}</span>
-        </a>`
-      ).join('');
+      const activeProjects = allProjects.filter(p=>p.status!=='archived');
+      if (userId && typeof SidebarPrefs !== 'undefined') {
+        const renderReviewNav = () => {
+          const { pinned, rest } = SidebarPrefs.sortProjects(userId, activeProjects);
+          navEl.innerHTML = [...pinned, ...rest].map(p =>
+            SidebarPrefs.projectLink(userId, p, '', `review.html?project=${p.id}`)
+          ).join('');
+        };
+        renderReviewNav();
+        window.__sidebarRefresh = renderReviewNav;
+      } else {
+        navEl.innerHTML = activeProjects.map(p =>
+          `<a class="nav-item ${p.id===currentProjId?'active':''}" href="review.html?project=${p.id}">
+            <i class="ti ti-building-skyscraper"></i>${p.id}
+            <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name||'').slice(0,12)}</span>
+          </a>`
+        ).join('');
+      }
     }
     renderAll();
   }

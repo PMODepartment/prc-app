@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>Portfolio Overview — Megawide EPC</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
   <link rel="stylesheet" href="assets/css/dashboard.css"/>
@@ -158,69 +158,62 @@
           </div>
         </div>
 
-        <!-- Charts Row 1: Budget + Variance -->
+        <!-- Charts Row 1: Budget/Awarded by Period + WP Status donut -->
         <div class="grid-2">
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget vs Contract by Project (₱M)</div>
+            <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Period</div>
             <div class="legend">
               <span><span class="legend-dot" style="background:#282C28"></span>Budget BCB</span>
-              <span><span class="legend-dot" style="background:#2D9B6F"></span>Total Awarded</span>
+              <span><span class="legend-dot" style="background:#EE3124"></span>Awarded</span>
+              <span><span class="legend-dot" style="background:#555"></span>Cumul. Budget</span>
+              <span><span class="legend-dot" style="background:#EE3124;opacity:.5"></span>Cumul. Awarded</span>
             </div>
-            <div style="position:relative;height:200px"><canvas id="c-budget"></canvas></div>
+            <div style="position:relative;height:220px"><canvas id="c-period"></canvas></div>
           </div>
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-line"></i>Variance Trend — Portfolio (₱M)</div>
-            <div class="legend">
-              <span><span class="legend-dot" style="background:#2D9B6F"></span>Cumulative savings</span>
-              <span><span class="legend-dot" style="background:#EE3124"></span>Cumulative overrun</span>
-            </div>
-            <div style="position:relative;height:200px"><canvas id="c-trend"></canvas></div>
+            <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+            <div style="position:relative;height:220px"><canvas id="c-wp-status-ov"></canvas></div>
           </div>
         </div>
 
-        <!-- Charts Row 2: Award Status + Donuts -->
+        <!-- Charts Row 2: WP by Trade + Budget by Trade -->
         <div class="grid-2">
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Award Status by Zone</div>
+            <div class="panel-title"><i class="ti ti-chart-bar-mid"></i>Work Package by Trade</div>
             <div class="legend">
-              <span><span class="legend-dot" style="background:#2D9B6F"></span>Awarded</span>
-              <span><span class="legend-dot" style="background:#D97706"></span>Partially awarded</span>
-              <span><span class="legend-dot" style="background:#DCDBDB"></span>Not yet awarded</span>
+              <span><span class="legend-dot" style="background:#282C28"></span>Total WP</span>
+              <span><span class="legend-dot" style="background:#EE3124"></span>Awarded WP</span>
             </div>
-            <div style="position:relative;height:200px"><canvas id="c-status"></canvas></div>
+            <div style="position:relative;height:260px"><canvas id="c-wp-trade"></canvas></div>
           </div>
           <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-donut"></i>Award Status per Project</div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;padding-top:4px" id="donut-grid"></div>
+            <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget and Awarded by Trade (₱M)</div>
+            <div class="legend">
+              <span><span class="legend-dot" style="background:#282C28"></span>Budget BCB</span>
+              <span><span class="legend-dot" style="background:#EE3124"></span>Awarded</span>
+            </div>
+            <div style="position:relative;height:260px"><canvas id="c-bud-trade"></canvas></div>
           </div>
         </div>
 
-        <!-- Charts Row 3: Budget by Trade + Award Rate by Trade -->
-        <div class="grid-2">
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (₱M) by Trade</div>
-            <div style="position:relative;height:220px"><canvas id="c-budget-trade"></canvas></div>
+        <!-- WP Monitoring Table -->
+        <div class="panel" style="padding:0;overflow:hidden">
+          <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div class="panel-title" style="margin:0"><i class="ti ti-table"></i>Work Package Monitoring</div>
+            <input id="wp-mon-search" type="text" placeholder="Search WPs…" oninput="filterWPTable()"
+              style="margin-left:auto;padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none;width:180px">
           </div>
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Award Rate by Trade</div>
-            <div style="position:relative;height:220px"><canvas id="c-award-trade"></canvas></div>
+          <div style="overflow-x:auto">
+            <table class="data-table" id="wp-mon-table" style="font-size:11px;min-width:900px">
+              <thead><tr>
+                <th>Project</th><th>WP No.</th><th>Description</th><th>Status</th>
+                <th>Budget</th><th>Awarded</th><th>Variance</th><th>%Var</th>
+                <th>Planned Award</th><th>Actual Award</th><th>Aging</th><th>Submittal</th>
+              </tr></thead>
+              <tbody id="wp-mon-body"></tbody>
+            </table>
           </div>
-        </div>
-
-        <!-- Top Lists -->
-        <div class="grid-3">
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-trending-up"></i>Top 5 Savings</div>
-            <div class="rank-list" id="rank-gains"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
-            <div class="rank-list" id="rank-value"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
-            <div class="rank-list" id="rank-losses"></div>
-          </div>
+          <div id="wp-mon-pager" style="padding:8px 16px;font-size:11px;color:#888;display:flex;align-items:center;gap:8px"></div>
         </div>
 
       </div><!-- /main-content -->
@@ -237,6 +230,15 @@
     window.__wpmRole = profile.role;
     renderUserBar('user-bar', profile);
 
+    // Exclusive login redirect — if user entered via project-specific selector, send them there
+    const _navCtx = sessionStorage.getItem('wpm_nav_ctx');
+    if (_navCtx && _navCtx !== 'consolidated') {
+      window.location.href = 'project.html?id=' + _navCtx;
+      return;
+    }
+    // Track navigation context — user is viewing consolidated dashboard
+    sessionStorage.setItem('wpm_nav_ctx', 'consolidated');
+
     if (['admin','super_admin'].includes(profile.role)) {
       document.getElementById('sidebar-admin').style.display = 'block';
       updatePendingBadge();
@@ -247,14 +249,22 @@
 
     document.getElementById('page-sub').textContent = permitted.length + ' project(s) · Read-only';
 
-    // Sidebar project links
+    // Sidebar project links with pin buttons
     const navEl = document.getElementById('nav-projects');
-    permitted.forEach(p => {
-      navEl.innerHTML += `<a class="nav-item" href="project.html?id=${p.id}">
-        <i class="ti ti-building-skyscraper"></i>${p.id}
-        <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name&&p.name!==p.id?p.name:'').split('—')[0].trim().slice(0,12)}</span>
-      </a>`;
-    });
+    const userId = profile.id;
+    const renderIndexNav = () => {
+      if (typeof SidebarPrefs !== 'undefined') {
+        const { pinned, rest } = SidebarPrefs.sortProjects(userId, permitted);
+        navEl.innerHTML = [...pinned, ...rest].map(p => SidebarPrefs.projectLink(userId, p)).join('');
+      } else {
+        navEl.innerHTML = permitted.map(p => `<a class="nav-item" href="project.html?id=${p.id}">
+          <i class="ti ti-building-skyscraper"></i>${p.id}
+          <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${(p.name&&p.name!==p.id?p.name:'').split('—')[0].trim().slice(0,12)}</span>
+        </a>`).join('');
+      }
+    };
+    renderIndexNav();
+    window.__sidebarRefresh = renderIndexNav;
 
     // Load all WPs
     const wpArrays = await Promise.all(permitted.map(p => WPDb.getApprovedWPs(p.id)));
@@ -287,6 +297,75 @@
       </a>`;
     }
 
+    // ── WP monitoring table helpers ───────────────────────────────
+    let _wpMonData = [], _wpMonPage = 1;
+    const WP_MON_PER_PAGE = 50;
+
+    function submittalLabel(w) {
+      if (w.review_status === 'approved') return 'Approved';
+      if (w.review_status === 'rejected') return 'Rejected';
+      if (w.review_status === 'pending_review') return 'Submitted';
+      return '—';
+    }
+
+    function wpAging(w) {
+      const ref = w.actual_awarding_date || (w.award_status === 'Awarded' ? null : w.awarding_date);
+      if (!ref) return null;
+      const diff = Math.floor((new Date() - new Date(ref)) / 86400000);
+      return diff;
+    }
+
+    window.filterWPTable = function() {
+      const q = (document.getElementById('wp-mon-search')?.value || '').toLowerCase();
+      const filtered = q ? _wpMonData.filter(w =>
+        (w.wp_no||'').toLowerCase().includes(q) ||
+        (w.description||'').toLowerCase().includes(q) ||
+        (w.project_id||'').toLowerCase().includes(q)
+      ) : _wpMonData;
+      _wpMonPage = 1;
+      renderWPMonTable(filtered);
+    };
+
+    function renderWPMonTable(rows) {
+      const tbody = document.getElementById('wp-mon-body');
+      const pager = document.getElementById('wp-mon-pager');
+      if (!tbody) return;
+      const start = (_wpMonPage - 1) * WP_MON_PER_PAGE;
+      const page = rows.slice(start, start + WP_MON_PER_PAGE);
+      tbody.innerHTML = page.map(w => {
+        const bud = w.approved_budget_bcb || 0;
+        const awd = w.total_awarded || 0;
+        const vari = bud - awd;
+        const pctVar = bud ? ((vari / bud) * 100).toFixed(1) : '—';
+        const aging = wpAging(w);
+        const agingStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : aging > 0 ? 'color:#888' : '';
+        const statusColor = w.award_status === 'Awarded' ? '#2D9B6F' : w.award_status === 'Partially Awarded' ? '#D97706' : '#EE3124';
+        return `<tr>
+          <td style="font-weight:600;color:#444">${w.project_id||'—'}</td>
+          <td>${w.wp_no||'—'}</td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(w.description||'').replace(/"/g,'&quot;')}">${w.description||'—'}</td>
+          <td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${statusColor}22;color:${statusColor}">${w.award_status||'—'}</span></td>
+          <td style="text-align:right">${bud?Fmt.money(bud):'—'}</td>
+          <td style="text-align:right">${awd?Fmt.money(awd):'—'}</td>
+          <td style="text-align:right;${vari>0?'color:#2D9B6F':vari<0?'color:#EE3124':''}">${bud?(vari>=0?'+':'')+Fmt.money(vari):'—'}</td>
+          <td style="text-align:right;${parseFloat(pctVar)>0?'color:#2D9B6F':parseFloat(pctVar)<0?'color:#EE3124':''}">${pctVar!=='—'?(parseFloat(pctVar)>=0?'+':'')+pctVar+'%':'—'}</td>
+          <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
+          <td>${w.actual_awarding_date?Fmt.date(w.actual_awarding_date):'—'}</td>
+          <td style="${agingStyle}">${aging!=null?(aging>0?aging+'d':'today'):'—'}</td>
+          <td>${submittalLabel(w)}</td>
+        </tr>`;
+      }).join('');
+      if (pager) {
+        const total = rows.length;
+        const totalPages = Math.ceil(total / WP_MON_PER_PAGE);
+        pager.innerHTML = total === 0 ? 'No work packages' :
+          `Showing ${start+1}–${Math.min(start+WP_MON_PER_PAGE, total)} of ${total}` +
+          (totalPages > 1 ? ` &nbsp;
+            <button onclick="_wpMonPage=Math.max(1,_wpMonPage-1);filterWPTable()" style="padding:2px 8px;border:1px solid #ddd;border-radius:5px;cursor:pointer;background:#fff;font-size:11px">‹</button>
+            <button onclick="_wpMonPage=Math.min(${totalPages},_wpMonPage+1);filterWPTable()" style="padding:2px 8px;border:1px solid #ddd;border-radius:5px;cursor:pointer;background:#fff;font-size:11px">›</button>` : '');
+      }
+    }
+
     function renderAll() {
       const sel = [..._activeIds];
       const filt = permitted.filter(p => sel.includes(p.id));
@@ -294,19 +373,33 @@
       const allStats = filt.map(p => computeStats(filtWPs.filter(w => w.project_id === p.id)));
       const global = computeStats(filtWPs);
 
-      // Metrics — use full unabbreviated numbers for money values
+      // Compute Power BI KPIs
+      const awarded    = filtWPs.filter(w => w.award_status === 'Awarded');
+      const totalBCB   = filtWPs.reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
+      const totalAwd   = filtWPs.reduce((s,w) => s + (w.total_awarded||0), 0);
+      const ctc        = filtWPs.filter(w => w.award_status !== 'Awarded').reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
+      const eac        = totalAwd + ctc;
+      const variance   = totalBCB - eac;
+      const pctVar     = totalBCB ? ((variance / totalBCB) * 100).toFixed(1) : '0.0';
+      const now        = new Date();
+      const dueNotAwd  = filtWPs.filter(w => w.award_status !== 'Awarded' && w.awarding_date && new Date(w.awarding_date) <= now).length;
+      const notDue     = filtWPs.filter(w => w.award_status !== 'Awarded' && (!w.awarding_date || new Date(w.awarding_date) > now)).length;
+      const pctAwdWP   = filtWPs.length ? ((awarded.length / filtWPs.length) * 100).toFixed(1) : '0.0';
+      const pctAwdVal  = totalBCB ? ((totalAwd / totalBCB) * 100).toFixed(1) : '0.0';
+
       buildMetrics('metrics-grid', [
-        { lbl:'Total projects',      val:filt.filter(p=>p.status!=='archived').length, sub:'active',                          cls:'',      accent:'dark' },
-        { lbl:'Total work packages', val:global.total,                                  sub:'approved entries',                 cls:'',      accent:'dark' },
-        { lbl:'Awarded',             val:global.awarded,                                sub:global.awardRate+'% award rate',    cls:'green', accent:'green' },
-        { lbl:'Not yet awarded',     val:global.notAwarded,                             sub:global.late+' past target date',    cls:'red',   accent:'red' },
-        { lbl:'Total budget',        val:Fmt.moneyFull(global.totalBudget),             sub:'approved BCB',                     cls:'',      accent:'dark' },
-        { lbl:'Total contracted',    val:Fmt.moneyFull(global.totalContract),           sub:'awarded amount',                   cls:'',      accent:'dark' },
-        { lbl:'Net variance',
-          val:(global.variance>=0?'+':'')+Fmt.moneyFull(global.variance),
-          sub:global.variance>=0?'net savings':'net overrun',
-          cls:global.variance>=0?'green':'red', accent:global.variance>=0?'green':'red' },
-        { lbl:'Late awards', val:global.late, sub:'past planned award date', cls:global.late>0?'red':'green', accent:global.late>0?'red':'dark' },
+        { lbl:'Budget BCB',          val:Fmt.moneyFull(totalBCB),   sub:'approved BCB',             cls:'', accent:'dark' },
+        { lbl:'Awarded Cost',        val:Fmt.moneyFull(totalAwd),   sub:'total awarded',            cls:'green', accent:'green' },
+        { lbl:'Cost to Complete',    val:Fmt.moneyFull(ctc),        sub:'remaining budget',         cls:'', accent:'dark' },
+        { lbl:'EAC',                 val:Fmt.moneyFull(eac),        sub:'estimate at completion',   cls:'', accent:'dark' },
+        { lbl:'Variance',            val:(variance>=0?'+':'')+Fmt.moneyFull(variance), sub:variance>=0?'net savings':'net overrun', cls:variance>=0?'green':'red', accent:variance>=0?'green':'red' },
+        { lbl:'% Variance',          val:(parseFloat(pctVar)>=0?'+':'')+pctVar+'%', sub:'budget vs EAC', cls:parseFloat(pctVar)>=0?'green':'red', accent:parseFloat(pctVar)>=0?'green':'red' },
+        { lbl:'Total WP',            val:filtWPs.length,            sub:'work packages',            cls:'', accent:'dark' },
+        { lbl:'Awarded WP',          val:awarded.length,            sub:'fully awarded',            cls:'green', accent:'green' },
+        { lbl:'Due Not Awarded',     val:dueNotAwd,                 sub:'past target date',         cls:dueNotAwd>0?'red':'green', accent:dueNotAwd>0?'red':'dark' },
+        { lbl:'WP Not Due',          val:notDue,                    sub:'future target date',       cls:'', accent:'dark' },
+        { lbl:'% Awarded by WP',     val:pctAwdWP+'%',             sub:'count-based',              cls:'', accent:'dark' },
+        { lbl:'% Awarded by Value',  val:pctAwdVal+'%',            sub:'value-based',              cls:'', accent:'dark' },
       ]);
 
       // Project Cards
@@ -333,34 +426,21 @@
       }
 
       // Destroy + re-render charts
-      ['c-budget','c-trend','c-status','c-budget-trade','c-award-trade'].forEach(id => {
+      ['c-period','c-wp-status-ov','c-wp-trade','c-bud-trade'].forEach(id => {
         try { const c = Chart.getChart(document.getElementById(id)); if(c) c.destroy(); } catch(e){}
       });
-      filt.forEach(p => { try { const c=Chart.getChart(document.getElementById('c-donut-'+p.id)); if(c) c.destroy(); } catch(e){} });
 
-      Charts.consolidatedBudget('c-budget', filt, allStats);
-      Charts.varianceTrend('c-trend', filtWPs);
-      Charts.statusByZone('c-status', filtWPs);
-      const trades = [...new Set(filtWPs.map(w=>w.trade).filter(Boolean))].sort();
-      Charts.budgetByTrade('c-budget-trade', filtWPs, trades);
-      Charts.awardRateByTrade('c-award-trade', filtWPs, trades);
+      Charts.budgetAwardedByPeriod('c-period', filtWPs);
+      Charts.wpStatusDonut('c-wp-status-ov', filtWPs);
+      Charts.wpByTrade('c-wp-trade', filtWPs);
+      Charts.budgetByTradeHBar('c-bud-trade', filtWPs);
 
-      // Donuts
-      const donutGrid = document.getElementById('donut-grid');
-      donutGrid.innerHTML = '';
-      filt.forEach(p => {
-        donutGrid.innerHTML += `<div style="text-align:center">
-          <div style="font-size:10px;font-weight:700;color:var(--mw-dark);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">${p.id}</div>
-          <div style="position:relative;height:100px"><canvas id="c-donut-${p.id}"></canvas></div>
-        </div>`;
+      // WP monitoring table
+      _wpMonData = [...filtWPs].sort((a,b) => {
+        const ag = d => { const r=d.actual_awarding_date||(d.award_status==='Awarded'?null:d.awarding_date); return r?Math.floor((new Date()-new Date(r))/86400000):-Infinity; };
+        return ag(b) - ag(a);
       });
-      filt.forEach((p,i) => Charts.awardDonut('c-donut-'+p.id, allStats[i]));
-
-      // Rank lists
-      const withBudget = filtWPs.filter(w=>w.approved_budget_bcb!=null);
-      buildRankList('rank-gains', withBudget.filter(w=>(w.variance||0)>0).sort((a,b)=>(b.variance||0)-(a.variance||0)).slice(0,5).map(w=>({name:w.description,sub:w.wp_no+' · '+(w.project_id||''),val:w.variance,color:'#2D9B6F'})),'green',v=>'+'+Fmt.money(v));
-      buildRankList('rank-value', filtWPs.filter(w=>w.total_awarded>0).sort((a,b)=>(b.total_awarded||0)-(a.total_awarded||0)).slice(0,5).map(w=>({name:w.description,sub:w.wp_no+' · '+(w.contractor||'—'),val:w.total_awarded,color:'#282C28'})),'dark',v=>Fmt.money(v));
-      buildRankList('rank-losses', withBudget.filter(w=>(w.variance||0)<0).sort((a,b)=>(a.variance||0)-(b.variance||0)).slice(0,5).map(w=>({name:w.description,sub:w.wp_no+' · '+(w.project_id||''),val:Math.abs(w.variance),color:'#EE3124'})),'red',v=>'-'+Fmt.money(v));
+      filterWPTable();
 
       // Update project count label + render table if active
       const countLabel = document.getElementById('proj-count-label');

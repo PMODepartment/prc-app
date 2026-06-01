@@ -10,6 +10,7 @@ const AppAuth = (() => {
     const { data: profile } = await sb.from('users').select('*').eq('id', session.user.id).single();
     if (!profile || profile.status !== 'approved') { await sb.auth.signOut(); window.location.href = 'login.html'; return; }
     window.__profile = profile; window.__session = session;
+    if (typeof WPDb !== 'undefined' && WPDb.updateLastLogin) WPDb.updateLastLogin(session.user.id).catch(()=>{});
     onReady(session.user, profile);
   }
   async function requireAdmin(onReady) { requireLogin((user, profile) => { if (!['admin','super_admin'].includes(profile.role)) { window.location.href = 'index.html'; return; } onReady(user, profile); }); }
