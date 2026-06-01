@@ -394,6 +394,27 @@ Logo is styled globally in `dashboard.css`:
 
 ---
 
+## Performance (Mobile Load Speed)
+
+### Script Loading Pattern
+`auth.js`, `db.js`, `ui.js` are loaded at the **bottom of `<body>`** (just before the inline init script), NOT in `<head>`. This ensures the HTML skeleton (sidebar, topbar) renders immediately while scripts download, eliminating the blank-screen delay on mobile.
+
+**Do NOT move these scripts back to `<head>` without `defer`.** Blocking scripts in `<head>` prevent any HTML from rendering until all three scripts download and execute — on mobile this causes a visible white screen.
+
+### Resource Hints (all pages)
+Each page `<head>` has:
+```html
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="preconnect" href="https://cdn.jsdelivr.net"/>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
+<link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
+```
+Google Fonts is loaded via `<link>` in HTML (not `@import` in CSS) to avoid 2 extra sequential round-trips.
+
+---
+
 ## Deployment
 
 ```bash
