@@ -3,7 +3,7 @@
 ## Project Overview
 Work Package Management (WPM) Dashboard for Megawide Construction Corporation EPC projects. Tracks procurement work packages, award status, budgets, and contractors across multiple projects.
 
-**Live URL:** https://pmodepartment.github.io/prc-app (login: `/login.html`) — migrated from Vercel 2026-06-01  
+**Live URL:** https://pmodepartment.github.io/prc-app (login: `/login.html`) — migrated from Vercel 2026-06-01
 **Stack:** Vanilla HTML/CSS/JS (no build step) + Supabase (PostgreSQL + Auth) + GitHub Pages hosting
 
 ---
@@ -15,13 +15,13 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 ### Key Files
 | File | Purpose |
 |---|---|
-| `assets/js/auth.js` | Supabase auth wrapper — `AppAuth.requireLogin()`, `AppAuth.requireAdmin()`, `getSB()` |
+| `assets/js/auth.js` | Supabase auth wrapper — `AppAuth.requireLogin()`, `AppAuth.requireAdmin()`, `getSB()`, profile cache |
 | `assets/js/db.js` | All DB operations via `WPDb.*` — also `computeStats()`, `Fmt.*`, `renderUserBar()` |
 | `assets/js/ui.js` | Shared UI helpers — sidebar init, modals, toast, hamburger menu, iOS pinch-zoom prevention |
 | `assets/css/dashboard.css` | Global styles, CSS variables, responsive breakpoints, view-tabs, mobile fixes |
 | `supabase-schema.sql` | Full DB schema for reference |
 
-> `assets/js/db.js`, `assets/js/auth.js`, `assets/js/ui.js` are the canonical files. Some pages also reference root-level copies — if making changes, update `assets/js/` files and sync root copies if needed.
+> `assets/js/` files are canonical. Root-level copies (`auth.js`, `db.js`, `ui.js`) exist but are **not referenced by any page** — do not edit them.
 
 ### Pages
 | File | Auth | Purpose |
@@ -31,10 +31,10 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 | `pending.html` | public | Shown to unapproved users |
 | `forgot-password.html` | public | Password reset |
 | `project-selector.html` | user | Project picker — shown after login; admins also see Portfolio Overview card |
-| `index.html` | user | Portfolio Overview — consolidated dashboard with 6 tabs |
-| `project.html` | user | Single project dashboard (tabs: Overview, Backlog, Budget, Schedule, Works, WP List, Claims, Change Orders) |
+| `index.html` | user | Portfolio Overview — consolidated dashboard with 6 tabs (Overview, Backlog, Budget, Schedule, Works, WP List) |
+| `project.html` | user | Single project dashboard — tabs: Overview, Backlog, Budget, Schedule, Works, WP List (last) |
 | `wp-form.html` | user | Add / edit work package |
-| `claim-form.html` | user | Add / edit claim or change order (`?section=change-order` for CO mode) |
+| `claim-form.html` | user | Add / edit claim or change order (`?section=change-order` for CO mode) — hidden feature |
 | `my-wps.html` | user | Officer's WP list |
 | `review.html` | admin | Approve / reject pending WPs |
 | `admin.html` | admin | User management + project management |
@@ -48,39 +48,42 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 ### Tables
 - **`projects`** — `id` (text PK e.g. 'AVR101'), name, location, status, budget_bcb, start_date, end_date
 - **`users`** — `id` (UUID FK → auth.users), email, role (`super_admin|admin|user`), status (`pending|approved|rejected`), projects (text[]), last_login (timestamptz)
-- **`work_packages`** — all WP fields; `review_status` (`pending_review|approved|rejected`); `claim_tag` (text, nullable) — optional tag values: `Extension of Time (EOT)|Material Escalation|Labor Escalation|Change Order`; see schema for full column list
+- **`work_packages`** — all WP fields; `review_status` (`pending_review|approved|rejected`); `claim_tag` (text, nullable) — optional tag: `Extension of Time (EOT)|Material Escalation|Labor Escalation|Change Order`; see schema for full column list
 - **`claims`** — `id`, `project_id`, `claim_no`, `claim_type` (`Extension of Time (EOT)|Material Escalation|Labor Escalation|Change Order`), `party` (`Client|Vendor`), `description`, `wp_no`, `contractor`, `date_filed`, `amount_claimed`, `basis`, `status` (`Draft|Filed|Under Review|Approved|Partially Approved|Rejected|Withdrawn`), `approved_amount`, `date_resolved`, `review_status` (`pending_review|approved|rejected`), `review_notes`, `remarks`, `submitted_by` (UUID FK → auth.users), `created_at`, `updated_at`
 
 ### WPDb API (db.js)
 ```js
-WPDb.getProjects()            // all projects
-WPDb.getProject(id)           // single project
-WPDb.createProject(data)      // new project
+WPDb.getProjects()                          // all projects
+WPDb.getProject(id)                         // single project
+WPDb.createProject(data)                    // new project
 WPDb.updateProject(id, data)
-WPDb.archiveProject(id)       // sets status='archived'
+WPDb.archiveProject(id)                     // sets status='archived'
 WPDb.unarchiveProject(id)
-WPDb.deleteProject(id)        // also deletes all WPs
+WPDb.deleteProject(id)                      // also deletes all WPs
 
-WPDb.getApprovedWPs(pid)                  // approved WPs for one project
-WPDb.getAllApprovedWPs()                  // all approved WPs (admin — single query, all projects)
-WPDb.getApprovedWPsForProjects(ids)       // approved WPs for array of project IDs (single .in() query — used by consolidated dashboard)
-WPDb.getAllWPs(pid)                       // all WPs regardless of status
-WPDb.getPendingWPs()                      // pending_review WPs (admin)
-WPDb.submitWP(data, user)     // inserts with review_status='pending_review'
-WPDb.updateWP(id, data)       // update (resets to pending_review)
-WPDb.updateWPDirect(id, data) // update without status change
+WPDb.getApprovedWPs(pid)                    // approved WPs for one project
+WPDb.getAllApprovedWPs()                    // all approved WPs across all projects (single query)
+WPDb.getApprovedWPsForProjects(ids)         // approved WPs for array of project IDs — single .in() query; used by consolidated dashboard to avoid N+1
+WPDb.getAllWPs(pid)                         // all WPs regardless of status
+WPDb.getPendingWPs()                        // pending_review WPs (admin)
+WPDb.submitWP(data, user)                   // inserts with review_status='pending_review'
+WPDb.updateWP(id, data)                     // update (resets to pending_review)
+WPDb.updateWPDirect(id, data)               // update without status change
 WPDb.approveWP(id)
 WPDb.rejectWP(id, _, reason)
 WPDb.getAllUsers()
 WPDb.updateUser(id, updates)
-WPDb.updateLastLogin(userId)  // writes current timestamp to users.last_login
+WPDb.updateLastLogin(userId)                // writes current timestamp to users.last_login
 ```
 
 ### Auth Flow
-1. `getSB()` — lazy-loads Supabase client (CDN ESM import)
-2. `AppAuth.requireLogin(cb)` — checks session → checks `users.status === 'approved'` → calls `WPDb.updateLastLogin()` → calls cb(user, profile)
-3. `AppAuth.requireAdmin(cb)` — requires role in `['admin', 'super_admin']`
-4. Role stored in `window.__wpmRole`, profile in `window.__profile`, session in `window.__session`
+1. `getSB()` — returns `window.__sb` (Supabase client created synchronously from UMD bundle on page load)
+2. `AppAuth.requireLogin(cb)` — checks session → loads profile from **sessionStorage cache** if available, otherwise fetches from `users` table and caches → checks `status === 'approved'` → calls `WPDb.updateLastLogin()` → calls cb(user, profile)
+3. `AppAuth.requireAdmin(cb)` — wraps `requireLogin`, additionally requires role in `['admin', 'super_admin']`
+4. `AppAuth.logout()` — clears `wpm_prof_*` sessionStorage keys, signs out, redirects to login
+5. Role stored in `window.__wpmRole`, profile in `window.__profile`, session in `window.__session`
+
+**Profile cache:** Stored in `sessionStorage` under key `wpm_prof_{userId}`. Avoids a DB round-trip on every page navigation within the same tab session. Cleared on logout. Safe because sessionStorage is per-tab and clears when the tab closes.
 
 ### Supabase Email / Auth Settings
 - **Email confirmation is disabled** — users register and go straight to `pending` status for admin approval; no email verification step required
@@ -99,8 +102,6 @@ WPDb.updateLastLogin(userId)  // writes current timestamp to users.last_login
 
 - Admins and super_admins see all projects; users see only projects in their `profile.projects[]` array
 - When admin submits a WP via CSV import or form, it auto-approves (`WPDb.approveWP()` called after `WPDb.submitWP()`)
-- When admin submits a Claim or Change Order (form or CSV), `review_status` is set directly to `'approved'`; users get `'pending_review'`
-- Admin new claims/COs default to `status: 'Filed'`; user submissions default to `status: 'Draft'`
 - Project assignment is per-user, stored as `text[]` in `users.projects`
 
 ---
@@ -118,22 +119,21 @@ WPDb.updateLastLogin(userId)  // writes current timestamp to users.last_login
 ```
 Current Project
   └─ [project name] (active)
-     └─ Switch Project (→ login.html)
 
 Work Packages
   ├─ Add Work Package
   └─ Review WPs (admin only, with pending badge)
 
-Claims & Change Order Register
-  ├─ Add Claim (→ claim-form.html?project=ID)
-  ├─ Add Change Order (→ claim-form.html?project=ID&section=change-order)
-  └─ View Register (→ project.html?tab=claims-register) — combined pending badge
+Claims & Change Order Register    ← HIDDEN (style="display:none") — not yet active
+  ├─ Add Claim
+  ├─ Add Change Order
+  └─ View Register
 
 Tools
-  └─ Download Template → opens picker modal (WP / Claims / Change Orders)
+  └─ Download Template → opens picker modal
 
 Admin (admin only)
-  ├─ Portfolio Overview (→ index.html?view=consolidated)
+  ├─ Portfolio Overview (→ index.html)
   ├─ User Management (→ admin.html)
   ├─ Pinned Projects
   └─ Recent Projects
@@ -165,6 +165,7 @@ Admin
 - `admin.html` uses plain project links (no pin/star buttons)
 - `project.html` uses `SidebarPrefs.projectLink()` with pin/star support
 - `review.html` uses `SidebarPrefs.projectLink()` with custom href parameter
+- The separate "Overview" section was removed from `admin.html` — "Portfolio Overview" now lives under the Admin section in both contexts
 
 ### SidebarPrefs (ui.js)
 - Pins stored in `localStorage` key `wpm_sidebar_{userId}`
@@ -175,7 +176,7 @@ Admin
 
 ## Consolidated Dashboard (index.html)
 
-Six-tab layout matching Power BI format:
+Six-tab layout matching Power BI format (Claims tab is **hidden**):
 
 | Tab | Content |
 |---|---|
@@ -186,62 +187,48 @@ Six-tab layout matching Power BI format:
 | **Works** | Stacked period chart + 3 donuts + summary table |
 | **WP List** | Full WP monitoring table with search + pagination |
 
+**Data loading:** Single Supabase query using `WPDb.getAllApprovedWPs()` (admin) or `WPDb.getApprovedWPsForProjects(ids)` (user). **Do NOT revert to `Promise.all(permitted.map(p => WPDb.getApprovedWPs(p.id)))` — that causes N separate API calls (one per project), which is the main cause of slow mobile loading.**
+
 **Lazy rendering:** `_rendered` flags per tab — charts only render when a tab is first opened. Filter changes reset all flags so tabs re-render fresh on next view.
 
 **Read-only:** Consolidated view is read-only (no add/edit). Export button hidden on mobile. READ-ONLY badge hidden on mobile via `.topbar-badge-readonly { display: none }` — do NOT add `display:inline-flex` as inline style or the media query cannot override it.
 
 ---
 
+## Per-Project Dashboard (project.html)
+
+Tab order (left to right): **Overview → Backlog → Budget → Schedule → Works → WP List**
+
+- WP List is intentionally last — users don't have to scroll past the full monitoring table to reach Overview charts and Top 5 panels
+- Within the Overview tab, row order: Charts → Top 5 by Contract Value / Savings / Overbudget → Work Package Monitoring table
+- Claims & Change Orders tab exists in HTML but is hidden (`style="display:none"`)
+
+---
+
 ## Template Picker Modal (shared pattern across pages)
 
 A single "Download Template" button in the sidebar Tools section opens a picker modal with three styled cards:
-- **Work Packages** — downloads `WPM_Import_Template.csv` via `downloadCSVTemplate()`
-- **Claims** — disabled ("Coming soon"); greyed out, `cursor:not-allowed`, no onclick — pending Claims register completion
-- **Change Orders** — disabled ("Coming soon"); greyed out, `cursor:not-allowed`, no onclick — pending Claims register completion
+- **Work Packages** — active; downloads `WPM_Import_Template.csv` via `downloadCSVTemplate()`
+- **Claims** — **disabled** ("Coming soon"); greyed out, `cursor:not-allowed`, no onclick — pending Claims register completion
+- **Change Orders** — **disabled** ("Coming soon"); greyed out, `cursor:not-allowed`, no onclick — pending Claims register completion
 
-Present on: `project.html` (`#template-picker-modal`), `wp-form.html` (`#template-picker-modal`), `claim-form.html` (`#template-picker-modal`). All three download functions must be defined on each page that hosts the modal.
+Present on: `project.html`, `wp-form.html`, `claim-form.html` (all use `#template-picker-modal`).
 
 `openTemplatePickerModal()` / `closeTemplatePickerModal()` — toggle `display:flex/none`.
 
-## CSV Import — moved into forms
+---
 
-CSV import is no longer in the sidebar. Each form has a **bulk import banner** at the top of the content area:
+## CSV Import (Work Packages)
 
-- **`wp-form.html`** — banner with Template + Import CSV buttons; `openWPImportModal()` opens `#wp-import-modal`; after import redirects to `project.html?id=<pid>`
-- **`claim-form.html`** — banner label updates to "Claims" or "Change Orders" based on `isCO`; Import CSV button calls `openClaimsCSVModal()` or `openCOsCSVModal()` accordingly
+CSV import is in `wp-form.html` as a bulk import banner at the top of the content area.
 
-## CSV Import Feature (project.html)
-
-### Work Packages CSV
 `downloadCSVTemplate()` — generates `WPM_Import_Template.csv` with headers + 2 example rows.
 
 **Headers:** Cost Code, WP No., Description, Zone, Trade, Planned Award Date, Actual Award Date, Target Delivery Date, Target Completion Date, Target Installation Date, Lead Time (Days), Budget BCB (PHP), Total Awarded (PHP), Procurement Status, Award Status, Contractor, PO/JO Count, PO/JO Numbers, Remarks
 
-`openCSVImportModal()` / `closeCSVImportModal()` — modal `#csv-import-modal`.
-
-`handleCSVFile(file)` — reads via FileReader, validates CSV, shows row count preview.
-
 `importWPsFromCSV()` — parses rows, calls `WPDb.submitWP()` per row, then `WPDb.approveWP()` if admin/super_admin.
 
 **Date parsing:** Uses `new Date(value).toISOString().split('T')[0]` — accepts MM/DD/YYYY or YYYY-MM-DD.
-
-### Claims CSV
-`downloadClaimsCSVTemplate()` — generates `Claims_Import_Template.csv`.
-
-**Headers:** Claim No., Party, Description, Linked WP No., Contractor / Client Name, Date Filed, Amount Claimed (PHP), Basis / Grounds, Status, Remarks
-
-`openClaimsCSVModal()` / `closeClaimsCSVModal()` — modal `#claims-csv-modal`.
-
-`handleClaimsCSVFile(file)` / `importClaimsFromCSV()` — inserts rows with `claim_type = 'Extension of Time (EOT)'`; admin → `review_status: 'approved'`, user → `'pending_review'`.
-
-### Change Orders CSV
-`downloadCOsCSVTemplate()` — generates `ChangeOrders_Import_Template.csv`.
-
-**Headers:** CO No., Party, Description, Linked WP No., Contractor / Client Name, Date Filed, Amount Claimed (PHP), Basis / Grounds, Status, Remarks
-
-`openCOsCSVModal()` / `closeCOsCSVModal()` — modal `#cos-csv-modal`.
-
-`handleCOsCSVFile(file)` / `importCOsFromCSV()` — inserts rows with `claim_type = 'Change Order'`; same admin/user review logic.
 
 ---
 
@@ -251,54 +238,36 @@ Optional field on each Work Package (`claim_tag` column in `work_packages`). Set
 
 **Values:** `Extension of Time (EOT)` | `Material Escalation` | `Labor Escalation` | `Change Order` | null (none)
 
-- Displayed as a color-coded badge in the WP List tab (`claimTagBadge()` helper)
+- Displayed as a color-coded badge in the WP List tab (`claimTagBadge()` helper in `project.html`)
 - EOT → blue, Material Escalation → orange, Labor Escalation → amber, Change Order → green
 - **DB migration required:** `ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS claim_tag text DEFAULT NULL;`
 
 ---
 
-## Claims & Change Orders register (HIDDEN — independent feature, not yet active)
+## Claims & Change Orders Register (HIDDEN — independent feature, not yet active)
 
-The full Claims & Change Orders register (`claims` table, `claim-form.html`, `view-claims-register` tab) is built but hidden. To re-enable: remove `style="display:none"` from the sidebar section and tab button in `project.html`, and the Claims tab button in `index.html`.
-
-### Data Model (claims table)
+The full Claims & Change Orders register is built but hidden everywhere. To re-enable when ready:
+- `project.html`: remove `style="display:none"` from the sidebar section and tab button (`data-view="claims-register"`)
+- `index.html`: remove `style="display:none"` from the Claims tab button
+- `template-picker-modal` in all three pages: restore active onclick and styling for Claims and Change Orders cards
 
 ### Data Model
 Claims and Change Orders share the `claims` Supabase table, distinguished by `claim_type`:
-- `claim_type = 'Extension of Time (EOT)'` → appears in the **Claims** tab
-- `claim_type = 'Change Order'` → appears in the **Change Orders** tab
+- `claim_type = 'Extension of Time (EOT)'`, `'Material Escalation'`, `'Labor Escalation'` → Claims
+- `claim_type = 'Change Order'` → Change Orders
 
 ### claim-form.html
-- URL param `?section=change-order` switches the form to Change Order mode (`isCO = true`)
-- `?project=ID` pre-selects the project; `?id=UUID` enters edit mode
-- Admin/super_admin submissions: `review_status = 'approved'`, default `status = 'Filed'`, button = "Add Claim" / "Add Change Order"
-- User submissions: `review_status = 'pending_review'`, default `status = 'Draft'`, button = "Submit Claim for Review"
-- Claim status options: Draft, Filed, Under Review, Approved, Partially Approved, Rejected, Withdrawn
-- `claim_type` dropdown is **visible** for Claims mode (user selects: EOT / Material Escalation / Labor Escalation); **hidden + locked** to 'Change Order' in CO mode
-- Section title updates: "Claim Details" for claims, "Change Order Details" for CO
-- Sidebar shows Work Packages, Claims & Change Order Register, and Tools sections regardless of mode
-- Work Packages section: Add Work Package (→ `wp-form.html?project=ID`) + Review WPs (admin only, → `review.html?project=ID`)
-- Active link highlighted based on `isCO`
-- `updateSidebarLinks(pid)` wires all sidebar hrefs with project ID — called on both new and edit modes
-- CSV Template and Import from CSV buttons in sidebar for both sections; import modals (`#claims-csv-modal`, `#cos-csv-modal`) embedded in the page with inline Download template links
-- `downloadClaimsCSVTemplate()`, `downloadCOsCSVTemplate()`, `importClaimsFromCSV()`, `importCOsFromCSV()` all available on this page
+- URL param `?section=change-order` switches to Change Order mode (`isCO = true`)
+- `?project=ID` pre-selects project; `?id=UUID` enters edit mode
+- Admin/super_admin: `review_status = 'approved'`, default `status = 'Filed'`
+- User: `review_status = 'pending_review'`, default `status = 'Draft'`
+- Sidebar shows Claims & Change Order Register section with Add Claim, Add Change Order, View Register
 
 ### project.html — Claims & Change Orders tab (`view-claims-register`)
-- Single combined tab replaces the former separate Claims and Change Orders tabs
-- `data-view="claims-register"` — `switchView` also handles old `claims` / `change-orders` params for backwards compat
-- KPI strip: Total Claims (EOT), Total Change Orders, Total Claimed, Approved Amount, Pending Review
-- KPIs re-calculate when the Type filter changes
-- Filters: Type (All | Claims EOT | Change Orders), Party, Status, search
-- Action buttons: Add Claim + Add Change Order in the toolbar
-- Table columns: No., Type, Party, Description, Linked WP, Contractor, Date Filed, Claimed (₱M), Status, Approved (₱M), Actions
-- Edit links auto-include `&section=change-order` for Change Order rows
+- Single combined tab for both Claims and Change Orders
 - Admin actions per row: Edit, Approve (✓), Reject (✗), Delete
-- `renderClaimsRegisterKPIs()` / `renderClaimsRegister()` — driven by full `allClaims` array with client-side type filter
-- `approveClaim(id)` / `rejectClaim(id, reason)` / `deleteClaim(id)` — shared for both types
-- Single combined pending badge: `#claims-pending-badge` (sidebar) + `#claims-tab-badge` (tab)
-
-### loadClaims()
-Fetches all `claims` for the project from Supabase, populates `allClaims[]`, updates all badges, and calls `renderClaimsKPIs()` + `renderClaimsView()`. Called once on page load and after any approve/reject/delete action.
+- Users see Edit link only — edits re-queue as `pending_review`
+- `approveClaim(id)` / `rejectClaim(id, reason)` / `deleteClaim(id)` — shared helpers
 
 ---
 
@@ -306,7 +275,7 @@ Fetches all `claims` for the project from Supabase, populates `allClaims[]`, upd
 
 ### Design System (dashboard.css)
 - Brand: `--mw-red: #EE3124`, `--mw-black: #231F20`, `--mw-dark: #282C28`
-- Font: Montserrat (Google Fonts CDN)
+- Font: Montserrat — loaded via `<link>` in each HTML page (NOT `@import` in CSS)
 - Icons: Tabler Icons v2.44 webfont (`ti ti-*`)
 
 ### Responsive Breakpoints
@@ -376,44 +345,73 @@ Logo is styled globally in `dashboard.css`:
 
 ---
 
+## Performance (Mobile Load Speed)
+
+### Problem summary & fixes applied
+
+| Problem | Fix |
+|---|---|
+| Scripts in `<head>` blocked HTML rendering (blank white screen on mobile) | Moved `auth.js`, `db.js`, `ui.js` to bottom of `<body>` |
+| No early connections to CDN origins | Added `<link rel="preconnect">` for all CDN domains |
+| Google Fonts via CSS `@import` (2 extra sequential round-trips) | Moved to `<link rel="stylesheet">` directly in HTML |
+| Supabase ESM entry imported 5 sub-packages (6-request waterfall) | Switched to single UMD bundle (`supabase.min.js`) |
+| Body scripts only started downloading when parser reached them | Added `<link rel="preload" as="script">` for all body scripts |
+| User profile fetched from DB on every page navigation | Cached in `sessionStorage` under `wpm_prof_{userId}` |
+| Consolidated dashboard fired one API call per project (N+1) | Replaced with single `getApprovedWPsForProjects(ids)` query |
+| Hidden Claims fetch fired on every consolidated dashboard load | Removed — `_allClaims = []` since Claims tab is disabled |
+
+### Script loading order (all pages)
+All pages load scripts at the **bottom of `<body>`** in this order:
+```html
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/db.js"></script>
+<script src="assets/js/ui.js"></script>
+<!-- index.html and project.html also load Chart.js + charts.js here -->
+<script>
+  /* inline init — calls AppAuth.requireLogin() or AppAuth.requireAdmin() */
+</script>
+```
+**Do NOT move any of these back to `<head>` without `defer`.** Blocking scripts in `<head>` prevent any HTML from rendering until all scripts download and execute.
+
+### Resource hints (all pages `<head>`)
+```html
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="preconnect" href="https://cdn.jsdelivr.net"/>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com"/>  <!-- index.html + project.html only -->
+<link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
+<link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
+<link rel="preload" as="script" href="assets/js/auth.js"/>
+<link rel="preload" as="script" href="assets/js/db.js"/>
+<link rel="preload" as="script" href="assets/js/ui.js"/>
+<!-- index.html + project.html also preload Chart.js + charts.js -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
+```
+
+### Remaining variability
+The **Supabase free tier cold start** (5–30s on first load after 7 days inactivity) is the one remaining cause of extreme mobile lag. Fix: set up UptimeRobot to ping the project URL every 3–4 days.
+
+---
+
 ## Known Issues / Gotchas
 
 1. **Date validation:** `new Date(dateString)` can silently accept invalid dates. Always validate on input — `wp-form.html` validates Target Completion ≥ Planned Award Date.
 2. **Role caching:** `window.__wpmRole` is set once at login. If role changes mid-session, user must log out and back in.
-3. **WP count refresh:** After adding/editing WPs, call `loadData()` to refresh counts in the sidebar badge.
-4. **Chart.js memory leaks:** Destroy existing chart instances before re-rendering: `if (chartInstance) { chartInstance.destroy(); chartInstance = null; }`
-5. **Duplicate `saveProject` in db.js:** Lines 24 and 36 both define `saveProject`. The second one shadows the first — harmless but should be cleaned up.
-6. **`assets/js/` sync:** Some pages load scripts from `assets/js/db.js` while others use root `db.js`. Always update `assets/js/` files; sync root copies if both paths are referenced.
+3. **Profile cache staleness:** `sessionStorage` profile cache is cleared on logout and when the tab closes. If an admin changes a user's role or project access, the affected user must close and reopen their tab to pick up the change.
+4. **WP count refresh:** After adding/editing WPs, call `loadData()` to refresh counts in the sidebar badge.
+5. **Chart.js memory leaks:** Destroy existing chart instances before re-rendering: `if (chartInstance) { chartInstance.destroy(); chartInstance = null; }`
+6. **Duplicate `saveProject` in db.js:** Two definitions exist. The second shadows the first — harmless but should be cleaned up.
 7. **READ-ONLY badge inline style:** Never add `display:inline-flex` as an inline style to `.topbar-badge-readonly` — the mobile media query sets `display:none` and inline styles override it.
 8. **Sticky tabs + overflow:** `overflow: hidden/clip` on any ancestor of `.view-tabs` breaks `position: sticky` in Safari. Always clamp overflow at the element level, not the container level.
 9. **Supabase free tier pause:** Project pauses after 7 days inactivity → 5–30s cold start on first load. Use UptimeRobot to ping every 3–4 days to prevent this.
+10. **N+1 query anti-pattern:** Never use `Promise.all(projects.map(p => WPDb.getApprovedWPs(p.id)))` in the consolidated dashboard — use `getAllApprovedWPs()` or `getApprovedWPsForProjects(ids)` instead.
 
 ---
 
 ## Workflow Rules
 
 - **After every prompt:** Update the relevant sections of this CLAUDE.md file to reflect what was added, fixed, or changed, then commit and push all modified files (including CLAUDE.md) to `origin/main`.
-
----
-
-## Performance (Mobile Load Speed)
-
-### Script Loading Pattern
-`auth.js`, `db.js`, `ui.js` are loaded at the **bottom of `<body>`** (just before the inline init script), NOT in `<head>`. This ensures the HTML skeleton (sidebar, topbar) renders immediately while scripts download, eliminating the blank-screen delay on mobile.
-
-**Do NOT move these scripts back to `<head>` without `defer`.** Blocking scripts in `<head>` prevent any HTML from rendering until all three scripts download and execute — on mobile this causes a visible white screen.
-
-### Resource Hints (all pages)
-Each page `<head>` has:
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link rel="preconnect" href="https://cdn.jsdelivr.net"/>
-<link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
-<link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
-```
-Google Fonts is loaded via `<link>` in HTML (not `@import` in CSS) to avoid 2 extra sequential round-trips.
 
 ---
 
@@ -426,9 +424,9 @@ git commit -m "description"
 git push origin main
 ```
 
-**GitHub:** https://github.com/PMODepartment/prc-app  
-**Live URL:** https://pmodepartment.github.io/prc-app  
-**Login:** https://pmodepartment.github.io/prc-app/login.html  
+**GitHub:** https://github.com/PMODepartment/prc-app
+**Live URL:** https://pmodepartment.github.io/prc-app
+**Login:** https://pmodepartment.github.io/prc-app/login.html
 *(Migrated from Vercel on 2026-06-01)*
 
 ---
@@ -436,9 +434,9 @@ git push origin main
 ## Development Notes
 
 - No npm, no bundler, no TypeScript — pure vanilla JS loaded via `<script src="...">` tags
-- Supabase client loaded via CDN UMD single bundle (`supabase.min.js` from jsDelivr), preloaded in `<head>` and loaded as `<script>` before `auth.js` in body. UMD avoids the 6-sub-module ESM waterfall.
+- Supabase client loaded via **UMD single bundle** (`supabase.min.js` from jsDelivr) — avoids the 6-sub-module ESM import waterfall. Loaded as `<script>` before `auth.js` at bottom of body; `window.supabase.createClient()` is called synchronously in `auth.js`
 - All pages use `AppAuth.requireLogin()` or `AppAuth.requireAdmin()` as the entry point — never access DB directly without auth check
 - `WPDb.mapWP()` normalizes field aliases (e.g., `budget_bcb` ↔ `approved_budget_bcb`, `contract_amount_php` ↔ `total_awarded`)
 - `Fmt.money(v)` formats as `₱X.XXM`; `Fmt.moneyFull(v)` formats as `₱1,234,567`; `Fmt.date(d)` formats as `May 29, '26`
-- Charts use Chart.js loaded via CDN; chart functions are in `assets/js/charts.js`
+- Charts use Chart.js v4.4.1 loaded via CDN (cdnjs); chart functions are in `assets/js/charts.js`
 - Power BI chart functions: `budgetAwardedByPeriod`, `wpByTrade`, `wpStatusDonut`, `wpSubmittalDonut`, `wpByPeriodQuarterly`, `wpAgingBuckets`, `budgetByTradeHBar`, `budgetByPeriodPerTrade`, `budgetByTradeDonut`, `awardedByTradeDonut`
