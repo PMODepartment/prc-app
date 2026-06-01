@@ -328,9 +328,13 @@ On mobile (`≤767px`) the tab bar is:
 
 ### Mobile Topbar (52px height)
 - `.topbar-left`: `flex: 1; min-width: 0; overflow: hidden`
+- `.topbar`: `overflow: visible` on mobile — **do NOT set to `hidden`**, it clips the user profile dropdown
 - `.page-title`: `white-space: nowrap; overflow: hidden; text-overflow: ellipsis`
 - `.page-sub`: `display: none` on mobile
 - `.hide-mobile`: hides export button text (or entire button on consolidated view)
+
+### Consolidated Dashboard Sticky Tabs (index.html)
+On mobile, `#filter-tabs-bar` is made `position: sticky; top: 52px` as a single unit. Its children (`#proj-filter-wrap` and `.view-tabs`) are `position: static` within it — do NOT make them individually sticky inside the bar, as they would overlap each other at the same `top` offset.
 
 ### Mobile Overflow / Horizontal Scroll Prevention
 **Critical rule:** Do NOT set `overflow-x: hidden` or `overflow-x: clip` on `.main`, `.content`, `html`, or `body` in pages that use `position: sticky` tabs — any overflow value on a parent kills `position: sticky` in Safari iOS.
