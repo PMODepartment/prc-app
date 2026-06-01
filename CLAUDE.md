@@ -15,13 +15,13 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 ### Key Files
 | File | Purpose |
 |---|---|
-| `auth.js` | Supabase auth wrapper — `AppAuth.requireLogin()`, `AppAuth.requireAdmin()`, `getSB()` |
-| `db.js` | All DB operations via `WPDb.*` — also `computeStats()`, `Fmt.*` |
-| `ui.js` | Shared UI helpers — sidebar init, modals, toast, hamburger menu |
-| `dashboard.css` | Global styles, CSS variables, responsive breakpoints |
+| `assets/js/auth.js` | Supabase auth wrapper — `AppAuth.requireLogin()`, `AppAuth.requireAdmin()`, `getSB()` |
+| `assets/js/db.js` | All DB operations via `WPDb.*` — also `computeStats()`, `Fmt.*`, `renderUserBar()` |
+| `assets/js/ui.js` | Shared UI helpers — sidebar init, modals, toast, hamburger menu, iOS pinch-zoom prevention |
+| `assets/css/dashboard.css` | Global styles, CSS variables, responsive breakpoints, view-tabs, mobile fixes |
 | `supabase-schema.sql` | Full DB schema for reference |
 
-> `assets/js/db.js`, `assets/js/auth.js`, `assets/js/ui.js` are copies — edit root-level files and sync to `assets/js/` if both paths are referenced.
+> `assets/js/db.js`, `assets/js/auth.js`, `assets/js/ui.js` are the canonical files. Some pages also reference root-level copies — if making changes, update `assets/js/` files and sync root copies if needed.
 
 ### Pages
 | File | Auth | Purpose |
@@ -30,8 +30,9 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 | `register.html` | public | Self-registration (creates `pending` user) |
 | `pending.html` | public | Shown to unapproved users |
 | `forgot-password.html` | public | Password reset |
-| `index.html` | user | All-projects overview + consolidated dashboard |
-| `project.html` | user | Single project dashboard (tabs: Overview, WP Table, Analysis, Schedule, Budget) |
+| `project-selector.html` | user | Project picker — shown after login; admins also see Portfolio Overview card |
+| `index.html` | user | Portfolio Overview — consolidated dashboard with 6 tabs |
+| `project.html` | user | Single project dashboard (tabs: Overview, Backlog, Budget, Schedule, Works, WP List) |
 | `wp-form.html` | user | Add / edit work package |
 | `my-wps.html` | user | Officer's WP list |
 | `review.html` | admin | Approve / reject pending WPs |
@@ -45,36 +46,42 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 
 ### Tables
 - **`projects`** — `id` (text PK e.g. 'AVR101'), name, location, status, budget_bcb, start_date, end_date
-- **`users`** — `id` (UUID FK → auth.users), email, role (`super_admin|admin|user`), status (`pending|approved|rejected`), projects (text[])
+- **`users`** — `id` (UUID FK → auth.users), email, role (`super_admin|admin|user`), status (`pending|approved|rejected`), projects (text[]), last_login (timestamptz)
 - **`work_packages`** — all WP fields; `review_status` (`pending_review|approved|rejected`); see schema for full column list
 
 ### WPDb API (db.js)
 ```js
-WPDb.getProjects()          // all projects
-WPDb.getProject(id)         // single project
-WPDb.createProject(data)    // new project
+WPDb.getProjects()            // all projects
+WPDb.getProject(id)           // single project
+WPDb.createProject(data)      // new project
 WPDb.updateProject(id, data)
-WPDb.archiveProject(id)     // sets status='archived'
+WPDb.archiveProject(id)       // sets status='archived'
 WPDb.unarchiveProject(id)
-WPDb.deleteProject(id)      // also deletes all WPs
+WPDb.deleteProject(id)        // also deletes all WPs
 
-WPDb.getApprovedWPs(pid)    // approved WPs for project
-WPDb.getAllWPs(pid)          // all WPs regardless of status
-WPDb.getPendingWPs()        // pending_review WPs (admin)
-WPDb.submitWP(data, user)   // inserts with review_status='pending_review'
-WPDb.updateWP(id, data)     // update (resets to pending_review)
+WPDb.getApprovedWPs(pid)      // approved WPs for project
+WPDb.getAllWPs(pid)            // all WPs regardless of status
+WPDb.getPendingWPs()          // pending_review WPs (admin)
+WPDb.submitWP(data, user)     // inserts with review_status='pending_review'
+WPDb.updateWP(id, data)       // update (resets to pending_review)
 WPDb.updateWPDirect(id, data) // update without status change
 WPDb.approveWP(id)
 WPDb.rejectWP(id, _, reason)
 WPDb.getAllUsers()
 WPDb.updateUser(id, updates)
+WPDb.updateLastLogin(userId)  // writes current timestamp to users.last_login
 ```
 
 ### Auth Flow
 1. `getSB()` — lazy-loads Supabase client (CDN ESM import)
-2. `AppAuth.requireLogin(cb)` — checks session → checks `users.status === 'approved'` → calls cb(user, profile)
+2. `AppAuth.requireLogin(cb)` — checks session → checks `users.status === 'approved'` → calls `WPDb.updateLastLogin()` → calls cb(user, profile)
 3. `AppAuth.requireAdmin(cb)` — requires role in `['admin', 'super_admin']`
 4. Role stored in `window.__wpmRole`, profile in `window.__profile`, session in `window.__session`
+
+### Supabase Email / Auth Settings
+- **Email confirmation is disabled** — users register and go straight to `pending` status for admin approval; no email verification step required
+- **Free tier cold start:** Supabase free tier pauses projects after 7 days of inactivity, causing 5–30s cold start. Fix: use UptimeRobot to ping the project URL every 3–4 days, or upgrade to Supabase Pro ($25/mo)
+- **Email rate limit:** Free tier sends max ~3 auth emails/hour. For password reset reliability, configure a custom SMTP provider (Resend, Brevo, SendGrid) under Project Settings → Auth → SMTP
 
 ---
 
@@ -86,41 +93,94 @@ WPDb.updateUser(id, updates)
 | `admin` | Approve/reject WPs; manage users; create/archive projects on assigned projects |
 | `super_admin` | Full access to all projects + all admin features |
 
-- Admins see all projects; users see only projects in their `profile.projects[]` array
+- Admins and super_admins see all projects; users see only projects in their `profile.projects[]` array
 - When admin submits a WP via CSV import or form, it auto-approves (`WPDb.approveWP()` called after `WPDb.submitWP()`)
 - Project assignment is per-user, stored as `text[]` in `users.projects`
 
 ---
 
-## Sidebar Navigation Hierarchy (Final)
+## Navigation & Sidebar
 
-All pages follow this sidebar structure. Not all sections appear on every page — they're shown/hidden based on role and context.
+### Navigation Context (`sessionStorage`)
+- Key: `wpm_nav_ctx` — stores either a project ID (e.g. `'AVR101'`) or `'consolidated'`
+- Set by `project.html` (to project ID) and `index.html` (to `'consolidated'`)
+- Used by `admin.html` and `review.html` to show context-aware sidebar (back link vs full project list)
 
+### Sidebar Structure per Page
+
+**`project.html`**
 ```
-Overview
-  └─ All Projects (index.html)
-
 Current Project
   └─ [project name] (active)
+     └─ Switch Project (→ login.html)
 
-Work Packages  (visible when in project context)
-  ├─ Add Work Package (wp-form.html)
-  ├─ All WPs (my-wps.html)
-  ├─ CSV Template (download button)
-  └─ Import from CSV (modal button)
+Work Packages
+  ├─ Add Work Package
+  ├─ Review WPs (admin only, with pending badge)
+  ├─ All WPs
+  ├─ CSV Template
+  └─ Import from CSV
 
-Projects  (admin only — admin.html)
-  ├─ [project list]
-  └─ New Project (button)
-
-Admin  (admin only)
-  └─ User Management (admin.html)
-  └─ Review WPs (review.html) — with pending count badge
-
-[Switch Project link — bottom of sidebar on project.html]
+Admin (admin only)
+  ├─ Portfolio Overview (→ index.html?view=consolidated)
+  ├─ User Management (→ admin.html)
+  ├─ Pinned Projects
+  └─ Recent Projects
 ```
 
-**Important:** "Add Work Package" must NOT appear in admin.html outside of project context. It belongs only in the Work Packages section of `project.html`.
+**`admin.html`** — consolidated context (wpm_nav_ctx === 'consolidated')
+```
+Overview
+  └─ Portfolio Overview (→ index.html?view=consolidated)
+
+Projects
+  ├─ [searchable project list]
+  └─ New Project
+
+Admin
+  ├─ User Management (active)
+  └─ Select Project (→ project-selector.html)
+```
+
+**`admin.html`** — project context (wpm_nav_ctx = project ID)
+```
+Current Project
+  └─ Back to [Project Name]
+
+Admin
+  ├─ User Management (active)
+  └─ Select Project (→ project-selector.html)
+```
+
+**Key rules:**
+- "Add Work Package" must NOT appear in `admin.html` — belongs only in `project.html`
+- `admin.html` uses plain project links (no pin/star buttons)
+- `project.html` uses `SidebarPrefs.projectLink()` with pin/star support
+- `review.html` uses `SidebarPrefs.projectLink()` with custom href parameter
+
+### SidebarPrefs (ui.js)
+- Pins stored in `localStorage` key `wpm_sidebar_{userId}`
+- `SidebarPrefs.projectLink(userId, project, extra, href)` — renders a nav-item with star toggle; optional `href` param overrides default `project.html?id=`
+- `window.__sidebarRefresh` — callback registered by each page to re-render sidebar after pin toggle
+
+---
+
+## Consolidated Dashboard (index.html)
+
+Six-tab layout matching Power BI format:
+
+| Tab | Content |
+|---|---|
+| **Overview** | 12 KPI metrics + project cards + 4 charts (budget by period, WP status donut, WP by trade, budget by trade) |
+| **Backlog** | 2 KPI panels + aging chart + status donut + backlog table + period chart + submittal donut |
+| **Budget** | 6 KPI panels + budget by period chart + budget by trade chart |
+| **Schedule** | Period chart + trade chart + status donut + schedule summary table |
+| **Works** | Stacked period chart + 3 donuts + summary table |
+| **WP List** | Full WP monitoring table with search + pagination |
+
+**Lazy rendering:** `_rendered` flags per tab — charts only render when a tab is first opened. Filter changes reset all flags so tabs re-render fresh on next view.
+
+**Read-only:** Consolidated view is read-only (no add/edit). Export button hidden on mobile. READ-ONLY badge hidden on mobile via `.topbar-badge-readonly { display: none }` — do NOT add `display:inline-flex` as inline style or the media query cannot override it.
 
 ---
 
@@ -157,6 +217,47 @@ Admin  (admin only)
 | `≤767px` | Mobile — sidebar becomes slide-in drawer (`transform: translateX(-100%)`) |
 | `≤399px` | Small mobile — single column grid |
 
+### View Tabs (Global — dashboard.css)
+`.view-tabs` / `.view-tab` styles are defined globally in `dashboard.css`. **Do NOT redefine them inline in individual HTML files** — the global rule includes the sticky mobile behavior.
+
+On mobile (`≤767px`) the tab bar is:
+- `position: sticky; top: 52px` (52px = mobile topbar height)
+- Horizontally scrollable (`overflow-x: auto; flex-wrap: nowrap`)
+- Tabs do not wrap — they scroll off-screen
+
+### Mobile Topbar (52px height)
+- `.topbar-left`: `flex: 1; min-width: 0; overflow: hidden`
+- `.page-title`: `white-space: nowrap; overflow: hidden; text-overflow: ellipsis`
+- `.page-sub`: `display: none` on mobile
+- `.hide-mobile`: hides export button text (or entire button on consolidated view)
+
+### Mobile Overflow / Horizontal Scroll Prevention
+**Critical rule:** Do NOT set `overflow-x: hidden` or `overflow-x: clip` on `.main`, `.content`, `html`, or `body` in pages that use `position: sticky` tabs — any overflow value on a parent kills `position: sticky` in Safari iOS.
+
+**Correct approach — clamp at element level:**
+```css
+canvas { max-width: 100% !important; width: 100% !important; }
+.panel { min-width: 0; max-width: 100%; }
+.grid-2 > *, .grid-3 > * { min-width: 0; }
+.data-table, .budget-table { display: block; max-width: 100%; overflow-x: auto; }
+```
+
+Standalone pages without sticky tabs (`login.html`, `register.html`, `pending.html`, `forgot-password.html`, `project-selector.html`) use `overflow-x: hidden` on `html, body` safely.
+
+### iOS Pinch Zoom Prevention
+Added to `ui.js` (runs on every page that loads it):
+```js
+document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+document.addEventListener('gesturestart', e => e.preventDefault());
+```
+The viewport `user-scalable=no` meta tag is also on all pages but is ignored by Safari iOS 10+; the JS above is the actual fix.
+
+### Viewport Meta (All Pages)
+All `.html` files have:
+```html
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+```
+
 ### Mobile Hamburger Menu
 - Button `.btn-menu` shown at `≤767px` (hidden on desktop via `display:none`)
 - Sidebar gets class `.open` when toggled; `.sidebar-overlay` covers background
@@ -167,18 +268,21 @@ Logo is styled globally in `dashboard.css`:
 ```css
 .sidebar-logo img { width: 140px; height: auto; display: block; }
 ```
-**Do NOT add inline `.sidebar-logo img` CSS to individual HTML files.** All pages use the global rule.
+**Do NOT add inline `.sidebar-logo img` CSS to individual HTML files.**
 
 ---
 
 ## Known Issues / Gotchas
 
-1. **Date validation:** `new Date(dateString)` can silently accept invalid dates. Always validate on input — the `wp-form.html` validates that Target Completion ≥ Planned Award Date.
+1. **Date validation:** `new Date(dateString)` can silently accept invalid dates. Always validate on input — `wp-form.html` validates Target Completion ≥ Planned Award Date.
 2. **Role caching:** `window.__wpmRole` is set once at login. If role changes mid-session, user must log out and back in.
 3. **WP count refresh:** After adding/editing WPs, call `loadData()` to refresh counts in the sidebar badge.
 4. **Chart.js memory leaks:** Destroy existing chart instances before re-rendering: `if (chartInstance) { chartInstance.destroy(); chartInstance = null; }`
-5. **Duplicate `saveProject` in db.js:** Lines 24 and 36 both define `saveProject`. The second one (line 36) shadows the first — this is harmless but should be cleaned up eventually.
-6. **`assets/js/` sync:** Some pages load scripts from `assets/js/db.js` while others use root `db.js`. If making changes, update root files and sync to `assets/js/`.
+5. **Duplicate `saveProject` in db.js:** Lines 24 and 36 both define `saveProject`. The second one shadows the first — harmless but should be cleaned up.
+6. **`assets/js/` sync:** Some pages load scripts from `assets/js/db.js` while others use root `db.js`. Always update `assets/js/` files; sync root copies if both paths are referenced.
+7. **READ-ONLY badge inline style:** Never add `display:inline-flex` as an inline style to `.topbar-badge-readonly` — the mobile media query sets `display:none` and inline styles override it.
+8. **Sticky tabs + overflow:** `overflow: hidden/clip` on any ancestor of `.view-tabs` breaks `position: sticky` in Safari. Always clamp overflow at the element level, not the container level.
+9. **Supabase free tier pause:** Project pauses after 7 days inactivity → 5–30s cold start on first load. Use UptimeRobot to ping every 3–4 days to prevent this.
 
 ---
 
@@ -205,3 +309,5 @@ git push origin main
 - All pages use `AppAuth.requireLogin()` or `AppAuth.requireAdmin()` as the entry point — never access DB directly without auth check
 - `WPDb.mapWP()` normalizes field aliases (e.g., `budget_bcb` ↔ `approved_budget_bcb`, `contract_amount_php` ↔ `total_awarded`)
 - `Fmt.money(v)` formats as `₱X.XXM`; `Fmt.moneyFull(v)` formats as `₱1,234,567`; `Fmt.date(d)` formats as `May 29, '26`
+- Charts use Chart.js loaded via CDN; chart functions are in `assets/js/charts.js`
+- Power BI chart functions: `budgetAwardedByPeriod`, `wpByTrade`, `wpStatusDonut`, `wpSubmittalDonut`, `wpByPeriodQuarterly`, `wpAgingBuckets`, `budgetByTradeHBar`, `budgetByPeriodPerTrade`, `budgetByTradeDonut`, `awardedByTradeDonut`
