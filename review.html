@@ -86,12 +86,21 @@
       <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading submissions…</span></div>
       <div id="main-content" style="display:none">
 
-        <!-- Project context bar -->
+        <!-- Filter bar: Project + Trade + Search -->
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
           <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Project</label>
-          <select id="proj-select" onchange="changeProject(this.value)" style="font-size:13px;padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-family:inherit;background:#fff;color:#231F20;min-width:220px;cursor:pointer">
-            <option value="ALL">All Projects (Consolidated)</option>
+          <select id="proj-select" onchange="changeProject(this.value)" style="font-size:13px;padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-family:inherit;background:#fff;color:#231F20;min-width:180px;cursor:pointer">
+            <option value="ALL">All Projects</option>
           </select>
+          <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Trade</label>
+          <select id="trade-filter" onchange="applyFilters()" style="font-size:13px;padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-family:inherit;background:#fff;color:#231F20;min-width:150px;cursor:pointer">
+            <option value="ALL">All Trades</option>
+          </select>
+          <div style="position:relative;flex:1;min-width:180px">
+            <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#bbb;font-size:13px;pointer-events:none"></i>
+            <input id="review-search" type="text" placeholder="Search WP No. or description…" oninput="applyFilters()"
+              style="width:100%;padding:7px 12px 7px 32px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
+          </div>
           <span id="proj-context-badge" style="display:none;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:#EE3124;color:#fff"></span>
         </div>
 
@@ -216,16 +225,37 @@
   };
 
   function renderAll() {
-    const pending  = allWPs.filter(w => w.review_status === 'pending_review');
-    const approved = allWPs.filter(w => w.review_status === 'approved');
-    const rejected = allWPs.filter(w => w.review_status === 'rejected');
+    // Populate trade filter dropdown
+    const tradeEl = document.getElementById('trade-filter');
+    if (tradeEl) {
+      const trades = [...new Set(allWPs.map(w => w.trade).filter(Boolean))].sort();
+      const cur = tradeEl.value;
+      tradeEl.innerHTML = '<option value="ALL">All Trades</option>' +
+        trades.map(t => `<option value="${t}" ${t===cur?'selected':''}>${t}</option>`).join('');
+    }
+    applyFilters();
+  }
+
+  window.applyFilters = function() {
+    const trade = (document.getElementById('trade-filter')?.value || 'ALL');
+    const q = (document.getElementById('review-search')?.value || '').toLowerCase().trim();
+    function filter(wps) {
+      return wps.filter(w => {
+        if (trade !== 'ALL' && w.trade !== trade) return false;
+        if (q && !((w.wp_no||'').toLowerCase().includes(q) || (w.description||'').toLowerCase().includes(q))) return false;
+        return true;
+      });
+    }
+    const pending  = filter(allWPs.filter(w => w.review_status === 'pending_review'));
+    const approved = filter(allWPs.filter(w => w.review_status === 'approved'));
+    const rejected = filter(allWPs.filter(w => w.review_status === 'rejected'));
     document.getElementById('ct-pending').textContent  = pending.length;
     document.getElementById('ct-approved').textContent = approved.length;
     document.getElementById('ct-rejected').textContent = rejected.length;
     renderPanel('panel-pending', pending, 'pending');
     renderPanel('panel-approved', approved, 'approved');
     renderPanel('panel-rejected', rejected, 'rejected');
-  }
+  };
 
   function fmtM(v) { if(v==null)return'—'; return'₱'+(v/1e6).toFixed(2)+'M'; }
   function fmtDate(d) { if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});}catch{return d;} }
