@@ -123,12 +123,13 @@ Work Packages
   └─ Review WPs (admin only, with pending badge)
 
 Claims (EOT)
-  ├─ Add Claim (→ claim-form.html?project=ID)
-  └─ Claims Register (→ project.html?tab=claims)
+  └─ Add Claim (→ claim-form.html?project=ID)
 
 Change Orders
-  ├─ Add Change Order (→ claim-form.html?project=ID&section=change-order)
-  └─ Change Orders (→ project.html?tab=change-orders)
+  └─ Add Change Order (→ claim-form.html?project=ID&section=change-order)
+
+Claims & Change Orders
+  └─ Register (→ project.html?tab=claims-register) — combined pending badge
 
 Tools
   └─ Download Template → opens picker modal (WP / Claims / Change Orders)
@@ -270,23 +271,19 @@ Claims and Change Orders share the `claims` Supabase table, distinguished by `cl
 - CSV Template and Import from CSV buttons in sidebar for both sections; import modals (`#claims-csv-modal`, `#cos-csv-modal`) embedded in the page with inline Download template links
 - `downloadClaimsCSVTemplate()`, `downloadCOsCSVTemplate()`, `importClaimsFromCSV()`, `importCOsFromCSV()` all available on this page
 
-### project.html — Claims tab (`view-claims`)
-- KPI strip: Total Claims, Client Claims, Vendor Claims, Total Claimed, Approved Amount, Pending Review
-- Filters: Party, Status, search
-- Table columns: Claim No., Type, Party, Description, Linked WP, Contractor, Date Filed, Claimed (₱M), Status, Approved (₱M), Actions
+### project.html — Claims & Change Orders tab (`view-claims-register`)
+- Single combined tab replaces the former separate Claims and Change Orders tabs
+- `data-view="claims-register"` — `switchView` also handles old `claims` / `change-orders` params for backwards compat
+- KPI strip: Total Claims (EOT), Total Change Orders, Total Claimed, Approved Amount, Pending Review
+- KPIs re-calculate when the Type filter changes
+- Filters: Type (All | Claims EOT | Change Orders), Party, Status, search
+- Action buttons: Add Claim + Add Change Order in the toolbar
+- Table columns: No., Type, Party, Description, Linked WP, Contractor, Date Filed, Claimed (₱M), Status, Approved (₱M), Actions
+- Edit links auto-include `&section=change-order` for Change Order rows
 - Admin actions per row: Edit, Approve (✓), Reject (✗), Delete
-- `renderClaimsKPIs()` / `renderClaimsView()` — driven by `allClaims` array (filtered to non-CO records)
-- `approveClaim(id)` — prompts for approved amount, sets `review_status: 'approved'`, `status: 'Approved'`
-- `rejectClaim(id, reason)` — sets `review_status: 'rejected'`, `status: 'Rejected'`, saves `review_notes`
-- Pending badge: `#claims-pending-badge` (sidebar) + `#claims-tab-badge` (tab)
-
-### project.html — Change Orders tab (`view-change-orders`)
-- Same structure as Claims tab but filtered to `claim_type === 'Change Order'`
-- KPI strip: Total Change Orders, Client COs, Vendor COs, Total Claimed, Approved Amount, Pending Review
-- Table columns: CO No., Party, Description, Linked WP, Contractor, Date Filed, Claimed (₱M), Status, Approved (₱M), Actions
-- `renderCOKPIs()` / `renderChangeOrdersView()` — driven by `allClaims` filtered to CO records
-- Reuses `approveClaim` / `rejectClaim` / `deleteClaim` functions
-- Pending badge: `#co-pending-badge` (sidebar) + `#co-tab-badge` (tab)
+- `renderClaimsRegisterKPIs()` / `renderClaimsRegister()` — driven by full `allClaims` array with client-side type filter
+- `approveClaim(id)` / `rejectClaim(id, reason)` / `deleteClaim(id)` — shared for both types
+- Single combined pending badge: `#claims-pending-badge` (sidebar) + `#claims-tab-badge` (tab)
 
 ### loadClaims()
 Fetches all `claims` for the project from Supabase, populates `allClaims[]`, updates all badges, and calls `renderClaimsKPIs()` + `renderClaimsView()`. Called once on page load and after any approve/reject/delete action.
