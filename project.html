@@ -76,7 +76,7 @@
           <span class="nbadge" id="review-badge" style="display:none">0</span>
         </a>
       </div>
-      <div class="sidebar-section">
+      <div class="sidebar-section" style="display:none">
         <div class="sidebar-section-label">Claims &amp; Change Order Register</div>
         <a class="nav-item" id="add-claim-link" href="claim-form.html"><i class="ti ti-file-plus"></i>Add Claim</a>
         <a class="nav-item" id="add-co-link" href="claim-form.html"><i class="ti ti-file-plus"></i>Add Change Order</a>
@@ -146,7 +146,7 @@
           <button class="view-tab" data-view="table" onclick="switchView('table')">
             <i class="ti ti-table"></i>WP List
           </button>
-          <button class="view-tab" data-view="claims-register" onclick="switchView('claims-register')">
+          <button class="view-tab" data-view="claims-register" onclick="switchView('claims-register')" style="display:none">
             <i class="ti ti-file-invoice"></i>Claims &amp; Change Orders
             <span class="tbadge" id="claims-tab-badge" style="display:none;background:#D97706">0</span>
           </button>
@@ -551,6 +551,7 @@ const COLS={
     {key:'submittal_type',label:'Submittal',w:'100px'},
     {key:'delivery_status',label:'Delivery',w:'130px'},
     {key:'contractor',label:'Contractor',w:'130px'},
+    {key:'claim_tag',label:'Tag',w:'120px'},
     {key:'remarks',label:'Remarks',w:'140px'},
   ],
 };
@@ -560,6 +561,17 @@ function toggleCol(grp){ colGroups[grp]=!colGroups[grp]; buildTable(); }
 
 function fmt(n){ if(n==null)return'—'; return'₱'+(Math.abs(n)/1e6).toFixed(1)+'M'; }
 function fmtDate(d){ if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});}catch{return d;} }
+function claimTagBadge(t) {
+  if (!t) return '<span style="color:#bbb">—</span>';
+  const map = {
+    'Extension of Time (EOT)': {bg:'#EFF6FF',c:'#2563EB'},
+    'Material Escalation':     {bg:'#FFF7ED',c:'#EA580C'},
+    'Labor Escalation':        {bg:'#FFFBEB',c:'#D97706'},
+    'Change Order':            {bg:'#F0FDF4',c:'#15803D'},
+  };
+  const {bg,c} = map[t] || {bg:'#F3F4F6',c:'#6B7280'};
+  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+t+'</span>';
+}
 function statusBadge(s){
   const c={Awarded:'#2D9B6F','Partially Awarded':'#D97706','Not Yet Awarded':'#EE3124'}[s]||'#999';
   return '<span style="font-size:10px;font-weight:600;color:'+c+'">'+(s||'—')+'</span>';
@@ -952,6 +964,7 @@ function buildTable(){
       submittal_type:submittalBadge(w.submittal_type||'Not Required'),
       delivery_status:deliveryBadge(w.delivery_status),
       contractor:w.contractor||'<span style="color:#bbb">—</span>',
+      claim_tag:claimTagBadge(w.claim_tag),
       remarks:'<span style="font-size:10px;color:#888">'+(w.remarks||'—')+'</span>',
     };
     const tr=document.createElement('tr');
