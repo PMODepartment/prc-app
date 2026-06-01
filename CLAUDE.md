@@ -194,8 +194,8 @@ Six-tab layout matching Power BI format:
 
 A single "Download Template" button in the sidebar Tools section opens a picker modal with three styled cards:
 - **Work Packages** — downloads `WPM_Import_Template.csv` via `downloadCSVTemplate()`
-- **Claims** — downloads `Claims_Import_Template.csv` via `downloadClaimsCSVTemplate()`
-- **Change Orders** — downloads `ChangeOrders_Import_Template.csv` via `downloadCOsCSVTemplate()`
+- **Claims** — disabled ("Coming soon"); greyed out, `cursor:not-allowed`, no onclick — pending Claims register completion
+- **Change Orders** — disabled ("Coming soon"); greyed out, `cursor:not-allowed`, no onclick — pending Claims register completion
 
 Present on: `project.html` (`#template-picker-modal`), `wp-form.html` (`#template-picker-modal`), `claim-form.html` (`#template-picker-modal`). All three download functions must be defined on each page that hosts the modal.
 
