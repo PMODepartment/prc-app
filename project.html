@@ -461,8 +461,10 @@
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
             <select id="cr-filter-type" onchange="renderClaimsRegister()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
               <option value="">All Types</option>
-              <option value="claim">Claims (EOT)</option>
-              <option value="co">Change Orders</option>
+              <option value="Extension of Time (EOT)">Extension of Time (EOT)</option>
+              <option value="Material Escalation">Material Escalation</option>
+              <option value="Labor Escalation">Labor Escalation</option>
+              <option value="Change Order">Change Orders</option>
             </select>
             <select id="cr-filter-party" onchange="renderClaimsRegister()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
               <option value="">All Parties</option>
@@ -975,12 +977,16 @@ let allClaims = [], _claimsPage = 1;
 const CLAIMS_PER_PAGE = 20;
 
 function claimTypeBadge(t) {
-  const isEOT = t && t.includes('EOT');
-  const bg = isEOT ? '#EFF6FF' : '#FFF7ED';
-  const c  = isEOT ? '#1D4ED8' : '#C2410C';
-  const lbl = isEOT ? 'EOT' : 'Change Order';
-  return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${bg};color:${c};white-space:nowrap">${lbl}</span>`;
+  const map = {
+    'Extension of Time (EOT)': { bg:'#EFF6FF', c:'#1D4ED8' },
+    'Material Escalation':     { bg:'#FFF7ED', c:'#C2410C' },
+    'Labor Escalation':        { bg:'#FAF5FF', c:'#7C3AED' },
+    'Change Order':            { bg:'#ECFDF5', c:'#059669' },
+  };
+  const { bg, c } = map[t] || { bg:'#F3F4F6', c:'#9CA3AF' };
+  return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${bg};color:${c}">${t||'—'}</span>`;
 }
+
 function claimPartyBadge(p) {
   const bg = p === 'Client' ? '#F0FDF4' : '#FFF7ED';
   const c  = p === 'Client' ? '#15803D'  : '#C2410C';
@@ -1020,8 +1026,7 @@ function renderClaimsRegisterKPIs() {
   if (!grid) return;
   const typeFilter = document.getElementById('cr-filter-type')?.value || '';
   let rows = allClaims;
-  if (typeFilter === 'claim') rows = rows.filter(c => c.claim_type !== 'Change Order');
-  else if (typeFilter === 'co') rows = rows.filter(c => c.claim_type === 'Change Order');
+  if (typeFilter) rows = rows.filter(c => c.claim_type === typeFilter);
 
   const totalClaims = allClaims.filter(c => c.claim_type !== 'Change Order').length;
   const totalCOs    = allClaims.filter(c => c.claim_type === 'Change Order').length;
@@ -1047,8 +1052,7 @@ window.renderClaimsRegister = function() {
   const isAdmin    = userProfile && ['admin','super_admin'].includes(userProfile.role);
 
   let rows = allClaims.filter(c => {
-    if (typeFilter === 'claim' && c.claim_type === 'Change Order') return false;
-    if (typeFilter === 'co'    && c.claim_type !== 'Change Order') return false;
+    if (typeFilter && c.claim_type !== typeFilter) return false;
     if (party  && c.party  !== party)  return false;
     if (status && c.status !== status) return false;
     if (q && !((c.claim_no||'').toLowerCase().includes(q) ||
@@ -1118,9 +1122,7 @@ window.renderClaimsRegister = function() {
 window.crPrev = function() { if (_crPage > 1) { _crPage--; renderClaimsRegister(); } };
 window.crNext = function() {
   const typeFilter = document.getElementById('cr-filter-type')?.value || '';
-  let filtered = allClaims;
-  if (typeFilter === 'claim') filtered = filtered.filter(c => c.claim_type !== 'Change Order');
-  else if (typeFilter === 'co') filtered = filtered.filter(c => c.claim_type === 'Change Order');
+  const filtered = typeFilter ? allClaims.filter(c => c.claim_type === typeFilter) : allClaims;
   const pages = Math.ceil(filtered.length / CLAIMS_PER_PAGE);
   if (_crPage < pages) { _crPage++; renderClaimsRegister(); }
 };
@@ -1545,10 +1547,11 @@ AppAuth.requireLogin(async (user, profile) => {
   }
 
   window.downloadClaimsCSVTemplate = function() {
-    const headers = ['Claim No.','Party','Description','Linked WP No.','Contractor / Client Name','Date Filed','Amount Claimed (PHP)','Basis / Grounds','Status','Remarks'];
-    const ex1 = ['CLM-001','Client','Extension of time due to design changes','WP-42','ABC Corp','05/15/2026','500000','Contract clause 12.3 — owner-caused delay','Filed','Pending resolution'];
-    const ex2 = ['CLM-002','Vendor','Additional material costs — steel price escalation','WP-15','XYZ Steel','06/01/2026','250000','Force majeure — global supply chain disruption','Under Review',''];
-    downloadCSVBlob([headers, ex1, ex2].map(r => r.map(v => `"${v}"`).join(',')).join('\n'), 'Claims_Import_Template.csv');
+    const headers = ['Claim No.','Claim Type','Party','Description','Linked WP No.','Contractor / Client Name','Date Filed','Amount Claimed (PHP)','Basis / Grounds','Status','Remarks'];
+    const ex1 = ['CLM-001','Extension of Time (EOT)','Client','Extension of time due to design changes','WP-42','ABC Corp','05/15/2026','500000','Contract clause 12.3 — owner-caused delay','Filed','Pending resolution'];
+    const ex2 = ['CLM-002','Material Escalation','Vendor','Steel price escalation — global supply disruption','WP-15','XYZ Steel','06/01/2026','250000','Force majeure — commodity price spike','Under Review',''];
+    const ex3 = ['CLM-003','Labor Escalation','Vendor','Labor cost increase due to DOLE wage order','WP-08','DEF Contractors','06/15/2026','180000','DOLE Wage Order No. 24','Filed',''];
+    downloadCSVBlob([headers, ex1, ex2, ex3].map(r => r.map(v => `"${v}"`).join(',')).join('\n'), 'Claims_Import_Template.csv');
   };
 
   window.downloadCOsCSVTemplate = function() {
@@ -1600,19 +1603,21 @@ AppAuth.requireLogin(async (user, profile) => {
       const userId = (await sb.auth.getUser()).data.user.id;
       const rows = claimsCSVFileData.slice(1).map(l => parseCSVRowGeneric(l)).filter(r => r[2]);
       for (const r of rows) {
+        const validClaimTypes = ['Extension of Time (EOT)','Material Escalation','Labor Escalation'];
+        const claimType = validClaimTypes.includes(r[1]) ? r[1] : 'Extension of Time (EOT)';
         await sb.from('claims').insert({
           project_id: projId,
           claim_no: r[0] || null,
-          claim_type: 'Extension of Time (EOT)',
-          party: r[1] || null,
-          description: r[2],
-          wp_no: r[3] || null,
-          contractor: r[4] || null,
-          date_filed: parseCSVDateGeneric(r[5]),
-          amount_claimed: parseFloat(r[6]) || null,
-          basis: r[7] || null,
-          status: r[8] || 'Filed',
-          remarks: r[9] || null,
+          claim_type: claimType,
+          party: r[2] || null,
+          description: r[3],
+          wp_no: r[4] || null,
+          contractor: r[5] || null,
+          date_filed: parseCSVDateGeneric(r[6]),
+          amount_claimed: parseFloat(r[7]) || null,
+          basis: r[8] || null,
+          status: r[9] || 'Filed',
+          remarks: r[10] || null,
           submitted_by: userId,
           review_status: isAdmin ? 'approved' : 'pending_review',
         });

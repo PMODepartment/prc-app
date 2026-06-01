@@ -118,7 +118,7 @@
 
           <!-- Claim Identity -->
           <div class="form-section">
-            <div class="form-section-title"><i class="ti ti-file-invoice" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Claim Details</div>
+            <div class="form-section-title" id="form-section-title-details"><i class="ti ti-file-invoice" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Claim Details</div>
             <div class="form-grid">
               <div class="form-group">
                 <label>Project *</label>
@@ -128,12 +128,14 @@
                 <label id="label-claim-no">Claim No.</label>
                 <input type="text" id="f-claim-no" placeholder="Auto-generated if blank, e.g. CLM-001"/>
               </div>
-              <div class="form-group">
+              <div class="form-group" id="claim-type-group">
                 <label>Claim Type *</label>
                 <select id="f-claim-type">
-                  <option value="">— Select —</option>
+                  <option value="">— Select Type —</option>
                   <option value="Extension of Time (EOT)">Extension of Time (EOT)</option>
-                  <option value="Change Order">Change Order (Additional Works)</option>
+                  <option value="Material Escalation">Material Escalation</option>
+                  <option value="Labor Escalation">Labor Escalation</option>
+                  <option value="Change Order">Change Order</option>
                 </select>
               </div>
               <div class="form-group">
@@ -243,6 +245,10 @@
     document.getElementById('sb-new-claim-link').classList.add('active');
   }
 
+  // Update section title
+  const sectionTitleEl = document.getElementById('form-section-title-details');
+  if (sectionTitleEl) sectionTitleEl.innerHTML = `<i class="ti ti-file-invoice" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>${isCO ? 'Change Order Details' : 'Claim Details'}`;
+
   // Update bulk import banner label to match section
   const bannerTitle = document.getElementById('import-banner-title');
   if (bannerTitle) bannerTitle.textContent = isCO ? 'Bulk Import Change Orders via CSV' : 'Bulk Import Claims via CSV';
@@ -262,15 +268,13 @@
   window.openTemplatePickerModal  = () => document.getElementById('template-picker-modal').style.display = 'flex';
   window.closeTemplatePickerModal = () => document.getElementById('template-picker-modal').style.display = 'none';
 
-  // Lock claim type dropdown based on section
+  // Claim type: visible + selectable for Claims; hidden + locked for Change Orders
   const claimTypeEl = document.getElementById('f-claim-type');
   if (isCO) {
     claimTypeEl.value = 'Change Order';
-    claimTypeEl.closest('.form-group').style.display = 'none'; // hide — locked to Change Order
-  } else {
-    claimTypeEl.value = 'Extension of Time (EOT)';
-    claimTypeEl.closest('.form-group').style.display = 'none'; // hide — locked to EOT/Claim
+    document.getElementById('claim-type-group').style.display = 'none';
   }
+  // For Claims, the dropdown stays visible so the user picks EOT / Material / Labor
 
   function fmtPeso(v) {
     if (!v) return '';
@@ -415,10 +419,11 @@
   };
 
   window.downloadClaimsCSVTemplate = function() {
-    const h = ['Claim No.','Party','Description','Linked WP No.','Contractor / Client Name','Date Filed','Amount Claimed (PHP)','Basis / Grounds','Status','Remarks'];
-    const r1 = ['CLM-001','Client','Extension of time due to design changes','WP-42','ABC Corp','05/15/2026','500000','Contract clause 12.3 — owner-caused delay','Filed','Pending resolution'];
-    const r2 = ['CLM-002','Vendor','Additional material costs — steel price escalation','WP-15','XYZ Steel','06/01/2026','250000','Force majeure — global supply chain disruption','Under Review',''];
-    downloadCSVBlob([h,r1,r2].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n'), 'Claims_Import_Template.csv');
+    const h = ['Claim No.','Claim Type','Party','Description','Linked WP No.','Contractor / Client Name','Date Filed','Amount Claimed (PHP)','Basis / Grounds','Status','Remarks'];
+    const r1 = ['CLM-001','Extension of Time (EOT)','Client','Extension of time due to design changes','WP-42','ABC Corp','05/15/2026','500000','Contract clause 12.3','Filed',''];
+    const r2 = ['CLM-002','Material Escalation','Vendor','Steel price escalation','WP-15','XYZ Steel','06/01/2026','250000','Force majeure','Under Review',''];
+    const r3 = ['CLM-003','Labor Escalation','Vendor','Labor cost increase — DOLE wage order','WP-08','DEF Contractors','06/15/2026','180000','DOLE Wage Order No. 24','Filed',''];
+    downloadCSVBlob([h,r1,r2,r3].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n'), 'Claims_Import_Template.csv');
   };
 
   window.downloadCOsCSVTemplate = function() {
@@ -471,26 +476,33 @@
   window.handleClaimsCSVFile = f => handleCSVUpload(f, 'claims-csv-modal', '_claimsCSV', 'claim');
   window.handleCOsCSVFile    = f => handleCSVUpload(f, 'cos-csv-modal', '_cosCSV', 'change order');
 
-  async function importFromCSV(csvVar, claimType, modalId, tabTarget) {
+  async function importFromCSV(csvVar, fixedClaimType, modalId, tabTarget) {
     const lines = window[csvVar];
     if (!lines) return;
     const btn = document.getElementById(modalId + '-btn');
     const errEl = document.getElementById(modalId + '-error');
     btn.textContent = 'Importing…'; btn.disabled = true; errEl.style.display = 'none';
+    const validClaimTypes = ['Extension of Time (EOT)','Material Escalation','Labor Escalation'];
     try {
       const isAdmin = AppAuth.isAdmin(userProfile);
       const sb = await getSB();
       const userId = (await sb.auth.getUser()).data.user.id;
       const pid = document.getElementById('f-project').value || projId;
       if (!pid) throw new Error('No project selected. Please select a project first.');
-      const rows = lines.slice(1).map(parseCSVRow).filter(r => r[2]);
+      // Claims CSV has Claim Type in col 1; CO CSV has no type col (fixedClaimType used)
+      const hasCsvType = fixedClaimType !== 'Change Order';
+      const rows = lines.slice(1).map(parseCSVRow).filter(r => hasCsvType ? r[3] : r[2]);
       for (const r of rows) {
+        const claimType = hasCsvType
+          ? (validClaimTypes.includes(r[1]) ? r[1] : 'Extension of Time (EOT)')
+          : fixedClaimType;
+        const offset = hasCsvType ? 1 : 0; // Claims CSV has extra Claim Type column
         await sb.from('claims').insert({
           project_id: pid, claim_type: claimType,
-          claim_no: r[0] || null, party: r[1] || null, description: r[2],
-          wp_no: r[3] || null, contractor: r[4] || null,
-          date_filed: parseCSVDate(r[5]), amount_claimed: parseFloat(r[6]) || null,
-          basis: r[7] || null, status: r[8] || 'Filed', remarks: r[9] || null,
+          claim_no: r[0] || null, party: r[1+offset] || null, description: r[2+offset],
+          wp_no: r[3+offset] || null, contractor: r[4+offset] || null,
+          date_filed: parseCSVDate(r[5+offset]), amount_claimed: parseFloat(r[6+offset]) || null,
+          basis: r[7+offset] || null, status: r[8+offset] || 'Filed', remarks: r[9+offset] || null,
           submitted_by: userId, review_status: isAdmin ? 'approved' : 'pending_review',
         });
       }
