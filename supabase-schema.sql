@@ -66,8 +66,9 @@ create table if not exists work_packages (
   target_completion     date,
 
   -- Procurement Status
-  procurement_status    text default 'Not Started',  -- Not Started | Sourcing | RFQ | Bid Open | Bid Closed | LOA | Contract | Mob/Del
+  procurement_status    text default 'Not Started',  -- Not Started | Sourcing | Solicitation | Evaluation | Negotiation | Awarded
   award_status          text default 'Not Yet Awarded',  -- Not Yet Awarded | Partially Awarded | Awarded
+  delivery_status       text default 'Not Awarded',  -- Not Awarded | Awarded | Detailed Drawings | Production | In-Transit Delivery | Installation | Delivered | Not Installed | DP Processing
   awarding_status       text,   -- DUE | NOT DUE
   purchase_request      text,   -- WITH PR | WITHOUT PR
   responsible_team      text,
@@ -92,7 +93,7 @@ create table if not exists work_packages (
   requires_approval     boolean default false,
   approver_name         text,
   approval_date         date,
-  submittal_type        text,   -- Not Required | Not Submitted | Submitted | Approved
+  submittal_type        text default 'Not Required',   -- Not Required | Submitted | Approved
 
   -- Payment Terms
   payment_terms_days    integer,

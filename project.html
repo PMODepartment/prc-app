@@ -188,7 +188,7 @@
                 <thead><tr>
                   <th>WP No.</th><th>Description</th><th>Status</th>
                   <th>Budget (BCB)</th><th>Awarded</th><th>Variance</th><th>% Var</th>
-                  <th>Planned Award</th><th>Actual Award</th><th>Aging</th><th>Submittal</th><th>Delivery</th>
+                  <th>Planned Award</th><th>Actual Award</th><th>Aging</th><th>Submittal</th><th>Delivery</th><th>Award Status</th>
                 </tr></thead>
                 <tbody id="monitoring-tbody"></tbody>
               </table>
@@ -355,7 +355,7 @@
                 <thead><tr>
                   <th>WP No.</th><th>Description</th><th>Trade</th>
                   <th>Planned Award</th><th>Actual Award</th><th>Aging (d)</th>
-                  <th>Budget (BCB)</th><th>Status</th><th>Submittal</th><th>Target Delivery</th>
+                  <th>Budget (BCB)</th><th>Proc. Status</th><th>Submittal</th><th>Delivery Status</th>
                 </tr></thead>
                 <tbody id="sched-tbody"></tbody>
               </table>
@@ -479,6 +479,9 @@ const COLS={
     {key:'total_awarded',label:'Total Awarded',w:'100px'},
     {key:'variance',label:'Variance (₱)',w:'100px'},
     {key:'award_status',label:'Award Status',w:'120px'},
+    {key:'procurement_status',label:'Proc. Status',w:'120px'},
+    {key:'submittal_type',label:'Submittal',w:'100px'},
+    {key:'delivery_status',label:'Delivery',w:'130px'},
     {key:'contractor',label:'Contractor',w:'130px'},
     {key:'remarks',label:'Remarks',w:'140px'},
   ],
@@ -491,7 +494,43 @@ function fmt(n){ if(n==null)return'—'; return'₱'+(Math.abs(n)/1e6).toFixed(1
 function fmtDate(d){ if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'2-digit'});}catch{return d;} }
 function statusBadge(s){
   const c={Awarded:'#2D9B6F','Partially Awarded':'#D97706','Not Yet Awarded':'#EE3124'}[s]||'#999';
-  return '<span style="font-size:10px;font-weight:600;color:'+c+'">'+( s||'—')+'</span>';
+  return '<span style="font-size:10px;font-weight:600;color:'+c+'">'+(s||'—')+'</span>';
+}
+function procStatusBadge(s){
+  const map={
+    'Not Started':  {bg:'#F3F4F6',c:'#6B7280'},
+    'Sourcing':     {bg:'#EFF6FF',c:'#3B82F6'},
+    'Solicitation': {bg:'#F0FDF4',c:'#16A34A'},
+    'Evaluation':   {bg:'#FFFBEB',c:'#D97706'},
+    'Negotiation':  {bg:'#FFF7ED',c:'#EA580C'},
+    'Awarded':      {bg:'#F0FDF4',c:'#15803D'},
+  };
+  const {bg,c}=map[s]||{bg:'#F3F4F6',c:'#9CA3AF'};
+  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+(s||'—')+'</span>';
+}
+function submittalBadge(s){
+  const map={
+    'Not Required': {bg:'#F3F4F6',c:'#9CA3AF'},
+    'Submitted':    {bg:'#EFF6FF',c:'#2563EB'},
+    'Approved':     {bg:'#F0FDF4',c:'#15803D'},
+  };
+  const {bg,c}=map[s]||{bg:'#F3F4F6',c:'#9CA3AF'};
+  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+(s||'—')+'</span>';
+}
+function deliveryBadge(s){
+  const map={
+    'Not Awarded':      {bg:'#FEF2F2',c:'#DC2626'},
+    'Awarded':          {bg:'#F0FDF4',c:'#15803D'},
+    'Detailed Drawings':{bg:'#EFF6FF',c:'#2563EB'},
+    'Production':       {bg:'#FFFBEB',c:'#D97706'},
+    'In-Transit Delivery':{bg:'#F5F3FF',c:'#7C3AED'},
+    'Installation':     {bg:'#ECFDF5',c:'#059669'},
+    'Delivered':        {bg:'#F0FDF4',c:'#15803D'},
+    'Not Installed':    {bg:'#FFF7ED',c:'#EA580C'},
+    'DP Processing':    {bg:'#F0F9FF',c:'#0369A1'},
+  };
+  const {bg,c}=map[s]||{bg:'#F3F4F6',c:'#9CA3AF'};
+  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+(s||'—')+'</span>';
 }
 
 function switchView(v) {
@@ -528,10 +567,7 @@ function getFiltered(){
 }
 
 function submittalLabel(w){
-  if(w.review_status==='approved') return 'Approved';
-  if(w.review_status==='pending_review') return 'Submitted';
-  if(w.review_status==='rejected') return 'Rejected';
-  return 'Not Submitted';
+  return w.submittal_type || 'Not Required';
 }
 
 function buildMetrics(wps){
@@ -583,8 +619,8 @@ function renderOverview(){
     const submittal = submittalLabel(w);
     return `<tr>
       <td><span class="td-code">${w.wp_no||'—'}</span></td>
-      <td style="font-size:11px;max-width:200px">${w.description||'—'}</td>
-      <td>${statusBadge(w.award_status)}</td>
+      <td style="font-size:11px;max-width:180px">${w.description||'—'}</td>
+      <td>${procStatusBadge(w.procurement_status)}</td>
       <td style="text-align:right">${(bud/1e6).toFixed(1)} M</td>
       <td style="text-align:right">${awd>0?(awd/1e6).toFixed(1)+' M':'—'}</td>
       <td style="text-align:right;color:${vari>=0?'#2D9B6F':'#EE3124'};font-weight:600">${vari>=0?'+':''}${(vari/1e6).toFixed(1)} M</td>
@@ -592,10 +628,11 @@ function renderOverview(){
       <td>${fmtDate(w.awarding_date)}</td>
       <td>${fmtDate(w.actual_awarding_date)}</td>
       <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
-      <td style="font-size:11px;color:#555">${submittal}</td>
-      <td>${fmtDate(w.target_delivery || w.target_completion)}</td>
+      <td>${submittalBadge(submittal)}</td>
+      <td>${deliveryBadge(w.delivery_status)}</td>
+      <td>${statusBadge(w.award_status)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="12" style="text-align:center;color:#aaa;padding:20px">No data</td></tr>';
+  }).join('') || '<tr><td colspan="13" style="text-align:center;color:#aaa;padding:20px">No data</td></tr>';
   renderTop5(f);
 }
 
@@ -732,9 +769,9 @@ function renderSchedule(){
       <td>${fmtDate(w.actual_awarding_date)}</td>
       <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
       <td style="text-align:right">${((w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
-      <td>${statusBadge(w.award_status)}</td>
-      <td style="font-size:11px;color:#555">${submittalLabel(w)}</td>
-      <td>${fmtDate(w.target_delivery || w.target_completion)}</td>
+      <td>${procStatusBadge(w.procurement_status)}</td>
+      <td>${submittalBadge(submittalLabel(w))}</td>
+      <td>${deliveryBadge(w.delivery_status)}</td>
     </tr>`;
   }).join('');
 }
@@ -839,6 +876,9 @@ function buildTable(){
       total_awarded:fmt(w.total_awarded),
       variance:w.variance!=null?'<span style="color:'+(w.variance>=0?'#2D9B6F':'#EE3124')+';font-weight:600">'+(w.variance>=0?'+':'')+fmt(w.variance)+'</span>':'—',
       award_status:statusBadge(w.award_status),
+      procurement_status:procStatusBadge(w.procurement_status),
+      submittal_type:submittalBadge(w.submittal_type||'Not Required'),
+      delivery_status:deliveryBadge(w.delivery_status),
       contractor:w.contractor||'<span style="color:#bbb">—</span>',
       remarks:'<span style="font-size:10px;color:#888">'+(w.remarks||'—')+'</span>',
     };
