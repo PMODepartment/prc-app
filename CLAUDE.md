@@ -122,14 +122,10 @@ Work Packages
   ├─ Add Work Package
   └─ Review WPs (admin only, with pending badge)
 
-Claims (EOT)
-  └─ Add Claim (→ claim-form.html?project=ID)
-
-Change Orders
-  └─ Add Change Order (→ claim-form.html?project=ID&section=change-order)
-
-Claims & Change Orders
-  └─ Register (→ project.html?tab=claims-register) — combined pending badge
+Claims & Change Order Register
+  ├─ Add Claim (→ claim-form.html?project=ID)
+  ├─ Add Change Order (→ claim-form.html?project=ID&section=change-order)
+  └─ View Register (→ project.html?tab=claims-register) — combined pending badge
 
 Tools
   └─ Download Template → opens picker modal (WP / Claims / Change Orders)
@@ -201,7 +197,7 @@ Six-tab layout matching Power BI format:
 
 A single "Download Template" button in the sidebar Tools section opens a picker modal with three styled cards:
 - **Work Packages** — downloads `WPM_Import_Template.csv` via `downloadCSVTemplate()`
-- **Claims (EOT)** — downloads `Claims_Import_Template.csv` via `downloadClaimsCSVTemplate()`
+- **Claims** — downloads `Claims_Import_Template.csv` via `downloadClaimsCSVTemplate()`
 - **Change Orders** — downloads `ChangeOrders_Import_Template.csv` via `downloadCOsCSVTemplate()`
 
 Present on: `project.html` (`#template-picker-modal`), `wp-form.html` (`#template-picker-modal`), `claim-form.html` (`#template-picker-modal`). All three download functions must be defined on each page that hosts the modal.
@@ -265,7 +261,7 @@ Claims and Change Orders share the `claims` Supabase table, distinguished by `cl
 - Claim status options: Draft, Filed, Under Review, Approved, Partially Approved, Rejected, Withdrawn
 - `claim_type` dropdown is **visible** for Claims mode (user selects: EOT / Material Escalation / Labor Escalation); **hidden + locked** to 'Change Order' in CO mode
 - Section title updates: "Claim Details" for claims, "Change Order Details" for CO
-- Sidebar shows Work Packages, Claims (EOT), Change Orders, and Tools sections regardless of mode
+- Sidebar shows Work Packages, Claims & Change Order Register, and Tools sections regardless of mode
 - Work Packages section: Add Work Package (→ `wp-form.html?project=ID`) + Review WPs (admin only, → `review.html?project=ID`)
 - Active link highlighted based on `isCO`
 - `updateSidebarLinks(pid)` wires all sidebar hrefs with project ID — called on both new and edit modes
@@ -372,6 +368,12 @@ Logo is styled globally in `dashboard.css`:
 7. **READ-ONLY badge inline style:** Never add `display:inline-flex` as an inline style to `.topbar-badge-readonly` — the mobile media query sets `display:none` and inline styles override it.
 8. **Sticky tabs + overflow:** `overflow: hidden/clip` on any ancestor of `.view-tabs` breaks `position: sticky` in Safari. Always clamp overflow at the element level, not the container level.
 9. **Supabase free tier pause:** Project pauses after 7 days inactivity → 5–30s cold start on first load. Use UptimeRobot to ping every 3–4 days to prevent this.
+
+---
+
+## Workflow Rules
+
+- **After every prompt:** Update the relevant sections of this CLAUDE.md file to reflect what was added, fixed, or changed, then commit and push all modified files (including CLAUDE.md) to `origin/main`.
 
 ---
 
