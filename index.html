@@ -108,6 +108,7 @@
             <button class="view-tab" onclick="switchTab('schedule')"><i class="ti ti-calendar"></i>Schedule</button>
             <button class="view-tab" onclick="switchTab('works')"><i class="ti ti-tool"></i>Works</button>
             <button class="view-tab" onclick="switchTab('wplist')"><i class="ti ti-table"></i>WP List</button>
+            <button class="view-tab" onclick="switchTab('claims')"><i class="ti ti-file-invoice"></i>Claims</button>
           </div>
         </div>
 
@@ -329,6 +330,68 @@
           </div>
         </div>
 
+        <!-- ══ CLAIMS TAB ══ -->
+        <div id="tab-claims" style="display:none">
+
+          <!-- KPI strip -->
+          <div class="metrics-grid" id="cl-kpi-grid" style="margin-bottom:14px"></div>
+
+          <!-- Summary cards: EOT vs Change Order, Client vs Vendor -->
+          <div class="grid-2" style="margin-bottom:14px">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-file-invoice"></i>Claims by Type</div>
+              <div id="cl-by-type" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-users"></i>Claims by Party</div>
+              <div id="cl-by-party" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"></div>
+            </div>
+          </div>
+
+          <!-- Filter + table -->
+          <div class="panel" style="padding:0;overflow:hidden">
+            <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <div class="panel-title" style="margin:0;flex-shrink:0"><i class="ti ti-table"></i>Claims Register</div>
+              <select id="cl-f-type" onchange="filterClaimsTable()" style="padding:5px 9px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:11px;font-family:inherit;background:#fff">
+                <option value="">All Types</option>
+                <option value="Extension of Time (EOT)">EOT</option>
+                <option value="Change Order">Change Order</option>
+              </select>
+              <select id="cl-f-party" onchange="filterClaimsTable()" style="padding:5px 9px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:11px;font-family:inherit;background:#fff">
+                <option value="">All Parties</option>
+                <option value="Client">Client</option>
+                <option value="Vendor">Vendor</option>
+              </select>
+              <select id="cl-f-status" onchange="filterClaimsTable()" style="padding:5px 9px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:11px;font-family:inherit;background:#fff">
+                <option value="">All Statuses</option>
+                <option>Draft</option><option>Filed</option><option>Under Review</option>
+                <option>Approved</option><option>Partially Approved</option>
+                <option>Rejected</option><option>Withdrawn</option>
+              </select>
+              <div style="position:relative;margin-left:auto">
+                <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:12px;pointer-events:none"></i>
+                <input id="cl-f-search" type="text" placeholder="Search claims..." oninput="filterClaimsTable()"
+                  style="padding:5px 9px 5px 26px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:11px;font-family:inherit;outline:none;width:200px">
+              </div>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="data-table" id="cl-table" style="font-size:11px;min-width:900px">
+                <thead><tr>
+                  <th>Project</th><th>Claim No.</th><th>Type</th><th>Party</th>
+                  <th>Description</th><th>Linked WP</th><th>Date Filed</th>
+                  <th style="text-align:right">Claimed (&#x20B1;M)</th>
+                  <th>Status</th>
+                  <th style="text-align:right">Approved (&#x20B1;M)</th>
+                </tr></thead>
+                <tbody id="cl-tbody">
+                  <tr><td colspan="10" style="text-align:center;color:#aaa;padding:20px">Loading claims...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="cl-pager" style="padding:10px 16px;font-size:11px;color:#888;display:flex;align-items:center;gap:8px;border-top:1px solid #f0f0f0"></div>
+          </div>
+        </div><!-- /tab-claims -->
+
       </div><!-- /main-content -->
     </div><!-- /content -->
   </div><!-- /main -->
@@ -373,9 +436,13 @@
     renderIndexNav();
     window.__sidebarRefresh = renderIndexNav;
 
-    // Load all WPs
-    const wpArrays = await Promise.all(permitted.map(p => WPDb.getApprovedWPs(p.id)));
+    // Load all WPs + all Claims in parallel
+    const [wpArrays, claimsResult] = await Promise.all([
+      Promise.all(permitted.map(p => WPDb.getApprovedWPs(p.id))),
+      (async () => { const sb = await getSB(); const { data } = await sb.from('claims').select('*').order('created_at', { ascending: false }); return data || []; })()
+    ]);
     const _allWPs = wpArrays.flat();
+    let _allClaims = claimsResult;
 
     // Project filter state
     let _activeIds = new Set(permitted.map(p => p.id));
@@ -405,7 +472,7 @@
     }
 
     // ── Tab switching ─────────────────────────────────────────────
-    const ALL_TABS = ['overview','backlog','budget','schedule','works','wplist'];
+    const ALL_TABS = ['overview','backlog','budget','schedule','works','wplist','claims'];
     let _activeTab = 'overview';
     window.switchTab = function(tab) {
       _activeTab = tab;
@@ -416,6 +483,7 @@
       document.querySelectorAll('#view-tabs .view-tab').forEach((btn, i) => {
         btn.classList.toggle('active', ALL_TABS[i] === tab);
       });
+      if (tab === 'claims') { renderClaimsTab(); return; }
       // Lazy-render charts when tab first becomes visible
       if (!_rendered[tab] && _lastWPs) { _renderTab(tab, _lastWPs, _lastFilt, _lastStats); _rendered[tab] = true; }
     };
@@ -649,6 +717,8 @@
       _lastWPs = filtWPs; _lastFilt = filt; _lastStats = allStats;
       // Reset rendered flags so filter changes re-render all tabs
       ALL_TABS.forEach(t => { _rendered[t] = false; });
+      // If claims tab is active, re-render it immediately
+      if (_activeTab === 'claims') renderClaimsTab();
 
       // Shared KPIs (Overview)
       const now        = new Date();
@@ -718,6 +788,147 @@
       _renderTab(_activeTab, filtWPs, filt, allStats);
       _rendered[_activeTab] = true;
     }
+
+    // ══ CLAIMS TAB ═══════════════════════════════════════════════════
+    let _clFiltered = [], _clPage = 1;
+    const CL_PER_PAGE = 25;
+
+    function clTypeBadge(t) {
+      const isEOT = t && t.includes('EOT');
+      return `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${isEOT?'#EFF6FF':'#FFF7ED'};color:${isEOT?'#1D4ED8':'#C2410C'};white-space:nowrap">${isEOT?'EOT':'Change Order'}</span>`;
+    }
+    function clPartyBadge(p) {
+      return `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${p==='Client'?'#F0FDF4':'#FFF7ED'};color:${p==='Client'?'#15803D':'#C2410C'}">${p||'—'}</span>`;
+    }
+    function clStatusBadge(s) {
+      const m={'Draft':'#F3F4F6|#6B7280','Filed':'#EFF6FF|#2563EB','Under Review':'#FFFBEB|#D97706','Approved':'#F0FDF4|#15803D','Partially Approved':'#ECFDF5|#059669','Rejected':'#FEF2F2|#DC2626','Withdrawn':'#F3F4F6|#9CA3AF'};
+      const [bg,c]=(m[s]||'#F3F4F6|#9CA3AF').split('|');
+      return `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${bg};color:${c}">${s||'—'}</span>`;
+    }
+
+    function renderClaimsTab() {
+      // Filter to active projects only
+      const activeIds = [..._activeIds];
+      const claims = _allClaims.filter(c => activeIds.includes(c.project_id));
+
+      // KPIs
+      const grid = document.getElementById('cl-kpi-grid');
+      if (grid) {
+        const total    = claims.length;
+        const eot      = claims.filter(c => c.claim_type && c.claim_type.includes('EOT')).length;
+        const co       = claims.filter(c => c.claim_type && c.claim_type.includes('Change')).length;
+        const client   = claims.filter(c => c.party === 'Client').length;
+        const vendor   = claims.filter(c => c.party === 'Vendor').length;
+        const pending  = claims.filter(c => c.review_status === 'pending_review').length;
+        const claimed  = claims.reduce((s,c)=>s+(c.amount_claimed||0),0);
+        const approved = claims.filter(c=>['Approved','Partially Approved'].includes(c.status))
+                               .reduce((s,c)=>s+(c.approved_amount||0),0);
+        grid.innerHTML = [
+          {label:'Total Claims',   val:total},
+          {label:'EOT Claims',     val:eot,     style:'color:#1D4ED8'},
+          {label:'Change Orders',  val:co,      style:'color:#C2410C'},
+          {label:'Client Claims',  val:client,  style:'color:#15803D'},
+          {label:'Vendor Claims',  val:vendor,  style:'color:#D97706'},
+          {label:'Total Claimed',  val:'&#x20B1;'+(claimed/1e6).toFixed(2)+'M'},
+          {label:'Approved',       val:'&#x20B1;'+(approved/1e6).toFixed(2)+'M', style:'color:#15803D'},
+          {label:'Pending Review', val:pending, style:pending?'color:#EE3124':''},
+        ].map(k=>`<div class="metric-card"><div class="metric-value" style="${k.style||''}">${k.val}</div><div class="metric-label">${k.label}</div></div>`).join('');
+      }
+
+      // By-type summary
+      const byType = document.getElementById('cl-by-type');
+      if (byType) {
+        const types = ['Extension of Time (EOT)', 'Change Order'];
+        byType.innerHTML = types.map(t => {
+          const c = claims.filter(x => x.claim_type === t);
+          const am = c.reduce((s,x)=>s+(x.amount_claimed||0),0);
+          const isEOT = t.includes('EOT');
+          return `<div style="flex:1;min-width:140px;padding:12px 16px;border-radius:10px;background:${isEOT?'#EFF6FF':'#FFF7ED'};border:1.5px solid ${isEOT?'#BFDBFE':'#FED7AA'}">
+            <div style="font-size:11px;font-weight:700;color:${isEOT?'#1D4ED8':'#C2410C'};margin-bottom:6px">${isEOT?'Extension of Time (EOT)':'Change Order'}</div>
+            <div style="font-size:22px;font-weight:800;color:#231F20">${c.length}</div>
+            <div style="font-size:10px;color:#888;margin-top:2px">&#x20B1;${(am/1e6).toFixed(2)}M claimed</div>
+            <div style="font-size:10px;color:#888;margin-top:2px">Client: ${c.filter(x=>x.party==='Client').length} &nbsp; Vendor: ${c.filter(x=>x.party==='Vendor').length}</div>
+          </div>`;
+        }).join('');
+      }
+
+      // By-party summary
+      const byParty = document.getElementById('cl-by-party');
+      if (byParty) {
+        ['Client','Vendor'].forEach((party, i) => {
+          const c = claims.filter(x => x.party === party);
+          const am = c.reduce((s,x)=>s+(x.amount_claimed||0),0);
+          const apv = c.filter(x=>['Approved','Partially Approved'].includes(x.status)).reduce((s,x)=>s+(x.approved_amount||0),0);
+          byParty.innerHTML += `<div style="flex:1;min-width:140px;padding:12px 16px;border-radius:10px;background:${party==='Client'?'#F0FDF4':'#FFF7ED'};border:1.5px solid ${party==='Client'?'#BBF7D0':'#FED7AA'}">
+            <div style="font-size:11px;font-weight:700;color:${party==='Client'?'#15803D':'#C2410C'};margin-bottom:6px">${party}</div>
+            <div style="font-size:22px;font-weight:800;color:#231F20">${c.length}</div>
+            <div style="font-size:10px;color:#888;margin-top:2px">&#x20B1;${(am/1e6).toFixed(2)}M claimed</div>
+            <div style="font-size:10px;color:#2D9B6F;margin-top:2px">&#x20B1;${(apv/1e6).toFixed(2)}M approved</div>
+          </div>`;
+        });
+      }
+
+      filterClaimsTable(claims);
+    }
+
+    window.filterClaimsTable = function(claimsInput) {
+      const activeIds = [..._activeIds];
+      const base = claimsInput || _allClaims.filter(c => activeIds.includes(c.project_id));
+      const type   = document.getElementById('cl-f-type')?.value   || '';
+      const party  = document.getElementById('cl-f-party')?.value  || '';
+      const status = document.getElementById('cl-f-status')?.value || '';
+      const q      = (document.getElementById('cl-f-search')?.value || '').toLowerCase().trim();
+      _clFiltered = base.filter(c => {
+        if (type   && c.claim_type !== type)   return false;
+        if (party  && c.party      !== party)  return false;
+        if (status && c.status     !== status) return false;
+        if (q && !((c.claim_no||'').toLowerCase().includes(q) ||
+                   (c.description||'').toLowerCase().includes(q) ||
+                   (c.project_id||'').toLowerCase().includes(q) ||
+                   (c.contractor||'').toLowerCase().includes(q))) return false;
+        return true;
+      });
+      _clPage = 1;
+      renderClaimsTablePage();
+    };
+
+    function renderClaimsTablePage() {
+      const tbody = document.getElementById('cl-tbody');
+      const pager = document.getElementById('cl-pager');
+      if (!tbody) return;
+      const total = _clFiltered.length;
+      const pages = Math.max(1, Math.ceil(total / CL_PER_PAGE));
+      _clPage = Math.min(_clPage, pages);
+      const page = _clFiltered.slice((_clPage-1)*CL_PER_PAGE, _clPage*CL_PER_PAGE);
+      if (!page.length) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#aaa;padding:24px">No claims found.</td></tr>`;
+      } else {
+        tbody.innerHTML = page.map(c => `<tr style="${c.review_status==='pending_review'?'background:#FFFBEB':''}">
+          <td style="font-weight:600;color:#444;font-size:11px">${c.project_id||'—'}</td>
+          <td style="font-size:11px;font-weight:600">${c.claim_no||'—'}</td>
+          <td>${clTypeBadge(c.claim_type)}</td>
+          <td>${clPartyBadge(c.party)}</td>
+          <td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(c.description||'').replace(/"/g,'&quot;')}">${(c.description||'—').slice(0,50)}${(c.description||'').length>50?'…':''}</td>
+          <td style="font-size:11px;color:#888">${c.wp_no||'—'}</td>
+          <td style="font-size:11px;white-space:nowrap">${c.date_filed?new Date(c.date_filed).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}):'—'}</td>
+          <td style="text-align:right;font-weight:600">${c.amount_claimed?'&#x20B1;'+(c.amount_claimed/1e6).toFixed(2)+'M':'—'}</td>
+          <td>${clStatusBadge(c.status)}</td>
+          <td style="text-align:right;color:#2D9B6F;font-weight:600">${c.approved_amount?'&#x20B1;'+(c.approved_amount/1e6).toFixed(2)+'M':'—'}</td>
+        </tr>`).join('');
+      }
+      if (pager) {
+        const btnStyle='padding:4px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;font-size:11px;font-family:inherit';
+        pager.innerHTML = `<span>${total} claim${total!==1?'s':''}</span>` +
+          (pages > 1 ? `<span style="margin-left:auto;display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;color:#888">Page ${_clPage} of ${pages}</span>
+            <button onclick="clPagePrev()" style="${btnStyle}${_clPage<=1?';opacity:.4;cursor:default':''}">&#x2039; Prev</button>
+            <button onclick="clPageNext()" style="${btnStyle}${_clPage>=pages?';opacity:.4;cursor:default':''}">Next &#x203a;</button>
+          </span>` : '');
+      }
+    }
+
+    window.clPagePrev = function() { if (_clPage > 1) { _clPage--; renderClaimsTablePage(); } };
+    window.clPageNext = function() { const p = Math.ceil(_clFiltered.length/CL_PER_PAGE); if (_clPage < p) { _clPage++; renderClaimsTablePage(); } };
 
     // ── Project table view ───────────────────────────────────────────
     let _tableData=[], _tableSortCol='id', _tableSortDir=1;
