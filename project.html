@@ -79,17 +79,16 @@
       <div class="sidebar-section">
         <div class="sidebar-section-label">Claims (EOT)</div>
         <a class="nav-item" id="add-claim-link" href="claim-form.html"><i class="ti ti-file-plus"></i>Add Claim</a>
-        <a class="nav-item" id="claims-register-link" href="project.html">
-          <i class="ti ti-file-invoice"></i>Claims Register
-          <span class="nbadge" id="claims-pending-badge" style="display:none;background:#D97706">0</span>
-        </a>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-label">Change Orders</div>
         <a class="nav-item" id="add-co-link" href="claim-form.html"><i class="ti ti-file-plus"></i>Add Change Order</a>
-        <a class="nav-item" id="co-register-link" href="project.html">
-          <i class="ti ti-file-description"></i>Change Orders
-          <span class="nbadge" id="co-pending-badge" style="display:none;background:#D97706">0</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Claims &amp; Change Orders</div>
+        <a class="nav-item" id="claims-register-link" href="project.html">
+          <i class="ti ti-file-invoice"></i>Register
+          <span class="nbadge" id="claims-pending-badge" style="display:none;background:#D97706">0</span>
         </a>
       </div>
       <div class="sidebar-section">
@@ -153,13 +152,9 @@
           <button class="view-tab" data-view="table" onclick="switchView('table')">
             <i class="ti ti-table"></i>WP List
           </button>
-          <button class="view-tab" data-view="claims" onclick="switchView('claims')">
-            <i class="ti ti-file-invoice"></i>Claims
+          <button class="view-tab" data-view="claims-register" onclick="switchView('claims-register')">
+            <i class="ti ti-file-invoice"></i>Claims &amp; Change Orders
             <span class="tbadge" id="claims-tab-badge" style="display:none;background:#D97706">0</span>
-          </button>
-          <button class="view-tab" data-view="change-orders" onclick="switchView('change-orders')">
-            <i class="ti ti-file-description"></i>Change Orders
-            <span class="tbadge" id="co-tab-badge" style="display:none;background:#D97706">0</span>
           </button>
         </div>
 
@@ -456,20 +451,25 @@
           </div>
         </div>
 
-        <!-- ══ CLAIMS REGISTER VIEW ══ -->
-        <div id="view-claims" style="display:none">
+        <!-- ══ CLAIMS & CHANGE ORDERS REGISTER ══ -->
+        <div id="view-claims-register" style="display:none">
 
           <!-- KPI strip -->
           <div class="metrics-grid" id="claims-kpi-grid" style="margin-bottom:14px"></div>
 
-          <!-- Filter + Add button -->
+          <!-- Filters + actions -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-            <select id="cl-filter-party" onchange="renderClaimsView()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
+            <select id="cr-filter-type" onchange="renderClaimsRegister()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
+              <option value="">All Types</option>
+              <option value="claim">Claims (EOT)</option>
+              <option value="co">Change Orders</option>
+            </select>
+            <select id="cr-filter-party" onchange="renderClaimsRegister()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
               <option value="">All Parties</option>
               <option value="Client">Client</option>
               <option value="Vendor">Vendor</option>
             </select>
-            <select id="cl-filter-status" onchange="renderClaimsView()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
+            <select id="cr-filter-status" onchange="renderClaimsRegister()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
               <option value="">All Statuses</option>
               <option>Draft</option><option>Filed</option><option>Under Review</option>
               <option>Approved</option><option>Partially Approved</option>
@@ -477,23 +477,24 @@
             </select>
             <div style="position:relative;flex:1;min-width:150px">
               <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#bbb;font-size:12px;pointer-events:none"></i>
-              <input id="cl-search" type="text" placeholder="Search claims…" oninput="renderClaimsView()"
+              <input id="cr-search" type="text" placeholder="Search claims &amp; change orders…" oninput="renderClaimsRegister()"
                 style="width:100%;padding:6px 10px 6px 28px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;outline:none;background:var(--surface-2);box-sizing:border-box"/>
             </div>
             <a id="cl-add-btn" href="claim-form.html" class="btn btn-primary" style="white-space:nowrap;flex-shrink:0">
               <i class="ti ti-plus"></i> Add Claim
             </a>
-            <button class="btn" onclick="downloadClaimsCSVTemplate()" style="white-space:nowrap;flex-shrink:0"><i class="ti ti-download"></i><span class="hide-mobile">Template</span></button>
-            <button class="btn" onclick="openClaimsCSVModal()" style="white-space:nowrap;flex-shrink:0"><i class="ti ti-upload"></i><span class="hide-mobile">Import CSV</span></button>
+            <a id="co-add-btn" href="claim-form.html" class="btn" style="white-space:nowrap;flex-shrink:0">
+              <i class="ti ti-plus"></i> Add Change Order
+            </a>
           </div>
 
-          <!-- Claims table -->
+          <!-- Combined table -->
           <div class="panel" style="padding:0;overflow:hidden">
             <div style="overflow-x:auto">
-              <table class="budget-table" id="claims-table" style="min-width:900px">
+              <table class="budget-table" id="claims-table" style="min-width:920px">
                 <thead>
                   <tr>
-                    <th>Claim No.</th>
+                    <th>No.</th>
                     <th>Type</th>
                     <th>Party</th>
                     <th style="min-width:200px">Description</th>
@@ -507,70 +508,14 @@
                   </tr>
                 </thead>
                 <tbody id="claims-tbody">
-                  <tr><td colspan="11" style="text-align:center;color:#aaa;padding:30px">Loading claims…</td></tr>
+                  <tr><td colspan="11" style="text-align:center;color:#aaa;padding:30px">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
             <div id="claims-pager" style="padding:10px 16px;font-size:11px;color:#888;border-top:1px solid #f0f0f0"></div>
           </div>
 
-        </div><!-- /view-claims -->
-
-        <!-- ══ CHANGE ORDERS VIEW ══ -->
-        <div id="view-change-orders" style="display:none">
-
-          <div class="metrics-grid" id="co-kpi-grid" style="margin-bottom:14px"></div>
-
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-            <select id="co-filter-party" onchange="renderChangeOrdersView()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
-              <option value="">All Parties</option>
-              <option value="Client">Client</option>
-              <option value="Vendor">Vendor</option>
-            </select>
-            <select id="co-filter-status" onchange="renderChangeOrdersView()" style="padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;background:var(--surface-2)">
-              <option value="">All Statuses</option>
-              <option>Draft</option><option>Filed</option><option>Under Review</option>
-              <option>Approved</option><option>Partially Approved</option>
-              <option>Rejected</option><option>Withdrawn</option>
-            </select>
-            <div style="position:relative;flex:1;min-width:150px">
-              <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#bbb;font-size:12px;pointer-events:none"></i>
-              <input id="co-search" type="text" placeholder="Search change orders…" oninput="renderChangeOrdersView()"
-                style="width:100%;padding:6px 10px 6px 28px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;outline:none;background:var(--surface-2);box-sizing:border-box"/>
-            </div>
-            <a id="co-add-btn" href="claim-form.html" class="btn btn-primary" style="white-space:nowrap;flex-shrink:0">
-              <i class="ti ti-plus"></i> Add Change Order
-            </a>
-            <button class="btn" onclick="downloadCOsCSVTemplate()" style="white-space:nowrap;flex-shrink:0"><i class="ti ti-download"></i><span class="hide-mobile">Template</span></button>
-            <button class="btn" onclick="openCOsCSVModal()" style="white-space:nowrap;flex-shrink:0"><i class="ti ti-upload"></i><span class="hide-mobile">Import CSV</span></button>
-          </div>
-
-          <div class="panel" style="padding:0;overflow:hidden">
-            <div style="overflow-x:auto">
-              <table class="budget-table" id="co-table" style="min-width:860px">
-                <thead>
-                  <tr>
-                    <th>CO No.</th>
-                    <th>Party</th>
-                    <th style="min-width:200px">Description</th>
-                    <th>Linked WP</th>
-                    <th>Contractor</th>
-                    <th>Date Filed</th>
-                    <th style="text-align:right">Claimed (&#x20B1;M)</th>
-                    <th>Status</th>
-                    <th style="text-align:right">Approved (&#x20B1;M)</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="co-tbody">
-                  <tr><td colspan="10" style="text-align:center;color:#aaa;padding:30px">Loading change orders…</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div id="co-pager" style="padding:10px 16px;font-size:11px;color:#888;border-top:1px solid #f0f0f0"></div>
-          </div>
-
-        </div><!-- /view-change-orders -->
+        </div><!-- /view-claims-register -->
 
       </div><!-- /main-content -->
     </div><!-- /content -->
@@ -673,8 +618,7 @@ function switchView(v) {
   else if(v==='schedule') renderSchedule();
   else if(v==='works') renderWorks();
   else if(v==='table') buildTable();
-  else if(v==='claims') { renderClaimsKPIs(); renderClaimsView(); }
-  else if(v==='change-orders') { renderCOKPIs(); renderChangeOrdersView(); }
+  else if(v==='claims-register' || v==='claims' || v==='change-orders') { renderClaimsRegisterKPIs(); renderClaimsRegister(); }
 }
 
 function getFiltered(){
@@ -1056,61 +1000,52 @@ async function loadClaims() {
   const { data } = await sb.from('claims').select('*').eq('project_id', projId).order('created_at', { ascending: false });
   allClaims = data || [];
 
-  const claims  = allClaims.filter(c => c.claim_type !== 'Change Order');
-  const cos     = allClaims.filter(c => c.claim_type === 'Change Order');
-  const clPend  = claims.filter(c => c.review_status === 'pending_review').length;
-  const coPend  = cos.filter(c => c.review_status === 'pending_review').length;
+  const pending = allClaims.filter(c => c.review_status === 'pending_review').length;
+  const pb = document.getElementById('claims-pending-badge');
+  const tb = document.getElementById('claims-tab-badge');
+  if (pb) { pb.textContent = pending; pb.style.display = pending ? 'inline' : 'none'; }
+  if (tb) { tb.textContent = pending; tb.style.display = pending ? 'inline' : 'none'; }
 
-  // Claims badges
-  const pb  = document.getElementById('claims-pending-badge');
-  const tb  = document.getElementById('claims-tab-badge');
-  if (pb) { pb.textContent = clPend; pb.style.display = clPend ? 'inline' : 'none'; }
-  if (tb) { tb.textContent = clPend; tb.style.display = clPend ? 'inline' : 'none'; }
-
-  // Change Orders badges
-  const cpb = document.getElementById('co-pending-badge');
-  const ctb = document.getElementById('co-tab-badge');
-  if (cpb) { cpb.textContent = coPend; cpb.style.display = coPend ? 'inline' : 'none'; }
-  if (ctb) { ctb.textContent = coPend; ctb.style.display = coPend ? 'inline' : 'none'; }
-
-  renderClaimsKPIs();
-  renderClaimsView();
+  renderClaimsRegisterKPIs();
+  renderClaimsRegister();
 }
 
-function renderClaimsKPIs() {
+function renderClaimsRegisterKPIs() {
   const grid = document.getElementById('claims-kpi-grid');
   if (!grid) return;
-  const total   = allClaims.length;
-  const client  = allClaims.filter(c => c.party === 'Client').length;
-  const vendor  = allClaims.filter(c => c.party === 'Vendor').length;
-  const pending = allClaims.filter(c => c.review_status === 'pending_review').length;
-  const claimed = allClaims.reduce((s,c) => s + (c.amount_claimed||0), 0);
-  const approved= allClaims.filter(c => c.status === 'Approved' || c.status === 'Partially Approved')
-                            .reduce((s,c) => s + (c.approved_amount||0), 0);
+  const typeFilter = document.getElementById('cr-filter-type')?.value || '';
+  let rows = allClaims;
+  if (typeFilter === 'claim') rows = rows.filter(c => c.claim_type !== 'Change Order');
+  else if (typeFilter === 'co') rows = rows.filter(c => c.claim_type === 'Change Order');
+
+  const totalClaims = allClaims.filter(c => c.claim_type !== 'Change Order').length;
+  const totalCOs    = allClaims.filter(c => c.claim_type === 'Change Order').length;
+  const pending     = rows.filter(c => c.review_status === 'pending_review').length;
+  const claimed     = rows.reduce((s,c) => s + (c.amount_claimed||0), 0);
+  const approved    = rows.filter(c => ['Approved','Partially Approved'].includes(c.status))
+                          .reduce((s,c) => s + (c.approved_amount||0), 0);
   grid.innerHTML = [
-    { label:'Total Claims',     val:total,                      cls:'' },
-    { label:'Client Claims',    val:client,                     cls:'' },
-    { label:'Vendor Claims',    val:vendor,                     cls:'' },
-    { label:'Total Claimed',    val:'₱'+(claimed/1e6).toFixed(2)+'M', cls:'' },
-    { label:'Approved Amount',  val:'₱'+(approved/1e6).toFixed(2)+'M',cls:'green' },
-    { label:'Pending Review',   val:pending,                    cls:pending?'red':'' },
-  ].map(k => `
-    <div class="metric-card">
-      <div class="metric-value ${k.cls}">${k.val}</div>
-      <div class="metric-label">${k.label}</div>
-    </div>`).join('');
+    { label:'Total Claims (EOT)',    val:totalClaims,                           cls:'' },
+    { label:'Total Change Orders',   val:totalCOs,                              cls:'' },
+    { label:'Total Claimed',         val:'₱'+(claimed/1e6).toFixed(2)+'M',     cls:'' },
+    { label:'Approved Amount',       val:'₱'+(approved/1e6).toFixed(2)+'M',    cls:'green' },
+    { label:'Pending Review',        val:pending,                               cls:pending?'red':'' },
+  ].map(k=>`<div class="metric-card"><div class="metric-value ${k.cls}">${k.val}</div><div class="metric-label">${k.label}</div></div>`).join('');
 }
 
-window.renderClaimsView = function() {
-  const party  = document.getElementById('cl-filter-party')?.value || '';
-  const status = document.getElementById('cl-filter-status')?.value || '';
-  const q      = (document.getElementById('cl-search')?.value || '').toLowerCase().trim();
-  const isAdmin = userProfile && ['admin','super_admin'].includes(userProfile.role);
+let _crPage = 1;
+window.renderClaimsRegister = function() {
+  const typeFilter = document.getElementById('cr-filter-type')?.value  || '';
+  const party      = document.getElementById('cr-filter-party')?.value  || '';
+  const status     = document.getElementById('cr-filter-status')?.value || '';
+  const q          = (document.getElementById('cr-search')?.value || '').toLowerCase().trim();
+  const isAdmin    = userProfile && ['admin','super_admin'].includes(userProfile.role);
 
-  // Claims tab = everything EXCEPT Change Orders
-  let rows = allClaims.filter(c => c.claim_type !== 'Change Order').filter(c => {
-    if (party  && c.party      !== party)  return false;
-    if (status && c.status     !== status) return false;
+  let rows = allClaims.filter(c => {
+    if (typeFilter === 'claim' && c.claim_type === 'Change Order') return false;
+    if (typeFilter === 'co'    && c.claim_type !== 'Change Order') return false;
+    if (party  && c.party  !== party)  return false;
+    if (status && c.status !== status) return false;
     if (q && !((c.claim_no||'').toLowerCase().includes(q) ||
                (c.description||'').toLowerCase().includes(q) ||
                (c.contractor||'').toLowerCase().includes(q) ||
@@ -1118,28 +1053,33 @@ window.renderClaimsView = function() {
     return true;
   });
 
+  // Re-render KPIs when type filter changes
+  renderClaimsRegisterKPIs();
+
   const total = rows.length;
   const pages = Math.max(1, Math.ceil(total / CLAIMS_PER_PAGE));
-  _claimsPage = Math.min(_claimsPage, pages);
-  const page = rows.slice((_claimsPage-1)*CLAIMS_PER_PAGE, _claimsPage*CLAIMS_PER_PAGE);
+  _crPage = Math.min(_crPage, pages);
+  const page = rows.slice((_crPage-1)*CLAIMS_PER_PAGE, _crPage*CLAIMS_PER_PAGE);
 
   const tbody = document.getElementById('claims-tbody');
   if (!tbody) return;
 
   if (!page.length) {
-    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#aaa;padding:30px">No claims found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:#aaa;padding:30px">No records found.</td></tr>`;
   } else {
     tbody.innerHTML = page.map(c => {
+      const isCO = c.claim_type === 'Change Order';
+      const editHref = `claim-form.html?id=${c.id}&project=${c.project_id}${isCO?'&section=change-order':''}`;
       const pendingStyle = c.review_status === 'pending_review' ? 'background:#FFFBEB;' : '';
       const actions = isAdmin
         ? `<div style="display:flex;gap:6px;align-items:center">
-            <a href="claim-form.html?id=${c.id}&project=${c.project_id}" style="font-size:11px;color:#2563EB;font-weight:600;text-decoration:none">Edit</a>
+            <a href="${editHref}" style="font-size:11px;color:#2563EB;font-weight:600;text-decoration:none">Edit</a>
             ${c.review_status === 'pending_review' ? `
               <button onclick="approveClaim('${c.id}')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid #BBF7D0;background:#F0FDF4;color:#15803D;cursor:pointer;font-family:inherit">✓</button>
               <button onclick="openRejectClaim('${c.id}')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer;font-family:inherit">✗</button>` : ''}
             <button onclick="deleteClaim('${c.id}')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit">Del</button>
           </div>`
-        : `<a href="claim-form.html?id=${c.id}&project=${c.project_id}" style="font-size:11px;color:#2563EB;font-weight:600;text-decoration:none">Edit</a>`;
+        : `<a href="${editHref}" style="font-size:11px;color:#2563EB;font-weight:600;text-decoration:none">Edit</a>`;
       return `<tr style="${pendingStyle}">
         <td style="font-weight:600;font-size:11px">${c.claim_no||'—'}</td>
         <td>${claimTypeBadge(c.claim_type)}</td>
@@ -1159,115 +1099,25 @@ window.renderClaimsView = function() {
   const pager = document.getElementById('claims-pager');
   if (pager) {
     const btnStyle = 'padding:4px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;font-size:11px;font-family:inherit';
+    const label = typeFilter === 'co' ? 'change order' : typeFilter === 'claim' ? 'claim' : 'record';
     pager.innerHTML = total === 0 ? '' :
-      `<span>${total} claim${total!==1?'s':''}</span>` +
+      `<span>${total} ${label}${total!==1?'s':''}</span>` +
       (pages > 1 ? `<span style="margin-left:auto;display:flex;align-items:center;gap:6px">
-        <span style="font-size:11px;color:#888">Page ${_claimsPage} of ${pages}</span>
-        <button onclick="claimsPrev()" style="${btnStyle}${_claimsPage<=1?';opacity:.4;cursor:default':''}">‹ Prev</button>
-        <button onclick="claimsNext()" style="${btnStyle}${_claimsPage>=pages?';opacity:.4;cursor:default':''}">Next ›</button>
+        <span style="font-size:11px;color:#888">Page ${_crPage} of ${pages}</span>
+        <button onclick="crPrev()" style="${btnStyle}${_crPage<=1?';opacity:.4;cursor:default':''}">‹ Prev</button>
+        <button onclick="crNext()" style="${btnStyle}${_crPage>=pages?';opacity:.4;cursor:default':''}">Next ›</button>
       </span>` : '');
   }
 };
 
-window.claimsPrev = function() { if (_claimsPage > 1) { _claimsPage--; renderClaimsView(); } };
-window.claimsNext = function() {
-  const pages = Math.ceil(allClaims.filter(c=>c.claim_type!=='Change Order').length / CLAIMS_PER_PAGE);
-  if (_claimsPage < pages) { _claimsPage++; renderClaimsView(); }
-};
-
-// ── CHANGE ORDERS ─────────────────────────────────────────────────────
-let _coPage = 1;
-
-function renderCOKPIs() {
-  const grid = document.getElementById('co-kpi-grid');
-  if (!grid) return;
-  const cos     = allClaims.filter(c => c.claim_type === 'Change Order');
-  const client  = cos.filter(c => c.party === 'Client').length;
-  const vendor  = cos.filter(c => c.party === 'Vendor').length;
-  const pending = cos.filter(c => c.review_status === 'pending_review').length;
-  const claimed = cos.reduce((s,c) => s + (c.amount_claimed||0), 0);
-  const approved= cos.filter(c => ['Approved','Partially Approved'].includes(c.status))
-                     .reduce((s,c) => s + (c.approved_amount||0), 0);
-  grid.innerHTML = [
-    { label:'Total Change Orders', val:cos.length, cls:'' },
-    { label:'Client Change Orders', val:client,     cls:'' },
-    { label:'Vendor Change Orders', val:vendor,     cls:'' },
-    { label:'Total Claimed',       val:'₱'+(claimed/1e6).toFixed(2)+'M', cls:'' },
-    { label:'Approved Amount',     val:'₱'+(approved/1e6).toFixed(2)+'M', cls:'green' },
-    { label:'Pending Review',      val:pending, cls:pending?'red':'' },
-  ].map(k=>`<div class="metric-card"><div class="metric-value ${k.cls}">${k.val}</div><div class="metric-label">${k.label}</div></div>`).join('');
-}
-
-window.renderChangeOrdersView = function() {
-  const party  = document.getElementById('co-filter-party')?.value  || '';
-  const status = document.getElementById('co-filter-status')?.value || '';
-  const q      = (document.getElementById('co-search')?.value || '').toLowerCase().trim();
-  const isAdmin = userProfile && ['admin','super_admin'].includes(userProfile.role);
-
-  let rows = allClaims.filter(c => c.claim_type === 'Change Order').filter(c => {
-    if (party  && c.party  !== party)  return false;
-    if (status && c.status !== status) return false;
-    if (q && !((c.claim_no||'').toLowerCase().includes(q) ||
-               (c.description||'').toLowerCase().includes(q) ||
-               (c.contractor||'').toLowerCase().includes(q) ||
-               (c.wp_no||'').toLowerCase().includes(q))) return false;
-    return true;
-  });
-
-  const total = rows.length;
-  const pages = Math.max(1, Math.ceil(total / CLAIMS_PER_PAGE));
-  _coPage = Math.min(_coPage, pages);
-  const page = rows.slice((_coPage-1)*CLAIMS_PER_PAGE, _coPage*CLAIMS_PER_PAGE);
-
-  const tbody = document.getElementById('co-tbody');
-  if (!tbody) return;
-
-  if (!page.length) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#aaa;padding:30px">No change orders found.</td></tr>`;
-  } else {
-    tbody.innerHTML = page.map(c => {
-      const pendingStyle = c.review_status === 'pending_review' ? 'background:#FFFBEB;' : '';
-      const actions = isAdmin
-        ? `<div style="display:flex;gap:6px;align-items:center">
-            <a href="claim-form.html?id=${c.id}&project=${c.project_id}&section=change-order" style="font-size:11px;color:#2563EB;font-weight:600;text-decoration:none">Edit</a>
-            ${c.review_status === 'pending_review' ? `
-              <button onclick="approveClaim('${c.id}')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid #BBF7D0;background:#F0FDF4;color:#15803D;cursor:pointer;font-family:inherit">✓</button>
-              <button onclick="openRejectClaim('${c.id}')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid #FECACA;background:#FEF2F2;color:#DC2626;cursor:pointer;font-family:inherit">✗</button>` : ''}
-            <button onclick="deleteClaim('${c.id}')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit">Del</button>
-          </div>`
-        : `<a href="claim-form.html?id=${c.id}&project=${c.project_id}&section=change-order" style="font-size:11px;color:#2563EB;font-weight:600;text-decoration:none">Edit</a>`;
-      return `<tr style="${pendingStyle}">
-        <td style="font-weight:600;font-size:11px">${c.claim_no||'—'}</td>
-        <td>${claimPartyBadge(c.party)}</td>
-        <td style="font-size:11px;max-width:220px" title="${(c.description||'').replace(/"/g,'&quot;')}">${(c.description||'—').slice(0,60)}${(c.description||'').length>60?'…':''}</td>
-        <td style="font-size:11px;color:#888">${c.wp_no||'—'}</td>
-        <td style="font-size:11px">${c.contractor||'—'}</td>
-        <td style="font-size:11px;white-space:nowrap">${fmtDate(c.date_filed)}</td>
-        <td style="text-align:right;font-weight:600">${c.amount_claimed ? '₱'+(c.amount_claimed/1e6).toFixed(2)+'M' : '—'}</td>
-        <td>${claimStatusBadge(c.status)}</td>
-        <td style="text-align:right;color:#2D9B6F;font-weight:600">${c.approved_amount ? '₱'+(c.approved_amount/1e6).toFixed(2)+'M' : '—'}</td>
-        <td>${actions}</td>
-      </tr>`;
-    }).join('');
-  }
-
-  const pager = document.getElementById('co-pager');
-  if (pager) {
-    const btnStyle = 'padding:4px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;font-size:11px;font-family:inherit';
-    pager.innerHTML = total === 0 ? '' :
-      `<span>${total} change order${total!==1?'s':''}</span>` +
-      (pages > 1 ? `<span style="margin-left:auto;display:flex;align-items:center;gap:6px">
-        <span style="font-size:11px;color:#888">Page ${_coPage} of ${pages}</span>
-        <button onclick="coPrev()" style="${btnStyle}${_coPage<=1?';opacity:.4;cursor:default':''}">‹ Prev</button>
-        <button onclick="coNext()" style="${btnStyle}${_coPage>=pages?';opacity:.4;cursor:default':''}">Next ›</button>
-      </span>` : '');
-  }
-};
-
-window.coPrev = function() { if (_coPage > 1) { _coPage--; renderChangeOrdersView(); } };
-window.coNext = function() {
-  const pages = Math.ceil(allClaims.filter(c=>c.claim_type==='Change Order').length / CLAIMS_PER_PAGE);
-  if (_coPage < pages) { _coPage++; renderChangeOrdersView(); }
+window.crPrev = function() { if (_crPage > 1) { _crPage--; renderClaimsRegister(); } };
+window.crNext = function() {
+  const typeFilter = document.getElementById('cr-filter-type')?.value || '';
+  let filtered = allClaims;
+  if (typeFilter === 'claim') filtered = filtered.filter(c => c.claim_type !== 'Change Order');
+  else if (typeFilter === 'co') filtered = filtered.filter(c => c.claim_type === 'Change Order');
+  const pages = Math.ceil(filtered.length / CLAIMS_PER_PAGE);
+  if (_crPage < pages) { _crPage++; renderClaimsRegister(); }
 };
 
 window.approveClaim = async function(id) {
@@ -1305,8 +1155,8 @@ window.deleteClaim = async function(id) {
   const sb = await getSB();
   await sb.from('claims').delete().eq('id', id);
   allClaims = allClaims.filter(c => c.id !== id);
-  renderClaimsKPIs();
-  renderClaimsView();
+  renderClaimsRegisterKPIs();
+  renderClaimsRegister();
 };
 
 if(typeof initMobileMenu==='function') initMobileMenu();
@@ -1347,11 +1197,9 @@ AppAuth.requireLogin(async (user, profile) => {
   const addClaimLink = document.getElementById('add-claim-link');
   if (addClaimLink) addClaimLink.href = 'claim-form.html?project=' + projId + '&section=claim';
   const claimsRegLink = document.getElementById('claims-register-link');
-  if (claimsRegLink) claimsRegLink.href = 'project.html?id=' + projId + '&tab=claims';
+  if (claimsRegLink) claimsRegLink.href = 'project.html?id=' + projId + '&tab=claims-register';
   const addCoLink = document.getElementById('add-co-link');
   if (addCoLink) addCoLink.href = 'claim-form.html?project=' + projId + '&section=change-order';
-  const coRegLink = document.getElementById('co-register-link');
-  if (coRegLink) coRegLink.href = 'project.html?id=' + projId + '&tab=change-orders';
   const coAddBtn = document.getElementById('co-add-btn');
   if (coAddBtn) coAddBtn.href = 'claim-form.html?project=' + projId + '&section=change-order';
   const clAddBtn = document.getElementById('cl-add-btn');
