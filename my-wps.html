@@ -67,11 +67,23 @@
     <div class="content">
       <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading your work packages…</span></div>
       <div id="main-content" style="display:none">
-        <div class="filter-tabs">
-          <button class="ftab active" onclick="filterWPs('all')">All <span class="nbadge" id="ct-all">0</span></button>
-          <button class="ftab" onclick="filterWPs('approved')">Approved <span class="nbadge" id="ct-approved" style="background:#2D9B6F">0</span></button>
-          <button class="ftab" onclick="filterWPs('pending_review')">Pending <span class="nbadge" id="ct-pending" style="background:#D97706">0</span></button>
-          <button class="ftab" onclick="filterWPs('rejected')">Rejected <span class="nbadge" id="ct-rejected" style="background:#888">0</span></button>
+        <!-- Status tabs + trade filter + search bar -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <div class="filter-tabs" style="margin-bottom:0;flex-wrap:wrap">
+            <button class="ftab active" onclick="filterWPs('all')">All <span class="nbadge" id="ct-all">0</span></button>
+            <button class="ftab" onclick="filterWPs('approved')">Approved <span class="nbadge" id="ct-approved" style="background:#2D9B6F">0</span></button>
+            <button class="ftab" onclick="filterWPs('pending_review')">Pending <span class="nbadge" id="ct-pending" style="background:#D97706">0</span></button>
+            <button class="ftab" onclick="filterWPs('rejected')">Rejected <span class="nbadge" id="ct-rejected" style="background:#888">0</span></button>
+          </div>
+          <select id="trade-filter" onchange="filterWPs(currentFilter)"
+            style="padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:12px;font-family:inherit;background:#fff;cursor:pointer;min-width:130px">
+            <option value="">All Trades</option>
+          </select>
+          <div style="position:relative;flex:1;min-width:150px">
+            <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#bbb;font-size:12px;pointer-events:none"></i>
+            <input id="wp-search" type="text" placeholder="Search WP No. or description…" oninput="filterWPs(currentFilter)"
+              style="width:100%;padding:6px 10px 6px 28px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box"/>
+          </div>
         </div>
         <div id="wp-list"></div>
       </div>
@@ -115,6 +127,14 @@
     document.getElementById('ct-pending').textContent = allWPs.filter(w=>w.review_status==='pending_review').length;
     document.getElementById('ct-rejected').textContent = allWPs.filter(w=>w.review_status==='rejected').length;
 
+    // Populate trade filter
+    const tradeEl = document.getElementById('trade-filter');
+    if (tradeEl) {
+      const trades = [...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
+      tradeEl.innerHTML = '<option value="">All Trades</option>' +
+        trades.map(t=>`<option value="${t}">${t}</option>`).join('');
+    }
+
     renderList(allWPs);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
@@ -123,7 +143,14 @@
   function filterWPs(status) {
     currentFilter = status;
     document.querySelectorAll('.ftab').forEach((t,i)=>t.classList.toggle('active',['all','approved','pending_review','rejected'][i]===status));
-    const filtered = status === 'all' ? allWPs : allWPs.filter(w=>w.review_status===status);
+    const trade = document.getElementById('trade-filter')?.value || '';
+    const q = (document.getElementById('wp-search')?.value || '').toLowerCase().trim();
+    let filtered = status === 'all' ? allWPs : allWPs.filter(w=>w.review_status===status);
+    if (trade) filtered = filtered.filter(w=>w.trade===trade);
+    if (q) filtered = filtered.filter(w=>
+      (w.wp_no||'').toLowerCase().includes(q) ||
+      (w.description||'').toLowerCase().includes(q)
+    );
     renderList(filtered);
   }
 
