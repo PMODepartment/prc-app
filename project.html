@@ -608,10 +608,15 @@ function deliveryBadge(s){
 function switchView(v) {
   currentView = v;
   document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
-  ['overview','backlog','budget','schedule','works','table','claims','change-orders'].forEach(id => {
+  ['overview','backlog','budget','schedule','works','table','claims-register'].forEach(id => {
     const el = document.getElementById('view-'+id);
     if(el) el.style.display = id === v ? '' : 'none';
   });
+  // backwards compat: old ?tab=claims / ?tab=change-orders both show the combined register
+  if (v === 'claims' || v === 'change-orders') {
+    const el = document.getElementById('view-claims-register');
+    if (el) el.style.display = '';
+  }
   if(v==='overview') renderOverview();
   else if(v==='backlog') renderBacklog();
   else if(v==='budget') renderBudget();
