@@ -1,5 +1,15 @@
 /* ui.js — shared UI helpers */
 
+/* ── Prevent pinch-zoom on iOS (Safari ignores viewport user-scalable since iOS 10) ── */
+(function() {
+  document.addEventListener('touchmove', function(e) {
+    if (e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('gesturestart', function(e) {
+    e.preventDefault();
+  });
+})();
+
 /* ── Mobile sidebar toggle ──────────────────────────────────────────── */
 function initMobileMenu() {
   const sidebar = document.getElementById('sidebar');
