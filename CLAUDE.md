@@ -3,14 +3,14 @@
 ## Project Overview
 Work Package Management (WPM) Dashboard for Megawide Construction Corporation EPC projects. Tracks procurement work packages, award status, budgets, and contractors across multiple projects.
 
-**Live URL:** https://wpm-dashboard.vercel.app (deployed via Vercel, GitHub: PMODepartment/prc-app)  
-**Stack:** Vanilla HTML/CSS/JS (no build step) + Supabase (PostgreSQL + Auth) + Vercel static hosting
+**Live URL:** https://pmodepartment.github.io/prc-app (login: `/login.html`) — migrated from Vercel 2026-06-01  
+**Stack:** Vanilla HTML/CSS/JS (no build step) + Supabase (PostgreSQL + Auth) + GitHub Pages hosting
 
 ---
 
 ## Architecture
 
-### No build step — edit files directly, push to GitHub, Vercel auto-deploys.
+### No build step — edit files directly, push to GitHub, GitHub Pages auto-deploys (~1–2 min).
 
 ### Key Files
 | File | Purpose |
@@ -185,17 +185,16 @@ Logo is styled globally in `dashboard.css`:
 ## Deployment
 
 ```bash
-# Push to GitHub (Vercel auto-deploys on push to main)
+# Push to GitHub — GitHub Pages auto-deploys on push to main (~1–2 min)
 git add <files>
 git commit -m "description"
 git push origin main
-
-# Or deploy manually
-vercel --prod
 ```
 
 **GitHub:** https://github.com/PMODepartment/prc-app  
-**Vercel Project:** wpm-dashboard (fmlozano-pmo-s-projects)
+**Live URL:** https://pmodepartment.github.io/prc-app  
+**Login:** https://pmodepartment.github.io/prc-app/login.html  
+*(Migrated from Vercel on 2026-06-01)*
 
 ---
 
