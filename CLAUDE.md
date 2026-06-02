@@ -165,6 +165,7 @@ Admin
 - `admin.html` uses plain project links (no pin/star buttons)
 - `project.html` uses `SidebarPrefs.projectLink()` with pin/star support
 - `review.html` uses `SidebarPrefs.projectLink()` with custom href parameter
+- `review.html` sidebar always shows "Add Work Package" link above "Review WPs"; href auto-updates to `wp-form.html?project={id}` when viewing a specific project
 - The separate "Overview" section was removed from `admin.html` — "Portfolio Overview" now lives under the Admin section in both contexts
 
 ### SidebarPrefs (ui.js)
@@ -222,7 +223,7 @@ Tab order (left to right): **Overview → Dashboard → Backlog → WP List**
 - **Overview**: Two KPI groups side-by-side (Cost Overview 6 cards / Work Package Status 6 cards). No charts, no monitoring table.
 - **Dashboard**: Period chart (Monthly/Quarterly toggle, `c-dash-period`) + WP by Trade (`c-dash-trade`) + WP by Status donut (`c-dash-status`) + backlog table (not-awarded, overdue-first) + Top 5 panels (`rank-value`, `rank-gains`, `rank-losses`)
 - **Backlog**: Backlog table first (8 columns: WP No., Description, Trade, Planned Award, Aging, Budget, Status, Submittal) + aging chart + status donut + period chart (Quarterly/Monthly toggle) + submittal donut. KPI cards removed.
-- **WP List**: Trade-grouped with collapse/expand header rows (▼ chevron, `_collapseState` Map), fixed TRADE_ORDER sequence, numeric WP-No sort, frozen Description column. Trade column removed from table (replaced by group headers).
+- **WP List**: Trade-grouped with collapse/expand header rows (▼ chevron, `_collapseState` Map), fixed TRADE_ORDER sequence, numeric WP-No sort, **WP No. column frozen** (sticky left). 35 columns in strict WP FORM.xlsx order: Cost Code No. → Trade → Works → Type → Scope → WP No. (frozen) → Work Package Description → Vendors → No. of PO/JO → PO/JO No. → Budget (BCB) Net → Awarded Net → Variance → Surety Bond → Perf. Bond → Warranty Bond → Payment Terms → DP% → DP Terms → DP Amount → Date of Release → Retention% → Retention Amt → Lead Time → Target Awarding → Actual Awarding → Target Delivery → Actual Delivery → Target Install → Target Completion → Submittals Approver → Date of Approval → Type of Submittal → Status → Remarks.
 - Claims & Change Orders tab exists in HTML but is hidden (`style="display:none"`)
 
 ### Lazy rendering flags (project.html)
@@ -299,15 +300,23 @@ CSV import is in `wp-form.html` as a bulk import banner at the top of the conten
 
 ---
 
-## WP Claim / Change Order Tag (wp-form.html + project.html WP List)
+## Charging Field (wp-form.html)
 
-Optional field on each Work Package (`claim_tag` column in `work_packages`). Set via dropdown in `wp-form.html` after Remarks.
+**Required** field on every Work Package (`charging_type` column in `work_packages`). Replaced the old optional "Claim / Change Order Tag". Set via dropdown in the Procurement Status section of `wp-form.html`.
 
-**Values:** `Extension of Time (EOT)` | `Material Escalation` | `Labor Escalation` | `Change Order` | null (none)
+**Values:** `Main Contract` | `Change Order`
 
-- Displayed as a color-coded badge in the WP List tab (`claimTagBadge()` helper in `project.html`)
-- EOT → blue, Material Escalation → orange, Labor Escalation → amber, Change Order → green
-- **DB migration required:** `ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS claim_tag text DEFAULT NULL;`
+- **Main Contract** → shows "Contract Package Number" text input (`id="f-contract-package-no"`, `contract_package_no` DB column)
+- **Change Order** → shows "Change Order Description" textarea (`id="f-co-description"`, `co_description` DB column)
+- `onChargingChange()` — shows/hides the conditional sub-fields
+- Validation in `submitForm()` prevents saving without selecting a charging type
+
+**DB migration required:**
+```sql
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS charging_type text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS contract_package_no text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS co_description text DEFAULT NULL;
+```
 
 ---
 
