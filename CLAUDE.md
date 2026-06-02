@@ -47,8 +47,8 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 
 ### Tables
 - **`projects`** — `id` (text PK e.g. 'AVR101'), name, location, status, budget_bcb, start_date, end_date
-- **`users`** — `id` (UUID FK → auth.users), email, role (`super_admin|admin|user`), status (`pending|approved|rejected`), projects (text[]), last_login (timestamptz)
-- **`work_packages`** — all WP fields; `review_status` (`pending_review|approved|rejected`); `claim_tag` (text, nullable) — optional tag: `Extension of Time (EOT)|Material Escalation|Labor Escalation|Change Order`; see schema for full column list
+- **`users`** — `id` (UUID FK → auth.users), email, role (`super_admin|admin|user|viewer`), status (`pending|approved|rejected`), projects (text[]), last_login (timestamptz). Role constraint: `CHECK (role IN ('super_admin','admin','user','viewer'))` — run `ALTER TABLE users DROP CONSTRAINT users_role_check; ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin','admin','user','viewer'));` if viewer saves fail.
+- **`work_packages`** — all WP fields; `review_status` (`pending_review|approved|rejected`). **Generated columns** (cannot INSERT into): `total_awarded` (= `awarded_cost + additionals`), `awarding_lead_time` (= `actual_awarding_date - awarding_date`), `variance` (= `approved_budget_bcb - total_awarded`). Insert into `awarded_cost` instead of `total_awarded`. Key columns added via migration: `works`, `scope`, `type_of_service`, `actual_delivery`, `surety_bond`, `performance_bond`, `warranty_bond`, `payment_terms_days`, `dp_percent`, `dp_terms`, `dp_release_date`, `dp_amount`, `retention_percent`, `retention_amount`, `approver_name`, `approval_date`, `submittal_document_type`, `charging_type`, `contract_package_no`, `co_description`.
 - **`claims`** — `id`, `project_id`, `claim_no`, `claim_type` (`Extension of Time (EOT)|Material Escalation|Labor Escalation|Change Order`), `party` (`Client|Vendor`), `description`, `wp_no`, `contractor`, `date_filed`, `amount_claimed`, `basis`, `status` (`Draft|Filed|Under Review|Approved|Partially Approved|Rejected|Withdrawn`), `approved_amount`, `date_resolved`, `review_status` (`pending_review|approved|rejected`), `review_notes`, `remarks`, `submitted_by` (UUID FK → auth.users), `created_at`, `updated_at`
 
 ### WPDb API (db.js)
@@ -104,12 +104,12 @@ WPDb.updateLastLogin(userId)                // writes current timestamp to users
 **Viewer role restrictions** (`body.viewer-mode` CSS class + `window.__isViewer` flag):
 - Cost KPI group hidden in Overview tab (both dashboards)
 - Budget tab hidden entirely (index.html)
-- Budget/Awarded/Variance + DP Amount + Retention columns hidden in WP List
+- Financial view tab hidden in WP List (both dashboards)
+- Cost columns excluded from all WP List views via `_getActiveCols()` / `getActiveCols()` column key filter
 - Budget column hidden in backlog tables
 - "Add Work Package" sidebar link hidden; Edit buttons hidden in WP List
-- "Download Template" / Tools sidebar section hidden
-- `wp-form.html` redirects viewers back to project page
-- `getActiveCols()` in project.html filters out cost columns from COLS array
+- "Download Template" / Tools sidebar section (`#sidebar-tools`) hidden
+- `wp-form.html` redirects viewers back to project page immediately on load
 
 - Admins and super_admins see all projects; users/viewers see only projects in their `profile.projects[]` array
 - When admin submits a WP via CSV import or form, it auto-approves (`WPDb.approveWP()` called after `WPDb.submitWP()`)
@@ -204,8 +204,8 @@ Seven-tab layout (Claims tab is **hidden**):
 | **Budget** | 6 KPI cost cards + budget-by-period chart (Monthly/Quarterly toggle) + budget-by-trade HBar chart + **Budget (BCB) and Awarded by Project** grouped bar chart + budget summary table by trade (IDX_TRADE_ORDER sorted) |
 | **Schedule** | Period chart (Monthly/Quarterly toggle) + WP by Trade bar + WP by Status donut + **collapsible** schedule summary table (project header row → click to expand trade sub-rows) |
 | **Works** | Budget-by-period-per-trade stacked chart + Budget/Awarded/Count donuts by trade + **Procurement Budget (BCB) by Period per Scope** table (collapsible trade→works) + **Procurement Budget (BCB) and Awarded by Period per Scope** table |
-| **WP List** | Full WP monitoring table — trade-grouped with collapse/expand headers (+/− button), fixed TRADE_ORDER, numeric WP-No sort, frozen WP No. column, search + pagination. Collapse is **virtual-items based** — toggling re-renders the full item list (headers + WP rows), collapsed trades excluded from pagination so WPs don't bleed across pages. |
-| **Backlog** (tab) | Filter bar (Trade select, Sort-by select, Search) + backlog table + aging chart + status donut + period chart + submittal donut. Sort options: Most Overdue, Planned Award Date, Trade, Budget (High→Low), Description (A→Z). `window.renderBlTable()` applies all active filters. |
+| **WP List** | Trade-grouped table with 4 **view tabs** (Overview / Financial / Schedule / Submittals), each showing 10–12 focused columns. +/− collapse per trade group. **− All** collapses all trades, **+ All** expands all (Excel convention). Virtual-items pagination excludes collapsed WP rows entirely. `_WPC` column defs + `_WP_VIEWS` config + `_getActiveCols()` drive dynamic colgroup/thead/rows. `setWPListView(view)` switches tabs and re-renders. |
+| **Backlog** (tab) | Filter bar (Trade select, Sort-by select, Search) + **collapsible trade group headers** (same +/− pattern) + backlog table + aging/status/period/submittal charts. `window.renderBlTable()` applies all active filters. `_blCollapseState` Map + `toggleBlGroup(trade)` handle collapse. |
 
 **KPI label renames (Budget tab):** "Cost to Complete" → "Procurement Cost to Complete", "Est. at Completion" → "Procurement Estimate at Completion"
 
@@ -235,7 +235,7 @@ Tab order (left to right): **Overview → Dashboard → Backlog → WP List**
 - **Overview**: Two KPI groups side-by-side (Cost Overview 6 cards / Work Package Status 6 cards). No charts, no monitoring table.
 - **Dashboard**: Period chart (Monthly/Quarterly toggle, `c-dash-period`) + WP by Trade (`c-dash-trade`) + WP by Status donut (`c-dash-status`) + backlog table (not-awarded, overdue-first) + Top 5 panels (`rank-value`, `rank-gains`, `rank-losses`)
 - **Backlog**: Filter bar (Trade select, Sort-by select, Search, Budget min/max) + backlog table (8 cols) + aging chart + status donut + period chart (Quarterly/Monthly toggle) + submittal donut. `renderBacklog()` applies all filters. KPI cards removed.
-- **WP List**: Trade-grouped with collapse/expand header rows (▼ chevron, `_collapseState` Map), fixed TRADE_ORDER sequence, numeric WP-No sort, **WP No. column frozen** (sticky left). 35 columns in strict WP FORM.xlsx order: Cost Code No. → Trade → Works → Type → Scope → WP No. (frozen) → Work Package Description → Vendors → No. of PO/JO → PO/JO No. → Budget (BCB) Net → Awarded Net → Variance → Surety Bond → Perf. Bond → Warranty Bond → Payment Terms → DP% → DP Terms → DP Amount → Date of Release → Retention% → Retention Amt → Lead Time → Target Awarding → Actual Awarding → Target Delivery → Actual Delivery → Target Install → Target Completion → Submittals Approver → Date of Approval → Type of Submittal → Status → Remarks.
+- **WP List**: 4 view tabs (Overview / Financial / Schedule / Submittals) each showing 10–12 focused columns. Trade-grouped with +/− collapse, **− All** / **+ All** buttons, virtual-items pagination, WP No. frozen. `WP_TABLE_VIEWS` config + `getActiveCols()` filter COLS by view. `setWPTableView(view)` switches view + re-renders. `_collapseState` Map, `_blCollapseState` Map (backlog). Backlog also has collapsible trade group headers.
 - Claims & Change Orders tab exists in HTML but is hidden (`style="display:none"`)
 
 ### Lazy rendering flags (project.html)
@@ -304,11 +304,13 @@ CSV import is in `wp-form.html` as a bulk import banner at the top of the conten
 
 `downloadCSVTemplate()` — generates `WPM_Import_Template.csv` with headers + 2 example rows.
 
-**Headers:** Cost Code, WP No., Description, Zone, Trade, Planned Award Date, Actual Award Date, Target Delivery Date, Target Completion Date, Target Installation Date, Lead Time (Days), Budget BCB (PHP), Total Awarded (PHP), Procurement Status, Award Status, Contractor, PO/JO Count, PO/JO Numbers, Remarks
+**Headers (25 columns):** Cost Code No., Trade, Works, WP No., Work Package Description, Zone, Scope of Work, Charging Type, Contract Package No., CO Description, Proposed Vendors, No. of PO/JO, PO/JO Numbers, Budget BCB (PHP), Total Awarded (PHP), Award Status, Procurement Status, Planned Award Date, Actual Award Date, Target Delivery Date, Actual Delivery Date, Target Completion Date, Target Installation Date, Lead Time (Days), Remarks
 
-`importWPsFromCSV()` — parses rows, calls `WPDb.submitWP()` per row, then `WPDb.approveWP()` if admin/super_admin.
+`importWPsFromCSV()` — parses the 25-column format, calls `WPDb.submitWP()` per row, then `WPDb.approveWP()` if admin/super_admin.
 
-**Date parsing:** Uses `new Date(value).toISOString().split('T')[0]` — accepts MM/DD/YYYY or YYYY-MM-DD.
+**Date parsing:** Uses `pd.to_datetime()` / `new Date(value).toISOString().split('T')[0]` — accepts MM/DD/YYYY or YYYY-MM-DD.
+
+**⚠️ Generated columns:** Never include `total_awarded`, `awarding_lead_time`, or `variance` in INSERT statements — they are generated by Supabase. Use `awarded_cost` instead of `total_awarded`.
 
 ---
 
@@ -323,11 +325,34 @@ CSV import is in `wp-form.html` as a bulk import banner at the top of the conten
 - `onChargingChange()` — shows/hides the conditional sub-fields
 - Validation in `submitForm()` prevents saving without selecting a charging type
 
-**DB migration required:**
+**All DB migrations applied (run once, already live):**
 ```sql
+-- WP form new fields
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS works text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS type_of_works text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS scope text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS actual_delivery date DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS type_of_service text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS charging_type text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS contract_package_no text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS co_description text DEFAULT NULL;
+-- Bond / payment / retention fields
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS surety_bond text DEFAULT 'No';
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS performance_bond text DEFAULT 'No';
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS warranty_bond text DEFAULT 'No';
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS payment_terms_days integer;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS dp_percent numeric(5,4);
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS dp_terms text;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS dp_release_date date;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS dp_amount numeric(18,2);
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS retention_percent numeric(5,4);
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS retention_amount numeric(18,2);
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS approver_name text;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS approval_date date;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS submittal_document_type text;
+-- Viewer role
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin','admin','user','viewer'));
 ```
 
 ---
@@ -424,22 +449,31 @@ All `.html` files have:
 - Sidebar gets class `.open` when toggled; `.sidebar-overlay` covers background
 - Handled in `ui.js`
 
-### WP List Collapse Pattern (index.html + project.html)
+### WP List Collapse + View Tab Pattern (index.html + project.html)
 
-`renderWPMonTable(rows)` and `buildTable()` both use a **virtual items** approach for collapse:
-1. Group `rows` by trade (in TRADE_ORDER sequence)
-2. Build `items[]`: `{type:'header', trade, count, collapsed}` + (if not collapsed) `{type:'row', wp}` per WP
-3. Paginate `items[]` — collapsed trade WPs are excluded from the item list entirely, so they don't appear on any page
-4. `toggleTradeGroup(trade)` flips `_collapseState` and calls re-render (page resets to 1)
-5. Collapse indicator: `+` (collapsed) / `−` (expanded) in a small grey badge, `float:right`
+**Column views**: WP List has 4 tabs — Overview, Financial, Schedule, Submittals. Each shows 10–12 focused columns.
+- `index.html`: `_WPC` (column defs), `_WP_VIEWS` (view configs), `_getActiveCols()` returns filtered array. `renderWPMonTable()` rebuilds `<colgroup>` + `<thead>` dynamically per view. `setWPListView(view)` updates active tab style + re-renders.
+- `project.html`: `WP_TABLE_VIEWS` (Set of keys per view), `getActiveCols()` filters COLS array. `setWPTableView(view)` updates + re-renders.
+- Financial tab hidden for Viewer role (no cost data).
 
-Same pattern applies to Schedule tab (`toggleSchRow` + `${projRowId}-ind` span) and Works tab (`toggleWkTrade` + `${tradeId}-ind` span), but those use DOM-only toggle (no pagination) — indicator is flipped in the toggle function.
+**Collapse (virtual-items)**:
+1. Group `rows` by trade (TRADE_ORDER sequence)
+2. Build `items[]`: `{type:'header'}` always + `{type:'row'}` only if trade not collapsed
+3. Paginate `items[]` — collapsed trades absent from all pages
+4. `toggleTradeGroup(trade)` flips `_collapseState`, resets page to 1, re-renders
+5. **− All** (collapseAllTrades) = hide all rows. **+ All** (expandAllTrades) = show all rows. Excel convention: − = currently expanded → click to collapse; + = currently collapsed → click to expand.
+6. Individual header badge: `−` when expanded, `+` when collapsed (same Excel logic)
+
+**Backlog collapse**: `_blCollapseState` Map + `toggleBlGroup(trade)` — same approach but no pagination (simpler DOM group headers).
+
+**Schedule tab** (`toggleSchRow`) and **Works tab** (`toggleWkTrade`) use DOM-only toggle (no pagination) — indicator span `${id}-ind` is flipped via JS in the toggle function.
 
 ### Logo Styling (Global)
-Logo is styled globally in `dashboard.css`:
+Logo is styled globally in `dashboard.css`. Current rule fills the full sidebar panel width:
 ```css
-.sidebar-logo img { width: 140px; height: auto; display: block; }
+.sidebar-logo img { width: 100%; height: auto; max-width: none; display: block; object-fit: contain; object-position: left center; background: transparent !important; }
 ```
+File: `assets/img/megawide-logo.png` (white version). Favicon: `assets/img/favicon.png` (unchanged).
 **Do NOT add inline `.sidebar-logo img` CSS to individual HTML files.**
 
 ---
@@ -505,6 +539,9 @@ The **Supabase free tier cold start** (5–30s on first load after 7 days inacti
 8. **Sticky tabs + overflow:** `overflow: hidden/clip` on any ancestor of `.view-tabs` breaks `position: sticky` in Safari. Always clamp overflow at the element level, not the container level.
 9. **Supabase free tier pause:** Project pauses after 7 days inactivity → 5–30s cold start on first load. Use UptimeRobot to ping every 3–4 days to prevent this.
 10. **N+1 query anti-pattern:** Never use `Promise.all(projects.map(p => WPDb.getApprovedWPs(p.id)))` in the consolidated dashboard — use `getAllApprovedWPs()` or `getApprovedWPsForProjects(ids)` instead.
+11. **Generated columns:** `total_awarded`, `awarding_lead_time`, `variance` are `GENERATED ALWAYS AS` columns — inserting into them causes a Postgres error. Always insert into `awarded_cost` and let the DB compute `total_awarded`.
+12. **Trade name consistency:** All trades must use the exact strings from the WP form dropdown (e.g. "General Requirements" not "General Requirement"). Fix stale data: `UPDATE work_packages SET trade='General Requirements' WHERE trade='General Requirement';`
+13. **AVR101 data:** 114 WPs imported (approved) across General Requirements (42), Structural Works (11), Architectural Works (30), Site Works (5), MEPF split into Mechanical/Electrical/Plumbing/Fire Protection/Auxiliary (20), Site Development Works (6). If WP count appears doubled (228), run the dedup SQL: `DELETE FROM work_packages WHERE project_id='AVR101' AND id NOT IN (SELECT DISTINCT ON (wp_no) id FROM work_packages WHERE project_id='AVR101' ORDER BY wp_no, created_at ASC);`
 
 ---
 
