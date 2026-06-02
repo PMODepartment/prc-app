@@ -527,6 +527,23 @@
 <script>
   initMobileMenu();
 
+  // Show a retry prompt if loading takes more than 20 s (Supabase cold-start)
+  const _loadTimeout = setTimeout(() => {
+    const ov = document.getElementById('loading');
+    if (ov && ov.style.display !== 'none') {
+      ov.innerHTML = `
+        <div style="text-align:center;padding:24px;max-width:320px">
+          <div style="font-size:32px;margin-bottom:12px">⏳</div>
+          <div style="font-size:15px;font-weight:700;color:#231F20;margin-bottom:8px">Taking longer than usual</div>
+          <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:20px">
+            The database may be waking up from sleep.<br>This can take up to 30 seconds on first load.
+          </div>
+          <button onclick="location.reload()" style="background:#EE3124;color:#fff;border:none;border-radius:8px;padding:11px 28px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:12px;width:100%">Retry</button>
+          <div style="font-size:11px;color:#bbb">Or wait — the page will load automatically once the database responds.</div>
+        </div>`;
+    }
+  }, 20000);
+
   AppAuth.requireLogin(async (user, profile) => {
     window.__wpmRole = profile.role;
     window.__isViewer = profile.role === 'viewer';
@@ -1879,6 +1896,7 @@
 
     document.getElementById('btn-export').addEventListener('click', () => exportCSV(_allWPs.filter(w=>[..._activeIds].includes(w.project_id)), 'ALL_PROJECTS'));
 
+    clearTimeout(_loadTimeout);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
   });
