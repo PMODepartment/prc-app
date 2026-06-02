@@ -189,12 +189,23 @@ Seven-tab layout (Claims tab is **hidden**):
 | **Overview** | Two KPI groups side-by-side (Cost Overview: 6 cards; Work Package Status: 6 cards) + project cards (cards/table toggle below) |
 | **Dashboard** | Period chart (Monthly/Quarterly toggle) + WP by Trade bar + WP by Status donut + backlog table (not-awarded) + Top 5 panels |
 | **Backlog** | Backlog table first (not-awarded, sorted most overdue) + aging chart + status donut + period chart (Quarterly/Monthly toggle) + submittal donut |
-| **Budget** | 6 KPI cost cards + budget-by-period chart (Monthly/Quarterly toggle) + budget-by-trade HBar chart + budget summary table by trade |
-| **Schedule** | Period chart (Monthly/Quarterly toggle) + WP by Trade bar + WP by Status donut + schedule summary table by project |
-| **Works** | Budget-by-period-per-trade stacked chart + Budget/Awarded/Count donuts by trade + works summary table by trade |
+| **Budget** | 6 KPI cost cards + budget-by-period chart (Monthly/Quarterly toggle) + budget-by-trade HBar chart + **Budget (BCB) and Awarded by Project** grouped bar chart + budget summary table by trade (IDX_TRADE_ORDER sorted) |
+| **Schedule** | Period chart (Monthly/Quarterly toggle) + WP by Trade bar + WP by Status donut + **collapsible** schedule summary table (project header row → click to expand trade sub-rows) |
+| **Works** | Budget-by-period-per-trade stacked chart + Budget/Awarded/Count donuts by trade + **Procurement Budget (BCB) by Period per Scope** table (collapsible trade→works) + **Procurement Budget (BCB) and Awarded by Period per Scope** table |
 | **WP List** | Full WP monitoring table — trade-grouped with collapse/expand headers (▼ chevron), fixed trade order, numeric WP-No sort, frozen Description column, search + pagination. No Trade column (redundant with group headers). |
 
-**KPI label renames (Overview tab):** "Budget (BCB)" → "Procurement Budget (BCB)", "Cost to Complete" → "Procurement Cost to Complete", "Est. at Completion" → "Procurement Estimate at Completion"
+**KPI label renames (Budget tab):** "Cost to Complete" → "Procurement Cost to Complete", "Est. at Completion" → "Procurement Estimate at Completion"
+
+**Chart axis labels:** All money Y-axes now show `₱ Million` axis title; count X-axes show `Count`. Panel titles no longer include `(₱M)` suffix.
+
+**IDX_TRADE_ORDER constant** (index.html `<script>`): Fixed trade order used for Budget table, Schedule sub-rows, and Works scope tables:
+```javascript
+const IDX_TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
+  'Architectural Works','Mechanical Works','Electrical Works','Auxiliary Works',
+  'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
+```
+
+**`Charts.budgetAwardedByProject(id, wps, projects)`** — new function in `charts.js`: grouped bar (Budget BCB vs Awarded) per project ID. Called in Budget tab as `Charts.budgetAwardedByProject('c-idx-bud-by-proj', wps, filt)`.
 
 **Data loading:** Single Supabase query using `WPDb.getAllApprovedWPs()` (admin) or `WPDb.getApprovedWPsForProjects(ids)` (user). **Do NOT revert to `Promise.all(permitted.map(p => WPDb.getApprovedWPs(p.id)))` — that causes N separate API calls (one per project), which is the main cause of slow mobile loading.**
 
