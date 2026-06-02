@@ -33,5 +33,6 @@ const AppAuth = (() => {
   function canAccessProject(profile, projectId) { if (['admin','super_admin'].includes(profile.role)) return true; return (profile.projects||[]).includes(projectId); }
   function isAdmin(p) { return ['admin','super_admin'].includes(p?.role); }
   function isSuperAdmin(p) { return p?.role === 'super_admin'; }
-  return { requireLogin, requireAdmin, logout, getPermittedProjects, canAccessProject, isAdmin, isSuperAdmin };
+  function isViewer(p) { return p?.role === 'viewer'; }
+  return { requireLogin, requireAdmin, logout, getPermittedProjects, canAccessProject, isAdmin, isSuperAdmin, isViewer };
 })();

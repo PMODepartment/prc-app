@@ -115,7 +115,7 @@
             <button class="view-tab active" onclick="switchTab('overview')"><i class="ti ti-layout-dashboard"></i>Overview</button>
             <button class="view-tab" onclick="switchTab('dashboard')"><i class="ti ti-chart-bar"></i>Dashboard</button>
             <button class="view-tab" onclick="switchTab('backlog')"><i class="ti ti-clock"></i>Backlog</button>
-            <button class="view-tab" onclick="switchTab('budget')"><i class="ti ti-report-money"></i>Budget</button>
+            <button id="tab-budget-btn" class="view-tab" onclick="switchTab('budget')"><i class="ti ti-report-money"></i>Budget</button>
             <button class="view-tab" onclick="switchTab('schedule')"><i class="ti ti-calendar"></i>Schedule</button>
             <button class="view-tab" onclick="switchTab('works')"><i class="ti ti-tool"></i>Works</button>
             <button class="view-tab" onclick="switchTab('wplist')"><i class="ti ti-table"></i>WP List</button>
@@ -132,8 +132,8 @@
           </div>
           <!-- Two KPI groups side by side -->
           <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
-            <div style="flex:1;min-width:280px">
-              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Cost Overview</div>
+            <div id="metrics-cost-group" style="flex:1;min-width:280px">
+              <div class="cost-overview-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Cost Overview</div>
               <div id="metrics-cost" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
             </div>
             <div style="flex:1;min-width:280px">
@@ -379,13 +379,13 @@
               </table>
             </div>
           </div>
-          <div class="panel" style="margin-top:14px;padding:0;overflow:hidden">
+          <div id="idx-wk-scope-budget-panel" class="panel" style="margin-top:14px;padding:0;overflow:hidden">
             <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0">
               <div class="panel-title" style="margin:0"><i class="ti ti-table"></i>Procurement Budget (BCB) and Awarded by Period per Scope</div>
             </div>
             <div style="overflow-x:auto">
               <table class="data-table" id="idx-wk-scope-budget-table" style="font-size:11px">
-                <thead><tr><th>Trade / Works</th><th>Budget (BCB)</th><th>Awarded</th><th>Variance</th></tr></thead>
+                <thead><tr><th>Trade / Works</th><th style="text-align:right">Budget (BCB)</th><th style="text-align:right">Awarded</th><th style="text-align:right">Variance</th></tr></thead>
                 <tbody id="idx-wk-scope-budget-tbody"></tbody>
               </table>
             </div>
@@ -539,6 +539,8 @@
 
   AppAuth.requireLogin(async (user, profile) => {
     window.__wpmRole = profile.role;
+    window.__isViewer = profile.role === 'viewer';
+    if (window.__isViewer) document.body.classList.add('viewer-mode');
     renderUserBar('user-bar', profile);
 
     // Track navigation context — user is viewing consolidated dashboard
@@ -695,6 +697,7 @@
     };
 
     window.switchTab = function(tab) {
+      if (window.__isViewer && tab === 'budget') tab = 'overview';
       _activeTab = tab;
       ALL_TABS.forEach(t => {
         const el = document.getElementById('tab-' + t);
@@ -1097,7 +1100,8 @@
           tradesSeen.add(trade);
           const chevron = `<span style="float:right;font-size:11px;color:#aaa;transition:transform .2s;display:inline-block;transform:${isCollapsed?'rotate(-90deg)':'rotate(0deg)'}">▼</span>`;
           const count = `<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${tradeTotals.get(trade)||0} WPs</span>`;
-          html += `<tr class="trade-group-header" data-trade="${trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5"><td colspan="36" style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">${trade}${chevron}${count}</td></tr>`;
+          const _colspan = window.__isViewer ? 30 : 36;
+          html += `<tr class="trade-group-header" data-trade="${trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5"><td colspan="${_colspan}" style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">${trade}${chevron}${count}</td></tr>`;
         }
         const bud = w.approved_budget_bcb || 0;
         const awd = w.total_awarded || 0;
@@ -1585,6 +1589,31 @@
 <style>
   .hide-mobile { }
   @media(max-width:480px) { .hide-mobile { display:none; } }
+
+  /* Viewer mode — hide all cost data */
+  body.viewer-mode #metrics-cost-group { display:none !important; }
+  body.viewer-mode #tab-budget { display:none !important; }
+  body.viewer-mode #tab-budget-btn { display:none !important; }
+  body.viewer-mode #idx-wk-scope-budget-panel { display:none !important; }
+  body.viewer-mode #idx-wk-scope-budget-panel + div { display:none !important; }
+  /* Hide cost columns in consolidated WP list (Budget, Awarded, Variance, DP Amt, Retention%, Retention Amt) */
+  body.viewer-mode #wp-mon-table th:nth-child(12),
+  body.viewer-mode #wp-mon-table td:nth-child(12),
+  body.viewer-mode #wp-mon-table th:nth-child(13),
+  body.viewer-mode #wp-mon-table td:nth-child(13),
+  body.viewer-mode #wp-mon-table th:nth-child(14),
+  body.viewer-mode #wp-mon-table td:nth-child(14),
+  body.viewer-mode #wp-mon-table th:nth-child(21),
+  body.viewer-mode #wp-mon-table td:nth-child(21),
+  body.viewer-mode #wp-mon-table th:nth-child(23),
+  body.viewer-mode #wp-mon-table td:nth-child(23),
+  body.viewer-mode #wp-mon-table th:nth-child(24),
+  body.viewer-mode #wp-mon-table td:nth-child(24) { display:none !important; }
+  /* Hide Budget column in backlog tables and dashboard backlog */
+  body.viewer-mode #bl-table th:nth-child(7),
+  body.viewer-mode #bl-table td:nth-child(7),
+  body.viewer-mode #idx-dash-backlog-table th:nth-child(6),
+  body.viewer-mode #idx-dash-backlog-table td:nth-child(6) { display:none !important; }
 </style>
 
 </body>
