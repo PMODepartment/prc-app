@@ -482,6 +482,14 @@ All `.html` files have:
 
 **Schedule tab** (`toggleSchRow`) and **Works tab** (`toggleWkTrade`) use DOM-only toggle (no pagination) — indicator span `${id}-ind` is flipped via JS in the toggle function.
 
+**Works tab — both tables now collapsible:** `toggleWkTrade(tradeId)` toggles `${tradeId}-row` sub-rows in the Period table; `toggleWkBudget(budTradeId)` toggles `${budTradeId}-brow` sub-rows in the Budget+Awarded table. Both use `budTradeId = 'wkb-trade-' + ...` / `tradeId = 'wk-trade-' + ...` prefixes to avoid ID collision.
+
+**WP List toolbar (index.html):** Split into two compact rows — Row 1: title + Trade select + Status select + Search; Row 2: Collapse/Expand buttons + view tabs. Eliminates wrapping on standard desktop widths.
+
+**WP List Works column:** Width reduced 130 → 100px; cell now has `overflow:hidden; text-overflow:ellipsis; white-space:nowrap` with `title` tooltip showing full text on hover.
+
+**Project filter (index.html):** Removed `_filterDirty` deferred-apply pattern. `toggleProjectPill` now calls `renderAll()` immediately on each tick/untick — dashboards update live. `selectAllPills` / `clearPills` also call `renderAll()` directly. `closeProjFilter` just closes the panel.
+
 ### Logo Styling (Global)
 Logo is styled globally in `dashboard.css`. Current rule fills the full sidebar panel width:
 ```css
