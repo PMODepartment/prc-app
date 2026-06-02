@@ -178,7 +178,7 @@
           <!-- Period chart with toggle -->
           <div class="panel" style="margin-bottom:14px">
             <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <span><i class="ti ti-chart-bar"></i><span id="dash-period-title">Budget (BCB) and Awarded Cost by Period</span></span>
+              <span><i class="ti ti-chart-bar"></i><span id="dash-period-title">Procurement Budget (BCB) and Awarded Cost by Period</span></span>
               <div style="display:flex;gap:4px">
                 <button id="dash-btn-monthly" onclick="setDashPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
                 <button id="dash-btn-quarterly" onclick="setDashPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
@@ -203,7 +203,7 @@
             <div style="overflow-x:auto">
               <table class="budget-table" id="dash-backlog-table">
                 <thead><tr>
-                  <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Budget (BCB)</th><th>Status</th>
+                  <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Procurement Budget (BCB)</th><th>Status</th>
                 </tr></thead>
                 <tbody id="dash-backlog-tbody"></tbody>
               </table>
@@ -257,7 +257,7 @@
               <table class="budget-table" id="backlog-table">
                 <thead><tr>
                   <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th>
-                  <th>Aging (d)</th><th>Budget (BCB)</th><th>Status</th><th>Submittal</th>
+                  <th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th>
                 </tr></thead>
                 <tbody id="backlog-tbody"></tbody>
               </table>
@@ -433,7 +433,7 @@ const COLS=[
   {key:'proposed_vendors', label:'Vendors',            w:'130px'},
   {key:'po_jo_count',      label:'No. of PO/JO',       w:'70px'},
   {key:'po_jo_numbers',    label:'PO/JO No.',          w:'130px'},
-  {key:'approved_budget_bcb', label:'Budget (BCB) Net', w:'110px'},
+  {key:'approved_budget_bcb', label:'Procurement Budget (BCB) Net', w:'110px'},
   {key:'total_awarded',    label:'Awarded Net',        w:'100px'},
   {key:'variance',         label:'Variance',           w:'100px'},
   {key:'surety_bond',      label:'Surety Bond',        w:'90px'},
@@ -464,10 +464,10 @@ const COST_KEYS = new Set(['approved_budget_bcb','total_awarded','variance','dp_
 
 let _wpTableView = 'overview';
 const WP_TABLE_VIEWS = {
-  overview:   {keys:new Set(['cost_code','wp_no','description','trade','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','award_status','remarks'])},
-  financial:  {keys:new Set(['wp_no','description','trade','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount']), cost:true},
-  schedule:   {keys:new Set(['wp_no','description','trade','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion'])},
-  submittals: {keys:new Set(['wp_no','description','trade','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
+  overview:   {keys:new Set(['cost_code','wp_no','works','description','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','award_status','remarks'])},
+  financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount']), cost:true},
+  schedule:   {keys:new Set(['cost_code','wp_no','description','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion'])},
+  submittals: {keys:new Set(['cost_code','wp_no','description','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
 };
 function getActiveCols() {
   const v = WP_TABLE_VIEWS[_wpTableView] || WP_TABLE_VIEWS.overview;
@@ -595,7 +595,7 @@ function buildMetrics(wps){
   const card = (lbl,val,cls) => '<div class="metric-card"><div class="metric-label">'+lbl+'</div><div class="metric-value '+cls+'">'+val+'</div></div>';
 
   const costCards = [
-    card('Procurement Budget (BCB)', fmt(totalBudget), ''),
+    card('Procurement Procurement Budget (BCB)', fmt(totalBudget), ''),
     card('Awarded Cost', fmt(totalAwarded), ''),
     card('Procurement Cost to Complete', fmt(costToComplete), ''),
     card('Procurement Estimate at Completion', fmt(eac), ''),
@@ -1294,6 +1294,14 @@ AppAuth.requireLogin(async (user, profile) => {
     } catch(e) { alert('Error: '+e.message); }
   };
 
+  // Comma formatting for ep-budget
+  (function() {
+    const el = document.getElementById('ep-budget');
+    if (!el) return;
+    el.addEventListener('blur',  () => { const v=parseFloat(el.value.replace(/,/g,'')); if(!isNaN(v)) el.value=v.toLocaleString('en-US'); });
+    el.addEventListener('focus', () => { el.value = el.value.replace(/,/g,''); });
+  })();
+
   window.openEditProjectModal = async function() {
     const meta = await WPDb.getProject(projId);
     if (!meta) return;
@@ -1301,7 +1309,7 @@ AppAuth.requireLogin(async (user, profile) => {
     document.getElementById('ep-name').value = meta.name !== meta.id ? (meta.name||'') : '';
     document.getElementById('ep-location').value = meta.location || '';
     document.getElementById('ep-description').value = meta.description || '';
-    document.getElementById('ep-budget').value = meta.budget_bcb || '';
+    const _epb = meta.budget_bcb; document.getElementById('ep-budget').value = _epb ? parseFloat(_epb).toLocaleString('en-US') : '';
     document.getElementById('ep-error').style.display = 'none';
     document.getElementById('ep-modal').style.display = 'flex';
     document.getElementById('ep-name').focus();
@@ -1320,7 +1328,7 @@ AppAuth.requireLogin(async (user, profile) => {
         name,
         location: document.getElementById('ep-location').value.trim()||null,
         description: document.getElementById('ep-description').value.trim()||null,
-        budget_bcb: parseFloat(document.getElementById('ep-budget').value)||null,
+        budget_bcb: parseFloat(document.getElementById('ep-budget').value.replace(/,/g,''))||null,
       });
       closeEditProjectModal();
       location.reload();
@@ -1368,7 +1376,7 @@ AppAuth.requireLogin(async (user, profile) => {
     const headers = [
       'Cost Code','WP No.','Description','Zone','Trade',
       'Planned Award Date','Actual Award Date','Target Delivery Date','Target Completion Date','Target Installation Date',
-      'Lead Time (Days)','Budget BCB (PHP)','Total Awarded (PHP)',
+      'Lead Time (Days)','Procurement Budget (BCB) (PHP)','Total Awarded (PHP)',
       'Procurement Status','Award Status',
       'Contractor','PO/JO Count','PO/JO Numbers','Remarks'
     ];
@@ -1800,7 +1808,7 @@ AppAuth.requireLogin(async (user, profile) => {
             <input id="wqm-completion" type="date" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Budget BCB (₱) *</label>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Procurement Budget (BCB) (₱) *</label>
             <input id="wqm-budget" type="number" step="0.01" placeholder="e.g. 2500000" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
           </div>
           <div>
@@ -1882,7 +1890,7 @@ window.saveQuickWP = async function() {
   if (!v('wqm-trade')) { errEl.textContent='Trade is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-award-date')) { const _de=document.getElementById('wqm-award-date'); errEl.textContent=_de&&_de.validity.badInput?'Planned Award Date: invalid date — use the calendar picker.':'Planned Award Date is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-completion')) { const _de=document.getElementById('wqm-completion'); errEl.textContent=_de&&_de.validity.badInput?'Target Completion: invalid date — use the calendar picker.':'Target Completion is required.'; errEl.style.display='block'; return; }
-  if (!n('wqm-budget')) { errEl.textContent='Budget BCB is required.'; errEl.style.display='block'; return; }
+  if (!n('wqm-budget')) { errEl.textContent='Procurement Budget (BCB) is required.'; errEl.style.display='block'; return; }
   if (!_wqmProjectId) { errEl.textContent='No project selected.'; errEl.style.display='block'; return; }
 
   const btn = document.getElementById('wqm-save-btn');
@@ -1985,8 +1993,8 @@ window.saveQuickWP = async function() {
         <input id="ep-description" type="text" placeholder="Optional description" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div>
-        <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:6px">Budget BCB (₱)</div>
-        <input id="ep-budget" type="number" placeholder="e.g. 274900000" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+        <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:6px">Procurement Budget (BCB) (₱)</div>
+        <input id="ep-budget" type="text" inputmode="numeric" placeholder="e.g. 274,900,000" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div id="ep-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 12px;font-size:13px"></div>
     </div>

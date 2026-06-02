@@ -229,6 +229,7 @@
       <div id="crm-current-role" style="font-size:13px;font-weight:600;color:#231F20;margin-bottom:16px;padding:8px 12px;background:#f9f9f9;border-radius:8px"></div>
       <div class="modal-field-label" style="margin-bottom:6px">New role</div>
       <select class="role-select" id="crm-role-select">
+        <option value="viewer">Viewer — view assigned WPs (no cost data)</option>
         <option value="user">User — view &amp; update assigned WPs</option>
         <option value="admin">Admin — manage assigned projects &amp; users</option>
         <option value="super_admin" id="crm-opt-super">Super Admin — full access</option>
@@ -268,8 +269,8 @@
           <textarea id="np-description" placeholder="Brief project description..." rows="2" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;resize:vertical"></textarea>
         </div>
         <div>
-          <div class="modal-field-label">Budget BCB (₱)</div>
-          <input id="np-budget" type="number" placeholder="e.g. 274900000" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none">
+          <div class="modal-field-label">Procurement Budget (BCB) (₱)</div>
+          <input id="np-budget" type="text" inputmode="numeric" placeholder="e.g. 274,900,000" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none">
         </div>
         <div>
           <div class="modal-field-label">Assign Users (optional)</div>
@@ -828,6 +829,14 @@
     });
   };
 
+  // Comma formatting for budget input
+  (function() {
+    const el = document.getElementById('np-budget');
+    if (!el) return;
+    el.addEventListener('blur',  () => { const v=parseFloat(el.value.replace(/,/g,'')); if(!isNaN(v)) el.value=v.toLocaleString('en-US'); });
+    el.addEventListener('focus', () => { el.value = el.value.replace(/,/g,''); });
+  })();
+
   window.closeNewProjectModal = function() {
     document.getElementById('newProjectModal').classList.add('hidden');
     ['np-id','np-name','np-location','np-description','np-budget'].forEach(id=>{
@@ -841,7 +850,7 @@
     const name = document.getElementById('np-name').value.trim();
     const location = document.getElementById('np-location').value.trim();
     const description = document.getElementById('np-description').value.trim();
-    const budget = parseFloat(document.getElementById('np-budget').value)||null;
+    const budget = parseFloat(document.getElementById('np-budget').value.replace(/,/g,''))||null;
     const errEl = document.getElementById('np-error');
     if (!id||!name){ errEl.textContent='Project Code and Name are required.'; errEl.style.display='block'; return; }
     if (!/^[A-Z0-9]+$/.test(id)){ errEl.textContent='Project Code must be letters/numbers only (e.g. AVR102).'; errEl.style.display='block'; return; }

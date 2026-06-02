@@ -337,7 +337,7 @@
             <div class="form-grid">
               <div class="form-group">
                 <label>Approved Budget / ABC (₱) *</label>
-                <input type="number" id="f-budget" placeholder="e.g. 185000000" min="0"/>
+                <input type="text" inputmode="numeric" id="f-budget" placeholder="e.g. 185,000,000"/>
                 <span class="hint" id="budget-display"></span>
               </div>
               <div class="form-group">
@@ -682,8 +682,8 @@
 
   /* Live variance display */
   function updateVariance() {
-    const b = parseFloat(document.getElementById('f-budget').value);
-    const c = parseFloat(document.getElementById('f-contract').value);
+    const b = parseFloat(document.getElementById('f-budget').value.replace(/,/g,''));
+    const c = parseFloat(document.getElementById('f-contract').value.replace(/,/g,''));
     document.getElementById('budget-display').textContent = b ? fmtPeso(b) : '';
     document.getElementById('contract-display').textContent = c ? fmtPeso(c) : '';
     if (b && c) {
@@ -698,8 +698,15 @@
     }
   }
 
+  function fmtComma(el) {
+    const raw = parseFloat(el.value.replace(/,/g, ''));
+    if (!isNaN(raw)) el.value = raw.toLocaleString('en-US');
+  }
   ['f-budget','f-contract'].forEach(id => {
-    document.getElementById(id).addEventListener('input', updateVariance);
+    const el = document.getElementById(id);
+    el.addEventListener('input', updateVariance);
+    el.addEventListener('blur',  () => fmtComma(el));
+    el.addEventListener('focus', () => { el.value = el.value.replace(/,/g, ''); });
   });
 
   initMobileMenu();
@@ -839,7 +846,7 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-actual-delivery', existingWP.actual_delivery || '');
       fill('f-target-installation', existingWP.target_installation);
       fill('f-target-completion', existingWP.target_completion);
-      fill('f-budget', existingWP.approved_budget_bcb);
+      const _bv = existingWP.approved_budget_bcb; document.getElementById('f-budget').value = _bv ? parseFloat(_bv).toLocaleString('en-US') : '';
       fill('f-contract', existingWP.total_awarded);
       fill('f-award-status', existingWP.award_status);
       fill('f-payment-terms-days', existingWP.payment_terms_days);
@@ -874,7 +881,7 @@ AppAuth.requireLogin(async (user, profile) => {
   });
 
   function getVal(id) { return document.getElementById(id).value.trim(); }
-  function getNum(id) { const v=parseFloat(document.getElementById(id).value); return isNaN(v)?null:v; }
+  function getNum(id) { const v=parseFloat(document.getElementById(id).value.replace(/,/g,'')); return isNaN(v)?null:v; }
 
   async function submitForm() {
     const alertEl = document.getElementById('alert');
@@ -1007,7 +1014,7 @@ AppAuth.requireLogin(async (user, profile) => {
       'Cost Code No.','Trade','Works','WP No.','Work Package Description','Zone','Scope of Work',
       'Charging Type','Contract Package No.','CO Description',
       'Proposed Vendors','No. of PO/JO','PO/JO Numbers',
-      'Budget BCB (PHP)','Total Awarded (PHP)','Award Status','Procurement Status',
+      'Procurement Budget (BCB) (PHP)','Total Awarded (PHP)','Award Status','Procurement Status',
       'Planned Award Date','Actual Award Date',
       'Target Delivery Date','Actual Delivery Date','Target Completion Date','Target Installation Date',
       'Lead Time (Days)','Remarks'
@@ -1104,7 +1111,7 @@ AppAuth.requireLogin(async (user, profile) => {
         // New 25-column template: Cost Code No.(0) Trade(1) Works(2) WP No.(3) Description(4) Zone(5)
         // Scope(6) Charging Type(7) Contract Package No.(8) CO Description(9)
         // Vendors(10) No. of PO/JO(11) PO/JO Numbers(12)
-        // Budget BCB(13) Total Awarded(14) Award Status(15) Procurement Status(16)
+        // Procurement Budget (BCB)(13) Total Awarded(14) Award Status(15) Procurement Status(16)
         // Planned Award(17) Actual Award(18) Target Delivery(19) Actual Delivery(20)
         // Target Completion(21) Target Installation(22) Lead Time(23) Remarks(24)
         const isNew = r.length >= 20;
