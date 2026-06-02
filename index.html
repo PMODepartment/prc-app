@@ -527,6 +527,17 @@
 <script>
   initMobileMenu();
 
+  // Trade name normalizer — must be at script scope so it's available before the async callback runs
+  const _TRADE_NORM = {
+    'general requirement':'General Requirements','general requirements':'General Requirements',
+    'structural works':'Structural Works','architectural works':'Architectural Works',
+    'site works':'Site Works','site development':'Site Development Works',
+    'mechanical works':'Mechanical Works','electrical works':'Electrical Works',
+    'plumbing works':'Plumbing Works','fire protection works':'Fire Protection Works',
+    'auxiliary works':'Auxiliary Works','allied services':'Allied Services',
+  };
+  function normTrade(t){ if(!t)return t; const k=t.trim().toLowerCase(); return _TRADE_NORM[k]||t.trim(); }
+
   // Show a retry prompt if loading takes more than 20 s (Supabase cold-start)
   const _loadTimeout = setTimeout(() => {
     const ov = document.getElementById('loading');
@@ -648,17 +659,6 @@
     const IDX_TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
       'Architectural Works','Mechanical Works','Electrical Works','Auxiliary Works',
       'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
-
-    // ── Trade name normalizer (maps legacy/wrong names to canonical) ──
-    const _TRADE_NORM = {
-      'general requirement':'General Requirements','general requirements':'General Requirements',
-      'structural works':'Structural Works','architectural works':'Architectural Works',
-      'site works':'Site Works','site development':'Site Development Works',
-      'mechanical works':'Mechanical Works','electrical works':'Electrical Works',
-      'plumbing works':'Plumbing Works','fire protection works':'Fire Protection Works',
-      'auxiliary works':'Auxiliary Works','allied services':'Allied Services',
-    };
-    function normTrade(t){ if(!t)return t; const k=t.trim().toLowerCase(); return _TRADE_NORM[k]||t.trim(); }
 
     // ── Trade ordering + collapse state ──────────────────────────
     const TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
