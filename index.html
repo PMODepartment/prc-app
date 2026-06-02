@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png"/>
   <title>Portfolio Overview — Megawide EPC</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -112,10 +113,8 @@
 
           <div class="view-tabs" id="view-tabs" style="flex:1;margin-bottom:0">
             <button class="view-tab active" onclick="switchTab('overview')"><i class="ti ti-layout-dashboard"></i>Overview</button>
+            <button class="view-tab" onclick="switchTab('dashboard')"><i class="ti ti-chart-bar"></i>Dashboard</button>
             <button class="view-tab" onclick="switchTab('backlog')"><i class="ti ti-clock"></i>Backlog</button>
-            <button class="view-tab" onclick="switchTab('budget')"><i class="ti ti-report-money"></i>Budget</button>
-            <button class="view-tab" onclick="switchTab('schedule')"><i class="ti ti-calendar"></i>Schedule</button>
-            <button class="view-tab" onclick="switchTab('works')"><i class="ti ti-tool"></i>Works</button>
             <button class="view-tab" onclick="switchTab('wplist')"><i class="ti ti-table"></i>WP List</button>
             <button class="view-tab" onclick="switchTab('claims')" style="display:none"><i class="ti ti-file-invoice"></i>Claims</button>
           </div>
@@ -128,28 +127,20 @@
             <div style="flex:1"><strong>Portfolio view is read-only.</strong> Click any project card to enter its dashboard and manage work packages.</div>
             <button onclick="document.getElementById('readonly-notice').style.display='none'" style="background:none;border:none;cursor:pointer;color:#D97706;font-size:16px;line-height:1;padding:0;flex-shrink:0;margin-top:-1px" title="Dismiss">×</button>
           </div>
-          <div class="metrics-grid" id="metrics-grid"></div>
-          <div class="grid-2">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Period</div>
-              <div style="position:relative;height:220px"><canvas id="c-ov-period"></canvas></div>
+          <!-- Two KPI groups side by side -->
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+            <div style="flex:1;min-width:280px">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Cost Overview</div>
+              <div id="metrics-cost" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
             </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
-              <div style="position:relative;height:220px"><canvas id="c-ov-status"></canvas></div>
-            </div>
-          </div>
-          <div class="grid-2">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar-mid"></i>Work Package by Trade</div>
-              <div style="position:relative;height:260px"><canvas id="c-ov-trade"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget and Awarded by Trade (₱M)</div>
-              <div style="position:relative;height:260px"><canvas id="c-ov-bud-trade"></canvas></div>
+            <div style="flex:1;min-width:280px">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Work Package Status</div>
+              <div id="metrics-wp" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
             </div>
           </div>
-          <!-- Project cards — moved below charts -->
+          <!-- Hidden metrics-grid kept for JS compatibility -->
+          <div class="metrics-grid" id="metrics-grid" style="display:none"></div>
+          <!-- Project cards below KPIs -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;margin-top:4px;flex-wrap:wrap">
             <button id="btn-view-cards" onclick="setProjectView('cards')" class="btn" style="background:#231F20;color:#fff;border-color:#231F20"><i class="ti ti-layout-grid"></i><span class="hide-mobile"> Cards</span></button>
             <button id="btn-view-table" onclick="setProjectView('table')" class="btn"><i class="ti ti-table"></i><span class="hide-mobile"> Table</span></button>
@@ -183,122 +174,98 @@
           </div>
         </div>
 
-        <!-- ══ BACKLOG TAB ══ -->
-        <div id="tab-backlog" style="display:none">
-          <div class="grid-2" style="margin-bottom:14px">
-            <div class="panel" style="text-align:center">
-              <div id="bl-kpi-due" style="font-size:40px;font-weight:800;color:#EE3124">—</div>
-              <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:4px">WPs Due but Not Awarded</div>
+        <!-- ══ DASHBOARD TAB ══ -->
+        <div id="tab-dashboard" style="display:none">
+          <!-- Period chart with toggle -->
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded Cost by Period</span>
+              <div style="display:flex;gap:4px">
+                <button id="idx-dash-btn-monthly" onclick="setIdxDashPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
+                <button id="idx-dash-btn-quarterly" onclick="setIdxDashPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
+              </div>
             </div>
-            <div class="panel" style="text-align:center">
-              <div id="bl-kpi-upcoming" style="font-size:40px;font-weight:800;color:#D97706">—</div>
-              <div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:4px">Due in Next 30 Days</div>
+            <div style="position:relative;height:240px"><canvas id="c-idx-dash-period"></canvas></div>
+          </div>
+          <!-- WP by Trade + WP Status donut -->
+          <div class="grid-2" style="margin-bottom:14px">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-list"></i>Work Package by Trade</div>
+              <div style="position:relative;height:240px"><canvas id="c-idx-dash-trade"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+              <div style="position:relative;height:240px"><canvas id="c-idx-dash-status"></canvas></div>
             </div>
           </div>
+          <!-- Backlog table -->
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog — Not Awarded</div>
+            <div style="overflow-x:auto">
+              <table class="data-table" id="idx-dash-backlog-table" style="font-size:11px">
+                <thead><tr>
+                  <th>Project</th><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Budget (BCB)</th><th>Status</th>
+                </tr></thead>
+                <tbody id="idx-dash-backlog-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <!-- Top 5 panels -->
+          <div class="grid-3">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
+              <div class="rank-list" id="idx-rank-value"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-trending-up"></i>Top 5 Savings</div>
+              <div class="rank-list" id="idx-rank-gains"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
+              <div class="rank-list" id="idx-rank-losses"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ BACKLOG TAB ══ -->
+        <div id="tab-backlog" style="display:none">
+          <!-- Backlog table first -->
+          <div class="panel" style="margin-bottom:14px;padding:0;overflow:hidden">
+            <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0">
+              <div class="panel-title" style="margin:0"><i class="ti ti-list"></i>Backlog — Not Awarded WPs</div>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="data-table" id="bl-table" style="font-size:11px">
+                <thead><tr><th>Project</th><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Aging (d)</th><th>Budget BCB</th><th>Status</th><th>Submittal</th></tr></thead>
+                <tbody id="bl-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <!-- Charts below -->
           <div class="grid-2" style="margin-bottom:14px">
             <div class="panel">
               <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Aging Bucket</div>
-              <div style="position:relative;height:180px"><canvas id="c-bl-aging"></canvas></div>
-              <div class="panel-title" style="margin-top:16px"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
-              <div style="position:relative;height:180px"><canvas id="c-bl-status"></canvas></div>
+              <div style="position:relative;height:200px"><canvas id="c-bl-aging"></canvas></div>
             </div>
-            <div class="panel" style="padding:0;overflow:hidden">
-              <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0">
-                <div class="panel-title" style="margin:0"><i class="ti ti-list"></i>Backlog — Not Awarded WPs</div>
-              </div>
-              <div style="overflow-x:auto;max-height:400px;overflow-y:auto">
-                <table class="data-table" id="bl-table" style="font-size:11px">
-                  <thead><tr><th>Project</th><th>WP No.</th><th>Description</th><th>Aging (d)</th><th>Planned Award</th><th>Budget BCB</th></tr></thead>
-                  <tbody id="bl-tbody"></tbody>
-                </table>
-              </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+              <div style="position:relative;height:200px"><canvas id="c-bl-status"></canvas></div>
             </div>
           </div>
           <div class="grid-2">
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Period</div>
+              <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                <span><i class="ti ti-chart-bar"></i>Work Package by Period</span>
+                <div style="display:flex;gap:4px">
+                  <button id="idx-bl-btn-quarterly" onclick="setIdxBlPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
+                  <button id="idx-bl-btn-monthly" onclick="setIdxBlPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
+                </div>
+              </div>
               <div style="position:relative;height:220px"><canvas id="c-bl-period"></canvas></div>
             </div>
             <div class="panel">
               <div class="panel-title"><i class="ti ti-chart-donut"></i>WP by Submittal Status</div>
               <div style="position:relative;height:220px"><canvas id="c-bl-submittal"></canvas></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ══ BUDGET TAB ══ -->
-        <div id="tab-budget" style="display:none">
-          <div class="metrics-grid" id="budget-metrics" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px"></div>
-          <div class="grid-2">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Period</div>
-              <div style="position:relative;height:240px"><canvas id="c-bud-period"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget and Awarded by Trade (₱M)</div>
-              <div style="position:relative;height:240px"><canvas id="c-bud-trade"></canvas></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ══ SCHEDULE TAB ══ -->
-        <div id="tab-schedule" style="display:none">
-          <div class="grid-2" style="margin-bottom:14px">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Period (Planned vs Actual)</div>
-              <div style="position:relative;height:240px"><canvas id="c-sch-period"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar-mid"></i>Work Package by Trade</div>
-              <div style="position:relative;height:240px"><canvas id="c-sch-trade"></canvas></div>
-            </div>
-          </div>
-          <div class="grid-2">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
-              <div style="position:relative;height:220px"><canvas id="c-sch-status"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-table"></i>Schedule Summary</div>
-              <div style="overflow-x:auto">
-                <table class="data-table" id="sch-table" style="font-size:11px">
-                  <thead><tr><th>Project</th><th>Total WP</th><th>Awarded</th><th>Due Not Awd</th><th>Not Due</th><th>% Awarded</th></tr></thead>
-                  <tbody id="sch-tbody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ══ WORKS TAB ══ -->
-        <div id="tab-works" style="display:none">
-          <div class="panel" style="margin-bottom:14px">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) by Period per Trade</div>
-            <div style="position:relative;height:260px"><canvas id="c-wk-period"></canvas></div>
-          </div>
-          <div class="grid-3" style="margin-bottom:14px">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Budget by Trade</div>
-              <div style="position:relative;height:200px"><canvas id="c-wk-bud"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Awarded by Trade</div>
-              <div style="position:relative;height:200px"><canvas id="c-wk-awd"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>WP Count by Trade</div>
-              <div style="position:relative;height:200px"><canvas id="c-wk-count"></canvas></div>
-            </div>
-          </div>
-          <div class="panel" style="padding:0;overflow:hidden">
-            <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0">
-              <div class="panel-title" style="margin:0"><i class="ti ti-table"></i>Budget Summary by Trade</div>
-            </div>
-            <div style="overflow-x:auto">
-              <table class="data-table" id="wk-table" style="font-size:11px">
-                <thead><tr><th>Trade</th><th>Total WP</th><th>Budget BCB</th><th>Awarded</th><th>Variance</th><th>% Awd</th></tr></thead>
-                <tbody id="wk-tbody"></tbody>
-              </table>
             </div>
           </div>
         </div>
@@ -328,7 +295,7 @@
             <div style="overflow-x:auto">
               <table class="data-table" id="wp-mon-table" style="font-size:11px;min-width:900px">
                 <thead><tr>
-                  <th>Project</th><th>WP No.</th><th>Description</th><th>Status</th>
+                  <th>Project</th><th>WP No.</th><th style="position:sticky;left:0;background:#fff;z-index:2;min-width:180px;max-width:220px;">Description</th><th>Status</th>
                   <th>Budget</th><th>Awarded</th><th>Variance</th><th>%Var</th>
                   <th>Planned Award</th><th>Actual Award</th><th>Aging</th><th>Submittal</th>
                 </tr></thead>
@@ -483,8 +450,40 @@
     }
 
     // ── Tab switching ─────────────────────────────────────────────
-    const ALL_TABS = ['overview','backlog','budget','schedule','works','wplist','claims'];
+    const ALL_TABS = ['overview','dashboard','backlog','wplist','claims'];
     let _activeTab = 'overview';
+    let _idxDashPeriodMode = 'monthly';
+    let _idxBlPeriodMode = 'quarterly';
+
+    window.setIdxDashPeriodMode = function(mode) {
+      _idxDashPeriodMode = mode;
+      const btnM = document.getElementById('idx-dash-btn-monthly');
+      const btnQ = document.getElementById('idx-dash-btn-quarterly');
+      const onStyle = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
+      const offStyle = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+      if(btnM) btnM.style.cssText = mode==='monthly' ? onStyle : offStyle;
+      if(btnQ) btnQ.style.cssText = mode==='quarterly' ? onStyle : offStyle;
+      if(_lastWPs) {
+        if(mode==='monthly') Charts.budgetAwardedByPeriod('c-idx-dash-period', _lastWPs);
+        else Charts.wpByPeriodQuarterly('c-idx-dash-period', _lastWPs);
+      }
+    };
+
+    window.setIdxBlPeriodMode = function(mode) {
+      _idxBlPeriodMode = mode;
+      const btnQ = document.getElementById('idx-bl-btn-quarterly');
+      const btnM = document.getElementById('idx-bl-btn-monthly');
+      const onStyle = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
+      const offStyle = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+      if(btnQ) btnQ.style.cssText = mode==='quarterly' ? onStyle : offStyle;
+      if(btnM) btnM.style.cssText = mode==='monthly' ? onStyle : offStyle;
+      if(_lastWPs) {
+        const notAwarded = _lastWPs.filter(w => w.award_status !== 'Awarded');
+        if(mode==='monthly') Charts.budgetAwardedByPeriod('c-bl-period', notAwarded);
+        else Charts.wpByPeriodQuarterly('c-bl-period', notAwarded);
+      }
+    };
+
     window.switchTab = function(tab) {
       _activeTab = tab;
       ALL_TABS.forEach(t => {
@@ -506,113 +505,125 @@
       ids.forEach(id => { try { const c = Chart.getChart(document.getElementById(id)); if(c) c.destroy(); } catch(e){} });
     }
 
+    function wpNumSort(a, b) {
+      const nums = s => (s||'').match(/\d+/g)||[];
+      const na = nums(a), nb = nums(b);
+      for(let i=0;i<Math.max(na.length,nb.length);i++){
+        const d = (parseInt(na[i])||0) - (parseInt(nb[i])||0);
+        if(d!==0) return d;
+      }
+      return String(a).localeCompare(String(b));
+    }
+
+    function idxBuildRankList(elId, items, fmt) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      if (!items.length) { el.innerHTML = '<div style="color:#aaa;font-size:11px;padding:10px">No data</div>'; return; }
+      el.innerHTML = items.map((it,i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f5f5f5">
+          <span style="font-size:11px;font-weight:700;color:#888;min-width:16px">${i+1}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.name}</div>
+            <div style="font-size:10px;color:#aaa">${it.sub||''}</div>
+          </div>
+          <span style="font-size:11px;font-weight:700;color:${it.color||'#231F20'};white-space:nowrap">${fmt(it.val)}</span>
+        </div>`).join('');
+    }
+
     function _renderTab(tab, wps, filt, allStats) {
       const now = new Date();
       if (tab === 'overview') {
-        _destroyCharts(['c-ov-period','c-ov-status','c-ov-trade','c-ov-bud-trade']);
-        Charts.budgetAwardedByPeriod('c-ov-period', wps);
-        Charts.wpStatusDonut('c-ov-status', wps);
-        Charts.wpByTrade('c-ov-trade', wps);
-        Charts.budgetByTradeHBar('c-ov-bud-trade', wps);
+        // Overview: just KPI groups — rendered in renderAll
+      } else if (tab === 'dashboard') {
+        _destroyCharts(['c-idx-dash-period','c-idx-dash-trade','c-idx-dash-status']);
+        if(_idxDashPeriodMode==='monthly') Charts.budgetAwardedByPeriod('c-idx-dash-period', wps);
+        else Charts.wpByPeriodQuarterly('c-idx-dash-period', wps);
+        Charts.wpByTrade('c-idx-dash-trade', wps);
+        Charts.wpStatusDonut('c-idx-dash-status', wps);
+
+        // Backlog table
+        const notAwarded = [...wps.filter(w => w.award_status !== 'Awarded')].sort((a,b) => {
+          const agA = a.awarding_date ? (now-new Date(a.awarding_date)) : -Infinity;
+          const agB = b.awarding_date ? (now-new Date(b.awarding_date)) : -Infinity;
+          return agB - agA;
+        });
+        const dbt = document.getElementById('idx-dash-backlog-tbody');
+        if(dbt) dbt.innerHTML = notAwarded.map(w => {
+          const aging = w.awarding_date ? Math.round((now-new Date(w.awarding_date))/86400000) : null;
+          const agStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : '';
+          return `<tr>
+            <td style="font-weight:600;font-size:11px">${w.project_id||'—'}</td>
+            <td>${w.wp_no||'—'}</td>
+            <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.description||'—'}</td>
+            <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
+            <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
+            <td>${w.approved_budget_bcb?Fmt.money(w.approved_budget_bcb):'—'}</td>
+            <td><span style="font-size:10px;font-weight:600;color:${w.award_status==='Awarded'?'#2D9B6F':w.award_status==='Partially Awarded'?'#D97706':'#EE3124'}">${w.award_status||'—'}</span></td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+
+        // Top 5
+        const withBoth = wps.filter(w=>w.approved_budget_bcb>0&&w.total_awarded>0);
+        const variance = w => (w.approved_budget_bcb||0)-(w.total_awarded||0);
+        idxBuildRankList('idx-rank-value',
+          [...wps].filter(w=>w.total_awarded>0).sort((a,b)=>(b.total_awarded||0)-(a.total_awarded||0)).slice(0,5)
+            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.project_id?' · '+w.project_id:''),val:w.total_awarded,color:'#282C28'})),
+          v=>Fmt.money(v));
+        idxBuildRankList('idx-rank-gains',
+          withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
+            .map(w=>({name:w.description,sub:(w.wp_no||'')+' · '+(w.project_id||''),val:variance(w),color:'#2D9B6F'})),
+          v=>'+'+Fmt.money(v));
+        idxBuildRankList('idx-rank-losses',
+          withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
+            .map(w=>({name:w.description,sub:(w.wp_no||'')+' · '+(w.project_id||''),val:Math.abs(variance(w)),color:'#EE3124'})),
+          v=>'-'+Fmt.money(v));
+
       } else if (tab === 'backlog') {
         const notAwarded = wps.filter(w => w.award_status !== 'Awarded');
-        const due = notAwarded.filter(w => w.awarding_date && new Date(w.awarding_date) <= now);
-        const soon = notAwarded.filter(w => w.awarding_date && new Date(w.awarding_date) > now && (new Date(w.awarding_date)-now)/86400000 <= 30);
-        const el1 = document.getElementById('bl-kpi-due'), el2 = document.getElementById('bl-kpi-upcoming');
-        if (el1) el1.textContent = due.length;
-        if (el2) el2.textContent = soon.length;
         _destroyCharts(['c-bl-aging','c-bl-status','c-bl-period','c-bl-submittal']);
         Charts.wpAgingBuckets('c-bl-aging', notAwarded, '');
         Charts.wpStatusDonut('c-bl-status', wps);
-        Charts.wpByPeriodQuarterly('c-bl-period', wps);
+        if(_idxBlPeriodMode==='monthly') Charts.budgetAwardedByPeriod('c-bl-period', notAwarded);
+        else Charts.wpByPeriodQuarterly('c-bl-period', notAwarded);
         Charts.wpSubmittalDonut('c-bl-submittal', wps);
-        // Backlog table
+        // Backlog table — sorted most overdue first, grouped by trade with numeric WP sort
+        const trades = [...new Set(notAwarded.map(w=>w.trade||'').filter(Boolean))].sort();
+        const sortedNA = [];
+        trades.forEach(t => {
+          notAwarded.filter(w=>w.trade===t).sort((a,b)=>wpNumSort(a.wp_no,b.wp_no)).forEach(w=>sortedNA.push(w));
+        });
+        notAwarded.filter(w=>!w.trade).sort((a,b)=>wpNumSort(a.wp_no,b.wp_no)).forEach(w=>sortedNA.push(w));
+        // Re-sort by aging within each group
         const sorted = [...notAwarded].sort((a,b) => {
-          const ag = w => w.awarding_date ? Math.floor((now-new Date(w.awarding_date))/86400000) : -9999;
-          return ag(b) - ag(a);
+          const agA = a.awarding_date ? (now-new Date(a.awarding_date)) : -Infinity;
+          const agB = b.awarding_date ? (now-new Date(b.awarding_date)) : -Infinity;
+          return agB - agA;
         });
         const tbody = document.getElementById('bl-tbody');
-        if (tbody) tbody.innerHTML = sorted.slice(0,100).map(w => {
-          const aging = w.awarding_date ? Math.floor((now-new Date(w.awarding_date))/86400000) : null;
-          const agStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : '';
-          return `<tr>
-            <td style="font-weight:600">${w.project_id||'—'}</td>
-            <td>${w.wp_no||'—'}</td>
-            <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.description||'—'}</td>
-            <td style="${agStyle}">${aging!=null?(aging>0?'+'+aging+'d':aging===0?'today':aging+'d'):'—'}</td>
-            <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
-            <td>${w.approved_budget_bcb?Fmt.money(w.approved_budget_bcb):'—'}</td>
-          </tr>`;
-        }).join('');
-      } else if (tab === 'budget') {
-        const totalBCB = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-        const totalAwd = wps.reduce((s,w)=>s+(w.total_awarded||0),0);
-        const ctc = wps.filter(w=>w.award_status!=='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-        const eac = totalAwd + ctc;
-        const variance = totalBCB - eac;
-        const pctVar = totalBCB ? ((variance/totalBCB)*100).toFixed(1) : '0.0';
-        buildMetrics('budget-metrics', [
-          { lbl:'Budget BCB',       val:Fmt.moneyFull(totalBCB), sub:'approved BCB',           cls:'', accent:'dark' },
-          { lbl:'Awarded Cost',     val:Fmt.moneyFull(totalAwd), sub:'total awarded',          cls:'green', accent:'green' },
-          { lbl:'Cost to Complete', val:Fmt.moneyFull(ctc),      sub:'remaining budget',       cls:'', accent:'dark' },
-          { lbl:'EAC',              val:Fmt.moneyFull(eac),      sub:'estimate at completion', cls:'', accent:'dark' },
-          { lbl:'Variance',         val:(variance>=0?'+':'')+Fmt.moneyFull(variance), sub:variance>=0?'net savings':'net overrun', cls:variance>=0?'green':'red', accent:variance>=0?'green':'red' },
-          { lbl:'% Variance',       val:(parseFloat(pctVar)>=0?'+':'')+pctVar+'%',   sub:'budget vs EAC', cls:parseFloat(pctVar)>=0?'green':'red', accent:parseFloat(pctVar)>=0?'green':'red' },
-        ]);
-        _destroyCharts(['c-bud-period','c-bud-trade']);
-        Charts.budgetAwardedByPeriod('c-bud-period', wps);
-        Charts.budgetByTradeHBar('c-bud-trade', wps);
-      } else if (tab === 'schedule') {
-        _destroyCharts(['c-sch-period','c-sch-trade','c-sch-status']);
-        Charts.wpByPeriodQuarterly('c-sch-period', wps);
-        Charts.wpByTrade('c-sch-trade', wps);
-        Charts.wpStatusDonut('c-sch-status', wps);
-        // Schedule summary table
-        const tbody = document.getElementById('sch-tbody');
-        if (tbody) tbody.innerHTML = filt.map((p,i) => {
-          const s = allStats[i];
-          const pWps = wps.filter(w=>w.project_id===p.id);
-          const due = pWps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<=now).length;
-          const notDue = pWps.filter(w=>w.award_status!=='Awarded'&&(!w.awarding_date||new Date(w.awarding_date)>now)).length;
-          return `<tr>
-            <td><span style="font-size:10px;font-weight:700;background:#EE3124;color:#fff;padding:2px 7px;border-radius:4px">${p.id}</span></td>
-            <td style="text-align:center">${pWps.length}</td>
-            <td style="text-align:center;color:#2D9B6F;font-weight:600">${s.awarded}</td>
-            <td style="text-align:center;color:#EE3124;font-weight:600">${due}</td>
-            <td style="text-align:center;color:#888">${notDue}</td>
-            <td style="text-align:center;font-weight:700">${s.awardRate}%</td>
-          </tr>`;
-        }).join('');
-      } else if (tab === 'works') {
-        _destroyCharts(['c-wk-period','c-wk-bud','c-wk-awd','c-wk-count']);
-        Charts.budgetByPeriodPerTrade('c-wk-period', wps);
-        Charts.budgetByTradeDonut('c-wk-bud', wps);
-        Charts.awardedByTradeDonut('c-wk-awd', wps);
-        // WP count by trade donut
-        const trades = [...new Set(wps.map(w=>w.trade).filter(Boolean))].sort();
-        const counts = trades.map(t => wps.filter(w=>w.trade===t).length);
-        const ctx = document.getElementById('c-wk-count');
-        if (ctx) {
-          const existing = Chart.getChart(ctx); if(existing) existing.destroy();
-          new Chart(ctx, { type:'doughnut', data:{labels:trades, datasets:[{data:counts, backgroundColor:['#282C28','#EE3124','#D97706','#2D9B6F','#6366F1','#0EA5E9','#F97316','#EC4899'],borderWidth:2}]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},padding:8}}}}});
+        if (tbody) {
+          const totalBudget = sorted.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+          tbody.innerHTML = sorted.map(w => {
+            const aging = w.awarding_date ? Math.floor((now-new Date(w.awarding_date))/86400000) : null;
+            const agStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : '';
+            const submittalLabel = w.submittal_type || (w.review_status==='approved'?'Approved':w.review_status==='pending_review'?'Submitted':'Not Required');
+            return `<tr>
+              <td style="font-weight:600;font-size:11px">${w.project_id||'—'}</td>
+              <td>${w.wp_no||'—'}</td>
+              <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.description||'—'}</td>
+              <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
+              <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
+              <td style="${agStyle}">${aging!=null?(aging>0?'+'+aging+'d':aging===0?'today':aging+'d'):'—'}</td>
+              <td>${w.approved_budget_bcb?Fmt.money(w.approved_budget_bcb):'—'}</td>
+              <td><span style="font-size:10px;font-weight:600;color:${w.award_status==='Awarded'?'#2D9B6F':w.award_status==='Partially Awarded'?'#D97706':'#EE3124'}">${w.award_status||'—'}</span></td>
+              <td style="font-size:10px;color:#888">${submittalLabel}</td>
+            </tr>`;
+          }).join('') +
+          (sorted.length ? `<tr style="background:#fafafa;font-weight:700;border-top:2px solid #e5e5e5">
+            <td colspan="6" style="font-size:11px;padding:8px 10px">TOTAL (${sorted.length} WPs)</td>
+            <td style="font-size:11px;padding:8px 10px">${Fmt.money(totalBudget)}</td>
+            <td colspan="2"></td>
+          </tr>` : '');
         }
-        // Works summary table
-        const tbody = document.getElementById('wk-tbody');
-        if (tbody) tbody.innerHTML = trades.map(t => {
-          const tWps = wps.filter(w=>w.trade===t);
-          const bud = tWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-          const awd = tWps.reduce((s,w)=>s+(w.total_awarded||0),0);
-          const vari = bud-awd;
-          const pct = bud?((awd/bud)*100).toFixed(1):'0.0';
-          return `<tr>
-            <td style="font-weight:600">${t}</td>
-            <td style="text-align:center">${tWps.length}</td>
-            <td style="text-align:right">${bud?Fmt.money(bud):'—'}</td>
-            <td style="text-align:right;color:#2D9B6F">${awd?Fmt.money(awd):'—'}</td>
-            <td style="text-align:right;${vari>=0?'color:#2D9B6F':'color:#EE3124'}">${bud?(vari>=0?'+':'')+Fmt.money(vari):'—'}</td>
-            <td style="text-align:center;font-weight:700">${pct}%</td>
-          </tr>`;
-        }).join('');
       } else if (tab === 'wplist') {
         _wpMonPage = 1;
         filterWPTable();
@@ -678,7 +689,16 @@
       if (!tbody) return;
       const start = (_wpMonPage - 1) * WP_MON_PER_PAGE;
       const page = rows.slice(start, start + WP_MON_PER_PAGE);
-      tbody.innerHTML = page.map(w => {
+
+      // Group page rows by trade for header rows
+      const tradesSeen = new Set();
+      let html = '';
+      page.forEach(w => {
+        const trade = w.trade || '(No Trade)';
+        if (!tradesSeen.has(trade)) {
+          tradesSeen.add(trade);
+          html += `<tr><td colspan="13" style="background:#f5f5f5;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;padding:6px 12px;border-bottom:1px solid #e5e5e5;">${trade}</td></tr>`;
+        }
         const bud = w.approved_budget_bcb || 0;
         const awd = w.total_awarded || 0;
         const vari = bud - awd;
@@ -686,10 +706,10 @@
         const aging = wpAging(w);
         const agingStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : aging > 0 ? 'color:#888' : '';
         const statusColor = w.award_status === 'Awarded' ? '#2D9B6F' : w.award_status === 'Partially Awarded' ? '#D97706' : '#EE3124';
-        return `<tr>
+        html += `<tr>
           <td style="font-weight:600;color:#444">${w.project_id||'—'}</td>
           <td>${w.wp_no||'—'}</td>
-          <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(w.description||'').replace(/"/g,'&quot;')}">${w.description||'—'}</td>
+          <td style="position:sticky;left:0;background:#fff;z-index:1;min-width:180px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(w.description||'').replace(/"/g,'&quot;')}">${w.description||'—'}</td>
           <td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${statusColor}22;color:${statusColor}">${w.award_status||'—'}</span></td>
           <td style="text-align:right">${bud?Fmt.money(bud):'—'}</td>
           <td style="text-align:right">${awd?Fmt.money(awd):'—'}</td>
@@ -700,7 +720,9 @@
           <td style="${agingStyle}">${aging!=null?(aging>0?aging+'d':'today'):'—'}</td>
           <td>${submittalLabel(w)}</td>
         </tr>`;
-      }).join('');
+      });
+      tbody.innerHTML = html;
+
       if (pager) {
         const total = rows.length;
         const totalPages = Math.ceil(total / WP_MON_PER_PAGE);
@@ -745,20 +767,26 @@
       const pctAwdWP   = filtWPs.length ? ((awarded.length / filtWPs.length) * 100).toFixed(1) : '0.0';
       const pctAwdVal  = totalBCB ? ((totalAwd / totalBCB) * 100).toFixed(1) : '0.0';
 
-      buildMetrics('metrics-grid', [
-        { lbl:'Budget BCB',         val:Fmt.moneyFull(totalBCB),   sub:'approved BCB',             cls:'', accent:'dark' },
-        { lbl:'Awarded Cost',       val:Fmt.moneyFull(totalAwd),   sub:'total awarded',            cls:'green', accent:'green' },
-        { lbl:'Cost to Complete',   val:Fmt.moneyFull(ctc),        sub:'remaining budget',         cls:'', accent:'dark' },
-        { lbl:'EAC',                val:Fmt.moneyFull(eac),        sub:'estimate at completion',   cls:'', accent:'dark' },
-        { lbl:'Variance',           val:(variance>=0?'+':'')+Fmt.moneyFull(variance), sub:variance>=0?'net savings':'net overrun', cls:variance>=0?'green':'red', accent:variance>=0?'green':'red' },
-        { lbl:'% Variance',         val:(parseFloat(pctVar)>=0?'+':'')+pctVar+'%', sub:'budget vs EAC', cls:parseFloat(pctVar)>=0?'green':'red', accent:parseFloat(pctVar)>=0?'green':'red' },
-        { lbl:'Total WP',           val:filtWPs.length,            sub:'work packages',            cls:'', accent:'dark' },
-        { lbl:'Awarded WP',         val:awarded.length,            sub:'fully awarded',            cls:'green', accent:'green' },
-        { lbl:'Due Not Awarded',    val:dueNotAwd,                 sub:'past target date',         cls:dueNotAwd>0?'red':'green', accent:dueNotAwd>0?'red':'dark' },
-        { lbl:'WP Not Due',         val:notDue,                    sub:'future target date',       cls:'', accent:'dark' },
-        { lbl:'% Awarded by WP',    val:pctAwdWP+'%',             sub:'count-based',              cls:'', accent:'dark' },
-        { lbl:'% Awarded by Value', val:pctAwdVal+'%',            sub:'value-based',              cls:'', accent:'dark' },
-      ]);
+      // Two-group KPI layout
+      const card = (lbl,val,cls) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls}">${val}</div></div>`;
+      const costEl = document.getElementById('metrics-cost');
+      const wpEl = document.getElementById('metrics-wp');
+      if(costEl) costEl.innerHTML = [
+        card('Procurement Budget (BCB)', Fmt.moneyFull(totalBCB), ''),
+        card('Awarded Cost', Fmt.moneyFull(totalAwd), 'green'),
+        card('Procurement Cost to Complete', Fmt.moneyFull(ctc), ''),
+        card('Procurement Estimate at Completion', Fmt.moneyFull(eac), ''),
+        card('Variance', (variance>=0?'+':'')+Fmt.moneyFull(variance), variance>=0?'green':'red'),
+        card('% Variance', (parseFloat(pctVar)>=0?'+':'')+pctVar+'%', parseFloat(pctVar)>=0?'green':'red'),
+      ].join('');
+      if(wpEl) wpEl.innerHTML = [
+        card('Total WP', filtWPs.length, ''),
+        card('Awarded WP', awarded.length, 'green'),
+        card('Due Not Awarded', dueNotAwd, dueNotAwd>0?'red':''),
+        card('WP Not Due', notDue, ''),
+        card('% Awarded by WP', pctAwdWP+'%', ''),
+        card('% Awarded by Value', pctAwdVal+'%', ''),
+      ].join('');
 
       // Project Cards
       const cardsEl = document.getElementById('project-cards');
@@ -788,11 +816,13 @@
       _tableData = filt.map((p,i)=>({p, s:allStats[i]}));
       if (document.getElementById('project-table-wrap')?.style.display !== 'none') renderProjectTable();
 
-      // WP monitoring data (for WP List tab)
-      _wpMonData = [...filtWPs].sort((a,b) => {
-        const ag = d => { const r=d.actual_awarding_date||(d.award_status==='Awarded'?null:d.awarding_date); return r?Math.floor((new Date()-new Date(r))/86400000):-Infinity; };
-        return ag(b) - ag(a);
+      // WP monitoring data (for WP List tab) — grouped by trade, sorted by WP-No numerically within each trade
+      const _trades = [...new Set(filtWPs.map(w=>w.trade||'').filter(Boolean))].sort();
+      _wpMonData = [];
+      _trades.forEach(t => {
+        filtWPs.filter(w=>w.trade===t).sort((a,b)=>wpNumSort(a.wp_no,b.wp_no)).forEach(w=>_wpMonData.push(w));
       });
+      filtWPs.filter(w=>!w.trade).sort((a,b)=>wpNumSort(a.wp_no,b.wp_no)).forEach(w=>_wpMonData.push(w));
       populateWPMonTradeFilter();
 
       // Render the currently active tab immediately

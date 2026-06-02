@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png"/>
   <title>Project — EPC WPM Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -140,17 +141,11 @@
           <button class="view-tab active" data-view="overview" onclick="switchView('overview')">
             <i class="ti ti-layout-dashboard"></i>Overview
           </button>
+          <button class="view-tab" data-view="dashboard" onclick="switchView('dashboard')">
+            <i class="ti ti-chart-bar"></i>Dashboard
+          </button>
           <button class="view-tab" data-view="backlog" onclick="switchView('backlog')">
             <i class="ti ti-clock"></i>Backlog
-          </button>
-          <button class="view-tab" data-view="budget" onclick="switchView('budget')">
-            <i class="ti ti-report-money"></i>Budget
-          </button>
-          <button class="view-tab" data-view="schedule" onclick="switchView('schedule')">
-            <i class="ti ti-calendar"></i>Schedule
-          </button>
-          <button class="view-tab" data-view="works" onclick="switchView('works')">
-            <i class="ti ti-tool"></i>Works
           </button>
           <button class="view-tab" data-view="table" onclick="switchView('table')">
             <i class="ti ti-table"></i>WP List
@@ -161,35 +156,60 @@
           </button>
         </div>
 
-        <!-- ══ OVERVIEW VIEW (mirrors Power BI "Projects" page) ══ -->
+        <!-- ══ OVERVIEW VIEW ══ -->
         <div id="view-overview">
-          <!-- Row 1: Budget/Period chart + WP by Trade -->
-          <div class="grid-2">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Period</div>
-              <div style="position:relative;height:240px"><canvas id="c-period"></canvas></div>
+          <!-- Two KPI groups side by side -->
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+            <!-- Cost cards -->
+            <div style="flex:1;min-width:280px">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Cost Overview</div>
+              <div class="metrics-group" id="metrics-cost" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
             </div>
+            <!-- WP status cards -->
+            <div style="flex:1;min-width:280px">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Work Package Status</div>
+              <div class="metrics-group" id="metrics-wp" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ DASHBOARD VIEW ══ -->
+        <div id="view-dashboard" style="display:none">
+          <!-- Period chart with toggle -->
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span><i class="ti ti-chart-bar"></i><span id="dash-period-title">Budget (BCB) and Awarded Cost by Period</span></span>
+              <div style="display:flex;gap:4px">
+                <button id="dash-btn-monthly" onclick="setDashPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
+                <button id="dash-btn-quarterly" onclick="setDashPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
+              </div>
+            </div>
+            <div style="position:relative;height:240px"><canvas id="c-dash-period"></canvas></div>
+          </div>
+          <!-- WP by Trade + WP Status donut -->
+          <div class="grid-2" style="margin-bottom:14px">
             <div class="panel">
               <div class="panel-title"><i class="ti ti-list"></i>Work Package by Trade</div>
-              <div style="position:relative;height:240px"><canvas id="c-wp-trade"></canvas></div>
+              <div style="position:relative;height:240px"><canvas id="c-dash-trade"></canvas></div>
             </div>
-          </div>
-          <!-- Row 2: WP Status donut + Variance Trend + Budget vs Contract -->
-          <div class="grid-3">
             <div class="panel">
               <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
-              <div style="position:relative;height:200px"><canvas id="c-wp-status-ov"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-line"></i>Variance Trend (₱M)</div>
-              <div style="position:relative;height:200px"><canvas id="c-trend"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget vs Contract (₱M)</div>
-              <div style="position:relative;height:200px"><canvas id="c-budget"></canvas></div>
+              <div style="position:relative;height:240px"><canvas id="c-dash-status"></canvas></div>
             </div>
           </div>
-          <!-- Row 3: Top 5 Rank Lists -->
+          <!-- Backlog table (not-awarded only) -->
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog — Not Awarded</div>
+            <div style="overflow-x:auto">
+              <table class="budget-table" id="dash-backlog-table">
+                <thead><tr>
+                  <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Budget (BCB)</th><th>Status</th>
+                </tr></thead>
+                <tbody id="dash-backlog-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <!-- Top 5 panels -->
           <div class="grid-3">
             <div class="panel">
               <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
@@ -204,24 +224,11 @@
               <div class="rank-list" id="rank-losses"></div>
             </div>
           </div>
-          <!-- Row 4: Work Package Monitoring table -->
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-table"></i>Work Package Monitoring</div>
-            <div style="overflow-x:auto">
-              <table class="budget-table" id="monitoring-table">
-                <thead><tr>
-                  <th>WP No.</th><th>Description</th><th>Status</th>
-                  <th>Budget (BCB)</th><th>Awarded</th><th>Variance</th><th>% Var</th>
-                  <th>Planned Award</th><th>Actual Award</th><th>Aging</th><th>Submittal</th><th>Delivery</th>
-                </tr></thead>
-                <tbody id="monitoring-tbody"></tbody>
-              </table>
-            </div>
-          </div>
         </div>
 
-        <!-- ══ BACKLOG VIEW (mirrors Power BI "Backlog" page) ══ -->
+        <!-- ══ BACKLOG VIEW ══ -->
         <div id="view-backlog" style="display:none">
+          <!-- Budget filter -->
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
             <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;flex:1;min-width:140px">WORK PACKAGES — NOT AWARDED ONLY</div>
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -232,189 +239,44 @@
               <button class="btn" onclick="renderBacklog()" style="font-size:11px;padding:4px 10px">Apply</button>
             </div>
           </div>
-          <!-- KPI strip -->
-          <div class="grid-2" style="margin-bottom:16px">
-            <div class="panel" style="text-align:center;padding:18px">
-              <div id="backlog-kpi-due" style="font-size:42px;font-weight:700;color:#EE3124">0</div>
-              <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">WPs Due but Not Awarded</div>
-            </div>
-            <div class="panel" style="text-align:center;padding:18px">
-              <div id="backlog-kpi-upcoming" style="font-size:42px;font-weight:700;color:#D97706">0</div>
-              <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Due in Next 30 Days</div>
+          <!-- Backlog table first -->
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog</div>
+            <div style="overflow-x:auto">
+              <table class="budget-table" id="backlog-table">
+                <thead><tr>
+                  <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th>
+                  <th>Aging (d)</th><th>Budget (BCB)</th><th>Status</th><th>Submittal</th>
+                </tr></thead>
+                <tbody id="backlog-tbody"></tbody>
+              </table>
             </div>
           </div>
-          <!-- Row 1: Backlog table + Aging chart -->
-          <div class="grid-2" style="margin-bottom:16px">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog</div>
-              <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
-                <table class="budget-table" id="backlog-table">
-                  <thead><tr>
-                    <th>Work Package</th><th>Aging (d)</th><th>Planned Award</th>
-                    <th>Budget (BCB)</th><th>Status</th><th>Submittal</th>
-                  </tr></thead>
-                  <tbody id="backlog-tbody"></tbody>
-                </table>
-              </div>
-            </div>
+          <!-- Charts below -->
+          <div class="grid-2" style="margin-bottom:14px">
             <div class="panel">
               <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Aging</div>
-              <div style="position:relative;height:160px"><canvas id="c-backlog-aging"></canvas></div>
-              <div class="panel-title" style="margin-top:16px"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
-              <div style="position:relative;height:160px"><canvas id="c-wp-status-bl"></canvas></div>
+              <div style="position:relative;height:200px"><canvas id="c-backlog-aging"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+              <div style="position:relative;height:200px"><canvas id="c-wp-status-bl"></canvas></div>
             </div>
           </div>
-          <!-- Row 2: Period chart + Submittal donut -->
           <div class="grid-2">
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Period</div>
+              <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                <span><i class="ti ti-chart-bar"></i>Work Package by Period</span>
+                <div style="display:flex;gap:4px">
+                  <button id="bl-btn-quarterly" onclick="setBlPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
+                  <button id="bl-btn-monthly" onclick="setBlPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
+                </div>
+              </div>
               <div style="position:relative;height:220px"><canvas id="c-backlog-period"></canvas></div>
             </div>
             <div class="panel">
               <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Submittal Status</div>
               <div style="position:relative;height:220px"><canvas id="c-backlog-submittal"></canvas></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ══ BUDGET VIEW (mirrors Power BI "Budget Variance Analysis" page) ══ -->
-        <div id="view-budget" style="display:none">
-          <!-- KPI row: 3+3 grid matching Power BI layout -->
-          <div class="grid-3" style="margin-bottom:16px">
-            <div class="panel" style="text-align:center;padding:16px">
-              <div id="bud-total" style="font-size:26px;font-weight:700;color:#231F20">—</div>
-              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Budget (BCB)</div>
-            </div>
-            <div class="panel" style="text-align:center;padding:16px">
-              <div id="bud-awarded" style="font-size:26px;font-weight:700;color:#231F20">—</div>
-              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Awarded Cost</div>
-            </div>
-            <div class="panel" style="text-align:center;padding:16px">
-              <div id="bud-ctc" style="font-size:26px;font-weight:700;color:#231F20">—</div>
-              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Cost to Complete</div>
-            </div>
-            <div class="panel" style="text-align:center;padding:16px">
-              <div id="bud-eac" style="font-size:26px;font-weight:700;color:#231F20">—</div>
-              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Estimate at Completion</div>
-            </div>
-            <div class="panel" style="text-align:center;padding:16px">
-              <div id="bud-variance" style="font-size:26px;font-weight:700">—</div>
-              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Variance</div>
-            </div>
-            <div class="panel" style="text-align:center;padding:16px">
-              <div id="bud-pct-var" style="font-size:26px;font-weight:700">—</div>
-              <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Percent Variance</div>
-            </div>
-          </div>
-          <!-- Charts row -->
-          <div class="grid-2">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Period</div>
-              <div style="position:relative;height:240px"><canvas id="c-bud-period"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) and Awarded by Trade</div>
-              <div style="position:relative;height:240px"><canvas id="c-bud-trade"></canvas></div>
-            </div>
-          </div>
-          <!-- Budget table -->
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-table"></i>Budget (BCB) and Awarded by Trade</div>
-            <div style="overflow-x:auto">
-              <table class="budget-table" id="budget-table">
-                <thead><tr>
-                  <th>Trade</th><th>WP Count</th><th>Budget BCB (₱M)</th>
-                  <th>Awarded (₱M)</th><th>Variance (₱M)</th><th>% Var</th><th>Award Rate</th>
-                </tr></thead>
-                <tbody id="budget-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- ══ SCHEDULE VIEW (mirrors Power BI "Procurement Schedule" page) ══ -->
-        <div id="view-schedule" style="display:none">
-          <!-- Row 1: Period chart + Trade chart -->
-          <div class="grid-2">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Period</div>
-              <div style="position:relative;height:240px"><canvas id="c-sched-period"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Trade</div>
-              <div style="position:relative;height:240px"><canvas id="c-sched-trade"></canvas></div>
-            </div>
-          </div>
-          <!-- Row 2: Status donut + Lead Time -->
-          <div class="grid-2" style="margin-top:0">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
-              <div style="position:relative;height:220px"><canvas id="c-sched-status"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-clock"></i>Lead Time Distribution (Days)</div>
-              <div style="position:relative;height:220px"><canvas id="c-sched-leadtime"></canvas></div>
-            </div>
-          </div>
-          <!-- Schedule table -->
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-table"></i>Work Package Schedule</div>
-            <div style="overflow-x:auto">
-              <table class="budget-table" id="sched-table">
-                <thead><tr>
-                  <th>WP No.</th><th>Description</th><th>Trade</th>
-                  <th>Planned Award</th><th>Actual Award</th><th>Aging (d)</th>
-                  <th>Budget (BCB)</th><th>Status</th><th>Submittal</th><th>Delivery</th>
-                </tr></thead>
-                <tbody id="sched-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- ══ WORKS VIEW (mirrors Power BI "Works Analysis" page) ══ -->
-        <div id="view-works" style="display:none">
-          <div class="works-summary" id="works-summary"></div>
-          <!-- Row 1: Stacked period chart -->
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Budget (BCB) by Period per Trade</div>
-            <div style="position:relative;height:260px"><canvas id="c-works-period"></canvas></div>
-          </div>
-          <!-- Row 2: Three donuts matching Power BI -->
-          <div class="grid-3">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Budget (BCB) by Trade</div>
-              <div style="position:relative;height:200px"><canvas id="c-works-bud-donut"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Awarded by Trade</div>
-              <div style="position:relative;height:200px"><canvas id="c-works-awd-donut"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Packages by Trade</div>
-              <div style="position:relative;height:200px"><canvas id="c-works-donut"></canvas></div>
-            </div>
-          </div>
-          <!-- Row 3: Budget by Period per Scope (pivot table) -->
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-table"></i>Budget (BCB) by Period per Trade</div>
-            <div style="overflow-x:auto">
-              <table class="budget-table" id="works-pivot-table">
-                <thead id="works-pivot-head"></thead>
-                <tbody id="works-pivot-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-          <!-- Row 4: Budget and Awarded by Trade table -->
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-table"></i>Budget (BCB) and Awarded by Trade</div>
-            <div style="overflow-x:auto">
-              <table class="budget-table" id="works-table">
-                <thead><tr>
-                  <th>Trade</th><th>Total WPs</th><th>Awarded</th><th>Not Yet</th><th>Award Rate</th><th>Budget BCB (₱M)</th><th>Awarded (₱M)</th><th>Variance (₱M)</th>
-                </tr></thead>
-                <tbody id="works-tbody"></tbody>
-              </table>
             </div>
           </div>
         </div>
@@ -626,10 +488,12 @@ function deliveryBadge(s){
   return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+(s||'—')+'</span>';
 }
 
+const _rendered = { overview: false, dashboard: false, backlog: false, table: false };
+
 function switchView(v) {
   currentView = v;
   document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
-  ['overview','backlog','budget','schedule','works','table','claims-register'].forEach(id => {
+  ['overview','dashboard','backlog','table','claims-register'].forEach(id => {
     const el = document.getElementById('view-'+id);
     if(el) el.style.display = id === v ? '' : 'none';
   });
@@ -638,11 +502,9 @@ function switchView(v) {
     const el = document.getElementById('view-claims-register');
     if (el) el.style.display = '';
   }
-  if(v==='overview') renderOverview();
-  else if(v==='backlog') renderBacklog();
-  else if(v==='budget') renderBudget();
-  else if(v==='schedule') renderSchedule();
-  else if(v==='works') renderWorks();
+  if(v==='overview') { if(!_rendered.overview){renderOverview();_rendered.overview=true;} }
+  else if(v==='dashboard') { if(!_rendered.dashboard){renderDashboard();_rendered.dashboard=true;} else renderDashboard(); }
+  else if(v==='backlog') { if(!_rendered.backlog){renderBacklog();_rendered.backlog=true;} }
   else if(v==='table') buildTable();
   else if(v==='claims-register' || v==='claims' || v==='change-orders') { renderClaimsRegisterKPIs(); renderClaimsRegister(); }
 }
@@ -658,9 +520,6 @@ function getFiltered(){
     if(zn!=='all'&&w.zone!==zn)return false;
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
     return true;
-  }).sort((a,b)=>{
-    const va=a[sortCol]??'', vb=b[sortCol]??'';
-    return typeof va==='number'?(va-vb)*sortDir:String(va).localeCompare(String(vb))*sortDir;
   });
 }
 
@@ -682,55 +541,100 @@ function buildMetrics(wps){
   const notDue=wps.filter(w=>w.award_status!=='Awarded'&&(!w.awarding_date||new Date(w.awarding_date)>=today)).length;
   const pctByWP=total?Math.round(awarded/total*100):0;
   const pctByVal=totalBudget?Math.round(totalAwarded/totalBudget*100):0;
-  document.getElementById('metrics-grid').innerHTML=[
-    {lbl:'Budget (BCB)',val:fmt(totalBudget),cls:''},
-    {lbl:'Awarded Cost',val:fmt(totalAwarded),cls:''},
-    {lbl:'Cost to Complete',val:fmt(costToComplete),cls:''},
-    {lbl:'Est. at Completion',val:fmt(eac),cls:''},
-    {lbl:'Variance',val:(variance>=0?'+':'')+fmt(variance),cls:variance>=0?'green':'red'},
-    {lbl:'% Variance',val:(pctVar>=0?'+':'')+pctVar.toFixed(1)+'%',cls:pctVar>=0?'green':'red'},
-    {lbl:'Total WP',val:total,cls:''},
-    {lbl:'Awarded WP',val:awarded,cls:'green'},
-    {lbl:'Due Not Awarded',val:dueNotAwarded,cls:dueNotAwarded>0?'red':''},
-    {lbl:'WP Not Due',val:notDue,cls:''},
-    {lbl:'% Awarded by WP',val:pctByWP+'%',cls:''},
-    {lbl:'% Awarded by Value',val:pctByVal+'%',cls:''},
-  ].map(c=>'<div class="metric-card"><div class="metric-label">'+c.lbl+'</div><div class="metric-value '+c.cls+'">'+c.val+'</div></div>').join('');
+
+  const card = (lbl,val,cls) => '<div class="metric-card"><div class="metric-label">'+lbl+'</div><div class="metric-value '+cls+'">'+val+'</div></div>';
+
+  const costCards = [
+    card('Procurement Budget (BCB)', fmt(totalBudget), ''),
+    card('Awarded Cost', fmt(totalAwarded), ''),
+    card('Procurement Cost to Complete', fmt(costToComplete), ''),
+    card('Procurement Estimate at Completion', fmt(eac), ''),
+    card('Variance', (variance>=0?'+':'')+fmt(variance), variance>=0?'green':'red'),
+    card('% Variance', (pctVar>=0?'+':'')+pctVar.toFixed(1)+'%', pctVar>=0?'green':'red'),
+  ].join('');
+
+  const wpCards = [
+    card('Total WP', total, ''),
+    card('Awarded WP', awarded, 'green'),
+    card('Due Not Awarded', dueNotAwarded, dueNotAwarded>0?'red':''),
+    card('WP Not Due', notDue, ''),
+    card('% Awarded by WP', pctByWP+'%', ''),
+    card('% Awarded by Value', pctByVal+'%', ''),
+  ].join('');
+
+  const costEl = document.getElementById('metrics-cost');
+  const wpEl = document.getElementById('metrics-wp');
+  if(costEl) costEl.innerHTML = costCards;
+  if(wpEl) wpEl.innerHTML = wpCards;
+  // Keep legacy metrics-grid empty (it may be referenced elsewhere)
+  const grid = document.getElementById('metrics-grid');
+  if(grid) grid.innerHTML = '';
 }
 
 function renderOverview(){
-  const f = getFiltered();
-  // Power BI "Projects" page charts
-  Charts.budgetAwardedByPeriod('c-period', f);
-  Charts.wpByTrade('c-wp-trade', f);
-  Charts.wpStatusDonut('c-wp-status-ov', f);
-  Charts.varianceTrend('c-trend', f);
-  Charts.budgetVsContract('c-budget', f);
-  // WP Monitoring table
+  // Overview now only shows KPI groups (already rendered by buildMetrics)
+  // Nothing else needed here
+}
+
+let _dashPeriodMode = 'monthly';
+let _blPeriodMode = 'quarterly';
+
+function setDashPeriodMode(mode) {
+  _dashPeriodMode = mode;
+  document.getElementById('dash-btn-monthly').style.cssText = mode==='monthly'
+    ? 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600'
+    : 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+  document.getElementById('dash-btn-quarterly').style.cssText = mode==='quarterly'
+    ? 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600'
+    : 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+  renderDashPeriod(allWPs);
+}
+
+function setBlPeriodMode(mode) {
+  _blPeriodMode = mode;
+  document.getElementById('bl-btn-quarterly').style.cssText = mode==='quarterly'
+    ? 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600'
+    : 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+  document.getElementById('bl-btn-monthly').style.cssText = mode==='monthly'
+    ? 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600'
+    : 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+  const notAwarded = allWPs.filter(w=>w.award_status!=='Awarded');
+  if(mode==='monthly') Charts.budgetAwardedByPeriod('c-backlog-period', notAwarded);
+  else Charts.wpByPeriodQuarterly('c-backlog-period', notAwarded);
+}
+
+function renderDashPeriod(wps) {
+  if(_dashPeriodMode==='monthly') Charts.budgetAwardedByPeriod('c-dash-period', wps);
+  else Charts.wpByPeriodQuarterly('c-dash-period', wps);
+}
+
+function renderDashboard(){
+  const wps = allWPs;
+  renderDashPeriod(wps);
+  Charts.wpByTrade('c-dash-trade', wps);
+  Charts.wpStatusDonut('c-dash-status', wps);
+
+  // Backlog table in dashboard: not-awarded, sorted most overdue first
   const today = new Date();
-  const sorted = [...f].sort((a,b)=>{ if(!a.awarding_date)return 1; if(!b.awarding_date)return -1; return new Date(a.awarding_date)-new Date(b.awarding_date); });
-  document.getElementById('monitoring-tbody').innerHTML = sorted.map(w=>{
+  const notAwarded = [...wps.filter(w=>w.award_status!=='Awarded')].sort((a,b)=>{
+    const agA = a.awarding_date ? (today-new Date(a.awarding_date)) : -Infinity;
+    const agB = b.awarding_date ? (today-new Date(b.awarding_date)) : -Infinity;
+    return agB - agA;
+  });
+  document.getElementById('dash-backlog-tbody').innerHTML = notAwarded.map(w=>{
     const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
     const agCls = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
-    const bud = w.approved_budget_bcb||0, awd = w.total_awarded||0, vari = bud-awd;
-    const pctV = bud ? ((vari/bud)*100).toFixed(1)+'%' : '—';
-    const submittal = submittalLabel(w);
     return `<tr>
       <td><span class="td-code">${w.wp_no||'—'}</span></td>
-      <td style="font-size:11px;max-width:180px">${w.description||'—'}</td>
-      <td>${statusBadge(w.award_status)}</td>
-      <td style="text-align:right">${(bud/1e6).toFixed(1)} M</td>
-      <td style="text-align:right">${awd>0?(awd/1e6).toFixed(1)+' M':'—'}</td>
-      <td style="text-align:right;color:${vari>=0?'#2D9B6F':'#EE3124'};font-weight:600">${vari>=0?'+':''}${(vari/1e6).toFixed(1)} M</td>
-      <td style="color:${vari>=0?'#2D9B6F':'#EE3124'}">${pctV}</td>
+      <td style="font-size:11px;max-width:200px">${w.description||'—'}</td>
+      <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
       <td>${fmtDate(w.awarding_date)}</td>
-      <td>${fmtDate(w.actual_awarding_date)}</td>
-      <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
-      <td>${submittalBadge(submittal)}</td>
-      <td>${deliveryBadge(w.delivery_status)}</td>
+      <td style="text-align:right">${((w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
+      <td>${statusBadge(w.award_status)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="12" style="text-align:center;color:#aaa;padding:20px">No data</td></tr>';
-  renderTop5(f);
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+
+  renderTop5(wps);
 }
 
 function renderTop5(wps){
@@ -752,24 +656,19 @@ function renderTop5(wps){
 
 function renderBacklog(){
   const today = new Date();
-  const in30 = new Date(today); in30.setDate(in30.getDate()+30);
   const minBud = parseFloat(document.getElementById('backlog-min-budget')?.value||0)*1e6||0;
   const maxBud = parseFloat(document.getElementById('backlog-max-budget')?.value||0)*1e6||Infinity;
   let notAwarded = allWPs.filter(w=>w.award_status!=='Awarded');
   if(minBud>0||maxBud<Infinity) notAwarded=notAwarded.filter(w=>(w.approved_budget_bcb||0)>=minBud&&(w.approved_budget_bcb||0)<=maxBud);
 
-  const pastDue = notAwarded.filter(w=>w.awarding_date&&new Date(w.awarding_date)<today);
-  const upcoming = notAwarded.filter(w=>w.awarding_date&&new Date(w.awarding_date)>=today&&new Date(w.awarding_date)<=in30);
-  document.getElementById('backlog-kpi-due').textContent = pastDue.length;
-  document.getElementById('backlog-kpi-upcoming').textContent = upcoming.length;
-
-  // Charts: Aging buckets, Period, Status donut, Submittal donut
+  // Charts: Aging buckets, Status donut, Period, Submittal donut
   Charts.wpAgingBuckets('c-backlog-aging', notAwarded, projId||'Project');
-  Charts.wpByPeriodQuarterly('c-backlog-period', notAwarded);
   Charts.wpStatusDonut('c-wp-status-bl', notAwarded);
+  if(_blPeriodMode==='monthly') Charts.budgetAwardedByPeriod('c-backlog-period', notAwarded);
+  else Charts.wpByPeriodQuarterly('c-backlog-period', notAwarded);
   Charts.wpSubmittalDonut('c-backlog-submittal', allWPs);
 
-  // Backlog table — sorted by aging descending (most overdue first), matching Power BI
+  // Backlog table — sorted by aging descending (most overdue first)
   const sorted = [...notAwarded].sort((a,b)=>{
     const agA = a.awarding_date ? (today-new Date(a.awarding_date)) : -Infinity;
     const agB = b.awarding_date ? (today-new Date(b.awarding_date)) : -Infinity;
@@ -779,214 +678,142 @@ function renderBacklog(){
     const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
     const agCls = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
     return `<tr>
-      <td style="font-size:11px;max-width:200px">${w.description||w.wp_no||'—'}</td>
-      <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
-      <td>${fmtDate(w.awarding_date)}</td>
-      <td style="text-align:right">${(( w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
-      <td>${statusBadge(w.award_status)}</td>
-      <td style="font-size:11px;color:#555">${submittalLabel(w)}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
-}
-
-function renderBudget(){
-  const totalBudget=allWPs.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-  const totalAwarded=allWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
-  const costToComplete=allWPs.filter(w=>w.award_status!=='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-  const eac=totalAwarded+costToComplete;
-  const variance=totalBudget-eac;
-  const pctVar=totalBudget?((variance/totalBudget)*100):0;
-
-  document.getElementById('bud-total').textContent = fmt(totalBudget);
-  document.getElementById('bud-awarded').textContent = fmt(totalAwarded);
-  document.getElementById('bud-ctc').textContent = fmt(costToComplete);
-  document.getElementById('bud-eac').textContent = fmt(eac);
-  const varEl=document.getElementById('bud-variance');
-  varEl.textContent=(variance>=0?'+':'')+fmt(variance);
-  varEl.style.color=variance>=0?'#2D9B6F':'#EE3124';
-  const pctEl=document.getElementById('bud-pct-var');
-  pctEl.textContent=(pctVar>=0?'+':'')+pctVar.toFixed(2)+'%';
-  pctEl.style.color=pctVar>=0?'#2D9B6F':'#EE3124';
-
-  Charts.budgetAwardedByPeriod('c-bud-period', allWPs);
-  Charts.budgetByTradeHBar('c-bud-trade', allWPs);
-
-  const trades=[...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
-  const rows=trades.map(t=>{
-    const tWPs=allWPs.filter(w=>w.trade===t);
-    const budget=tWPs.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-    const awarded=tWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
-    const variance=budget-awarded;
-    const awardCount=tWPs.filter(w=>w.award_status==='Awarded').length;
-    return {t,count:tWPs.length,budget,awarded,variance,awardRate:tWPs.length?Math.round(awardCount/tWPs.length*100):0};
-  });
-  const totBudget=rows.reduce((s,r)=>s+r.budget,0);
-  const totAwarded=rows.reduce((s,r)=>s+r.awarded,0);
-  const totVar=totBudget-totAwarded;
-  document.getElementById('budget-tbody').innerHTML=[
-    ...rows.map(r=>`<tr>
-      <td>${r.t}</td><td>${r.count}</td>
-      <td style="text-align:right">${(r.budget/1e6).toFixed(1)} M</td>
-      <td style="text-align:right">${(r.awarded/1e6).toFixed(1)} M</td>
-      <td style="text-align:right;color:${r.variance>=0?'#2D9B6F':'#EE3124'};font-weight:600">${r.variance>=0?'+':''}${(r.variance/1e6).toFixed(1)} M</td>
-      <td style="color:${r.variance>=0?'#2D9B6F':'#EE3124'}">${r.budget?((r.variance/r.budget)*100).toFixed(1)+'%':'—'}</td>
-      <td>${r.awardRate}%</td>
-    </tr>`),
-    `<tr class="total-row">
-      <td>TOTAL</td><td>${allWPs.length}</td>
-      <td style="text-align:right">${(totBudget/1e6).toFixed(1)} M</td>
-      <td style="text-align:right">${(totAwarded/1e6).toFixed(1)} M</td>
-      <td style="text-align:right;color:${totVar>=0?'#2D9B6F':'#EE3124'}">${totVar>=0?'+':''}${(totVar/1e6).toFixed(1)} M</td>
-      <td style="color:${totVar>=0?'#2D9B6F':'#EE3124'}">${totBudget?((totVar/totBudget)*100).toFixed(1)+'%':'—'}</td>
-      <td>—</td>
-    </tr>`
-  ].join('');
-}
-
-function renderSchedule(){
-  // Quarterly period chart with cumulative lines (matches Power BI Schedule page)
-  Charts.wpByPeriodQuarterly('c-sched-period', allWPs);
-  Charts.wpByTrade('c-sched-trade', allWPs);
-  Charts.wpStatusDonut('c-sched-status', allWPs);
-  Charts.awardingLeadTime('c-sched-leadtime', allWPs);
-
-  const today=new Date();
-  const sorted=[...allWPs].sort((a,b)=>{
-    if(!a.awarding_date)return 1; if(!b.awarding_date)return -1;
-    return new Date(a.awarding_date)-new Date(b.awarding_date);
-  });
-  document.getElementById('sched-tbody').innerHTML=sorted.map(w=>{
-    const aging=w.awarding_date?Math.round((today-new Date(w.awarding_date))/86400000):null;
-    const agCls=aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
-    return `<tr>
       <td><span class="td-code">${w.wp_no||'—'}</span></td>
-      <td style="font-size:11px;max-width:180px">${w.description||'—'}</td>
+      <td style="font-size:11px;max-width:200px">${w.description||'—'}</td>
       <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
       <td>${fmtDate(w.awarding_date)}</td>
-      <td>${fmtDate(w.actual_awarding_date)}</td>
       <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
       <td style="text-align:right">${((w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
       <td>${statusBadge(w.award_status)}</td>
-      <td>${submittalBadge(submittalLabel(w))}</td>
-      <td>${deliveryBadge(w.delivery_status)}</td>
+      <td style="font-size:11px;color:#555">${submittalLabel(w)}</td>
     </tr>`;
-  }).join('');
+  }).join('') || '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
 }
 
-function renderWorks(){
-  const trades=[...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
-  const rows=trades.map(t=>{
-    const tWPs=allWPs.filter(w=>w.trade===t);
-    const aw=tWPs.filter(w=>w.award_status==='Awarded').length;
-    const ny=tWPs.filter(w=>w.award_status!=='Awarded').length;
-    const budget=tWPs.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-    const awarded=tWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
-    return {t,total:tWPs.length,aw,ny,rate:tWPs.length?Math.round(aw/tWPs.length*100):0,budget,awarded,variance:budget-awarded};
+function wpNumSort(a, b) {
+  const nums = s => (s||'').match(/\d+/g)||[];
+  const na = nums(a), nb = nums(b);
+  for(let i=0;i<Math.max(na.length,nb.length);i++){
+    const d = (parseInt(na[i])||0) - (parseInt(nb[i])||0);
+    if(d!==0) return d;
+  }
+  return String(a).localeCompare(String(b));
+}
+
+function getFilteredSorted(){
+  const st=document.getElementById('f-status').value;
+  const tr=document.getElementById('f-trade').value;
+  const zn=document.getElementById('f-zone').value;
+  const sr=(document.getElementById('f-search').value||'').toLowerCase();
+  let rows = allWPs.filter(w=>{
+    if(st!=='all'&&w.award_status!==st)return false;
+    if(tr!=='all'&&w.trade!==tr)return false;
+    if(zn!=='all'&&w.zone!==zn)return false;
+    if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
+    return true;
   });
-
-  // Summary KPI strip
-  document.getElementById('works-summary').innerHTML=[
-    {lbl:'Total WPs',val:allWPs.length},
-    {lbl:'Awarded',val:allWPs.filter(w=>w.award_status==='Awarded').length},
-    {lbl:'Not Yet Awarded',val:allWPs.filter(w=>w.award_status!=='Awarded').length},
-    {lbl:'Trades',val:trades.length},
-  ].map(k=>`<div class="works-kpi"><div class="works-kpi-val">${k.val}</div><div class="works-kpi-lbl">${k.lbl}</div></div>`).join('');
-
-  // Charts matching Power BI Works page
-  Charts.budgetByPeriodPerTrade('c-works-period', allWPs);
-  Charts.budgetByTradeDonut('c-works-bud-donut', allWPs);
-  Charts.awardedByTradeDonut('c-works-awd-donut', allWPs);
-
-  // WP count by trade donut
-  const COLORS=['#EE3124','#282C28','#2D9B6F','#D97706','#DCDBDB','#5A5858','#C42127','#3B6D11','#92400E','#6B7280'];
-  if(window.__chartWorksDonut) window.__chartWorksDonut.destroy();
-  const c1=document.getElementById('c-works-donut');
-  if(c1) window.__chartWorksDonut=new Chart(c1.getContext('2d'),{
-    type:'doughnut',
-    data:{labels:rows.map(r=>r.t),datasets:[{data:rows.map(r=>r.total),backgroundColor:COLORS,borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}}}}
+  // Group by trade, within each trade sort by WP-No numerically
+  const trades = [...new Set(rows.map(w=>w.trade||'').filter(Boolean))].sort();
+  const noTrade = rows.filter(w=>!w.trade);
+  const sorted = [];
+  trades.forEach(t=>{
+    const group = rows.filter(w=>w.trade===t).sort((a,b)=>wpNumSort(a.wp_no,b.wp_no));
+    sorted.push({trade:t, wps:group});
   });
-
-  // Pivot table: Budget by Period per Trade
-  function getQKey(d){const q=Math.ceil((d.getMonth()+1)/3);return `${d.getFullYear()}-${q}`;}
-  function qLabel(k){const[y,q]=k.split('-');return `Q${q} '${y.slice(2)}`;}
-  const qSet=new Set(); allWPs.forEach(w=>{if(w.awarding_date)qSet.add(getQKey(new Date(w.awarding_date)));});
-  const quarters=[...qSet].sort();
-  const pivotHead=document.getElementById('works-pivot-head');
-  pivotHead.innerHTML=`<tr><th>Trade</th>${quarters.map(q=>`<th style="text-align:right">${qLabel(q)}</th>`).join('')}<th style="text-align:right">Total</th></tr>`;
-  const pivotBody=document.getElementById('works-pivot-tbody');
-  pivotBody.innerHTML=[
-    ...rows.map(r=>{
-      const qVals=quarters.map(qk=>allWPs.filter(w=>w.trade===r.t&&w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
-      return `<tr><td>${r.t}</td>${qVals.map(v=>`<td style="text-align:right">${v>0?v.toFixed(1)+' M':'—'}</td>`).join('')}<td style="text-align:right;font-weight:600">${(r.budget/1e6).toFixed(1)} M</td></tr>`;
-    }),
-    `<tr class="total-row"><td>TOTAL</td>${quarters.map(qk=>{
-      const v=allWPs.filter(w=>w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6;
-      return `<td style="text-align:right">${v>0?v.toFixed(1)+' M':'—'}</td>`;
-    }).join('')}<td style="text-align:right">${(rows.reduce((s,r)=>s+r.budget,0)/1e6).toFixed(1)} M</td></tr>`
-  ].join('');
-
-  // Trade summary table
-  document.getElementById('works-tbody').innerHTML=rows.map(r=>`<tr>
-    <td>${r.t}</td><td>${r.total}</td>
-    <td style="color:#2D9B6F;font-weight:600">${r.aw}</td>
-    <td style="color:#EE3124;font-weight:600">${r.ny}</td>
-    <td>${r.rate}%</td>
-    <td style="text-align:right">${(r.budget/1e6).toFixed(1)} M</td>
-    <td style="text-align:right">${(r.awarded/1e6).toFixed(1)} M</td>
-    <td style="text-align:right;color:${r.variance>=0?'#2D9B6F':'#EE3124'};font-weight:600">${r.variance>=0?'+':''}${(r.variance/1e6).toFixed(1)} M</td>
-  </tr>`).join('');
+  if(noTrade.length) sorted.push({trade:'(No Trade)', wps:noTrade.sort((a,b)=>wpNumSort(a.wp_no,b.wp_no))});
+  return sorted;
 }
 
 function buildTable(){
-  const filtered=getFiltered(), cols=getActiveCols();
-  const total=filtered.length, pages=Math.max(1,Math.ceil(total/PAGE));
+  const groups=getFilteredSorted(), cols=getActiveCols();
+  const allRows = groups.flatMap(g=>g.wps);
+  const total=allRows.length, pages=Math.max(1,Math.ceil(total/PAGE));
   curPage=Math.min(curPage,pages);
-  const slice=filtered.slice((curPage-1)*PAGE,curPage*PAGE);
+  const start=(curPage-1)*PAGE, end=curPage*PAGE;
   document.getElementById('row-count').textContent=total+' packages';
   document.getElementById('pg-info').textContent='Page '+curPage+' of '+pages;
   document.getElementById('btn-prev').disabled=curPage<=1;
   document.getElementById('btn-next').disabled=curPage>=pages;
+
   const thead=document.getElementById('tbl-head'); thead.innerHTML='';
   const colRow=document.createElement('tr');
   cols.forEach(c=>{
-    const th=document.createElement('th'); th.style.minWidth=c.w;
+    const th=document.createElement('th');
+    th.style.minWidth=c.w;
+    // Freeze Description column
+    if(c.key==='description'){
+      th.style.cssText='position:sticky;left:0;background:#fff;z-index:2;min-width:180px;max-width:220px;';
+    }
     th.innerHTML=c.label+(sortCol===c.key?(sortDir===1?' ↑':' ↓'):'');
     th.style.cursor='pointer';
     th.addEventListener('click',()=>{if(sortCol===c.key)sortDir*=-1;else{sortCol=c.key;sortDir=1;}curPage=1;buildTable();});
     colRow.appendChild(th);
   });
+  // Edit column header
+  const thEdit=document.createElement('th'); thEdit.textContent=''; colRow.appendChild(thEdit);
   thead.appendChild(colRow);
+
   const tbody=document.getElementById('tbl-body'); tbody.innerHTML='';
-  slice.forEach(w=>{
-    const cellMap={
-      cost_code:'<span class="td-code">'+(w.cost_code||'—')+'</span>',
-      wp_no:'<span class="td-code">'+(w.wp_no||'—')+'</span>',
-      description:'<span class="td-name">'+(w.description||'—')+'</span>',
-      zone:w.zone||'—', trade:w.trade||'—',
-      awarding_date:fmtDate(w.awarding_date),
-      actual_awarding_date:fmtDate(w.actual_awarding_date),
-      awarding_lead_time:w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—',
-      target_delivery:fmtDate(w.target_delivery || w.target_completion),
-      target_completion:fmtDate(w.target_completion),
-      approved_budget_bcb:fmt(w.approved_budget_bcb),
-      total_awarded:fmt(w.total_awarded),
-      variance:w.variance!=null?'<span style="color:'+(w.variance>=0?'#2D9B6F':'#EE3124')+';font-weight:600">'+(w.variance>=0?'+':'')+fmt(w.variance)+'</span>':'—',
-      award_status:statusBadge(w.award_status),
-      procurement_status:procStatusBadge(w.procurement_status),
-      submittal_type:submittalBadge(w.submittal_type||'Not Required'),
-      delivery_status:deliveryBadge(w.delivery_status),
-      contractor:w.contractor||'<span style="color:#bbb">—</span>',
-      claim_tag:claimTagBadge(w.claim_tag),
-      remarks:'<span style="font-size:10px;color:#888">'+(w.remarks||'—')+'</span>',
-    };
-    const tr=document.createElement('tr');
-    cols.forEach(c=>{const td=document.createElement('td');td.innerHTML=cellMap[c.key]??'—';tr.appendChild(td);});
-    // Edit button cell
-    const tdEdit=document.createElement('td');
-    tdEdit.innerHTML=`<a href="wp-form.html?id=${w.id}&project=${w.project_id}" style="font-size:11px;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
-    tr.appendChild(tdEdit);
-    tbody.appendChild(tr);
+  let rowIdx=0;
+  groups.forEach(({trade, wps})=>{
+    wps.forEach((w,i)=>{
+      // Insert trade header row at start of each group, only if within page range
+      if(i===0 && rowIdx >= start && rowIdx < end){
+        const headerTr=document.createElement('tr');
+        const headerTd=document.createElement('td');
+        headerTd.colSpan=cols.length+1;
+        headerTd.style.cssText='background:#f5f5f5;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;padding:6px 12px;border-bottom:1px solid #e5e5e5;';
+        headerTd.textContent=trade;
+        headerTr.appendChild(headerTd);
+        tbody.appendChild(headerTr);
+      } else if(i===0 && rowIdx < start && rowIdx+(wps.length-1) >= start){
+        // group straddles page boundary — still show header
+        const headerTr=document.createElement('tr');
+        const headerTd=document.createElement('td');
+        headerTd.colSpan=cols.length+1;
+        headerTd.style.cssText='background:#f5f5f5;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;padding:6px 12px;border-bottom:1px solid #e5e5e5;';
+        headerTd.textContent=trade;
+        headerTr.appendChild(headerTd);
+        tbody.appendChild(headerTr);
+      }
+      if(rowIdx >= start && rowIdx < end){
+        const cellMap={
+          cost_code:'<span class="td-code">'+(w.cost_code||'—')+'</span>',
+          wp_no:'<span class="td-code">'+(w.wp_no||'—')+'</span>',
+          description:'<span class="td-name">'+(w.description||'—')+'</span>',
+          zone:w.zone||'—', trade:w.trade||'—',
+          awarding_date:fmtDate(w.awarding_date),
+          actual_awarding_date:fmtDate(w.actual_awarding_date),
+          awarding_lead_time:w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—',
+          target_delivery:fmtDate(w.target_delivery || w.target_completion),
+          target_completion:fmtDate(w.target_completion),
+          approved_budget_bcb:fmt(w.approved_budget_bcb),
+          total_awarded:fmt(w.total_awarded),
+          variance:w.variance!=null?'<span style="color:'+(w.variance>=0?'#2D9B6F':'#EE3124')+';font-weight:600">'+(w.variance>=0?'+':'')+fmt(w.variance)+'</span>':'—',
+          award_status:statusBadge(w.award_status),
+          procurement_status:procStatusBadge(w.procurement_status),
+          submittal_type:submittalBadge(w.submittal_type||'Not Required'),
+          delivery_status:deliveryBadge(w.delivery_status),
+          contractor:w.contractor||'<span style="color:#bbb">—</span>',
+          claim_tag:claimTagBadge(w.claim_tag),
+          remarks:'<span style="font-size:10px;color:#888">'+(w.remarks||'—')+'</span>',
+        };
+        const tr=document.createElement('tr');
+        cols.forEach(c=>{
+          const td=document.createElement('td');
+          td.innerHTML=cellMap[c.key]??'—';
+          if(c.key==='description'){
+            td.style.cssText='position:sticky;left:0;background:#fff;z-index:1;min-width:180px;max-width:220px;';
+          }
+          tr.appendChild(td);
+        });
+        const tdEdit=document.createElement('td');
+        tdEdit.innerHTML=`<a href="wp-form.html?id=${w.id}&project=${w.project_id}" style="font-size:11px;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
+        tr.appendChild(tdEdit);
+        tbody.appendChild(tr);
+      }
+      rowIdx++;
+    });
   });
 }
 
@@ -1275,7 +1102,13 @@ AppAuth.requireLogin(async (user, profile) => {
 
   ['f-status','f-trade','f-zone'].forEach(id=>{
     const el = document.getElementById(id);
-    if(el) el.addEventListener('change',()=>{curPage=1; if(currentView==='table')buildTable(); else if(currentView==='overview')renderOverview();});
+    if(el) el.addEventListener('change',()=>{
+      curPage=1;
+      // Reset lazy-render flags so tabs re-render with new filter
+      Object.keys(_rendered).forEach(k=>_rendered[k]=false);
+      if(currentView==='table') buildTable();
+      else switchView(currentView);
+    });
   });
   const srch = document.getElementById('f-search');
   if(srch) srch.addEventListener('input',()=>{curPage=1; if(currentView==='table')buildTable();});
@@ -1285,8 +1118,9 @@ AppAuth.requireLogin(async (user, profile) => {
   // Re-fetch WPs and refresh view after quick-add modal saves
   window.__wpmReloadFn = async () => {
     allWPs = await WPDb.getAllWPs(projId);
-    if (typeof renderOverview === 'function') renderOverview();
     buildMetrics(allWPs);
+    Object.keys(_rendered).forEach(k=>_rendered[k]=false);
+    switchView(currentView);
   };
 
   window.archiveCurrentProject = async function() {
@@ -1724,7 +1558,7 @@ AppAuth.requireLogin(async (user, profile) => {
   // Auto-switch to tab specified in URL (e.g. ?tab=claims)
   const tabParam = new URLSearchParams(location.search).get('tab');
   if (tabParam) switchView(tabParam);
-  else renderOverview();
+  else switchView('overview');
 });
 
 
