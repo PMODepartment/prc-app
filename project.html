@@ -408,7 +408,6 @@ const COLS={
     {key:'wp_no',label:'WP No.',w:'80px'},
     {key:'description',label:'Work Package',w:'200px'},
     {key:'zone',label:'Zone',w:'70px'},
-    {key:'trade',label:'Trade',w:'110px'},
   ],
   schedule:[
     {key:'awarding_date',label:'Planned Award',w:'100px'},
@@ -700,6 +699,23 @@ function wpNumSort(a, b) {
   return String(a).localeCompare(String(b));
 }
 
+const TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
+  'Architectural Works','Mechanical Works','Electrical Works','Auxiliary Works',
+  'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
+
+const _collapseState = new Map();
+
+window.toggleTradeGroup = function(trade) {
+  const collapsed = !(_collapseState.get(trade) || false);
+  _collapseState.set(trade, collapsed);
+  document.querySelectorAll('.trade-group-header[data-trade="'+CSS.escape(trade)+'"] span').forEach(s => {
+    if (s.style.transition) s.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+  });
+  document.querySelectorAll('tr[data-trade-row]').forEach(r => {
+    if (r.dataset.tradeRow === trade) r.style.display = collapsed ? 'none' : '';
+  });
+};
+
 function getFilteredSorted(){
   const st=document.getElementById('f-status').value;
   const tr=document.getElementById('f-trade').value;
@@ -712,11 +728,16 @@ function getFilteredSorted(){
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
     return true;
   });
-  // Group by trade, within each trade sort by WP-No numerically
-  const trades = [...new Set(rows.map(w=>w.trade||'').filter(Boolean))].sort();
+  // Group by trade using fixed order
+  const tradeOrder = t => { const i = TRADE_ORDER.indexOf(t); return i >= 0 ? i : 999; };
+  const tradeNames = [...new Set(rows.map(w=>w.trade||'').filter(Boolean))];
+  tradeNames.sort((a,b) => {
+    const od = tradeOrder(a) - tradeOrder(b);
+    return od !== 0 ? od : a.localeCompare(b);
+  });
   const noTrade = rows.filter(w=>!w.trade);
   const sorted = [];
-  trades.forEach(t=>{
+  tradeNames.forEach(t=>{
     const group = rows.filter(w=>w.trade===t).sort((a,b)=>wpNumSort(a.wp_no,b.wp_no));
     sorted.push({trade:t, wps:group});
   });
@@ -757,22 +778,35 @@ function buildTable(){
   let rowIdx=0;
   groups.forEach(({trade, wps})=>{
     wps.forEach((w,i)=>{
+      const isCollapsed = _collapseState.get(trade) || false;
       // Insert trade header row at start of each group, only if within page range
       if(i===0 && rowIdx >= start && rowIdx < end){
         const headerTr=document.createElement('tr');
+        headerTr.className='trade-group-header';
+        headerTr.dataset.trade=trade;
+        headerTr.style.cssText='cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5';
+        headerTr.onclick=()=>toggleTradeGroup(trade);
         const headerTd=document.createElement('td');
         headerTd.colSpan=cols.length+1;
-        headerTd.style.cssText='background:#f5f5f5;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;padding:6px 12px;border-bottom:1px solid #e5e5e5;';
-        headerTd.textContent=trade;
+        headerTd.style.cssText='padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555';
+        headerTd.innerHTML=trade
+          +'<span style="float:right;font-size:11px;color:#aaa;transition:transform .2s;display:inline-block;transform:'+(isCollapsed?'rotate(-90deg)':'rotate(0deg)')+'" >▼</span>'
+          +'<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">'+wps.length+' WPs</span>';
         headerTr.appendChild(headerTd);
         tbody.appendChild(headerTr);
       } else if(i===0 && rowIdx < start && rowIdx+(wps.length-1) >= start){
         // group straddles page boundary — still show header
         const headerTr=document.createElement('tr');
+        headerTr.className='trade-group-header';
+        headerTr.dataset.trade=trade;
+        headerTr.style.cssText='cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5';
+        headerTr.onclick=()=>toggleTradeGroup(trade);
         const headerTd=document.createElement('td');
         headerTd.colSpan=cols.length+1;
-        headerTd.style.cssText='background:#f5f5f5;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;padding:6px 12px;border-bottom:1px solid #e5e5e5;';
-        headerTd.textContent=trade;
+        headerTd.style.cssText='padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555';
+        headerTd.innerHTML=trade
+          +'<span style="float:right;font-size:11px;color:#aaa;transition:transform .2s;display:inline-block;transform:'+(isCollapsed?'rotate(-90deg)':'rotate(0deg)')+'" >▼</span>'
+          +'<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">'+wps.length+' WPs</span>';
         headerTr.appendChild(headerTd);
         tbody.appendChild(headerTr);
       }
@@ -781,7 +815,7 @@ function buildTable(){
           cost_code:'<span class="td-code">'+(w.cost_code||'—')+'</span>',
           wp_no:'<span class="td-code">'+(w.wp_no||'—')+'</span>',
           description:'<span class="td-name">'+(w.description||'—')+'</span>',
-          zone:w.zone||'—', trade:w.trade||'—',
+          zone:w.zone||'—',
           awarding_date:fmtDate(w.awarding_date),
           actual_awarding_date:fmtDate(w.actual_awarding_date),
           awarding_lead_time:w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—',
@@ -799,6 +833,8 @@ function buildTable(){
           remarks:'<span style="font-size:10px;color:#888">'+(w.remarks||'—')+'</span>',
         };
         const tr=document.createElement('tr');
+        tr.dataset.tradeRow=trade;
+        if(isCollapsed) tr.style.display='none';
         cols.forEach(c=>{
           const td=document.createElement('td');
           td.innerHTML=cellMap[c.key]??'—';
