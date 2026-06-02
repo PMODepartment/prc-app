@@ -312,11 +312,16 @@
           <div class="panel" style="padding:0">
             <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap">
               <span id="row-count" style="font-size:12px;font-weight:600;color:#888;flex:1"></span>
-              <div style="display:flex;gap:4px;flex-shrink:0">
-                <button onclick="collapseAllTrades()" title="Collapse all" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">+</span> All</button>
-                <button onclick="expandAllTrades()" title="Expand all" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">−</span> All</button>
+              <div style="display:flex;gap:4px;flex-shrink:0;border:1.5px solid #e5e5e5;border-radius:8px;overflow:hidden;background:#f8f8f8">
+                <button class="proj-vtab active" data-view="overview" onclick="setWPTableView('overview')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:#EE3124;color:#fff">Overview</button>
+                <button class="proj-vtab" data-view="financial" onclick="setWPTableView('financial')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Financial</button>
+                <button class="proj-vtab" data-view="schedule" onclick="setWPTableView('schedule')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Schedule</button>
+                <button class="proj-vtab" data-view="submittals" onclick="setWPTableView('submittals')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Submittals</button>
               </div>
-              <button id="proj-wp-mobile-toggle" onclick="toggleProjWPTableMode()" style="display:none;padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #EE3124;border-radius:7px;background:#fff;color:#EE3124;cursor:pointer">Full Table</button>
+              <div style="display:flex;gap:4px;flex-shrink:0">
+                <button onclick="collapseAllTrades()" title="Collapse all" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">−</span> All</button>
+                <button onclick="expandAllTrades()" title="Expand all" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">+</span> All</button>
+              </div>
             </div>
             <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
               <table class="data-table" id="proj-wp-table">
@@ -456,7 +461,28 @@ const COLS=[
 ];
 
 const COST_KEYS = new Set(['approved_budget_bcb','total_awarded','variance','dp_amount','retention_percent','retention_amount']);
-function getActiveCols(){ return window.__isViewer ? COLS.filter(c => !COST_KEYS.has(c.key)) : COLS; }
+
+let _wpTableView = 'overview';
+const WP_TABLE_VIEWS = {
+  overview:   {keys:new Set(['cost_code','wp_no','description','trade','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','award_status','remarks'])},
+  financial:  {keys:new Set(['wp_no','description','trade','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount']), cost:true},
+  schedule:   {keys:new Set(['wp_no','description','trade','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion'])},
+  submittals: {keys:new Set(['wp_no','description','trade','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
+};
+function getActiveCols() {
+  const v = WP_TABLE_VIEWS[_wpTableView] || WP_TABLE_VIEWS.overview;
+  const base = window.__isViewer ? COLS.filter(c=>!COST_KEYS.has(c.key)) : COLS;
+  return base.filter(c => v.keys.has(c.key));
+}
+function setWPTableView(view) {
+  _wpTableView = view;
+  document.querySelectorAll('.proj-vtab').forEach(b => {
+    const active = b.dataset.view === view;
+    b.style.background = active ? '#EE3124' : 'transparent';
+    b.style.color = active ? '#fff' : '#555';
+  });
+  curPage = 1; buildTable();
+}
 
 function fmt(n){ if(n==null)return'—'; return'₱'+(Math.abs(n)/1e6).toFixed(1)+'M'; }
 function fmtDate(d){ if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});}catch{return d;} }
@@ -1140,7 +1166,10 @@ AppAuth.requireLogin(async (user, profile) => {
   userProfile = profile;
   window.__wpmRole = profile.role;
   window.__isViewer = profile.role === 'viewer';
-  if (window.__isViewer) document.body.classList.add('viewer-mode');
+  if (window.__isViewer) {
+    document.body.classList.add('viewer-mode');
+    document.querySelectorAll('.proj-vtab[data-view="financial"]').forEach(b=>b.style.display='none');
+  }
   projId = new URLSearchParams(location.search).get('id');
   if (!projId) { location.href='login.html'; return; }
 
@@ -1693,29 +1722,10 @@ AppAuth.requireLogin(async (user, profile) => {
 <style>
   .hide-mobile { }
   @media(max-width:480px) { .hide-mobile { display:none; } }
-  /* WP List mobile compact view */
+  /* WP List mobile: view tabs reduce column count; ensure smooth scroll */
   @media (max-width: 767px) {
-    #proj-wp-mobile-toggle { display:inline-block !important; }
-    /* Compact: show WP No.(6), Description(7), Budget(11), Target Awarding(24), Status(33) + Edit(35) */
-    #proj-wp-table:not(.wp-table-full) th,
-    #proj-wp-table:not(.wp-table-full) td { display:none; }
-    #proj-wp-table:not(.wp-table-full) th:nth-child(6),
-    #proj-wp-table:not(.wp-table-full) td:nth-child(6),
-    #proj-wp-table:not(.wp-table-full) th:nth-child(7),
-    #proj-wp-table:not(.wp-table-full) td:nth-child(7),
-    #proj-wp-table:not(.wp-table-full) th:nth-child(11),
-    #proj-wp-table:not(.wp-table-full) td:nth-child(11),
-    #proj-wp-table:not(.wp-table-full) th:nth-child(24),
-    #proj-wp-table:not(.wp-table-full) td:nth-child(24),
-    #proj-wp-table:not(.wp-table-full) th:nth-child(33),
-    #proj-wp-table:not(.wp-table-full) td:nth-child(33),
-    #proj-wp-table:not(.wp-table-full) th:nth-child(35),
-    #proj-wp-table:not(.wp-table-full) td:nth-child(35) { display:table-cell; }
-    #proj-wp-table:not(.wp-table-full) td[colspan] { display:table-cell !important; }
-    #proj-wp-table.wp-table-full th,
-    #proj-wp-table.wp-table-full td { display:table-cell; }
-    body.viewer-mode #proj-wp-table:not(.wp-table-full) th:nth-child(11),
-    body.viewer-mode #proj-wp-table:not(.wp-table-full) td:nth-child(11) { display:none !important; }
+    #proj-wp-table { font-size:10px; }
+    #proj-wp-table th, #proj-wp-table td { padding:6px 8px !important; white-space:nowrap; }
   }
   /* Viewer mode — hide all cost data and editing tools */
   body.viewer-mode #metrics-cost-group { display:none !important; }
