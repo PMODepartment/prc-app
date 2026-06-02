@@ -490,6 +490,8 @@ Logo is styled globally in `dashboard.css`. Current rule fills the full sidebar 
 File: `assets/img/megawide-logo.png` (white version). Favicon: `assets/img/favicon.png` (unchanged).
 **Do NOT add inline `.sidebar-logo img` CSS to individual HTML files.**
 
+**Brand panel logo (login.html, register.html):** `.brand-logo { width:100%; height:auto; display:block; }` — fills the full panel content width. Mobile override adds `width:auto` so the logo doesn't stretch in the horizontal compact bar layout (`height:44px; width:auto; flex-shrink:0`).
+
 ---
 
 ## Performance (Mobile Load Speed)
@@ -543,7 +545,7 @@ All pages load scripts at the **bottom of `<body>`** in this order:
 ```
 
 ### Remaining variability
-The **Supabase free tier cold start** (5–30s on first load after 7 days inactivity) is the one remaining cause of extreme mobile lag. Fix: set up UptimeRobot to ping the project URL every 3–4 days.
+The **Supabase free tier cold start** (5–30s on first load after 7 days inactivity) is the one remaining cause of extreme load lag. `index.html` shows a "Taking longer than usual" message with a **Retry** button after 20 s (`_loadTimeout` / `clearTimeout`). Fix permanently: set up UptimeRobot to ping the project URL every 3–4 days.
 
 ---
 
