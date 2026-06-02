@@ -6,7 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Select Project — Megawide EPC</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
+  <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
+  <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
+  <link rel="preload" as="script" href="assets/js/auth.js"/>
+  <link rel="preload" as="script" href="assets/js/db.js"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
@@ -17,7 +22,6 @@
     }
     img, canvas, svg { max-width: 100% !important; }
 
-    /* ── Page layout ── */
     .page {
       min-height: 100vh;
       display: flex;
@@ -27,7 +31,6 @@
       padding: 40px 16px 60px;
     }
 
-    /* ── Header ── */
     .top-bar {
       width: 100%;
       max-width: 640px;
@@ -43,11 +46,7 @@
       display: flex;
       align-items: center;
     }
-    .logo-wrap img {
-      height: 44px;
-      width: auto;
-      display: block;
-    }
+    .logo-wrap img { height: 44px; width: auto; display: block; }
     .user-chip {
       display: flex;
       align-items: center;
@@ -60,197 +59,137 @@
       color: #231F20;
     }
     .user-avatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: #EE3124;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 700;
-      flex-shrink: 0;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: #EE3124; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; flex-shrink: 0;
     }
     .logout-btn {
-      background: none;
-      border: none;
-      font-size: 12px;
-      color: #888;
-      cursor: pointer;
-      margin-left: 4px;
-      font-family: 'Montserrat', sans-serif;
+      background: none; border: none; font-size: 12px; color: #888;
+      cursor: pointer; margin-left: 4px; font-family: 'Montserrat', sans-serif;
     }
     .logout-btn:hover { color: #EE3124; }
 
-    /* ── Heading ── */
-    .heading {
-      text-align: center;
-      margin-bottom: 32px;
-    }
-    .heading h1 {
-      font-size: 22px;
-      font-weight: 700;
-      color: #231F20;
-      margin-bottom: 6px;
-    }
-    .heading p {
-      font-size: 14px;
-      color: #888;
-    }
+    .heading { text-align: center; margin-bottom: 32px; }
+    .heading h1 { font-size: 22px; font-weight: 700; color: #231F20; margin-bottom: 6px; }
+    .heading p { font-size: 14px; color: #888; }
 
-    /* ── Project cards grid ── */
-    .cards {
-      width: 100%;
-      max-width: 640px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+    .cards { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 10px; }
 
-    /* ── Consolidated card (special) ── */
     .card-consolidated {
-      background: #231F20;
-      border-radius: 12px;
-      padding: 20px 22px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      transition: background .15s, transform .1s;
-      text-decoration: none;
+      background: #231F20; border-radius: 12px; padding: 20px 22px;
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; transition: background .15s, transform .1s; text-decoration: none;
     }
-    .card-consolidated:hover {
-      background: #333;
-      transform: translateY(-1px);
-    }
-    .card-consolidated .card-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: #fff;
-    }
-    .card-consolidated .card-sub {
-      font-size: 12px;
-      color: rgba(255,255,255,.55);
-      margin-top: 2px;
-    }
-    .card-consolidated .card-arrow {
-      color: rgba(255,255,255,.5);
-      font-size: 18px;
-    }
-    .card-consolidated .badge-all {
-      background: rgba(238,49,36,.85);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 10px;
-      margin-left: 8px;
-      vertical-align: middle;
+    .card-consolidated:hover { background: #333; transform: translateY(-1px); }
+    .card-consolidated .card-title { font-size: 15px; font-weight: 600; color: #fff; }
+    .card-consolidated .card-sub { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 2px; }
+    .card-consolidated .card-arrow { color: rgba(255,255,255,.5); font-size: 18px; }
+    .badge-all {
+      background: rgba(238,49,36,.85); color: #fff; font-size: 10px; font-weight: 700;
+      padding: 2px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle;
     }
 
-    /* ── Regular project card ── */
     .card-project {
-      background: #fff;
-      border: 1px solid #ebebeb;
-      border-radius: 12px;
-      padding: 18px 22px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      transition: border-color .15s, box-shadow .15s, transform .1s;
-      text-decoration: none;
+      background: #fff; border: 1px solid #ebebeb; border-radius: 12px; padding: 18px 22px;
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .1s; text-decoration: none;
     }
     .card-project:hover {
-      border-color: #EE3124;
-      box-shadow: 0 2px 12px rgba(238,49,36,.08);
-      transform: translateY(-1px);
+      border-color: #EE3124; box-shadow: 0 2px 12px rgba(238,49,36,.08); transform: translateY(-1px);
     }
     .card-left { flex: 1; }
     .card-id {
-      display: inline-block;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: .06em;
-      background: #EE3124;
-      color: #fff;
-      padding: 2px 8px;
-      border-radius: 4px;
-      margin-bottom: 6px;
+      display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .06em;
+      background: #EE3124; color: #fff; padding: 2px 8px; border-radius: 4px; margin-bottom: 6px;
     }
-    .card-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #231F20;
-    }
-    .card-sub {
-      font-size: 12px;
-      color: #888;
-      margin-top: 2px;
-    }
-    .card-stats {
-      display: flex;
-      gap: 16px;
-      margin-right: 16px;
-      text-align: center;
-    }
-    .stat-item { }
-    .stat-val {
-      font-size: 16px;
-      font-weight: 700;
-      color: #231F20;
-    }
-    .stat-lbl {
-      font-size: 10px;
-      color: #999;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-    }
-    .card-arrow {
-      color: #ccc;
-      font-size: 18px;
-    }
+    .card-title { font-size: 14px; font-weight: 600; color: #231F20; }
+    .card-sub { font-size: 12px; color: #888; margin-top: 2px; }
+    .card-stats { display: flex; gap: 16px; margin-right: 16px; text-align: center; }
+    .stat-val { font-size: 16px; font-weight: 700; color: #231F20; }
+    .stat-lbl { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: .04em; }
+    .card-arrow { color: #ccc; font-size: 18px; }
     .card-project:hover .card-arrow { color: #EE3124; }
 
-    /* ── Empty / loading states ── */
-    .loading {
-      text-align: center;
-      padding: 40px 0;
-      color: #888;
-      font-size: 14px;
+    /* New Project card */
+    .card-new-project {
+      background: #fff; border: 1.5px dashed #ddd; border-radius: 12px; padding: 18px 22px;
+      display: flex; align-items: center; gap: 12px;
+      cursor: pointer; transition: border-color .15s, background .15s;
+      font-size: 14px; font-weight: 600; color: #aaa;
     }
+    .card-new-project:hover { border-color: #EE3124; color: #EE3124; background: #fff8f8; }
+    .card-new-project .plus-circle {
+      width: 32px; height: 32px; border-radius: 50%; border: 2px solid #ddd;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0; transition: border-color .15s;
+    }
+    .card-new-project:hover .plus-circle { border-color: #EE3124; }
+
+    .loading { text-align: center; padding: 40px 0; color: #888; font-size: 14px; }
     .spinner {
-      width: 24px;
-      height: 24px;
-      border: 2px solid #e5e5e5;
-      border-top-color: #EE3124;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      margin: 0 auto 12px;
+      width: 24px; height: 24px; border: 2px solid #e5e5e5; border-top-color: #EE3124;
+      border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 12px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Section separator ── */
     .section-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: #bbb;
-      margin: 16px 0 8px;
+      font-size: 11px; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase; color: #bbb; margin: 16px 0 8px;
     }
 
-    /* Mobile: hide stats on very small screens */
-    @media (max-width: 400px) {
-      .card-stats { display: none; }
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,.45); align-items: center; justify-content: center; padding: 16px;
     }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 16px; width: 100%; max-width: 460px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.18); overflow: hidden;
+    }
+    .modal-header { padding: 22px 24px 0; }
+    .modal-title { font-size: 17px; font-weight: 700; color: #231F20; }
+    .modal-sub { font-size: 12px; color: #aaa; margin-top: 3px; }
+    .modal-body { padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; }
+    .field-label {
+      font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase;
+      letter-spacing: .04em; display: block; margin-bottom: 5px;
+    }
+    .field-input {
+      width: 100%; padding: 10px 12px; border: 1.5px solid #e5e5e5; border-radius: 8px;
+      font-size: 14px; font-family: inherit; outline: none; transition: border-color .15s;
+    }
+    .field-input:focus { border-color: #EE3124; }
+    .field-hint { font-size: 11px; color: #bbb; margin-top: 4px; }
+    .modal-error {
+      display: none; background: #FEE2E2; color: #991B1B; border-radius: 8px;
+      padding: 10px 12px; font-size: 13px;
+    }
+    .modal-footer {
+      padding: 14px 24px 20px; display: flex; gap: 10px; justify-content: flex-end;
+      border-top: 1px solid #f0f0f0;
+    }
+    .btn-create {
+      background: #EE3124; color: #fff; border: none; border-radius: 8px;
+      padding: 10px 20px; font-size: 14px; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-create:hover:not(:disabled) { background: #c9261b; }
+    .btn-create:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-cancel-modal {
+      background: none; border: 1px solid #e5e5e5; border-radius: 8px;
+      padding: 10px 16px; font-size: 14px; font-family: inherit;
+      cursor: pointer; color: #666; transition: border-color .15s;
+    }
+    .btn-cancel-modal:hover { border-color: #bbb; }
+
+    @media (max-width: 400px) { .card-stats { display: none; } }
   </style>
 </head>
 <body>
   <div class="page">
 
-    <!-- Top bar: logo + user -->
     <div class="top-bar">
       <div class="logo-wrap">
         <img src="assets/img/logo-white.png" alt="Megawide Construction">
@@ -258,17 +197,15 @@
       <div class="user-chip">
         <div class="user-avatar" id="userInitial">F</div>
         <span id="userName">Loading…</span>
-        <button class="logout-btn" onclick="logout()">Sign out</button>
+        <button class="logout-btn" onclick="AppAuth.logout()">Sign out</button>
       </div>
     </div>
 
-    <!-- Heading -->
     <div class="heading">
       <h1>Select a Project</h1>
       <p>Choose which project dashboard to open.</p>
     </div>
 
-    <!-- Cards -->
     <div class="cards" id="cardContainer">
       <div class="loading">
         <div class="spinner"></div>
@@ -278,72 +215,167 @@
 
   </div>
 
-  <script type="module">
-    import { requireAuth, canAccessConsolidated, logout as authLogout } from './assets/js/auth.js';
-    import { getAllProjects, getProjectKPIs } from './assets/js/db.js';
+  <!-- New Project Modal -->
+  <div class="modal-overlay" id="newProjectModal" onclick="if(event.target===this)closeNewProjectModal()">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">Create New Project</div>
+        <div class="modal-sub">Add a new project to the dashboard</div>
+      </div>
+      <div class="modal-body">
+        <div>
+          <label class="field-label" for="ps-np-id">Project Code <span style="color:#EE3124">*</span></label>
+          <input id="ps-np-id" class="field-input" type="text" placeholder="e.g. AVR102"
+            oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+          <div class="field-hint">Short unique code — letters &amp; numbers only. Cannot be changed later.</div>
+        </div>
+        <div>
+          <label class="field-label" for="ps-np-name">Project Name <span style="color:#EE3124">*</span></label>
+          <input id="ps-np-name" class="field-input" type="text" placeholder="e.g. Avesta Residences Tower 2">
+        </div>
+        <div>
+          <label class="field-label" for="ps-np-location">Location</label>
+          <input id="ps-np-location" class="field-input" type="text" placeholder="e.g. Quezon City">
+        </div>
+        <div>
+          <label class="field-label" for="ps-np-budget">Procurement Budget BCB (₱)</label>
+          <input id="ps-np-budget" class="field-input" type="text" inputmode="numeric" placeholder="e.g. 274,900,000">
+        </div>
+        <div id="ps-np-error" class="modal-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel-modal" onclick="closeNewProjectModal()">Cancel</button>
+        <button class="btn-create" id="ps-btn-create" onclick="createProject()">Create &amp; Open</button>
+      </div>
+    </div>
+  </div>
 
-    window.logout = authLogout;
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/db.js"></script>
+  <script>
+    // Budget input comma formatting
+    (function() {
+      const el = document.getElementById('ps-np-budget');
+      if (!el) return;
+      el.addEventListener('blur',  () => { const v=parseFloat(el.value.replace(/,/g,'')); if(!isNaN(v)) el.value=v.toLocaleString('en-US'); });
+      el.addEventListener('focus', () => { el.value=el.value.replace(/,/g,''); });
+    })();
 
-    async function init() {
-      const user = await requireAuth();
-      if (!user) return;
+    function openNewProjectModal() {
+      ['ps-np-id','ps-np-name','ps-np-location','ps-np-budget'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.value='';
+      });
+      document.getElementById('ps-np-error').style.display='none';
+      document.getElementById('ps-btn-create').textContent='Create & Open';
+      document.getElementById('ps-btn-create').disabled=false;
+      document.getElementById('newProjectModal').classList.add('active');
+      setTimeout(()=>document.getElementById('ps-np-id').focus(), 50);
+    }
 
-      // Set user chip
-      document.getElementById('userName').textContent = user.name || user.email;
-      document.getElementById('userInitial').textContent = (user.name || user.email)[0].toUpperCase();
+    function closeNewProjectModal() {
+      document.getElementById('newProjectModal').classList.remove('active');
+    }
 
+    async function createProject() {
+      const id   = document.getElementById('ps-np-id').value.trim();
+      const name = document.getElementById('ps-np-name').value.trim();
+      const loc  = document.getElementById('ps-np-location').value.trim();
+      const budget = parseFloat(document.getElementById('ps-np-budget').value.replace(/,/g,''))||null;
+      const errEl = document.getElementById('ps-np-error');
+      errEl.style.display = 'none';
+
+      if (!id || !name) {
+        errEl.textContent = 'Project Code and Name are required.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (!/^[A-Z0-9]+$/.test(id)) {
+        errEl.textContent = 'Project Code must be letters and numbers only (e.g. AVR102).';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      const btn = document.getElementById('ps-btn-create');
+      btn.textContent = 'Creating…'; btn.disabled = true;
+
+      try {
+        await WPDb.createProject({ id, name, location: loc, budget_bcb: budget, status: 'active' });
+        // Auto-assign to logged-in admin if they have a projects array
+        const profile = window.__profile;
+        if (profile && Array.isArray(profile.projects)) {
+          await WPDb.updateUser(profile.id, { projects: [...new Set([...(profile.projects), id])] });
+        }
+        closeNewProjectModal();
+        window.location.href = `project.html?id=${id}`;
+      } catch(err) {
+        const isDupe = err.message && (err.message.includes('duplicate') || err.message.includes('unique'));
+        errEl.textContent = isDupe
+          ? `Project Code "${id}" already exists. Choose a different code.`
+          : 'Error: ' + (err.message || 'Could not create project');
+        errEl.style.display = 'block';
+        btn.textContent = 'Create & Open'; btn.disabled = false;
+      }
+    }
+
+    // Enter key submits modal
+    document.getElementById('newProjectModal').addEventListener('keydown', e => {
+      if (e.key === 'Enter') createProject();
+      if (e.key === 'Escape') closeNewProjectModal();
+    });
+
+    AppAuth.requireLogin(async (user, profile) => {
+      window.__wpmRole = profile.role;
+      window.__profile = profile;
+
+      document.getElementById('userName').textContent = profile.email || user.email || '';
+      document.getElementById('userInitial').textContent = ((profile.email || user.email || 'U')[0]).toUpperCase();
+
+      const isAdmin = ['admin','super_admin'].includes(profile.role);
       const container = document.getElementById('cardContainer');
       container.innerHTML = '';
 
-      // ── Consolidated view (admins / super admins) ──
-      if (canAccessConsolidated(user)) {
+      // Portfolio Overview card (admin/super_admin only)
+      if (isAdmin) {
         const consolidatedCard = document.createElement('a');
-        consolidatedCard.href = 'index.html?view=consolidated';
+        consolidatedCard.href = 'index.html';
         consolidatedCard.className = 'card-consolidated';
         consolidatedCard.innerHTML = `
           <div>
-            <div class="card-title">
-              Portfolio Overview
-              <span class="badge-all">ALL PROJECTS</span>
-            </div>
+            <div class="card-title">Portfolio Overview <span class="badge-all">ALL PROJECTS</span></div>
             <div class="card-sub">Consolidated view — all projects &amp; work packages</div>
           </div>
-          <div class="card-arrow">→</div>
-        `;
+          <div class="card-arrow">→</div>`;
         container.appendChild(consolidatedCard);
       }
 
-      // ── Per-project cards ──
-      const { data: allProjects } = await getAllProjects();
-      if (!allProjects?.length) {
-        container.innerHTML += '<div style="text-align:center;color:#888;padding:24px;font-size:14px">No projects found.</div>';
-        return;
-      }
+      const allProjects = await WPDb.getProjects();
+      const projects = (allProjects || []).filter(p => p.status !== 'archived');
 
-      // Filter to user's assigned projects (super_admin sees all)
-      const visibleProjects = user.role === 'super_admin'
-        ? allProjects
-        : allProjects.filter(p => user.projects?.includes(p.id));
+      const visible = profile.role === 'super_admin'
+        ? projects
+        : projects.filter(p => (profile.projects || []).includes(p.id));
 
-      if (!visibleProjects.length) {
+      if (!visible.length) {
         container.innerHTML += '<div style="text-align:center;color:#888;padding:24px;font-size:14px">No projects assigned yet. Contact your administrator.</div>';
+        if (isAdmin) addNewProjectCard(container);
         return;
       }
 
-      if (canAccessConsolidated(user)) {
+      // Auto-navigate if only one project and not admin
+      if (visible.length === 1 && !isAdmin) {
+        window.location.href = `project.html?id=${visible[0].id}`;
+        return;
+      }
+
+      if (isAdmin) {
         const sep = document.createElement('div');
         sep.className = 'section-label';
         sep.textContent = 'Individual Projects';
         container.appendChild(sep);
       }
 
-      // Load KPIs for each project in parallel
-      const kpiResults = await Promise.all(
-        visibleProjects.map(p => getProjectKPIs(p.id))
-      );
-
-      visibleProjects.forEach((project, i) => {
-        const kpis = kpiResults[i].data;
+      visible.forEach(project => {
         const card = document.createElement('a');
         card.href = `project.html?id=${project.id}`;
         card.className = 'card-project';
@@ -353,36 +385,21 @@
             <div class="card-title">${project.name}</div>
             <div class="card-sub">${project.location || ''}</div>
           </div>
-          ${kpis ? `
-            <div class="card-stats">
-              <div class="stat-item">
-                <div class="stat-val">${kpis.totalPackages}</div>
-                <div class="stat-lbl">WPs</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-val" style="color:#2D9B6F">${kpis.awarded}</div>
-                <div class="stat-lbl">Awarded</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-val" style="color:${kpis.variance >= 0 ? '#2D9B6F' : '#EE3124'}">
-                  ${kpis.variance >= 0 ? '+' : ''}${(kpis.variancePct).toFixed(1)}%
-                </div>
-                <div class="stat-lbl">Variance</div>
-              </div>
-            </div>
-          ` : ''}
-          <div class="card-arrow">→</div>
-        `;
+          <div class="card-arrow">→</div>`;
         container.appendChild(card);
       });
 
-      // If only one project and no consolidated access, go directly
-      if (visibleProjects.length === 1 && !canAccessConsolidated(user)) {
-        window.location.href = `project.html?id=${visibleProjects[0].id}`;
-      }
-    }
+      // Add New Project card (admin only) — at bottom of list
+      if (isAdmin) addNewProjectCard(container);
+    });
 
-    init();
+    function addNewProjectCard(container) {
+      const card = document.createElement('div');
+      card.className = 'card-new-project';
+      card.onclick = openNewProjectModal;
+      card.innerHTML = `<div class="plus-circle">+</div> Add New Project`;
+      container.appendChild(card);
+    }
   </script>
 </body>
 </html>
