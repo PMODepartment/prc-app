@@ -549,7 +549,7 @@ function buildMetrics(wps){
     card('Awarded Cost', fmt(totalAwarded), ''),
     card('Procurement Cost to Complete', fmt(costToComplete), ''),
     card('Procurement Estimate at Completion', fmt(eac), ''),
-    card('Variance', (variance>=0?'+':'')+fmt(variance), variance>=0?'green':'red'),
+    card('Variance', (variance>=0?'+₱':'-₱')+(Math.abs(variance)/1e6).toFixed(1)+'M', variance>=0?'green':'red'),
     card('% Variance', (pctVar>=0?'+':'')+pctVar.toFixed(1)+'%', pctVar>=0?'green':'red'),
   ].join('');
 
@@ -599,13 +599,13 @@ function setBlPeriodMode(mode) {
     ? 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600'
     : 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
   const notAwarded = allWPs.filter(w=>w.award_status!=='Awarded');
-  if(mode==='monthly') Charts.budgetAwardedByPeriod('c-backlog-period', notAwarded);
-  else Charts.wpByPeriodQuarterly('c-backlog-period', notAwarded);
+  if(mode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-backlog-period', notAwarded);
+  else Charts.budgetAwardedByPeriod('c-backlog-period', notAwarded);
 }
 
 function renderDashPeriod(wps) {
-  if(_dashPeriodMode==='monthly') Charts.budgetAwardedByPeriod('c-dash-period', wps);
-  else Charts.wpByPeriodQuarterly('c-dash-period', wps);
+  if(_dashPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-dash-period', wps);
+  else Charts.budgetAwardedByPeriod('c-dash-period', wps);
 }
 
 function renderDashboard(){
@@ -664,8 +664,8 @@ function renderBacklog(){
   // Charts: Aging buckets, Status donut, Period, Submittal donut
   Charts.wpAgingBuckets('c-backlog-aging', notAwarded, projId||'Project');
   Charts.wpStatusDonut('c-wp-status-bl', notAwarded);
-  if(_blPeriodMode==='monthly') Charts.budgetAwardedByPeriod('c-backlog-period', notAwarded);
-  else Charts.wpByPeriodQuarterly('c-backlog-period', notAwarded);
+  if(_blPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-backlog-period', notAwarded);
+  else Charts.budgetAwardedByPeriod('c-backlog-period', notAwarded);
   Charts.wpSubmittalDonut('c-backlog-submittal', allWPs);
 
   // Backlog table — sorted by aging descending (most overdue first)

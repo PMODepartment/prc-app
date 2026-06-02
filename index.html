@@ -464,8 +464,8 @@
       if(btnM) btnM.style.cssText = mode==='monthly' ? onStyle : offStyle;
       if(btnQ) btnQ.style.cssText = mode==='quarterly' ? onStyle : offStyle;
       if(_lastWPs) {
-        if(mode==='monthly') Charts.budgetAwardedByPeriod('c-idx-dash-period', _lastWPs);
-        else Charts.wpByPeriodQuarterly('c-idx-dash-period', _lastWPs);
+        if(mode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-dash-period', _lastWPs);
+        else Charts.budgetAwardedByPeriod('c-idx-dash-period', _lastWPs);
       }
     };
 
@@ -479,8 +479,8 @@
       if(btnM) btnM.style.cssText = mode==='monthly' ? onStyle : offStyle;
       if(_lastWPs) {
         const notAwarded = _lastWPs.filter(w => w.award_status !== 'Awarded');
-        if(mode==='monthly') Charts.budgetAwardedByPeriod('c-bl-period', notAwarded);
-        else Charts.wpByPeriodQuarterly('c-bl-period', notAwarded);
+        if(mode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-bl-period', notAwarded);
+        else Charts.budgetAwardedByPeriod('c-bl-period', notAwarded);
       }
     };
 
@@ -536,8 +536,8 @@
         // Overview: just KPI groups — rendered in renderAll
       } else if (tab === 'dashboard') {
         _destroyCharts(['c-idx-dash-period','c-idx-dash-trade','c-idx-dash-status']);
-        if(_idxDashPeriodMode==='monthly') Charts.budgetAwardedByPeriod('c-idx-dash-period', wps);
-        else Charts.wpByPeriodQuarterly('c-idx-dash-period', wps);
+        if(_idxDashPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-dash-period', wps);
+        else Charts.budgetAwardedByPeriod('c-idx-dash-period', wps);
         Charts.wpByTrade('c-idx-dash-trade', wps);
         Charts.wpStatusDonut('c-idx-dash-status', wps);
 
@@ -776,7 +776,7 @@
         card('Awarded Cost', Fmt.moneyFull(totalAwd), 'green'),
         card('Procurement Cost to Complete', Fmt.moneyFull(ctc), ''),
         card('Procurement Estimate at Completion', Fmt.moneyFull(eac), ''),
-        card('Variance', (variance>=0?'+':'')+Fmt.moneyFull(variance), variance>=0?'green':'red'),
+        card('Variance', (variance>=0?'+₱':'-₱')+Fmt.moneyFull(Math.abs(variance)).replace('₱',''), variance>=0?'green':'red'),
         card('% Variance', (parseFloat(pctVar)>=0?'+':'')+pctVar+'%', parseFloat(pctVar)>=0?'green':'red'),
       ].join('');
       if(wpEl) wpEl.innerHTML = [

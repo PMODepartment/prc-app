@@ -94,6 +94,28 @@
   function getQKey(d){ const q=Math.ceil((d.getMonth()+1)/3); return `${d.getFullYear()}-${q}`; }
   function qLabel(k){ const[y,q]=k.split('-'); return `Q${q} '${y.slice(2)}`; }
 
+  // Budget (BCB) and Awarded by Period — MONTHLY combo chart
+  function budgetAwardedByPeriodMonthly(id, wps){
+    const mSet=new Set();
+    wps.forEach(w=>{ if(w.awarding_date){ const d=new Date(w.awarding_date); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } });
+    if(!mSet.size){ destroy(id); return; }
+    const months=[...mSet].sort();
+    const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const mLabel=k=>{ const[y,m]=k.split('-'); return MONTH_NAMES[parseInt(m)-1]+' \''+y.slice(2); };
+    const getMKey=d=>d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
+    const budgetData=months.map(mk=>wps.filter(w=>w.awarding_date&&getMKey(new Date(w.awarding_date))===mk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
+    const awardedData=months.map(mk=>wps.filter(w=>w.actual_awarding_date&&getMKey(new Date(w.actual_awarding_date))===mk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
+    let cb=0,ca=0;
+    const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
+    const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
+    make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
+      {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
+      {label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2},
+      {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'}}}}});
+  }
+
   // Budget (BCB) and Awarded by Period — quarterly combo chart (matches Power BI Projects & Budget pages)
   function budgetAwardedByPeriod(id, wps){
     const qSet=new Set();
@@ -226,5 +248,5 @@
     make(id,{type:'doughnut',data:{labels:trades,datasets:[{data:vals,backgroundColor:COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}}}}});
   }
 
-  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,wpByTrade,wpStatusDonut,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut};
+  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut};
 })();
