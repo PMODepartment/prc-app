@@ -562,11 +562,20 @@
       updatePendingBadge();
     }
 
-    // Parallelize projects + WPs fetch for admins (saves one round-trip)
+    // WP data cache — stale-while-revalidate (5-min TTL)
     const isAdminUser = AppAuth.isAdmin(profile);
-    const [allProjectsRaw, adminWPs] = await Promise.all([
+    const _WP_CACHE_KEY = `wpm_wps_idx_${profile.id}`;
+    const _WP_CACHE_TTL = 5 * 60 * 1000;
+    let _cachedEntry = null;
+    try { _cachedEntry = JSON.parse(sessionStorage.getItem(_WP_CACHE_KEY)); } catch(e) {}
+    const _cacheValid = _cachedEntry && (Date.now() - _cachedEntry.ts < _WP_CACHE_TTL);
+
+    // Parallelize projects + WPs fetch; skip WP fetch when cache is warm
+    const [allProjectsRaw, freshWPs] = await Promise.all([
       WPDb.getProjects(),
-      isAdminUser ? WPDb.getAllApprovedWPs() : Promise.resolve(null),
+      _cacheValid ? Promise.resolve(null)
+        : isAdminUser ? WPDb.getAllApprovedWPs()
+        : Promise.resolve(null),
     ]);
     const permitted = AppAuth.getPermittedProjects(profile, allProjectsRaw);
 
@@ -589,8 +598,20 @@
     renderIndexNav();
     window.__sidebarRefresh = renderIndexNav;
 
-    // Single query for all WPs (admin WPs already fetched in parallel above)
-    const rawWPs = adminWPs ?? await WPDb.getApprovedWPsForProjects(permitted.map(p => p.id));
+    // Resolve WPs: cache hit → use cache; otherwise fetch (non-admin users fetch by project list)
+    let rawWPs;
+    if (_cacheValid) {
+      rawWPs = _cachedEntry.wps;
+    } else if (freshWPs) {
+      rawWPs = freshWPs;
+    } else {
+      rawWPs = await WPDb.getApprovedWPsForProjects(permitted.map(p => p.id));
+    }
+    // Save fresh data to cache
+    if (!_cacheValid) {
+      try { sessionStorage.setItem(_WP_CACHE_KEY, JSON.stringify({ wps: rawWPs, ts: Date.now() })); } catch(e) {}
+    }
+
     const _allWPs = rawWPs.map(w => ({...w, trade: normTrade(w.trade)}));
     // ID-keyed lookup for WP detail modal (avoids JSON.stringify in every table cell)
     window._wpById = Object.fromEntries(_allWPs.map(w => [w.id, w]));
@@ -1899,6 +1920,18 @@
     clearTimeout(_loadTimeout);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
+
+    // Background refresh when we served from cache — keep data warm for next visit
+    if (_cacheValid) {
+      (async () => {
+        try {
+          const bg = isAdminUser
+            ? await WPDb.getAllApprovedWPs()
+            : await WPDb.getApprovedWPsForProjects(permitted.map(p => p.id));
+          sessionStorage.setItem(_WP_CACHE_KEY, JSON.stringify({ wps: bg, ts: Date.now() }));
+        } catch(e) { /* silent — stale cache still valid */ }
+      })();
+    }
   });
 </script>
 

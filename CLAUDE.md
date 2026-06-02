@@ -511,6 +511,7 @@ File: `assets/img/megawide-logo.png` (white version). Favicon: `assets/img/favic
 | `login`, `register`, `pending`, `forgot-password` used ESM `import { createClient }` (+esm waterfall) | Switched all four to UMD bundle + `window.supabase.createClient()` |
 | `index.html` fetched projects then WPs sequentially (2 round-trips for admins) | Parallelized with `Promise.all([getProjects(), getAllApprovedWPs()])` — saves one round-trip |
 | `JSON.stringify(w)` embedded in every WP table cell onclick (~90KB DOM overhead per render) | Replaced with `openWPDetail("id")` + `window._wpById` lookup map |
+| WP data re-fetched from Supabase on every return visit to `index.html` (e.g. after viewing a project) | **WP cache (stale-while-revalidate)** in `sessionStorage` under `wpm_wps_idx_{userId}` — 5-min TTL. Cache hit skips WP network call entirely; background refresh updates cache after render. First load still fetches; repeat visits are near-instant. |
 
 ### Public auth pages (login, register, pending, forgot-password)
 These pages do **not** load `auth.js`/`db.js`/`ui.js`. They load the UMD bundle inline and call `window.supabase.createClient()` directly in their own `<script>` block. Top-level `await` is wrapped in an async IIFE (not ES modules). `forgot-password.html` `redirectTo` points to `https://pmodepartment.github.io/prc-app/login.html`.
