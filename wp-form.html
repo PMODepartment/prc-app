@@ -120,6 +120,33 @@
                 <input type="text" id="f-cost-code" placeholder="e.g. CC-002-004"/>
               </div>
               <div class="form-group">
+                <label>Trade / Discipline *</label>
+                <select id="f-trade" onchange="onTradeChange()">
+                  <option value="">Select trade…</option>
+                  <option>General Requirements</option>
+                  <option>Site Works</option>
+                  <option>Structural Works</option>
+                  <option>Architectural Works</option>
+                  <option>Mechanical Works</option>
+                  <option>Electrical Works</option>
+                  <option>Auxiliary Works</option>
+                  <option>Plumbing Works</option>
+                  <option>Fire Protection Works</option>
+                  <option>Allied Services</option>
+                  <option>Site Development Works</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Works *</label>
+                <select id="f-works" onchange="onWorksChange()">
+                  <option value="">Select trade first…</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Type</label>
+                <input type="text" id="f-type" readonly style="background:#f5f5f5;color:#888;cursor:default"/>
+              </div>
+              <div class="form-group">
                 <label>WP No. *</label>
                 <input type="text" id="f-wp-no" placeholder="e.g. WP-T1-004"/>
               </div>
@@ -128,8 +155,8 @@
                 <input type="text" id="f-description" placeholder="e.g. Structural Steel Framework"/>
               </div>
               <div class="form-group full">
-                <label>Detailed Description <span style="font-size:10px;color:#aaa;font-weight:400">(scope of work)</span></label>
-                <textarea id="f-detailed-description" rows="3" placeholder="Full scope description, items included, specifications…"></textarea>
+                <label>Scope of Work</label>
+                <textarea id="f-scope" rows="2" placeholder="Brief scope description…"></textarea>
               </div>
               <div class="form-group">
                 <label>Project *</label>
@@ -139,19 +166,9 @@
                 <label>Zone <span style="font-size:10px;color:#aaa;font-weight:400">(optional)</span></label>
                 <input type="text" id="f-zone" placeholder="e.g. Tower 1, Gen Req"/>
               </div>
-              <div class="form-group">
-                <label>Trade / Discipline *</label>
-                <select id="f-trade">
-                  <option value="">Select trade…</option>
-                  <option>Civil Works</option><option>Structural Steel</option>
-                  <option>Concrete Works</option><option>Waterproofing</option>
-                  <option>Mechanical</option><option>Electrical</option>
-                  <option>Plumbing</option><option>HVAC</option>
-                  <option>Facade</option><option>Finishes</option>
-                  <option>Landscaping</option><option>Fire Protection</option>
-                  <option>Elevators</option><option>Fit-out</option>
-                  <option>General Requirements</option><option>Specialty</option>
-                </select>
+              <div class="form-group full">
+                <label>Detailed Description <span style="font-size:10px;color:#aaa;font-weight:400">(scope of work)</span></label>
+                <textarea id="f-detailed-description" rows="3" placeholder="Full scope description, items included, specifications…"></textarea>
               </div>
               <div class="form-group">
                 <label>Type of Service</label>
@@ -296,6 +313,11 @@
               <div class="form-group">
                 <label>Target Delivery Date *</label>
                 <input type="date" id="f-target-delivery"/>
+              </div>
+              <div class="form-group">
+                <label>Actual Delivery Date</label>
+                <input type="date" id="f-actual-delivery"/>
+                <span class="hint">Leave blank if not yet delivered</span>
               </div>
               <div class="form-group">
                 <label>Target Installation Date</label>
@@ -490,6 +512,149 @@
 <script src="assets/js/ui.js"></script>
 <script src="assets/js/db.js"></script>
 <script>
+  const TRADE_WORKS = {
+    'General Requirements': [
+      ['Mobilization/Demobilization','Service'],
+      ['Temporary Facilities','Service'],
+      ['Office Equipment & Supplies','Service'],
+      ['Support Crew','Service'],
+      ['Security Services','Service'],
+      ['Housekeeping & Sanitation','Service'],
+      ['Heavy Equipment','Service'],
+      ['Light Equipment and Tools','Service'],
+      ['Service Vehicle','Service'],
+      ['Fuel & Oil','Service'],
+      ['Falseworks','Service'],
+      ['Personal Protective Equipment & Safety Provisions','Service'],
+      ['Drawing Services','Service'],
+      ['Bonds, Insurances & Permits','Service'],
+      ['Material Testing','Service'],
+    ],
+    'Site Works': [
+      ['Bulk Excavation & Backfilling','Service'],
+      ['Structural Excavation','Service'],
+      ['Piling Works','Service'],
+      ['Soil Protection','Service'],
+      ['Chemical Treatment','Service'],
+      ['Vapor Barrier','Materials & Labor'],
+      ['Dewatering','Service'],
+    ],
+    'Structural Works': [
+      ['Rebar','Materials & Labor'],
+      ['Formworks','Materials & Labor'],
+      ['Concrete','Materials & Labor'],
+      ['Precast','Materials & Labor'],
+      ['Structural Steel','Service'],
+      ['Post Tensioning','Service'],
+    ],
+    'Architectural Works': [
+      ['Block Works & Masonry Concrete','Materials & Labor'],
+      ['Precast','Materials & Labor'],
+      ['Sealant','Materials & Labor'],
+      ['Roof & Wall Sheeting','Materials & Labor'],
+      ['Stone & Tiles','Materials & Labor'],
+      ['Drywall & Ceiling','Materials & Labor'],
+      ['Waterproofing','Materials & Labor'],
+      ['Metal Doors','Materials & Labor'],
+      ['Wood Doors','Materials & Labor'],
+      ['PVC Doors','Materials & Labor'],
+      ['Door Hardware','Materials & Labor'],
+      ['Metal Works','Materials & Labor'],
+      ['Aluminum & Glazing','Materials & Labor'],
+      ['Paint','Materials & Labor'],
+      ['Cabinetry & Mill Works','Materials & Labor'],
+      ['Landscape & Amenities','Service'],
+      ['Specialties','Service'],
+    ],
+    'Mechanical Works': [
+      ['Air Conditioning Equipment','Materials & Labor'],
+      ['Fans & Blowers','Materials & Labor'],
+      ['Airconditioning Pipes','Materials & Labor'],
+      ['Insulation & Fittings','Materials & Labor'],
+      ['Air Conditioning Valves & Accessories','Materials & Labor'],
+      ['Ducting Works','Materials & Labor'],
+      ['Specialties','Service'],
+    ],
+    'Electrical Works': [
+      ['Distribution Equipment','Materials & Labor'],
+      ['Lightning & Ground Protection','Materials & Labor'],
+      ['Panel Boards & Breakers','Materials & Labor'],
+      ['Raceways','Materials & Labor'],
+      ['Conduits & Boxes','Materials & Labor'],
+      ['Bus Ducts','Materials & Labor'],
+      ['Wires & Cables','Materials & Labor'],
+      ['Wiring Devices','Materials & Labor'],
+      ['Lighting Fixtures','Materials & Labor'],
+      ['Specialties','Service'],
+    ],
+    'Auxiliary Works': [
+      ['Structured Cabling System','Service'],
+      ['Closed Circuit Television','Service'],
+      ['Public Address & Background Music','Service'],
+      ['Fire Detection & Alarm System','Service'],
+      ['Access Control System','Service'],
+      ['Building Management System','Service'],
+      ['Raceways','Materials & Labor'],
+      ['Conduits & Boxes','Materials & Labor'],
+      ['Wires & Cables','Materials & Labor'],
+      ['Specialties','Service'],
+    ],
+    'Plumbing Works': [
+      ['Plumbing Fixtures','Materials & Labor'],
+      ['Tanks, Pumps & Equipment','Materials & Labor'],
+      ['Valves & Accessories','Materials & Labor'],
+      ['Waterline Distribution Pipes & Fittings','Materials & Labor'],
+      ['Sanitary Pipes & Fittings','Materials & Labor'],
+      ['Sewer Treatment Plant','Service'],
+      ['Specialties','Service'],
+    ],
+    'Fire Protection Works': [
+      ['Tanks','Materials & Labor'],
+      ['Pumps & Equipment','Materials & Labor'],
+      ['Pipes & Fittings','Materials & Labor'],
+      ['Valves & Accessories','Materials & Labor'],
+      ['Cabinets, Sprinkler & Extinguishers','Materials & Labor'],
+      ['Specialties','Service'],
+    ],
+    'Allied Services': [
+      ['Elevators','Service'],
+      ['Escalators','Service'],
+      ['Transformers','Service'],
+      ['Building Management Units','Service'],
+      ['Generator Sets','Service'],
+    ],
+    'Site Development Works': [
+      ['Site Development','Service'],
+    ],
+  };
+
+  function onTradeChange() {
+    const trade = document.getElementById('f-trade').value;
+    const worksEl = document.getElementById('f-works');
+    const typeEl = document.getElementById('f-type');
+    worksEl.innerHTML = '<option value="">Select works…</option>';
+    typeEl.value = '';
+    if (trade && TRADE_WORKS[trade]) {
+      TRADE_WORKS[trade].forEach(([works]) => {
+        const opt = document.createElement('option');
+        opt.value = works; opt.textContent = works;
+        worksEl.appendChild(opt);
+      });
+    }
+  }
+
+  function onWorksChange() {
+    const trade = document.getElementById('f-trade').value;
+    const works = document.getElementById('f-works').value;
+    const typeEl = document.getElementById('f-type');
+    if (trade && works && TRADE_WORKS[trade]) {
+      const entry = TRADE_WORKS[trade].find(([w]) => w === works);
+      typeEl.value = entry ? entry[1] : '';
+    } else {
+      typeEl.value = '';
+    }
+  }
+
   const params = new URLSearchParams(location.search);
   const editId = params.get('id');   // firestore_id of WP being edited
   const projId = params.get('project'); // pre-fill project
@@ -631,6 +796,10 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-project', existingWP.project_id);
       fill('f-zone', existingWP.zone);
       fill('f-trade', existingWP.trade);
+      onTradeChange();
+      fill('f-works', existingWP.works || '');
+      fill('f-type', existingWP.type_of_works || '');
+      fill('f-scope', existingWP.scope || '');
       fill('f-type-service', existingWP.type_of_service);
       fill('f-type-procurement', existingWP.type_of_procurement);
       fill('f-type-contract', existingWP.type_of_contract);
@@ -651,6 +820,7 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-awarding-date', existingWP.awarding_date);
       fill('f-actual-awarding-date', existingWP.actual_awarding_date);
       fill('f-target-delivery', existingWP.target_delivery);
+      fill('f-actual-delivery', existingWP.actual_delivery || '');
       fill('f-target-installation', existingWP.target_installation);
       fill('f-target-completion', existingWP.target_completion);
       fill('f-budget', existingWP.approved_budget_bcb);
@@ -713,6 +883,9 @@ AppAuth.requireLogin(async (user, profile) => {
       project_id:               getVal('f-project'),
       zone:                     getVal('f-zone'),
       trade:                    getVal('f-trade'),
+      works:                    getVal('f-works') || null,
+      type_of_works:            getVal('f-type') || null,
+      scope:                    getVal('f-scope') || null,
       type_of_service:          getVal('f-type-service') || null,
       type_of_procurement:      getVal('f-type-procurement') || null,
       type_of_contract:         getVal('f-type-contract') || null,
@@ -733,6 +906,7 @@ AppAuth.requireLogin(async (user, profile) => {
       awarding_date:            getVal('f-awarding-date') || null,
       actual_awarding_date:     getVal('f-actual-awarding-date') || null,
       target_delivery:     getVal('f-target-delivery') || null,
+      actual_delivery:     getVal('f-actual-delivery') || null,
       target_installation: getVal('f-target-installation') || null,
       target_completion:   getVal('f-target-completion') || null,
       approved_budget_bcb:      getNum('f-budget'),
