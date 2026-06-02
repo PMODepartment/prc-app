@@ -314,7 +314,7 @@
               <span id="row-count" style="font-size:12px;font-weight:600;color:#888;flex:1"></span>
               <div style="display:flex;gap:4px;flex-shrink:0;border:1.5px solid #e5e5e5;border-radius:8px;overflow:hidden;background:#f8f8f8">
                 <button class="proj-vtab active" data-view="overview" onclick="setWPTableView('overview')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:#EE3124;color:#fff">Overview</button>
-                <button class="proj-vtab" data-view="financial" onclick="setWPTableView('financial')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Financial</button>
+                <button class="proj-vtab" data-view="financial" onclick="setWPTableView('financial')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Award</button>
                 <button class="proj-vtab" data-view="schedule" onclick="setWPTableView('schedule')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Schedule</button>
                 <button class="proj-vtab" data-view="submittals" onclick="setWPTableView('submittals')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Submittals</button>
               </div>
@@ -464,7 +464,7 @@ const COST_KEYS = new Set(['approved_budget_bcb','total_awarded','variance','dp_
 
 let _wpTableView = 'overview';
 const WP_TABLE_VIEWS = {
-  overview:   {keys:new Set(['cost_code','wp_no','works','description','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','award_status','remarks'])},
+  overview:   {keys:new Set(['cost_code','wp_no','works','description','scope','proposed_vendors','award_status','remarks'])},
   financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount']), cost:true},
   schedule:   {keys:new Set(['cost_code','wp_no','description','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion'])},
   submittals: {keys:new Set(['cost_code','wp_no','description','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
@@ -482,6 +482,82 @@ function setWPTableView(view) {
     b.style.color = active ? '#fff' : '#555';
   });
   curPage = 1; buildTable();
+}
+
+function openWPDetail(w) {
+  const isViewer = window.__isViewer;
+  const fmtM = v => v ? '₱'+(Math.abs(v)/1e6).toFixed(1)+'M' : '—';
+  const fmtD = d => { if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});}catch{return d;} };
+  const fmtPct = v => v != null ? (parseFloat(v)*100).toFixed(0)+'%' : '—';
+  const row = (label, val) => val && val !== '—' ? `<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f5f5f5"><span style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;min-width:140px;flex-shrink:0">${label}</span><span style="font-size:12px;color:#231F20;word-break:break-word">${val}</span></div>` : '';
+  const bud=w.approved_budget_bcb||0, awd=w.total_awarded||0, vari=bud-awd;
+  const sc=w.award_status==='Awarded'?'#2D9B6F':w.award_status==='Partially Awarded'?'#D97706':'#EE3124';
+  let html = `
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Identity</div>
+      ${row('WP No.',w.wp_no||'—')}
+      ${row('Cost Code',w.cost_code||'—')}
+      ${row('Works',w.works||'—')}
+      ${row('Type',w.type_of_works||'—')}
+      ${row('Trade',w.trade||'—')}
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Description</div>
+      ${row('Work Package',w.description||'—')}
+      ${w.scope ? `<div style="padding:6px 0;border-bottom:1px solid #f5f5f5"><span style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Scope of Work</span><span style="font-size:12px;color:#231F20;white-space:pre-wrap;word-break:break-word;line-height:1.5">${w.scope}</span></div>` : ''}
+      ${row('Vendors',w.proposed_vendors||'—')}
+      ${row('No. PO/JO',w.po_jo_count!=null?String(w.po_jo_count):'—')}
+      ${row('PO/JO Numbers',w.po_jo_numbers||'—')}
+      ${row('Remarks',w.remarks||'—')}
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Status</div>
+      ${row('Award Status',`<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${sc}22;color:${sc}">${w.award_status||'—'}</span>`)}
+      ${row('Charging Type',w.charging_type||'—')}
+      ${row('Contract Pkg No.',w.contract_package_no||'—')}
+      ${row('CO Description',w.co_description||'—')}
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Schedule</div>
+      ${row('Target Awarding',fmtD(w.awarding_date))}
+      ${row('Actual Awarding',fmtD(w.actual_awarding_date))}
+      ${row('Lead Time',w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—')}
+      ${row('Target Delivery',fmtD(w.target_delivery||w.target_completion))}
+      ${row('Actual Delivery',fmtD(w.actual_delivery))}
+      ${row('Target Install',fmtD(w.target_installation))}
+      ${row('Target Completion',fmtD(w.target_completion))}
+    </div>`;
+  if (!isViewer) {
+    html += `<div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Financials</div>
+      ${row('Procurement Budget',fmtM(bud))}
+      ${row('Awarded',fmtM(awd))}
+      ${row('Variance',(bud||awd)?`<span style="color:${vari>=0?'#2D9B6F':'#EE3124'};font-weight:600">${vari>=0?'+':''}${fmtM(vari)}</span>`:'—')}
+      ${row('Surety Bond',w.surety_bond||'—')}
+      ${row('Perf. Bond',w.performance_bond||'—')}
+      ${row('Warranty Bond',w.warranty_bond||'—')}
+      ${row('Payment Terms',w.payment_terms_days?w.payment_terms_days+'d':'—')}
+      ${row('DP %',fmtPct(w.dp_percent))}
+      ${row('DP Terms',w.dp_terms||'—')}
+      ${row('DP Amount',fmtM(w.dp_amount))}
+      ${row('DP Release Date',fmtD(w.dp_release_date))}
+      ${row('Retention %',fmtPct(w.retention_percent))}
+      ${row('Retention Amt',fmtM(w.retention_amount))}
+    </div>`;
+  }
+  html += `<div>
+    <div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Submittals</div>
+    ${row('Approver',w.approver_name||'—')}
+    ${row('Approval Date',fmtD(w.approval_date))}
+    ${row('Submittal Type',w.submittal_doc_type||'—')}
+  </div>`;
+  document.getElementById('wp-detail-modal-title').textContent = w.wp_no||'Work Package Detail';
+  document.getElementById('wp-detail-modal-sub').textContent = w.description||'';
+  document.getElementById('wp-detail-modal-body').innerHTML = html;
+  document.getElementById('wp-detail-modal').style.display = 'flex';
+}
+function closeWPDetailModal() {
+  document.getElementById('wp-detail-modal').style.display = 'none';
 }
 
 function fmt(n){ if(n==null)return'—'; return'₱'+(Math.abs(n)/1e6).toFixed(1)+'M'; }
@@ -932,8 +1008,8 @@ function buildTable(){
         trade:w.trade||'—',
         works:w.works||'—',
         type_of_works:w.type_of_works||'—',
-        scope:'<span style="font-size:10px;color:#888">'+(w.scope||'—')+'</span>',
-        wp_no:'<span class="td-code">'+(w.wp_no||'—')+'</span>',
+        scope:(()=>{const sc=w.scope||'';const sh=sc.length>55?sc.slice(0,55)+'…':sc;return(sh||'—')+(sc.length>55?`<button onclick='openWPDetail(${JSON.stringify(w).replace(/'/g,"&#39;")})' style="margin-left:4px;font-size:9px;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:'')+(sc?'':`<button onclick='openWPDetail(${JSON.stringify(w).replace(/'/g,"&#39;")})' style="font-size:9px;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`)})(),
+        wp_no:`<span class="td-code" style="cursor:pointer;color:#EE3124" onclick='openWPDetail(${JSON.stringify(w).replace(/'/g,"&#39;")})'>`+(w.wp_no||'—')+'</span>',
         description:'<span class="td-name">'+(w.description||'—')+'</span>',
         proposed_vendors:w.proposed_vendors||'—',
         po_jo_count:w.po_jo_count!=null?w.po_jo_count:'—',
@@ -964,11 +1040,16 @@ function buildTable(){
         award_status:statusBadge(w.award_status),
         remarks:'<span style="font-size:10px;color:#888">'+(w.remarks||'—')+'</span>',
       };
+      const _tdExtra={description:'max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap',proposed_vendors:'max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap',scope:'max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#666',remarks:'max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'};
       const tr=document.createElement('tr'); tr.dataset.tradeRow=item.trade;
       cols.forEach(c=>{
         const td=document.createElement('td');
         td.innerHTML=cellMap[c.key]??'—';
-        if(c.sticky) td.style.cssText='position:sticky;left:'+c._left+'px;background:#fff;z-index:1;min-width:'+c.w+';';
+        if(c.key==='description') td.title=w.description||'';
+        if(c.key==='proposed_vendors') td.title=w.proposed_vendors||'';
+        if(c.key==='remarks') td.title=w.remarks||'';
+        if(c.sticky) td.style.cssText='position:sticky;left:'+c._left+'px;background:#fff;z-index:1;min-width:'+c.w+';'+(_tdExtra[c.key]||'');
+        else if(_tdExtra[c.key]) td.style.cssText=_tdExtra[c.key];
         tr.appendChild(td);
       });
       const tdEdit=document.createElement('td');
@@ -2123,6 +2204,20 @@ window.saveQuickWP = async function() {
       <button id="csv-import-btn" onclick="importWPsFromCSV()" disabled style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;opacity:.5" disabled>Import</button>
       <button onclick="closeCSVImportModal()" style="padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;cursor:pointer">Cancel</button>
     </div>
+  </div>
+</div>
+
+<!-- WP Detail Modal -->
+<div id="wp-detail-modal" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.45);align-items:flex-start;justify-content:flex-end" onclick="if(event.target===this)closeWPDetailModal()">
+  <div style="background:#fff;width:100%;max-width:480px;height:100%;overflow-y:auto;box-shadow:-4px 0 32px rgba(0,0,0,.18);display:flex;flex-direction:column">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid #f0f0f0;display:flex;align-items:flex-start;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#231F20" id="wp-detail-modal-title">Work Package Detail</div>
+        <div style="font-size:11px;color:#aaa;margin-top:2px;max-width:380px;word-break:break-word" id="wp-detail-modal-sub"></div>
+      </div>
+      <button onclick="closeWPDetailModal()" style="background:none;border:none;cursor:pointer;padding:4px;color:#aaa;font-size:22px;line-height:1;flex-shrink:0;margin-left:8px">&times;</button>
+    </div>
+    <div style="padding:16px 20px;flex:1" id="wp-detail-modal-body"></div>
   </div>
 </div>
 
