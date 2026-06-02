@@ -95,7 +95,7 @@
           <span class="nbadge" id="claims-pending-badge" style="display:none;background:#D97706">0</span>
         </a>
       </div>
-      <div class="sidebar-section">
+      <div id="sidebar-tools" class="sidebar-section">
         <div class="sidebar-section-label">Tools</div>
         <button class="nav-item" onclick="openTemplatePickerModal()"><i class="ti ti-download"></i>Download Template</button>
       </div>
@@ -229,15 +229,26 @@
         <!-- ══ BACKLOG VIEW ══ -->
         <div id="view-backlog" style="display:none">
           <!-- Budget filter -->
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
             <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;flex:1;min-width:140px">WORK PACKAGES — NOT AWARDED ONLY</div>
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-              <label style="font-size:11px;color:#888;font-weight:600">Budget Filter:</label>
-              <input id="backlog-min-budget" type="number" placeholder="Min ₱M" style="width:70px;font-size:11px;padding:4px 8px;border:1.5px solid var(--border-md);border-radius:6px;background:var(--surface-2)">
-              <span style="font-size:11px;color:#aaa">—</span>
-              <input id="backlog-max-budget" type="number" placeholder="Max ₱M" style="width:70px;font-size:11px;padding:4px 8px;border:1.5px solid var(--border-md);border-radius:6px;background:var(--surface-2)">
-              <button class="btn" onclick="renderBacklog()" style="font-size:11px;padding:4px 10px">Apply</button>
+            <select id="bl-trade-filter" onchange="renderBacklog()" style="font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff">
+              <option value="">All Trades</option>
+            </select>
+            <select id="bl-sort-by" onchange="renderBacklog()" style="font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff">
+              <option value="aging">Most Overdue First</option>
+              <option value="date">Planned Award Date</option>
+              <option value="trade">Trade</option>
+              <option value="budget">Budget (High→Low)</option>
+              <option value="desc">Description (A→Z)</option>
+            </select>
+            <div style="position:relative">
+              <i class="ti ti-search" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);color:#bbb;font-size:11px;pointer-events:none"></i>
+              <input id="bl-search" type="text" placeholder="Search…" oninput="renderBacklog()" style="font-size:11px;padding:4px 8px 4px 24px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;width:140px">
             </div>
+            <label style="font-size:11px;color:#888;font-weight:600">Budget:</label>
+            <input id="backlog-min-budget" type="number" placeholder="Min ₱M" oninput="renderBacklog()" style="width:65px;font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
+            <span style="font-size:11px;color:#aaa">—</span>
+            <input id="backlog-max-budget" type="number" placeholder="Max ₱M" oninput="renderBacklog()" style="width:65px;font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
           </div>
           <!-- Backlog table first -->
           <div class="panel" style="margin-bottom:14px">
@@ -666,23 +677,45 @@ function renderBacklog(){
   const today = new Date();
   const minBud = parseFloat(document.getElementById('backlog-min-budget')?.value||0)*1e6||0;
   const maxBud = parseFloat(document.getElementById('backlog-max-budget')?.value||0)*1e6||Infinity;
-  let notAwarded = allWPs.filter(w=>w.award_status!=='Awarded');
-  if(minBud>0||maxBud<Infinity) notAwarded=notAwarded.filter(w=>(w.approved_budget_bcb||0)>=minBud&&(w.approved_budget_bcb||0)<=maxBud);
+  const tradeF = document.getElementById('bl-trade-filter')?.value||'';
+  const sortBy = document.getElementById('bl-sort-by')?.value||'aging';
+  const search = (document.getElementById('bl-search')?.value||'').toLowerCase().trim();
 
-  // Charts: Aging buckets, Status donut, Period, Submittal donut
+  let notAwarded = allWPs.filter(w=>w.award_status!=='Awarded');
+
+  // Populate trade filter dropdown
+  const tradeEl = document.getElementById('bl-trade-filter');
+  if (tradeEl && tradeEl.options.length <= 1) {
+    const trades = [...new Set(notAwarded.map(w=>w.trade).filter(Boolean))].sort();
+    trades.forEach(t => { const o=document.createElement('option'); o.value=t; o.textContent=t; tradeEl.appendChild(o); });
+  }
+
+  // Apply filters
+  if (tradeF) notAwarded = notAwarded.filter(w=>w.trade===tradeF);
+  if (minBud>0||maxBud<Infinity) notAwarded = notAwarded.filter(w=>(w.approved_budget_bcb||0)>=minBud&&(w.approved_budget_bcb||0)<=maxBud);
+  if (search) notAwarded = notAwarded.filter(w=>(w.description||'').toLowerCase().includes(search)||(w.wp_no||'').toLowerCase().includes(search)||(w.trade||'').toLowerCase().includes(search));
+
+  // Charts (use all not-awarded before search filter for accuracy)
   Charts.wpAgingBuckets('c-backlog-aging', notAwarded, projId||'Project');
   Charts.wpStatusDonut('c-wp-status-bl', notAwarded);
   if(_blPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-backlog-period', notAwarded);
   else Charts.budgetAwardedByPeriod('c-backlog-period', notAwarded);
   Charts.wpSubmittalDonut('c-backlog-submittal', allWPs);
 
-  // Backlog table — sorted by aging descending (most overdue first)
+  // Sort
   const sorted = [...notAwarded].sort((a,b)=>{
+    if (sortBy==='date') return (a.awarding_date||'9999') < (b.awarding_date||'9999') ? -1 : 1;
+    if (sortBy==='trade') return (a.trade||'').localeCompare(b.trade||'');
+    if (sortBy==='budget') return (b.approved_budget_bcb||0)-(a.approved_budget_bcb||0);
+    if (sortBy==='desc') return (a.description||'').localeCompare(b.description||'');
+    // default: aging descending (most overdue first)
     const agA = a.awarding_date ? (today-new Date(a.awarding_date)) : -Infinity;
     const agB = b.awarding_date ? (today-new Date(b.awarding_date)) : -Infinity;
     return agB - agA;
   });
-  document.getElementById('backlog-tbody').innerHTML = sorted.map(w=>{
+
+  const tbody = document.getElementById('backlog-tbody');
+  tbody.innerHTML = sorted.map(w=>{
     const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
     const agCls = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
     return `<tr>
@@ -715,14 +748,9 @@ const TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
 const _collapseState = new Map();
 
 window.toggleTradeGroup = function(trade) {
-  const collapsed = !(_collapseState.get(trade) || false);
-  _collapseState.set(trade, collapsed);
-  document.querySelectorAll('.trade-group-header[data-trade="'+CSS.escape(trade)+'"] span').forEach(s => {
-    if (s.style.transition) s.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-  });
-  document.querySelectorAll('tr[data-trade-row]').forEach(r => {
-    if (r.dataset.tradeRow === trade) r.style.display = collapsed ? 'none' : '';
-  });
+  _collapseState.set(trade, !(_collapseState.get(trade) || false));
+  curPage = 1;
+  buildTable();
 };
 
 function getFilteredSorted(){
@@ -756,11 +784,22 @@ function getFilteredSorted(){
 
 function buildTable(){
   const groups=getFilteredSorted(), cols=getActiveCols();
-  const allRows = groups.flatMap(g=>g.wps);
-  const total=allRows.length, pages=Math.max(1,Math.ceil(total/PAGE));
+  const totalWPs=groups.reduce((s,g)=>s+g.wps.length,0);
+
+  // Build virtual item list: header + (if not collapsed) WP row items per trade group
+  const items=[];
+  groups.forEach(({trade,wps})=>{
+    const collapsed=!!_collapseState.get(trade);
+    items.push({type:'header',trade,wps,collapsed});
+    if(!collapsed) wps.forEach(w=>items.push({type:'row',trade,wp:w}));
+  });
+
+  const totalItems=items.length;
+  const pages=Math.max(1,Math.ceil(totalItems/PAGE));
   curPage=Math.min(curPage,pages);
   const start=(curPage-1)*PAGE, end=curPage*PAGE;
-  document.getElementById('row-count').textContent=total+' packages';
+
+  document.getElementById('row-count').textContent=totalWPs+' packages';
   document.getElementById('pg-info').textContent='Page '+curPage+' of '+pages;
   document.getElementById('btn-prev').disabled=curPage<=1;
   document.getElementById('btn-next').disabled=curPage>=pages;
@@ -770,110 +809,79 @@ function buildTable(){
   cols.forEach(c=>{
     const th=document.createElement('th');
     th.style.minWidth=c.w;
-    if(c.sticky){
-      th.style.cssText='position:sticky;left:0;background:#f8f8f8;z-index:3;min-width:'+c.w+';';
-    }
+    if(c.sticky) th.style.cssText='position:sticky;left:0;background:#f8f8f8;z-index:3;min-width:'+c.w+';';
     th.innerHTML=c.label+(sortCol===c.key?(sortDir===1?' ↑':' ↓'):'');
     th.style.cursor='pointer';
     th.addEventListener('click',()=>{if(sortCol===c.key)sortDir*=-1;else{sortCol=c.key;sortDir=1;}curPage=1;buildTable();});
     colRow.appendChild(th);
   });
-  // Edit column header
   const thEdit=document.createElement('th'); thEdit.textContent=''; colRow.appendChild(thEdit);
   thead.appendChild(colRow);
 
   const tbody=document.getElementById('tbl-body'); tbody.innerHTML='';
-  let rowIdx=0;
-  groups.forEach(({trade, wps})=>{
-    wps.forEach((w,i)=>{
-      const isCollapsed = _collapseState.get(trade) || false;
-      // Insert trade header row at start of each group, only if within page range
-      if(i===0 && rowIdx >= start && rowIdx < end){
-        const headerTr=document.createElement('tr');
-        headerTr.className='trade-group-header';
-        headerTr.dataset.trade=trade;
-        headerTr.style.cssText='cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5';
-        headerTr.onclick=()=>toggleTradeGroup(trade);
-        const headerTd=document.createElement('td');
-        headerTd.colSpan=cols.length+1;
-        headerTd.style.cssText='padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555';
-        headerTd.innerHTML=trade
-          +'<span style="float:right;font-size:11px;color:#aaa;transition:transform .2s;display:inline-block;transform:'+(isCollapsed?'rotate(-90deg)':'rotate(0deg)')+'" >▼</span>'
-          +'<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">'+wps.length+' WPs</span>';
-        headerTr.appendChild(headerTd);
-        tbody.appendChild(headerTr);
-      } else if(i===0 && rowIdx < start && rowIdx+(wps.length-1) >= start){
-        // group straddles page boundary — still show header
-        const headerTr=document.createElement('tr');
-        headerTr.className='trade-group-header';
-        headerTr.dataset.trade=trade;
-        headerTr.style.cssText='cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5';
-        headerTr.onclick=()=>toggleTradeGroup(trade);
-        const headerTd=document.createElement('td');
-        headerTd.colSpan=cols.length+1;
-        headerTd.style.cssText='padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555';
-        headerTd.innerHTML=trade
-          +'<span style="float:right;font-size:11px;color:#aaa;transition:transform .2s;display:inline-block;transform:'+(isCollapsed?'rotate(-90deg)':'rotate(0deg)')+'" >▼</span>'
-          +'<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">'+wps.length+' WPs</span>';
-        headerTr.appendChild(headerTd);
-        tbody.appendChild(headerTr);
-      }
-      if(rowIdx >= start && rowIdx < end){
-        const cellMap={
-          cost_code:'<span class="td-code">'+(w.cost_code||'—')+'</span>',
-          trade:w.trade||'—',
-          works:w.works||'—',
-          type_of_works:w.type_of_works||'—',
-          scope:'<span style="font-size:10px;color:#888">'+(w.scope||'—')+'</span>',
-          wp_no:'<span class="td-code">'+(w.wp_no||'—')+'</span>',
-          description:'<span class="td-name">'+(w.description||'—')+'</span>',
-          proposed_vendors:w.proposed_vendors||'—',
-          po_jo_count:w.po_jo_count!=null?w.po_jo_count:'—',
-          po_jo_numbers:w.po_jo_numbers||'—',
-          approved_budget_bcb:fmt(w.approved_budget_bcb),
-          total_awarded:fmt(w.total_awarded),
-          variance:(()=>{ const v=(w.approved_budget_bcb||0)-(w.total_awarded||0); return (w.approved_budget_bcb||w.total_awarded)?'<span style="color:'+(v>=0?'#2D9B6F':'#EE3124')+';font-weight:600">'+(v>=0?'+':'')+fmt(v)+'</span>':'—'; })(),
-          surety_bond:w.surety_bond||'—',
-          performance_bond:w.performance_bond||'—',
-          warranty_bond:w.warranty_bond||'—',
-          payment_terms_days:w.payment_terms_days?w.payment_terms_days+'d':'—',
-          dp_percent:w.dp_percent!=null?(parseFloat(w.dp_percent)*100).toFixed(0)+'%':'—',
-          dp_terms:w.dp_terms||'—',
-          dp_amount:fmt(w.dp_amount),
-          dp_release_date:fmtDate(w.dp_release_date),
-          retention_percent:w.retention_percent!=null?(parseFloat(w.retention_percent)*100).toFixed(0)+'%':'—',
-          retention_amount:fmt(w.retention_amount),
-          awarding_lead_time:w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—',
-          awarding_date:fmtDate(w.awarding_date),
-          actual_awarding_date:fmtDate(w.actual_awarding_date),
-          target_delivery:fmtDate(w.target_delivery||w.target_completion),
-          actual_delivery:fmtDate(w.actual_delivery),
-          target_installation:fmtDate(w.target_installation),
-          target_completion:fmtDate(w.target_completion),
-          approver_name:w.approver_name||'—',
-          approval_date:fmtDate(w.approval_date),
-          submittal_doc_type:w.submittal_doc_type||'—',
-          award_status:statusBadge(w.award_status),
-          remarks:'<span style="font-size:10px;color:#888">'+(w.remarks||'—')+'</span>',
-        };
-        const tr=document.createElement('tr');
-        tr.dataset.tradeRow=trade;
-        if(isCollapsed) tr.style.display='none';
-        cols.forEach(c=>{
-          const td=document.createElement('td');
-          td.innerHTML=cellMap[c.key]??'—';
-          if(c.sticky){
-            td.style.cssText='position:sticky;left:0;background:#fff;z-index:1;min-width:'+c.w+';';
-          }
-          tr.appendChild(td);
-        });
-        const tdEdit=document.createElement('td');
-        tdEdit.innerHTML = window.__isViewer ? '' : `<a href="wp-form.html?id=${w.id}&project=${w.project_id}" style="font-size:11px;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
-        tr.appendChild(tdEdit);
-        tbody.appendChild(tr);
-      }
-      rowIdx++;
-    });
+  items.slice(start,end).forEach(item=>{
+    if(item.type==='header'){
+      const tr=document.createElement('tr');
+      tr.className='trade-group-header'; tr.dataset.trade=item.trade;
+      tr.style.cssText='cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5';
+      tr.onclick=()=>toggleTradeGroup(item.trade);
+      const td=document.createElement('td');
+      td.colSpan=cols.length+1;
+      td.style.cssText='padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555';
+      td.innerHTML=item.trade
+        +'<span style="float:right;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-left:4px">'+(item.collapsed?'+':'−')+'</span>'
+        +'<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">'+item.wps.length+' WPs</span>';
+      tr.appendChild(td); tbody.appendChild(tr);
+    } else {
+      const w=item.wp;
+      const cellMap={
+        cost_code:'<span class="td-code">'+(w.cost_code||'—')+'</span>',
+        trade:w.trade||'—',
+        works:w.works||'—',
+        type_of_works:w.type_of_works||'—',
+        scope:'<span style="font-size:10px;color:#888">'+(w.scope||'—')+'</span>',
+        wp_no:'<span class="td-code">'+(w.wp_no||'—')+'</span>',
+        description:'<span class="td-name">'+(w.description||'—')+'</span>',
+        proposed_vendors:w.proposed_vendors||'—',
+        po_jo_count:w.po_jo_count!=null?w.po_jo_count:'—',
+        po_jo_numbers:w.po_jo_numbers||'—',
+        approved_budget_bcb:fmt(w.approved_budget_bcb),
+        total_awarded:fmt(w.total_awarded),
+        variance:(()=>{const v=(w.approved_budget_bcb||0)-(w.total_awarded||0);return(w.approved_budget_bcb||w.total_awarded)?'<span style="color:'+(v>=0?'#2D9B6F':'#EE3124')+';font-weight:600">'+(v>=0?'+':'')+fmt(v)+'</span>':'—';})(),
+        surety_bond:w.surety_bond||'—',
+        performance_bond:w.performance_bond||'—',
+        warranty_bond:w.warranty_bond||'—',
+        payment_terms_days:w.payment_terms_days?w.payment_terms_days+'d':'—',
+        dp_percent:w.dp_percent!=null?(parseFloat(w.dp_percent)*100).toFixed(0)+'%':'—',
+        dp_terms:w.dp_terms||'—',
+        dp_amount:fmt(w.dp_amount),
+        dp_release_date:fmtDate(w.dp_release_date),
+        retention_percent:w.retention_percent!=null?(parseFloat(w.retention_percent)*100).toFixed(0)+'%':'—',
+        retention_amount:fmt(w.retention_amount),
+        awarding_lead_time:w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—',
+        awarding_date:fmtDate(w.awarding_date),
+        actual_awarding_date:fmtDate(w.actual_awarding_date),
+        target_delivery:fmtDate(w.target_delivery||w.target_completion),
+        actual_delivery:fmtDate(w.actual_delivery),
+        target_installation:fmtDate(w.target_installation),
+        target_completion:fmtDate(w.target_completion),
+        approver_name:w.approver_name||'—',
+        approval_date:fmtDate(w.approval_date),
+        submittal_doc_type:w.submittal_doc_type||'—',
+        award_status:statusBadge(w.award_status),
+        remarks:'<span style="font-size:10px;color:#888">'+(w.remarks||'—')+'</span>',
+      };
+      const tr=document.createElement('tr'); tr.dataset.tradeRow=item.trade;
+      cols.forEach(c=>{
+        const td=document.createElement('td');
+        td.innerHTML=cellMap[c.key]??'—';
+        if(c.sticky) td.style.cssText='position:sticky;left:0;background:#fff;z-index:1;min-width:'+c.w+';';
+        tr.appendChild(td);
+      });
+      const tdEdit=document.createElement('td');
+      tdEdit.innerHTML=window.__isViewer?'':`<a href="wp-form.html?id=${w.id}&project=${w.project_id}" style="font-size:11px;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
+      tr.appendChild(tdEdit); tbody.appendChild(tr);
+    }
   });
 }
 
@@ -1632,8 +1640,9 @@ AppAuth.requireLogin(async (user, profile) => {
 <style>
   .hide-mobile { }
   @media(max-width:480px) { .hide-mobile { display:none; } }
-  /* Viewer mode — hide all cost data */
+  /* Viewer mode — hide all cost data and editing tools */
   body.viewer-mode #metrics-cost-group { display:none !important; }
+  body.viewer-mode #sidebar-tools { display:none !important; }
   body.viewer-mode #dash-backlog-table th:nth-child(5),
   body.viewer-mode #dash-backlog-table td:nth-child(5),
   body.viewer-mode #backlog-min-budget,

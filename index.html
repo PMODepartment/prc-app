@@ -234,8 +234,22 @@
         <div id="tab-backlog" style="display:none">
           <!-- Backlog table first -->
           <div class="panel" style="margin-bottom:14px;padding:0;overflow:hidden">
-            <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0">
-              <div class="panel-title" style="margin:0"><i class="ti ti-list"></i>Backlog — Not Awarded WPs</div>
+            <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <div class="panel-title" style="margin:0;flex-shrink:0"><i class="ti ti-list"></i>Backlog — Not Awarded WPs</div>
+              <select id="bl-trade-filter" onchange="renderBlTable()" style="font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff">
+                <option value="">All Trades</option>
+              </select>
+              <select id="bl-sort-by" onchange="renderBlTable()" style="font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff">
+                <option value="aging">Most Overdue First</option>
+                <option value="date">Planned Award Date</option>
+                <option value="trade">Trade</option>
+                <option value="budget">Budget (High→Low)</option>
+                <option value="desc">Description (A→Z)</option>
+              </select>
+              <div style="position:relative;margin-left:auto">
+                <i class="ti ti-search" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);color:#bbb;font-size:11px;pointer-events:none"></i>
+                <input id="bl-search" type="text" placeholder="Search…" oninput="renderBlTable()" style="font-size:11px;padding:4px 8px 4px 24px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;width:150px">
+              </div>
             </div>
             <div style="overflow-x:auto">
               <table class="data-table" id="bl-table" style="font-size:11px">
@@ -617,18 +631,9 @@
       'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
     const _collapseState = new Map();
     window.toggleTradeGroup = function(trade) {
-      const collapsed = !(_collapseState.get(trade) || false);
-      _collapseState.set(trade, collapsed);
-      document.querySelectorAll('.trade-group-header[data-trade]').forEach(hdr => {
-        if (hdr.dataset.trade === trade) {
-          hdr.querySelectorAll('span').forEach(s => {
-            if (s.style.transition) s.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-          });
-        }
-      });
-      document.querySelectorAll('tr[data-trade-row]').forEach(r => {
-        if (r.dataset.tradeRow === trade) r.style.display = collapsed ? 'none' : '';
-      });
+      _collapseState.set(trade, !(_collapseState.get(trade) || false));
+      _wpMonPage = 1;
+      renderWPMonTable(_wpMonFiltered);
     };
 
     // ── Tab switching ─────────────────────────────────────────────
@@ -799,26 +804,36 @@
         if(_idxBlPeriodMode==='monthly') Charts.budgetAwardedByPeriod('c-bl-period', notAwarded);
         else Charts.wpByPeriodQuarterly('c-bl-period', notAwarded);
         Charts.wpSubmittalDonut('c-bl-submittal', wps);
-        // Backlog table — sorted most overdue first, grouped by trade with numeric WP sort
-        const trades = [...new Set(notAwarded.map(w=>w.trade||'').filter(Boolean))].sort();
-        const sortedNA = [];
-        trades.forEach(t => {
-          notAwarded.filter(w=>w.trade===t).sort((a,b)=>wpNumSort(a.wp_no,b.wp_no)).forEach(w=>sortedNA.push(w));
-        });
-        notAwarded.filter(w=>!w.trade).sort((a,b)=>wpNumSort(a.wp_no,b.wp_no)).forEach(w=>sortedNA.push(w));
-        // Re-sort by aging within each group
-        const sorted = [...notAwarded].sort((a,b) => {
-          const agA = a.awarding_date ? (now-new Date(a.awarding_date)) : -Infinity;
-          const agB = b.awarding_date ? (now-new Date(b.awarding_date)) : -Infinity;
-          return agB - agA;
-        });
-        const tbody = document.getElementById('bl-tbody');
-        if (tbody) {
-          const totalBudget = sorted.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-          tbody.innerHTML = sorted.map(w => {
+        // Populate trade filter dropdown
+        const blTradeEl = document.getElementById('bl-trade-filter');
+        if (blTradeEl && blTradeEl.options.length <= 1) {
+          const blTrades = TRADE_ORDER.filter(t=>notAwarded.some(w=>w.trade===t))
+            .concat([...new Set(notAwarded.map(w=>w.trade).filter(t=>t&&!TRADE_ORDER.includes(t)))].sort());
+          blTrades.forEach(t => { const o=document.createElement('option'); o.value=t; o.textContent=t; blTradeEl.appendChild(o); });
+        }
+        window.renderBlTable = function() {
+          const tradeF = document.getElementById('bl-trade-filter')?.value||'';
+          const sortBy = document.getElementById('bl-sort-by')?.value||'aging';
+          const search = (document.getElementById('bl-search')?.value||'').toLowerCase().trim();
+          let rows = notAwarded.slice();
+          if (tradeF) rows = rows.filter(w=>w.trade===tradeF);
+          if (search) rows = rows.filter(w=>(w.description||'').toLowerCase().includes(search)||(w.wp_no||'').toLowerCase().includes(search)||(w.project_id||'').toLowerCase().includes(search)||(w.trade||'').toLowerCase().includes(search));
+          rows.sort((a,b)=>{
+            if(sortBy==='date') return (a.awarding_date||'9999')<(b.awarding_date||'9999')?-1:1;
+            if(sortBy==='trade'){const od=TRADE_ORDER.indexOf(a.trade||'')-TRADE_ORDER.indexOf(b.trade||'');return od!==0?od:(a.trade||'').localeCompare(b.trade||'');}
+            if(sortBy==='budget') return (b.approved_budget_bcb||0)-(a.approved_budget_bcb||0);
+            if(sortBy==='desc') return (a.description||'').localeCompare(b.description||'');
+            const agA=a.awarding_date?(now-new Date(a.awarding_date)):-Infinity;
+            const agB=b.awarding_date?(now-new Date(b.awarding_date)):-Infinity;
+            return agB-agA;
+          });
+          const tbody = document.getElementById('bl-tbody');
+          if (!tbody) return;
+          const totalBudget = rows.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+          tbody.innerHTML = rows.map(w => {
             const aging = w.awarding_date ? Math.floor((now-new Date(w.awarding_date))/86400000) : null;
             const agStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : '';
-            const submittalLabel = w.submittal_type || (w.review_status==='approved'?'Approved':w.review_status==='pending_review'?'Submitted':'Not Required');
+            const slbl = w.submittal_type||(w.review_status==='approved'?'Approved':w.review_status==='pending_review'?'Submitted':'Not Required');
             return `<tr>
               <td style="font-weight:600;font-size:11px">${w.project_id||'—'}</td>
               <td>${w.wp_no||'—'}</td>
@@ -828,15 +843,15 @@
               <td style="${agStyle}">${aging!=null?(aging>0?'+'+aging+'d':aging===0?'today':aging+'d'):'—'}</td>
               <td>${w.approved_budget_bcb?Fmt.money(w.approved_budget_bcb):'—'}</td>
               <td><span style="font-size:10px;font-weight:600;color:${w.award_status==='Awarded'?'#2D9B6F':w.award_status==='Partially Awarded'?'#D97706':'#EE3124'}">${w.award_status||'—'}</span></td>
-              <td style="font-size:10px;color:#888">${submittalLabel}</td>
+              <td style="font-size:10px;color:#888">${slbl}</td>
             </tr>`;
-          }).join('') +
-          (sorted.length ? `<tr style="background:#fafafa;font-weight:700;border-top:2px solid #e5e5e5">
-            <td colspan="6" style="font-size:11px;padding:8px 10px">TOTAL (${sorted.length} WPs)</td>
+          }).join('') + (rows.length ? `<tr style="background:#fafafa;font-weight:700;border-top:2px solid #e5e5e5">
+            <td colspan="6" style="font-size:11px;padding:8px 10px">TOTAL (${rows.length} WPs)</td>
             <td style="font-size:11px;padding:8px 10px">${Fmt.money(totalBudget)}</td>
             <td colspan="2"></td>
           </tr>` : '');
-        }
+        };
+        window.renderBlTable();
       } else if (tab === 'budget') {
         const totalBCB = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
         const totalAwd = wps.reduce((s,w)=>s+(w.total_awarded||0),0);
@@ -909,7 +924,8 @@
               <td colspan="6" style="padding:8px 12px">
                 <span style="font-size:10px;font-weight:700;background:#EE3124;color:#fff;padding:2px 7px;border-radius:4px;margin-right:8px">${p.id}</span>
                 ${p.name||p.id}
-                <span style="float:right;font-size:11px;color:#888">${s.awardRate}% awarded ▼</span>
+                <span style="float:right;font-size:11px;color:#888">${s.awardRate}% awarded</span>
+                <span id="${projRowId}-ind" style="float:right;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-right:6px">−</span>
               </td>
             </tr>
             <tr id="${projRowId}-summary" style="background:#fafafa">
@@ -944,6 +960,8 @@
           const tradeRows = document.querySelectorAll(`tr[id="${projRowId}-trade"]`);
           const isHidden = tradeRows.length && tradeRows[0].style.display === 'none';
           tradeRows.forEach(r => r.style.display = isHidden ? '' : 'none');
+          const ind = document.getElementById(projRowId + '-ind');
+          if (ind) ind.textContent = isHidden ? '−' : '+';
         };
       } else if (tab === 'works') {
         _destroyCharts(['c-idx-wk-period','c-idx-wk-bud','c-idx-wk-awd','c-idx-wk-count']);
@@ -977,7 +995,7 @@
           const tradeId = 'wk-trade-'+trade.replace(/\s+/g,'-').replace(/[^a-zA-Z0-9-]/g,'');
           const qTotals = quarters.map(qk=>tradeWps.filter(w=>w.awarding_date&&wkGetQKey(new Date(w.awarding_date))===qk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
           periodHtml += `<tr style="background:#f0f0f0;cursor:pointer;font-weight:700" onclick="toggleWkTrade('${tradeId}')">
-            <td style="padding:8px 12px">${trade} <span style="float:right;color:#aaa;font-size:11px">▼</span></td>
+            <td style="padding:8px 12px">${trade} <span id="${tradeId}-ind" style="float:right;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700">+</span></td>
             ${qTotals.map(v=>`<td style="text-align:right">${v>0?v.toFixed(1)+' M':'—'}</td>`).join('')}
             <td style="text-align:right">${(tradeTotal/1e6).toFixed(1)} M</td>
           </tr>`;
@@ -1019,6 +1037,8 @@
           const rows = document.querySelectorAll(`tr[id="${tradeId}-row"]`);
           const isHidden = rows.length && rows[0].style.display === 'none';
           rows.forEach(r => r.style.display = isHidden ? '' : 'none');
+          const ind = document.getElementById(tradeId + '-ind');
+          if (ind) ind.textContent = isHidden ? '−' : '+';
         };
       } else if (tab === 'wplist') {
         _wpMonPage = 1;
@@ -1066,8 +1086,7 @@
       if (_wpMonPage > 1) { _wpMonPage--; renderWPMonTable(_wpMonFiltered); }
     };
     window.wpMonNext = function() {
-      const totalPages = Math.ceil(_wpMonFiltered.length / WP_MON_PER_PAGE);
-      if (_wpMonPage < totalPages) { _wpMonPage++; renderWPMonTable(_wpMonFiltered); }
+      _wpMonPage++; renderWPMonTable(_wpMonFiltered); // renderWPMonTable clamps to totalPages
     };
 
     function populateWPMonTradeFilter() {
@@ -1083,87 +1102,100 @@
       const tbody = document.getElementById('wp-mon-body');
       const pager = document.getElementById('wp-mon-pager');
       if (!tbody) return;
-      const start = (_wpMonPage - 1) * WP_MON_PER_PAGE;
-      const page = rows.slice(start, start + WP_MON_PER_PAGE);
 
-      // Count WPs per trade across ALL filtered rows (not just this page)
-      const tradeTotals = new Map();
-      rows.forEach(w => { const t = w.trade||'(No Trade)'; tradeTotals.set(t, (tradeTotals.get(t)||0)+1); });
-
-      // Group page rows by trade for header rows with collapse/expand
-      const tradesSeen = new Set();
-      let html = '';
-      page.forEach(w => {
-        const trade = w.trade || '(No Trade)';
-        const isCollapsed = _collapseState.get(trade) || false;
-        if (!tradesSeen.has(trade)) {
-          tradesSeen.add(trade);
-          const chevron = `<span style="float:right;font-size:11px;color:#aaa;transition:transform .2s;display:inline-block;transform:${isCollapsed?'rotate(-90deg)':'rotate(0deg)'}">▼</span>`;
-          const count = `<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${tradeTotals.get(trade)||0} WPs</span>`;
-          const _colspan = window.__isViewer ? 30 : 36;
-          html += `<tr class="trade-group-header" data-trade="${trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5"><td colspan="${_colspan}" style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">${trade}${chevron}${count}</td></tr>`;
-        }
-        const bud = w.approved_budget_bcb || 0;
-        const awd = w.total_awarded || 0;
-        const vari = bud - awd;
-        const statusColor = w.award_status === 'Awarded' ? '#2D9B6F' : w.award_status === 'Partially Awarded' ? '#D97706' : '#EE3124';
-        const fmtM = v => v ? Fmt.money(v) : '—';
-        const fmtD = d => d ? Fmt.date(d) : '—';
-        const fmtPct = v => v != null ? (parseFloat(v)*100).toFixed(0)+'%' : '—';
-        html += `<tr data-trade-row="${trade.replace(/"/g,'&quot;')}" style="${isCollapsed?'display:none':''}">
-          <td style="font-weight:600;color:#444">${w.project_id||'—'}</td>
-          <td><span class="td-code">${w.cost_code||'—'}</span></td>
-          <td>${w.trade||'—'}</td>
-          <td>${w.works||'—'}</td>
-          <td>${w.type_of_works||'—'}</td>
-          <td style="font-size:10px;color:#888">${w.scope||'—'}</td>
-          <td style="position:sticky;left:0;background:#fff;z-index:1;min-width:90px"><span class="td-code">${w.wp_no||'—'}</span></td>
-          <td style="min-width:200px"><span class="td-name">${w.description||'—'}</span></td>
-          <td>${w.proposed_vendors||'—'}</td>
-          <td>${w.po_jo_count!=null?w.po_jo_count:'—'}</td>
-          <td>${w.po_jo_numbers||'—'}</td>
-          <td style="text-align:right">${fmtM(bud)}</td>
-          <td style="text-align:right">${fmtM(awd)}</td>
-          <td style="text-align:right;${vari>0?'color:#2D9B6F':vari<0?'color:#EE3124':''}">${(bud||awd)?(vari>=0?'+':'')+Fmt.money(vari):'—'}</td>
-          <td>${w.surety_bond||'—'}</td>
-          <td>${w.performance_bond||'—'}</td>
-          <td>${w.warranty_bond||'—'}</td>
-          <td>${w.payment_terms_days?w.payment_terms_days+'d':'—'}</td>
-          <td>${fmtPct(w.dp_percent)}</td>
-          <td>${w.dp_terms||'—'}</td>
-          <td style="text-align:right">${fmtM(w.dp_amount)}</td>
-          <td>${fmtD(w.dp_release_date)}</td>
-          <td>${fmtPct(w.retention_percent)}</td>
-          <td style="text-align:right">${fmtM(w.retention_amount)}</td>
-          <td>${w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—'}</td>
-          <td>${fmtD(w.awarding_date)}</td>
-          <td>${fmtD(w.actual_awarding_date)}</td>
-          <td>${fmtD(w.target_delivery||w.target_completion)}</td>
-          <td>${fmtD(w.actual_delivery)}</td>
-          <td>${fmtD(w.target_installation)}</td>
-          <td>${fmtD(w.target_completion)}</td>
-          <td>${w.approver_name||'—'}</td>
-          <td>${fmtD(w.approval_date)}</td>
-          <td>${w.submittal_doc_type||'—'}</td>
-          <td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${statusColor}22;color:${statusColor}">${w.award_status||'—'}</span></td>
-          <td style="font-size:10px;color:#888">${w.remarks||'—'}</td>
-        </tr>`;
+      // Group rows by trade — preserve order from _wpMonData (already TRADE_ORDER sorted)
+      const tradeGroups = new Map();
+      const tradeOrder = [];
+      rows.forEach(w => {
+        const t = w.trade || '(No Trade)';
+        if (!tradeGroups.has(t)) { tradeGroups.set(t, []); tradeOrder.push(t); }
+        tradeGroups.get(t).push(w);
       });
-      tbody.innerHTML = html;
+
+      // Build virtual item list: header item + WP row items (skip WP rows when collapsed)
+      const items = [];
+      tradeOrder.forEach(trade => {
+        const wps = tradeGroups.get(trade);
+        const collapsed = !!_collapseState.get(trade);
+        items.push({ type: 'header', trade, count: wps.length, collapsed });
+        if (!collapsed) wps.forEach(w => items.push({ type: 'row', trade, wp: w }));
+      });
+
+      const totalWPs   = rows.length;
+      const totalItems = items.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / WP_MON_PER_PAGE));
+      if (_wpMonPage > totalPages) _wpMonPage = totalPages;
+      const start = (_wpMonPage - 1) * WP_MON_PER_PAGE;
+      const pageItems = items.slice(start, start + WP_MON_PER_PAGE);
+
+      const _colspan = window.__isViewer ? 30 : 36;
+      const fmtM = v => v ? Fmt.money(v) : '—';
+      const fmtD = d => d ? Fmt.date(d) : '—';
+      const fmtPct = v => v != null ? (parseFloat(v)*100).toFixed(0)+'%' : '—';
+
+      let html = '';
+      pageItems.forEach(item => {
+        if (item.type === 'header') {
+          const chevron = `<span style="float:right;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-left:4px">${item.collapsed?'+':'−'}</span>`;
+          const count   = `<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${item.count} WPs</span>`;
+          html += `<tr class="trade-group-header" data-trade="${item.trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5"><td colspan="${_colspan}" style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">${item.trade}${chevron}${count}</td></tr>`;
+        } else {
+          const w = item.wp;
+          const bud = w.approved_budget_bcb || 0;
+          const awd = w.total_awarded || 0;
+          const vari = bud - awd;
+          const sc = w.award_status === 'Awarded' ? '#2D9B6F' : w.award_status === 'Partially Awarded' ? '#D97706' : '#EE3124';
+          html += `<tr data-trade-row="${item.trade.replace(/"/g,'&quot;')}">
+            <td style="font-weight:600;color:#444">${w.project_id||'—'}</td>
+            <td><span class="td-code">${w.cost_code||'—'}</span></td>
+            <td>${w.trade||'—'}</td>
+            <td>${w.works||'—'}</td>
+            <td>${w.type_of_works||'—'}</td>
+            <td style="font-size:10px;color:#888">${w.scope||'—'}</td>
+            <td style="position:sticky;left:0;background:#fff;z-index:1;min-width:90px"><span class="td-code">${w.wp_no||'—'}</span></td>
+            <td style="min-width:200px"><span class="td-name">${w.description||'—'}</span></td>
+            <td>${w.proposed_vendors||'—'}</td>
+            <td>${w.po_jo_count!=null?w.po_jo_count:'—'}</td>
+            <td>${w.po_jo_numbers||'—'}</td>
+            <td style="text-align:right">${fmtM(bud)}</td>
+            <td style="text-align:right">${fmtM(awd)}</td>
+            <td style="text-align:right;${vari>0?'color:#2D9B6F':vari<0?'color:#EE3124':''}">${(bud||awd)?(vari>=0?'+':'')+Fmt.money(vari):'—'}</td>
+            <td>${w.surety_bond||'—'}</td>
+            <td>${w.performance_bond||'—'}</td>
+            <td>${w.warranty_bond||'—'}</td>
+            <td>${w.payment_terms_days?w.payment_terms_days+'d':'—'}</td>
+            <td>${fmtPct(w.dp_percent)}</td>
+            <td>${w.dp_terms||'—'}</td>
+            <td style="text-align:right">${fmtM(w.dp_amount)}</td>
+            <td>${fmtD(w.dp_release_date)}</td>
+            <td>${fmtPct(w.retention_percent)}</td>
+            <td style="text-align:right">${fmtM(w.retention_amount)}</td>
+            <td>${w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—'}</td>
+            <td>${fmtD(w.awarding_date)}</td>
+            <td>${fmtD(w.actual_awarding_date)}</td>
+            <td>${fmtD(w.target_delivery||w.target_completion)}</td>
+            <td>${fmtD(w.actual_delivery)}</td>
+            <td>${fmtD(w.target_installation)}</td>
+            <td>${fmtD(w.target_completion)}</td>
+            <td>${w.approver_name||'—'}</td>
+            <td>${fmtD(w.approval_date)}</td>
+            <td>${w.submittal_doc_type||'—'}</td>
+            <td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${sc}22;color:${sc}">${w.award_status||'—'}</span></td>
+            <td style="font-size:10px;color:#888">${w.remarks||'—'}</td>
+          </tr>`;
+        }
+      });
+      tbody.innerHTML = html || '<tr><td colspan="' + _colspan + '" style="text-align:center;color:#aaa;padding:20px">No work packages found</td></tr>';
 
       if (pager) {
-        const total = rows.length;
-        const totalPages = Math.ceil(total / WP_MON_PER_PAGE);
-        const btnStyle = 'padding:4px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;font-size:11px;font-family:inherit';
-        const prevDisabled = _wpMonPage <= 1 ? 'opacity:.4;cursor:default;' : '';
-        const nextDisabled = _wpMonPage >= totalPages ? 'opacity:.4;cursor:default;' : '';
-        pager.innerHTML = total === 0 ? '<span>No work packages found</span>' :
-          `<span>Showing ${start+1}–${Math.min(start+WP_MON_PER_PAGE,total)} of ${total}</span>` +
+        const btnStyle = 'padding:4px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;font-size:11px;font-family:inherit;';
+        pager.innerHTML = totalWPs === 0 ? '<span>No work packages found</span>' :
+          `<span>${totalWPs} work package${totalWPs!==1?'s':''}</span>` +
           (totalPages > 1 ? `
             <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
               <span style="font-size:11px;color:#888">Page ${_wpMonPage} of ${totalPages}</span>
-              <button onclick="wpMonPrev()" style="${btnStyle}${prevDisabled}">‹ Prev</button>
-              <button onclick="wpMonNext()" style="${btnStyle}${nextDisabled}">Next ›</button>
+              <button onclick="wpMonPrev()" style="${btnStyle}${_wpMonPage<=1?'opacity:.4;cursor:default;':''}">‹ Prev</button>
+              <button onclick="wpMonNext()" style="${btnStyle}${_wpMonPage>=totalPages?'opacity:.4;cursor:default;':''}">Next ›</button>
             </span>` : '');
       }
     }

@@ -96,11 +96,22 @@ WPDb.updateLastLogin(userId)                // writes current timestamp to users
 
 | Role | Can Do |
 |---|---|
+| `viewer` | View WPs on assigned projects — **no costs visible**, cannot add/edit WPs, no template download |
 | `user` | View/add WPs on assigned projects; WPs go to `pending_review` |
 | `admin` | Approve/reject WPs; manage users; create/archive projects on assigned projects |
 | `super_admin` | Full access to all projects + all admin features |
 
-- Admins and super_admins see all projects; users see only projects in their `profile.projects[]` array
+**Viewer role restrictions** (`body.viewer-mode` CSS class + `window.__isViewer` flag):
+- Cost KPI group hidden in Overview tab (both dashboards)
+- Budget tab hidden entirely (index.html)
+- Budget/Awarded/Variance + DP Amount + Retention columns hidden in WP List
+- Budget column hidden in backlog tables
+- "Add Work Package" sidebar link hidden; Edit buttons hidden in WP List
+- "Download Template" / Tools sidebar section hidden
+- `wp-form.html` redirects viewers back to project page
+- `getActiveCols()` in project.html filters out cost columns from COLS array
+
+- Admins and super_admins see all projects; users/viewers see only projects in their `profile.projects[]` array
 - When admin submits a WP via CSV import or form, it auto-approves (`WPDb.approveWP()` called after `WPDb.submitWP()`)
 - Project assignment is per-user, stored as `text[]` in `users.projects`
 
@@ -193,7 +204,8 @@ Seven-tab layout (Claims tab is **hidden**):
 | **Budget** | 6 KPI cost cards + budget-by-period chart (Monthly/Quarterly toggle) + budget-by-trade HBar chart + **Budget (BCB) and Awarded by Project** grouped bar chart + budget summary table by trade (IDX_TRADE_ORDER sorted) |
 | **Schedule** | Period chart (Monthly/Quarterly toggle) + WP by Trade bar + WP by Status donut + **collapsible** schedule summary table (project header row → click to expand trade sub-rows) |
 | **Works** | Budget-by-period-per-trade stacked chart + Budget/Awarded/Count donuts by trade + **Procurement Budget (BCB) by Period per Scope** table (collapsible trade→works) + **Procurement Budget (BCB) and Awarded by Period per Scope** table |
-| **WP List** | Full WP monitoring table — trade-grouped with collapse/expand headers (▼ chevron), fixed trade order, numeric WP-No sort, frozen Description column, search + pagination. No Trade column (redundant with group headers). |
+| **WP List** | Full WP monitoring table — trade-grouped with collapse/expand headers (+/− button), fixed TRADE_ORDER, numeric WP-No sort, frozen WP No. column, search + pagination. Collapse is **virtual-items based** — toggling re-renders the full item list (headers + WP rows), collapsed trades excluded from pagination so WPs don't bleed across pages. |
+| **Backlog** (tab) | Filter bar (Trade select, Sort-by select, Search) + backlog table + aging chart + status donut + period chart + submittal donut. Sort options: Most Overdue, Planned Award Date, Trade, Budget (High→Low), Description (A→Z). `window.renderBlTable()` applies all active filters. |
 
 **KPI label renames (Budget tab):** "Cost to Complete" → "Procurement Cost to Complete", "Est. at Completion" → "Procurement Estimate at Completion"
 
@@ -222,7 +234,7 @@ Tab order (left to right): **Overview → Dashboard → Backlog → WP List**
 
 - **Overview**: Two KPI groups side-by-side (Cost Overview 6 cards / Work Package Status 6 cards). No charts, no monitoring table.
 - **Dashboard**: Period chart (Monthly/Quarterly toggle, `c-dash-period`) + WP by Trade (`c-dash-trade`) + WP by Status donut (`c-dash-status`) + backlog table (not-awarded, overdue-first) + Top 5 panels (`rank-value`, `rank-gains`, `rank-losses`)
-- **Backlog**: Backlog table first (8 columns: WP No., Description, Trade, Planned Award, Aging, Budget, Status, Submittal) + aging chart + status donut + period chart (Quarterly/Monthly toggle) + submittal donut. KPI cards removed.
+- **Backlog**: Filter bar (Trade select, Sort-by select, Search, Budget min/max) + backlog table (8 cols) + aging chart + status donut + period chart (Quarterly/Monthly toggle) + submittal donut. `renderBacklog()` applies all filters. KPI cards removed.
 - **WP List**: Trade-grouped with collapse/expand header rows (▼ chevron, `_collapseState` Map), fixed TRADE_ORDER sequence, numeric WP-No sort, **WP No. column frozen** (sticky left). 35 columns in strict WP FORM.xlsx order: Cost Code No. → Trade → Works → Type → Scope → WP No. (frozen) → Work Package Description → Vendors → No. of PO/JO → PO/JO No. → Budget (BCB) Net → Awarded Net → Variance → Surety Bond → Perf. Bond → Warranty Bond → Payment Terms → DP% → DP Terms → DP Amount → Date of Release → Retention% → Retention Amt → Lead Time → Target Awarding → Actual Awarding → Target Delivery → Actual Delivery → Target Install → Target Completion → Submittals Approver → Date of Approval → Type of Submittal → Status → Remarks.
 - Claims & Change Orders tab exists in HTML but is hidden (`style="display:none"`)
 
@@ -411,6 +423,17 @@ All `.html` files have:
 - Button `.btn-menu` shown at `≤767px` (hidden on desktop via `display:none`)
 - Sidebar gets class `.open` when toggled; `.sidebar-overlay` covers background
 - Handled in `ui.js`
+
+### WP List Collapse Pattern (index.html + project.html)
+
+`renderWPMonTable(rows)` and `buildTable()` both use a **virtual items** approach for collapse:
+1. Group `rows` by trade (in TRADE_ORDER sequence)
+2. Build `items[]`: `{type:'header', trade, count, collapsed}` + (if not collapsed) `{type:'row', wp}` per WP
+3. Paginate `items[]` — collapsed trade WPs are excluded from the item list entirely, so they don't appear on any page
+4. `toggleTradeGroup(trade)` flips `_collapseState` and calls re-render (page resets to 1)
+5. Collapse indicator: `+` (collapsed) / `−` (expanded) in a small grey badge, `float:right`
+
+Same pattern applies to Schedule tab (`toggleSchRow` + `${projRowId}-ind` span) and Works tab (`toggleWkTrade` + `${tradeId}-ind` span), but those use DOM-only toggle (no pagination) — indicator is flipped in the toggle function.
 
 ### Logo Styling (Global)
 Logo is styled globally in `dashboard.css`:
