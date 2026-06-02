@@ -474,15 +474,21 @@
                 <label>Remarks / Notes</label>
                 <textarea id="f-remarks" placeholder="Issues, escalations, scope changes, etc."></textarea>
               </div>
-              <div class="form-group">
-                <label>Claim / Change Order Tag <span style="font-weight:400;color:#aaa">(optional)</span></label>
-                <select id="f-claim-tag">
-                  <option value="">— None —</option>
-                  <option value="Extension of Time (EOT)">Extension of Time (EOT)</option>
-                  <option value="Material Escalation">Material Escalation</option>
-                  <option value="Labor Escalation">Labor Escalation</option>
+              <div class="form-group full">
+                <label>Charging <span style="color:#EE3124">*</span></label>
+                <select id="f-charging" required onchange="onChargingChange()">
+                  <option value="">— Select Charging Type —</option>
+                  <option value="Main Contract">Main Contract</option>
                   <option value="Change Order">Change Order</option>
                 </select>
+              </div>
+              <div class="form-group" id="charging-contract-group" style="display:none">
+                <label>Contract Package Number <span style="color:#EE3124">*</span></label>
+                <input type="text" id="f-contract-package-no" placeholder="e.g. CP-001"/>
+              </div>
+              <div class="form-group full" id="charging-co-group" style="display:none">
+                <label>Change Order Description <span style="color:#EE3124">*</span></label>
+                <textarea id="f-co-description" rows="2" placeholder="Describe the change order…"></textarea>
               </div>
             </div>
           </div>
@@ -653,6 +659,14 @@
     } else {
       typeEl.value = '';
     }
+  }
+
+  function onChargingChange() {
+    const v = document.getElementById('f-charging').value;
+    const cg = document.getElementById('charging-contract-group');
+    const cog = document.getElementById('charging-co-group');
+    if(cg) cg.style.display = v === 'Main Contract' ? '' : 'none';
+    if(cog) cog.style.display = v === 'Change Order' ? '' : 'none';
   }
 
   const params = new URLSearchParams(location.search);
@@ -840,7 +854,12 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-delivery-status', existingWP.delivery_status);
       fill('f-contractor', existingWP.contractor);
       fill('f-remarks', existingWP.remarks);
-      fill('f-claim-tag', existingWP.claim_tag || '');
+      if (existingWP.charging_type) {
+        document.getElementById('f-charging').value = existingWP.charging_type || '';
+        onChargingChange();
+        document.getElementById('f-contract-package-no').value = existingWP.contract_package_no || '';
+        document.getElementById('f-co-description').value = existingWP.co_description || '';
+      }
       updateVariance();
 
       /* Update sidebar project link */
@@ -874,6 +893,7 @@ AppAuth.requireLogin(async (user, profile) => {
     if (!getVal('f-target-delivery'))return showErr('Target Delivery Date is required.');
     if (!getVal('f-target-completion'))return showErr('Target Completion Date is required.');
     if (!getNum('f-budget'))         return showErr('Approved Budget is required.');
+    if (!getVal('f-charging'))       return showErr('Charging type is required.');
 
     const data = {
       cost_code:                getVal('f-cost-code'),
@@ -926,7 +946,9 @@ AppAuth.requireLogin(async (user, profile) => {
       delivery_status:          getVal('f-delivery-status'),
       contractor:               getVal('f-contractor') || null,
       remarks:                  getVal('f-remarks') || '',
-      claim_tag:                getVal('f-claim-tag') || null,
+      charging_type:            getVal('f-charging'),
+      contract_package_no:      getVal('f-contract-package-no') || null,
+      co_description:           getVal('f-co-description') || null,
     };
 
     const btn = document.getElementById('btn-submit');
