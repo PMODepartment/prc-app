@@ -28,7 +28,7 @@
       width:280px;height:280px;border-radius:50%;
       background:#EE3124;opacity:.15;pointer-events:none
     }
-    .brand-logo{height:48px;max-width:240px;width:auto;display:block;object-fit:contain;background:transparent}
+    .brand-logo{width:100%;height:auto;max-height:70px;display:block;object-fit:contain;object-position:left center;background:transparent}
     .brand-text h1{font-size:26px;font-weight:700;color:#fff;line-height:1.25;margin-bottom:8px}
     .brand-text h1 span{color:#EE3124}
     .brand-text p{font-size:12px;color:rgba(255,255,255,.4)}
@@ -174,10 +174,9 @@
   </div>
 </div>
 
-<script type="module">
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
-const sb = createClient(
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const sb = window.supabase.createClient(
   'https://cayjeqeleenizbdzrums.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw'
 );
@@ -194,12 +193,14 @@ function clearMsg(id) {
 }
 
 // Auto-restore session
-const { data: { session } } = await sb.auth.getSession();
-if (session) {
-  const { data: p } = await sb.from('users').select('*').eq('id', session.user.id).single();
-  if (p?.status === 'approved') showProjectPicker(p);
-  else if (p?.status === 'pending') window.location.href = 'pending.html';
-}
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    const { data: p } = await sb.from('users').select('*').eq('id', session.user.id).single();
+    if (p?.status === 'approved') showProjectPicker(p);
+    else if (p?.status === 'pending') window.location.href = 'pending.html';
+  }
+})();
 
 // Sign In handler
 document.getElementById('btnSignIn').addEventListener('click', handleSignIn);
@@ -303,7 +304,7 @@ document.getElementById('searchInput').addEventListener('input', function() {
 
 document.getElementById('btnGo').addEventListener('click', () => {
   if (!selectedValue) { showMsg('msgBox2', 'Please select a dashboard.'); return; }
-  if (selectedValue === 'consolidated') window.location.href = 'index.html?view=consolidated';
+  if (selectedValue === 'consolidated') window.location.href = 'index.html';
   else window.location.href = `project.html?id=${selectedValue}`;
 });
 

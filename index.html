@@ -545,7 +545,12 @@
       updatePendingBadge();
     }
 
-    const [allProjectsRaw] = await Promise.all([WPDb.getProjects()]);
+    // Parallelize projects + WPs fetch for admins (saves one round-trip)
+    const isAdminUser = AppAuth.isAdmin(profile);
+    const [allProjectsRaw, adminWPs] = await Promise.all([
+      WPDb.getProjects(),
+      isAdminUser ? WPDb.getAllApprovedWPs() : Promise.resolve(null),
+    ]);
     const permitted = AppAuth.getPermittedProjects(profile, allProjectsRaw);
 
     document.getElementById('page-sub').textContent = permitted.length + ' project(s) · Read-only';
@@ -567,11 +572,11 @@
     renderIndexNav();
     window.__sidebarRefresh = renderIndexNav;
 
-    // Single query for all WPs (replaces N per-project queries — major mobile perf win)
-    const _allWPs = (AppAuth.isAdmin(profile)
-      ? await WPDb.getAllApprovedWPs()
-      : await WPDb.getApprovedWPsForProjects(permitted.map(p => p.id))
-    ).map(w => ({...w, trade: normTrade(w.trade)}));
+    // Single query for all WPs (admin WPs already fetched in parallel above)
+    const rawWPs = adminWPs ?? await WPDb.getApprovedWPsForProjects(permitted.map(p => p.id));
+    const _allWPs = rawWPs.map(w => ({...w, trade: normTrade(w.trade)}));
+    // ID-keyed lookup for WP detail modal (avoids JSON.stringify in every table cell)
+    window._wpById = Object.fromEntries(_allWPs.map(w => [w.id, w]));
     let _allClaims = []; // Claims register hidden — skip fetch
 
     // Project filter state
@@ -736,7 +741,9 @@
       _collapseState.clear();
       _wpMonPage = 1; renderWPMonTable(_wpMonFiltered);
     };
-    window.openWPDetail = function(w) {
+    window.openWPDetail = function(idOrObj) {
+      const w = typeof idOrObj === 'string' ? (window._wpById||{})[idOrObj] : idOrObj;
+      if (!w) return;
       const isViewer = window.__isViewer;
       const fmtM = v => v ? Fmt.money(v) : '—';
       const fmtD = d => d ? Fmt.date(d) : '—';
@@ -1365,9 +1372,9 @@
             const sc2 = w.scope||'';
             const short2 = sc2.length > 55 ? sc2.slice(0,55)+'…' : sc2;
             const hasMore = sc2.length > 55;
-            return `<td style="font-size:10px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${short2||'—'}${hasMore?`<button onclick='openWPDetail(${JSON.stringify(w).replace(/'/g,"&#39;")})' style="margin-left:4px;font-size:9px;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:''}${!sc2?`<button onclick='openWPDetail(${JSON.stringify(w).replace(/'/g,"&#39;")})' title="View details" style="font-size:9px;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`:''}</td>`;
+            return `<td style="font-size:10px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${short2||'—'}${hasMore?`<button onclick='openWPDetail("${w.id}")' style="margin-left:4px;font-size:9px;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:''}${!sc2?`<button onclick='openWPDetail("${w.id}")' title="View details" style="font-size:9px;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`:''}</td>`;
           }
-          case 'wp_no':      return `<td style="${sl}"><span class="td-code" style="cursor:pointer;color:#EE3124" onclick='openWPDetail(${JSON.stringify(w).replace(/'/g,"&#39;")})'>${w.wp_no||'—'}</span></td>`;
+          case 'wp_no':      return `<td style="${sl}"><span class="td-code" style="cursor:pointer;color:#EE3124" onclick='openWPDetail("${w.id}")'>${w.wp_no||'—'}</span></td>`;
           case 'description':return `<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(w.description||'').replace(/"/g,'&quot;')}"><span class="td-name">${w.description||'—'}</span></td>`;
           case 'vendors':    return `<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px" title="${(w.proposed_vendors||'').replace(/"/g,'&quot;')}">${w.proposed_vendors||'—'}</td>`;
           case 'po_count':   return `<td style="text-align:center">${w.po_jo_count!=null?w.po_jo_count:'—'}</td>`;

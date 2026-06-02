@@ -495,7 +495,9 @@ function setWPTableView(view) {
   curPage = 1; buildTable();
 }
 
-function openWPDetail(w) {
+function openWPDetail(idOrObj) {
+  const w = typeof idOrObj === 'string' ? (window._wpById||{})[idOrObj] : idOrObj;
+  if (!w) return;
   const isViewer = window.__isViewer;
   const fmtM = v => v ? '₱'+(Math.abs(v)/1e6).toFixed(1)+'M' : '—';
   const fmtD = d => { if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});}catch{return d;} };
@@ -1025,8 +1027,8 @@ function buildTable(){
         trade:w.trade||'—',
         works:w.works||'—',
         type_of_works:w.type_of_works||'—',
-        scope:(()=>{const sc=w.scope||'';const sh=sc.length>55?sc.slice(0,55)+'…':sc;return(sh||'—')+(sc.length>55?`<button onclick='openWPDetail(${JSON.stringify(w).replace(/'/g,"&#39;")})' style="margin-left:4px;font-size:9px;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:'')+(sc?'':`<button onclick='openWPDetail(${JSON.stringify(w).replace(/'/g,"&#39;")})' style="font-size:9px;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`)})(),
-        wp_no:`<span class="td-code" style="cursor:pointer;color:#EE3124" onclick='openWPDetail(${JSON.stringify(w).replace(/'/g,"&#39;")})'>`+(w.wp_no||'—')+'</span>',
+        scope:(()=>{const sc=w.scope||'';const sh=sc.length>55?sc.slice(0,55)+'…':sc;return(sh||'—')+(sc.length>55?`<button onclick='openWPDetail("${w.id}")' style="margin-left:4px;font-size:9px;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:'')+(sc?'':`<button onclick='openWPDetail("${w.id}")' style="font-size:9px;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`)})(),
+        wp_no:`<span class="td-code" style="cursor:pointer;color:#EE3124" onclick='openWPDetail("${w.id}")'>`+(w.wp_no||'—')+'</span>',
         description:'<span class="td-name">'+(w.description||'—')+'</span>',
         proposed_vendors:w.proposed_vendors||'—',
         po_jo_count:w.po_jo_count!=null?w.po_jo_count:'—',
@@ -1329,6 +1331,7 @@ AppAuth.requireLogin(async (user, profile) => {
   // Load data in parallel (WPs + Claims)
   const [meta, wps] = await Promise.all([WPDb.getProject(projId), WPDb.getAllWPs(projId)]);
   allWPs = wps;
+  window._wpById = Object.fromEntries((wps||[]).map(w => [w.id, w]));
   loadClaims(); // async — loads in background
 
   if (meta) {
@@ -1385,6 +1388,7 @@ AppAuth.requireLogin(async (user, profile) => {
   // Re-fetch WPs and refresh view after quick-add modal saves
   window.__wpmReloadFn = async () => {
     allWPs = (await WPDb.getAllWPs(projId)).map(w => ({...w, trade: normTrade(w.trade)}));
+    window._wpById = Object.fromEntries(allWPs.map(w => [w.id, w]));
     buildMetrics(allWPs);
     Object.keys(_rendered).forEach(k=>_rendered[k]=false);
     switchView(currentView);
