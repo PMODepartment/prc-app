@@ -31,7 +31,7 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 | `pending.html` | public | Shown to unapproved users |
 | `forgot-password.html` | public | Password reset |
 | `project-selector.html` | user | Project picker — shown after login; admins also see Portfolio Overview card |
-| `index.html` | user | Portfolio Overview — consolidated dashboard with 4 tabs (Overview, Dashboard, Backlog, WP List) |
+| `index.html` | user | Portfolio Overview — consolidated dashboard with 7 tabs (Overview, Dashboard, Backlog, Budget, Schedule, Works, WP List) |
 | `project.html` | user | Single project dashboard — tabs: Overview, Dashboard, Backlog, WP List |
 | `wp-form.html` | user | Add / edit work package |
 | `claim-form.html` | user | Add / edit claim or change order (`?section=change-order` for CO mode) — hidden feature |
@@ -182,14 +182,17 @@ All HTML pages include `<link rel="icon" type="image/png" href="assets/img/favic
 
 ## Consolidated Dashboard (index.html)
 
-Four-tab layout (Budget, Schedule, Works tabs removed; Claims tab **hidden**):
+Seven-tab layout (Claims tab is **hidden**):
 
 | Tab | Content |
 |---|---|
 | **Overview** | Two KPI groups side-by-side (Cost Overview: 6 cards; Work Package Status: 6 cards) + project cards (cards/table toggle below) |
 | **Dashboard** | Period chart (Monthly/Quarterly toggle) + WP by Trade bar + WP by Status donut + backlog table (not-awarded) + Top 5 panels |
 | **Backlog** | Backlog table first (not-awarded, sorted most overdue) + aging chart + status donut + period chart (Quarterly/Monthly toggle) + submittal donut |
-| **WP List** | Full WP monitoring table — trade-grouped with header rows, numeric WP-No sort, frozen Description column, search + pagination |
+| **Budget** | 6 KPI cost cards + budget-by-period chart (Monthly/Quarterly toggle) + budget-by-trade HBar chart + budget summary table by trade |
+| **Schedule** | Period chart (Monthly/Quarterly toggle) + WP by Trade bar + WP by Status donut + schedule summary table by project |
+| **Works** | Budget-by-period-per-trade stacked chart + Budget/Awarded/Count donuts by trade + works summary table by trade |
+| **WP List** | Full WP monitoring table — trade-grouped with collapse/expand headers (▼ chevron), fixed trade order, numeric WP-No sort, frozen Description column, search + pagination. No Trade column (redundant with group headers). |
 
 **KPI label renames (Overview tab):** "Budget (BCB)" → "Procurement Budget (BCB)", "Cost to Complete" → "Procurement Cost to Complete", "Est. at Completion" → "Procurement Estimate at Completion"
 
@@ -208,7 +211,7 @@ Tab order (left to right): **Overview → Dashboard → Backlog → WP List**
 - **Overview**: Two KPI groups side-by-side (Cost Overview 6 cards / Work Package Status 6 cards). No charts, no monitoring table.
 - **Dashboard**: Period chart (Monthly/Quarterly toggle, `c-dash-period`) + WP by Trade (`c-dash-trade`) + WP by Status donut (`c-dash-status`) + backlog table (not-awarded, overdue-first) + Top 5 panels (`rank-value`, `rank-gains`, `rank-losses`)
 - **Backlog**: Backlog table first (8 columns: WP No., Description, Trade, Planned Award, Aging, Budget, Status, Submittal) + aging chart + status donut + period chart (Quarterly/Monthly toggle) + submittal donut. KPI cards removed.
-- **WP List**: Trade-grouped with header rows, numeric WP-No sort, frozen Description column.
+- **WP List**: Trade-grouped with collapse/expand header rows (▼ chevron, `_collapseState` Map), fixed TRADE_ORDER sequence, numeric WP-No sort, frozen Description column. Trade column removed from table (replaced by group headers).
 - Claims & Change Orders tab exists in HTML but is hidden (`style="display:none"`)
 
 ### Lazy rendering flags (project.html)
