@@ -423,10 +423,10 @@ let userProfile=null;
 let currentView='overview';
 
 const COLS=[
-  {key:'cost_code',        label:'Cost Code No.',      w:'90px'},
-  {key:'wp_no',            label:'WP No.',             w:'90px', sticky:true},
+  {key:'cost_code',        label:'Cost Code No.',      w:'90px',  sticky:true},
+  {key:'wp_no',            label:'WP No.',             w:'90px',  sticky:true},
+  {key:'works',            label:'Works',              w:'130px', sticky:true},
   {key:'trade',            label:'Trade',              w:'110px'},
-  {key:'works',            label:'Works',              w:'130px'},
   {key:'type_of_works',    label:'Type',               w:'80px'},
   {key:'scope',            label:'Scope',              w:'140px'},
   {key:'description',      label:'Work Package Description', w:'200px'},
@@ -883,12 +883,16 @@ function buildTable(){
   document.getElementById('btn-prev').disabled=curPage<=1;
   document.getElementById('btn-next').disabled=curPage>=pages;
 
+  // Compute cumulative left offsets for sticky columns
+  let _sl=0;
+  cols.forEach(c=>{ if(c.sticky){c._left=_sl;_sl+=parseInt(c.w);}});
+
   const thead=document.getElementById('tbl-head'); thead.innerHTML='';
   const colRow=document.createElement('tr');
   cols.forEach(c=>{
     const th=document.createElement('th');
     th.style.minWidth=c.w;
-    if(c.sticky) th.style.cssText='position:sticky;left:0;background:#f8f8f8;z-index:3;min-width:'+c.w+';';
+    if(c.sticky) th.style.cssText='position:sticky;left:'+c._left+'px;background:#f8f8f8;z-index:3;min-width:'+c.w+';';
     th.innerHTML=c.label+(sortCol===c.key?(sortDir===1?' ↑':' ↓'):'');
     th.style.cursor='pointer';
     th.addEventListener('click',()=>{if(sortCol===c.key)sortDir*=-1;else{sortCol=c.key;sortDir=1;}curPage=1;buildTable();});
@@ -954,7 +958,7 @@ function buildTable(){
       cols.forEach(c=>{
         const td=document.createElement('td');
         td.innerHTML=cellMap[c.key]??'—';
-        if(c.sticky) td.style.cssText='position:sticky;left:0;background:#fff;z-index:1;min-width:'+c.w+';';
+        if(c.sticky) td.style.cssText='position:sticky;left:'+c._left+'px;background:#fff;z-index:1;min-width:'+c.w+';';
         tr.appendChild(td);
       });
       const tdEdit=document.createElement('td');
