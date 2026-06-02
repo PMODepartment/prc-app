@@ -714,21 +714,51 @@ function renderBacklog(){
     return agB - agA;
   });
 
+  // Group by TRADE_ORDER, preserving inner sort
+  const tradeGroups = new Map();
+  const tradeSeq = [];
+  sorted.forEach(w => {
+    const t = w.trade||'(No Trade)';
+    if (!tradeGroups.has(t)) { tradeGroups.set(t, []); tradeSeq.push(t); }
+    tradeGroups.get(t).push(w);
+  });
+  tradeSeq.sort((a,b) => {
+    const oa=TRADE_ORDER.indexOf(a), ob=TRADE_ORDER.indexOf(b);
+    return (oa<0?999:oa)-(ob<0?999:ob);
+  });
+
   const tbody = document.getElementById('backlog-tbody');
-  tbody.innerHTML = sorted.map(w=>{
-    const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
-    const agCls = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
-    return `<tr>
-      <td><span class="td-code">${w.wp_no||'—'}</span></td>
-      <td style="font-size:11px;max-width:200px">${w.description||'—'}</td>
-      <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
-      <td>${fmtDate(w.awarding_date)}</td>
-      <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
-      <td style="text-align:right">${((w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
-      <td>${statusBadge(w.award_status)}</td>
-      <td style="font-size:11px;color:#555">${submittalLabel(w)}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+  let html = '';
+  tradeSeq.forEach(trade => {
+    const tWps = tradeGroups.get(trade);
+    const collapsed = !!_blCollapseState.get(trade);
+    const tBudget = tWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    const ind = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;float:right;margin-left:4px">${collapsed?'+':'−'}</span>`;
+    const budgeLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:10px;color:#888;font-weight:400">${((tBudget)/1e6).toFixed(1)} M</span>`;
+    html += `<tr onclick="toggleBlGroup(this.dataset.trade)" data-trade="${trade.replace(/"/g,'&quot;')}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
+      <td colspan="8" style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
+        ${trade}${ind}
+        <span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${tWps.length} WPs</span>
+        ${budgeLabel}
+      </td></tr>`;
+    if (!collapsed) {
+      tWps.forEach(w => {
+        const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
+        const agCls = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
+        html += `<tr>
+          <td><span class="td-code">${w.wp_no||'—'}</span></td>
+          <td style="font-size:11px;max-width:200px">${w.description||'—'}</td>
+          <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
+          <td>${fmtDate(w.awarding_date)}</td>
+          <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
+          <td style="text-align:right">${((w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
+          <td>${statusBadge(w.award_status)}</td>
+          <td style="font-size:11px;color:#555">${submittalLabel(w)}</td>
+        </tr>`;
+      });
+    }
+  });
+  tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
 }
 
 function wpNumSort(a, b) {
@@ -746,6 +776,11 @@ const TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
   'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
 const _collapseState = new Map();
+const _blCollapseState = new Map();
+window.toggleBlGroup = function(trade) {
+  _blCollapseState.set(trade, !(_blCollapseState.get(trade)||false));
+  renderBacklog();
+};
 
 window.toggleTradeGroup = function(trade) {
   _collapseState.set(trade, !(_collapseState.get(trade) || false));
