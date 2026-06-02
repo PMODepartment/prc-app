@@ -431,6 +431,7 @@
                 <button class="wp-vtab" data-view="financial" onclick="setWPListView('financial')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Award</button>
                 <button class="wp-vtab" data-view="schedule" onclick="setWPListView('schedule')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Schedule</button>
                 <button class="wp-vtab" data-view="submittals" onclick="setWPListView('submittals')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Submittals</button>
+                <button class="wp-vtab" data-view="all" onclick="setWPListView('all')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">All</button>
               </div>
               <div style="position:relative;margin-left:auto">
                 <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:12px;pointer-events:none"></i>
@@ -532,7 +533,7 @@
     if (window.__isViewer) {
       document.body.classList.add('viewer-mode');
       // Hide Financial view tab — contains cost data
-      document.querySelectorAll('.wp-vtab[data-view="financial"]').forEach(b=>b.style.display='none');
+      document.querySelectorAll('.wp-vtab[data-view="financial"],.wp-vtab[data-view="all"]').forEach(b=>b.style.display='none');
     }
     renderUserBar('user-bar', profile);
 
@@ -667,23 +668,53 @@
       financial:  {label:'Award',      keys:['cost_code','wp_no','description','budget','awarded','variance','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt'], cost:true},
       schedule:   {label:'Schedule',   keys:['cost_code','wp_no','description','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp']},
       submittals: {label:'Submittals', keys:['cost_code','wp_no','description','vendors','po_count','po_numbers','approver','appr_date','submittal','status']},
+      all:        {label:'All',        keys:['project','cost_code','wp_no','works','description','type_ow','scope','vendors','po_count','po_numbers','budget','awarded','variance','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp','approver','appr_date','submittal','status','remarks'], cost:true},
+    };
+    // Sort state for WP List table
+    let _wpMonSortCol = null, _wpMonSortDir = 1;
+    // Map column key → WP object field for sorting
+    const _WPC_SORT_FIELD = {
+      project:'project_id', cost_code:'cost_code', trade:'trade', works:'works',
+      type_ow:'type_of_works', scope:'scope', wp_no:'wp_no', description:'description',
+      vendors:'proposed_vendors', po_count:'po_jo_count', po_numbers:'po_jo_numbers',
+      budget:'approved_budget_bcb', awarded:'total_awarded', lead_time:'awarding_lead_time',
+      tgt_award:'awarding_date', act_award:'actual_awarding_date', tgt_deliv:'target_delivery',
+      act_deliv:'actual_delivery', tgt_inst:'target_installation', tgt_comp:'target_completion',
+      status:'award_status', remarks:'remarks', approver:'approver_name', appr_date:'approval_date',
+      submittal:'submittal_doc_type', surety:'surety_bond', perf_bond:'performance_bond',
+      warranty:'warranty_bond', pay_terms:'payment_terms_days', dp_pct:'dp_percent',
+      dp_terms:'dp_terms', dp_amount:'dp_amount', dp_release:'dp_release_date',
+      ret_pct:'retention_percent', ret_amt:'retention_amount',
+    };
+    window.setWPMonSort = function(key) {
+      if (_wpMonSortCol === key) _wpMonSortDir *= -1;
+      else { _wpMonSortCol = key; _wpMonSortDir = 1; }
+      _wpMonPage = 1;
+      renderWPMonTable(_wpMonFiltered);
     };
     function _getActiveCols() {
       const v = _WP_VIEWS[_wpListView] || _WP_VIEWS.overview;
+      const freezeDesc = _wpListView !== 'overview';
       return v.keys
         .filter(k => !(window.__isViewer && _WPC[k]?.cost))
-        .map(k => ({key:k, ..._WPC[k]}));
+        .map(k => {
+          const col = {key:k, ..._WPC[k]};
+          if (k === 'description' && freezeDesc) col.sticky = true;
+          return col;
+        });
     }
     window.setWPListView = function(view) {
       _wpListView = view;
+      _wpMonSortCol = null; _wpMonSortDir = 1; // reset sort on tab switch
       document.querySelectorAll('.wp-vtab').forEach(b => {
         const active = b.dataset.view === view;
         b.style.background = active ? '#EE3124' : 'transparent';
         b.style.color = active ? '#fff' : '#555';
       });
-      // Hide Financial tab for viewers
-      const finBtn = document.querySelector('.wp-vtab[data-view="financial"]');
-      if (finBtn) finBtn.style.display = window.__isViewer ? 'none' : '';
+      // Hide Award and All tabs for viewers (cost data)
+      document.querySelectorAll('.wp-vtab[data-view="financial"],.wp-vtab[data-view="all"]').forEach(b => {
+        b.style.display = window.__isViewer ? 'none' : '';
+      });
       _wpMonPage = 1;
       renderWPMonTable(_wpMonFiltered);
     };
@@ -1310,11 +1341,14 @@
       const cg = document.getElementById('wp-mon-colgroup');
       if (cg) cg.innerHTML = cols.map(c=>`<col style="width:${c.w}px">`).join('');
 
-      // Update thead
+      // Update thead — sortable columns
       const headRow = document.getElementById('wp-mon-head-row');
-      if (headRow) headRow.innerHTML = cols.map(c =>
-        `<th${c.sticky?` style="position:sticky;left:${_stickyLeft[c.key]}px;background:#f8f8f8;z-index:3"`:''}>${c.h}</th>`
-      ).join('');
+      if (headRow) headRow.innerHTML = cols.map(c => {
+        const isSorted = _wpMonSortCol === c.key;
+        const ind = isSorted ? `<span style="margin-left:3px;color:#EE3124">${_wpMonSortDir===1?'↑':'↓'}</span>` : '';
+        const stickyStyle = c.sticky ? `position:sticky;left:${_stickyLeft[c.key]}px;background:#f8f8f8;z-index:3;` : '';
+        return `<th onclick="setWPMonSort('${c.key}')" style="${stickyStyle}cursor:pointer;white-space:nowrap;user-select:none" title="Sort by ${c.h}">${c.h}${ind}</th>`;
+      }).join('');
 
       // Cell renderer per column key
       function renderCell(key, w) {
@@ -1376,6 +1410,16 @@
       });
       // Sort tradeOrder by TRADE_ORDER
       tradeOrder.sort((a,b)=>{const oa=TRADE_ORDER.indexOf(a),ob=TRADE_ORDER.indexOf(b);return(oa<0?999:oa)-(ob<0?999:ob);});
+      // Sort WPs within each group by active column
+      if (_wpMonSortCol && _WPC_SORT_FIELD[_wpMonSortCol]) {
+        const field = _WPC_SORT_FIELD[_wpMonSortCol];
+        const dir = _wpMonSortDir;
+        tradeGroups.forEach(arr => arr.sort((a, b) => {
+          let av = a[field] ?? '', bv = b[field] ?? '';
+          if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+          return String(av).localeCompare(String(bv)) * dir;
+        }));
+      }
 
       // Build virtual items (header + WP rows, skip WP rows when collapsed)
       const items = [];

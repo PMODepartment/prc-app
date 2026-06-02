@@ -317,6 +317,7 @@
                 <button class="proj-vtab" data-view="financial" onclick="setWPTableView('financial')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Award</button>
                 <button class="proj-vtab" data-view="schedule" onclick="setWPTableView('schedule')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Schedule</button>
                 <button class="proj-vtab" data-view="submittals" onclick="setWPTableView('submittals')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Submittals</button>
+                <button class="proj-vtab" data-view="all" onclick="setWPTableView('all')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">All</button>
               </div>
               <div style="display:flex;gap:4px;flex-shrink:0">
                 <button onclick="collapseAllTrades()" title="Collapse all" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">−</span> All</button>
@@ -468,18 +469,28 @@ const WP_TABLE_VIEWS = {
   financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount']), cost:true},
   schedule:   {keys:new Set(['cost_code','wp_no','description','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion'])},
   submittals: {keys:new Set(['cost_code','wp_no','description','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
+  all:        {keys:new Set(['cost_code','wp_no','works','description','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion','approver_name','approval_date','submittal_doc_type','award_status','remarks']), cost:true},
 };
 function getActiveCols() {
   const v = WP_TABLE_VIEWS[_wpTableView] || WP_TABLE_VIEWS.overview;
   const base = window.__isViewer ? COLS.filter(c=>!COST_KEYS.has(c.key)) : COLS;
-  return base.filter(c => v.keys.has(c.key));
+  const freezeDesc = _wpTableView !== 'overview';
+  return base.filter(c => v.keys.has(c.key)).map(c => {
+    if (c.key === 'description' && freezeDesc) return {...c, sticky: true};
+    return c;
+  });
 }
 function setWPTableView(view) {
   _wpTableView = view;
+  sortCol = 'wp_no'; sortDir = 1; // reset sort on tab switch
   document.querySelectorAll('.proj-vtab').forEach(b => {
     const active = b.dataset.view === view;
     b.style.background = active ? '#EE3124' : 'transparent';
     b.style.color = active ? '#fff' : '#555';
+  });
+  // Hide Award and All tabs for viewers
+  document.querySelectorAll('.proj-vtab[data-view="financial"],.proj-vtab[data-view="all"]').forEach(b => {
+    b.style.display = window.__isViewer ? 'none' : '';
   });
   curPage = 1; buildTable();
 }
@@ -979,8 +990,14 @@ function buildTable(){
     const th=document.createElement('th');
     th.style.minWidth=c.w;
     if(c.sticky) th.style.cssText='position:sticky;left:'+c._left+'px;background:#f8f8f8;z-index:3;min-width:'+c.w+';';
-    th.innerHTML=c.label+(sortCol===c.key?(sortDir===1?' ↑':' ↓'):'');
+    const sortInd = sortCol===c.key ? `<span style="margin-left:3px;color:#EE3124">${sortDir===1?'↑':'↓'}</span>` : '';
+    th.innerHTML=c.label+sortInd;
     th.style.cursor='pointer';
+    th.title='Sort by '+c.label;
+    th.style.whiteSpace='nowrap';
+    th.style.userSelect='none';
+    th.addEventListener('mouseenter',()=>{ th.style.color='#EE3124'; });
+    th.addEventListener('mouseleave',()=>{ th.style.color=''; });
     th.addEventListener('click',()=>{if(sortCol===c.key)sortDir*=-1;else{sortCol=c.key;sortDir=1;}curPage=1;buildTable();});
     colRow.appendChild(th);
   });
@@ -1263,7 +1280,7 @@ AppAuth.requireLogin(async (user, profile) => {
   window.__isViewer = profile.role === 'viewer';
   if (window.__isViewer) {
     document.body.classList.add('viewer-mode');
-    document.querySelectorAll('.proj-vtab[data-view="financial"]').forEach(b=>b.style.display='none');
+    document.querySelectorAll('.proj-vtab[data-view="financial"],.proj-vtab[data-view="all"]').forEach(b=>b.style.display='none');
   }
   projId = new URLSearchParams(location.search).get('id');
   if (!projId) { location.href='login.html'; return; }
