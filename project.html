@@ -310,11 +310,16 @@
           </div>
 
           <div class="panel" style="padding:0">
-            <div style="display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #f0f0f0">
-              <span id="row-count" style="font-size:12px;font-weight:600;color:#888"></span>
+            <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap">
+              <span id="row-count" style="font-size:12px;font-weight:600;color:#888;flex:1"></span>
+              <div style="display:flex;gap:4px;flex-shrink:0">
+                <button onclick="collapseAllTrades()" title="Collapse all" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">+</span> All</button>
+                <button onclick="expandAllTrades()" title="Expand all" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">−</span> All</button>
+              </div>
+              <button id="proj-wp-mobile-toggle" onclick="toggleProjWPTableMode()" style="display:none;padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #EE3124;border-radius:7px;background:#fff;color:#EE3124;cursor:pointer">Full Table</button>
             </div>
-            <div style="overflow-x:auto">
-              <table class="data-table">
+            <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+              <table class="data-table" id="proj-wp-table">
                 <thead id="tbl-head"></thead>
                 <tbody id="tbl-body"></tbody>
               </table>
@@ -786,6 +791,19 @@ window.toggleTradeGroup = function(trade) {
   _collapseState.set(trade, !(_collapseState.get(trade) || false));
   curPage = 1;
   buildTable();
+};
+window.collapseAllTrades = function() {
+  [...new Set(allWPs.map(w=>w.trade||'(No Trade)'))].forEach(t=>_collapseState.set(t,true));
+  curPage = 1; buildTable();
+};
+window.expandAllTrades = function() {
+  _collapseState.clear(); curPage = 1; buildTable();
+};
+window.toggleProjWPTableMode = function() {
+  const tbl = document.getElementById('proj-wp-table');
+  const btn = document.getElementById('proj-wp-mobile-toggle');
+  const full = tbl.classList.toggle('wp-table-full');
+  if (btn) btn.textContent = full ? 'Compact View' : 'Full Table';
 };
 
 function getFilteredSorted(){
@@ -1675,6 +1693,30 @@ AppAuth.requireLogin(async (user, profile) => {
 <style>
   .hide-mobile { }
   @media(max-width:480px) { .hide-mobile { display:none; } }
+  /* WP List mobile compact view */
+  @media (max-width: 767px) {
+    #proj-wp-mobile-toggle { display:inline-block !important; }
+    /* Compact: show WP No.(6), Description(7), Budget(11), Target Awarding(24), Status(33) + Edit(35) */
+    #proj-wp-table:not(.wp-table-full) th,
+    #proj-wp-table:not(.wp-table-full) td { display:none; }
+    #proj-wp-table:not(.wp-table-full) th:nth-child(6),
+    #proj-wp-table:not(.wp-table-full) td:nth-child(6),
+    #proj-wp-table:not(.wp-table-full) th:nth-child(7),
+    #proj-wp-table:not(.wp-table-full) td:nth-child(7),
+    #proj-wp-table:not(.wp-table-full) th:nth-child(11),
+    #proj-wp-table:not(.wp-table-full) td:nth-child(11),
+    #proj-wp-table:not(.wp-table-full) th:nth-child(24),
+    #proj-wp-table:not(.wp-table-full) td:nth-child(24),
+    #proj-wp-table:not(.wp-table-full) th:nth-child(33),
+    #proj-wp-table:not(.wp-table-full) td:nth-child(33),
+    #proj-wp-table:not(.wp-table-full) th:nth-child(35),
+    #proj-wp-table:not(.wp-table-full) td:nth-child(35) { display:table-cell; }
+    #proj-wp-table:not(.wp-table-full) td[colspan] { display:table-cell !important; }
+    #proj-wp-table.wp-table-full th,
+    #proj-wp-table.wp-table-full td { display:table-cell; }
+    body.viewer-mode #proj-wp-table:not(.wp-table-full) th:nth-child(11),
+    body.viewer-mode #proj-wp-table:not(.wp-table-full) td:nth-child(11) { display:none !important; }
+  }
   /* Viewer mode — hide all cost data and editing tools */
   body.viewer-mode #metrics-cost-group { display:none !important; }
   body.viewer-mode #sidebar-tools { display:none !important; }

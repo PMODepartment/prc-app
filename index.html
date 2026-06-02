@@ -422,14 +422,57 @@
                 <option value="Partially Awarded">Partially Awarded</option>
                 <option value="Not Yet Awarded">Not Yet Awarded</option>
               </select>
+              <div style="display:flex;gap:4px;flex-shrink:0">
+                <button onclick="collapseAllTrades()" title="Collapse all trades" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">+</span> All</button>
+                <button onclick="expandAllTrades()" title="Expand all trades" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">−</span> All</button>
+              </div>
               <div style="position:relative;margin-left:auto">
                 <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:12px;pointer-events:none"></i>
                 <input id="wp-mon-search" type="text" placeholder="Search WP No. or description…" oninput="filterWPTable()"
                   style="padding:6px 10px 6px 26px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none;width:210px">
               </div>
+              <button id="wp-mon-mobile-toggle" onclick="toggleWPTableMode()" style="display:none;padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #EE3124;border-radius:7px;background:#fff;color:#EE3124;cursor:pointer">Full Table</button>
             </div>
-            <div style="overflow-x:auto">
-              <table class="data-table" id="wp-mon-table" style="font-size:11px;min-width:1200px">
+            <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+              <table class="data-table" id="wp-mon-table" style="font-size:11px;min-width:3000px;table-layout:fixed">
+                <colgroup>
+                  <col style="width:70px">  <!-- Project -->
+                  <col style="width:90px">  <!-- Cost Code -->
+                  <col style="width:120px"> <!-- Trade -->
+                  <col style="width:130px"> <!-- Works -->
+                  <col style="width:75px">  <!-- Type -->
+                  <col style="width:110px"> <!-- Scope -->
+                  <col style="width:80px">  <!-- WP No. -->
+                  <col style="width:200px"> <!-- Description -->
+                  <col style="width:130px"> <!-- Vendors -->
+                  <col style="width:65px">  <!-- No. PO/JO -->
+                  <col style="width:120px"> <!-- PO/JO No. -->
+                  <col style="width:110px"> <!-- Budget -->
+                  <col style="width:100px"> <!-- Awarded -->
+                  <col style="width:100px"> <!-- Variance -->
+                  <col style="width:70px">  <!-- Surety -->
+                  <col style="width:70px">  <!-- Perf. -->
+                  <col style="width:75px">  <!-- Warranty -->
+                  <col style="width:85px">  <!-- Payment Terms -->
+                  <col style="width:60px">  <!-- DP % -->
+                  <col style="width:85px">  <!-- DP Terms -->
+                  <col style="width:100px"> <!-- DP Amount -->
+                  <col style="width:95px">  <!-- Date of Release -->
+                  <col style="width:75px">  <!-- Retention % -->
+                  <col style="width:100px"> <!-- Retention Amt -->
+                  <col style="width:75px">  <!-- Lead Time -->
+                  <col style="width:105px"> <!-- Target Awarding -->
+                  <col style="width:105px"> <!-- Actual Awarding -->
+                  <col style="width:105px"> <!-- Target Delivery -->
+                  <col style="width:105px"> <!-- Actual Delivery -->
+                  <col style="width:105px"> <!-- Target Install -->
+                  <col style="width:105px"> <!-- Target Completion -->
+                  <col style="width:120px"> <!-- Submittals Approver -->
+                  <col style="width:95px">  <!-- Date of Approval -->
+                  <col style="width:110px"> <!-- Type of Submittal -->
+                  <col style="width:110px"> <!-- Status -->
+                  <col style="width:130px"> <!-- Remarks -->
+                </colgroup>
                 <thead><tr>
                   <th>Project</th>
                   <th>Cost Code No.</th>
@@ -639,6 +682,20 @@
       _collapseState.set(trade, !(_collapseState.get(trade) || false));
       _wpMonPage = 1;
       renderWPMonTable(_wpMonFiltered);
+    };
+    window.collapseAllTrades = function() {
+      [...new Set((_wpMonFiltered||[]).map(w=>w.trade||'(No Trade)'))].forEach(t=>_collapseState.set(t,true));
+      _wpMonPage = 1; renderWPMonTable(_wpMonFiltered);
+    };
+    window.expandAllTrades = function() {
+      _collapseState.clear();
+      _wpMonPage = 1; renderWPMonTable(_wpMonFiltered);
+    };
+    window.toggleWPTableMode = function() {
+      const tbl = document.getElementById('wp-mon-table');
+      const btn = document.getElementById('wp-mon-mobile-toggle');
+      const full = tbl.classList.toggle('wp-table-full');
+      if (btn) btn.textContent = full ? 'Compact View' : 'Full Table';
     };
 
     // ── Tab switching ─────────────────────────────────────────────
@@ -1685,6 +1742,33 @@
   body.viewer-mode #wp-mon-table td:nth-child(23),
   body.viewer-mode #wp-mon-table th:nth-child(24),
   body.viewer-mode #wp-mon-table td:nth-child(24) { display:none !important; }
+  /* WP List mobile: compact view shows only key columns */
+  @media (max-width: 767px) {
+    #wp-mon-mobile-toggle { display:inline-block !important; }
+    #wp-mon-table { min-width:0 !important; }
+    /* Compact mode: hide all cols except WP No.(7), Description(8), Budget(12), Target Awarding(26), Status(35) */
+    #wp-mon-table:not(.wp-table-full) th,
+    #wp-mon-table:not(.wp-table-full) td { display:none; }
+    #wp-mon-table:not(.wp-table-full) th:nth-child(7),
+    #wp-mon-table:not(.wp-table-full) td:nth-child(7),
+    #wp-mon-table:not(.wp-table-full) th:nth-child(8),
+    #wp-mon-table:not(.wp-table-full) td:nth-child(8),
+    #wp-mon-table:not(.wp-table-full) th:nth-child(12),
+    #wp-mon-table:not(.wp-table-full) td:nth-child(12),
+    #wp-mon-table:not(.wp-table-full) th:nth-child(26),
+    #wp-mon-table:not(.wp-table-full) td:nth-child(26),
+    #wp-mon-table:not(.wp-table-full) th:nth-child(35),
+    #wp-mon-table:not(.wp-table-full) td:nth-child(35) { display:table-cell; }
+    /* Trade group headers always full width */
+    #wp-mon-table:not(.wp-table-full) td[colspan] { display:table-cell !important; }
+    /* Full mode: restore scroll */
+    #wp-mon-table.wp-table-full { min-width:3000px !important; }
+    #wp-mon-table.wp-table-full th,
+    #wp-mon-table.wp-table-full td { display:table-cell; }
+    /* Viewer compact: budget col hidden, show status & award date only */
+    body.viewer-mode #wp-mon-table:not(.wp-table-full) th:nth-child(12),
+    body.viewer-mode #wp-mon-table:not(.wp-table-full) td:nth-child(12) { display:none !important; }
+  }
   /* Hide Budget column in backlog tables and dashboard backlog */
   body.viewer-mode #bl-table th:nth-child(7),
   body.viewer-mode #bl-table td:nth-child(7),
