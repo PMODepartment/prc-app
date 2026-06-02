@@ -30,7 +30,7 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 | `register.html` | public | Self-registration (creates `pending` user) |
 | `pending.html` | public | Shown to unapproved users |
 | `forgot-password.html` | public | Password reset |
-| `project-selector.html` | user | Project picker — shown after login; admins also see Portfolio Overview card |
+| `project-selector.html` | user | Project picker — shown after login; admins also see Portfolio Overview card + **Add New Project** dashed card. Uses UMD bundle + `AppAuth.requireLogin()` (NOT ES module imports). New project modal: Code, Name, Location, Budget BCB → `WPDb.createProject()` → auto-navigate to `project.html?id=<newId>`. |
 | `index.html` | user | Portfolio Overview — consolidated dashboard with 7 tabs (Overview, Dashboard, Backlog, Budget, Schedule, Works, WP List) |
 | `project.html` | user | Single project dashboard — tabs: Overview, Dashboard, Backlog, WP List |
 | `wp-form.html` | user | Add / edit work package |
