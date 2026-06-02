@@ -397,13 +397,45 @@
               </div>
             </div>
             <div style="overflow-x:auto">
-              <table class="data-table" id="wp-mon-table" style="font-size:11px;min-width:900px">
+              <table class="data-table" id="wp-mon-table" style="font-size:11px;min-width:1200px">
                 <thead><tr>
-                  <th>Project</th><th>WP No.</th><th style="position:sticky;left:0;background:#fff;z-index:2;min-width:180px;max-width:220px;">Description</th><th>Status</th>
-                  <th>Budget</th><th>Awarded</th><th>Variance</th><th>%Var</th>
-                  <th>Planned Award</th><th>Actual Award</th><th>Aging</th><th>Submittal</th>
+                  <th>Project</th>
+                  <th>Cost Code No.</th>
+                  <th>Trade</th>
+                  <th>Works</th>
+                  <th>Type</th>
+                  <th>Scope</th>
+                  <th style="position:sticky;left:0;background:#f8f8f8;z-index:3;min-width:90px">WP No.</th>
+                  <th style="min-width:200px">Work Package Description</th>
+                  <th>Vendors</th>
+                  <th>No. of PO/JO</th>
+                  <th>PO/JO No.</th>
+                  <th>Budget (BCB) Net</th>
+                  <th>Awarded Net</th>
+                  <th>Variance</th>
+                  <th>Surety Bond</th>
+                  <th>Perf. Bond</th>
+                  <th>Warranty Bond</th>
+                  <th>Payment Terms</th>
+                  <th>DP %</th>
+                  <th>DP Terms</th>
+                  <th>DP Amount</th>
+                  <th>Date of Release</th>
+                  <th>Retention %</th>
+                  <th>Retention Amt</th>
+                  <th>Lead Time (d)</th>
+                  <th>Target Awarding</th>
+                  <th>Actual Awarding</th>
+                  <th>Target Delivery</th>
+                  <th>Actual Delivery</th>
+                  <th>Target Install</th>
+                  <th>Target Completion</th>
+                  <th>Submittals Approver</th>
+                  <th>Date of Approval</th>
+                  <th>Type of Submittal</th>
+                  <th>Status</th>
+                  <th>Remarks</th>
                 </tr></thead>
-                <!-- Note: Trade column removed — rows are grouped by trade headers -->
                 <tbody id="wp-mon-body"></tbody>
               </table>
             </div>
@@ -958,28 +990,52 @@
           tradesSeen.add(trade);
           const chevron = `<span style="float:right;font-size:11px;color:#aaa;transition:transform .2s;display:inline-block;transform:${isCollapsed?'rotate(-90deg)':'rotate(0deg)'}">▼</span>`;
           const count = `<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${tradeTotals.get(trade)||0} WPs</span>`;
-          html += `<tr class="trade-group-header" data-trade="${trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5"><td colspan="12" style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">${trade}${chevron}${count}</td></tr>`;
+          html += `<tr class="trade-group-header" data-trade="${trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5"><td colspan="36" style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">${trade}${chevron}${count}</td></tr>`;
         }
         const bud = w.approved_budget_bcb || 0;
         const awd = w.total_awarded || 0;
         const vari = bud - awd;
-        const pctVar = bud ? ((vari / bud) * 100).toFixed(1) : '—';
-        const aging = wpAging(w);
-        const agingStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : aging > 0 ? 'color:#888' : '';
         const statusColor = w.award_status === 'Awarded' ? '#2D9B6F' : w.award_status === 'Partially Awarded' ? '#D97706' : '#EE3124';
+        const fmtM = v => v ? Fmt.money(v) : '—';
+        const fmtD = d => d ? Fmt.date(d) : '—';
+        const fmtPct = v => v != null ? (parseFloat(v)*100).toFixed(0)+'%' : '—';
         html += `<tr data-trade-row="${trade.replace(/"/g,'&quot;')}" style="${isCollapsed?'display:none':''}">
           <td style="font-weight:600;color:#444">${w.project_id||'—'}</td>
-          <td>${w.wp_no||'—'}</td>
-          <td style="position:sticky;left:0;background:#fff;z-index:1;min-width:180px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(w.description||'').replace(/"/g,'&quot;')}">${w.description||'—'}</td>
+          <td><span class="td-code">${w.cost_code||'—'}</span></td>
+          <td>${w.trade||'—'}</td>
+          <td>${w.works||'—'}</td>
+          <td>${w.type_of_works||'—'}</td>
+          <td style="font-size:10px;color:#888">${w.scope||'—'}</td>
+          <td style="position:sticky;left:0;background:#fff;z-index:1;min-width:90px"><span class="td-code">${w.wp_no||'—'}</span></td>
+          <td style="min-width:200px"><span class="td-name">${w.description||'—'}</span></td>
+          <td>${w.proposed_vendors||'—'}</td>
+          <td>${w.po_jo_count!=null?w.po_jo_count:'—'}</td>
+          <td>${w.po_jo_numbers||'—'}</td>
+          <td style="text-align:right">${fmtM(bud)}</td>
+          <td style="text-align:right">${fmtM(awd)}</td>
+          <td style="text-align:right;${vari>0?'color:#2D9B6F':vari<0?'color:#EE3124':''}">${(bud||awd)?(vari>=0?'+':'')+Fmt.money(vari):'—'}</td>
+          <td>${w.surety_bond||'—'}</td>
+          <td>${w.performance_bond||'—'}</td>
+          <td>${w.warranty_bond||'—'}</td>
+          <td>${w.payment_terms_days?w.payment_terms_days+'d':'—'}</td>
+          <td>${fmtPct(w.dp_percent)}</td>
+          <td>${w.dp_terms||'—'}</td>
+          <td style="text-align:right">${fmtM(w.dp_amount)}</td>
+          <td>${fmtD(w.dp_release_date)}</td>
+          <td>${fmtPct(w.retention_percent)}</td>
+          <td style="text-align:right">${fmtM(w.retention_amount)}</td>
+          <td>${w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—'}</td>
+          <td>${fmtD(w.awarding_date)}</td>
+          <td>${fmtD(w.actual_awarding_date)}</td>
+          <td>${fmtD(w.target_delivery||w.target_completion)}</td>
+          <td>${fmtD(w.actual_delivery)}</td>
+          <td>${fmtD(w.target_installation)}</td>
+          <td>${fmtD(w.target_completion)}</td>
+          <td>${w.approver_name||'—'}</td>
+          <td>${fmtD(w.approval_date)}</td>
+          <td>${w.submittal_doc_type||'—'}</td>
           <td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${statusColor}22;color:${statusColor}">${w.award_status||'—'}</span></td>
-          <td style="text-align:right">${bud?Fmt.money(bud):'—'}</td>
-          <td style="text-align:right">${awd?Fmt.money(awd):'—'}</td>
-          <td style="text-align:right;${vari>0?'color:#2D9B6F':vari<0?'color:#EE3124':''}">${bud?(vari>=0?'+':'')+Fmt.money(vari):'—'}</td>
-          <td style="text-align:right;${parseFloat(pctVar)>0?'color:#2D9B6F':parseFloat(pctVar)<0?'color:#EE3124':''}">${pctVar!=='—'?(parseFloat(pctVar)>=0?'+':'')+pctVar+'%':'—'}</td>
-          <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
-          <td>${w.actual_awarding_date?Fmt.date(w.actual_awarding_date):'—'}</td>
-          <td style="${agingStyle}">${aging!=null?(aging>0?aging+'d':'today'):'—'}</td>
-          <td>${submittalLabel(w)}</td>
+          <td style="font-size:10px;color:#888">${w.remarks||'—'}</td>
         </tr>`;
       });
       tbody.innerHTML = html;

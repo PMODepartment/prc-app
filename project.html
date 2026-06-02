@@ -398,40 +398,48 @@
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
-const colGroups={identity:true,schedule:true,budget:true};
 let userProfile=null;
 let currentView='overview';
 
-const COLS={
-  identity:[
-    {key:'cost_code',label:'Cost Code',w:'90px'},
-    {key:'wp_no',label:'WP No.',w:'80px'},
-    {key:'description',label:'Work Package',w:'200px'},
-    {key:'zone',label:'Zone',w:'70px'},
-  ],
-  schedule:[
-    {key:'awarding_date',label:'Planned Award',w:'100px'},
-    {key:'actual_awarding_date',label:'Actual Award',w:'100px'},
-    {key:'awarding_lead_time',label:'Aging (d)',w:'70px'},
-    {key:'target_delivery',label:'Target Delivery',w:'100px'},
-    {key:'target_completion',label:'Target Comp.',w:'100px'},
-  ],
-  budget:[
-    {key:'approved_budget_bcb',label:'Budget BCB',w:'100px'},
-    {key:'total_awarded',label:'Total Awarded',w:'100px'},
-    {key:'variance',label:'Variance (₱)',w:'100px'},
-    {key:'award_status',label:'Award Status',w:'120px'},
-    {key:'procurement_status',label:'Proc. Status',w:'120px'},
-    {key:'submittal_type',label:'Submittal',w:'100px'},
-    {key:'delivery_status',label:'Delivery',w:'130px'},
-    {key:'contractor',label:'Contractor',w:'130px'},
-    {key:'claim_tag',label:'Tag',w:'120px'},
-    {key:'remarks',label:'Remarks',w:'140px'},
-  ],
-};
+const COLS=[
+  {key:'cost_code',        label:'Cost Code No.',      w:'90px'},
+  {key:'trade',            label:'Trade',              w:'110px'},
+  {key:'works',            label:'Works',              w:'130px'},
+  {key:'type_of_works',    label:'Type',               w:'80px'},
+  {key:'scope',            label:'Scope',              w:'140px'},
+  {key:'wp_no',            label:'WP No.',             w:'90px', sticky:true},
+  {key:'description',      label:'Work Package Description', w:'200px'},
+  {key:'proposed_vendors', label:'Vendors',            w:'130px'},
+  {key:'po_jo_count',      label:'No. of PO/JO',       w:'70px'},
+  {key:'po_jo_numbers',    label:'PO/JO No.',          w:'130px'},
+  {key:'approved_budget_bcb', label:'Budget (BCB) Net', w:'110px'},
+  {key:'total_awarded',    label:'Awarded Net',        w:'100px'},
+  {key:'variance',         label:'Variance',           w:'100px'},
+  {key:'surety_bond',      label:'Surety Bond',        w:'90px'},
+  {key:'performance_bond', label:'Perf. Bond',         w:'90px'},
+  {key:'warranty_bond',    label:'Warranty Bond',      w:'90px'},
+  {key:'payment_terms_days', label:'Payment Terms',    w:'90px'},
+  {key:'dp_percent',       label:'DP %',               w:'70px'},
+  {key:'dp_terms',         label:'DP Terms',           w:'90px'},
+  {key:'dp_amount',        label:'DP Amount',          w:'100px'},
+  {key:'dp_release_date',  label:'Date of Release',    w:'100px'},
+  {key:'retention_percent', label:'Retention %',       w:'80px'},
+  {key:'retention_amount', label:'Retention Amt',      w:'100px'},
+  {key:'awarding_lead_time', label:'Lead Time (d)',     w:'80px'},
+  {key:'awarding_date',    label:'Target Awarding',    w:'100px'},
+  {key:'actual_awarding_date', label:'Actual Awarding', w:'100px'},
+  {key:'target_delivery',  label:'Target Delivery',    w:'100px'},
+  {key:'actual_delivery',  label:'Actual Delivery',    w:'100px'},
+  {key:'target_installation', label:'Target Install',  w:'100px'},
+  {key:'target_completion', label:'Target Completion', w:'100px'},
+  {key:'approver_name',    label:'Submittals Approver', w:'130px'},
+  {key:'approval_date',    label:'Date of Approval',   w:'100px'},
+  {key:'submittal_doc_type', label:'Type of Submittal', w:'120px'},
+  {key:'award_status',     label:'Status',             w:'110px'},
+  {key:'remarks',          label:'Remarks',            w:'150px'},
+];
 
-function getActiveCols(){ return [...(colGroups.identity?COLS.identity:[]),...(colGroups.schedule?COLS.schedule:[]),...(colGroups.budget?COLS.budget:[])]; }
-function toggleCol(grp){ colGroups[grp]=!colGroups[grp]; buildTable(); }
+function getActiveCols(){ return COLS; }
 
 function fmt(n){ if(n==null)return'—'; return'₱'+(Math.abs(n)/1e6).toFixed(1)+'M'; }
 function fmtDate(d){ if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});}catch{return d;} }
@@ -761,9 +769,8 @@ function buildTable(){
   cols.forEach(c=>{
     const th=document.createElement('th');
     th.style.minWidth=c.w;
-    // Freeze Description column
-    if(c.key==='description'){
-      th.style.cssText='position:sticky;left:0;background:#fff;z-index:2;min-width:180px;max-width:220px;';
+    if(c.sticky){
+      th.style.cssText='position:sticky;left:0;background:#f8f8f8;z-index:3;min-width:'+c.w+';';
     }
     th.innerHTML=c.label+(sortCol===c.key?(sortDir===1?' ↑':' ↓'):'');
     th.style.cursor='pointer';
@@ -813,23 +820,39 @@ function buildTable(){
       if(rowIdx >= start && rowIdx < end){
         const cellMap={
           cost_code:'<span class="td-code">'+(w.cost_code||'—')+'</span>',
+          trade:w.trade||'—',
+          works:w.works||'—',
+          type_of_works:w.type_of_works||'—',
+          scope:'<span style="font-size:10px;color:#888">'+(w.scope||'—')+'</span>',
           wp_no:'<span class="td-code">'+(w.wp_no||'—')+'</span>',
           description:'<span class="td-name">'+(w.description||'—')+'</span>',
-          zone:w.zone||'—',
-          awarding_date:fmtDate(w.awarding_date),
-          actual_awarding_date:fmtDate(w.actual_awarding_date),
-          awarding_lead_time:w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—',
-          target_delivery:fmtDate(w.target_delivery || w.target_completion),
-          target_completion:fmtDate(w.target_completion),
+          proposed_vendors:w.proposed_vendors||'—',
+          po_jo_count:w.po_jo_count!=null?w.po_jo_count:'—',
+          po_jo_numbers:w.po_jo_numbers||'—',
           approved_budget_bcb:fmt(w.approved_budget_bcb),
           total_awarded:fmt(w.total_awarded),
-          variance:w.variance!=null?'<span style="color:'+(w.variance>=0?'#2D9B6F':'#EE3124')+';font-weight:600">'+(w.variance>=0?'+':'')+fmt(w.variance)+'</span>':'—',
+          variance:(()=>{ const v=(w.approved_budget_bcb||0)-(w.total_awarded||0); return (w.approved_budget_bcb||w.total_awarded)?'<span style="color:'+(v>=0?'#2D9B6F':'#EE3124')+';font-weight:600">'+(v>=0?'+':'')+fmt(v)+'</span>':'—'; })(),
+          surety_bond:w.surety_bond||'—',
+          performance_bond:w.performance_bond||'—',
+          warranty_bond:w.warranty_bond||'—',
+          payment_terms_days:w.payment_terms_days?w.payment_terms_days+'d':'—',
+          dp_percent:w.dp_percent!=null?(parseFloat(w.dp_percent)*100).toFixed(0)+'%':'—',
+          dp_terms:w.dp_terms||'—',
+          dp_amount:fmt(w.dp_amount),
+          dp_release_date:fmtDate(w.dp_release_date),
+          retention_percent:w.retention_percent!=null?(parseFloat(w.retention_percent)*100).toFixed(0)+'%':'—',
+          retention_amount:fmt(w.retention_amount),
+          awarding_lead_time:w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—',
+          awarding_date:fmtDate(w.awarding_date),
+          actual_awarding_date:fmtDate(w.actual_awarding_date),
+          target_delivery:fmtDate(w.target_delivery||w.target_completion),
+          actual_delivery:fmtDate(w.actual_delivery),
+          target_installation:fmtDate(w.target_installation),
+          target_completion:fmtDate(w.target_completion),
+          approver_name:w.approver_name||'—',
+          approval_date:fmtDate(w.approval_date),
+          submittal_doc_type:w.submittal_doc_type||'—',
           award_status:statusBadge(w.award_status),
-          procurement_status:procStatusBadge(w.procurement_status),
-          submittal_type:submittalBadge(w.submittal_type||'Not Required'),
-          delivery_status:deliveryBadge(w.delivery_status),
-          contractor:w.contractor||'<span style="color:#bbb">—</span>',
-          claim_tag:claimTagBadge(w.claim_tag),
           remarks:'<span style="font-size:10px;color:#888">'+(w.remarks||'—')+'</span>',
         };
         const tr=document.createElement('tr');
@@ -838,8 +861,8 @@ function buildTable(){
         cols.forEach(c=>{
           const td=document.createElement('td');
           td.innerHTML=cellMap[c.key]??'—';
-          if(c.key==='description'){
-            td.style.cssText='position:sticky;left:0;background:#fff;z-index:1;min-width:180px;max-width:220px;';
+          if(c.sticky){
+            td.style.cssText='position:sticky;left:0;background:#fff;z-index:1;min-width:'+c.w+';';
           }
           tr.appendChild(td);
         });
