@@ -85,6 +85,30 @@
     .msg2{font-size:13px;padding:10px 14px;border-radius:8px;margin-bottom:12px;display:none;border:1px solid #FFD0D0;background:#FEE2E2;color:#991B1B}
     .msg2.show{display:block}
 
+    /* ── Add New Project button (admin picker) ── */
+    .btn-new-project{display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;background:none;border:1.5px dashed #ddd;border-radius:8px;font-size:13px;font-weight:600;color:#aaa;cursor:pointer;font-family:'Montserrat',sans-serif;transition:border-color .15s,color .15s;margin-top:4px}
+    .btn-new-project:hover{border-color:#EE3124;color:#EE3124}
+    .btn-new-project .np-plus{width:24px;height:24px;border-radius:50%;border:2px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;line-height:1}
+    /* ── New Project Modal ── */
+    .np-overlay{display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:16px}
+    .np-overlay.active{display:flex}
+    .np-box{background:#fff;border-radius:16px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.18);overflow:hidden}
+    .np-head{padding:20px 22px 0}
+    .np-title{font-size:16px;font-weight:700;color:#231F20}
+    .np-sub{font-size:12px;color:#aaa;margin-top:3px}
+    .np-body{padding:16px 22px;display:flex;flex-direction:column;gap:12px}
+    .np-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px}
+    .np-input{width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:'Montserrat',sans-serif;outline:none;transition:border-color .15s}
+    .np-input:focus{border-color:#EE3124}
+    .np-hint{font-size:11px;color:#bbb;margin-top:3px}
+    .np-err{display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:9px 12px;font-size:12px}
+    .np-foot{padding:12px 22px 18px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #f0f0f0}
+    .np-btn-create{background:#EE3124;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;font-family:'Montserrat',sans-serif;cursor:pointer;transition:background .15s}
+    .np-btn-create:hover:not(:disabled){background:#c9261b}
+    .np-btn-create:disabled{opacity:.55;cursor:not-allowed}
+    .np-btn-cancel{background:none;border:1px solid #e5e5e5;border-radius:8px;padding:10px 14px;font-size:13px;font-family:'Montserrat',sans-serif;cursor:pointer;color:#666}
+    .np-btn-cancel:hover{border-color:#bbb}
+
     /* ── Mobile layout ── */
     @media(max-width:640px){
       .page{flex-direction:column}
@@ -167,9 +191,47 @@
         <div class="project-list" id="projectList"></div>
 
         <button class="btn-primary" id="btnGo">Open Dashboard →</button>
+        <!-- Add New Project — shown for admin/super_admin only -->
+        <button class="btn-new-project" id="btnNewProject" style="display:none" onclick="openNPModal()">
+          <span class="np-plus">+</span> Add New Project
+        </button>
         <div class="picker-footer"><a href="#" id="signOutLink">Sign out</a></div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- New Project Modal -->
+<div class="np-overlay" id="npModal" onclick="if(event.target===this)closeNPModal()">
+  <div class="np-box">
+    <div class="np-head">
+      <div class="np-title">Create New Project</div>
+      <div class="np-sub">Fill in the details below to add a new project</div>
+    </div>
+    <div class="np-body">
+      <div>
+        <label class="np-label" for="np-id">Project Code <span style="color:#EE3124">*</span></label>
+        <input class="np-input" id="np-id" type="text" placeholder="e.g. AVR102" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+        <div class="np-hint">Short unique code — letters &amp; numbers only. Cannot be changed later.</div>
+      </div>
+      <div>
+        <label class="np-label" for="np-name">Project Name <span style="color:#EE3124">*</span></label>
+        <input class="np-input" id="np-name" type="text" placeholder="e.g. Avesta Residences Tower 2">
+      </div>
+      <div>
+        <label class="np-label" for="np-location">Location</label>
+        <input class="np-input" id="np-location" type="text" placeholder="e.g. Quezon City">
+      </div>
+      <div>
+        <label class="np-label" for="np-budget">Procurement Budget BCB (₱)</label>
+        <input class="np-input" id="np-budget" type="text" inputmode="numeric" placeholder="e.g. 274,900,000">
+      </div>
+      <div id="np-err" class="np-err"></div>
+    </div>
+    <div class="np-foot">
+      <button class="np-btn-cancel" onclick="closeNPModal()">Cancel</button>
+      <button class="np-btn-create" id="np-btn-create" onclick="submitNP()">Create &amp; Open</button>
     </div>
   </div>
 </div>
@@ -233,6 +295,51 @@ async function handleSignIn() {
 // Project picker state
 let allItems = [];
 let selectedValue = null;
+let _pickerSb = null; // sb reference for NP modal
+
+// ── New Project modal ──────────────────────────────────────────
+function openNPModal() {
+  ['np-id','np-name','np-location','np-budget'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  const err = document.getElementById('np-err'); if(err) { err.style.display='none'; err.textContent=''; }
+  const btn = document.getElementById('np-btn-create'); if(btn) { btn.textContent='Create & Open'; btn.disabled=false; }
+  document.getElementById('npModal').classList.add('active');
+  setTimeout(() => document.getElementById('np-id').focus(), 50);
+}
+function closeNPModal() { document.getElementById('npModal').classList.remove('active'); }
+async function submitNP() {
+  const id  = (document.getElementById('np-id').value||'').trim();
+  const name = (document.getElementById('np-name').value||'').trim();
+  const loc  = (document.getElementById('np-location').value||'').trim();
+  const raw  = (document.getElementById('np-budget').value||'').replace(/,/g,'');
+  const budget = parseFloat(raw) || null;
+  const err = document.getElementById('np-err');
+  err.style.display = 'none';
+  if (!id || !name) { err.textContent='Project Code and Name are required.'; err.style.display='block'; return; }
+  if (!/^[A-Z0-9]+$/.test(id)) { err.textContent='Project Code must be letters and numbers only (e.g. AVR102).'; err.style.display='block'; return; }
+  const btn = document.getElementById('np-btn-create');
+  btn.textContent='Creating…'; btn.disabled=true;
+  try {
+    const { error } = await sb.from('projects').insert({ id, name, location: loc||null, budget_bcb: budget, status:'active' });
+    if (error) throw error;
+    closeNPModal();
+    window.location.href = `project.html?id=${id}`;
+  } catch(e) {
+    const isDupe = e.message && (e.message.includes('duplicate') || e.message.includes('unique'));
+    err.textContent = isDupe ? `Project Code "${id}" already exists. Choose a different code.` : 'Error: '+(e.message||'Could not create project');
+    err.style.display = 'block';
+    btn.textContent='Create & Open'; btn.disabled=false;
+  }
+}
+document.getElementById('npModal').addEventListener('keydown', e => {
+  if (e.key==='Enter') submitNP();
+  if (e.key==='Escape') closeNPModal();
+});
+// Budget comma formatting
+(function(){
+  const el = document.getElementById('np-budget');
+  el.addEventListener('blur',  () => { const v=parseFloat(el.value.replace(/,/g,'')); if(!isNaN(v)) el.value=v.toLocaleString('en-US'); });
+  el.addEventListener('focus', () => { el.value=el.value.replace(/,/g,''); });
+})();
 
 async function showProjectPicker(profile) {
   document.getElementById('loginForm').classList.add('hidden');
@@ -265,6 +372,7 @@ async function showProjectPicker(profile) {
   if (allItems.length > 5) document.getElementById('searchWrap').style.display = 'block';
   renderList(allItems);
   if (allItems.length) selectItem(allItems[0].value);
+  if (isAdmin) document.getElementById('btnNewProject').style.display = 'flex';
 }
 
 function renderList(items) {
