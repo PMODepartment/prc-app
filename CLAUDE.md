@@ -506,8 +506,14 @@ File: `assets/img/megawide-logo.png` (white version). Favicon: `assets/img/favic
 | User profile fetched from DB on every page navigation | Cached in `sessionStorage` under `wpm_prof_{userId}` |
 | Consolidated dashboard fired one API call per project (N+1) | Replaced with single `getApprovedWPsForProjects(ids)` query |
 | Hidden Claims fetch fired on every consolidated dashboard load | Removed — `_allClaims = []` since Claims tab is disabled |
+| `login`, `register`, `pending`, `forgot-password` used ESM `import { createClient }` (+esm waterfall) | Switched all four to UMD bundle + `window.supabase.createClient()` |
+| `index.html` fetched projects then WPs sequentially (2 round-trips for admins) | Parallelized with `Promise.all([getProjects(), getAllApprovedWPs()])` — saves one round-trip |
+| `JSON.stringify(w)` embedded in every WP table cell onclick (~90KB DOM overhead per render) | Replaced with `openWPDetail("id")` + `window._wpById` lookup map |
 
-### Script loading order (all pages)
+### Public auth pages (login, register, pending, forgot-password)
+These pages do **not** load `auth.js`/`db.js`/`ui.js`. They load the UMD bundle inline and call `window.supabase.createClient()` directly in their own `<script>` block. Top-level `await` is wrapped in an async IIFE (not ES modules). `forgot-password.html` `redirectTo` points to `https://pmodepartment.github.io/prc-app/login.html`.
+
+### Script loading order (dashboard pages)
 All pages load scripts at the **bottom of `<body>`** in this order:
 ```html
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
