@@ -101,6 +101,8 @@ WPDb.updateLastLogin(userId)                // writes current timestamp to users
 | `admin` | Approve/reject WPs; manage users; create/archive projects on assigned projects |
 | `super_admin` | Full access to all projects + all admin features |
 
+**Viewer role in admin.html:** Both the approval modal (`modalRoleSelect`) and the Change Role modal (`crm-role-select`) include `viewer` as the first option. The viewer role constraint is live in the DB — see migration in Known Issues #1.
+
 **Viewer role restrictions** (`body.viewer-mode` CSS class + `window.__isViewer` flag):
 - Cost KPI group hidden in Overview tab (both dashboards)
 - Budget tab hidden entirely (index.html)
@@ -201,10 +203,10 @@ Seven-tab layout (Claims tab is **hidden**):
 | **Overview** | Two KPI groups side-by-side (Cost Overview: 6 cards; Work Package Status: 6 cards) + project cards (cards/table toggle below) |
 | **Dashboard** | Period chart (Monthly/Quarterly toggle) + WP by Trade bar + WP by Status donut + backlog table (not-awarded) + Top 5 panels |
 | **Backlog** | Backlog table first (not-awarded, sorted most overdue) + aging chart + status donut + period chart (Quarterly/Monthly toggle) + submittal donut |
-| **Budget** | 6 KPI cost cards + budget-by-period chart (Monthly/Quarterly toggle) + budget-by-trade HBar chart + **Budget (BCB) and Awarded by Project** grouped bar chart + budget summary table by trade (IDX_TRADE_ORDER sorted) |
+| **Budget** | 6 KPI cost cards + budget-by-period chart (Monthly/Quarterly toggle) + budget-by-trade HBar chart + **Procurement Budget (BCB) and Awarded by Project** grouped bar chart + budget summary table by trade (IDX_TRADE_ORDER sorted) |
 | **Schedule** | Period chart (Monthly/Quarterly toggle) + WP by Trade bar + WP by Status donut + **collapsible** schedule summary table (project header row → click to expand trade sub-rows) |
 | **Works** | Budget-by-period-per-trade stacked chart + Budget/Awarded/Count donuts by trade + **Procurement Budget (BCB) by Period per Scope** table (collapsible trade→works) + **Procurement Budget (BCB) and Awarded by Period per Scope** table |
-| **WP List** | Trade-grouped table with 4 **view tabs** (Overview / Financial / Schedule / Submittals), each showing 10–12 focused columns. Column order: Cost Code → WP No. → … (WP No. is 2nd in all views). +/− collapse per trade group. **− All** collapses all trades, **+ All** expands all (Excel convention). Virtual-items pagination excludes collapsed WP rows entirely. `_WPC` column defs + `_WP_VIEWS` config + `_getActiveCols()` drive dynamic colgroup/thead/rows. `setWPListView(view)` switches tabs and re-renders. |
+| **WP List** | Trade-grouped table with 4 **view tabs** (Overview / Financial / Schedule / Submittals), each showing focused columns. Column order: Cost Code → WP No. → Works → … (first 3 frozen/sticky). **Trade column removed** — already shown in group header rows. +/− collapse per trade group. **− All** / **+ All** buttons. Virtual-items pagination. `_WPC` column defs + `_WP_VIEWS` config + `_getActiveCols()` drive dynamic colgroup/thead/rows. `setWPListView(view)` switches tabs and re-renders. |
 | **Backlog** (tab) | Filter bar (Trade select, Sort-by select, Search) + **collapsible trade group headers** (same +/− pattern) + backlog table + aging/status/period/submittal charts. `window.renderBlTable()` applies all active filters. `_blCollapseState` Map + `toggleBlGroup(trade)` handle collapse. |
 
 **KPI label renames (Budget tab):** "Cost to Complete" → "Procurement Cost to Complete", "Est. at Completion" → "Procurement Estimate at Completion"
@@ -235,7 +237,7 @@ Tab order (left to right): **Overview → Dashboard → Backlog → WP List**
 - **Overview**: Two KPI groups side-by-side (Cost Overview 6 cards / Work Package Status 6 cards). No charts, no monitoring table.
 - **Dashboard**: Period chart (Monthly/Quarterly toggle, `c-dash-period`) + WP by Trade (`c-dash-trade`) + WP by Status donut (`c-dash-status`) + backlog table (not-awarded, overdue-first) + Top 5 panels (`rank-value`, `rank-gains`, `rank-losses`)
 - **Backlog**: Filter bar (Trade select, Sort-by select, Search, Budget min/max) + backlog table (8 cols) + aging chart + status donut + period chart (Quarterly/Monthly toggle) + submittal donut. `renderBacklog()` applies all filters. KPI cards removed.
-- **WP List**: 4 view tabs (Overview / Financial / Schedule / Submittals) each showing 10–12 focused columns. Trade-grouped with +/− collapse, **− All** / **+ All** buttons, virtual-items pagination, WP No. frozen. `WP_TABLE_VIEWS` config + `getActiveCols()` filter COLS by view. `setWPTableView(view)` switches view + re-renders. `_collapseState` Map, `_blCollapseState` Map (backlog). Backlog also has collapsible trade group headers. **Column order:** Cost Code No. → WP No. → … (WP No. is 2nd column in all 4 views across both dashboards).
+- **WP List**: 4 view tabs (Overview / Financial / Schedule / Submittals). Column order: Cost Code → WP No. → Works → … (first 3 sticky with stacked `left` offsets). **Trade column removed** from all views — redundant with trade group headers. `WP_TABLE_VIEWS` config + `getActiveCols()` filter COLS by view. `setWPTableView(view)` switches view + re-renders. `_collapseState` Map, `_blCollapseState` Map (backlog). Backlog also has collapsible trade group headers.
 - Claims & Change Orders tab exists in HTML but is hidden (`style="display:none"`)
 
 ### Lazy rendering flags (project.html)
@@ -253,6 +255,18 @@ A single "Download Template" button in the sidebar Tools section opens a picker 
 Present on: `project.html`, `wp-form.html`, `claim-form.html` (all use `#template-picker-modal`).
 
 `openTemplatePickerModal()` / `closeTemplatePickerModal()` — toggle `display:flex/none`.
+
+---
+
+## Budget Input Formatting
+
+**Procurement Budget (BCB)** inputs (`f-budget` in wp-form.html, `np-budget` in admin.html, `ep-budget` in project.html) use `type="text" inputmode="numeric"` with comma formatting:
+- On **blur**: value is formatted with thousand separators via `toLocaleString('en-US')` (e.g. `274,900,000`)
+- On **focus**: commas are stripped so user can type/edit cleanly
+- All `parseFloat()` calls that read these fields strip commas first: `.replace(/,/g,'')`
+- `getNum(id)` in wp-form.html also strips commas before parsing
+
+**Global rename:** "Budget (BCB)" and "Budget BCB" → **"Procurement Budget (BCB)"** across all UI labels in index.html, project.html, admin.html, review.html, wp-form.html. DB column names (`approved_budget_bcb`, `budget_bcb`) and standalone files are unchanged.
 
 ---
 
