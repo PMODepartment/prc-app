@@ -595,7 +595,7 @@ function buildMetrics(wps){
   const card = (lbl,val,cls) => '<div class="metric-card"><div class="metric-label">'+lbl+'</div><div class="metric-value '+cls+'">'+val+'</div></div>';
 
   const costCards = [
-    card('Procurement Procurement Budget (BCB)', fmt(totalBudget), ''),
+    card('Procurement Budget (BCB)', fmt(totalBudget), ''),
     card('Awarded Cost', fmt(totalAwarded), ''),
     card('Procurement Cost to Complete', fmt(costToComplete), ''),
     card('Procurement Estimate at Completion', fmt(eac), ''),
@@ -805,6 +805,16 @@ function wpNumSort(a, b) {
 const TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
   'Architectural Works','Mechanical Works','Electrical Works','Auxiliary Works',
   'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
+
+const _TRADE_NORM = {
+  'general requirement':'General Requirements','general requirements':'General Requirements',
+  'structural works':'Structural Works','architectural works':'Architectural Works',
+  'site works':'Site Works','site development':'Site Development Works',
+  'mechanical works':'Mechanical Works','electrical works':'Electrical Works',
+  'plumbing works':'Plumbing Works','fire protection works':'Fire Protection Works',
+  'auxiliary works':'Auxiliary Works','allied services':'Allied Services',
+};
+function normTrade(t){ if(!t)return t; const k=t.trim().toLowerCase(); return _TRADE_NORM[k]||t.trim(); }
 
 const _collapseState = new Map();
 const _blCollapseState = new Map();
@@ -1276,7 +1286,7 @@ AppAuth.requireLogin(async (user, profile) => {
 
   // Re-fetch WPs and refresh view after quick-add modal saves
   window.__wpmReloadFn = async () => {
-    allWPs = await WPDb.getAllWPs(projId);
+    allWPs = (await WPDb.getAllWPs(projId)).map(w => ({...w, trade: normTrade(w.trade)}));
     buildMetrics(allWPs);
     Object.keys(_rendered).forEach(k=>_rendered[k]=false);
     switchView(currentView);

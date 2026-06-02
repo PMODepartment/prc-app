@@ -384,7 +384,7 @@
           </div>
           <div class="panel" style="margin-top:14px;padding:0;overflow:hidden">
             <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0">
-              <div class="panel-title" style="margin:0"><i class="ti ti-table"></i>Procurement Procurement Budget (BCB) by Period per Scope</div>
+              <div class="panel-title" style="margin:0"><i class="ti ti-table"></i>Procurement Budget (BCB) by Period per Scope</div>
             </div>
             <div style="overflow-x:auto">
               <table class="data-table" id="idx-wk-scope-period-table" style="font-size:11px">
@@ -395,7 +395,7 @@
           </div>
           <div id="idx-wk-scope-budget-panel" class="panel" style="margin-top:14px;padding:0;overflow:hidden">
             <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0">
-              <div class="panel-title" style="margin:0"><i class="ti ti-table"></i>Procurement Procurement Budget (BCB) and Awarded by Period per Scope</div>
+              <div class="panel-title" style="margin:0"><i class="ti ti-table"></i>Procurement Budget (BCB) and Awarded by Period per Scope</div>
             </div>
             <div style="overflow-x:auto">
               <table class="data-table" id="idx-wk-scope-budget-table" style="font-size:11px">
@@ -567,9 +567,10 @@
     window.__sidebarRefresh = renderIndexNav;
 
     // Single query for all WPs (replaces N per-project queries — major mobile perf win)
-    const _allWPs = AppAuth.isAdmin(profile)
+    const _allWPs = (AppAuth.isAdmin(profile)
       ? await WPDb.getAllApprovedWPs()
-      : await WPDb.getApprovedWPsForProjects(permitted.map(p => p.id));
+      : await WPDb.getApprovedWPsForProjects(permitted.map(p => p.id))
+    ).map(w => ({...w, trade: normTrade(w.trade)}));
     let _allClaims = []; // Claims register hidden — skip fetch
 
     // Project filter state
@@ -603,6 +604,17 @@
     const IDX_TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
       'Architectural Works','Mechanical Works','Electrical Works','Auxiliary Works',
       'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
+
+    // ── Trade name normalizer (maps legacy/wrong names to canonical) ──
+    const _TRADE_NORM = {
+      'general requirement':'General Requirements','general requirements':'General Requirements',
+      'structural works':'Structural Works','architectural works':'Architectural Works',
+      'site works':'Site Works','site development':'Site Development Works',
+      'mechanical works':'Mechanical Works','electrical works':'Electrical Works',
+      'plumbing works':'Plumbing Works','fire protection works':'Fire Protection Works',
+      'auxiliary works':'Auxiliary Works','allied services':'Allied Services',
+    };
+    function normTrade(t){ if(!t)return t; const k=t.trim().toLowerCase(); return _TRADE_NORM[k]||t.trim(); }
 
     // ── Trade ordering + collapse state ──────────────────────────
     const TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
@@ -906,7 +918,7 @@
                 return od!==0?od:0; // preserve inner sort within each trade
               });
           // Build groups preserving sort within each trade
-          const tradeOf = w => w.trade||'(No Trade)';
+          const tradeOf = w => normTrade(w.trade)||'(No Trade)';
           rows.forEach(w => {
             const t=tradeOf(w);
             if(!tradeGroups.has(t)){tradeGroups.set(t,[]);tradeSeq.push(t);}
@@ -966,7 +978,7 @@
         if (budCards) {
           const card = (lbl,val,cls) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls}">${val}</div></div>`;
           budCards.innerHTML = [
-            card('Procurement Procurement Budget (BCB)', Fmt.money(totalBCB), ''),
+            card('Procurement Budget (BCB)', Fmt.money(totalBCB), ''),
             card('Awarded Cost', Fmt.money(totalAwd), 'green'),
             card('Procurement Cost to Complete', Fmt.money(ctc), ''),
             card('Procurement Estimate at Completion', Fmt.money(eac), ''),
@@ -1276,10 +1288,12 @@
       // Group rows by trade
       const tradeGroups = new Map(), tradeOrder = [];
       rows.forEach(w => {
-        const t = w.trade||'(No Trade)';
+        const t = normTrade(w.trade)||'(No Trade)';
         if (!tradeGroups.has(t)) { tradeGroups.set(t,[]); tradeOrder.push(t); }
         tradeGroups.get(t).push(w);
       });
+      // Sort tradeOrder by TRADE_ORDER
+      tradeOrder.sort((a,b)=>{const oa=TRADE_ORDER.indexOf(a),ob=TRADE_ORDER.indexOf(b);return(oa<0?999:oa)-(ob<0?999:ob);});
 
       // Build virtual items (header + WP rows, skip WP rows when collapsed)
       const items = [];
@@ -1300,7 +1314,7 @@
         if (item.type === 'header') {
           const btn = `<span style="float:right;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-left:4px">${item.collapsed?'+':'−'}</span>`;
           const cnt = `<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${item.count} WPs</span>`;
-          html += `<tr class="trade-group-header" data-trade="${item.trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5"><td colspan="${nCols}" style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">${item.trade}${btn}${cnt}</td></tr>`;
+          html += `<tr class="trade-group-header" data-trade="${item.trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5"><td colspan="${nCols}" style="position:sticky;left:0;z-index:2;background:#f8f8f8;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">${item.trade}${btn}${cnt}</td></tr>`;
         } else {
           html += `<tr data-trade-row="${item.trade.replace(/"/g,'&quot;')}">${cols.map(c=>renderCell(c.key,item.wp)).join('')}</tr>`;
         }
@@ -1351,7 +1365,7 @@
       const costEl = document.getElementById('metrics-cost');
       const wpEl = document.getElementById('metrics-wp');
       if(costEl) costEl.innerHTML = [
-        card('Procurement Procurement Budget (BCB)', Fmt.moneyFull(totalBCB), ''),
+        card('Procurement Budget (BCB)', Fmt.moneyFull(totalBCB), ''),
         card('Awarded Cost', Fmt.moneyFull(totalAwd), 'green'),
         card('Procurement Cost to Complete', Fmt.moneyFull(ctc), ''),
         card('Procurement Estimate at Completion', Fmt.moneyFull(eac), ''),
