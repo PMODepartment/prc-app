@@ -26,11 +26,11 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 ### Pages
 | File | Auth | Purpose |
 |---|---|---|
-| `login.html` | public | Sign-in |
+| `login.html` | public | Sign-in + **Step 2 project picker** (shown after auth). Picker shows Portfolio Overview card (admins), project list, and **Add New Project** dashed button (admin/super_admin only). New project modal uses raw `sb.from('projects').insert()` — no `WPDb` on this page. On create → navigates to `project.html?id=<newId>`. |
 | `register.html` | public | Self-registration (creates `pending` user) |
 | `pending.html` | public | Shown to unapproved users |
 | `forgot-password.html` | public | Password reset |
-| `project-selector.html` | user | Project picker — shown after login; admins also see Portfolio Overview card + **Add New Project** dashed card. Uses UMD bundle + `AppAuth.requireLogin()` (NOT ES module imports). New project modal: Code, Name, Location, Budget BCB → `WPDb.createProject()` → auto-navigate to `project.html?id=<newId>`. |
+| `project-selector.html` | user | Standalone project picker page — **not linked from anywhere in the app**. The real project selection happens inside `login.html` Step 2 picker. This file exists but is unused. |
 | `index.html` | user | Portfolio Overview — consolidated dashboard with 7 tabs (Overview, Dashboard, Backlog, Budget, Schedule, Works, WP List) |
 | `project.html` | user | Single project dashboard — tabs: Overview, Dashboard, Backlog, WP List |
 | `wp-form.html` | user | Add / edit work package |
