@@ -232,6 +232,48 @@ Present on: `project.html`, `wp-form.html`, `claim-form.html` (all use `#templat
 
 ---
 
+## WP Form — Identity & Classification Field Order (wp-form.html)
+
+Current field order in the Identity & Classification section:
+1. Cost Code No.
+2. Trade / Discipline (cascading — triggers Works dropdown)
+3. Works (cascading dropdown — updates based on Trade; `id="f-works"`)
+4. Type (read-only — auto-fills "Service" or "Materials & Labor" from Works; `id="f-type"`)
+5. WP No.
+6. Work Package Description
+7. Scope of Work (`id="f-scope"`, textarea)
+8. Project
+9. Zone
+10. Detailed Description
+11. Type of Service
+12. Type of Procurement
+13. Type of Contract
+14. Proposed Vendors
+15. No. of PO/JO
+16. PO/JO Numbers
+
+### Trade → Works → Type cascade (wp-form.html)
+
+`TRADE_WORKS` JS object maps each Trade to an array of `[works, type]` pairs. Defined at top of `<script>` block.
+
+Trade options: General Requirements, Site Works, Structural Works, Architectural Works, Mechanical Works, Electrical Works, Auxiliary Works, Plumbing Works, Fire Protection Works, Allied Services, Site Development Works.
+
+- `onTradeChange()` — repopulates `#f-works` dropdown and clears `#f-type`
+- `onWorksChange()` — sets `#f-type` to "Service" or "Materials & Labor"
+
+**DB columns needed (run migration):**
+```sql
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS works text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS type_of_works text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS scope text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS actual_delivery date DEFAULT NULL;
+```
+
+### Actual Delivery Date (Schedule section)
+`id="f-actual-delivery"` — added after Target Delivery Date. Optional; maps to `actual_delivery` DB column.
+
+---
+
 ## CSV Import (Work Packages)
 
 CSV import is in `wp-form.html` as a bulk import banner at the top of the content area.
