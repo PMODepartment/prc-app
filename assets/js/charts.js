@@ -113,7 +113,7 @@
       {label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2},
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
       {label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'}}}}});
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}}}}});
   }
 
   // Budget (BCB) and Awarded by Period — quarterly combo chart (matches Power BI Projects & Budget pages)
@@ -133,7 +133,7 @@
       {label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2},
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
       {label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'}}}}});
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}}}}});
   }
 
   // Work Package by Trade — horizontal grouped bar (Total WP vs Awarded WP count)
@@ -143,7 +143,7 @@
     make(id,{type:'bar',data:{labels:data.map(d=>d.t),datasets:[
       {label:'Total WP',data:data.map(d=>d.total),backgroundColor:'#282C28',borderRadius:3},
       {label:'Awarded WP',data:data.map(d=>d.awarded),backgroundColor:'#EE3124',borderRadius:3},
-    ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}},scales:{x:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+    ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}},scales:{x:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'Count',font:{size:9}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
   }
 
   // Work Package by Status — donut (Awarded / Due but Not Awarded / Not Due)
@@ -183,7 +183,7 @@
       {label:'Actual',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
       {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'}}}}});
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'Count',font:{size:9}}}}}});
   }
 
   // Work Package by Aging per Project — stacked horizontal bar with 4 aging buckets
@@ -211,7 +211,7 @@
     make(id,{type:'bar',data:{labels:data.map(d=>d.t),datasets:[
       {label:'Budget (BCB)',data:data.map(d=>+d.budget.toFixed(1)),backgroundColor:'#282C28',borderRadius:3},
       {label:'Awarded',data:data.map(d=>+d.awarded.toFixed(1)),backgroundColor:'#EE3124',borderRadius:3},
-    ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},datalabels:{display:false}},scales:{x:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+    ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},datalabels:{display:false}},scales:{x:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
   }
 
   // Budget (BCB) by Period per Trade — stacked bar chart (Works page)
@@ -229,7 +229,7 @@
       backgroundColor:COLORS[i%COLORS.length],
       borderRadius:2,stack:'bgt'
     }));
-    make(id,{type:'bar',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10,padding:6}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'}}}}});
+    make(id,{type:'bar',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10,padding:6}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}}}}});
   }
 
   // Budget (BCB) by Trade — donut
@@ -240,6 +240,23 @@
     make(id,{type:'doughnut',data:{labels:trades,datasets:[{data:vals,backgroundColor:COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}}}}});
   }
 
+  // Budget (BCB) and Awarded by Project — grouped bar
+  function budgetAwardedByProject(id, wps, projects){
+    const labels=projects.map(p=>p.id);
+    const budgets=projects.map(p=>wps.filter(w=>w.project_id===p.id).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
+    const awarded=projects.map(p=>wps.filter(w=>w.project_id===p.id).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
+    make(id,{type:'bar',data:{labels,datasets:[
+      {label:'Budget (BCB)',data:budgets,backgroundColor:'#282C28',borderRadius:3},
+      {label:'Awarded',data:awarded,backgroundColor:'#EE3124',borderRadius:3},
+    ]},options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:9}}},
+        y:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}}
+      }
+    }});
+  }
+
   // Awarded by Trade — donut
   function awardedByTradeDonut(id, wps){
     const trades=[...new Set(wps.filter(w=>w.total_awarded>0).map(w=>w.trade).filter(Boolean))].sort();
@@ -248,5 +265,5 @@
     make(id,{type:'doughnut',data:{labels:trades,datasets:[{data:vals,backgroundColor:COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}}}}});
   }
 
-  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut};
+  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject};
 })();
