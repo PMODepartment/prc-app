@@ -135,3 +135,60 @@ const SidebarPrefs = (() => {
     }
   };
 })();
+
+/* ── Expandable chart panels ─────────────────────────────────────────
+   Adds a click-to-expand toggle to every .panel that contains a canvas.
+   Collapsed (default): chart at original height, data labels hidden.
+   Expanded: chart doubles in height, data labels appear.
+   Call once after the page DOM is ready. ─────────────────────────── */
+function initExpandableCharts() {
+  document.querySelectorAll('.panel').forEach(panel => {
+    // Find the inline-height wrapper and its canvas
+    const wrap = Array.from(panel.children).find(
+      el => el.style && el.style.height && el.querySelector('canvas')
+    );
+    if (!wrap) return;
+    const canvas = wrap.querySelector('canvas');
+    if (!canvas || !canvas.id) return;
+    const titleEl = panel.querySelector('.panel-title');
+    if (!titleEl) return;
+
+    // Avoid double-init
+    if (panel.dataset.expandInit) return;
+    panel.dataset.expandInit = '1';
+
+    const origH = parseInt(wrap.style.height) || 240;
+    let expanded = false;
+
+    // Build expand button — append to panel-title flex row
+    const hasAutoMarginChild = Array.from(titleEl.children).some(
+      c => c.style && c.style.marginLeft === 'auto'
+    );
+    const btn = document.createElement('span');
+    btn.className = 'chart-expand-btn';
+    if (!hasAutoMarginChild) btn.style.marginLeft = 'auto';
+    btn.style.cssText += ';cursor:pointer;display:inline-flex;align-items:center;opacity:0.4;transition:opacity .15s;flex-shrink:0;padding:2px 4px;border-radius:4px';
+    btn.title = 'Expand chart';
+    btn.innerHTML = '<i class="ti ti-arrows-diagonal" style="font-size:12px"></i>';
+    btn.addEventListener('mouseenter', () => { btn.style.opacity = '1'; btn.style.background = 'rgba(238,49,36,.07)'; });
+    btn.addEventListener('mouseleave', () => { btn.style.opacity = expanded ? '1' : '0.4'; btn.style.background = ''; });
+    titleEl.appendChild(btn);
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      expanded = !expanded;
+      wrap.style.height = (expanded ? origH * 2.2 : origH) + 'px';
+      btn.querySelector('i').className = expanded ? 'ti ti-arrows-diagonal-minimize-2' : 'ti ti-arrows-diagonal';
+      btn.style.opacity = '1';
+      btn.title = expanded ? 'Collapse chart' : 'Expand chart';
+      if (!expanded) btn.style.opacity = '0.4';
+
+      // Toggle data labels after Chart.js resizes (next animation frame)
+      requestAnimationFrame(() => {
+        if (typeof Charts !== 'undefined') {
+          expanded ? Charts.expand(canvas.id) : Charts.collapse(canvas.id);
+        }
+      });
+    });
+  });
+}

@@ -759,17 +759,26 @@
 
   function _userName(u) { return (u.name || u.email || '').trim(); }
 
+  // Role rank for responsible-field filtering — can only add same or lower role
+  const _ROLE_RANK = { viewer:0, user:1, manager:2, specialist:3, admin:4, super_admin:5 };
+  const _ROLE_LABEL = { super_admin:'Super Admin', admin:'Admin', specialist:'Specialist', manager:'Manager', user:'User', viewer:'Viewer' };
+
   function _buildMsOpts(field) {
     const dd = document.getElementById('ms-' + field + '-dd');
     const list = dd.querySelector('.ms-list');
     list.innerHTML = '';
-    if (!_allUsers.length) {
+    // For the responsible field, only show users with role rank ≤ current user's role
+    const myRank = _ROLE_RANK[userProfile?.role] ?? 99;
+    const visibleUsers = field === 'responsible'
+      ? _allUsers.filter(u => (_ROLE_RANK[u.role] ?? 0) <= myRank)
+      : _allUsers;
+    if (!visibleUsers.length) {
       list.innerHTML = '<div style="padding:12px;font-size:12px;color:#aaa;text-align:center">No users found</div>';
       return;
     }
-    _allUsers.forEach(u => {
+    visibleUsers.forEach(u => {
       const name = _userName(u);
-      const roleLabel = { super_admin:'Super Admin', admin:'Admin', user:'User', viewer:'Viewer' }[u.role] || u.role;
+      const roleLabel = _ROLE_LABEL[u.role] || u.role;
       const checked = _msState[field].has(u.id);
       const div = document.createElement('div');
       div.className = 'ms-opt' + (checked ? ' checked' : '');
@@ -920,6 +929,12 @@ AppAuth.requireLogin(async (user, profile) => {
     allProjects = _projects;
     _allUsers = (_users || []).filter(u => u.status === 'approved');
     _populateApproverSelect(_allUsers);
+
+    // Auto-fill Responsible with the logged-in user (new WP only)
+    if (!editId && profile.id) {
+      _msState.responsible.add(profile.id);
+      _updateMsPills('responsible');
+    }
     const permitted = AppAuth.getPermittedProjects(profile, allProjects);
     const projSel = document.getElementById('f-project');
     permitted.forEach(p => {
