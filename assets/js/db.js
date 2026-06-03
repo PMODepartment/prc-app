@@ -130,19 +130,68 @@ function exportCSV(wps, label) {
     return na - nb;
   });
 
-  const h = ['Project','WP No','Cost Code','Description','Zone','Trade',
-    'Procurement Status','Award Status','Planned Award','Actual Award',
-    'Lead Time (d)','Target Delivery','Target Completion',
-    'Budget BCB (PHP)','Total Awarded (PHP)','Variance (PHP)',
-    'Contractor','PO/JO Count','PO/JO Numbers','Remarks'];
+  const h = [
+    // Identity
+    'Project','WP No','Cost Code','Trade','Works','Type of Works','Zone',
+    // Description
+    'Work Package Description','Scope of Work','Type of Service',
+    'Type of Procurement','Type of Contract',
+    // Charging
+    'Charging Type','Contract Package No.','CO Description',
+    // Vendors & PO
+    'Proposed Vendors','No. of PO/JO','PO/JO Numbers',
+    // Team
+    'Responsible Team','Approver','Support Team',
+    // Procurement schedule
+    'Lead Time (d)','Planned Award Date','Actual Award Date',
+    'Target Delivery','Actual Delivery','Target Installation','Target Completion',
+    // Budget & contract
+    'Budget BCB (PHP)','Contract Amount (PHP)','Total Awarded (PHP)','Variance (PHP)',
+    'Award Status','Contractor',
+    // Bonds
+    'Surety Bond','Performance Bond','Warranty Bond',
+    // Payment terms
+    'Payment Terms (d)','DP %','DP Terms','DP Amount (PHP)','DP Release Date','DP Notes',
+    // Retention
+    'Retention %','Retention Amount (PHP)','Retention Period',
+    // Submittals
+    'Requires Submittal Approval','Type of Submittal','Submittal Approver','Approval Date',
+    // Status
+    'Procurement Status','Awarding Status','Delivery Status','Submittal Status',
+    'Purchase Request','Remarks',
+  ];
 
+  const pct = v => v != null ? (parseFloat(v) * 100).toFixed(2) + '%' : '';
   const cell = v => `"${(v??'').toString().replace(/"/g,'""')}"`;
   const rows = sorted.map(w => [
-    w.project_id, w.wp_no, w.cost_code, w.description, w.zone, w.trade,
-    w.procurement_status, w.award_status, w.awarding_date, w.actual_awarding_date,
-    w.awarding_lead_time, w.target_delivery, w.target_completion,
-    w.approved_budget_bcb, w.total_awarded, w.variance,
-    w.contractor, w.po_jo_count, w.po_jo_numbers, w.remarks
+    // Identity
+    w.project_id, w.wp_no, w.cost_code, w.trade, w.works, w.type_of_works, w.zone,
+    // Description
+    w.description, w.scope, w.type_of_service,
+    w.type_of_procurement, w.type_of_contract,
+    // Charging
+    w.charging_type, w.contract_package_no, w.co_description,
+    // Vendors & PO
+    w.proposed_vendors, w.po_jo_count, w.po_jo_numbers,
+    // Team
+    w.responsible_team, w.approver, w.support_team,
+    // Procurement schedule
+    w.awarding_lead_time, w.awarding_date, w.actual_awarding_date,
+    w.target_delivery, w.actual_delivery, w.target_installation, w.target_completion,
+    // Budget & contract
+    w.approved_budget_bcb, w.awarded_cost, w.total_awarded, w.variance,
+    w.award_status, w.contractor,
+    // Bonds
+    w.surety_bond, w.performance_bond, w.warranty_bond,
+    // Payment terms
+    w.payment_terms_days, pct(w.dp_percent), w.dp_terms, w.dp_amount, w.dp_release_date, w.dp_notes,
+    // Retention
+    pct(w.retention_percent), w.retention_amount, w.retention_period,
+    // Submittals
+    w.requires_approval ? 'Yes' : 'No', w.submittal_document_type, w.approver_name, w.approval_date,
+    // Status
+    w.procurement_status, w.awarding_status, w.delivery_status, w.submittal_type,
+    w.purchase_request, w.remarks,
   ].map(cell).join(','));
 
   // BOM + header + data â€” BOM ensures Excel opens UTF-8 correctly (handles â‚± etc)

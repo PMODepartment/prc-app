@@ -66,6 +66,9 @@
       <a class="nav-item" href="login.html" style="opacity:.75;font-size:12px">
         <i class="ti ti-switch-horizontal"></i>Switch Project
       </a>
+      <a class="nav-item" href="index.html" style="opacity:.75;font-size:12px">
+        <i class="ti ti-layout-dashboard"></i>Portfolio Overview
+      </a>
     </div>
 
     <div id="sidebar-projects" style="display:none">
@@ -889,6 +892,14 @@ function renderBacklog(){
   tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
 }
 
+// Dynamic WP sort — respects current sortCol/sortDir; falls back to wp_no natural sort
+function _wpSortFn(a, b) {
+  if (sortCol === 'wp_no' || !sortCol) return wpNumSort(a.wp_no, b.wp_no) * (sortDir||1);
+  const av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
+  if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sortDir;
+  return String(av).localeCompare(String(bv)) * sortDir;
+}
+
 function wpNumSort(a, b) {
   const nums = s => (s||'').match(/\d+/g)||[];
   const na = nums(a), nb = nums(b);
@@ -961,10 +972,10 @@ function getFilteredSorted(){
   const noTrade = rows.filter(w=>!w.trade);
   const sorted = [];
   tradeNames.forEach(t=>{
-    const group = rows.filter(w=>w.trade===t).sort((a,b)=>wpNumSort(a.wp_no,b.wp_no));
+    const group = rows.filter(w=>w.trade===t).sort(_wpSortFn);
     sorted.push({trade:t, wps:group});
   });
-  if(noTrade.length) sorted.push({trade:'(No Trade)', wps:noTrade.sort((a,b)=>wpNumSort(a.wp_no,b.wp_no))});
+  if(noTrade.length) sorted.push({trade:'(No Trade)', wps:noTrade.sort(_wpSortFn)});
   return sorted;
 }
 
