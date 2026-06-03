@@ -25,8 +25,8 @@ create table if not exists users (
   id          uuid primary key references auth.users(id) on delete cascade,
   name        text,
   email       text unique not null,
-  role        text not null default 'user'   -- super_admin | admin | user
-                check (role in ('super_admin','admin','user')),
+  role        text not null default 'user'   -- super_admin | admin | specialist | manager | user | viewer
+                check (role in ('super_admin','admin','specialist','manager','user','viewer')),
   status      text not null default 'pending'  -- pending | approved | rejected
                 check (status in ('pending','approved','rejected')),
   projects    text[] default '{}',            -- array of project IDs assigned to user

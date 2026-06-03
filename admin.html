@@ -144,6 +144,8 @@
                   <option value="">Set role…</option>
                   <option value="viewer">Viewer</option>
                   <option value="user">User</option>
+                  <option value="manager">Manager</option>
+                  <option value="specialist">Specialist</option>
                   <option value="admin">Admin</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
@@ -189,10 +191,12 @@
     <div class="modal-body">
       <div class="modal-field-label">Role</div>
       <select class="role-select" id="modalRoleSelect" style="margin-bottom:16px">
-        <option value="viewer">Viewer — assigned projects only, view WPs (no cost data)</option>
-        <option value="user">User — assigned projects only, view &amp; update WPs</option>
-        <option value="admin">Admin — assigned projects + user management</option>
-        <option value="super_admin" id="opt-super-admin">Super Admin — all projects + full control</option>
+        <option value="viewer">Viewer — assigned projects, view WPs (no cost data)</option>
+        <option value="user">User — assigned projects, view &amp; submit WPs (for approval)</option>
+        <option value="manager">Manager — assigned projects, edit WPs (auto-approved)</option>
+        <option value="specialist">Specialist — all projects visible, edit assigned WPs (auto-approved)</option>
+        <option value="admin">Admin — all projects, edit WPs + user management</option>
+        <option value="super_admin" id="opt-super-admin">Super Admin — full access</option>
       </select>
       <!-- Assign to Admin — super_admin only -->
       <div id="assign-admin-wrap" style="display:none;margin-bottom:16px">
@@ -230,8 +234,10 @@
       <div class="modal-field-label" style="margin-bottom:6px">New role</div>
       <select class="role-select" id="crm-role-select">
         <option value="viewer">Viewer — view assigned WPs (no cost data)</option>
-        <option value="user">User — view &amp; update assigned WPs</option>
-        <option value="admin">Admin — manage assigned projects &amp; users</option>
+        <option value="user">User — submit WPs for approval</option>
+        <option value="manager">Manager — edit WPs (auto-approved)</option>
+        <option value="specialist">Specialist — view all projects, edit assigned WPs</option>
+        <option value="admin">Admin — all projects + user management</option>
         <option value="super_admin" id="crm-opt-super">Super Admin — full access</option>
       </select>
     </div>
@@ -659,14 +665,18 @@
   // ── Role badge helpers ────────────────────────────────────────
   function roleLabel(role) {
     if (role === 'super_admin') return 'Super Admin';
-    if (role === 'admin') return 'Admin';
-    if (role === 'viewer') return 'Viewer';
+    if (role === 'admin')       return 'Admin';
+    if (role === 'specialist')  return 'Specialist';
+    if (role === 'manager')     return 'Manager';
+    if (role === 'viewer')      return 'Viewer';
     return 'User';
   }
   function roleStyle(role) {
     const base = 'font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-block;white-space:nowrap;';
     if (role === 'super_admin') return base + 'background:#EDE9FE;color:#5B21B6';
     if (role === 'admin')       return base + 'background:#D1FAE5;color:#065F46';
+    if (role === 'specialist')  return base + 'background:#DBEAFE;color:#1E40AF';
+    if (role === 'manager')     return base + 'background:#FCE7F3;color:#9D174D';
     if (role === 'viewer')      return base + 'background:#FEF3C7;color:#92400E';
     return base + 'background:#E0F2FE;color:#0369A1';
   }
@@ -954,10 +964,11 @@ window.addEventListener('beforeunload', function(e) {
     if (profile.role === 'super_admin') {
       document.getElementById('col-admin-head').style.display = '';
     }
-    // Restrict bulk role options for admin role
+    // Admins cannot assign super_admin or specialist roles
     if (profile.role === 'admin') {
-      const superOpt = document.querySelector('#bulk-role-select option[value="super_admin"]');
-      if (superOpt) superOpt.remove();
+      ['super_admin','specialist'].forEach(v => {
+        document.querySelectorAll(`#bulk-role-select option[value="${v}"], #modalRoleSelect option[value="${v}"], #crm-role-select option[value="${v}"]`).forEach(o => o.remove());
+      });
       const superModalOpt = document.getElementById('opt-super-admin');
       if (superModalOpt) superModalOpt.remove();
     }

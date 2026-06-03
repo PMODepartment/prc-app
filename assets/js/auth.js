@@ -29,10 +29,17 @@ const AppAuth = (() => {
     await sb.auth.signOut();
     window.location.href = 'login.html';
   }
-  function getPermittedProjects(profile, allProjects) { if (['admin','super_admin'].includes(profile.role)) return allProjects; return allProjects.filter(p => (profile.projects||[]).includes(p.id)); }
-  function canAccessProject(profile, projectId) { if (['admin','super_admin'].includes(profile.role)) return true; return (profile.projects||[]).includes(projectId); }
+  // Roles that see ALL projects (not just assigned)
+  const _ALL_PROJECT_ROLES = ['admin','super_admin','specialist'];
+  function getPermittedProjects(profile, allProjects) { if (_ALL_PROJECT_ROLES.includes(profile.role)) return allProjects; return allProjects.filter(p => (profile.projects||[]).includes(p.id)); }
+  // Specialist can VIEW all projects but can only EDIT assigned ones — editing checks use profile.projects
+  function canAccessProject(profile, projectId) { if (_ALL_PROJECT_ROLES.includes(profile.role)) return true; return (profile.projects||[]).includes(projectId); }
   function isAdmin(p) { return ['admin','super_admin'].includes(p?.role); }
   function isSuperAdmin(p) { return p?.role === 'super_admin'; }
   function isViewer(p) { return p?.role === 'viewer'; }
-  return { requireLogin, requireAdmin, logout, getPermittedProjects, canAccessProject, isAdmin, isSuperAdmin, isViewer };
+  function isSpecialist(p) { return p?.role === 'specialist'; }
+  function isManager(p) { return p?.role === 'manager'; }
+  // Roles whose WP submissions auto-approve (skip pending_review)
+  function isAutoApprove(p) { return ['super_admin','admin','specialist','manager'].includes(p?.role); }
+  return { requireLogin, requireAdmin, logout, getPermittedProjects, canAccessProject, isAdmin, isSuperAdmin, isViewer, isSpecialist, isManager, isAutoApprove };
 })();

@@ -578,7 +578,8 @@
     }
 
     // WP data cache — stale-while-revalidate (5-min TTL)
-    const isAdminUser = AppAuth.isAdmin(profile);
+    // Specialist also loads all WPs (cross-project visibility)
+    const _seesAllWPs = ['admin','super_admin','specialist'].includes(profile.role);
     const _WP_CACHE_KEY = `wpm_wps_idx_${profile.id}`;
     const _WP_CACHE_TTL = 5 * 60 * 1000;
     let _cachedEntry = null;
@@ -589,7 +590,7 @@
     const [allProjectsRaw, freshWPs] = await Promise.all([
       WPDb.getProjects(),
       _cacheValid ? Promise.resolve(null)
-        : isAdminUser ? WPDb.getAllApprovedWPs()
+        : _seesAllWPs ? WPDb.getAllApprovedWPs()
         : Promise.resolve(null),
     ]);
     const permitted = AppAuth.getPermittedProjects(profile, allProjectsRaw);

@@ -346,26 +346,29 @@ async function showProjectPicker(profile) {
   document.getElementById('projectPicker').classList.add('visible');
 
   const name = profile.name || profile.email.split('@')[0];
-  const roleLabel = profile.role === 'super_admin' ? 'Super Admin' : profile.role === 'admin' ? 'Admin' : 'User';
+  const _roleLabelMap = { super_admin:'Super Admin', admin:'Admin', specialist:'Specialist', manager:'Manager', viewer:'Viewer' };
+  const roleLabel = _roleLabelMap[profile.role] || 'User';
   const roleClass = profile.role === 'super_admin' ? 'role-super' : profile.role === 'admin' ? 'role-admin' : 'role-user';
   document.getElementById('pickerGreeting').innerHTML =
     `Hi <strong>${name}</strong>! <span class="role-badge ${roleClass}">${roleLabel}</span><br>Choose which dashboard to open.`;
 
   const isAdmin = ['admin', 'super_admin'].includes(profile.role);
+  // Specialist can see all projects (read-only cross-project visibility)
+  const seesAllProjects = ['admin', 'super_admin', 'specialist'].includes(profile.role);
   const { data: projects } = await sb.from('projects').select('id,name,location').order('id');
-  const visible = isAdmin ? (projects || []) : (projects || []).filter(p => (profile.projects || []).includes(p.id));
+  const visible = seesAllProjects ? (projects || []) : (projects || []).filter(p => (profile.projects || []).includes(p.id));
 
   allItems = [];
-  // Portfolio overview: admins always; users get it when assigned to 2+ projects
-  const showPortfolio = isAdmin || visible.length >= 2;
+  // Portfolio overview: all-project roles always; others when assigned to 2+ projects
+  const showPortfolio = seesAllProjects || visible.length >= 2;
   if (showPortfolio) {
-    const sub = isAdmin ? 'All projects & work packages' : `Your ${visible.length} assigned projects`;
+    const sub = seesAllProjects ? 'All projects & work packages' : `Your ${visible.length} assigned projects`;
     allItems.push({ value: 'consolidated', id: 'ALL PROJECTS', name: 'Portfolio — Consolidated View', sub, consolidated: true });
   }
   visible.forEach(p => allItems.push({ value: p.id, id: p.id, name: p.name || p.id, sub: p.location || '', consolidated: false }));
 
   // User with exactly 1 project: skip picker, go directly
-  if (!isAdmin && visible.length === 1) {
+  if (!seesAllProjects && visible.length === 1) {
     window.location.href = `project.html?id=${visible[0].id}`;
     return;
   }

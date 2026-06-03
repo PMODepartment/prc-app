@@ -137,18 +137,30 @@ ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin',
 
 ## Role-Based Access Control
 
-| Role | Can Do |
-|---|---|
-| `viewer` | View WPs on assigned projects — no costs, no add/edit, no template download |
-| `user` | View/add WPs on assigned projects; WPs go to `pending_review` |
-| `admin` | Approve/reject WPs; manage users; create/archive projects |
-| `super_admin` | Full access to all projects + all admin features |
+| Role | Projects Visible | Edit WPs | Auto-Approve | Admin Rights | Cost Data |
+|---|---|---|---|---|---|
+| `super_admin` | All | All | ✅ | Full | ✅ |
+| `admin` | All | All | ✅ | Users + Projects | ✅ |
+| `specialist` | All (read) | Assigned only | ✅ | None | ✅ |
+| `manager` | Assigned | Assigned | ✅ | None | ✅ |
+| `user` | Assigned | Assigned | ❌ → pending_review | None | ✅ |
+| `viewer` | Assigned | None | — | None | ❌ |
+
+**Auto-approve roles** (`AppAuth.isAutoApprove(profile)`): `super_admin`, `admin`, `specialist`, `manager` — WPs save directly as `approved`; no `pending_review` step.
+
+**Specialist** sees all projects in login picker and `index.html` (same as admin) but `canAccessProject()` still limits editing to `profile.projects`. Uses `getAllApprovedWPs()` (single query, no N+1).
 
 **Viewer restrictions** (`body.viewer-mode` + `window.__isViewer`): cost KPIs hidden, Budget tab hidden, Financial WP List tab hidden, cost columns excluded via `_getActiveCols()`/`getActiveCols()`, Add WP + Edit buttons hidden, Tools section hidden, `wp-form.html` redirects immediately.
 
-**Admin CSV/form submit:** auto-approves (`WPDb.approveWP()` called after `WPDb.submitWP()`).
+**Admin role restriction**: admins cannot assign `super_admin` or `specialist` roles to other users (only `super_admin` can).
 
-Both approval modal (`modalRoleSelect`) and Change Role modal (`crm-role-select`) in `admin.html` include `viewer` as an option.
+**DB constraint** (run in Supabase SQL Editor):
+```sql
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin','admin','specialist','manager','user','viewer'));
+```
+
+Both approval modal (`modalRoleSelect`) and Change Role modal (`crm-role-select`) in `admin.html` include all 6 roles.
 
 ---
 

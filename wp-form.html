@@ -1122,9 +1122,9 @@ AppAuth.requireLogin(async (user, profile) => {
     btn.disabled = true; spinner.style.display = 'flex';
 
     try {
-      const isAdmin = ['admin','super_admin'].includes(userProfile.role);
+      const autoApprove = AppAuth.isAutoApprove(userProfile);
       if (editId && existingWP) {
-        if (isAdmin) {
+        if (autoApprove) {
           await WPDb.updateWPDirect(editId, data);
           document.getElementById('success-text').textContent = 'Work package updated.';
         } else {
@@ -1132,7 +1132,7 @@ AppAuth.requireLogin(async (user, profile) => {
           document.getElementById('success-text').textContent = 'Update submitted for review.';
         }
       } else {
-        if (isAdmin) {
+        if (autoApprove) {
           const newWP = await WPDb.submitWP(data, userProfile);
           if (newWP?.id) await WPDb.approveWP(newWP.id);
           document.getElementById('success-text').textContent = 'Work package saved and approved.';
@@ -1292,7 +1292,7 @@ AppAuth.requireLogin(async (user, profile) => {
         };
         wpData.project_id = pid;
         const newWP = await WPDb.submitWP(wpData, { id: userId });
-        if (['admin','super_admin'].includes(role) && newWP?.id) await WPDb.approveWP(newWP.id);
+        if (AppAuth.isAutoApprove({role}) && newWP?.id) await WPDb.approveWP(newWP.id);
       }
       document.getElementById('wp-csv-status').textContent = `✓ Imported ${rows.length} work package(s) successfully`;
       setTimeout(() => { closeWPImportModal(); location.href = 'project.html?id=' + pid; }, 1400);
