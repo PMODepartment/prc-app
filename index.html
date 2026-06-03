@@ -446,7 +446,8 @@
               </div>
             </div>
             <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-              <table class="data-table" id="wp-mon-table" style="font-size:11px">
+              <table class="data-table" id="wp-mon-table" style="font-size:11px;table-layout:fixed">
+                <colgroup id="wp-mon-colgroup"></colgroup>
                 <thead><tr id="wp-mon-head-row"></tr></thead>
                 <tbody id="wp-mon-body"></tbody>
               </table>
@@ -1392,6 +1393,10 @@
       let _sl = 0;
       const _stickyLeft = {};
       cols.forEach(c => { if (c.sticky) { _stickyLeft[c.key] = _sl; _sl += c.w; } });
+
+      // Update colgroup — forces fixed column widths so sticky left offsets match rendered widths
+      const cg = document.getElementById('wp-mon-colgroup');
+      if (cg) cg.innerHTML = cols.map(c => `<col style="width:${c.w}px;min-width:${c.w}px">`).join('');
 
       // Update thead — sortable columns
       const headRow = document.getElementById('wp-mon-head-row');
