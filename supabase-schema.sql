@@ -194,76 +194,136 @@ create trigger trg_projects_updated before update on projects
 alter table projects       enable row level security;
 alter table users          enable row level security;
 alter table work_packages  enable row level security;
+alter table claims         enable row level security;
 
--- Projects: visible to all authenticated users who are approved
-create policy "approved users can read projects" on projects
-  for select using (
-    exists (select 1 from users u where u.id = auth.uid() and u.status = 'approved')
+-- ── SECURITY DEFINER helpers (avoids circular self-reference in user policies) ──
+-- These run as the function owner (postgres) and bypass RLS, safe to call from policies.
+create or replace function public.get_my_role()
+returns text language sql security definer stable
+set search_path = public as $$
+  select role from public.users where id = auth.uid() limit 1;
+$$;
+
+create or replace function public.get_my_status()
+returns text language sql security definer stable
+set search_path = public as $$
+  select status from public.users where id = auth.uid() limit 1;
+$$;
+
+create or replace function public.get_my_projects()
+returns text[] language sql security definer stable
+set search_path = public as $$
+  select coalesce(projects, '{}') from public.users where id = auth.uid() limit 1;
+$$;
+
+-- ── PROJECTS ──────────────────────────────────────────────────
+-- Any approved authenticated user can read projects
+create policy "projects_select" on projects
+  for select to authenticated
+  using (public.get_my_status() = 'approved');
+
+-- super_admin and admin can create/update/delete projects
+create policy "projects_write" on projects
+  for all to authenticated
+  using (public.get_my_role() in ('super_admin','admin'))
+  with check (public.get_my_role() in ('super_admin','admin'));
+
+-- ── USERS ─────────────────────────────────────────────────────
+-- Any authenticated user can read all users (needed for dropdowns, user management)
+create policy "users_select" on users
+  for select to authenticated
+  using (true);
+
+-- Own row insert only (registration flow)
+create policy "users_insert" on users
+  for insert to authenticated
+  with check (id = auth.uid());
+
+-- Own row update (last_login etc.) OR admin/super_admin (approvals, role changes)
+create policy "users_update" on users
+  for update to authenticated
+  using (
+    id = auth.uid()
+    or public.get_my_role() in ('super_admin','admin')
   );
 
--- Projects: only super_admin can insert/update/delete
-create policy "super_admin manages projects" on projects
-  for all using (
-    exists (select 1 from users u where u.id = auth.uid() and u.role = 'super_admin')
-  );
-
--- Users: users can read their own row; admins can read all
-create policy "users read own row" on users
-  for select using (id = auth.uid());
-
-create policy "admins read all users" on users
-  for select using (
-    exists (select 1 from users u where u.id = auth.uid() and u.role in ('super_admin','admin'))
-  );
-
--- Users: super_admin can update any user (role changes, approvals)
-create policy "super_admin manages users" on users
-  for update using (
-    exists (select 1 from users u where u.id = auth.uid() and u.role = 'super_admin')
-  );
-
--- Users: admin can approve/reject users for their assigned projects
-create policy "admin approves pending users" on users
-  for update using (
-    exists (select 1 from users u where u.id = auth.uid() and u.role in ('super_admin','admin'))
-  );
-
--- Users: anyone can insert their own row on registration
-create policy "users can register" on users
-  for insert with check (id = auth.uid());
-
--- Work packages: readable by assigned-project users
-create policy "users read assigned project wps" on work_packages
-  for select using (
-    exists (
-      select 1 from users u
-      where u.id = auth.uid()
-        and u.status = 'approved'
-        and (
-          u.role in ('super_admin','admin')
-          or project_id = any(u.projects)
-        )
+-- ── WORK PACKAGES ─────────────────────────────────────────────
+-- SELECT: super_admin/admin/specialist see all; others see only assigned projects
+create policy "wp_select" on work_packages
+  for select to authenticated
+  using (
+    public.get_my_status() = 'approved'
+    and (
+      public.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(public.get_my_projects())
     )
   );
 
--- Work packages: writable by super_admin and admin (their projects) and assigned officers
-create policy "super_admin writes all wps" on work_packages
-  for all using (
-    exists (select 1 from users u where u.id = auth.uid() and u.role = 'super_admin')
-  );
-
-create policy "admin writes assigned project wps" on work_packages
-  for all using (
-    exists (
-      select 1 from users u
-      where u.id = auth.uid()
-        and u.role = 'admin'
-        and project_id = any(u.projects)
+-- INSERT: any approved non-viewer can submit WPs for their assigned projects
+create policy "wp_insert" on work_packages
+  for insert to authenticated
+  with check (
+    public.get_my_status() = 'approved'
+    and public.get_my_role() <> 'viewer'
+    and (
+      public.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(public.get_my_projects())
     )
   );
 
-create policy "officer writes assigned wps" on work_packages
-  for update using (assigned_officer = auth.uid());
+-- UPDATE: approved non-viewers for their project scope
+create policy "wp_update" on work_packages
+  for update to authenticated
+  using (
+    public.get_my_status() = 'approved'
+    and public.get_my_role() <> 'viewer'
+    and (
+      public.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(public.get_my_projects())
+    )
+  );
+
+-- DELETE: super_admin only
+create policy "wp_delete" on work_packages
+  for delete to authenticated
+  using (public.get_my_role() = 'super_admin');
+
+-- ── CLAIMS ────────────────────────────────────────────────────
+create policy "claims_select" on claims
+  for select to authenticated
+  using (
+    public.get_my_status() = 'approved'
+    and (
+      public.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(public.get_my_projects())
+    )
+  );
+
+create policy "claims_insert" on claims
+  for insert to authenticated
+  with check (
+    public.get_my_status() = 'approved'
+    and public.get_my_role() <> 'viewer'
+    and (
+      public.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(public.get_my_projects())
+    )
+  );
+
+create policy "claims_update" on claims
+  for update to authenticated
+  using (
+    public.get_my_status() = 'approved'
+    and public.get_my_role() <> 'viewer'
+    and (
+      public.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(public.get_my_projects())
+    )
+  );
+
+create policy "claims_delete" on claims
+  for delete to authenticated
+  using (public.get_my_role() = 'super_admin');
 
 -- ── SEED: insert the AVR101 project ──────────────────────────
 insert into projects (id, name, location, description, status)
