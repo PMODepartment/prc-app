@@ -1,43 +1,44 @@
-﻿# Megawide EPC Procurement â€” WPM Dashboard
+# Megawide EPC Procurement — WPM Dashboard
 
 ## Project Overview
 Work Package Management (WPM) Dashboard for Megawide Construction Corporation EPC projects. Tracks procurement work packages, award status, budgets, and contractors across multiple projects.
 
-**Live URL:** https://pmodepartment.github.io/prc-app (login: `/login.html`) â€” migrated from Vercel 2026-06-01
+**Live URL:** https://pmodepartment.github.io/prc-app (login: `/login.html`)
 **Stack:** Vanilla HTML/CSS/JS (no build step) + Supabase (PostgreSQL + Auth) + GitHub Pages hosting
+**GitHub:** https://github.com/PMODepartment/prc-app
 
 ---
 
 ## Architecture
 
-### No build step â€” edit files directly, push to GitHub, GitHub Pages auto-deploys (~1â€“2 min).
+No build step — edit files directly, push to GitHub, GitHub Pages auto-deploys (~1–2 min).
 
 ### Key Files
 | File | Purpose |
 |---|---|
-| `assets/js/auth.js` | Supabase auth wrapper â€” `AppAuth.requireLogin()`, `AppAuth.requireAdmin()`, `getSB()`, profile cache |
-| `assets/js/db.js` | All DB operations via `WPDb.*` â€” also `computeStats()`, `Fmt.*`, `renderUserBar()` |
-| `assets/js/ui.js` | Shared UI helpers â€” sidebar init, modals, toast, hamburger menu, iOS pinch-zoom prevention |
+| `assets/js/auth.js` | Supabase auth wrapper — `AppAuth.requireLogin()`, `AppAuth.requireAdmin()`, `getSB()`, profile cache |
+| `assets/js/db.js` | All DB operations via `WPDb.*` — also `computeStats()`, `Fmt.*`, `renderUserBar()` |
+| `assets/js/ui.js` | Shared UI helpers — sidebar init, modals, toast, hamburger menu, iOS pinch-zoom prevention |
 | `assets/css/dashboard.css` | Global styles, CSS variables, responsive breakpoints, view-tabs, mobile fixes |
 | `supabase-schema.sql` | Full DB schema for reference |
 
-> `assets/js/` files are canonical. Root-level copies (`auth.js`, `db.js`, `ui.js`) exist but are **not referenced by any page** â€” do not edit them.
+> `assets/js/` files are canonical. Root-level copies (`auth.js`, `db.js`, `ui.js`) are **not referenced by any page** — do not edit them.
 
 ### Pages
 | File | Auth | Purpose |
 |---|---|---|
-| `login.html` | public | Sign-in + **Step 2 project picker** (shown after auth). Picker shows Portfolio Overview card (admins), project list, and **Add New Project** dashed button (admin/super_admin only). New project modal uses raw `sb.from('projects').insert()` â€” no `WPDb` on this page. On create â†’ navigates to `project.html?id=<newId>`. |
+| `login.html` | public | Sign-in + Step 2 project picker. Shows Portfolio Overview card (admins), project list, Add New Project (admin/super_admin). On create → `project.html?id=<newId>`. |
 | `register.html` | public | Self-registration (creates `pending` user) |
 | `pending.html` | public | Shown to unapproved users |
-| `forgot-password.html` | public | Password reset |
-| `project-selector.html` | user | Standalone project picker page â€” **not linked from anywhere in the app**. The real project selection happens inside `login.html` Step 2 picker. This file exists but is unused. |
-| `index.html` | user | Portfolio Overview â€” consolidated dashboard with 7 tabs (Overview, Dashboard, Backlog, Budget, Schedule, Works, WP List) |
-| `project.html` | user | Single project dashboard â€” tabs: Overview, Dashboard, Backlog, WP List |
+| `forgot-password.html` | public | Password reset — `redirectTo` points to `/prc-app/login.html` |
+| `index.html` | user | Portfolio Overview — consolidated dashboard, 7 tabs |
+| `project.html` | user | Single project dashboard — 4 tabs |
 | `wp-form.html` | user | Add / edit work package |
-| `claim-form.html` | user | Add / edit claim or change order (`?section=change-order` for CO mode) â€” hidden feature |
-| `my-wps.html` | user | Officer's WP list |
 | `review.html` | admin | Approve / reject pending WPs |
 | `admin.html` | admin | User management + project management |
+| `claim-form.html` | user | Add / edit claim or CO — **hidden feature, not yet active** |
+| `my-wps.html` | user | Officer's WP list |
+| `project-selector.html` | user | Standalone picker — **unused, not linked** |
 
 ---
 
@@ -46,335 +47,54 @@ Work Package Management (WPM) Dashboard for Megawide Construction Corporation EP
 **URL:** `https://cayjeqeleenizbdzrums.supabase.co`
 
 ### Tables
-- **`projects`** â€” `id` (text PK e.g. 'AVR101'), name, location, status, budget_bcb, start_date, end_date
-- **`users`** â€” `id` (UUID FK â†’ auth.users), email, role (`super_admin|admin|user|viewer`), status (`pending|approved|rejected`), projects (text[]), last_login (timestamptz). Role constraint: `CHECK (role IN ('super_admin','admin','user','viewer'))` â€” run `ALTER TABLE users DROP CONSTRAINT users_role_check; ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin','admin','user','viewer'));` if viewer saves fail.
-- **`work_packages`** â€” all WP fields; `review_status` (`pending_review|approved|rejected`). **Generated columns** (cannot INSERT into): `total_awarded` (= `awarded_cost + additionals`), `awarding_lead_time` (= `actual_awarding_date - awarding_date`), `variance` (= `approved_budget_bcb - total_awarded`). Insert into `awarded_cost` instead of `total_awarded`. Key columns added via migration: `works`, `scope`, `type_of_service`, `actual_delivery`, `surety_bond`, `performance_bond`, `warranty_bond`, `payment_terms_days`, `dp_percent`, `dp_terms`, `dp_release_date`, `dp_amount`, `retention_percent`, `retention_amount`, `approver_name`, `approval_date`, `submittal_document_type`, `charging_type`, `contract_package_no`, `co_description`.
-- **`claims`** â€” `id`, `project_id`, `claim_no`, `claim_type` (`Extension of Time (EOT)|Material Escalation|Labor Escalation|Change Order`), `party` (`Client|Vendor`), `description`, `wp_no`, `contractor`, `date_filed`, `amount_claimed`, `basis`, `status` (`Draft|Filed|Under Review|Approved|Partially Approved|Rejected|Withdrawn`), `approved_amount`, `date_resolved`, `review_status` (`pending_review|approved|rejected`), `review_notes`, `remarks`, `submitted_by` (UUID FK â†’ auth.users), `created_at`, `updated_at`
+- **`projects`** — `id` (text PK e.g. 'AVR101'), name, location, status, budget_bcb, start_date, end_date
+- **`users`** — `id` (UUID FK → auth.users), name, email, role (`super_admin|admin|user|viewer`), status (`pending|approved|rejected`), projects (text[]), last_login
+- **`work_packages`** — all WP fields. **Generated columns (never INSERT into):** `total_awarded` (= `awarded_cost + additionals`), `awarding_lead_time` (= `actual_awarding_date - awarding_date`), `variance` (= `approved_budget_bcb - total_awarded`). Use `awarded_cost` and `lead_time` instead. `unmap()` in `db.js` strips all three automatically.
+- **`claims`** — `id`, `project_id`, `claim_no`, `claim_type`, `party` (`Client|Vendor`), `description`, `wp_no`, `contractor`, `date_filed`, `amount_claimed`, `basis`, `status`, `approved_amount`, `date_resolved`, `review_status`, `review_notes`, `remarks`, `submitted_by`
 
 ### WPDb API (db.js)
 ```js
-WPDb.getProjects()                          // all projects
-WPDb.getProject(id)                         // single project
-WPDb.createProject(data)                    // new project
+WPDb.getProjects()                         // all projects
+WPDb.getProject(id)
+WPDb.createProject(data)
 WPDb.updateProject(id, data)
-WPDb.archiveProject(id)                     // sets status='archived'
+WPDb.archiveProject(id)                    // sets status='archived'
 WPDb.unarchiveProject(id)
-WPDb.deleteProject(id)                      // also deletes all WPs
+WPDb.deleteProject(id)                     // also deletes all WPs
 
-WPDb.getApprovedWPs(pid)                    // approved WPs for one project
-WPDb.getAllApprovedWPs()                    // all approved WPs across all projects (single query)
-WPDb.getApprovedWPsForProjects(ids)         // approved WPs for array of project IDs â€” single .in() query; used by consolidated dashboard to avoid N+1
-WPDb.getAllWPs(pid)                         // all WPs regardless of status
-WPDb.getPendingWPs()                        // pending_review WPs (admin)
-WPDb.submitWP(data, user)                   // inserts with review_status='pending_review'
-WPDb.updateWP(id, data)                     // update (resets to pending_review)
-WPDb.updateWPDirect(id, data)               // update without status change
+WPDb.getApprovedWPs(pid)                   // approved WPs for one project
+WPDb.getAllApprovedWPs()                   // all approved WPs (single query)
+WPDb.getApprovedWPsForProjects(ids)        // approved WPs for array of IDs — avoids N+1
+WPDb.getAllWPs(pid)                        // all WPs regardless of status
+WPDb.getPendingWPs()                       // pending_review WPs (admin)
+WPDb.submitWP(data, user)                  // inserts with review_status='pending_review'; throws on error
+WPDb.updateWP(id, data)                    // update (resets to pending_review); throws on error
+WPDb.updateWPDirect(id, data)             // update without status change; throws on error
 WPDb.approveWP(id)
 WPDb.rejectWP(id, _, reason)
 WPDb.getAllUsers()
 WPDb.updateUser(id, updates)
-WPDb.updateLastLogin(userId)                // writes current timestamp to users.last_login
+WPDb.updateLastLogin(userId)
 ```
 
 ### Auth Flow
-1. `getSB()` â€” returns `window.__sb` (Supabase client created synchronously from UMD bundle on page load)
-2. `AppAuth.requireLogin(cb)` â€” checks session â†’ loads profile from **sessionStorage cache** if available, otherwise fetches from `users` table and caches â†’ checks `status === 'approved'` â†’ calls `WPDb.updateLastLogin()` â†’ calls cb(user, profile)
-3. `AppAuth.requireAdmin(cb)` â€” wraps `requireLogin`, additionally requires role in `['admin', 'super_admin']`
-4. `AppAuth.logout()` â€” clears `wpm_prof_*` sessionStorage keys, signs out, redirects to login
-5. Role stored in `window.__wpmRole`, profile in `window.__profile`, session in `window.__session`
+1. `getSB()` — returns `window.__sb` (Supabase client, UMD bundle, created synchronously on page load)
+2. `AppAuth.requireLogin(cb)` — checks session → loads profile from `sessionStorage` cache (`wpm_prof_{userId}`) or fetches from DB → checks `status === 'approved'` → calls cb(user, profile)
+3. `AppAuth.requireAdmin(cb)` — wraps `requireLogin`, requires role in `['admin', 'super_admin']`
+4. `AppAuth.logout()` — clears `wpm_prof_*` sessionStorage keys, signs out, redirects to login
+5. Role in `window.__wpmRole`, profile in `window.__profile`
 
-**Profile cache:** Stored in `sessionStorage` under key `wpm_prof_{userId}`. Avoids a DB round-trip on every page navigation within the same tab session. Cleared on logout. Safe because sessionStorage is per-tab and clears when the tab closes.
-
-### Supabase Email / Auth Settings
-- **Email confirmation is disabled** â€” users register and go straight to `pending` status for admin approval; no email verification step required
-- **Free tier cold start:** Supabase free tier pauses projects after 7 days of inactivity, causing 5â€“30s cold start. Fix: use UptimeRobot to ping the project URL every 3â€“4 days, or upgrade to Supabase Pro ($25/mo)
-- **Email rate limit:** Free tier sends max ~3 auth emails/hour. For password reset reliability, configure a custom SMTP provider (Resend, Brevo, SendGrid) under Project Settings â†’ Auth â†’ SMTP
+### Supabase Settings
+- **Email confirmation disabled** — users go straight to `pending` for admin approval
+- **Free tier cold start:** Pauses after 7 days inactivity → 5–30s delay. Use UptimeRobot (ping every 3–4 days) to prevent.
+- **Email rate limit:** ~3 auth emails/hour on free tier. Use custom SMTP (Resend/Brevo) for reliability.
 
 ---
 
-## Role-Based Access Control
+## DB Migrations — Run in Supabase SQL Editor (all IF NOT EXISTS, safe to re-run)
 
-| Role | Can Do |
-|---|---|
-| `viewer` | View WPs on assigned projects â€” **no costs visible**, cannot add/edit WPs, no template download |
-| `user` | View/add WPs on assigned projects; WPs go to `pending_review` |
-| `admin` | Approve/reject WPs; manage users; create/archive projects on assigned projects |
-| `super_admin` | Full access to all projects + all admin features |
-
-**Viewer role in admin.html:** Both the approval modal (`modalRoleSelect`) and the Change Role modal (`crm-role-select`) include `viewer` as the first option. The viewer role constraint is live in the DB â€” see migration in Known Issues #1.
-
-**Viewer role restrictions** (`body.viewer-mode` CSS class + `window.__isViewer` flag):
-- Cost KPI group hidden in Overview tab (both dashboards)
-- Budget tab hidden entirely (index.html)
-- Financial view tab hidden in WP List (both dashboards)
-- Cost columns excluded from all WP List views via `_getActiveCols()` / `getActiveCols()` column key filter
-- Budget column hidden in backlog tables
-- "Add Work Package" sidebar link hidden; Edit buttons hidden in WP List
-- "Download Template" / Tools sidebar section (`#sidebar-tools`) hidden
-- `wp-form.html` redirects viewers back to project page immediately on load
-
-- Admins and super_admins see all projects; users/viewers see only projects in their `profile.projects[]` array
-- When admin submits a WP via CSV import or form, it auto-approves (`WPDb.approveWP()` called after `WPDb.submitWP()`)
-- Project assignment is per-user, stored as `text[]` in `users.projects`
-
----
-
-## Navigation & Sidebar
-
-### Navigation Context (`sessionStorage`)
-- Key: `wpm_nav_ctx` â€” stores either a project ID (e.g. `'AVR101'`) or `'consolidated'`
-- Set by `project.html` (to project ID) and `index.html` (to `'consolidated'`)
-- Used by `admin.html` and `review.html` to show context-aware sidebar (back link vs full project list)
-
-### Sidebar Structure per Page
-
-**`project.html`**
-```
-Current Project
-  â””â”€ [project name] (active)
-
-Work Packages
-  â”œâ”€ Add Work Package
-  â””â”€ Review WPs (admin only, with pending badge)
-
-Claims & Change Order Register    â† HIDDEN (style="display:none") â€” not yet active
-  â”œâ”€ Add Claim
-  â”œâ”€ Add Change Order
-  â””â”€ View Register
-
-Tools
-  â””â”€ Download Template â†’ opens picker modal
-
-Admin (admin only)
-  â”œâ”€ Portfolio Overview (â†’ index.html)
-  â”œâ”€ User Management (â†’ admin.html)
-  â”œâ”€ Pinned Projects
-  â””â”€ Recent Projects
-```
-
-**`admin.html`** â€” consolidated context (wpm_nav_ctx === 'consolidated')
-```
-Projects
-  â”œâ”€ [searchable project list]
-  â””â”€ New Project
-
-Admin
-  â”œâ”€ User Management (active)
-  â””â”€ Portfolio Overview (â†’ index.html)
-```
-
-**`admin.html`** â€” project context (wpm_nav_ctx = project ID)
-```
-Current Project
-  â””â”€ Back to [Project Name]
-
-Admin
-  â”œâ”€ User Management (active)
-  â””â”€ Portfolio Overview (â†’ index.html)
-```
-
-**Key rules:**
-- "Add Work Package" must NOT appear in `admin.html` â€” belongs only in `project.html`
-- `admin.html` uses plain project links (no pin/star buttons)
-- `project.html` uses `SidebarPrefs.projectLink()` with pin/star support
-- `review.html` uses `SidebarPrefs.projectLink()` with custom href parameter
-- `review.html` sidebar always shows "Add Work Package" link above "Review WPs"; href auto-updates to `wp-form.html?project={id}` when viewing a specific project
-- The separate "Overview" section was removed from `admin.html` â€” "Portfolio Overview" now lives under the Admin section in both contexts
-
-### SidebarPrefs (ui.js)
-- Pins stored in `localStorage` key `wpm_sidebar_{userId}`
-- `SidebarPrefs.projectLink(userId, project, extra, href)` â€” renders a nav-item with star toggle; optional `href` param overrides default `project.html?id=`
-- `window.__sidebarRefresh` â€” callback registered by each page to re-render sidebar after pin toggle
-
----
-
-## Favicon
-
-All HTML pages include `<link rel="icon" type="image/png" href="assets/img/favicon.png"/>` in `<head>`. File: `assets/img/favicon.png`.
-
----
-
-## Consolidated Dashboard (index.html)
-
-Seven-tab layout (Claims tab is **hidden**):
-
-| Tab | Content |
-|---|---|
-| **Overview** | Two KPI groups side-by-side (Cost Overview: 6 cards; Work Package Status: 6 cards) + project cards (cards/table toggle below) |
-| **Dashboard** | Period chart (Monthly/Quarterly toggle) + WP by Trade bar + WP by Status donut + backlog table (not-awarded) + Top 5 panels |
-| **Backlog** | Backlog table first (not-awarded, sorted most overdue) + aging chart + status donut + period chart (Quarterly/Monthly toggle) + submittal donut |
-| **Budget** | 6 KPI cost cards + budget-by-period chart (Monthly/Quarterly toggle) + budget-by-trade HBar chart + **Procurement Budget (BCB) and Awarded by Project** grouped bar chart + budget summary table by trade (IDX_TRADE_ORDER sorted) |
-| **Schedule** | Period chart (Monthly/Quarterly toggle) + WP by Trade bar + WP by Status donut + **collapsible** schedule summary table (project header row â†’ click to expand trade sub-rows) |
-| **Works** | Budget-by-period-per-trade stacked chart + Budget/Awarded/Count donuts by trade + **Procurement Budget (BCB) by Period per Scope** table (collapsible tradeâ†’works) + **Procurement Budget (BCB) and Awarded by Period per Scope** table |
-| **WP List** | Trade-grouped table with 5 **view tabs** (Overview / **Award** / Schedule / Submittals / **All**), each showing focused columns. Column order: Cost Code â†’ WP No. â†’ Works â†’ â€¦ (first 3 frozen/sticky). **Description column also frozen** in Award, Schedule, Submittals, and All tabs. **Trade column removed** â€” already shown in group header rows. +/âˆ’ collapse per trade group. **âˆ’ All** / **+ All** buttons. Virtual-items pagination. **Column headers clickable to sort** (â†‘â†“ indicator, red on active); sort resets on tab switch. `_WPC` column defs + `_WP_VIEWS` config + `_getActiveCols()` drive dynamic colgroup/thead/rows. `setWPListView(view)` switches tabs and re-renders. **Overview tab**: slim set (Project, Cost Code, WP No., Works, Description, Scope, Vendors, Status, Remarks). **All tab**: every column; cost cols hidden for viewers; hidden for viewers entirely. **WP detail slide-in panel** (`openWPDetail(w)` / `closeWPDetailModal()`): right-side drawer, full WP info. Opened by WP No. (red link) or scope "more" button. |
-| **Backlog** (tab) | Filter bar (Trade select, Sort-by select, Search) + **collapsible trade group headers** (same +/âˆ’ pattern) + backlog table + aging/status/period/submittal charts. `window.renderBlTable()` applies all active filters. `_blCollapseState` Map + `toggleBlGroup(trade)` handle collapse. |
-
-**KPI label renames (Budget tab):** "Cost to Complete" â†’ "Procurement Cost to Complete", "Est. at Completion" â†’ "Procurement Estimate at Completion"
-
-**Chart axis labels:** All money Y-axes now show `â‚± Million` axis title; count X-axes show `Count`. Panel titles no longer include `(â‚±M)` suffix.
-
-**IDX_TRADE_ORDER constant** (index.html `<script>`): Fixed trade order used for Budget table, Schedule sub-rows, and Works scope tables:
-```javascript
-const IDX_TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
-  'Architectural Works','Mechanical Works','Electrical Works','Auxiliary Works',
-  'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
-```
-
-**`Charts.budgetAwardedByProject(id, wps, projects)`** â€” new function in `charts.js`: grouped bar (Budget BCB vs Awarded) per project ID. Called in Budget tab as `Charts.budgetAwardedByProject('c-idx-bud-by-proj', wps, filt)`.
-
-**Data loading:** Single Supabase query using `WPDb.getAllApprovedWPs()` (admin) or `WPDb.getApprovedWPsForProjects(ids)` (user). **Do NOT revert to `Promise.all(permitted.map(p => WPDb.getApprovedWPs(p.id)))` â€” that causes N separate API calls (one per project), which is the main cause of slow mobile loading.**
-
-**Lazy rendering:** `_rendered` flags per tab â€” charts only render when a tab is first opened. Filter changes reset all flags so tabs re-render fresh on next view.
-
-**Read-only:** Consolidated view is read-only (no add/edit). Export button hidden on mobile. READ-ONLY badge hidden on mobile via `.topbar-badge-readonly { display: none }` â€” do NOT add `display:inline-flex` as inline style or the media query cannot override it.
-
----
-
-## Per-Project Dashboard (project.html)
-
-Tab order (left to right): **Overview â†’ Dashboard â†’ Backlog â†’ WP List**
-
-- **Overview**: Two KPI groups side-by-side (Cost Overview 6 cards / Work Package Status 6 cards). No charts, no monitoring table.
-- **Dashboard**: Period chart (Monthly/Quarterly toggle, `c-dash-period`) + WP by Trade (`c-dash-trade`) + WP by Status donut (`c-dash-status`) + backlog table (not-awarded, overdue-first) + Top 5 panels (`rank-value`, `rank-gains`, `rank-losses`)
-- **Backlog**: Filter bar (Trade select, Sort-by select, Search, Budget min/max) + backlog table (8 cols) + aging chart + status donut + period chart (Quarterly/Monthly toggle) + submittal donut. `renderBacklog()` applies all filters. KPI cards removed.
-- **WP List**: 4 view tabs (Overview / **Award** / Schedule / Submittals). Column order: Cost Code â†’ WP No. â†’ Works â†’ â€¦ (first 3 sticky with stacked `left` offsets). **Trade column removed** from all views â€” redundant with trade group headers. `WP_TABLE_VIEWS` config + `getActiveCols()` filter COLS by view. `setWPTableView(view)` switches view + re-renders. `_collapseState` Map, `_blCollapseState` Map (backlog). Backlog also has collapsible trade group headers. **Overview tab** slimmed: type_of_works, po_jo_count, po_jo_numbers removed (in detail panel). **WP detail slide-in panel** (`openWPDetail(w)` / `closeWPDetailModal()`): right-side drawer, full WP info. Opened by WP No. (red clickable) or scope "more" button.
-- Claims & Change Orders tab exists in HTML but is hidden (`style="display:none"`)
-
-### Lazy rendering flags (project.html)
-`_rendered = { overview, dashboard, backlog, table }` â€” set to `false` on filter change or data reload. `switchView` checks flag before calling render function.
-
----
-
-## Template Picker Modal (shared pattern across pages)
-
-A single "Download Template" button in the sidebar Tools section opens a picker modal with three styled cards:
-- **Work Packages** â€” active; downloads `WPM_Import_Template.csv` via `downloadCSVTemplate()`
-- **Claims** â€” **disabled** ("Coming soon"); greyed out, `cursor:not-allowed`, no onclick â€” pending Claims register completion
-- **Change Orders** â€” **disabled** ("Coming soon"); greyed out, `cursor:not-allowed`, no onclick â€” pending Claims register completion
-
-Present on: `project.html`, `wp-form.html`, `claim-form.html` (all use `#template-picker-modal`).
-
-`openTemplatePickerModal()` / `closeTemplatePickerModal()` â€” toggle `display:flex/none`.
-
----
-
-## Budget Input Formatting
-
-**Procurement Budget (BCB)** inputs (`f-budget` in wp-form.html, `np-budget` in admin.html, `ep-budget` in project.html) use `type="text" inputmode="numeric"` with comma formatting:
-- On **blur**: value is formatted with thousand separators via `toLocaleString('en-US')` (e.g. `274,900,000`)
-- On **focus**: commas are stripped so user can type/edit cleanly
-- All `parseFloat()` calls that read these fields strip commas first: `.replace(/,/g,'')`
-- `getNum(id)` in wp-form.html also strips commas before parsing
-
-**Global rename:** "Budget (BCB)" and "Budget BCB" â†’ **"Procurement Budget (BCB)"** across all UI labels in index.html, project.html, admin.html, review.html, wp-form.html. DB column names (`approved_budget_bcb`, `budget_bcb`) and standalone files are unchanged.
-
----
-
-## WP Form â€” Identity & Classification Field Order (wp-form.html)
-
-Current field order in the Identity & Classification section:
-1. Cost Code No.
-2. Trade / Discipline (cascading â€” triggers Works dropdown)
-3. Works (cascading dropdown â€” updates based on Trade; `id="f-works"`)
-4. Type (read-only â€” auto-fills "Service" or "Materials & Labor" from Works; `id="f-type"`)
-5. WP No.
-6. Work Package Description
-7. Scope of Work (`id="f-scope"`, textarea)
-8. Project
-9. Zone
-10. Detailed Description
-11. Type of Service
-12. Type of Procurement
-13. Type of Contract
-14. Proposed Vendors
-15. No. of PO/JO
-16. PO/JO Numbers
-
-### Approval Matrix (wp-form.html)
-
-Fields: **Responsible** (multi-select, `_msState.responsible`), **Approver** (single `<select id="f-approver">`), **Support** (multi-select, `_msState.support`). All populated from `WPDb.getAllUsers()` (approved users only, `.catch(()=>[])` fallback). **Approver dropdown shows only admin/super_admin users.** Multi-select uses a custom pill-dropdown: `toggleMs(field)`, `msClearAll(field)`, `getMsValues(field)`, `_setMsFromText(field,text)`, `_msPillRemove(field,uid)`. Display name uses `u.name` (the `name` column on the `users` table â€” confirmed present from admin.html usage). Values stored as comma-separated names in `responsible_team` / `approver` / `support_team` text columns. Mobile: dropdown uses `position:fixed` full-width. `db.js submitWP/updateWP/updateWPDirect` now throw on Supabase error so failures surface as visible error messages.
-
-**Budget & Contract section:** "Contractor / Supplier" label renamed to **"Vendor/s"** (`id="f-contractor"`).
-
-### Trade â†’ Works â†’ Type cascade (wp-form.html)
-
-`TRADE_WORKS` JS object maps each Trade to an array of `[works, type]` pairs. Defined at top of `<script>` block.
-
-Trade options: General Requirements, Site Works, Structural Works, Architectural Works, Mechanical Works, Electrical Works, Auxiliary Works, Plumbing Works, Fire Protection Works, Allied Services, Site Development Works.
-
-- `onTradeChange()` â€” repopulates `#f-works` dropdown and clears `#f-type`
-- `onWorksChange()` â€” sets `#f-type` to "Service" or "Materials & Labor"
-
-**DB columns needed (run migration):**
 ```sql
-ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS works text DEFAULT NULL;
-ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS type_of_works text DEFAULT NULL;
-ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS scope text DEFAULT NULL;
-ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS actual_delivery date DEFAULT NULL;
-```
-
-### Actual Delivery Date (Schedule section)
-`id="f-actual-delivery"` â€” added after Target Delivery Date. Optional; maps to `actual_delivery` DB column.
-
----
-
-## CSV Import (Work Packages)
-
-CSV import is in `wp-form.html` as a bulk import banner at the top of the content area.
-
-`downloadCSVTemplate()` — generates `WPM_Import_Template.csv` with headers + 2 example rows.
-
-**25-column header → DB column mapping (position-based, not name-based):**
-
-| # | CSV Header | DB Column | Notes |
-|---|---|---|---|
-| 0 | Cost Code No. | `cost_code` | |
-| 1 | Trade | `trade` | |
-| 2 | Works | `works` | |
-| 3 | WP No. | `wp_no` | required — row skipped if blank |
-| 4 | Work Package Description | `description` | |
-| 5 | Zone | `zone` | |
-| 6 | Scope of Work | `scope` | |
-| 7 | Charging Type | `charging_type` | Main Contract / Change Order |
-| 8 | Contract Package No. | `contract_package_no` | |
-| 9 | CO Description | `co_description` | |
-| 10 | Proposed Vendors | `proposed_vendors` | NOT `contractor` |
-| 11 | No. of PO/JO | `po_jo_count` | integer |
-| 12 | PO/JO Numbers | `po_jo_numbers` | |
-| 13 | Procurement Budget (BCB) (PHP) | `approved_budget_bcb` | |
-| 14 | Total Awarded (PHP) | `awarded_cost` | NOT `total_awarded` (GENERATED) |
-| 15 | Award Status | `award_status` | |
-| 16 | Procurement Status | `procurement_status` | default: Not Started |
-| 17 | Planned Award Date | `awarding_date` | MM/DD/YYYY or YYYY-MM-DD |
-| 18 | Actual Award Date | `actual_awarding_date` | |
-| 19 | Target Delivery Date | `target_delivery` | |
-| 20 | Actual Delivery Date | `actual_delivery` | |
-| 21 | Target Completion Date | `target_completion` | |
-| 22 | Target Installation Date | `target_installation` | |
-| 23 | Lead Time (Days) | `lead_time` | NOT `awarding_lead_time` (GENERATED) |
-| 24 | Remarks | `remarks` | |
-
-`importWPsFromCSV()` — parses the 25-column format, calls `WPDb.submitWP()` per row, then `WPDb.approveWP()` if admin/super_admin. Errors are surfaced in the import modal (submitWP throws on Supabase error).
-
-**Date parsing:** `new Date(value).toISOString().split('T')[0]` — accepts MM/DD/YYYY or YYYY-MM-DD.
-
-**⚠️ Generated columns — NEVER insert into:** `total_awarded`, `awarding_lead_time`, `variance`. The import uses `awarded_cost` and `lead_time` instead. `unmap()` in `db.js` strips all three as a final safety net.
----
-
-## Charging Field (wp-form.html)
-
-**Required** field on every Work Package (`charging_type` column in `work_packages`). Replaced the old optional "Claim / Change Order Tag". Set via dropdown in the Procurement Status section of `wp-form.html`.
-
-**Values:** `Main Contract` | `Change Order`
-
-- **Main Contract** â†’ shows "Contract Package Number" text input (`id="f-contract-package-no"`, `contract_package_no` DB column)
-- **Change Order** â†’ shows "Change Order Description" textarea (`id="f-co-description"`, `co_description` DB column)
-- `onChargingChange()` â€” shows/hides the conditional sub-fields
-- Validation in `submitForm()` prevents saving without selecting a charging type
-
-**All DB migrations — run entire block in Supabase SQL Editor (all use IF NOT EXISTS, safe to re-run):**
-```sql
--- Batch 1: WP form fields (already live)
+-- WP form fields
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS works text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS type_of_works text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS scope text DEFAULT NULL;
@@ -383,7 +103,7 @@ ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS type_of_service text DEFAULT 
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS charging_type text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS contract_package_no text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS co_description text DEFAULT NULL;
--- Batch 2: Bond / payment / retention (already live)
+-- Bond / payment / retention
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS surety_bond text DEFAULT 'No';
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS performance_bond text DEFAULT 'No';
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS warranty_bond text DEFAULT 'No';
@@ -397,8 +117,7 @@ ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS retention_amount numeric(18,2
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS approver_name text;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS approval_date date;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS submittal_document_type text;
--- Batch 3: columns in supabase-schema.sql missing from live DB
--- (approver caused error 2026-06-03; delivery_status caused error 2026-06-03)
+-- Columns missing from original live DB
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS approver text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS support_team text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS delivery_status text DEFAULT 'Not Awarded';
@@ -412,252 +131,281 @@ ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin','admin','user','viewer'));
 ```
 
-**Root cause of recurring "column not found" errors:** The live DB was created from an early version of supabase-schema.sql that lacked many columns. All subsequent columns require ALTER TABLE. Batch 3 covers all gaps confirmed or likely missing. Safe to re-run (IF NOT EXISTS).
-
-**Field mapping notes:**
-- `lead_time` (integer, editable) — user-entered planned lead time. `awarding_lead_time` is GENERATED (auto-computed) and stripped by `unmap()`.
-- `dp_percent` stored as decimal (0.20 = 20%). Form accepts % entry (user types "20") and divides by 100; edit mode multiplies by 100 to display.
+> The live DB was created from an early schema version. Any "column not found" error means a column needs to be added above — all statements are idempotent.
 
 ---
 
-## Claims & Change Orders Register (HIDDEN â€” independent feature, not yet active)
+## Role-Based Access Control
 
-The full Claims & Change Orders register is built but hidden everywhere. To re-enable when ready:
-- `project.html`: remove `style="display:none"` from the sidebar section and tab button (`data-view="claims-register"`)
-- `index.html`: remove `style="display:none"` from the Claims tab button
-- `template-picker-modal` in all three pages: restore active onclick and styling for Claims and Change Orders cards
+| Role | Can Do |
+|---|---|
+| `viewer` | View WPs on assigned projects — no costs, no add/edit, no template download |
+| `user` | View/add WPs on assigned projects; WPs go to `pending_review` |
+| `admin` | Approve/reject WPs; manage users; create/archive projects |
+| `super_admin` | Full access to all projects + all admin features |
 
-### Data Model
-Claims and Change Orders share the `claims` Supabase table, distinguished by `claim_type`:
-- `claim_type = 'Extension of Time (EOT)'`, `'Material Escalation'`, `'Labor Escalation'` â†’ Claims
-- `claim_type = 'Change Order'` â†’ Change Orders
+**Viewer restrictions** (`body.viewer-mode` + `window.__isViewer`): cost KPIs hidden, Budget tab hidden, Financial WP List tab hidden, cost columns excluded via `_getActiveCols()`/`getActiveCols()`, Add WP + Edit buttons hidden, Tools section hidden, `wp-form.html` redirects immediately.
 
-### claim-form.html
-- URL param `?section=change-order` switches to Change Order mode (`isCO = true`)
-- `?project=ID` pre-selects project; `?id=UUID` enters edit mode
-- Admin/super_admin: `review_status = 'approved'`, default `status = 'Filed'`
-- User: `review_status = 'pending_review'`, default `status = 'Draft'`
-- Sidebar shows Claims & Change Order Register section with Add Claim, Add Change Order, View Register
+**Admin CSV/form submit:** auto-approves (`WPDb.approveWP()` called after `WPDb.submitWP()`).
 
-### project.html â€” Claims & Change Orders tab (`view-claims-register`)
-- Single combined tab for both Claims and Change Orders
-- Admin actions per row: Edit, Approve (âœ“), Reject (âœ—), Delete
-- Users see Edit link only â€” edits re-queue as `pending_review`
-- `approveClaim(id)` / `rejectClaim(id, reason)` / `deleteClaim(id)` â€” shared helpers
+Both approval modal (`modalRoleSelect`) and Change Role modal (`crm-role-select`) in `admin.html` include `viewer` as an option.
+
+---
+
+## Navigation & Sidebar
+
+**Nav context** (`sessionStorage` key `wpm_nav_ctx`): stores project ID or `'consolidated'`. Set by `project.html` and `index.html`; read by `admin.html` and `review.html` for context-aware sidebar.
+
+### Sidebar per Page
+
+**`project.html`**
+```
+Current Project → [project name]
+Work Packages → Add Work Package | Review WPs (admin, pending badge)
+Claims & Change Order Register → HIDDEN (display:none)
+Tools → Download Template
+Admin (admin only) → Portfolio Overview | User Management | Pinned/Recent Projects
+```
+
+**`wp-form.html`**
+```
+Current Project → Back to [project]
+Work Packages → WP Form | Review WPs (admin)
+Navigation → Portfolio Overview
+Tools → Download Template
+Admin (admin only) → User Management
+```
+
+**`review.html`**
+```
+Overview → Portfolio Overview
+Current Project → Back to [project] (project context only)
+Projects → [list]
+Work Packages → Add Work Package | Review WPs (active)
+Admin → User Management
+```
+
+**`admin.html`** — consolidated context
+```
+Projects → [searchable list] | New Project
+Admin → User Management (active) | Portfolio Overview
+```
+
+**`admin.html`** — project context
+```
+Current Project → Back to [project]
+Admin → User Management (active) | Portfolio Overview
+```
+
+**Key rules:**
+- "Add Work Package" must NOT appear in `admin.html`
+- `admin.html` uses plain project links (no pin/star)
+- `project.html` and `review.html` use `SidebarPrefs.projectLink()`
+- `SidebarPrefs`: pins in `localStorage` key `wpm_sidebar_{userId}`; `window.__sidebarRefresh` callback re-renders after pin toggle
+
+---
+
+## Consolidated Dashboard (index.html)
+
+Single Supabase query: `getAllApprovedWPs()` (admin) or `getApprovedWPsForProjects(ids)` (user). **Never revert to per-project N+1 calls.**
+
+Lazy rendering: `_rendered` flags per tab — charts render on first open, reset on filter change.
+
+**Tabs** (Claims tab hidden):
+
+| Tab | Key content |
+|---|---|
+| Overview | Cost KPIs (6) + WP Status KPIs (6) + project cards/table |
+| Dashboard | Period chart + WP by Trade bar + WP by Status donut + backlog table + Top 5 panels |
+| Backlog | Backlog table + aging chart + status donut + period chart + submittal donut |
+| Budget | Cost KPIs + budget-by-period + budget-by-trade HBar + Budget vs Awarded by Project grouped bar + budget table by trade |
+| Schedule | Period chart + WP by Trade + WP by Status + collapsible schedule summary table |
+| Works | Stacked period chart + donuts by trade + collapsible BCB by Period per Scope table + BCB & Awarded by Period per Scope table |
+| WP List | Trade-grouped, 5 view tabs (Overview/Award/Schedule/Submittals/All), sortable headers, virtual pagination, slide-in detail panel |
+
+**IDX_TRADE_ORDER** (used for Budget, Schedule, Works tables):
+```js
+['General Requirements','Site Works','Structural Works','Architectural Works',
+ 'Mechanical Works','Electrical Works','Auxiliary Works','Plumbing Works',
+ 'Fire Protection Works','Allied Services','Site Development Works']
+```
+
+**WP List** (`index.html`): `_WPC` column defs + `_WP_VIEWS` + `_getActiveCols()`. `renderWPMonTable()` rebuilds colgroup/thead per view. `setWPListView(view)` switches + resets sort. `openWPDetail(w)` / `closeWPDetailModal()` — slide-in panel. All tab hidden for viewers.
+
+**Collapse pattern**: items[] built from trade groups (header always + rows only if expanded). `toggleTradeGroup` / `collapseAllTrades` / `expandAllTrades`. Works tab uses DOM-only toggle (`toggleWkTrade`, `toggleWkBudget`). Schedule tab uses `toggleSchRow`.
+
+**Project filter**: `_activeIds` Set; `toggleProjectPill` calls `renderAll()` immediately. Empty Set = "No projects selected" state (red label, empty charts).
+
+**READ-ONLY badge**: never add `display:inline-flex` as inline style — media query sets `display:none` and inline overrides it.
+
+---
+
+## Per-Project Dashboard (project.html)
+
+Tabs: Overview → Dashboard → Backlog → WP List
+
+- **Overview**: Cost KPIs (6) + WP Status KPIs (6). No charts.
+- **Dashboard**: Period chart + WP by Trade + WP by Status donut + backlog table + Top 5 panels
+- **Backlog**: Filter bar (Trade, Sort, Search, Budget min/max) + backlog table + aging/status/period/submittal charts. `renderBacklog()` applies filters. Collapsible trade groups.
+- **WP List**: 4 view tabs (Overview/Award/Schedule/Submittals). `WP_TABLE_VIEWS` + `getActiveCols()`. `setWPTableView(view)`. Collapsible trade groups. `openWPDetail(w)` slide-in panel.
+- Claims tab exists in HTML but hidden (`display:none`)
+
+`_rendered = { overview, dashboard, backlog, table }` — reset on filter change or data reload.
+
+---
+
+## WP Form (wp-form.html)
+
+### Sections & Key Fields
+1. **Identity & Classification**: Cost Code, Trade → Works → Type (cascade), WP No., Description, Scope, Project, Zone, Detailed Description, Type of Service, Type of Procurement, Type of Contract, Proposed Vendors, No. of PO/JO, PO/JO Numbers
+2. **Approval Matrix**: Responsible (multi-select), Approver (single select, admin/super_admin only), Support (multi-select). All from `WPDb.getAllUsers()`. Uses `u.name` for display. Values stored comma-separated in `responsible_team` / `approver` / `support_team`.
+3. **Insurance Bonds**: Surety Bond, Performance Bond, Warranty Bond
+4. **Material/Subcon Submittals**: Requires Approval, Type of Submittal, Name of Approver, Date of Approval
+5. **Procurement Schedule**: Lead Time (→ `lead_time`), Awarding Date, Actual Awarding Date, Target Delivery, Actual Delivery, Target Installation, Target Completion
+6. **Budget & Contract**: Procurement Budget (BCB) (→ `approved_budget_bcb`), Contract Amount (→ `awarded_cost`), Award Status, Vendor/s (→ `contractor`)
+7. **Payment Terms**: Terms (Days), Down Payment % (free numeric input — user enters percentage e.g. 20, stored as 0.20), DP Terms, DP Amount, Date of DP Release, Payment Notes, Retention %, Retention Amount, Retention Period
+8. **Procurement Status**: Procurement Status, Submittal Status, Delivery Status, Remarks, Charging (required: Main Contract → Contract Package No. | Change Order → CO Description)
+
+### Trade → Works → Type Cascade
+`TRADE_WORKS` object maps Trade → array of `[works, type]`. `onTradeChange()` repopulates Works; `onWorksChange()` sets Type ("Service" or "Materials & Labor").
+
+### Approval Matrix Multi-Select
+`toggleMs(field)`, `msClearAll(field)`, `getMsValues(field)`, `_setMsFromText(field, text)`, `_msPillRemove(field, uid)`. Mobile: dropdown uses `position:fixed` full-width.
+
+### Budget Input Formatting
+`f-budget` uses `type="text" inputmode="numeric"` with comma formatting on blur, stripped on focus. All reads use `.replace(/,/g,'')` before `parseFloat`.
+
+### Unsaved Changes Guard
+`formDirty` flag. `markDirty()` on input/change events. `markClean()` called on successful save. `beforeunload` fires only if `formDirty`.
+
+---
+
+## CSV Import (Work Packages)
+
+`downloadCSVTemplate()` generates `WPM_Import_Template.csv`. `importWPsFromCSV()` parses by column position, calls `WPDb.submitWP()` per row (throws on error), then `WPDb.approveWP()` if admin.
+
+**25-column mapping (position-based):**
+
+| # | Header | DB Column |
+|---|---|---|
+| 0 | Cost Code No. | `cost_code` |
+| 1 | Trade | `trade` |
+| 2 | Works | `works` |
+| 3 | WP No. | `wp_no` (required — row skipped if blank) |
+| 4 | Work Package Description | `description` |
+| 5 | Zone | `zone` |
+| 6 | Scope of Work | `scope` |
+| 7 | Charging Type | `charging_type` |
+| 8 | Contract Package No. | `contract_package_no` |
+| 9 | CO Description | `co_description` |
+| 10 | Proposed Vendors | `proposed_vendors` |
+| 11 | No. of PO/JO | `po_jo_count` |
+| 12 | PO/JO Numbers | `po_jo_numbers` |
+| 13 | Procurement Budget (BCB) (PHP) | `approved_budget_bcb` |
+| 14 | Total Awarded (PHP) | `awarded_cost` (NOT `total_awarded` — generated) |
+| 15 | Award Status | `award_status` |
+| 16 | Procurement Status | `procurement_status` (default: Not Started) |
+| 17 | Planned Award Date | `awarding_date` |
+| 18 | Actual Award Date | `actual_awarding_date` |
+| 19 | Target Delivery Date | `target_delivery` |
+| 20 | Actual Delivery Date | `actual_delivery` |
+| 21 | Target Completion Date | `target_completion` |
+| 22 | Target Installation Date | `target_installation` |
+| 23 | Lead Time (Days) | `lead_time` (NOT `awarding_lead_time` — generated) |
+| 24 | Remarks | `remarks` |
+
+Dates accept MM/DD/YYYY or YYYY-MM-DD.
+
+---
+
+## Claims & Change Orders (HIDDEN — not yet active)
+
+To re-enable: remove `style="display:none"` from sidebar section + tab button in `project.html`; Claims tab button in `index.html`; restore Claims/CO cards in template picker modals.
+
+`claim-form.html`: `?section=change-order` for CO mode, `?project=ID` pre-selects project, `?id=UUID` for edit. Claims and COs share the `claims` table distinguished by `claim_type`.
 
 ---
 
 ## CSS / Styling
 
-### Design System (dashboard.css)
-- Brand: `--mw-red: #EE3124`, `--mw-black: #231F20`, `--mw-dark: #282C28`
-- Font: Montserrat â€” loaded via `<link>` in each HTML page (NOT `@import` in CSS)
-- Icons: Tabler Icons v2.44 webfont (`ti ti-*`)
+**Design system**: `--mw-red: #EE3124`, `--mw-black: #231F20`, `--mw-dark: #282C28`. Font: Montserrat via `<link>` (not `@import`). Icons: Tabler Icons v2.44 (`ti ti-*`).
 
-### Responsive Breakpoints
-| Breakpoint | Behavior |
-|---|---|
-| `â‰¥1024px` | Desktop â€” sidebar always visible (`240px`) |
-| `â‰¤1024px` | Tablet â€” sidebar shrinks to `220px` |
-| `â‰¤767px` | Mobile â€” sidebar becomes slide-in drawer (`transform: translateX(-100%)`) |
-| `â‰¤399px` | Small mobile â€” single column grid |
+**Breakpoints**: ≥1024px desktop sidebar (240px) | ≤1024px tablet (220px) | ≤767px mobile slide-in drawer | ≤399px single-column.
 
-### View Tabs (Global â€” dashboard.css)
-`.view-tabs` / `.view-tab` styles are defined globally in `dashboard.css`. **Do NOT redefine them inline in individual HTML files** â€” the global rule includes the sticky mobile behavior.
+**View tabs** (`.view-tabs` / `.view-tab`): defined globally in `dashboard.css` — do NOT redefine inline. On mobile: `position:sticky; top:52px`, horizontally scrollable.
 
-On mobile (`â‰¤767px`) the tab bar is:
-- `position: sticky; top: 52px` (52px = mobile topbar height)
-- Horizontally scrollable (`overflow-x: auto; flex-wrap: nowrap`)
-- Tabs do not wrap â€” they scroll off-screen
+**Mobile topbar** (52px): `.topbar` must have `overflow:visible` — `hidden` clips the user profile dropdown.
 
-### Mobile Topbar (52px height)
-- `.topbar-left`: `flex: 1; min-width: 0; overflow: hidden`
-- `.topbar`: `overflow: visible` on mobile â€” **do NOT set to `hidden`**, it clips the user profile dropdown
-- `.page-title`: `white-space: nowrap; overflow: hidden; text-overflow: ellipsis`
-- `.page-sub`: `display: none` on mobile
-- `.hide-mobile`: hides export button text (or entire button on consolidated view)
-
-### Consolidated Dashboard Sticky Tabs (index.html)
-On mobile, `#filter-tabs-bar` is made `position: sticky; top: 52px` as a single unit. Its children (`#proj-filter-wrap` and `.view-tabs`) are `position: static` within it â€” do NOT make them individually sticky inside the bar, as they would overlap each other at the same `top` offset.
-
-### Mobile Overflow / Horizontal Scroll Prevention
-**Critical rule:** Do NOT set `overflow-x: hidden` or `overflow-x: clip` on `.main`, `.content`, `html`, or `body` in pages that use `position: sticky` tabs â€” any overflow value on a parent kills `position: sticky` in Safari iOS.
-
-**Correct approach â€” clamp at element level:**
+**Critical — sticky tabs + overflow**: Never set `overflow-x:hidden` or `overflow-x:clip` on `.main`, `.content`, `html`, or `body` on pages with sticky tabs — kills `position:sticky` in Safari iOS. Clamp overflow at element level:
 ```css
-canvas { max-width: 100% !important; width: 100% !important; }
-.panel { min-width: 0; max-width: 100%; }
-.grid-2 > *, .grid-3 > * { min-width: 0; }
-.data-table, .budget-table { display: block; max-width: 100%; overflow-x: auto; }
+canvas { max-width:100% !important; }
+.panel, .grid-2 > *, .grid-3 > * { min-width:0; }
+.data-table, .budget-table { display:block; overflow-x:auto; }
 ```
+Standalone pages (login, register, pending, forgot-password) without sticky tabs can use `overflow-x:hidden` safely.
 
-Standalone pages without sticky tabs (`login.html`, `register.html`, `pending.html`, `forgot-password.html`, `project-selector.html`) use `overflow-x: hidden` on `html, body` safely.
+**Logo**: styled globally in `dashboard.css` — do NOT add inline `.sidebar-logo img` CSS to individual HTML files.
 
-### iOS Pinch Zoom Prevention
-Added to `ui.js` (runs on every page that loads it):
-```js
-document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-document.addEventListener('gesturestart', e => e.preventDefault());
-```
-The viewport `user-scalable=no` meta tag is also on all pages but is ignored by Safari iOS 10+; the JS above is the actual fix.
-
-### Viewport Meta (All Pages)
-All `.html` files have:
-```html
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-```
-
-### Mobile Hamburger Menu
-- Button `.btn-menu` shown at `â‰¤767px` (hidden on desktop via `display:none`)
-- Sidebar gets class `.open` when toggled; `.sidebar-overlay` covers background
-- Handled in `ui.js`
-
-### WP List Collapse + View Tab Pattern (index.html + project.html)
-
-**Column views**: WP List has 4 tabs â€” Overview, Financial, Schedule, Submittals. Each shows 10â€“12 focused columns.
-- `index.html`: `_WPC` (column defs), `_WP_VIEWS` (view configs, incl. `all`), `_getActiveCols()` returns filtered+mapped array (marks `description` sticky when view â‰  overview). `_wpMonSortCol`/`_wpMonSortDir` sort state; `setWPMonSort(key)` sorts within trade groups via `_WPC_SORT_FIELD` map. `renderWPMonTable()` rebuilds `<colgroup>` + `<thead>` dynamically per view. `setWPListView(view)` switches tab, resets sort, re-renders. `openWPDetail(w)` / `closeWPDetailModal()` â€” slide-in detail panel (`#wp-detail-modal`).
-- `project.html`: `WP_TABLE_VIEWS` (Set of keys per view, incl. `all`), `getActiveCols()` filters+maps COLS (marks `description` sticky when view â‰  overview). Column headers have sort indicator (â†‘â†“ red), hover color, title tooltip; `sortCol`/`sortDir` state. `setWPTableView(view)` switches tab, resets sort, re-renders. `openWPDetail(w)` / `closeWPDetailModal()` â€” same slide-in detail panel (`#wp-detail-modal`).
-- Financial tab hidden for Viewer role (no cost data).
-
-**Collapse (virtual-items)**:
-1. Group `rows` by trade (TRADE_ORDER sequence)
-2. Build `items[]`: `{type:'header'}` always + `{type:'row'}` only if trade not collapsed
-3. Paginate `items[]` â€” collapsed trades absent from all pages
-4. `toggleTradeGroup(trade)` flips `_collapseState`, resets page to 1, re-renders
-5. **âˆ’ All** (collapseAllTrades) = hide all rows. **+ All** (expandAllTrades) = show all rows. Excel convention: âˆ’ = currently expanded â†’ click to collapse; + = currently collapsed â†’ click to expand.
-6. Individual header badge: `âˆ’` when expanded, `+` when collapsed (same Excel logic)
-
-**Backlog collapse**: `_blCollapseState` Map + `toggleBlGroup(trade)` â€” same approach but no pagination (simpler DOM group headers).
-
-**Schedule tab** (`toggleSchRow`) and **Works tab** (`toggleWkTrade`) use DOM-only toggle (no pagination) â€” indicator span `${id}-ind` is flipped via JS in the toggle function.
-
-**Works tab â€” both tables now collapsible:** `toggleWkTrade(tradeId)` toggles `${tradeId}-row` sub-rows in the Period table; `toggleWkBudget(budTradeId)` toggles `${budTradeId}-brow` sub-rows in the Budget+Awarded table. Both use `budTradeId = 'wkb-trade-' + ...` / `tradeId = 'wk-trade-' + ...` prefixes to avoid ID collision.
-
-**WP List toolbar (index.html):** Split into two compact rows â€” Row 1: title + Trade select + Status select + Search; Row 2: Collapse/Expand buttons + view tabs. Eliminates wrapping on standard desktop widths.
-
-**WP List Works column:** Width reduced 130 â†’ 100px; cell now has `overflow:hidden; text-overflow:ellipsis; white-space:nowrap` with `title` tooltip showing full text on hover.
-
-**Project filter (index.html):** Removed `_filterDirty` deferred-apply pattern. `toggleProjectPill` now calls `renderAll()` immediately on each tick/untick â€” dashboards update live. `selectAllPills` / `clearPills` also call `renderAll()` directly. `closeProjFilter` just closes the panel.
-
-### Logo Styling (Global)
-Logo is styled globally in `dashboard.css`. Current rule fills the full sidebar panel width:
-```css
-.sidebar-logo img { width: 100%; height: auto; max-width: none; display: block; object-fit: contain; object-position: left center; background: transparent !important; }
-```
-File: `assets/img/megawide-logo.png` (white version). Favicon: `assets/img/favicon.png` (unchanged).
-**Do NOT add inline `.sidebar-logo img` CSS to individual HTML files.**
-
-**Brand panel logo (login.html, register.html):** `.brand-logo { width:100%; height:auto; display:block; }` â€” fills the full panel content width. Mobile override adds `width:auto` so the logo doesn't stretch in the horizontal compact bar layout (`height:44px; width:auto; flex-shrink:0`).
+**iOS pinch zoom**: handled in `ui.js` via `touchmove` + `gesturestart` listeners. `user-scalable=no` viewport is ignored by Safari iOS 10+.
 
 ---
 
-## Performance (Mobile Load Speed)
+## Script Loading (Dashboard Pages)
 
-### Problem summary & fixes applied
-
-| Problem | Fix |
-|---|---|
-| Scripts in `<head>` blocked HTML rendering (blank white screen on mobile) | Moved `auth.js`, `db.js`, `ui.js` to bottom of `<body>` |
-| No early connections to CDN origins | Added `<link rel="preconnect">` for all CDN domains |
-| Google Fonts via CSS `@import` (2 extra sequential round-trips) | Moved to `<link rel="stylesheet">` directly in HTML |
-| Supabase ESM entry imported 5 sub-packages (6-request waterfall) | Switched to single UMD bundle (`supabase.min.js`) |
-| Body scripts only started downloading when parser reached them | Added `<link rel="preload" as="script">` for all body scripts |
-| User profile fetched from DB on every page navigation | Cached in `sessionStorage` under `wpm_prof_{userId}` |
-| Consolidated dashboard fired one API call per project (N+1) | Replaced with single `getApprovedWPsForProjects(ids)` query |
-| Hidden Claims fetch fired on every consolidated dashboard load | Removed â€” `_allClaims = []` since Claims tab is disabled |
-| `login`, `register`, `pending`, `forgot-password` used ESM `import { createClient }` (+esm waterfall) | Switched all four to UMD bundle + `window.supabase.createClient()` |
-| `index.html` fetched projects then WPs sequentially (2 round-trips for admins) | Parallelized with `Promise.all([getProjects(), getAllApprovedWPs()])` â€” saves one round-trip |
-| `JSON.stringify(w)` embedded in every WP table cell onclick (~90KB DOM overhead per render) | Replaced with `openWPDetail("id")` + `window._wpById` lookup map |
-| WP data re-fetched from Supabase on every return visit to `index.html` (e.g. after viewing a project) | **WP cache (stale-while-revalidate)** in `sessionStorage` under `wpm_wps_idx_{userId}` â€” 5-min TTL. Cache hit skips WP network call entirely; background refresh updates cache after render. First load still fetches; repeat visits are near-instant. |
-| `_TRADE_NORM` declared as `const` inside async `requireLogin` callback AFTER `normTrade` was called â€” caused `ReferenceError: Cannot access '_TRADE_NORM' before initialization` (temporal dead zone), crashing the render silently and leaving the loading spinner indefinitely (never reaching `clearTimeout`) | Moved `_TRADE_NORM` and `normTrade` to top-level `<script>` scope, before the `requireLogin` callback |
-
-### Public auth pages (login, register, pending, forgot-password)
-These pages do **not** load `auth.js`/`db.js`/`ui.js`. They load the UMD bundle inline and call `window.supabase.createClient()` directly in their own `<script>` block. Top-level `await` is wrapped in an async IIFE (not ES modules). `forgot-password.html` `redirectTo` points to `https://pmodepartment.github.io/prc-app/login.html`.
-
-### Script loading order (dashboard pages)
-All pages load scripts at the **bottom of `<body>`** in this order:
+Scripts at **bottom of `<body>`** in this order — do NOT move to `<head>` without `defer`:
 ```html
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="assets/js/auth.js"></script>
 <script src="assets/js/db.js"></script>
 <script src="assets/js/ui.js"></script>
-<!-- index.html and project.html also load Chart.js + charts.js here -->
-<script>
-  /* inline init â€” calls AppAuth.requireLogin() or AppAuth.requireAdmin() */
-</script>
-```
-**Do NOT move any of these back to `<head>` without `defer`.** Blocking scripts in `<head>` prevent any HTML from rendering until all scripts download and execute.
-
-### Resource hints (all pages `<head>`)
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link rel="preconnect" href="https://cdn.jsdelivr.net"/>
-<link rel="preconnect" href="https://cdnjs.cloudflare.com"/>  <!-- index.html + project.html only -->
-<link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
-<link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-<link rel="preload" as="script" href="assets/js/auth.js"/>
-<link rel="preload" as="script" href="assets/js/db.js"/>
-<link rel="preload" as="script" href="assets/js/ui.js"/>
-<!-- index.html + project.html also preload Chart.js + charts.js -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
+<!-- index.html + project.html also load Chart.js + charts.js -->
+<script>/* inline init */</script>
 ```
 
-### Remaining variability
-The **Supabase free tier cold start** (5â€“30s on first load after 7 days inactivity) is the one remaining cause of extreme load lag. `index.html` shows a "Taking longer than usual" message with a **Retry** button after 20 s (`_loadTimeout` / `clearTimeout`). Fix permanently: set up UptimeRobot to ping the project URL every 3â€“4 days.
+Public pages (login, register, pending, forgot-password) load UMD bundle inline and call `window.supabase.createClient()` directly — they do NOT load `auth.js`/`db.js`/`ui.js`.
+
+Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net, cdnjs.cloudflare.com; `dns-prefetch` for Supabase URL; `preload as="script"` for all body scripts.
 
 ---
 
 ## Known Issues / Gotchas
 
-1. **Date validation:** `new Date(dateString)` can silently accept invalid dates. Always validate on input â€” `wp-form.html` validates Target Completion â‰¥ Planned Award Date.
-2. **Role caching:** `window.__wpmRole` is set once at login. If role changes mid-session, user must log out and back in.
-3. **Profile cache staleness:** `sessionStorage` profile cache is cleared on logout and when the tab closes. If an admin changes a user's role or project access, the affected user must close and reopen their tab to pick up the change.
-4. **WP count refresh:** After adding/editing WPs, call `loadData()` to refresh counts in the sidebar badge.
-5. **Chart.js memory leaks:** Destroy existing chart instances before re-rendering: `if (chartInstance) { chartInstance.destroy(); chartInstance = null; }`
-6. **Duplicate `saveProject` in db.js:** Two definitions exist. The second shadows the first â€” harmless but should be cleaned up.
-7. **READ-ONLY badge inline style:** Never add `display:inline-flex` as an inline style to `.topbar-badge-readonly` â€” the mobile media query sets `display:none` and inline styles override it.
-8. **Sticky tabs + overflow:** `overflow: hidden/clip` on any ancestor of `.view-tabs` breaks `position: sticky` in Safari. Always clamp overflow at the element level, not the container level.
-9. **Supabase free tier pause:** Project pauses after 7 days inactivity â†’ 5â€“30s cold start on first load. Use UptimeRobot to ping every 3â€“4 days to prevent this.
-10. **N+1 query anti-pattern:** Never use `Promise.all(projects.map(p => WPDb.getApprovedWPs(p.id)))` in the consolidated dashboard â€” use `getAllApprovedWPs()` or `getApprovedWPsForProjects(ids)` instead.
-11. **Generated columns:** `total_awarded`, `awarding_lead_time`, `variance` are `GENERATED ALWAYS AS` columns — inserting causes a Postgres error. `unmap()` in `db.js` now strips all three. Form sends `awarded_cost` (not `total_awarded`) and `lead_time` (not `awarding_lead_time`). The editable lead-time column is `lead_time integer`; `awarding_lead_time` is auto-computed from `actual_awarding_date - awarding_date`.
-12. **Trade name consistency:** All trades must use the exact strings from the WP form dropdown (e.g. "General Requirements" not "General Requirement"). A `normTrade(t)` function is defined in both `index.html` and `project.html` â€” it maps legacy/wrong names (all-caps, missing 's', etc.) to canonical TRADE_ORDER names. Applied at data load time via `.map(w=>({...w,trade:normTrade(w.trade)}))` so all charts, tables, and groupings see clean data. DB was fixed 2026-06-02 (patched 2 WPs: "GENERAL REQUIREMENT"â†’"General Requirements", "STRUCTURAL WORKS"â†’"Structural Works").
-13. **AVR101 data:** 114 WPs (approved) across General Requirements (42), Architectural Works (30), Structural Works (11), MEPF split into Mechanical/Electrical/Plumbing/Fire Protection/Auxiliary (20), Site Development Works (6), Site Works (5). WP Nos use `WP-` prefix (e.g. `WP-1`â€¦`WP-114`). The 228-record duplicate issue (two imports: 2026-05-26 all-caps trades + 2026-06-02 correct trades) was resolved 2026-06-02 by deleting the May 26 batch via service role API â€” 114 records removed, 114 remain.
-14. **TEST101 data:** 2 WPs (approved). WP Nos updated 2026-06-03 from old zero-padded format (`WP-001`, `WP-002`) to current format (`WP-1`, `WP-2`) to match AVR101 convention.
-15. **Project filter â€” deselect all:** `_activeIds` can now be an empty Set. The "None" button calls `clearPills()` which sets `_activeIds = new Set()`. The filter button label turns red ("No projects selected") and the Overview tab shows an empty-state message. All charts and KPIs render with zero/empty data gracefully when no projects are selected.
+1. **Generated columns**: `total_awarded`, `awarding_lead_time`, `variance` — never INSERT into them. Use `awarded_cost` and `lead_time`. `unmap()` strips all three automatically.
+2. **Sticky tabs + overflow**: `overflow:hidden/clip` on any ancestor of `.view-tabs` breaks `position:sticky` in Safari. See CSS section.
+3. **READ-ONLY badge**: never set `display:inline-flex` as inline style on `.topbar-badge-readonly` — mobile media query can't override it.
+4. **N+1 query**: never use `Promise.all(projects.map(p => WPDb.getApprovedWPs(p.id)))` — use `getAllApprovedWPs()` or `getApprovedWPsForProjects(ids)`.
+5. **Role caching**: `window.__wpmRole` set once at login. Role/project changes require the user to log out and back in.
+6. **Chart.js leaks**: always `chartInstance.destroy()` before re-rendering.
+7. **Trade name consistency**: use exact strings from the Trade dropdown. `normTrade(t)` in `index.html` and `project.html` maps legacy casing to canonical names — applied at data load time.
+8. **Supabase cold start**: free tier pauses after 7 days → 5–30s delay. UptimeRobot ping every 3–4 days prevents this.
+9. **Duplicate `saveProject` in db.js**: second definition shadows first — harmless but note when editing.
+10. **dp_percent**: stored as decimal (0.20 = 20%). Form input accepts percentage (user types "20"), divided by 100 before storing; edit mode multiplies by 100 to display.
 
 ---
 
 ## Workflow Rules
 
-- **After every prompt:** Update the relevant sections of this CLAUDE.md file to reflect what was added, fixed, or changed, then commit and push all modified files (including CLAUDE.md) to `origin/main`.
+- **After every prompt:** Update relevant sections of this CLAUDE.md, then commit and push all modified files (including CLAUDE.md) to `origin/main`.
 
 ---
 
 ## Deployment
 
 ```bash
-# Push to GitHub â€” GitHub Pages auto-deploys on push to main (~1â€“2 min)
 git add <files>
 git commit -m "description"
 git push origin main
 ```
 
-**GitHub:** https://github.com/PMODepartment/prc-app
-**Live URL:** https://pmodepartment.github.io/prc-app
-**Login:** https://pmodepartment.github.io/prc-app/login.html
-*(Migrated from Vercel on 2026-06-01)*
+GitHub Pages auto-deploys on push to main (~1–2 min).
 
 ---
 
 ## Development Notes
 
-- No npm, no bundler, no TypeScript â€” pure vanilla JS loaded via `<script src="...">` tags
-- Supabase client loaded via **UMD single bundle** (`supabase.min.js` from jsDelivr) â€” avoids the 6-sub-module ESM import waterfall. Loaded as `<script>` before `auth.js` at bottom of body; `window.supabase.createClient()` is called synchronously in `auth.js`
-- All pages use `AppAuth.requireLogin()` or `AppAuth.requireAdmin()` as the entry point â€” never access DB directly without auth check
-- `WPDb.mapWP()` normalizes field aliases (e.g., `budget_bcb` â†” `approved_budget_bcb`, `contract_amount_php` â†” `total_awarded`)
-- `Fmt.money(v)` formats as `â‚±X.XXM`; `Fmt.moneyFull(v)` formats as `â‚±1,234,567`; `Fmt.date(d)` formats as `May 29, '26`
-- Charts use Chart.js v4.4.1 loaded via CDN (cdnjs); chart functions are in `assets/js/charts.js`
-- Power BI chart functions: `budgetAwardedByPeriod`, `wpByTrade`, `wpStatusDonut`, `wpSubmittalDonut`, `wpByPeriodQuarterly`, `wpAgingBuckets`, `budgetByTradeHBar`, `budgetByPeriodPerTrade`, `budgetByTradeDonut`, `awardedByTradeDonut`
-
-
+- Pure vanilla JS — no npm, no bundler, no TypeScript
+- Supabase via UMD bundle (`supabase.min.js`) — `window.supabase.createClient()` called in `auth.js`
+- Always use `AppAuth.requireLogin()` / `AppAuth.requireAdmin()` as page entry point
+- `WPDb.mapWP()` normalizes aliases: `budget_bcb` ↔ `approved_budget_bcb`, `contract_amount_php` ↔ `total_awarded`
+- `Fmt.money(v)` → `₱X.XXM`; `Fmt.moneyFull(v)` → `₱1,234,567`; `Fmt.date(d)` → `May 29, '26`
+- Charts: Chart.js v4.4.1 via cdnjs; functions in `assets/js/charts.js`
