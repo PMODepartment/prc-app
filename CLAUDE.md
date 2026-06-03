@@ -296,39 +296,76 @@ Tabs: Overview → Dashboard → Backlog → WP List
 
 ## CSV Import (Work Packages)
 
-`downloadCSVTemplate()` generates `WPM_Import_Template.csv`. `importWPsFromCSV()` parses by column position, calls `WPDb.submitWP()` per row (throws on error), then `WPDb.approveWP()` if admin.
+`downloadCSVTemplate()` generates `WPM_Import_Template.csv`. Both `project.html` and `wp-form.html` share the same 54-column template. `importWPsFromCSV()` parses by column position, calls `WPDb.submitWP()` per row (throws on error), then `WPDb.approveWP()` if auto-approve role. Legacy files (<40 cols) are still accepted via format detection.
 
-**25-column mapping (position-based):**
+**54-column mapping (position-based) — WP No. at col 4 is required (row skipped if blank):**
 
-| # | Header | DB Column |
-|---|---|---|
-| 0 | Cost Code No. | `cost_code` |
-| 1 | Trade | `trade` |
-| 2 | Works | `works` |
-| 3 | WP No. | `wp_no` (required — row skipped if blank) |
-| 4 | Work Package Description | `description` |
-| 5 | Zone | `zone` |
-| 6 | Scope of Work | `scope` |
-| 7 | Charging Type | `charging_type` |
-| 8 | Contract Package No. | `contract_package_no` |
-| 9 | CO Description | `co_description` |
-| 10 | Proposed Vendors | `proposed_vendors` |
-| 11 | No. of PO/JO | `po_jo_count` |
-| 12 | PO/JO Numbers | `po_jo_numbers` |
-| 13 | Procurement Budget (BCB) (PHP) | `approved_budget_bcb` |
-| 14 | Total Awarded (PHP) | `awarded_cost` (NOT `total_awarded` — generated) |
-| 15 | Award Status | `award_status` |
-| 16 | Procurement Status | `procurement_status` (default: Not Started) |
-| 17 | Planned Award Date | `awarding_date` |
-| 18 | Actual Award Date | `actual_awarding_date` |
-| 19 | Target Delivery Date | `target_delivery` |
-| 20 | Actual Delivery Date | `actual_delivery` |
-| 21 | Target Completion Date | `target_completion` |
-| 22 | Target Installation Date | `target_installation` |
-| 23 | Lead Time (Days) | `lead_time` (NOT `awarding_lead_time` — generated) |
-| 24 | Remarks | `remarks` |
+| # | Header | DB Column | Notes |
+|---|---|---|---|
+| **Identity & Classification** |
+| 0 | Cost Code No. | `cost_code` | |
+| 1 | Trade | `trade` | |
+| 2 | Works | `works` | |
+| 3 | Type of Works | `type_of_works` | |
+| 4 | WP No. | `wp_no` | **Required** |
+| 5 | Work Package Description | `description` | |
+| 6 | Detailed Description | `detailed_description` | |
+| 7 | Scope of Work | `scope` | |
+| 8 | Zone | `zone` | |
+| 9 | Type of Service | `type_of_service` | |
+| 10 | Type of Procurement | `type_of_procurement` | |
+| 11 | Type of Contract | `type_of_contract` | |
+| 12 | Charging Type | `charging_type` | |
+| 13 | Contract Package No. | `contract_package_no` | |
+| 14 | CO Description | `co_description` | |
+| 15 | Proposed Vendors | `proposed_vendors` | |
+| 16 | No. of PO/JO | `po_jo_count` | |
+| 17 | PO/JO Numbers | `po_jo_numbers` | |
+| **Approval Matrix** |
+| 18 | Responsible Team | `responsible_team` | |
+| 19 | Approver | `approver` | |
+| 20 | Support Team | `support_team` | |
+| **Insurance Bonds** |
+| 21 | Surety Bond (Yes/No) | `surety_bond` | |
+| 22 | Performance Bond (Yes/No) | `performance_bond` | |
+| 23 | Warranty Bond (Yes/No) | `warranty_bond` | |
+| **Submittals** |
+| 24 | Requires Submittal Approval (Yes/No) | `requires_approval` | stored as boolean |
+| 25 | Submittal Document Type | `submittal_document_type` | |
+| 26 | Submittals Approver Name | `approver_name` | |
+| 27 | Date of Approval (MM/DD/YYYY) | `approval_date` | |
+| 28 | Submittal Status | `submittal_type` | e.g. Not Required / Submitted / Approved |
+| **Schedule** |
+| 29 | Lead Time (Days) | `lead_time` | NOT `awarding_lead_time` (generated) |
+| 30 | Planned Award Date (MM/DD/YYYY) | `awarding_date` | |
+| 31 | Actual Award Date (MM/DD/YYYY) | `actual_awarding_date` | |
+| 32 | Target Delivery Date (MM/DD/YYYY) | `target_delivery` | |
+| 33 | Actual Delivery Date (MM/DD/YYYY) | `actual_delivery` | |
+| 34 | Target Installation Date (MM/DD/YYYY) | `target_installation` | |
+| 35 | Target Completion Date (MM/DD/YYYY) | `target_completion` | |
+| **Budget & Contract** |
+| 36 | Procurement Budget BCB (PHP) | `approved_budget_bcb` | |
+| 37 | Contract Amount Awarded (PHP) | `awarded_cost` | NOT `total_awarded` (generated) |
+| 38 | Award Status | `award_status` | |
+| 39 | Vendor/Contractor | `contractor` | |
+| **Payment Terms** |
+| 40 | Payment Terms (Days) | `payment_terms_days` | |
+| 41 | Down Payment % | `dp_percent` | enter as e.g. 20 → stored as 0.20 |
+| 42 | DP Terms | `dp_terms` | |
+| 43 | DP Amount (PHP) | `dp_amount` | |
+| 44 | Date of DP Release (MM/DD/YYYY) | `dp_release_date` | |
+| 45 | Payment Notes | `dp_notes` | |
+| 46 | Retention % | `retention_percent` | enter as e.g. 10 → stored as 0.10 |
+| 47 | Retention Amount (PHP) | `retention_amount` | |
+| 48 | Retention Period | `retention_period` | |
+| **Status** |
+| 49 | Procurement Status | `procurement_status` | default: Not Started |
+| 50 | Awarding Status | `awarding_status` | |
+| 51 | Delivery Status | `delivery_status` | default: Not Awarded |
+| 52 | Remarks | `remarks` | |
+| 53 | Purchase Request | `purchase_request` | |
 
-Dates accept MM/DD/YYYY or YYYY-MM-DD.
+Dates accept MM/DD/YYYY or YYYY-MM-DD. `dp_percent` and `retention_percent` are entered as plain percentages (e.g. 20) and divided by 100 before storing.
 
 ---
 

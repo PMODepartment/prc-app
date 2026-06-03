@@ -1190,33 +1190,56 @@ AppAuth.requireLogin(async (user, profile) => {
 
   window.downloadCSVTemplate = function() {
     const headers = [
-      'Cost Code No.','Trade','Works','WP No.','Work Package Description','Zone','Scope of Work',
-      'Charging Type','Contract Package No.','CO Description',
+      // 0-17: Identity & Classification
+      'Cost Code No.','Trade','Works','Type of Works','WP No.','Work Package Description',
+      'Detailed Description','Scope of Work','Zone','Type of Service',
+      'Type of Procurement','Type of Contract','Charging Type','Contract Package No.','CO Description',
       'Proposed Vendors','No. of PO/JO','PO/JO Numbers',
-      'Procurement Budget (BCB) (PHP)','Total Awarded (PHP)','Award Status','Procurement Status',
-      'Planned Award Date','Actual Award Date',
-      'Target Delivery Date','Actual Delivery Date','Target Completion Date','Target Installation Date',
-      'Lead Time (Days)','Remarks'
+      // 18-20: Approval Matrix
+      'Responsible Team','Approver','Support Team',
+      // 21-23: Insurance Bonds
+      'Surety Bond (Yes/No)','Performance Bond (Yes/No)','Warranty Bond (Yes/No)',
+      // 24-28: Submittals
+      'Requires Submittal Approval (Yes/No)','Submittal Document Type','Submittals Approver Name','Date of Approval (MM/DD/YYYY)','Submittal Status',
+      // 29-35: Schedule
+      'Lead Time (Days)','Planned Award Date (MM/DD/YYYY)','Actual Award Date (MM/DD/YYYY)',
+      'Target Delivery Date (MM/DD/YYYY)','Actual Delivery Date (MM/DD/YYYY)',
+      'Target Installation Date (MM/DD/YYYY)','Target Completion Date (MM/DD/YYYY)',
+      // 36-39: Budget & Contract
+      'Procurement Budget BCB (PHP)','Contract Amount Awarded (PHP)','Award Status','Vendor/Contractor',
+      // 40-48: Payment Terms
+      'Payment Terms (Days)','Down Payment %','DP Terms','DP Amount (PHP)','Date of DP Release (MM/DD/YYYY)',
+      'Payment Notes','Retention %','Retention Amount (PHP)','Retention Period',
+      // 49-53: Status
+      'Procurement Status','Awarding Status','Delivery Status','Remarks','Purchase Request',
     ];
     const ex1 = [
-      '03-001','General Requirements','Mobilization','WP-001','Mobilization/Demobilization','','',
-      'Main Contract','CP-001','',
+      '03-001','General Requirements','Mobilization','Service','WP-001','Mobilization/Demobilization',
+      '','','','',
+      '','','Main Contract','CP-001','',
       '','','',
-      '500000','','Not Yet Awarded','Not Yet Awarded',
-      '05/31/2026','',
-      '06/07/2026','','06/30/2026','',
-      '7',''
+      '','','',
+      'No','No','No',
+      'No','','','','Not Required',
+      '7','05/31/2026','','06/07/2026','','','06/30/2026',
+      '500000','','Not Yet Awarded','',
+      '','','','','','','','','',
+      'Not Started','','Not Awarded','','',
     ];
     const ex2 = [
-      '03-002','Structural Works','Structural Works','WP-002','Tower Foundation Works','Tower 1','Piling and foundation works per design specs',
-      'Main Contract','CP-002','',
+      '03-002','Structural Works','Structural Works','Materials & Labor','WP-002','Tower Foundation Works',
+      '','Piling and foundation per design specs','Tower 1','Subcontract',
+      'Lump Sum','Subcontract','Main Contract','CP-002','',
       'ABC Construction Inc.','1','JO-2026-001',
-      '2000000','1850000','Awarded','Awarded',
-      '06/15/2026','07/01/2026',
-      '07/08/2026','07/15/2026','08/31/2026','09/15/2026',
-      '14',''
+      '','','',
+      'Yes','Yes','No',
+      'Yes','Technical Data Sheet','Engr. Juan Dela Cruz','07/01/2026','Approved',
+      '14','06/15/2026','07/01/2026','07/08/2026','07/15/2026','09/15/2026','08/31/2026',
+      '2000000','1850000','Awarded','ABC Construction Inc.',
+      '30','20','Monthly progress billing','370000','07/15/2026','','10','185000','Until completion',
+      'Awarded','Awarded','Delivered','','',
     ];
-    _downloadBlob([headers,ex1,ex2].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n'), 'WPM_Import_Template.csv');
+    _downloadBlob([headers, ex1, ex2].map(r => r.map(v => `"${v}"`).join(',')).join('\n'), 'WPM_Import_Template.csv');
   };
 
   window.downloadClaimsCSVTemplate = function() {
@@ -1279,39 +1302,72 @@ AppAuth.requireLogin(async (user, profile) => {
       cells.push(cur.trim()); return cells;
     }
     function pDate(v) { if(!v) return null; try{const d=new Date(v);return isNaN(d)?null:d.toISOString().split('T')[0];}catch{return null;} }
+    function pNum(v) { const n=parseFloat((v||'').replace(/,/g,'')); return isNaN(n)?null:n; }
+    function pPct(v) { const n=parseFloat((v||'').replace(/[,%]/g,'')); return isNaN(n)||n===0?null:n/100; }
     try {
       const pid = new URLSearchParams(location.search).get('project');
       if (!pid) throw new Error('No project in URL. Open this form from a project page.');
       const sb = await getSB();
       const userId = (await sb.auth.getUser()).data.user.id;
       const role = window.__wpmRole || 'user';
-      const rows = _wpCsvData.slice(1).map(parseRow).filter(r => r[3]);
+      // 54-col template: WP No. is at col 4; legacy 25-col had WP No. at col 3
+      const is54 = _wpCsvData.length > 1 && parseRow(_wpCsvData[1]).length >= 40;
+      const rows = _wpCsvData.slice(1).map(parseRow).filter(r => r[is54 ? 4 : 3]);
       for (const r of rows) {
-        // New 25-column template: Cost Code No.(0) Trade(1) Works(2) WP No.(3) Description(4) Zone(5)
-        // Scope(6) Charging Type(7) Contract Package No.(8) CO Description(9)
-        // Vendors(10) No. of PO/JO(11) PO/JO Numbers(12)
-        // Procurement Budget (BCB)(13) Total Awarded(14) Award Status(15) Procurement Status(16)
-        // Planned Award(17) Actual Award(18) Target Delivery(19) Actual Delivery(20)
-        // Target Completion(21) Target Installation(22) Lead Time(23) Remarks(24)
-        const isNew = r.length >= 20;
-        const wpData = isNew ? {
-          cost_code:r[0]||null, trade:r[1]||null, works:r[2]||null,
-          wp_no:r[3], description:r[4], zone:r[5]||null, scope:r[6]||null,
-          charging_type:r[7]||null, contract_package_no:r[8]||null, co_description:r[9]||null,
-          proposed_vendors:r[10]||null, po_jo_count:parseInt(r[11])||null, po_jo_numbers:r[12]||null,
-          approved_budget_bcb:parseFloat(r[13])||0, awarded_cost:parseFloat(r[14])||null,
-          award_status:r[15]||'Not Yet Awarded', procurement_status:r[16]||'Not Started',
-          awarding_date:pDate(r[17]), actual_awarding_date:pDate(r[18]),
-          target_delivery:pDate(r[19]), actual_delivery:pDate(r[20]),
-          target_completion:pDate(r[21]), target_installation:pDate(r[22]),
-          lead_time:parseInt(r[23])||null, remarks:r[24]||''
-        } : {
-          cost_code:r[0]||null, trade:r[1]||null, wp_no:r[2], description:r[3], zone:r[4]||null,
-          awarding_date:pDate(r[5]), target_completion:pDate(r[6]),
-          approved_budget_bcb:parseFloat(r[7])||0, award_status:r[8]||'Not Yet Awarded',
-          awarded_cost:parseFloat(r[9])||null, remarks:r[10]||''
-        };
-        wpData.project_id = pid;
+        let wpData;
+        if (is54) {
+          // 54-column template (positions 0-53)
+          wpData = {
+            project_id: pid,
+            // 0-17: Identity
+            cost_code:r[0]||null, trade:r[1]||null, works:r[2]||null, type_of_works:r[3]||null,
+            wp_no:r[4], description:r[5], detailed_description:r[6]||null, scope:r[7]||null,
+            zone:r[8]||null, type_of_service:r[9]||null, type_of_procurement:r[10]||null,
+            type_of_contract:r[11]||null, charging_type:r[12]||null,
+            contract_package_no:r[13]||null, co_description:r[14]||null,
+            proposed_vendors:r[15]||null, po_jo_count:parseInt(r[16])||null, po_jo_numbers:r[17]||null,
+            // 18-20: Approval Matrix
+            responsible_team:r[18]||null, approver:r[19]||null, support_team:r[20]||null,
+            // 21-23: Bonds
+            surety_bond:r[21]||'No', performance_bond:r[22]||'No', warranty_bond:r[23]||'No',
+            // 24-28: Submittals
+            requires_approval:(r[24]||'').toLowerCase()==='yes',
+            submittal_document_type:r[25]||null, approver_name:r[26]||null,
+            approval_date:pDate(r[27]), submittal_type:r[28]||'Not Required',
+            // 29-35: Schedule
+            lead_time:parseInt(r[29])||null, awarding_date:pDate(r[30]),
+            actual_awarding_date:pDate(r[31]), target_delivery:pDate(r[32]),
+            actual_delivery:pDate(r[33]), target_installation:pDate(r[34]),
+            target_completion:pDate(r[35]),
+            // 36-39: Budget
+            approved_budget_bcb:pNum(r[36])||0, awarded_cost:pNum(r[37]),
+            award_status:r[38]||'Not Yet Awarded', contractor:r[39]||null,
+            // 40-48: Payment Terms
+            payment_terms_days:parseInt(r[40])||null, dp_percent:pPct(r[41]),
+            dp_terms:r[42]||null, dp_amount:pNum(r[43]), dp_release_date:pDate(r[44]),
+            dp_notes:r[45]||null, retention_percent:pPct(r[46]),
+            retention_amount:pNum(r[47]), retention_period:r[48]||null,
+            // 49-53: Status
+            procurement_status:r[49]||'Not Started', awarding_status:r[50]||null,
+            delivery_status:r[51]||'Not Awarded', remarks:r[52]||'',
+            purchase_request:r[53]||null,
+          };
+        } else {
+          // Legacy 25-column fallback
+          wpData = {
+            project_id:pid,
+            cost_code:r[0]||null, trade:r[1]||null, works:r[2]||null,
+            wp_no:r[3], description:r[4], zone:r[5]||null, scope:r[6]||null,
+            charging_type:r[7]||null, contract_package_no:r[8]||null, co_description:r[9]||null,
+            proposed_vendors:r[10]||null, po_jo_count:parseInt(r[11])||null, po_jo_numbers:r[12]||null,
+            approved_budget_bcb:pNum(r[13])||0, awarded_cost:pNum(r[14]),
+            award_status:r[15]||'Not Yet Awarded', procurement_status:r[16]||'Not Started',
+            awarding_date:pDate(r[17]), actual_awarding_date:pDate(r[18]),
+            target_delivery:pDate(r[19]), actual_delivery:pDate(r[20]),
+            target_completion:pDate(r[21]), target_installation:pDate(r[22]),
+            lead_time:parseInt(r[23])||null, remarks:r[24]||'',
+          };
+        }
         const newWP = await WPDb.submitWP(wpData, { id: userId });
         if (AppAuth.isAutoApprove({role}) && newWP?.id) await WPDb.approveWP(newWP.id);
       }

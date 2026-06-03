@@ -1511,37 +1511,64 @@ AppAuth.requireLogin(async (user, profile) => {
   // CSV Functions
   let csvFileData = null;
 
+  function _downloadBlob(csv, filename) {
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
   window.downloadCSVTemplate = function() {
     const headers = [
-      'Cost Code','WP No.','Description','Zone','Trade',
-      'Planned Award Date','Actual Award Date','Target Delivery Date','Target Completion Date','Target Installation Date',
-      'Lead Time (Days)','Procurement Budget (BCB) (PHP)','Total Awarded (PHP)',
-      'Procurement Status','Award Status',
-      'Contractor','PO/JO Count','PO/JO Numbers','Remarks'
+      // 0-17: Identity & Classification
+      'Cost Code No.','Trade','Works','Type of Works','WP No.','Work Package Description',
+      'Detailed Description','Scope of Work','Zone','Type of Service',
+      'Type of Procurement','Type of Contract','Charging Type','Contract Package No.','CO Description',
+      'Proposed Vendors','No. of PO/JO','PO/JO Numbers',
+      // 18-20: Approval Matrix
+      'Responsible Team','Approver','Support Team',
+      // 21-23: Insurance Bonds
+      'Surety Bond (Yes/No)','Performance Bond (Yes/No)','Warranty Bond (Yes/No)',
+      // 24-28: Submittals
+      'Requires Submittal Approval (Yes/No)','Submittal Document Type','Submittals Approver Name','Date of Approval (MM/DD/YYYY)','Submittal Status',
+      // 29-35: Schedule
+      'Lead Time (Days)','Planned Award Date (MM/DD/YYYY)','Actual Award Date (MM/DD/YYYY)',
+      'Target Delivery Date (MM/DD/YYYY)','Actual Delivery Date (MM/DD/YYYY)',
+      'Target Installation Date (MM/DD/YYYY)','Target Completion Date (MM/DD/YYYY)',
+      // 36-39: Budget & Contract
+      'Procurement Budget BCB (PHP)','Contract Amount Awarded (PHP)','Award Status','Vendor/Contractor',
+      // 40-48: Payment Terms
+      'Payment Terms (Days)','Down Payment %','DP Terms','DP Amount (PHP)','Date of DP Release (MM/DD/YYYY)',
+      'Payment Notes','Retention %','Retention Amount (PHP)','Retention Period',
+      // 49-53: Status
+      'Procurement Status','Awarding Status','Delivery Status','Remarks','Purchase Request',
     ];
-    const example1 = [
-      '03-001','WP-001','Mobilization/Demobilization','','GENERAL REQUIREMENT',
-      '05/31/2026','','06/07/2026','06/30/2026','',
-      '7','500000','',
-      'Not Yet Awarded','Not Yet Awarded',
-      '','','',''
+    const ex1 = [
+      '03-001','General Requirements','Mobilization','Service','WP-001','Mobilization/Demobilization',
+      '','','','',
+      '','','Main Contract','CP-001','',
+      '','','',
+      '','','',
+      'No','No','No',
+      'No','','','','Not Required',
+      '7','05/31/2026','','06/07/2026','','','06/30/2026',
+      '500000','','Not Yet Awarded','',
+      '','','','','','','','','',
+      'Not Started','','Not Awarded','','',
     ];
-    const example2 = [
-      '03-002','WP-002','Tower Foundation Works','Tower 1','STRUCTURAL WORKS',
-      '06/15/2026','07/01/2026','07/08/2026','08/31/2026','09/15/2026',
-      '14','2000000','1850000',
-      'Awarded','Awarded',
-      'ABC Construction Inc.','1','JO-2026-001',''
+    const ex2 = [
+      '03-002','Structural Works','Structural Works','Materials & Labor','WP-002','Tower Foundation Works',
+      '','Piling and foundation per design specs','Tower 1','Subcontract',
+      'Lump Sum','Subcontract','Main Contract','CP-002','',
+      'ABC Construction Inc.','1','JO-2026-001',
+      '','','',
+      'Yes','Yes','No',
+      'Yes','Technical Data Sheet','Engr. Juan Dela Cruz','07/01/2026','Approved',
+      '14','06/15/2026','07/01/2026','07/08/2026','07/15/2026','09/15/2026','08/31/2026',
+      '2000000','1850000','Awarded','ABC Construction Inc.',
+      '30','20','Monthly progress billing','370000','07/15/2026','','10','185000','Until completion',
+      'Awarded','Awarded','Delivered','','',
     ];
-    const BOM = '﻿';
-    const csv = BOM + [headers, example1, example2].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
-    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'WPM_Import_Template.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    _downloadBlob([headers, ex1, ex2].map(r => r.map(v => `"${v}"`).join(',')).join('\n'), 'WPM_Import_Template.csv');
   };
 
   window.openCSVImportModal = function() {
@@ -1588,7 +1615,6 @@ AppAuth.requireLogin(async (user, profile) => {
 
   window.importWPsFromCSV = async function() {
     if (!csvFileData) return;
-    const headers = csvFileData[0].split(',').map(h => h.replace(/"/g,'').trim());
     const btn = document.getElementById('csv-import-btn');
     btn.textContent = 'Importing…'; btn.disabled = true;
     const errEl = document.getElementById('csv-error');
@@ -1611,49 +1637,69 @@ AppAuth.requireLogin(async (user, profile) => {
       cells.push(cur.trim());
       return cells;
     }
+    function pNum(v) { const n = parseFloat((v||'').replace(/,/g,'')); return isNaN(n) ? null : n; }
+    function pPct(v) { const n = parseFloat((v||'').replace(/[,%]/g,'')); return isNaN(n)||n===0 ? null : n/100; }
 
     try {
       const wps = [];
+      // Detect format: 54-col (WP No. at col 4), legacy 19-col (WP No. at col 1)
+      const firstRow = csvFileData.length > 1 ? parseCSVRow(csvFileData[1]) : [];
+      const is54 = firstRow.length >= 40;
       for (let i = 1; i < csvFileData.length; i++) {
         const row = parseCSVRow(csvFileData[i]);
-        if (!row[0]) continue;
-        // Detect format: legacy (11 cols) vs new (19 cols)
-        const isNew = row.length >= 15;
-        const wpData = isNew ? {
-          project_id: projId,
-          cost_code: row[0],
-          wp_no: row[1],
-          description: row[2],
-          zone: row[3] || null,
-          trade: row[4],
-          awarding_date: parseCSVDate(row[5]),
-          actual_awarding_date: parseCSVDate(row[6]),
-          target_delivery: parseCSVDate(row[7]),
-          target_completion: parseCSVDate(row[8]),
-          target_installation: parseCSVDate(row[9]),
-          awarding_lead_time: parseInt(row[10]) || null,
-          approved_budget_bcb: parseFloat(row[11]) || 0,
-          total_awarded: parseFloat(row[12]) || null,
-          procurement_status: row[13] || 'Not Yet Awarded',
-          award_status: row[14] || 'Not Yet Awarded',
-          contractor: row[15] || null,
-          po_jo_count: parseInt(row[16]) || null,
-          po_jo_numbers: row[17] || null,
-          remarks: row[18] || ''
-        } : {
-          project_id: projId,
-          cost_code: row[0],
-          wp_no: row[1],
-          description: row[2],
-          zone: row[3] || null,
-          trade: row[4],
-          awarding_date: parseCSVDate(row[5]),
-          target_completion: parseCSVDate(row[6]),
-          approved_budget_bcb: parseFloat(row[7]) || 0,
-          award_status: row[8] || 'Not Yet Awarded',
-          contractor: row[9] || null,
-          remarks: row[10] || ''
-        };
+        const wpNoIdx = is54 ? 4 : 1;
+        if (!row[wpNoIdx]) continue;
+        let wpData;
+        if (is54) {
+          wpData = {
+            project_id: projId,
+            // 0-17: Identity
+            cost_code:row[0]||null, trade:row[1]||null, works:row[2]||null, type_of_works:row[3]||null,
+            wp_no:row[4], description:row[5], detailed_description:row[6]||null, scope:row[7]||null,
+            zone:row[8]||null, type_of_service:row[9]||null, type_of_procurement:row[10]||null,
+            type_of_contract:row[11]||null, charging_type:row[12]||null,
+            contract_package_no:row[13]||null, co_description:row[14]||null,
+            proposed_vendors:row[15]||null, po_jo_count:parseInt(row[16])||null, po_jo_numbers:row[17]||null,
+            // 18-20: Approval Matrix
+            responsible_team:row[18]||null, approver:row[19]||null, support_team:row[20]||null,
+            // 21-23: Bonds
+            surety_bond:row[21]||'No', performance_bond:row[22]||'No', warranty_bond:row[23]||'No',
+            // 24-28: Submittals
+            requires_approval:(row[24]||'').toLowerCase()==='yes',
+            submittal_document_type:row[25]||null, approver_name:row[26]||null,
+            approval_date:parseCSVDate(row[27]), submittal_type:row[28]||'Not Required',
+            // 29-35: Schedule
+            lead_time:parseInt(row[29])||null, awarding_date:parseCSVDate(row[30]),
+            actual_awarding_date:parseCSVDate(row[31]), target_delivery:parseCSVDate(row[32]),
+            actual_delivery:parseCSVDate(row[33]), target_installation:parseCSVDate(row[34]),
+            target_completion:parseCSVDate(row[35]),
+            // 36-39: Budget
+            approved_budget_bcb:pNum(row[36])||0, awarded_cost:pNum(row[37]),
+            award_status:row[38]||'Not Yet Awarded', contractor:row[39]||null,
+            // 40-48: Payment Terms
+            payment_terms_days:parseInt(row[40])||null, dp_percent:pPct(row[41]),
+            dp_terms:row[42]||null, dp_amount:pNum(row[43]), dp_release_date:parseCSVDate(row[44]),
+            dp_notes:row[45]||null, retention_percent:pPct(row[46]),
+            retention_amount:pNum(row[47]), retention_period:row[48]||null,
+            // 49-53: Status
+            procurement_status:row[49]||'Not Started', awarding_status:row[50]||null,
+            delivery_status:row[51]||'Not Awarded', remarks:row[52]||'',
+            purchase_request:row[53]||null,
+          };
+        } else {
+          // Legacy 19-column fallback
+          wpData = {
+            project_id: projId,
+            cost_code:row[0]||null, wp_no:row[1], description:row[2], zone:row[3]||null, trade:row[4]||null,
+            awarding_date:parseCSVDate(row[5]), actual_awarding_date:parseCSVDate(row[6]),
+            target_delivery:parseCSVDate(row[7]), target_completion:parseCSVDate(row[8]),
+            target_installation:parseCSVDate(row[9]), lead_time:parseInt(row[10])||null,
+            approved_budget_bcb:pNum(row[11])||0, awarded_cost:pNum(row[12]),
+            procurement_status:row[13]||'Not Started', award_status:row[14]||'Not Yet Awarded',
+            contractor:row[15]||null, po_jo_count:parseInt(row[16])||null,
+            po_jo_numbers:row[17]||null, remarks:row[18]||'',
+          };
+        }
         wps.push(wpData);
       }
 
@@ -1662,7 +1708,7 @@ AppAuth.requireLogin(async (user, profile) => {
       const userId = (await sb.auth.getUser()).data.user.id;
       for (const wpData of wps) {
         const newWP = await WPDb.submitWP(wpData, { id: userId });
-        if (['admin','super_admin'].includes(role) && newWP?.id) {
+        if (AppAuth.isAutoApprove({role}) && newWP?.id) {
           await WPDb.approveWP(newWP.id);
         }
       }
