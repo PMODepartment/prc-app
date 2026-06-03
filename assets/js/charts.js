@@ -12,32 +12,13 @@ const Charts = (() => {
     destroy(id);
     const ctx=document.getElementById(id);
     if(!ctx)return;
-    // Save datalabels display fn, then hide by default — shown only when card is expanded
-    const dlPlugin = cfg.options?.plugins?.datalabels;
-    let savedDisplay = null;
-    if (dlPlugin && dlPlugin.display !== false) {
-      savedDisplay = dlPlugin.display !== undefined ? dlPlugin.display : true;
-      cfg.options.plugins.datalabels = { ...dlPlugin, display: false };
-    }
-    const chart = new Chart(ctx.getContext('2d'),cfg);
-    reg[id] = chart;
-    if (savedDisplay !== null) chart._dlDisplay = savedDisplay;
-    return chart;
+    reg[id]=new Chart(ctx.getContext('2d'),cfg);
+    return reg[id];
   }
 
-  // Called by initExpandableCharts() in ui.js when a chart panel is expanded/collapsed
-  function expand(id) {
-    const chart = reg[id];
-    if (!chart || !chart._dlDisplay) return;
-    chart.options.plugins.datalabels.display = chart._dlDisplay;
-    chart.update('none');
-  }
-  function collapse(id) {
-    const chart = reg[id];
-    if (!chart || !chart._dlDisplay) return;
-    chart.options.plugins.datalabels.display = false;
-    chart.update('none');
-  }
+  // Called by initExpandableCharts() after resize — ensures chart redraws cleanly at new height
+  function expand(id) { const c=reg[id]; if(c) c.update('none'); }
+  function collapse(id) { const c=reg[id]; if(c) c.update('none'); }
 
   // ── Data label helpers ───────────────────────────────────────
   function _mob() { return window.innerWidth < 640; }
