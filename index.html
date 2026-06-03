@@ -753,9 +753,20 @@
     };
     function _getActiveCols() {
       const v = _WP_VIEWS[_wpListView] || _WP_VIEWS.overview;
+      const nonOverview = _wpListView !== 'overview';
       return v.keys
         .filter(k => !(window.__isViewer && _WPC[k]?.cost))
-        .map(k => ({key:k, ..._WPC[k]}));
+        .map(k => {
+          const col = {key:k, ..._WPC[k]};
+          if (nonOverview) {
+            // Freeze WP Description across all non-overview tabs.
+            // In 'all' view, works sits between wp_no and description so it
+            // must also be sticky to keep the frozen chain contiguous.
+            if (k === 'description') col.sticky = true;
+            if (k === 'works' && _wpListView === 'all') col.sticky = true;
+          }
+          return col;
+        });
     }
     window.setWPListView = function(view) {
       _wpListView = view;
