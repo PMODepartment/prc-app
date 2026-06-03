@@ -415,50 +415,47 @@
 
         <!-- ══ WP LIST TAB ══ -->
         <div id="tab-wplist" style="display:none">
-          <div class="panel" style="padding:0;overflow:hidden">
-            <!-- Row 1: title + filters + search -->
-            <div style="padding:10px 16px 6px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <div class="panel-title" style="margin:0;flex-shrink:0"><i class="ti ti-table"></i>Work Package Monitoring</div>
-              <select id="wp-mon-trade" onchange="filterWPTable()"
-                style="padding:5px 8px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;background:#fff;cursor:pointer;min-width:120px">
-                <option value="">All Trades</option>
-              </select>
-              <select id="wp-mon-status" onchange="filterWPTable()"
-                style="padding:5px 8px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;background:#fff;cursor:pointer">
-                <option value="">All Statuses</option>
-                <option value="Awarded">Awarded</option>
-                <option value="Partially Awarded">Partially Awarded</option>
-                <option value="Not Yet Awarded">Not Yet Awarded</option>
-              </select>
-              <div style="position:relative;margin-left:auto">
-                <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:12px;pointer-events:none"></i>
-                <input id="wp-mon-search" type="text" placeholder="Search WP No. or description…" oninput="filterWPTable()"
-                  style="padding:5px 10px 5px 26px;border:1.5px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none;width:200px">
-              </div>
-              <button id="wp-mon-mobile-toggle" onclick="toggleWPTableMode()" style="display:none;padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #EE3124;border-radius:7px;background:#fff;color:#EE3124;cursor:pointer">Full Table</button>
+          <div class="filter-bar" style="flex-wrap:wrap;margin-bottom:12px">
+            <select id="wp-mon-trade" onchange="filterWPTable()">
+              <option value="">All Trades</option>
+            </select>
+            <select id="wp-mon-status" onchange="filterWPTable()">
+              <option value="">All Statuses</option>
+              <option value="Awarded">Awarded</option>
+              <option value="Partially Awarded">Partially Awarded</option>
+              <option value="Not Yet Awarded">Not Yet Awarded</option>
+            </select>
+            <div style="position:relative;flex:1;min-width:140px">
+              <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#aaa;font-size:13px;pointer-events:none"></i>
+              <input id="wp-mon-search" type="text" placeholder="Search WP No. or description…" oninput="filterWPTable()" style="width:100%;padding:6px 10px 6px 30px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;outline:none;background:var(--surface-2);color:var(--text-primary);box-sizing:border-box"/>
             </div>
-            <!-- Row 2: collapse/expand + view tabs -->
-            <div style="padding:6px 16px 8px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <div style="display:flex;gap:4px;flex-shrink:0">
-                <button onclick="collapseAllTrades()" title="Collapse all trades" style="padding:4px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">−</span> Collapse</button>
-                <button onclick="expandAllTrades()" title="Expand all trades" style="padding:4px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">+</span> Expand</button>
-              </div>
+          </div>
+          <div class="panel" style="padding:0">
+            <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap">
+              <span id="wp-mon-count" style="font-size:12px;font-weight:600;color:#888;flex:1"></span>
               <div id="wp-view-tabs" style="display:flex;gap:0;flex-shrink:0;border:1.5px solid #e5e5e5;border-radius:8px;overflow:hidden;background:#f8f8f8">
-                <button class="wp-vtab active" data-view="overview" onclick="setWPListView('overview')" style="padding:4px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:#EE3124;color:#fff">Overview</button>
-                <button class="wp-vtab" data-view="financial" onclick="setWPListView('financial')" style="padding:4px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Award</button>
-                <button class="wp-vtab" data-view="schedule" onclick="setWPListView('schedule')" style="padding:4px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Schedule</button>
-                <button class="wp-vtab" data-view="submittals" onclick="setWPListView('submittals')" style="padding:4px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Submittals</button>
-                <button class="wp-vtab" data-view="all" onclick="setWPListView('all')" style="padding:4px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">All</button>
+                <button class="wp-vtab active" data-view="overview" onclick="setWPListView('overview')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:#EE3124;color:#fff">Overview</button>
+                <button class="wp-vtab" data-view="financial" onclick="setWPListView('financial')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Award</button>
+                <button class="wp-vtab" data-view="schedule" onclick="setWPListView('schedule')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Schedule</button>
+                <button class="wp-vtab" data-view="submittals" onclick="setWPListView('submittals')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Submittals</button>
+                <button class="wp-vtab" data-view="all" onclick="setWPListView('all')" style="padding:5px 12px;font-size:11px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">All</button>
+              </div>
+              <div style="display:flex;gap:4px;flex-shrink:0">
+                <button onclick="collapseAllTrades()" title="Collapse all trades" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">−</span> Collapse</button>
+                <button onclick="expandAllTrades()" title="Expand all trades" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">+</span> Expand</button>
               </div>
             </div>
             <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-              <table class="data-table" id="wp-mon-table" style="font-size:11px;table-layout:fixed">
-                <colgroup id="wp-mon-colgroup"></colgroup>
+              <table class="data-table" id="wp-mon-table" style="font-size:11px">
                 <thead><tr id="wp-mon-head-row"></tr></thead>
                 <tbody id="wp-mon-body"></tbody>
               </table>
             </div>
-            <div id="wp-mon-pager" style="padding:10px 16px;font-size:11px;color:#888;display:flex;align-items:center;gap:8px;border-top:1px solid #f0f0f0"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid #f0f0f0">
+              <button class="btn" id="wp-mon-btn-prev" onclick="wpMonPrev()">← Prev</button>
+              <span id="wp-mon-pager" style="font-size:12px;color:#888"></span>
+              <button class="btn" id="wp-mon-btn-next" onclick="wpMonNext()">Next →</button>
+            </div>
           </div>
         </div>
 
@@ -687,10 +684,10 @@
     // ── WP List column definitions ────────────────────────────────
     let _wpListView = 'overview';
     const _WPC = { // column defs: h=header, w=width, sticky, cost(hidden for viewer)
-      project:    {h:'Project',             w:70},
+      project:    {h:'Project',             w:90, sticky:true},
       cost_code:  {h:'Cost Code',           w:90, sticky:true},
       trade:      {h:'Trade',               w:115},
-      works:      {h:'Works',               w:100, sticky:true},
+      works:      {h:'Works',               w:110},
       type_ow:    {h:'Type',                w:75},
       scope:      {h:'Scope',               w:110},
       wp_no:      {h:'WP No.',              w:80, sticky:true},
@@ -876,13 +873,6 @@
     window.closeWPDetailModal = function() {
       document.getElementById('wp-detail-modal').style.display = 'none';
     };
-    window.toggleWPTableMode = function() {
-      const tbl = document.getElementById('wp-mon-table');
-      const btn = document.getElementById('wp-mon-mobile-toggle');
-      const full = tbl.classList.toggle('wp-table-full');
-      if (btn) btn.textContent = full ? 'Compact View' : 'Full Table';
-    };
-
     // ── Tab switching ─────────────────────────────────────────────
     const ALL_TABS = ['overview','dashboard','backlog','budget','schedule','works','wplist','claims'];
     let _activeTab = 'overview';
@@ -1403,14 +1393,10 @@
       const fmtD = d => d ? Fmt.date(d) : '—';
       const fmtPct = v => v != null ? (parseFloat(v)*100).toFixed(0)+'%' : '—';
 
-      // Compute cumulative left offsets for sticky columns
+      // Compute cumulative left offsets for sticky columns (sticky cols must be contiguous at start)
       let _sl = 0;
       const _stickyLeft = {};
       cols.forEach(c => { if (c.sticky) { _stickyLeft[c.key] = _sl; _sl += c.w; } });
-
-      // Update colgroup
-      const cg = document.getElementById('wp-mon-colgroup');
-      if (cg) cg.innerHTML = cols.map(c=>`<col style="width:${c.w}px">`).join('');
 
       // Update thead — sortable columns
       const headRow = document.getElementById('wp-mon-head-row');
@@ -1427,7 +1413,7 @@
         const sc=w.award_status==='Awarded'?'#2D9B6F':w.award_status==='Partially Awarded'?'#D97706':'#EE3124';
         const sl = key in _stickyLeft ? `position:sticky;left:${_stickyLeft[key]}px;background:#fff;z-index:1;` : '';
         switch(key) {
-          case 'project':    return `<td style="font-weight:600;color:#444">${w.project_id||'—'}</td>`;
+          case 'project':    return `<td style="${sl}font-weight:600;color:#444">${w.project_id||'—'}</td>`;
           case 'cost_code':  return `<td style="${sl}"><span class="td-code">${w.cost_code||'—'}</span></td>`;
           case 'trade':      return `<td>${w.trade||'—'}</td>`;
           case 'works':      return `<td style="${sl}overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(w.works||'').replace(/"/g,'&quot;')}">${w.works||'—'}</td>`;
@@ -1518,16 +1504,14 @@
       });
       tbody.innerHTML = html || `<tr><td colspan="${nCols}" style="text-align:center;color:#aaa;padding:20px">No work packages found</td></tr>`;
 
-      if (pager) {
-        const bs = 'padding:4px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;font-size:11px;font-family:inherit;';
-        pager.innerHTML = totalWPs === 0 ? '<span>No work packages found</span>' :
-          `<span>${totalWPs} work package${totalWPs!==1?'s':''}</span>` +
-          (totalPages > 1 ? `<span style="margin-left:auto;display:flex;align-items:center;gap:6px">
-            <span style="font-size:11px;color:#888">Page ${_wpMonPage} of ${totalPages}</span>
-            <button onclick="wpMonPrev()" style="${bs}${_wpMonPage<=1?'opacity:.4;cursor:default;':''}">‹ Prev</button>
-            <button onclick="wpMonNext()" style="${bs}${_wpMonPage>=totalPages?'opacity:.4;cursor:default;':''}">Next ›</button>
-          </span>` : '');
-      }
+      const countEl = document.getElementById('wp-mon-count');
+      if (countEl) countEl.textContent = totalWPs + ' package' + (totalWPs !== 1 ? 's' : '');
+      const pagerEl = document.getElementById('wp-mon-pager');
+      if (pagerEl) pagerEl.textContent = totalPages > 1 ? 'Page ' + _wpMonPage + ' of ' + totalPages : '';
+      const prevBtn = document.getElementById('wp-mon-btn-prev');
+      const nextBtn = document.getElementById('wp-mon-btn-next');
+      if (prevBtn) prevBtn.disabled = _wpMonPage <= 1;
+      if (nextBtn) nextBtn.disabled = _wpMonPage >= totalPages;
     }
 
     function renderAll() {
