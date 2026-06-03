@@ -180,7 +180,9 @@ create index if not exists idx_users_role on users(role);
 
 -- ── UPDATED_AT trigger ────────────────────────────────────────
 create or replace function update_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = public
+as $$
 begin new.updated_at = now(); return new; end; $$;
 
 create trigger trg_wp_updated before update on work_packages
@@ -196,37 +198,44 @@ alter table users          enable row level security;
 alter table work_packages  enable row level security;
 alter table claims         enable row level security;
 
--- ── SECURITY DEFINER helpers (avoids circular self-reference in user policies) ──
--- These run as the function owner (postgres) and bypass RLS, safe to call from policies.
-create or replace function public.get_my_role()
+-- ── Private schema for RLS helpers (not exposed to PostgREST/anon) ───────────
+-- Avoids "Public Can Execute SECURITY DEFINER Function" warnings.
+create schema if not exists internal;
+grant usage on schema internal to authenticated;
+
+create or replace function internal.get_my_role()
 returns text language sql security definer stable
 set search_path = public as $$
   select role from public.users where id = auth.uid() limit 1;
 $$;
 
-create or replace function public.get_my_status()
+create or replace function internal.get_my_status()
 returns text language sql security definer stable
 set search_path = public as $$
   select status from public.users where id = auth.uid() limit 1;
 $$;
 
-create or replace function public.get_my_projects()
+create or replace function internal.get_my_projects()
 returns text[] language sql security definer stable
 set search_path = public as $$
   select coalesce(projects, '{}') from public.users where id = auth.uid() limit 1;
 $$;
 
+grant execute on function internal.get_my_role()     to authenticated;
+grant execute on function internal.get_my_status()   to authenticated;
+grant execute on function internal.get_my_projects() to authenticated;
+
 -- ── PROJECTS ──────────────────────────────────────────────────
 -- Any approved authenticated user can read projects
 create policy "projects_select" on projects
   for select to authenticated
-  using (public.get_my_status() = 'approved');
+  using (internal.get_my_status() = 'approved');
 
 -- super_admin and admin can create/update/delete projects
 create policy "projects_write" on projects
   for all to authenticated
-  using (public.get_my_role() in ('super_admin','admin'))
-  with check (public.get_my_role() in ('super_admin','admin'));
+  using (internal.get_my_role() in ('super_admin','admin'))
+  with check (internal.get_my_role() in ('super_admin','admin'));
 
 -- ── USERS ─────────────────────────────────────────────────────
 -- Any authenticated user can read all users (needed for dropdowns, user management)
@@ -244,7 +253,7 @@ create policy "users_update" on users
   for update to authenticated
   using (
     id = auth.uid()
-    or public.get_my_role() in ('super_admin','admin')
+    or internal.get_my_role() in ('super_admin','admin')
   );
 
 -- ── WORK PACKAGES ─────────────────────────────────────────────
@@ -252,10 +261,10 @@ create policy "users_update" on users
 create policy "wp_select" on work_packages
   for select to authenticated
   using (
-    public.get_my_status() = 'approved'
+    internal.get_my_status() = 'approved'
     and (
-      public.get_my_role() in ('super_admin','admin','specialist')
-      or project_id = any(public.get_my_projects())
+      internal.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(internal.get_my_projects())
     )
   );
 
@@ -263,11 +272,11 @@ create policy "wp_select" on work_packages
 create policy "wp_insert" on work_packages
   for insert to authenticated
   with check (
-    public.get_my_status() = 'approved'
-    and public.get_my_role() <> 'viewer'
+    internal.get_my_status() = 'approved'
+    and internal.get_my_role() <> 'viewer'
     and (
-      public.get_my_role() in ('super_admin','admin','specialist')
-      or project_id = any(public.get_my_projects())
+      internal.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(internal.get_my_projects())
     )
   );
 
@@ -275,55 +284,55 @@ create policy "wp_insert" on work_packages
 create policy "wp_update" on work_packages
   for update to authenticated
   using (
-    public.get_my_status() = 'approved'
-    and public.get_my_role() <> 'viewer'
+    internal.get_my_status() = 'approved'
+    and internal.get_my_role() <> 'viewer'
     and (
-      public.get_my_role() in ('super_admin','admin','specialist')
-      or project_id = any(public.get_my_projects())
+      internal.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(internal.get_my_projects())
     )
   );
 
 -- DELETE: super_admin only
 create policy "wp_delete" on work_packages
   for delete to authenticated
-  using (public.get_my_role() = 'super_admin');
+  using (internal.get_my_role() = 'super_admin');
 
 -- ── CLAIMS ────────────────────────────────────────────────────
 create policy "claims_select" on claims
   for select to authenticated
   using (
-    public.get_my_status() = 'approved'
+    internal.get_my_status() = 'approved'
     and (
-      public.get_my_role() in ('super_admin','admin','specialist')
-      or project_id = any(public.get_my_projects())
+      internal.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(internal.get_my_projects())
     )
   );
 
 create policy "claims_insert" on claims
   for insert to authenticated
   with check (
-    public.get_my_status() = 'approved'
-    and public.get_my_role() <> 'viewer'
+    internal.get_my_status() = 'approved'
+    and internal.get_my_role() <> 'viewer'
     and (
-      public.get_my_role() in ('super_admin','admin','specialist')
-      or project_id = any(public.get_my_projects())
+      internal.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(internal.get_my_projects())
     )
   );
 
 create policy "claims_update" on claims
   for update to authenticated
   using (
-    public.get_my_status() = 'approved'
-    and public.get_my_role() <> 'viewer'
+    internal.get_my_status() = 'approved'
+    and internal.get_my_role() <> 'viewer'
     and (
-      public.get_my_role() in ('super_admin','admin','specialist')
-      or project_id = any(public.get_my_projects())
+      internal.get_my_role() in ('super_admin','admin','specialist')
+      or project_id = any(internal.get_my_projects())
     )
   );
 
 create policy "claims_delete" on claims
   for delete to authenticated
-  using (public.get_my_role() = 'super_admin');
+  using (internal.get_my_role() = 'super_admin');
 
 -- ── SEED: insert the AVR101 project ──────────────────────────
 insert into projects (id, name, location, description, status)
