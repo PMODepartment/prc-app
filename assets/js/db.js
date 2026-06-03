@@ -17,7 +17,7 @@ const WPDb = (() => {
     const d = { ...w };
     if (d.budget_bcb && !d.approved_budget_bcb) d.approved_budget_bcb = d.budget_bcb;
     delete d.firestoreId; delete d.budget_bcb; delete d.contract_amount_php; delete d.id;
-    delete d.total_awarded; delete d.variance;
+    delete d.total_awarded; delete d.variance; delete d.awarding_lead_time;
     return d;
   }
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
