@@ -1567,9 +1567,17 @@
       // Project Cards
       const cardsEl = document.getElementById('project-cards');
       cardsEl.innerHTML = '';
-      filt.filter(p=>p.status!=='archived').forEach(p => {
-        cardsEl.innerHTML += renderProjectCard(p, allStats[filt.indexOf(p)]);
-      });
+      if (filt.length === 0) {
+        cardsEl.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:48px 24px;color:#aaa">
+          <i class="ti ti-filter-off" style="font-size:36px;display:block;margin-bottom:12px;opacity:.4"></i>
+          <div style="font-size:14px;font-weight:600;color:#888;margin-bottom:6px">No projects selected</div>
+          <div style="font-size:12px">Use the project filter above to select one or more projects.</div>
+        </div>`;
+      } else {
+        filt.filter(p=>p.status!=='archived').forEach(p => {
+          cardsEl.innerHTML += renderProjectCard(p, allStats[filt.indexOf(p)]);
+        });
+      }
       const archFilt = filt.filter(p=>p.status==='archived');
       const existingArch = document.getElementById('archived-section');
       if (existingArch) existingArch.remove();
@@ -1824,7 +1832,7 @@
 
     // ── Project filter ────────────────────────────────────────────
     window.toggleProjectPill = function(id, el) {
-      if (_activeIds.has(id)) { if (_activeIds.size > 1) _activeIds.delete(id); }
+      if (_activeIds.has(id)) _activeIds.delete(id);
       else _activeIds.add(id);
 
       // Update just this row's checkbox — panel stays open
@@ -1844,8 +1852,7 @@
       updateFilterLabel(); renderFilterList(); renderAll();
     };
     window.clearPills = function() {
-      const first = permitted[0];
-      _activeIds = new Set(first ? [first.id] : []);
+      _activeIds = new Set();
       updateFilterLabel(); renderFilterList(); renderAll();
     };
 
@@ -1885,10 +1892,17 @@
 
     function updateFilterLabel() {
       const lbl = document.getElementById('proj-filter-label');
+      const btn = document.getElementById('proj-filter-btn');
       if (!lbl) return;
       const sel = _activeIds.size;
       const total = permitted.length;
-      lbl.textContent = sel === total ? 'All projects' : `${sel} of ${total} projects selected`;
+      if (sel === 0) {
+        lbl.textContent = 'No projects selected';
+        if (btn) { btn.style.borderColor = '#EE3124'; btn.style.color = '#EE3124'; }
+      } else {
+        lbl.textContent = sel === total ? 'All projects' : `${sel} of ${total} project${sel !== 1 ? 's' : ''} selected`;
+        if (btn) { btn.style.borderColor = ''; btn.style.color = ''; }
+      }
     }
 
     function renderFilterList() {
