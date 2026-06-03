@@ -1307,12 +1307,15 @@ AppAuth.requireLogin(async (user, profile) => {
     if (window.__isViewer) addLink.style.display = 'none';
     else addLink.href = 'wp-form.html?project=' + projId;
   }
+  // Review WPs link — visible to all non-viewer roles
+  if (!window.__isViewer) {
+    const reviewLink = document.getElementById('review-wps-link');
+    if (reviewLink) { reviewLink.href = 'review.html?project=' + projId; reviewLink.style.display = 'flex'; }
+    if (isAdmin) updatePendingBadge();
+  }
   if(isAdmin) {
     document.getElementById('sidebar-projects').style.display='block';
     document.getElementById('sidebar-admin').style.display='block';
-    const reviewLink = document.getElementById('review-wps-link');
-    if(reviewLink) { reviewLink.href='review.html?project='+projId; reviewLink.style.display='flex'; }
-    updatePendingBadge();
     const editBtn=document.getElementById('btn-edit-project'); if(editBtn) editBtn.style.display='flex';
     if(profile.role==='super_admin') { const delBtn=document.getElementById('btn-delete-project'); if(delBtn) delBtn.style.display='flex'; }
   }

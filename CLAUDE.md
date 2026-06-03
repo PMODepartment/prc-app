@@ -34,7 +34,7 @@ No build step — edit files directly, push to GitHub, GitHub Pages auto-deploys
 | `index.html` | user | Portfolio Overview — consolidated dashboard, 7 tabs |
 | `project.html` | user | Single project dashboard — 4 tabs |
 | `wp-form.html` | user | Add / edit work package |
-| `review.html` | admin | Approve / reject pending WPs |
+| `review.html` | user+ | View WP submissions for assigned projects; admins can approve/reject |
 | `admin.html` | admin | User management + project management |
 | `claim-form.html` | user | Add / edit claim or CO — **hidden feature, not yet active** |
 | `my-wps.html` | user | Officer's WP list |

@@ -912,10 +912,16 @@ AppAuth.requireLogin(async (user, profile) => {
       if (pl) pl.href = 'project.html?id=' + projId;
       if (pn) pn.textContent = projId;
     }
+    // Review WPs link visible to all non-viewer roles
+    if (profile.role !== 'viewer') {
+      const reviewLink = document.getElementById('review-link-form');
+      if (reviewLink) {
+        reviewLink.href = projId ? 'review.html?project=' + projId : 'review.html';
+        reviewLink.style.display = 'flex';
+      }
+    }
     if (['admin','super_admin'].includes(profile.role)) {
       document.getElementById('sidebar-admin').style.display = 'block';
-      const reviewLink = document.getElementById('review-link-form');
-      if (reviewLink) reviewLink.style.display = 'flex';
       WPDb.getPendingWPs().then(wps => {
         if (wps.length > 0) {
           const b = document.getElementById('pending-badge');

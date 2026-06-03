@@ -154,49 +154,64 @@
 <script>
   let adminProfile, allWPs=[], currentTab='pending', rejectingId=null;
   let allProjects=[], currentProjId='ALL';
+  let _isAdminReviewer = false; // true for admin/super_admin — can approve/reject
   initMobileMenu();
 
-  AppAuth.requireAdmin(async (user, profile) => {
+  AppAuth.requireLogin(async (user, profile) => {
+    if (profile.role === 'viewer') { window.location.href = 'index.html'; return; }
     adminProfile = profile;
+    _isAdminReviewer = AppAuth.isAdmin(profile);
     window.__wpmRole = profile.role;
     renderUserBar('user-bar', profile);
     // Read project from URL param
     currentProjId = new URLSearchParams(location.search).get('project') || 'ALL';
-    // Track navigation context — reviewing a specific project or all
+    // Non-admins: always scoped to their assigned projects; ignore 'ALL'
+    if (!_isAdminReviewer && currentProjId === 'ALL') {
+      const assigned = profile.projects || [];
+      if (assigned.length === 1) currentProjId = assigned[0];
+    }
+    // Track navigation context
     sessionStorage.setItem('wpm_nav_ctx', currentProjId !== 'ALL' ? currentProjId : 'consolidated');
-    await loadAll();
+    await loadAll(profile);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
   });
 
-  async function loadAll() {
+  async function loadAll(profile) {
     allProjects = await WPDb.getProjects();
-    // Build project selector
+    const permitted = AppAuth.getPermittedProjects(profile || adminProfile, allProjects)
+      .filter(p => p.status !== 'archived');
+
+    // Build project selector — admins see all projects; others see only their assigned ones
     const sel = document.getElementById('proj-select');
     if (sel) {
-      sel.innerHTML = '<option value="ALL">All Projects (Consolidated)</option>' +
-        allProjects.filter(p=>p.status!=='archived')
-          .map(p=>`<option value="${p.id}" ${p.id===currentProjId?'selected':''}>${p.id} — ${p.name||p.id}</option>`)
-          .join('');
-      sel.value = currentProjId;
+      const opts = _isAdminReviewer
+        ? '<option value="ALL">All Projects (Consolidated)</option>' +
+          permitted.map(p=>`<option value="${p.id}" ${p.id===currentProjId?'selected':''}>${p.id} — ${p.name||p.id}</option>`).join('')
+        : permitted.map(p=>`<option value="${p.id}" ${p.id===currentProjId?'selected':''}>${p.id} — ${p.name||p.id}</option>`).join('');
+      sel.innerHTML = opts;
+      if (currentProjId !== 'ALL') sel.value = currentProjId;
     }
-    // Load WPs based on context
+
+    // Load WPs based on context and role
     if (currentProjId !== 'ALL') {
       allWPs = await WPDb.getAllWPs(currentProjId);
-      // Show project badge, hide the project filter dropdown (prevents bypassing dashboard selector)
       const badge = document.getElementById('proj-context-badge');
       if (badge) { badge.textContent = currentProjId; badge.style.display = 'inline'; }
       const filterWrap = document.getElementById('proj-filter-wrap');
       if (filterWrap) filterWrap.style.display = 'none';
-      // Update page subtitle
       const sub = document.querySelector('.page-sub');
       const proj = allProjects.find(p=>p.id===currentProjId);
-      if (sub) sub.textContent = (proj?.name||currentProjId)+' — Approve or reject work packages';
+      if (sub) sub.textContent = _isAdminReviewer
+        ? (proj?.name||currentProjId)+' — Approve or reject work packages'
+        : (proj?.name||currentProjId)+' — Work package submissions';
     } else {
-      allWPs = await WPDb.getAllWPsForAdmin();
+      // Admin consolidated view — all WPs; non-admin multi-project — their assigned projects
+      allWPs = _isAdminReviewer
+        ? await WPDb.getAllWPsForAdmin()
+        : await WPDb.getAllWPsForProjects(permitted.map(p=>p.id));
       const badge = document.getElementById('proj-context-badge');
       if (badge) badge.style.display = 'none';
-      // Show project filter in consolidated context
       const filterWrap = document.getElementById('proj-filter-wrap');
       if (filterWrap) filterWrap.style.display = 'flex';
     }
@@ -298,13 +313,20 @@
       const awarded = w.total_awarded;
       const v = (budget != null && awarded != null) ? budget - awarded : null;
       const vHtml = v==null?'—':v>=0?`<span style="color:#1D9E75">+${fmtM(v)}</span>`:`<span style="color:#E24B4A">-${fmtM(Math.abs(v))}</span>`;
-      const actionBtns = type === 'pending' ? `
-        <button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve</button>
-        <button class="btn-reject" onclick="openReject('${w.id}')"><i class="ti ti-x" style="font-size:13px"></i> Reject</button>
-        <a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-eye" style="font-size:13px"></i> View</a>` :
-        type === 'approved' ? `<a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-eye" style="font-size:13px"></i> View</a>` :
-        `<button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve</button>
-         <a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-eye" style="font-size:13px"></i> View</a>`;
+      const viewBtn = `<a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-edit" style="font-size:13px"></i> Edit</a>`;
+      let actionBtns;
+      if (_isAdminReviewer) {
+        actionBtns = type === 'pending'
+          ? `<button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve</button>
+             <button class="btn-reject" onclick="openReject('${w.id}')"><i class="ti ti-x" style="font-size:13px"></i> Reject</button>
+             ${viewBtn}`
+          : type === 'approved'
+            ? viewBtn
+            : `<button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve</button>${viewBtn}`;
+      } else {
+        // Non-admin: only the Edit button (no approve/reject)
+        actionBtns = viewBtn;
+      }
       return `<div class="review-card">
         <div class="review-card-header">
           <div>
