@@ -1398,13 +1398,13 @@
       const cg = document.getElementById('wp-mon-colgroup');
       if (cg) cg.innerHTML = cols.map(c => `<col style="width:${c.w}px;min-width:${c.w}px">`).join('');
 
-      // Update thead — sortable columns
+      // Update thead — sortable columns (no white-space:nowrap — let labels wrap to 2 lines)
       const headRow = document.getElementById('wp-mon-head-row');
       if (headRow) headRow.innerHTML = cols.map(c => {
         const isSorted = _wpMonSortCol === c.key;
         const ind = isSorted ? `<span style="margin-left:3px;color:#EE3124">${_wpMonSortDir===1?'↑':'↓'}</span>` : '';
         const stickyStyle = c.sticky ? `position:sticky;left:${_stickyLeft[c.key]}px;background:#f8f8f8;z-index:3;` : '';
-        return `<th onclick="setWPMonSort('${c.key}')" style="${stickyStyle}cursor:pointer;white-space:nowrap;user-select:none" title="Sort by ${c.h}">${c.h}${ind}</th>`;
+        return `<th onclick="setWPMonSort('${c.key}')" style="${stickyStyle}cursor:pointer;user-select:none;overflow:hidden;vertical-align:bottom" title="Sort by ${c.h}">${c.h}${ind}</th>`;
       }).join('');
 
       // Cell renderer per column key
@@ -1492,12 +1492,18 @@
       if (_wpMonPage > totalPages) _wpMonPage = totalPages;
       const pageItems = items.slice((_wpMonPage-1)*WP_MON_PER_PAGE, _wpMonPage*WP_MON_PER_PAGE);
 
+      // Count sticky cols so trade header can split into sticky + non-sticky tds
+      const nStickyCount = cols.filter(c => c.sticky).length;
+      const nNonStickyCount = nCols - nStickyCount;
+
       let html = '';
       pageItems.forEach(item => {
         if (item.type === 'header') {
-          const btn = `<span style="float:right;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-left:4px">${item.collapsed?'+':'−'}</span>`;
-          const cnt = `<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${item.count} WPs</span>`;
-          html += `<tr class="trade-group-header" data-trade="${item.trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5"><td colspan="${nCols}" style="position:sticky;left:0;z-index:2;background:#f8f8f8;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">${item.trade}${btn}${cnt}</td></tr>`;
+          const btn = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-left:6px;flex-shrink:0">${item.collapsed?'+':'−'}</span>`;
+          const cnt = `<span style="font-size:10px;color:#aaa;font-weight:400;white-space:nowrap">${item.count} WPs</span>`;
+          const tdSticky = `<td colspan="${nStickyCount||1}" style="position:sticky;left:0;z-index:2;background:#f8f8f8;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:table-cell">${item.trade}${btn}</td>`;
+          const tdRest = nNonStickyCount > 0 ? `<td colspan="${nNonStickyCount}" style="background:#f8f8f8;padding:7px 12px;text-align:right;vertical-align:middle">${cnt}</td>` : '';
+          html += `<tr class="trade-group-header" data-trade="${item.trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5">${tdSticky}${tdRest}</tr>`;
         } else {
           html += `<tr data-trade-row="${item.trade.replace(/"/g,'&quot;')}">${cols.map(c=>renderCell(c.key,item.wp)).join('')}</tr>`;
         }
