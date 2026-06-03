@@ -63,6 +63,28 @@
     .page-content{padding:20px;max-width:100%}
     .section-card{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:20px;margin-bottom:20px}
     .hidden{display:none!important}
+    /* ── Performance tab ── */
+    .perf-table{width:100%;min-width:720px;border-collapse:collapse}
+    .perf-table th{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#999;padding:9px 12px;text-align:left;border-bottom:2px solid #f0f0f0;background:#fafafa;cursor:pointer;white-space:nowrap;user-select:none}
+    .perf-table th:hover{color:#231F20}
+    .perf-table th .sort-ind{margin-left:4px;color:#EE3124}
+    .perf-table td{padding:10px 12px;font-size:12px;color:#231F20;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+    .perf-table tr.perf-user-row{cursor:pointer}
+    .perf-table tr.perf-user-row:hover td{background:#fafafa}
+    .perf-table tr.perf-expand-row td{padding:0;background:#f9f9f9;border-bottom:2px solid #f0f0f0}
+    .perf-chip{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap}
+    .perf-green{background:#D1FAE5;color:#065F46}
+    .perf-yellow{background:#FEF3C7;color:#92400E}
+    .perf-red{background:#FEE2E2;color:#991B1B}
+    .perf-neutral{background:#F3F4F6;color:#374151}
+    .perf-bar-wrap{display:inline-flex;align-items:center;gap:6px;width:100%}
+    .perf-bar-bg{flex:1;height:5px;background:#f0f0f0;border-radius:3px;overflow:hidden;min-width:40px}
+    .perf-bar-fill{height:100%;border-radius:3px;transition:width .3s}
+    .perf-wp-sub{padding:12px 16px}
+    .perf-wp-sub table{width:100%;border-collapse:collapse;font-size:11px}
+    .perf-wp-sub th{color:#aaa;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:4px 8px;border-bottom:1px solid #e5e5e5;text-align:left}
+    .perf-wp-sub td{padding:5px 8px;border-bottom:1px solid #f0f0f0;color:#374151}
+    .perf-wp-sub tr:last-child td{border-bottom:none}
   </style>
 </head>
 <body>
@@ -120,11 +142,12 @@
             <div class="kpi-card"><div class="kpi-value" id="kpiInactive" style="color:#D97706">—</div><div class="kpi-label">Inactive (7+ days)</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiRejected" style="color:#6B7280">—</div><div class="kpi-label">Revoked</div></div>
           </div>
-          <div class="tab-row">
+          <div class="tab-row" id="admin-tab-row">
             <button class="tab-btn active" id="tabAll" onclick="switchTab('all')">All Users</button>
             <button class="tab-btn" id="tabPending" onclick="switchTab('pending')">
               Pending <span id="pending-count" style="display:none;background:#EE3124;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px"></span>
             </button>
+            <button class="tab-btn" id="tabPerf" onclick="switchTab('perf')"><i class="ti ti-chart-bar" style="margin-right:4px;font-size:13px"></i>Performance</button>
           </div>
           <div class="section-card">
             <!-- Search + Bulk Assign Bar -->
@@ -173,6 +196,42 @@
               </table>
             </div>
           </div>
+
+          <!-- ══ PERFORMANCE PANEL ══ -->
+          <div id="perf-panel" style="display:none">
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+              <select id="perf-proj-filter" onchange="renderPerfTab()" style="padding:7px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:12px;font-family:inherit;background:#fff;color:#231F20">
+                <option value="ALL">All Projects</option>
+              </select>
+              <select id="perf-sort-sel" onchange="renderPerfTab()" style="padding:7px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:12px;font-family:inherit;background:#fff;color:#231F20">
+                <option value="awardRate">Sort: Award Rate</option>
+                <option value="onTimeRate">Sort: On-Time Rate</option>
+                <option value="budgetCompliance">Sort: Budget Compliance</option>
+                <option value="total">Sort: Total WPs</option>
+                <option value="overdue">Sort: Overdue</option>
+              </select>
+              <span id="perf-summary" style="font-size:11px;color:#888;margin-left:auto"></span>
+            </div>
+            <div class="table-wrapper">
+              <table class="perf-table">
+                <thead>
+                  <tr>
+                    <th style="width:28px"></th>
+                    <th>User</th>
+                    <th>Total WPs</th>
+                    <th>Award Rate</th>
+                    <th>On-Time Rate</th>
+                    <th>Avg Days Early/Late</th>
+                    <th>Overdue</th>
+                    <th>Budget Compliance</th>
+                    <th>Net Savings</th>
+                  </tr>
+                </thead>
+                <tbody id="perf-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -314,8 +373,214 @@
     currentTab = tab;
     document.getElementById('tabPending').classList.toggle('active', tab === 'pending');
     document.getElementById('tabAll').classList.toggle('active', tab === 'all');
+    document.getElementById('tabPerf').classList.toggle('active', tab === 'perf');
+    const sc = document.querySelector('.section-card');
+    if (sc) sc.style.display = tab === 'perf' ? 'none' : '';
+    document.getElementById('perf-panel').style.display = tab === 'perf' ? '' : 'none';
+    if (tab === 'perf') { loadPerfWPs(); return; }
     selectedUserIds.clear();
     filterAndRender();
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  // PERFORMANCE TAB
+  // ══════════════════════════════════════════════════════════════
+  let _perfWPs = null;        // cached after first load
+  let _perfData = [];         // computed per-user metrics
+  let _perfExpanded = new Set();
+  const _PERF_THRESHOLDS = {
+    awardRate:       { green: 0.75, yellow: 0.50 },
+    onTimeRate:      { green: 0.80, yellow: 0.60 },
+    budgetCompliance:{ green: 0.90, yellow: 0.70 },
+  };
+
+  function _perfChip(val, thresholds, label) {
+    if (val == null) return `<span class="perf-chip perf-neutral">—</span>`;
+    const cls = val >= thresholds.green ? 'perf-green' : val >= thresholds.yellow ? 'perf-yellow' : 'perf-red';
+    return `<div class="perf-bar-wrap">
+      <span class="perf-chip ${cls}">${label}</span>
+      <div class="perf-bar-bg"><div class="perf-bar-fill" style="width:${Math.round(val*100)}%;background:${cls==='perf-green'?'#2D9B6F':cls==='perf-yellow'?'#D97706':'#EE3124'}"></div></div>
+    </div>`;
+  }
+
+  function _fmtDays(d) {
+    if (d == null) return `<span class="perf-chip perf-neutral">—</span>`;
+    const rounded = Math.round(d);
+    if (rounded <= 0) return `<span class="perf-chip perf-green">${Math.abs(rounded)}d early</span>`;
+    if (rounded <= 5) return `<span class="perf-chip perf-yellow">${rounded}d late</span>`;
+    return `<span class="perf-chip perf-red">${rounded}d late</span>`;
+  }
+
+  function _fmtOverdue(n) {
+    if (n === 0) return `<span class="perf-chip perf-green">0</span>`;
+    if (n <= 2)  return `<span class="perf-chip perf-yellow">${n}</span>`;
+    return `<span class="perf-chip perf-red">${n}</span>`;
+  }
+
+  function _fmtMoney(v) {
+    if (v == null || v === 0) return '—';
+    const abs = Math.abs(v);
+    const str = abs >= 1e6 ? '₱' + (abs/1e6).toFixed(2) + 'M' : '₱' + abs.toLocaleString('en-PH',{minimumFractionDigits:0,maximumFractionDigits:0});
+    return v >= 0
+      ? `<span style="color:#065F46;font-weight:600">+${str}</span>`
+      : `<span style="color:#991B1B;font-weight:600">−${str}</span>`;
+  }
+
+  function buildPerfData(users, wps, permittedProjectIds) {
+    const today = new Date();
+    const projSet = new Set(permittedProjectIds);
+    // Only trackable roles
+    const trackable = users.filter(u => ['user','manager','specialist'].includes(u.role));
+
+    return trackable.map(u => {
+      const uName  = (u.name  || '').toLowerCase().trim();
+      const uEmail = (u.email || '').toLowerCase().trim();
+      const myWPs  = wps.filter(w => {
+        if (!projSet.has(w.project_id)) return false;
+        const parts = (w.responsible_team || '').split(',').map(s => s.trim().toLowerCase());
+        return parts.some(p => p && (p === uName || p === uEmail));
+      });
+      if (!myWPs.length) return null;
+
+      const awarded      = myWPs.filter(w => w.award_status === 'Awarded');
+      const withDates    = awarded.filter(w => w.actual_awarding_date && w.awarding_date);
+      const onTime       = withDates.filter(w => new Date(w.actual_awarding_date) <= new Date(w.awarding_date));
+      const overdue      = myWPs.filter(w => w.award_status !== 'Awarded' && w.awarding_date && new Date(w.awarding_date) < today);
+      const withBudget   = awarded.filter(w => w.approved_budget_bcb != null && w.total_awarded != null);
+      const compliant    = withBudget.filter(w => (w.approved_budget_bcb - w.total_awarded) >= 0);
+      const avgDays      = withDates.length
+        ? withDates.reduce((s,w) => s + (new Date(w.actual_awarding_date) - new Date(w.awarding_date)) / 86400000, 0) / withDates.length
+        : null;
+      const netSavings   = withBudget.reduce((s,w) => s + (w.approved_budget_bcb - w.total_awarded), 0);
+
+      return {
+        user: u,
+        wps: myWPs,
+        total:            myWPs.length,
+        awardedCount:     awarded.length,
+        awardRate:        myWPs.length  ? awarded.length   / myWPs.length    : 0,
+        onTimeRate:       withDates.length ? onTime.length / withDates.length : null,
+        avgDays,
+        overdueCount:     overdue.length,
+        budgetCompliance: withBudget.length ? compliant.length / withBudget.length : null,
+        netSavings:       withBudget.length ? netSavings : null,
+      };
+    }).filter(Boolean);
+  }
+
+  async function loadPerfWPs() {
+    if (_perfWPs) { renderPerfTab(); return; }
+    document.getElementById('perf-tbody').innerHTML =
+      '<tr><td colspan="9" style="text-align:center;padding:32px;color:#aaa">Loading performance data…</td></tr>';
+    const isManager = currentProfile?.role === 'manager';
+    const permitted = AppAuth.getPermittedProjects(currentProfile, allProjects).filter(p => p.status !== 'archived');
+
+    // Populate project filter
+    const sel = document.getElementById('perf-proj-filter');
+    sel.innerHTML = '<option value="ALL">All Projects</option>' +
+      permitted.map(p => `<option value="${p.id}">${p.id} — ${p.name||p.id}</option>`).join('');
+
+    _perfWPs = isManager
+      ? await WPDb.getAllWPsForProjects(permitted.map(p => p.id))
+      : await WPDb.getAllWPsForAdmin();
+    renderPerfTab();
+  }
+
+  window.renderPerfTab = function() {
+    const projFilter = (document.getElementById('perf-proj-filter')?.value) || 'ALL';
+    const sortSel    = (document.getElementById('perf-sort-sel')?.value)   || 'awardRate';
+    const permitted  = AppAuth.getPermittedProjects(currentProfile, allProjects)
+      .filter(p => p.status !== 'archived')
+      .filter(p => projFilter === 'ALL' || p.id === projFilter);
+    const filtWPs = projFilter === 'ALL' ? _perfWPs : _perfWPs.filter(w => w.project_id === projFilter);
+
+    _perfData = buildPerfData(allUsers, filtWPs || [], permitted.map(p => p.id));
+
+    // Sort
+    _perfData.sort((a,b) => {
+      const av = a[sortSel] ?? -Infinity;
+      const bv = b[sortSel] ?? -Infinity;
+      return sortSel === 'overdueCount' ? bv - av : bv - av; // desc
+    });
+    if (sortSel === 'awardRate' || sortSel === 'onTimeRate' || sortSel === 'budgetCompliance') {
+      _perfData.sort((a,b) => (b[sortSel]??-1) - (a[sortSel]??-1));
+    } else if (sortSel === 'total') {
+      _perfData.sort((a,b) => b.total - a.total);
+    } else if (sortSel === 'overdue') {
+      _perfData.sort((a,b) => b.overdueCount - a.overdueCount);
+    }
+
+    document.getElementById('perf-summary').textContent =
+      `${_perfData.length} user${_perfData.length!==1?'s':''} · ${(filtWPs||[]).length} work packages`;
+
+    const tbody = document.getElementById('perf-tbody');
+    if (!_perfData.length) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#aaa"><i class="ti ti-chart-off" style="font-size:32px;display:block;margin-bottom:8px;opacity:.3"></i>No performance data for the selected filter</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = _perfData.map((d, i) => {
+      const uid = d.user.id;
+      const isExpanded = _perfExpanded.has(uid);
+      const roleSt = roleStyle(d.user.role);
+      const roleL  = roleLabel(d.user.role);
+      const userRow = `<tr class="perf-user-row" onclick="togglePerfUser('${uid}')">
+        <td style="text-align:center;color:#aaa;font-size:11px">
+          <i class="ti ti-chevron-${isExpanded?'up':'down'}" style="font-size:13px"></i>
+        </td>
+        <td>
+          <div style="font-weight:600;font-size:13px">${d.user.name||d.user.email}</div>
+          <div style="margin-top:2px"><span style="${roleSt}">${roleL}</span></div>
+        </td>
+        <td><span style="font-weight:700;font-size:14px">${d.total}</span> <span style="color:#aaa;font-size:11px">(${d.awardedCount} awarded)</span></td>
+        <td>${_perfChip(d.awardRate, _PERF_THRESHOLDS.awardRate, Math.round(d.awardRate*100)+'%')}</td>
+        <td>${_perfChip(d.onTimeRate, _PERF_THRESHOLDS.onTimeRate, d.onTimeRate!=null ? Math.round(d.onTimeRate*100)+'%' : null)}</td>
+        <td>${_fmtDays(d.avgDays)}</td>
+        <td>${_fmtOverdue(d.overdueCount)}</td>
+        <td>${_perfChip(d.budgetCompliance, _PERF_THRESHOLDS.budgetCompliance, d.budgetCompliance!=null ? Math.round(d.budgetCompliance*100)+'%' : null)}</td>
+        <td>${_fmtMoney(d.netSavings)}</td>
+      </tr>`;
+
+      if (!isExpanded) return userRow;
+
+      const subRows = d.wps.map(w => {
+        const planned = w.awarding_date ? new Date(w.awarding_date).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : '—';
+        const actual  = w.actual_awarding_date ? new Date(w.actual_awarding_date).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : '—';
+        const variance = (w.approved_budget_bcb != null && w.total_awarded != null)
+          ? w.approved_budget_bcb - w.total_awarded : null;
+        const varHtml = variance == null ? '—'
+          : variance >= 0 ? `<span style="color:#065F46">+${(variance/1e6).toFixed(2)}M</span>`
+          : `<span style="color:#991B1B">${(variance/1e6).toFixed(2)}M</span>`;
+        const statusColor = w.award_status==='Awarded'?'#065F46':w.award_status==='Partially Awarded'?'#92400E':'#991B1B';
+        return `<tr>
+          <td>${w.wp_no||'—'}</td>
+          <td>${w.description||'—'}</td>
+          <td>${w.project_id||'—'}</td>
+          <td style="color:${statusColor};font-weight:600">${w.award_status||'—'}</td>
+          <td>${planned}</td>
+          <td>${actual}</td>
+          <td>${varHtml}</td>
+        </tr>`;
+      }).join('');
+
+      const expandRow = `<tr class="perf-expand-row">
+        <td colspan="9">
+          <div class="perf-wp-sub">
+            <table>
+              <thead><tr><th>WP No.</th><th>Description</th><th>Project</th><th>Award Status</th><th>Planned Award</th><th>Actual Award</th><th>Variance</th></tr></thead>
+              <tbody>${subRows}</tbody>
+            </table>
+          </div>
+        </td>
+      </tr>`;
+      return userRow + expandRow;
+    }).join('');
+  };
+
+  window.togglePerfUser = function(uid) {
+    if (_perfExpanded.has(uid)) _perfExpanded.delete(uid);
+    else _perfExpanded.add(uid);
+    renderPerfTab();
   };
 
   // ── Filter + render ──────────────────────────────────────────
@@ -940,53 +1205,75 @@ window.addEventListener('beforeunload', function(e) {
   };
 
   // ── Init ──────────────────────────────────────────────────────
-  AppAuth.requireAdmin(async (user, profile) => {
+  AppAuth.requireLogin(async (user, profile) => {
+    // Allow admin, super_admin, and manager; redirect everyone else
+    if (!['admin','super_admin','manager'].includes(profile.role)) {
+      window.location.href = 'index.html'; return;
+    }
     currentProfile = profile;
     window.__wpmRole = profile.role;
     renderUserBar('user-bar', profile);
 
-    // Navigation context: adapt sidebar based on how user entered the dashboard
+    const isManager = profile.role === 'manager';
+
+    // Managers: hide user-management UI, go straight to Performance tab
+    if (isManager) {
+      document.getElementById('kpiGrid').style.display = 'none';
+      document.getElementById('tabAll').style.display = 'none';
+      document.getElementById('tabPending').style.display = 'none';
+      const sc = document.querySelector('.section-card');
+      if (sc) sc.style.display = 'none';
+      document.querySelector('.page-title').textContent = 'Performance';
+      // Also hide project management from sidebar
+      const projSec = document.getElementById('nav-projects-section');
+      if (projSec) projSec.style.display = 'none';
+      switchTab('perf');
+    }
+
+    // Navigation context
     const navCtx = sessionStorage.getItem('wpm_nav_ctx');
     if (navCtx && navCtx !== 'consolidated') {
-      // Project-specific login: show Back to Project, hide full project list
-      const backSec      = document.getElementById('nav-back-section');
-      const backLink     = document.getElementById('nav-back-link');
-      const backName     = document.getElementById('nav-back-name');
-      const projectsSec  = document.getElementById('nav-projects-section');
-      if (backSec)     { backSec.style.display = 'block'; }
-      if (backLink)    { backLink.href = 'project.html?id=' + navCtx; }
-      if (backName)    { backName.textContent = navCtx; }
-      if (projectsSec) { projectsSec.style.display = 'none'; } // hide project list — not needed in project context
+      const backSec     = document.getElementById('nav-back-section');
+      const backLink    = document.getElementById('nav-back-link');
+      const backName    = document.getElementById('nav-back-name');
+      const projectsSec = document.getElementById('nav-projects-section');
+      if (backSec)  backSec.style.display = 'block';
+      if (backLink) backLink.href = 'project.html?id=' + navCtx;
+      if (backName) backName.textContent = navCtx;
+      if (projectsSec && !isManager) projectsSec.style.display = 'none';
     }
-    // Consolidated context: full project list already visible by default
 
-    // Show "Assigned Admin" column only for super_admin
-    if (profile.role === 'super_admin') {
-      document.getElementById('col-admin-head').style.display = '';
+    if (!isManager) {
+      // Show "Assigned Manager" column only for super_admin
+      if (profile.role === 'super_admin') {
+        document.getElementById('col-admin-head').style.display = '';
+      }
+      // Admins cannot assign super_admin or specialist roles
+      if (profile.role === 'admin') {
+        ['super_admin','specialist'].forEach(v => {
+          document.querySelectorAll(`#bulk-role-select option[value="${v}"], #modalRoleSelect option[value="${v}"], #crm-role-select option[value="${v}"]`).forEach(o => o.remove());
+        });
+        const superModalOpt = document.getElementById('opt-super-admin');
+        if (superModalOpt) superModalOpt.remove();
+      }
+      if (profile.role === 'super_admin') {
+        document.getElementById('assign-admin-wrap').style.display = 'block';
+      }
+      await loadData();
+    } else {
+      // Manager: only load projects + users for performance tab
+      const [_projects, _users] = await Promise.all([WPDb.getProjects(), WPDb.getAllUsers().catch(()=>[])]);
+      allProjects = _projects;
+      allUsers = (_users||[]).filter(u=>u.status==='approved');
     }
-    // Admins cannot assign super_admin or specialist roles
-    if (profile.role === 'admin') {
-      ['super_admin','specialist'].forEach(v => {
-        document.querySelectorAll(`#bulk-role-select option[value="${v}"], #modalRoleSelect option[value="${v}"], #crm-role-select option[value="${v}"]`).forEach(o => o.remove());
-      });
-      const superModalOpt = document.getElementById('opt-super-admin');
-      if (superModalOpt) superModalOpt.remove();
-    }
-    // Show assign-to-admin section in modal for super_admin
-    if (profile.role === 'super_admin') {
-      document.getElementById('assign-admin-wrap').style.display = 'block';
-    }
-    await loadData();
+
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
-    // Auto-open New Project modal AFTER data is loaded
-    if (sessionStorage.getItem('openNewProject') === '1') {
+
+    if (!isManager && sessionStorage.getItem('openNewProject') === '1') {
       sessionStorage.removeItem('openNewProject');
-      // Small delay to ensure DOM and data are fully ready
       await new Promise(r => setTimeout(r, 100));
-      if (typeof window.openNewProjectModal === 'function') {
-        window.openNewProjectModal();
-      }
+      if (typeof window.openNewProjectModal === 'function') window.openNewProjectModal();
     }
   });
 </script>
