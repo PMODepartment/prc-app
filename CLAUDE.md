@@ -290,6 +290,12 @@ Current field order in the Identity & Classification section:
 15. No. of PO/JO
 16. PO/JO Numbers
 
+### Approval Matrix (wp-form.html)
+
+Fields: **Responsible** (multi-select, `_msState.responsible`), **Approver** (single `<select id="f-approver">`), **Support** (multi-select, `_msState.support`). All populated from `WPDb.getAllUsers()` (approved users only). Multi-select uses a custom pill-dropdown component (`toggleMs(field)`, `getMsValues(field)`, `_setMsFromText(field, text)`). Values stored as comma-separated display names (full_name or email) in the existing `responsible_team` / `approver` / `support_team` text columns.
+
+**Budget & Contract section:** "Contractor / Supplier" label renamed to **"Vendor/s"** (`id="f-contractor"`).
+
 ### Trade → Works → Type cascade (wp-form.html)
 
 `TRADE_WORKS` JS object maps each Trade to an array of `[works, type]` pairs. Defined at top of `<script>` block.
@@ -571,7 +577,7 @@ The **Supabase free tier cold start** (5–30s on first load after 7 days inacti
 8. **Sticky tabs + overflow:** `overflow: hidden/clip` on any ancestor of `.view-tabs` breaks `position: sticky` in Safari. Always clamp overflow at the element level, not the container level.
 9. **Supabase free tier pause:** Project pauses after 7 days inactivity → 5–30s cold start on first load. Use UptimeRobot to ping every 3–4 days to prevent this.
 10. **N+1 query anti-pattern:** Never use `Promise.all(projects.map(p => WPDb.getApprovedWPs(p.id)))` in the consolidated dashboard — use `getAllApprovedWPs()` or `getApprovedWPsForProjects(ids)` instead.
-11. **Generated columns:** `total_awarded`, `awarding_lead_time`, `variance` are `GENERATED ALWAYS AS` columns — inserting into them causes a Postgres error. Always insert into `awarded_cost` and let the DB compute `total_awarded`.
+11. **Generated columns:** `total_awarded`, `awarding_lead_time`, `variance` are `GENERATED ALWAYS AS` columns — inserting into them causes a Postgres error. Always insert into `awarded_cost` and let the DB compute `total_awarded`. The `unmap()` in `db.js` strips `total_awarded` and `variance` automatically. `wp-form.html` sends `awarded_cost` (not `total_awarded`) — **this was the root cause of WPs silently not saving** (save showed success but WP never appeared in WP List).
 12. **Trade name consistency:** All trades must use the exact strings from the WP form dropdown (e.g. "General Requirements" not "General Requirement"). A `normTrade(t)` function is defined in both `index.html` and `project.html` — it maps legacy/wrong names (all-caps, missing 's', etc.) to canonical TRADE_ORDER names. Applied at data load time via `.map(w=>({...w,trade:normTrade(w.trade)}))` so all charts, tables, and groupings see clean data. DB was fixed 2026-06-02 (patched 2 WPs: "GENERAL REQUIREMENT"→"General Requirements", "STRUCTURAL WORKS"→"Structural Works").
 13. **AVR101 data:** 114 WPs (approved) across General Requirements (42), Architectural Works (30), Structural Works (11), MEPF split into Mechanical/Electrical/Plumbing/Fire Protection/Auxiliary (20), Site Development Works (6), Site Works (5). WP Nos use `WP-` prefix (e.g. `WP-1`…`WP-114`). The 228-record duplicate issue (two imports: 2026-05-26 all-caps trades + 2026-06-02 correct trades) was resolved 2026-06-02 by deleting the May 26 batch via service role API — 114 records removed, 114 remain.
 14. **TEST101 data:** 2 WPs (approved). WP Nos updated 2026-06-03 from old zero-padded format (`WP-001`, `WP-002`) to current format (`WP-1`, `WP-2`) to match AVR101 convention.
