@@ -431,6 +431,8 @@ Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic
 8. **Supabase cold start**: free tier pauses after 7 days → 5–30s delay. UptimeRobot ping every 3–4 days prevents this.
 9. **Duplicate `saveProject` in db.js**: second definition shadows first — harmless but note when editing.
 10. **dp_percent**: stored as decimal (0.20 = 20%). Form input accepts percentage (user types "20"), divided by 100 before storing; edit mode multiplies by 100 to display.
+11. **Sticky columns require `table-layout:fixed` + colgroup**: In `index.html` WP List (`renderWPMonTable`), sticky `left` offsets are hardcoded pixel values (e.g. project=0, cost_code=90, wp_no=180). Without `table-layout:fixed` + `<colgroup>` setting explicit column widths, the browser auto-sizes columns narrower than those values — causing sticky cells to physically overlap the next column even before scrolling. Always keep `<table style="table-layout:fixed">` + `<colgroup id="wp-mon-colgroup">` updated via `cg.innerHTML = cols.map(c => \`<col style="width:${c.w}px;min-width:${c.w}px">\`).join('')`.
+12. **Sticky column chain must be contiguous**: All sticky columns must be consecutive from the left with no non-sticky column in between. A non-sticky column between two sticky ones causes the right sticky column to get a wrong `left` offset (missing the non-sticky column's width). In `index.html`, sticky cols are project(0)→cost_code(90)→wp_no(180); `works` is NOT sticky. In `project.html`, cost_code(0)→wp_no(90)→works(180) are all sticky — `description` can be made sticky in non-overview views because the chain is unbroken.
 
 ---
 
