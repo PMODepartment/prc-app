@@ -292,7 +292,7 @@ Current field order in the Identity & Classification section:
 
 ### Approval Matrix (wp-form.html)
 
-Fields: **Responsible** (multi-select, `_msState.responsible`), **Approver** (single `<select id="f-approver">`), **Support** (multi-select, `_msState.support`). All populated from `WPDb.getAllUsers()` (approved users only). Multi-select uses a custom pill-dropdown component (`toggleMs(field)`, `getMsValues(field)`, `_setMsFromText(field, text)`). Values stored as comma-separated display names (full_name or email) in the existing `responsible_team` / `approver` / `support_team` text columns.
+Fields: **Responsible** (multi-select, `_msState.responsible`), **Approver** (single `<select id="f-approver">`), **Support** (multi-select, `_msState.support`). All populated from `WPDb.getAllUsers()` (approved users only, `.catch(()=>[])` fallback). **Approver dropdown shows only admin/super_admin users.** Multi-select uses a custom pill-dropdown: `toggleMs(field)`, `msClearAll(field)`, `getMsValues(field)`, `_setMsFromText(field,text)`, `_msPillRemove(field,uid)`. Display name uses `u.name` (the `name` column on the `users` table — confirmed present from admin.html usage). Values stored as comma-separated names in `responsible_team` / `approver` / `support_team` text columns. Mobile: dropdown uses `position:fixed` full-width. `db.js submitWP/updateWP/updateWPDirect` now throw on Supabase error so failures surface as visible error messages.
 
 **Budget & Contract section:** "Contractor / Supplier" label renamed to **"Vendor/s"** (`id="f-contractor"`).
 
