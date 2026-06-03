@@ -37,16 +37,28 @@
     .tbadge{font-size:9px;background:#EE3124;color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
     /* Multi-select user picker */
     .ms-wrap{position:relative}
-    .ms-trigger{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);background:var(--surface-2);cursor:pointer;font-size:12px;min-height:36px;gap:6px;user-select:none}
+    .ms-trigger{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);background:var(--surface-2);cursor:pointer;font-size:12px;min-height:38px;gap:6px;user-select:none;transition:border-color .15s}
     .ms-trigger:hover,.ms-trigger.open{border-color:#5B9DEA;background:#fff}
-    .ms-pills-wrap{display:flex;flex-wrap:wrap;gap:3px;flex:1;min-width:0}
-    .ms-pill{background:#dbeafe;color:#1e40af;border-radius:8px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap}
+    .ms-pills-wrap{display:flex;flex-wrap:wrap;gap:3px;flex:1;min-width:0;align-items:center}
+    .ms-pill{background:#dbeafe;color:#1e40af;border-radius:8px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+    .ms-pill-x{cursor:pointer;opacity:.6;font-size:13px;line-height:1;font-weight:400}
+    .ms-pill-x:hover{opacity:1}
     .ms-placeholder{color:#aaa;font-size:12px}
-    .ms-dd{position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:300;background:#fff;border:1.5px solid #5B9DEA;border-radius:var(--radius-md);max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.12);display:none}
+    .ms-dd{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:400;background:#fff;border:1.5px solid #5B9DEA;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.14);display:none}
     .ms-dd.open{display:block}
-    .ms-opt{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;font-size:12px;color:var(--text-primary)}
-    .ms-opt:hover,.ms-opt.checked{background:#EFF6FF}
-    .ms-opt input[type=checkbox]{flex-shrink:0;accent-color:#1e40af}
+    .ms-dd-header{padding:8px 12px 6px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between}
+    .ms-dd-header span{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em}
+    .ms-dd-header button{font-size:11px;color:#1e40af;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600;padding:0}
+    .ms-list{max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+    .ms-opt{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;font-size:12.5px;color:var(--text-primary);border-bottom:1px solid #f8f8f8;min-height:44px;box-sizing:border-box}
+    .ms-opt:last-child{border-bottom:none}
+    .ms-opt:active,.ms-opt.checked{background:#EFF6FF}
+    .ms-opt input[type=checkbox]{flex-shrink:0;width:16px;height:16px;accent-color:#1e40af;cursor:pointer}
+    .ms-opt .ms-name{flex:1;min-width:0;font-weight:500}
+    .ms-opt .ms-role{font-size:10px;color:#aaa;font-weight:400;margin-top:1px}
+    @media(max-width:767px){
+      .ms-dd{position:fixed;left:12px;right:12px;top:auto;z-index:500;border-radius:12px}
+    }
   </style>
 </head>
 <body>
@@ -233,24 +245,30 @@
                 <label>Responsible <span style="font-size:10px;color:#aaa;font-weight:400">(multiple)</span></label>
                 <div class="ms-wrap" id="ms-responsible-wrap">
                   <div class="ms-trigger" id="ms-responsible-trigger" onclick="toggleMs('responsible')">
-                    <div class="ms-pills-wrap" id="ms-responsible-pills"><span class="ms-placeholder">Select responsible…</span></div>
+                    <div class="ms-pills-wrap" id="ms-responsible-pills"><span class="ms-placeholder">Select responsible persons…</span></div>
                     <i class="ti ti-chevron-down" style="font-size:12px;color:#aaa;flex-shrink:0"></i>
                   </div>
-                  <div class="ms-dd" id="ms-responsible-dd"></div>
+                  <div class="ms-dd" id="ms-responsible-dd">
+                    <div class="ms-dd-header"><span>Select Responsible</span><button type="button" onclick="msClearAll('responsible')">Clear all</button></div>
+                    <div class="ms-list"></div>
+                  </div>
                 </div>
               </div>
               <div class="form-group">
-                <label>Approver</label>
+                <label>Approver <span style="font-size:10px;color:#aaa;font-weight:400">(admin/super admin)</span></label>
                 <select id="f-approver"><option value="">— Select approver —</option></select>
               </div>
               <div class="form-group">
                 <label>Support <span style="font-size:10px;color:#aaa;font-weight:400">(multiple)</span></label>
                 <div class="ms-wrap" id="ms-support-wrap">
                   <div class="ms-trigger" id="ms-support-trigger" onclick="toggleMs('support')">
-                    <div class="ms-pills-wrap" id="ms-support-pills"><span class="ms-placeholder">Select support…</span></div>
+                    <div class="ms-pills-wrap" id="ms-support-pills"><span class="ms-placeholder">Select support persons…</span></div>
                     <i class="ti ti-chevron-down" style="font-size:12px;color:#aaa;flex-shrink:0"></i>
                   </div>
-                  <div class="ms-dd" id="ms-support-dd"></div>
+                  <div class="ms-dd" id="ms-support-dd">
+                    <div class="ms-dd-header"><span>Select Support</span><button type="button" onclick="msClearAll('support')">Clear all</button></div>
+                    <div class="ms-list"></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -739,45 +757,62 @@
   let _allUsers = [];
   const _msState = { responsible: new Set(), support: new Set() };
 
+  function _userName(u) { return (u.name || u.email || '').trim(); }
+
   function _buildMsOpts(field) {
     const dd = document.getElementById('ms-' + field + '-dd');
-    dd.innerHTML = '';
+    const list = dd.querySelector('.ms-list');
+    list.innerHTML = '';
+    if (!_allUsers.length) {
+      list.innerHTML = '<div style="padding:12px;font-size:12px;color:#aaa;text-align:center">No users found</div>';
+      return;
+    }
     _allUsers.forEach(u => {
-      const label = (u.full_name || u.email || '').trim() || u.email;
+      const name = _userName(u);
+      const roleLabel = { super_admin:'Super Admin', admin:'Admin', user:'User', viewer:'Viewer' }[u.role] || u.role;
+      const checked = _msState[field].has(u.id);
       const div = document.createElement('div');
-      div.className = 'ms-opt' + (_msState[field].has(u.id) ? ' checked' : '');
-      div.innerHTML = `<input type="checkbox" ${_msState[field].has(u.id) ? 'checked' : ''}> <span>${label}</span>`;
-      div.addEventListener('mousedown', e => { e.preventDefault(); });
+      div.className = 'ms-opt' + (checked ? ' checked' : '');
+      div.innerHTML = `<input type="checkbox" ${checked ? 'checked' : ''}><div><div class="ms-name">${name}</div><div class="ms-role">${roleLabel}</div></div>`;
+      div.addEventListener('mousedown', e => e.preventDefault());
       div.addEventListener('click', () => {
         if (_msState[field].has(u.id)) _msState[field].delete(u.id);
         else _msState[field].add(u.id);
-        div.classList.toggle('checked', _msState[field].has(u.id));
-        div.querySelector('input').checked = _msState[field].has(u.id);
+        const isNowChecked = _msState[field].has(u.id);
+        div.classList.toggle('checked', isNowChecked);
+        div.querySelector('input').checked = isNowChecked;
         _updateMsPills(field);
         markDirty();
       });
-      dd.appendChild(div);
+      list.appendChild(div);
     });
   }
 
   function _updateMsPills(field) {
     const wrap = document.getElementById('ms-' + field + '-pills');
     const sel = _allUsers.filter(u => _msState[field].has(u.id));
-    if (sel.length === 0) {
-      wrap.innerHTML = `<span class="ms-placeholder">Select ${field}…</span>`;
-    } else {
-      wrap.innerHTML = sel.map(u => {
-        const label = (u.full_name || u.email || '').split('@')[0];
-        return `<span class="ms-pill">${label}</span>`;
-      }).join('');
+    if (!sel.length) {
+      wrap.innerHTML = `<span class="ms-placeholder">Select ${field === 'responsible' ? 'responsible persons' : 'support persons'}…</span>`;
+      return;
     }
+    wrap.innerHTML = sel.map(u =>
+      `<span class="ms-pill">${_userName(u)}<span class="ms-pill-x" data-field="${field}" data-id="${u.id}" onclick="event.stopPropagation();_msPillRemove('${field}','${u.id}')">×</span></span>`
+    ).join('');
   }
+
+  window._msPillRemove = function(field, uid) {
+    _msState[field].delete(uid);
+    _updateMsPills(field);
+    // sync checkbox if dropdown is open
+    const dd = document.getElementById('ms-' + field + '-dd');
+    if (dd.classList.contains('open')) _buildMsOpts(field);
+    markDirty();
+  };
 
   window.toggleMs = function(field) {
     const dd = document.getElementById('ms-' + field + '-dd');
     const trigger = document.getElementById('ms-' + field + '-trigger');
     const isOpen = dd.classList.contains('open');
-    // close all
     ['responsible','support'].forEach(f => {
       document.getElementById('ms-' + f + '-dd').classList.remove('open');
       document.getElementById('ms-' + f + '-trigger').classList.remove('open');
@@ -787,6 +822,13 @@
       dd.classList.add('open');
       trigger.classList.add('open');
     }
+  };
+
+  window.msClearAll = function(field) {
+    _msState[field] = new Set();
+    _updateMsPills(field);
+    _buildMsOpts(field);
+    markDirty();
   };
 
   document.addEventListener('click', e => {
@@ -799,8 +841,7 @@
   });
 
   window.getMsValues = function(field) {
-    return _allUsers.filter(u => _msState[field].has(u.id))
-      .map(u => u.full_name || u.email).join(', ') || '';
+    return _allUsers.filter(u => _msState[field].has(u.id)).map(_userName).join(', ');
   };
 
   function _setMsFromText(field, text) {
@@ -808,11 +849,9 @@
     if (!text) return;
     const parts = text.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     _allUsers.forEach(u => {
-      const email = (u.email || '').toLowerCase();
-      const name = (u.full_name || '').toLowerCase();
-      if (parts.some(p => email === p || name === p || email.startsWith(p + '@'))) {
-        _msState[field].add(u.id);
-      }
+      const n = _userName(u).toLowerCase();
+      const e = (u.email || '').toLowerCase();
+      if (parts.some(p => n === p || e === p)) _msState[field].add(u.id);
     });
     _updateMsPills(field);
   }
@@ -820,9 +859,9 @@
   function _populateApproverSelect(users) {
     const sel = document.getElementById('f-approver');
     sel.innerHTML = '<option value="">— Select approver —</option>';
-    users.forEach(u => {
-      const label = u.full_name || u.email;
-      sel.innerHTML += `<option value="${label}">${label}</option>`;
+    users.filter(u => ['admin','super_admin'].includes(u.role)).forEach(u => {
+      const name = _userName(u);
+      sel.innerHTML += `<option value="${name}">${name}</option>`;
     });
   }
 
