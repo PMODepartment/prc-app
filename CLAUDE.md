@@ -154,6 +154,8 @@ ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin',
 
 **Admin role restriction**: admins cannot assign `super_admin` or `specialist` roles to other users (only `super_admin` can).
 
+**User → Manager assignment**: `assigned_admin` DB column stores the manager's UUID. `admin.html` uses `WPDb.getManagerUsers()` to populate the dropdown (role=`manager` only). The "Assign to Manager" section is visible to `super_admin` only. Column header in user table shows "Manager".
+
 **DB constraint** (run in Supabase SQL Editor):
 ```sql
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
@@ -420,4 +422,5 @@ GitHub Pages auto-deploys on push to main (~1–2 min).
 - Always use `AppAuth.requireLogin()` / `AppAuth.requireAdmin()` as page entry point
 - `WPDb.mapWP()` normalizes aliases: `budget_bcb` ↔ `approved_budget_bcb`, `contract_amount_php` ↔ `total_awarded`
 - `Fmt.money(v)` → `₱X.XXM`; `Fmt.moneyFull(v)` → `₱1,234,567`; `Fmt.date(d)` → `May 29, '26`
-- Charts: Chart.js v4.4.1 via cdnjs; functions in `assets/js/charts.js`
+- Charts: Chart.js v4.4.1 via cdnjs + `chartjs-plugin-datalabels@2.2.0` via jsdelivr; functions in `assets/js/charts.js`
+- Data labels: plugin registered globally with `display:false` default; each chart opts in via `plugins.datalabels`. Helpers: `_dlBar(fmtFn, axis)` (outside-end), `_dlStacked(fmtFn)` (center, white), `_dlDonut(fmtFn, minPct)` (center, white, skip <5%). Dense charts (awardingLeadTime, budgetVsContract, varianceTrend, budgetByPeriodPerTrade, scheduleTimeline) keep labels off. Mobile: font 7px (vs 9px desktop) via `_mob()` check.

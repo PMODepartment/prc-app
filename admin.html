@@ -161,7 +161,7 @@
                     <th>User</th>
                     <th>Role</th>
                     <th>Assigned Projects</th>
-                    <th id="col-admin-head" style="display:none">Admin</th>
+                    <th id="col-admin-head" style="display:none">Manager</th>
                     <th>Activity</th>
                     <th>Registered</th>
                     <th>Actions</th>
@@ -198,13 +198,13 @@
         <option value="admin">Admin — all projects, edit WPs + user management</option>
         <option value="super_admin" id="opt-super-admin">Super Admin — full access</option>
       </select>
-      <!-- Assign to Admin — super_admin only -->
+      <!-- Assign to Manager — super_admin only -->
       <div id="assign-admin-wrap" style="display:none;margin-bottom:16px">
-        <div class="modal-field-label">Assign to Admin</div>
+        <div class="modal-field-label">Assign to Manager</div>
         <select class="role-select" id="modalAdminSelect">
-          <option value="">No admin assigned (unmanaged)</option>
+          <option value="">No manager assigned (unmanaged)</option>
         </select>
-        <div style="font-size:10px;color:#aaa;margin-top:4px">The selected admin will be responsible for managing this user.</div>
+        <div style="font-size:10px;color:#aaa;margin-top:4px">The selected manager will be responsible for overseeing this user.</div>
       </div>
       <div class="modal-field-label">Assign Projects</div>
       <div class="project-checkboxes" id="modalProjectList"></div>
@@ -481,7 +481,7 @@
       [allUsers, allProjects, allAdmins] = await Promise.all([
         WPDb.getUsersForAdmin(currentProfile),
         WPDb.getProjects(),
-        WPDb.getAdminUsers()
+        WPDb.getManagerUsers()
       ]);
       // Populate sidebar project links (with search when > 8 projects)
       const activeProjects = allProjects.filter(p=>p.status!=='archived');
@@ -516,10 +516,10 @@
     const sel = document.getElementById('modalAdminSelect');
     if (!sel) return;
     const options = allAdmins
-      .filter(a => a.role === 'admin') // only regular admins, not super_admin
+      .filter(a => a.role === 'manager')
       .map(a => `<option value="${a.id}" ${a.id === selectedAdminId ? 'selected' : ''}>${a.name || a.email}</option>`)
       .join('');
-    sel.innerHTML = '<option value="">No admin assigned (unmanaged)</option>' + options;
+    sel.innerHTML = '<option value="">No manager assigned (unmanaged)</option>' + options;
     if (selectedAdminId) sel.value = selectedAdminId;
   }
 
