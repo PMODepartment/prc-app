@@ -80,6 +80,10 @@
       <a class="nav-item" id="review-link-form" href="review.html" style="display:none"><i class="ti ti-clipboard-check"></i>Review WPs <span class="tbadge" id="pending-badge" style="display:none"></span></a>
     </div>
     <div class="sidebar-section">
+      <div class="sidebar-section-label">Navigation</div>
+      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Portfolio Overview</a>
+    </div>
+    <div class="sidebar-section">
       <div class="sidebar-section-label">Tools</div>
       <button class="nav-item" onclick="openTemplatePickerModal()"><i class="ti ti-download"></i>Download Template</button>
     </div>
@@ -141,7 +145,7 @@
             <div class="form-grid">
               <div class="form-group">
                 <label>Cost Code No. *</label>
-                <input type="text" id="f-cost-code" placeholder="e.g. CC-002-004"/>
+                <input type="text" id="f-cost-code"/>
               </div>
               <div class="form-group">
                 <label>Trade / Discipline *</label>
@@ -172,7 +176,7 @@
               </div>
               <div class="form-group">
                 <label>WP No. *</label>
-                <input type="text" id="f-wp-no" placeholder="e.g. WP-T1-004"/>
+                <input type="text" id="f-wp-no"/>
               </div>
               <div class="form-group full">
                 <label>Work Package Description *</label>
@@ -188,7 +192,7 @@
               </div>
               <div class="form-group">
                 <label>Zone <span style="font-size:10px;color:#aaa;font-weight:400">(optional)</span></label>
-                <input type="text" id="f-zone" placeholder="e.g. Tower 1, Gen Req"/>
+                <input type="text" id="f-zone"/>
               </div>
               <div class="form-group full">
                 <label>Detailed Description <span style="font-size:10px;color:#aaa;font-weight:400">(scope of work)</span></label>
@@ -423,15 +427,11 @@
               </div>
               <div class="form-group">
                 <label>Down Payment %</label>
-                <select id="f-dp-percent">
-                  <option value="0">No DP (0%)</option>
-                  <option value="0.15">15%</option>
-                  <option value="0.20">20%</option>
-                  <option value="0.30">30%</option>
-                  <option value="0.35">35%</option>
-                  <option value="0.50">50%</option>
-                  <option value="1.00">100% Full Payment</option>
-                </select>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <input type="text" inputmode="decimal" id="f-dp-percent" placeholder="0" style="flex:1"/>
+                  <span style="font-size:12px;color:var(--text-secondary);font-weight:600;flex-shrink:0">%</span>
+                </div>
+                <span class="hint">Enter percentage, e.g. 20 for 20%</span>
               </div>
               <div class="form-group">
                 <label>DP Terms</label>
@@ -526,7 +526,7 @@
               </div>
               <div class="form-group" id="charging-contract-group" style="display:none">
                 <label>Contract Package Number <span style="color:#EE3124">*</span></label>
-                <input type="text" id="f-contract-package-no" placeholder="e.g. CP-001"/>
+                <input type="text" id="f-contract-package-no"/>
               </div>
               <div class="form-group full" id="charging-co-group" style="display:none">
                 <label>Change Order Description <span style="color:#EE3124">*</span></label>
@@ -1007,7 +1007,7 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-contract', existingWP.total_awarded);
       fill('f-award-status', existingWP.award_status);
       fill('f-payment-terms-days', existingWP.payment_terms_days);
-      fill('f-dp-percent', existingWP.dp_percent);
+      if (existingWP.dp_percent != null) document.getElementById('f-dp-percent').value = parseFloat((existingWP.dp_percent * 100).toFixed(4)).toString();
       fill('f-dp-terms', existingWP.dp_terms);
       fill('f-dp-amount', existingWP.dp_amount);
       fill('f-dp-release-date', existingWP.dp_release_date);
@@ -1099,7 +1099,7 @@ AppAuth.requireLogin(async (user, profile) => {
       awarded_cost:             getNum('f-contract'),
       award_status:             getVal('f-award-status'),
       payment_terms_days:       getNum('f-payment-terms-days'),
-      dp_percent:               getNum('f-dp-percent'),
+      dp_percent:               (() => { const v = parseFloat(document.getElementById('f-dp-percent').value); return isNaN(v) ? null : v / 100; })(),
       dp_terms:                 getVal('f-dp-terms') || null,
       dp_amount:                getNum('f-dp-amount'),
       dp_release_date:          getVal('f-dp-release-date') || null,

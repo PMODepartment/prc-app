@@ -345,9 +345,9 @@ CSV import is in `wp-form.html` as a bulk import banner at the top of the conten
 - `onChargingChange()` â€” shows/hides the conditional sub-fields
 - Validation in `submitForm()` prevents saving without selecting a charging type
 
-**All DB migrations applied (run once, already live):**
+**All DB migrations — run entire block in Supabase SQL Editor (all use IF NOT EXISTS, safe to re-run):**
 ```sql
--- WP form new fields
+-- Batch 1: WP form fields (already live)
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS works text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS type_of_works text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS scope text DEFAULT NULL;
@@ -356,7 +356,7 @@ ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS type_of_service text DEFAULT 
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS charging_type text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS contract_package_no text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS co_description text DEFAULT NULL;
--- Bond / payment / retention fields
+-- Batch 2: Bond / payment / retention (already live)
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS surety_bond text DEFAULT 'No';
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS performance_bond text DEFAULT 'No';
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS warranty_bond text DEFAULT 'No';
@@ -370,16 +370,26 @@ ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS retention_amount numeric(18,2
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS approver_name text;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS approval_date date;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS submittal_document_type text;
+-- Batch 3: columns in supabase-schema.sql missing from live DB
+-- (approver caused error 2026-06-03; delivery_status caused error 2026-06-03)
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS approver text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS support_team text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS delivery_status text DEFAULT 'Not Awarded';
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS submittal_type text DEFAULT 'Not Required';
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS dp_notes text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS retention_period text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS awarding_status text DEFAULT NULL;
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS purchase_request text DEFAULT NULL;
 -- Viewer role
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin','admin','user','viewer'));
--- Approval Matrix approver column (was in base schema but missing from live DB â€” run if "approver column not found" error)
-ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS approver text DEFAULT NULL;
 ```
 
-**Field mapping corrections (applied 2026-06-03):**
-- Form `lead_time` field â†’ DB column `lead_time` (integer). The DB also has `awarding_lead_time` which is a **GENERATED ALWAYS AS** column (= `actual_awarding_date - awarding_date`) and **must never be inserted into**. `unmap()` now strips `awarding_lead_time` along with `total_awarded` and `variance`.
-- `approver` (Approval Matrix) â†’ DB column `approver text` â€” requires the migration above if not yet run.
+**Root cause of recurring "column not found" errors:** The live DB was created from an early version of supabase-schema.sql that lacked many columns. All subsequent columns require ALTER TABLE. Batch 3 covers all gaps confirmed or likely missing. Safe to re-run (IF NOT EXISTS).
+
+**Field mapping notes:**
+- `lead_time` (integer, editable) — user-entered planned lead time. `awarding_lead_time` is GENERATED (auto-computed) and stripped by `unmap()`.
+- `dp_percent` stored as decimal (0.20 = 20%). Form accepts % entry (user types "20") and divides by 100; edit mode multiplies by 100 to display.
 
 ---
 
