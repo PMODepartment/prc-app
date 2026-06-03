@@ -35,6 +35,18 @@
     .status-info{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--radius-md);padding:12px 14px;font-size:12px;color:#1e40af;margin-bottom:20px;display:flex;gap:10px;align-items:flex-start}
     .rejection-box{background:#FFF0F0;border:1px solid #FFD0D0;border-radius:var(--radius-md);padding:12px 14px;font-size:12px;color:#EE3124;margin-bottom:20px}
     .tbadge{font-size:9px;background:#EE3124;color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
+    /* Multi-select user picker */
+    .ms-wrap{position:relative}
+    .ms-trigger{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);background:var(--surface-2);cursor:pointer;font-size:12px;min-height:36px;gap:6px;user-select:none}
+    .ms-trigger:hover,.ms-trigger.open{border-color:#5B9DEA;background:#fff}
+    .ms-pills-wrap{display:flex;flex-wrap:wrap;gap:3px;flex:1;min-width:0}
+    .ms-pill{background:#dbeafe;color:#1e40af;border-radius:8px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap}
+    .ms-placeholder{color:#aaa;font-size:12px}
+    .ms-dd{position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:300;background:#fff;border:1.5px solid #5B9DEA;border-radius:var(--radius-md);max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.12);display:none}
+    .ms-dd.open{display:block}
+    .ms-opt{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;font-size:12px;color:var(--text-primary)}
+    .ms-opt:hover,.ms-opt.checked{background:#EFF6FF}
+    .ms-opt input[type=checkbox]{flex-shrink:0;accent-color:#1e40af}
   </style>
 </head>
 <body>
@@ -218,16 +230,28 @@
             <div class="form-section-title"><i class="ti ti-users-group" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Approval Matrix</div>
             <div class="form-grid">
               <div class="form-group">
-                <label>Responsible</label>
-                <input type="text" id="f-responsible" placeholder="e.g. BAF"/>
+                <label>Responsible <span style="font-size:10px;color:#aaa;font-weight:400">(multiple)</span></label>
+                <div class="ms-wrap" id="ms-responsible-wrap">
+                  <div class="ms-trigger" id="ms-responsible-trigger" onclick="toggleMs('responsible')">
+                    <div class="ms-pills-wrap" id="ms-responsible-pills"><span class="ms-placeholder">Select responsible…</span></div>
+                    <i class="ti ti-chevron-down" style="font-size:12px;color:#aaa;flex-shrink:0"></i>
+                  </div>
+                  <div class="ms-dd" id="ms-responsible-dd"></div>
+                </div>
               </div>
               <div class="form-group">
                 <label>Approver</label>
-                <input type="text" id="f-approver" placeholder="e.g. JVI"/>
+                <select id="f-approver"><option value="">— Select approver —</option></select>
               </div>
               <div class="form-group">
-                <label>Support</label>
-                <input type="text" id="f-support" placeholder="e.g. MFL"/>
+                <label>Support <span style="font-size:10px;color:#aaa;font-weight:400">(multiple)</span></label>
+                <div class="ms-wrap" id="ms-support-wrap">
+                  <div class="ms-trigger" id="ms-support-trigger" onclick="toggleMs('support')">
+                    <div class="ms-pills-wrap" id="ms-support-pills"><span class="ms-placeholder">Select support…</span></div>
+                    <i class="ti ti-chevron-down" style="font-size:12px;color:#aaa;flex-shrink:0"></i>
+                  </div>
+                  <div class="ms-dd" id="ms-support-dd"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -358,7 +382,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Contractor / Supplier</label>
+                <label>Vendor/s</label>
                 <input type="text" id="f-contractor" placeholder="Leave blank if not yet awarded"/>
               </div>
             </div>
@@ -711,6 +735,97 @@
 
   initMobileMenu();
 
+  // ── Multi-select user picker ──
+  let _allUsers = [];
+  const _msState = { responsible: new Set(), support: new Set() };
+
+  function _buildMsOpts(field) {
+    const dd = document.getElementById('ms-' + field + '-dd');
+    dd.innerHTML = '';
+    _allUsers.forEach(u => {
+      const label = (u.full_name || u.email || '').trim() || u.email;
+      const div = document.createElement('div');
+      div.className = 'ms-opt' + (_msState[field].has(u.id) ? ' checked' : '');
+      div.innerHTML = `<input type="checkbox" ${_msState[field].has(u.id) ? 'checked' : ''}> <span>${label}</span>`;
+      div.addEventListener('mousedown', e => { e.preventDefault(); });
+      div.addEventListener('click', () => {
+        if (_msState[field].has(u.id)) _msState[field].delete(u.id);
+        else _msState[field].add(u.id);
+        div.classList.toggle('checked', _msState[field].has(u.id));
+        div.querySelector('input').checked = _msState[field].has(u.id);
+        _updateMsPills(field);
+        markDirty();
+      });
+      dd.appendChild(div);
+    });
+  }
+
+  function _updateMsPills(field) {
+    const wrap = document.getElementById('ms-' + field + '-pills');
+    const sel = _allUsers.filter(u => _msState[field].has(u.id));
+    if (sel.length === 0) {
+      wrap.innerHTML = `<span class="ms-placeholder">Select ${field}…</span>`;
+    } else {
+      wrap.innerHTML = sel.map(u => {
+        const label = (u.full_name || u.email || '').split('@')[0];
+        return `<span class="ms-pill">${label}</span>`;
+      }).join('');
+    }
+  }
+
+  window.toggleMs = function(field) {
+    const dd = document.getElementById('ms-' + field + '-dd');
+    const trigger = document.getElementById('ms-' + field + '-trigger');
+    const isOpen = dd.classList.contains('open');
+    // close all
+    ['responsible','support'].forEach(f => {
+      document.getElementById('ms-' + f + '-dd').classList.remove('open');
+      document.getElementById('ms-' + f + '-trigger').classList.remove('open');
+    });
+    if (!isOpen) {
+      _buildMsOpts(field);
+      dd.classList.add('open');
+      trigger.classList.add('open');
+    }
+  };
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.ms-wrap')) {
+      ['responsible','support'].forEach(f => {
+        document.getElementById('ms-' + f + '-dd').classList.remove('open');
+        document.getElementById('ms-' + f + '-trigger').classList.remove('open');
+      });
+    }
+  });
+
+  window.getMsValues = function(field) {
+    return _allUsers.filter(u => _msState[field].has(u.id))
+      .map(u => u.full_name || u.email).join(', ') || '';
+  };
+
+  function _setMsFromText(field, text) {
+    _msState[field] = new Set();
+    if (!text) return;
+    const parts = text.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    _allUsers.forEach(u => {
+      const email = (u.email || '').toLowerCase();
+      const name = (u.full_name || '').toLowerCase();
+      if (parts.some(p => email === p || name === p || email.startsWith(p + '@'))) {
+        _msState[field].add(u.id);
+      }
+    });
+    _updateMsPills(field);
+  }
+
+  function _populateApproverSelect(users) {
+    const sel = document.getElementById('f-approver');
+    sel.innerHTML = '<option value="">— Select approver —</option>';
+    users.forEach(u => {
+      const label = u.full_name || u.email;
+      sel.innerHTML += `<option value="${label}">${label}</option>`;
+    });
+  }
+
   // ── Unsaved changes protection ──
 let formDirty = false;
 function markDirty() { formDirty = true; }
@@ -761,8 +876,11 @@ AppAuth.requireLogin(async (user, profile) => {
       });
     }
 
-    /* Load projects */
-    allProjects = await WPDb.getProjects();
+    /* Load projects + users in parallel */
+    const [_projects, _users] = await Promise.all([WPDb.getProjects(), WPDb.getAllUsers().catch(() => [])]);
+    allProjects = _projects;
+    _allUsers = (_users || []).filter(u => u.status === 'approved');
+    _populateApproverSelect(_allUsers);
     const permitted = AppAuth.getPermittedProjects(profile, allProjects);
     const projSel = document.getElementById('f-project');
     permitted.forEach(p => {
@@ -829,9 +947,9 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-proposed-vendors', existingWP.proposed_vendors);
       fill('f-po-jo-count', existingWP.po_jo_count);
       fill('f-po-jo-numbers', existingWP.po_jo_numbers);
-      fill('f-responsible', existingWP.responsible_team);
+      _setMsFromText('responsible', existingWP.responsible_team);
       fill('f-approver', existingWP.approver);
-      fill('f-support', existingWP.support_team);
+      _setMsFromText('support', existingWP.support_team);
       fill('f-surety-bond', existingWP.surety_bond || 'No');
       fill('f-performance-bond', existingWP.performance_bond || 'No');
       fill('f-warranty-bond', existingWP.warranty_bond || 'No');
@@ -921,9 +1039,9 @@ AppAuth.requireLogin(async (user, profile) => {
       proposed_vendors:         getVal('f-proposed-vendors') || null,
       po_jo_count:              getNum('f-po-jo-count') || 0,
       po_jo_numbers:            getVal('f-po-jo-numbers') || null,
-      responsible_team:         getVal('f-responsible') || null,
+      responsible_team:         getMsValues('responsible') || null,
       approver:                 getVal('f-approver') || null,
-      support_team:             getVal('f-support') || null,
+      support_team:             getMsValues('support') || null,
       surety_bond:              getVal('f-surety-bond'),
       performance_bond:         getVal('f-performance-bond'),
       warranty_bond:            getVal('f-warranty-bond'),
@@ -939,7 +1057,7 @@ AppAuth.requireLogin(async (user, profile) => {
       target_installation: getVal('f-target-installation') || null,
       target_completion:   getVal('f-target-completion') || null,
       approved_budget_bcb:      getNum('f-budget'),
-      total_awarded:            getNum('f-contract'),
+      awarded_cost:             getNum('f-contract'),
       award_status:             getVal('f-award-status'),
       payment_terms_days:       getNum('f-payment-terms-days'),
       dp_percent:               getNum('f-dp-percent'),
@@ -986,6 +1104,7 @@ AppAuth.requireLogin(async (user, profile) => {
       }
       successEl.className = 'alert alert-success';
       successEl.scrollIntoView({ behavior:'smooth' });
+      markClean();
       /* Clear form if new */
       if (!editId) {
         ['f-cost-code','f-wp-no','f-description','f-zone','f-actual-awarding-date',
