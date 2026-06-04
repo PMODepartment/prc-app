@@ -1534,40 +1534,64 @@
       if (prevBtn) prevBtn.disabled = _wpMonPage <= 1;
       if (nextBtn) nextBtn.disabled = _wpMonPage >= totalPages;
 
-      // ── Mobile card view ─────────────────────────────────────────────
+      // ── Mobile card view (tab-aware) ─────────────────────────────────
       const cardEl = document.getElementById('wp-mon-cards');
       if (cardEl) {
         const isViewer = window.__isViewer;
+        const view = _wpListView;
         const _sc = s => s==='Awarded'?'#2D9B6F':s==='Partially Awarded'?'#F59E0B':'#EE3124';
+        const _bc = s => s==='Awarded'?'#2D9B6F':s==='Partially Awarded'?'#F59E0B':'#e5e5e5';
+        function cardBody(w) {
+          const bud=w.approved_budget_bcb||0, awd=w.total_awarded||0, v=bud-awd;
+          const sc=_sc(w.award_status);
+          let b='';
+          if (!isViewer && (view==='financial'||view==='all'||view==='overview') && (bud||awd)) {
+            b+=`<div class="wpc-row">
+              <span><small>Budget</small>${fmtM(bud)}</span>
+              <span><small>Awarded</small>${awd?fmtM(awd):'—'}</span>
+              <span style="color:${v>=0?'#2D9B6F':'#EE3124'}"><small>Variance</small>${(bud||awd)?(v>=0?'+':'')+fmtM(v):'—'}</span>
+            </div>`;
+          }
+          if (!isViewer && view==='financial') {
+            const bonds=[w.surety_bond==='Yes'?'Surety':'',w.performance_bond==='Yes'?'Performance':'',w.warranty_bond==='Yes'?'Warranty':''].filter(Boolean).join(', ');
+            if (bonds) b+=`<div class="wpc-kv"><small>Bonds</small>${bonds}</div>`;
+            if (w.dp_percent) b+=`<div class="wpc-kv"><small>Down Payment</small>${(parseFloat(w.dp_percent)*100).toFixed(0)}%${w.dp_terms?' – '+w.dp_terms:''}</div>`;
+            if (w.retention_percent) b+=`<div class="wpc-kv"><small>Retention</small>${(parseFloat(w.retention_percent)*100).toFixed(0)}%</div>`;
+          }
+          if (view==='schedule'||view==='all') {
+            const sd=[[w.awarding_date,'Target Award'],[w.actual_awarding_date,'Actual Award'],[w.target_delivery||w.target_completion,'Target Delivery'],[w.actual_delivery,'Actual Delivery']].filter(([d])=>d);
+            if (sd.length) b+=`<div class="wpc-dates">${sd.map(([d,l])=>`<span><small>${l}</small>${fmtD(d)}</span>`).join('')}</div>`;
+            if (w.awarding_lead_time!=null) b+=`<div class="wpc-kv"><small>Lead Time</small>${w.awarding_lead_time} days</div>`;
+          }
+          if (view==='submittals'||view==='all') {
+            if (w.proposed_vendors) b+=`<div class="wpc-kv"><small>Vendor(s)</small>${w.proposed_vendors}</div>`;
+            if (w.po_jo_count!=null) b+=`<div class="wpc-kv"><small>PO/JO Count</small>${w.po_jo_count}${w.po_jo_numbers?' — '+w.po_jo_numbers:''}</div>`;
+            if (w.approver_name) b+=`<div class="wpc-kv"><small>Approver</small>${w.approver_name}${w.approval_date?' · '+fmtD(w.approval_date):''}</div>`;
+            if (w.submittal_doc_type) b+=`<div class="wpc-kv"><small>Submittal Type</small>${w.submittal_doc_type}</div>`;
+          }
+          if (view==='overview') {
+            if (w.proposed_vendors) b+=`<div class="wpc-kv"><small>Vendor(s)</small>${w.proposed_vendors}</div>`;
+            if (w.remarks) b+=`<div class="wpc-kv"><small>Remarks</small>${w.remarks}</div>`;
+          }
+          return b ? `<div class="wpc-body">${b}</div>` : '';
+        }
         let ch = '';
         pageItems.forEach(item => {
           if (item.type === 'header') {
-            ch += `<div class="wp-card-trade">${item.trade}<span class="wp-card-trade-count">${item.count} WPs</span></div>`;
+            ch += `<div class="wpc-trade">${item.trade}<span class="wpc-trade-count">${item.count} WPs</span></div>`;
           } else {
             const w = item.wp;
-            const bud = w.approved_budget_bcb||0, awd = w.total_awarded||0, v = bud - awd;
-            const sc = _sc(w.award_status);
-            const bc = w.award_status==='Awarded'?'#2D9B6F':w.award_status==='Partially Awarded'?'#F59E0B':'#e5e5e5';
-            const finHtml = !isViewer && (bud||awd) ? `<div class="wp-card-fin">
-              <span><small>Budget</small>${fmtM(bud)}</span>
-              <span><small>Awarded</small>${fmtM(awd)}</span>
-              <span style="color:${v>=0?'#2D9B6F':'#EE3124'}"><small>Variance</small>${v>=0?'+':''}${fmtM(v)}</span>
-            </div>` : '';
-            const datesHtml = (w.awarding_date||w.target_delivery||w.target_completion) ? `<div class="wp-card-dates">
-              ${w.awarding_date?`<span><small>Target Award</small>${fmtD(w.awarding_date)}</span>`:''}
-              ${(w.target_delivery||w.target_completion)?`<span><small>Target Delivery</small>${fmtD(w.target_delivery||w.target_completion)}</span>`:''}
-            </div>` : '';
-            const vendorHtml = w.proposed_vendors ? `<div class="wp-card-vendor">${w.proposed_vendors}</div>` : '';
-            ch += `<div class="wp-card" style="border-left-color:${bc}">
-              <div class="wp-card-header">
-                <span class="wp-card-wpno" onclick='openWPDetail("${w.id}")'>${w.wp_no||'—'}</span>
-                <span class="wp-card-badge" style="background:${sc}22;color:${sc}">${w.award_status||'—'}</span>
+            const sc=_sc(w.award_status), bc=_bc(w.award_status);
+            ch += `<div class="wpc" style="border-left-color:${bc}">
+              <div class="wpc-top">
+                <span class="wpc-wpno" onclick='openWPDetail("${w.id}")'>${w.wp_no||'—'}</span>
+                <span class="wpc-badge" style="background:${sc}22;color:${sc}">${w.award_status||'—'}</span>
               </div>
-              <div class="wp-card-project">${w.project_id||''}</div>
-              <div class="wp-card-desc">${w.description||'—'}</div>
-              <div class="wp-card-meta">${[w.trade,w.works].filter(Boolean).join(' › ')||'—'}</div>
-              ${finHtml}${datesHtml}${vendorHtml}
-              <div class="wp-card-actions">
+              <div class="wpc-proj">${w.project_id||''}</div>
+              <div class="wpc-desc">${w.description||'—'}</div>
+              <div class="wpc-meta">${[w.trade,w.works].filter(Boolean).join(' › ')||'—'}</div>
+              ${cardBody(w)}
+              <div class="wpc-actions">
                 <button onclick='openWPDetail("${w.id}")'>View Details</button>
               </div>
             </div>`;
@@ -2039,30 +2063,34 @@
   body.viewer-mode #wp-mon-table th:nth-child(24),
   body.viewer-mode #wp-mon-table td:nth-child(24) { display:none !important; }
   /* ── WP List: table on desktop, card view on mobile ── */
-  .wp-card-list { display:none; padding:0 2px 8px; }
+  .wp-card-list { display:none; padding:0 0 8px; }
   @media (max-width:767px) {
     #wp-view-tabs { overflow-x:auto; flex-wrap:nowrap; }
-    .wp-table-wrap  { display:none !important; }
-    .wp-card-list   { display:block; }
+    .wp-table-wrap { display:none !important; }
+    .wp-card-list  { display:block; }
   }
-  .wp-card-trade { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;padding:10px 2px 4px;border-top:2px solid #e5e5e5;margin-top:4px; }
-  .wp-card-trade:first-child { border-top:none;margin-top:0; }
-  .wp-card-trade-count { font-weight:400;color:#aaa;margin-left:6px; }
-  .wp-card { background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:10px;padding:13px 14px;border-left:3px solid #e5e5e5; }
-  .wp-card-header { display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:5px; }
-  .wp-card-wpno { font-family:monospace;font-size:12px;font-weight:700;color:#EE3124;cursor:pointer;flex-shrink:0; }
-  .wp-card-badge { font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0; }
-  .wp-card-project { font-size:10px;font-weight:700;color:#444;margin-bottom:2px; }
-  .wp-card-desc { font-size:12px;font-weight:600;color:#231F20;margin-bottom:3px;line-height:1.4; }
-  .wp-card-meta { font-size:10px;color:#aaa;margin-bottom:7px; }
-  .wp-card-fin { display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11px;font-weight:600;color:#333;padding:7px 0;border-top:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;margin-bottom:7px; }
-  .wp-card-fin small { font-size:9px;font-weight:400;color:#aaa;display:block;margin-bottom:1px; }
-  .wp-card-dates { display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11px;font-weight:500;color:#444;margin-bottom:7px; }
-  .wp-card-dates small { font-size:9px;font-weight:400;color:#aaa;display:block;margin-bottom:1px; }
-  .wp-card-vendor { font-size:10px;color:#666;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-  .wp-card-actions { display:flex;gap:8px;margin-top:6px; }
-  .wp-card-actions button { flex:1;font-size:11px;font-weight:600;color:#444;background:#f5f5f5;border:none;border-radius:6px;padding:7px 10px;cursor:pointer;font-family:inherit; }
-  .wp-card-actions a { font-size:11px;font-weight:600;color:#EE3124;border:1.5px solid #EE3124;border-radius:6px;padding:6px 14px;text-decoration:none;white-space:nowrap; }
+  .wpc-trade { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666;padding:10px 0 4px;border-top:2px solid #e8e8e8;margin-top:6px; }
+  .wpc-trade:first-child { border-top:none;margin-top:0; }
+  .wpc-trade-count { font-weight:400;color:#aaa;margin-left:6px; }
+  .wpc { background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:8px;padding:11px 12px;border-left:3px solid #e5e5e5; }
+  .wpc-top { display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px; }
+  .wpc-wpno { font-family:monospace;font-size:12px;font-weight:700;color:#EE3124;cursor:pointer; }
+  .wpc-badge { font-size:9px;font-weight:700;padding:2px 7px;border-radius:9px;white-space:nowrap; }
+  .wpc-proj { font-size:10px;font-weight:700;color:#888;margin-bottom:1px; }
+  .wpc-desc { font-size:12px;font-weight:600;color:#231F20;line-height:1.35;margin-bottom:2px; }
+  .wpc-meta { font-size:10px;color:#aaa; }
+  .wpc-body { border-top:1px solid #f0f0f0;margin-top:8px;padding-top:8px; }
+  .wpc-row { display:flex;flex-wrap:wrap;gap:3px 14px;margin-bottom:5px; }
+  .wpc-row > span { font-size:11px;font-weight:600; }
+  .wpc-row > span > small,
+  .wpc-kv > small,
+  .wpc-dates > span > small { font-size:9px;font-weight:400;color:#aaa;display:block;line-height:1.2;margin-bottom:1px; }
+  .wpc-kv { font-size:11px;color:#444;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .wpc-dates { display:flex;flex-wrap:wrap;gap:3px 14px;margin-bottom:5px; }
+  .wpc-dates > span { font-size:11px;font-weight:500;color:#333; }
+  .wpc-actions { display:flex;gap:7px;margin-top:9px; }
+  .wpc-actions button { flex:1;font-size:11px;font-weight:600;color:#555;background:#f5f5f5;border:none;border-radius:6px;padding:7px 6px;cursor:pointer;font-family:inherit; }
+  .wpc-actions a { font-size:11px;font-weight:600;color:#EE3124;border:1.5px solid #EE3124;border-radius:6px;padding:6px 12px;text-decoration:none;white-space:nowrap; }
   /* Hide Budget column in backlog tables and dashboard backlog */
   body.viewer-mode #bl-table th:nth-child(7),
   body.viewer-mode #bl-table td:nth-child(7),

@@ -1103,40 +1103,68 @@ function buildTable(){
   const tbody=document.getElementById('tbl-body');
   tbody.innerHTML=html||`<tr><td colspan="${nCols+1}" style="text-align:center;color:#aaa;padding:20px">No work packages found</td></tr>`;
 
-  // ── Mobile card view ────────────────────────────────────────────────
+  // ── Mobile card view (tab-aware) ────────────────────────────────────
   const cardEl=document.getElementById('proj-wp-cards');
   if(cardEl){
     const isViewer=window.__isViewer;
+    const view=_wpTableView;
     const _sc=s=>s==='Awarded'?'#2D9B6F':s==='Partially Awarded'?'#F59E0B':'#EE3124';
+    const _bc=s=>s==='Awarded'?'#2D9B6F':s==='Partially Awarded'?'#F59E0B':'#e5e5e5';
+    function cardBody(wp){
+      const bud=wp.approved_budget_bcb||0,awd=wp.total_awarded||0,v=bud-awd;
+      const sc=_sc(wp.award_status);
+      let b='';
+      // Financial section (Award + All tabs, non-viewer)
+      if(!isViewer&&(view==='financial'||view==='all'||view==='overview')&&(bud||awd)){
+        b+=`<div class="wpc-row">
+          <span><small>Budget</small>${fmt(bud)}</span>
+          <span><small>Awarded</small>${awd?fmt(awd):'—'}</span>
+          <span style="color:${v>=0?'#2D9B6F':'#EE3124'}"><small>Variance</small>${(bud||awd)?(v>=0?'+':'')+fmt(v):'—'}</span>
+        </div>`;
+      }
+      if(!isViewer&&view==='financial'){
+        const bonds=[wp.surety_bond==='Yes'?'Surety':'',wp.performance_bond==='Yes'?'Performance':'',wp.warranty_bond==='Yes'?'Warranty':''].filter(Boolean).join(', ');
+        if(bonds) b+=`<div class="wpc-kv"><small>Bonds</small>${bonds}</div>`;
+        if(wp.dp_percent) b+=`<div class="wpc-kv"><small>Down Payment</small>${(parseFloat(wp.dp_percent)*100).toFixed(0)}%${wp.dp_terms?' – '+wp.dp_terms:''}</div>`;
+        if(wp.retention_percent) b+=`<div class="wpc-kv"><small>Retention</small>${(parseFloat(wp.retention_percent)*100).toFixed(0)}%</div>`;
+      }
+      // Schedule section
+      if(view==='schedule'||view==='all'){
+        const sd=[[wp.awarding_date,'Target Award'],[wp.actual_awarding_date,'Actual Award'],[wp.target_delivery||wp.target_completion,'Target Delivery'],[wp.actual_delivery,'Actual Delivery']].filter(([d])=>d);
+        if(sd.length) b+=`<div class="wpc-dates">${sd.map(([d,l])=>`<span><small>${l}</small>${fmtDate(d)}</span>`).join('')}</div>`;
+        if(wp.awarding_lead_time!=null) b+=`<div class="wpc-kv"><small>Lead Time</small>${wp.awarding_lead_time} days</div>`;
+      }
+      // Submittals section
+      if(view==='submittals'||view==='all'){
+        if(wp.proposed_vendors) b+=`<div class="wpc-kv"><small>Vendor(s)</small>${wp.proposed_vendors}</div>`;
+        if(wp.po_jo_count!=null) b+=`<div class="wpc-kv"><small>PO/JO Count</small>${wp.po_jo_count}${wp.po_jo_numbers?' — '+wp.po_jo_numbers:''}</div>`;
+        if(wp.approver_name) b+=`<div class="wpc-kv"><small>Approver</small>${wp.approver_name}${wp.approval_date?' · '+fmtDate(wp.approval_date):''}</div>`;
+        if(wp.submittal_doc_type) b+=`<div class="wpc-kv"><small>Submittal Type</small>${wp.submittal_doc_type}</div>`;
+      }
+      // Overview: vendors + remarks
+      if(view==='overview'){
+        if(wp.proposed_vendors) b+=`<div class="wpc-kv"><small>Vendor(s)</small>${wp.proposed_vendors}</div>`;
+        if(wp.remarks) b+=`<div class="wpc-kv"><small>Remarks</small>${wp.remarks}</div>`;
+      }
+      return b?`<div class="wpc-body">${b}</div>`:'';
+    }
     let ch='';
     items.slice(start,end).forEach(item=>{
       if(item.type==='header'){
-        ch+=`<div class="wp-card-trade">${item.trade}<span class="wp-card-trade-count">${item.count} WPs</span></div>`;
+        ch+=`<div class="wpc-trade">${item.trade}<span class="wpc-trade-count">${item.count} WPs</span></div>`;
       } else {
         const wp=item.wp;
-        const bud=wp.approved_budget_bcb||0,awd=wp.total_awarded||0,v=bud-awd;
-        const sc=_sc(wp.award_status);
-        const bc=wp.award_status==='Awarded'?'#2D9B6F':wp.award_status==='Partially Awarded'?'#F59E0B':'#e5e5e5';
-        const finHtml=!isViewer&&(bud||awd)?`<div class="wp-card-fin">
-          <span><small>Budget</small>${fmt(bud)}</span>
-          <span><small>Awarded</small>${fmt(awd)}</span>
-          <span style="color:${v>=0?'#2D9B6F':'#EE3124'}"><small>Variance</small>${v>=0?'+':''}${fmt(v)}</span>
-        </div>`:'';
-        const datesHtml=(wp.awarding_date||wp.target_delivery||wp.target_completion)?`<div class="wp-card-dates">
-          ${wp.awarding_date?`<span><small>Target Award</small>${fmtDate(wp.awarding_date)}</span>`:''}
-          ${(wp.target_delivery||wp.target_completion)?`<span><small>Target Delivery</small>${fmtDate(wp.target_delivery||wp.target_completion)}</span>`:''}
-        </div>`:'';
-        const vendorHtml=wp.proposed_vendors?`<div class="wp-card-vendor">${wp.proposed_vendors}</div>`:'';
+        const sc=_sc(wp.award_status),bc=_bc(wp.award_status);
         const editHtml=!isViewer?`<a href="wp-form.html?id=${wp.id}&project=${wp.project_id}">Edit</a>`:'';
-        ch+=`<div class="wp-card" style="border-left-color:${bc}">
-          <div class="wp-card-header">
-            <span class="wp-card-wpno" onclick='openWPDetail("${wp.id}")'>${wp.wp_no||'—'}</span>
-            <span class="wp-card-badge" style="background:${sc}22;color:${sc}">${wp.award_status||'—'}</span>
+        ch+=`<div class="wpc" style="border-left-color:${bc}">
+          <div class="wpc-top">
+            <span class="wpc-wpno" onclick='openWPDetail("${wp.id}")'>${wp.wp_no||'—'}</span>
+            <span class="wpc-badge" style="background:${sc}22;color:${sc}">${wp.award_status||'—'}</span>
           </div>
-          <div class="wp-card-desc">${wp.description||'—'}</div>
-          <div class="wp-card-meta">${[wp.trade,wp.works].filter(Boolean).join(' › ')||'—'}</div>
-          ${finHtml}${datesHtml}${vendorHtml}
-          <div class="wp-card-actions">
+          <div class="wpc-desc">${wp.description||'—'}</div>
+          <div class="wpc-meta">${[wp.trade,wp.works].filter(Boolean).join(' › ')||'—'}</div>
+          ${cardBody(wp)}
+          <div class="wpc-actions">
             <button onclick='openWPDetail("${wp.id}")'>View Details</button>
             ${editHtml}
           </div>
@@ -1970,28 +1998,38 @@ AppAuth.requireLogin(async (user, profile) => {
   .hide-mobile { }
   @media(max-width:480px) { .hide-mobile { display:none; } }
   /* ── WP List: table on desktop, card view on mobile ── */
-  .wp-card-list { display:none; padding:0 2px 8px; }
+  /* ── WP List: table on desktop, card view on mobile ── */
+  .wp-card-list { display:none; padding:0 0 8px; }
   @media (max-width:767px) {
-    .wp-table-wrap  { display:none !important; }
-    .wp-card-list   { display:block; }
+    .wp-table-wrap { display:none !important; }
+    .wp-card-list  { display:block; }
   }
-  .wp-card-trade { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;padding:10px 2px 4px;border-top:2px solid #e5e5e5;margin-top:4px; }
-  .wp-card-trade:first-child { border-top:none;margin-top:0; }
-  .wp-card-trade-count { font-weight:400;color:#aaa;margin-left:6px; }
-  .wp-card { background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:10px;padding:13px 14px;border-left:3px solid #e5e5e5; }
-  .wp-card-header { display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:5px; }
-  .wp-card-wpno { font-family:monospace;font-size:12px;font-weight:700;color:#EE3124;cursor:pointer;flex-shrink:0; }
-  .wp-card-badge { font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0; }
-  .wp-card-desc { font-size:12px;font-weight:600;color:#231F20;margin-bottom:3px;line-height:1.4; }
-  .wp-card-meta { font-size:10px;color:#aaa;margin-bottom:7px; }
-  .wp-card-fin { display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11px;font-weight:600;color:#333;padding:7px 0;border-top:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;margin-bottom:7px; }
-  .wp-card-fin small { font-size:9px;font-weight:400;color:#aaa;display:block;margin-bottom:1px; }
-  .wp-card-dates { display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11px;font-weight:500;color:#444;margin-bottom:7px; }
-  .wp-card-dates small { font-size:9px;font-weight:400;color:#aaa;display:block;margin-bottom:1px; }
-  .wp-card-vendor { font-size:10px;color:#666;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-  .wp-card-actions { display:flex;gap:8px;margin-top:6px; }
-  .wp-card-actions button { flex:1;font-size:11px;font-weight:600;color:#444;background:#f5f5f5;border:none;border-radius:6px;padding:7px 10px;cursor:pointer;font-family:inherit; }
-  .wp-card-actions a { font-size:11px;font-weight:600;color:#EE3124;border:1.5px solid #EE3124;border-radius:6px;padding:6px 14px;text-decoration:none;white-space:nowrap; }
+  /* Trade group label */
+  .wpc-trade { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666;padding:10px 0 4px;border-top:2px solid #e8e8e8;margin-top:6px; }
+  .wpc-trade:first-child { border-top:none;margin-top:0; }
+  .wpc-trade-count { font-weight:400;color:#aaa;margin-left:6px; }
+  /* Card shell */
+  .wpc { background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:8px;padding:11px 12px;border-left:3px solid #e5e5e5; }
+  /* Card header row */
+  .wpc-top { display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px; }
+  .wpc-wpno { font-family:monospace;font-size:12px;font-weight:700;color:#EE3124;cursor:pointer; }
+  .wpc-badge { font-size:9px;font-weight:700;padding:2px 7px;border-radius:9px;white-space:nowrap; }
+  .wpc-desc { font-size:12px;font-weight:600;color:#231F20;line-height:1.35;margin-bottom:2px; }
+  .wpc-meta { font-size:10px;color:#aaa;margin-bottom:0; }
+  /* Tab-specific body */
+  .wpc-body { border-top:1px solid #f0f0f0;margin-top:8px;padding-top:8px; }
+  .wpc-row { display:flex;flex-wrap:wrap;gap:3px 14px;margin-bottom:5px; }
+  .wpc-row > span { font-size:11px;font-weight:600; }
+  .wpc-row > span > small,
+  .wpc-kv > small,
+  .wpc-dates > span > small { font-size:9px;font-weight:400;color:#aaa;display:block;line-height:1.2;margin-bottom:1px; }
+  .wpc-kv { font-size:11px;color:#444;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .wpc-dates { display:flex;flex-wrap:wrap;gap:3px 14px;margin-bottom:5px; }
+  .wpc-dates > span { font-size:11px;font-weight:500;color:#333; }
+  /* Actions */
+  .wpc-actions { display:flex;gap:7px;margin-top:9px; }
+  .wpc-actions button { flex:1;font-size:11px;font-weight:600;color:#555;background:#f5f5f5;border:none;border-radius:6px;padding:7px 6px;cursor:pointer;font-family:inherit; }
+  .wpc-actions a { font-size:11px;font-weight:600;color:#EE3124;border:1.5px solid #EE3124;border-radius:6px;padding:6px 12px;text-decoration:none;white-space:nowrap; }
   /* Viewer mode — hide all cost data and editing tools */
   body.viewer-mode #metrics-cost-group { display:none !important; }
   body.viewer-mode #sidebar-tools { display:none !important; }
