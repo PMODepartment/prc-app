@@ -244,7 +244,9 @@ Lazy rendering: `_rendered` flags per tab — charts render on first open, reset
  'Fire Protection Works','Allied Services','Site Development Works']
 ```
 
-**WP List** (`index.html`): `_WPC` column defs + `_WP_VIEWS` + `_getActiveCols()`. `renderWPMonTable()` rebuilds colgroup/thead per view. `setWPListView(view)` switches + resets sort. `openWPDetail(w)` / `closeWPDetailModal()` — slide-in panel. All tab hidden for viewers.
+**WP List** (`index.html`): `_WPC` column defs + `_WP_VIEWS` + `_getActiveCols()`. `renderWPMonTable()` rebuilds colgroup/thead per view and also populates `#wp-mon-cards` (mobile card view). `setWPListView(view)` switches + resets sort. `openWPDetail(w)` / `closeWPDetailModal()` — slide-in panel. All tab hidden for viewers.
+
+**Mobile WP List (both pages)**: On ≤767px the `.wp-table-wrap` is hidden and `.wp-card-list` shown instead. Cards render from the same paged `items[]` — trade group header + one card per WP. Each card: WP No (red, tappable → detail panel) + status badge, description, trade › works, budget/awarded/variance (non-viewer), target award + delivery dates, vendors, View Details + Edit. CSS classes: `.wp-card-list`, `.wp-card`, `.wp-card-*`, `.wp-table-wrap` — defined in each page's inline `<style>` block.
 
 **Collapse pattern**: items[] built from trade groups (header always + rows only if expanded). `toggleTradeGroup` / `collapseAllTrades` / `expandAllTrades`. Works tab uses DOM-only toggle (`toggleWkTrade`, `toggleWkBudget`). Schedule tab uses `toggleSchRow`.
 
@@ -261,7 +263,7 @@ Tabs: Overview → Dashboard → Backlog → WP List
 - **Overview**: Cost KPIs (6) + WP Status KPIs (6). No charts.
 - **Dashboard**: Period chart + WP by Trade + WP by Status donut + backlog table + Top 5 panels
 - **Backlog**: Filter bar (Trade, Sort, Search, Budget min/max) + backlog table + aging/status/period/submittal charts. `renderBacklog()` applies filters. Collapsible trade groups.
-- **WP List**: 5 view tabs (Overview/Award/Schedule/Submittals/All). `WP_TABLE_VIEWS` + `getActiveCols()`. `setWPTableView(view)`. `buildTable()` renders colgroup + thead + tbody via `innerHTML` exactly like `renderWPMonTable()` in `index.html` — uses `_stickyLeft` dict (never mutates col objects), `renderCell` switch, `white-space:normal` on `<th>`. Trade group header splits into sticky + non-sticky cells. `openWPDetail(w)` slide-in panel.
+- **WP List**: 5 view tabs (Overview/Award/Schedule/Submittals/All). `WP_TABLE_VIEWS` + `getActiveCols()`. `setWPTableView(view)`. `buildTable()` renders colgroup + thead + tbody via `innerHTML` exactly like `renderWPMonTable()` in `index.html` — uses `_stickyLeft` dict (never mutates col objects), `renderCell` switch, `white-space:normal` on `<th>`. Trade group header splits into sticky + non-sticky cells. Also populates `#proj-wp-cards` (mobile card view — same paged items, CSS toggles visibility). `openWPDetail(w)` slide-in panel.
 - Claims tab exists in HTML but hidden (`display:none`)
 
 `_rendered = { overview, dashboard, backlog, table }` — reset on filter change or data reload.
