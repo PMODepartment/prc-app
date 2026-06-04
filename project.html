@@ -1053,13 +1053,24 @@ function buildTable(){
       tr.className='trade-group-header'; tr.dataset.trade=item.trade;
       tr.style.cssText='cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5';
       tr.onclick=()=>toggleTradeGroup(item.trade);
-      const td=document.createElement('td');
-      td.colSpan=cols.length+1;
-      td.style.cssText='position:sticky;left:0;z-index:2;background:#f8f8f8;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555';
-      td.innerHTML=item.trade
-        +'<span style="float:right;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-left:4px">'+(item.collapsed?'+':'−')+'</span>'
-        +'<span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">'+item.wps.length+' WPs</span>';
-      tr.appendChild(td); tbody.appendChild(tr);
+      // Split into sticky cell (sticky cols only) + non-sticky cell (rest),
+      // matching index.html pattern — a full-colspan cell can't sticky-scroll.
+      const nSticky=cols.filter(c=>c.sticky).length;
+      const nRest=cols.length+1-nSticky; // +1 for edit col
+      const btn='<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-left:6px;flex-shrink:0">'+(item.collapsed?'+':'−')+'</span>';
+      const tdS=document.createElement('td');
+      tdS.colSpan=nSticky||1;
+      tdS.style.cssText='position:sticky;left:0;z-index:2;background:#f8f8f8;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:table-cell';
+      tdS.innerHTML=item.trade+btn;
+      tr.appendChild(tdS);
+      if(nRest>0){
+        const tdR=document.createElement('td');
+        tdR.colSpan=nRest;
+        tdR.style.cssText='background:#f8f8f8;padding:7px 12px;text-align:right;vertical-align:middle';
+        tdR.innerHTML='<span style="font-size:10px;color:#aaa;font-weight:400;white-space:nowrap">'+item.wps.length+' WPs</span>';
+        tr.appendChild(tdR);
+      }
+      tbody.appendChild(tr);
     } else {
       const w=item.wp;
       const cellMap={
