@@ -445,7 +445,8 @@
                 <button onclick="expandAllTrades()" title="Expand all trades" style="padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:12px;font-weight:700">+</span> Expand</button>
               </div>
             </div>
-            <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+            <div id="wp-mon-cards" class="wp-card-list"></div>
+            <div class="wp-table-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch">
               <table class="data-table" id="wp-mon-table" style="font-size:11px;table-layout:fixed">
                 <colgroup id="wp-mon-colgroup"></colgroup>
                 <thead><tr id="wp-mon-head-row"></tr></thead>
@@ -1532,6 +1533,48 @@
       const nextBtn = document.getElementById('wp-mon-btn-next');
       if (prevBtn) prevBtn.disabled = _wpMonPage <= 1;
       if (nextBtn) nextBtn.disabled = _wpMonPage >= totalPages;
+
+      // ── Mobile card view ─────────────────────────────────────────────
+      const cardEl = document.getElementById('wp-mon-cards');
+      if (cardEl) {
+        const isViewer = window.__isViewer;
+        const _sc = s => s==='Awarded'?'#2D9B6F':s==='Partially Awarded'?'#F59E0B':'#EE3124';
+        let ch = '';
+        pageItems.forEach(item => {
+          if (item.type === 'header') {
+            ch += `<div class="wp-card-trade">${item.trade}<span class="wp-card-trade-count">${item.count} WPs</span></div>`;
+          } else {
+            const w = item.wp;
+            const bud = w.approved_budget_bcb||0, awd = w.total_awarded||0, v = bud - awd;
+            const sc = _sc(w.award_status);
+            const bc = w.award_status==='Awarded'?'#2D9B6F':w.award_status==='Partially Awarded'?'#F59E0B':'#e5e5e5';
+            const finHtml = !isViewer && (bud||awd) ? `<div class="wp-card-fin">
+              <span><small>Budget</small>${fmtM(bud)}</span>
+              <span><small>Awarded</small>${fmtM(awd)}</span>
+              <span style="color:${v>=0?'#2D9B6F':'#EE3124'}"><small>Variance</small>${v>=0?'+':''}${fmtM(v)}</span>
+            </div>` : '';
+            const datesHtml = (w.awarding_date||w.target_delivery||w.target_completion) ? `<div class="wp-card-dates">
+              ${w.awarding_date?`<span><small>Target Award</small>${fmtD(w.awarding_date)}</span>`:''}
+              ${(w.target_delivery||w.target_completion)?`<span><small>Target Delivery</small>${fmtD(w.target_delivery||w.target_completion)}</span>`:''}
+            </div>` : '';
+            const vendorHtml = w.proposed_vendors ? `<div class="wp-card-vendor">${w.proposed_vendors}</div>` : '';
+            ch += `<div class="wp-card" style="border-left-color:${bc}">
+              <div class="wp-card-header">
+                <span class="wp-card-wpno" onclick='openWPDetail("${w.id}")'>${w.wp_no||'—'}</span>
+                <span class="wp-card-badge" style="background:${sc}22;color:${sc}">${w.award_status||'—'}</span>
+              </div>
+              <div class="wp-card-project">${w.project_id||''}</div>
+              <div class="wp-card-desc">${w.description||'—'}</div>
+              <div class="wp-card-meta">${[w.trade,w.works].filter(Boolean).join(' › ')||'—'}</div>
+              ${finHtml}${datesHtml}${vendorHtml}
+              <div class="wp-card-actions">
+                <button onclick='openWPDetail("${w.id}")'>View Details</button>
+              </div>
+            </div>`;
+          }
+        });
+        cardEl.innerHTML = ch || '<div style="text-align:center;color:#aaa;padding:20px">No work packages found</div>';
+      }
     }
 
     function renderAll() {
@@ -1995,12 +2038,31 @@
   body.viewer-mode #wp-mon-table td:nth-child(23),
   body.viewer-mode #wp-mon-table th:nth-child(24),
   body.viewer-mode #wp-mon-table td:nth-child(24) { display:none !important; }
-  /* WP List mobile: view tabs already reduce column count; ensure table scrolls smoothly */
-  @media (max-width: 767px) {
+  /* ── WP List: table on desktop, card view on mobile ── */
+  .wp-card-list { display:none; padding:0 2px 8px; }
+  @media (max-width:767px) {
     #wp-view-tabs { overflow-x:auto; flex-wrap:nowrap; }
-    #wp-mon-table { font-size:10px; }
-    #wp-mon-table th, #wp-mon-table td { padding:6px 8px !important; white-space:nowrap; }
+    .wp-table-wrap  { display:none !important; }
+    .wp-card-list   { display:block; }
   }
+  .wp-card-trade { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;padding:10px 2px 4px;border-top:2px solid #e5e5e5;margin-top:4px; }
+  .wp-card-trade:first-child { border-top:none;margin-top:0; }
+  .wp-card-trade-count { font-weight:400;color:#aaa;margin-left:6px; }
+  .wp-card { background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:10px;padding:13px 14px;border-left:3px solid #e5e5e5; }
+  .wp-card-header { display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:5px; }
+  .wp-card-wpno { font-family:monospace;font-size:12px;font-weight:700;color:#EE3124;cursor:pointer;flex-shrink:0; }
+  .wp-card-badge { font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0; }
+  .wp-card-project { font-size:10px;font-weight:700;color:#444;margin-bottom:2px; }
+  .wp-card-desc { font-size:12px;font-weight:600;color:#231F20;margin-bottom:3px;line-height:1.4; }
+  .wp-card-meta { font-size:10px;color:#aaa;margin-bottom:7px; }
+  .wp-card-fin { display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11px;font-weight:600;color:#333;padding:7px 0;border-top:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;margin-bottom:7px; }
+  .wp-card-fin small { font-size:9px;font-weight:400;color:#aaa;display:block;margin-bottom:1px; }
+  .wp-card-dates { display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11px;font-weight:500;color:#444;margin-bottom:7px; }
+  .wp-card-dates small { font-size:9px;font-weight:400;color:#aaa;display:block;margin-bottom:1px; }
+  .wp-card-vendor { font-size:10px;color:#666;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .wp-card-actions { display:flex;gap:8px;margin-top:6px; }
+  .wp-card-actions button { flex:1;font-size:11px;font-weight:600;color:#444;background:#f5f5f5;border:none;border-radius:6px;padding:7px 10px;cursor:pointer;font-family:inherit; }
+  .wp-card-actions a { font-size:11px;font-weight:600;color:#EE3124;border:1.5px solid #EE3124;border-radius:6px;padding:6px 14px;text-decoration:none;white-space:nowrap; }
   /* Hide Budget column in backlog tables and dashboard backlog */
   body.viewer-mode #bl-table th:nth-child(7),
   body.viewer-mode #bl-table td:nth-child(7),
