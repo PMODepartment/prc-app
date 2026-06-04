@@ -359,8 +359,8 @@
               <div style="overflow-x:auto">
                 <table class="data-table" id="idx-sch-table" style="font-size:11px">
                   <thead><tr>
-                    <th style="min-width:180px">Project / Trade</th>
-                    <th>Total WP</th><th>Awarded</th><th>Due Not Awd</th><th>Not Due</th><th>% Awarded</th>
+                    <th style="min-width:180px">Project / Trade / WP</th>
+                    <th>Total WPs</th><th>Awarded</th><th>Past Due / Tgt. Award</th><th>Not Due / Tgt. Delivery</th><th>Rate% / Lead</th>
                   </tr></thead>
                   <tbody id="idx-sch-tbody"></tbody>
                 </table>
@@ -1200,54 +1200,96 @@
         const schTbody = document.getElementById('idx-sch-tbody');
         if (schTbody && filt) {
           const tradeOrder = IDX_TRADE_ORDER;
+          const fmtD = d => d ? Fmt.date(d) : '—';
+          const _safeId = s => s.replace(/[^a-z0-9]/gi,'_');
           let schHtml = '';
           filt.forEach((p, pi) => {
             const pWps = wps.filter(w => w.project_id === p.id);
             const s = allStats[pi];
-            const due = pWps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<=now).length;
-            const notDue = pWps.filter(w=>w.award_status!=='Awarded'&&(!w.awarding_date||new Date(w.awarding_date)>now)).length;
-            const projRowId = 'sch-proj-'+p.id;
-            schHtml += `<tr style="background:#f0f0f0;cursor:pointer;font-weight:600" onclick="toggleSchRow('${projRowId}')">
+            const projRowId = 'sch-proj-' + p.id;
+
+            // ── Project header row (collapsible — hides/shows all trade rows) ──
+            schHtml += `<tr style="background:#f0f0f0;cursor:pointer;font-weight:600" onclick="toggleSchProj('${projRowId}')">
               <td colspan="6" style="padding:8px 12px">
                 <span style="font-size:10px;font-weight:700;background:#EE3124;color:#fff;padding:2px 7px;border-radius:4px;margin-right:8px">${p.id}</span>
                 ${p.name||p.id}
-                <span style="float:right;font-size:11px;color:#888">${s.awardRate}% awarded</span>
-                <span id="${projRowId}-ind" style="float:right;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-right:6px">+</span>
+                <span style="float:right;font-size:11px;color:#888">${pWps.length} WPs · ${s.awardRate}% awarded</span>
+                <span id="${projRowId}-ind" style="float:right;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-right:6px">−</span>
               </td>
-            </tr>
-            <tr id="${projRowId}-summary" style="background:#fafafa">
-              <td style="padding-left:24px;font-size:11px;color:#666">All Trades</td>
-              <td style="text-align:center">${pWps.length}</td>
-              <td style="text-align:center;color:#2D9B6F;font-weight:600">${s.awarded}</td>
-              <td style="text-align:center;color:#EE3124;font-weight:600">${due}</td>
-              <td style="text-align:center;color:#888">${notDue}</td>
-              <td style="text-align:center;font-weight:700">${s.awardRate}%</td>
             </tr>`;
-            const pTrades = tradeOrder.filter(t => pWps.some(w=>w.trade===t))
+
+            // ── Per-trade rows (visible by default; each trade is its own collapsible header) ──
+            const pTrades = tradeOrder.filter(t => pWps.some(w => w.trade===t))
               .concat([...new Set(pWps.map(w=>w.trade).filter(t=>t&&!tradeOrder.includes(t)))].sort());
             pTrades.forEach(t => {
-              const tw = pWps.filter(w=>w.trade===t);
+              const tradeKey = p.id + '§' + t;
+              const tId = _safeId(tradeKey);
+              const tw = pWps.filter(w => w.trade===t);
               const tDue = tw.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<=now).length;
               const tNotDue = tw.filter(w=>w.award_status!=='Awarded'&&(!w.awarding_date||new Date(w.awarding_date)>now)).length;
               const tAwd = tw.filter(w=>w.award_status==='Awarded').length;
               const tRate = tw.length ? Math.round(tAwd/tw.length*100) : 0;
-              schHtml += `<tr id="${projRowId}-trade" style="display:none">
-                <td style="padding-left:36px;font-size:11px;color:#555">${t}</td>
+
+              // Trade header row — clicking expands individual WP rows below
+              schHtml += `<tr data-proj="${projRowId}" data-trade-hdr="${tradeKey}" style="background:#fafafa;cursor:pointer" onclick="toggleSchTrade('${tradeKey}')">
+                <td style="padding-left:24px;font-size:11px;color:#333;font-weight:600">
+                  <span id="sch-ti-${tId}" style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:2px;background:#ddd;color:#555;font-size:11px;font-weight:700;margin-right:6px;vertical-align:middle;flex-shrink:0">+</span>${t}
+                </td>
                 <td style="text-align:center">${tw.length}</td>
                 <td style="text-align:center;color:#2D9B6F;font-weight:600">${tAwd}</td>
                 <td style="text-align:center;color:#EE3124;font-weight:600">${tDue}</td>
                 <td style="text-align:center;color:#888">${tNotDue}</td>
                 <td style="text-align:center">${tRate}%</td>
               </tr>`;
+
+              // Individual WP rows under this trade (hidden by default)
+              tw.slice().sort((a,b)=>(a.wp_no||'').localeCompare(b.wp_no||'')).forEach(wp => {
+                const sc = wp.award_status==='Awarded'?'#2D9B6F':wp.award_status==='Partially Awarded'?'#D97706':'#EE3124';
+                schHtml += `<tr data-proj="${projRowId}" data-trade-wp="${tradeKey}" style="display:none">
+                  <td style="padding-left:42px">
+                    <span style="font-family:monospace;font-size:10px;font-weight:700;color:#EE3124">${wp.wp_no||'—'}</span>
+                    <span style="display:block;font-size:10px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px" title="${(wp.description||'').replace(/"/g,'&quot;')}">${wp.description||'—'}</span>
+                  </td>
+                  <td style="text-align:center"><span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;background:${sc}22;color:${sc};white-space:nowrap">${wp.award_status||'—'}</span></td>
+                  <td style="text-align:center;font-size:10px;color:#666">—</td>
+                  <td style="text-align:center;font-size:10px;color:#666">${fmtD(wp.awarding_date)}</td>
+                  <td style="text-align:center;font-size:10px;color:#666">${fmtD(wp.target_delivery||wp.target_completion)}</td>
+                  <td style="text-align:center;font-size:10px;color:#888">${wp.awarding_lead_time!=null?wp.awarding_lead_time+'d':'—'}</td>
+                </tr>`;
+              });
             });
           });
           schTbody.innerHTML = schHtml;
         }
-        window.toggleSchRow = function(projRowId) {
-          const tradeRows = document.querySelectorAll(`tr[id="${projRowId}-trade"]`);
-          const isHidden = tradeRows.length && tradeRows[0].style.display === 'none';
-          tradeRows.forEach(r => r.style.display = isHidden ? '' : 'none');
+
+        // Toggle project: show/hide all trade rows (and collapse any expanded WP rows)
+        window.toggleSchProj = function(projRowId) {
+          const tbody = document.getElementById('idx-sch-tbody');
+          const tradeHdrs = tbody.querySelectorAll(`tr[data-proj="${projRowId}"][data-trade-hdr]`);
+          const wpRows   = tbody.querySelectorAll(`tr[data-proj="${projRowId}"][data-trade-wp]`);
+          const isHidden = tradeHdrs.length && tradeHdrs[0].style.display === 'none';
+          tradeHdrs.forEach(r => r.style.display = isHidden ? '' : 'none');
+          wpRows.forEach(r => r.style.display = 'none'); // always collapse WPs when toggling project
+          if (!isHidden) {
+            // Reset trade indicators when collapsing project
+            tradeHdrs.forEach(r => {
+              const _safeId = s => s.replace(/[^a-z0-9]/gi,'_');
+              const ind = document.getElementById('sch-ti-' + _safeId(r.dataset.tradeHdr));
+              if (ind) ind.textContent = '+';
+            });
+          }
           const ind = document.getElementById(projRowId + '-ind');
+          if (ind) ind.textContent = isHidden ? '−' : '+';
+        };
+
+        // Toggle trade: show/hide individual WP rows under that trade
+        window.toggleSchTrade = function(tradeKey) {
+          const tbody = document.getElementById('idx-sch-tbody');
+          const wpRows = tbody.querySelectorAll(`tr[data-trade-wp="${tradeKey}"]`);
+          const isHidden = wpRows.length && wpRows[0].style.display === 'none';
+          wpRows.forEach(r => r.style.display = isHidden ? '' : 'none');
+          const _safeId = s => s.replace(/[^a-z0-9]/gi,'_');
+          const ind = document.getElementById('sch-ti-' + _safeId(tradeKey));
           if (ind) ind.textContent = isHidden ? '−' : '+';
         };
       } else if (tab === 'works') {
