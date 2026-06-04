@@ -203,6 +203,12 @@
               <select id="perf-proj-filter" onchange="renderPerfTab()" style="padding:7px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:12px;font-family:inherit;background:#fff;color:#231F20">
                 <option value="ALL">All Projects</option>
               </select>
+              <select id="perf-role-filter" onchange="renderPerfTab()" style="padding:7px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:12px;font-family:inherit;background:#fff;color:#231F20">
+                <option value="ALL">All WP Roles</option>
+                <option value="Responsible">Responsible</option>
+                <option value="Approver">Approver</option>
+                <option value="Support">Support</option>
+              </select>
               <select id="perf-sort-sel" onchange="renderPerfTab()" style="padding:7px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:12px;font-family:inherit;background:#fff;color:#231F20">
                 <option value="awardRate">Sort: Award Rate</option>
                 <option value="onTimeRate">Sort: On-Time Rate</option>
@@ -438,7 +444,7 @@
     return r;
   }
 
-  function buildPerfData(users, wps, permittedProjectIds) {
+  function buildPerfData(users, wps, permittedProjectIds, roleFilter) {
     const today = new Date();
     const projSet = new Set(permittedProjectIds);
     // Track all approved users — any role can be assigned to a WP
@@ -450,8 +456,11 @@
       if (!uName && !uEmail) return null;
       const myWPs  = wps.filter(w => {
         if (!projSet.has(w.project_id)) return false;
-        // Match against responsible_team, approver, AND support_team
-        return _wpRoles(w, uName, uEmail).length > 0;
+        const roles = _wpRoles(w, uName, uEmail);
+        if (!roles.length) return false;
+        // Apply WP role filter: only include WPs where person has the selected role
+        if (roleFilter && roleFilter !== 'ALL') return roles.includes(roleFilter);
+        return true;
       });
       if (!myWPs.length) return null;
 
@@ -501,13 +510,14 @@
 
   window.renderPerfTab = function() {
     const projFilter = (document.getElementById('perf-proj-filter')?.value) || 'ALL';
+    const roleFilter = (document.getElementById('perf-role-filter')?.value) || 'ALL';
     const sortSel    = (document.getElementById('perf-sort-sel')?.value)   || 'awardRate';
     const permitted  = AppAuth.getPermittedProjects(currentProfile, allProjects)
       .filter(p => p.status !== 'archived')
       .filter(p => projFilter === 'ALL' || p.id === projFilter);
     const filtWPs = projFilter === 'ALL' ? _perfWPs : _perfWPs.filter(w => w.project_id === projFilter);
 
-    _perfData = buildPerfData(allUsers, filtWPs || [], permitted.map(p => p.id));
+    _perfData = buildPerfData(allUsers, filtWPs || [], permitted.map(p => p.id), roleFilter);
 
     // Sort
     _perfData.sort((a,b) => {
