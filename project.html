@@ -335,7 +335,8 @@
               </div>
             </div>
             <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-              <table class="data-table" id="proj-wp-table">
+              <table class="data-table" id="proj-wp-table" style="table-layout:fixed">
+                <colgroup id="proj-wp-colgroup"></colgroup>
                 <thead id="tbl-head"></thead>
                 <tbody id="tbl-body"></tbody>
               </table>
@@ -1004,6 +1005,10 @@ function buildTable(){
   // Compute cumulative left offsets for sticky columns
   let _sl=0;
   cols.forEach(c=>{ if(c.sticky){c._left=_sl;_sl+=parseInt(c.w);}});
+
+  // Update colgroup — forces fixed column widths so sticky left offsets match rendered widths
+  const cg=document.getElementById('proj-wp-colgroup');
+  if(cg) cg.innerHTML=cols.map(c=>`<col style="width:${parseInt(c.w)}px;min-width:${parseInt(c.w)}px">`).join('')+'<col style="width:50px;min-width:50px">';
 
   const thead=document.getElementById('tbl-head'); thead.innerHTML='';
   const colRow=document.createElement('tr');
