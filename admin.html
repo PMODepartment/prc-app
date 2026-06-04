@@ -225,6 +225,9 @@
                     <th style="width:28px"></th>
                     <th>Person</th>
                     <th>Total WPs</th>
+                    <th style="color:#1D4ED8">Responsible</th>
+                    <th style="color:#7C3AED">Approver</th>
+                    <th style="color:#059669">Support</th>
                     <th>Award Rate</th>
                     <th>On-Time Rate</th>
                     <th>Avg Days Early/Late</th>
@@ -480,6 +483,9 @@
         wps: myWPs,
         total:            myWPs.length,
         awardedCount:     awarded.length,
+        responsibleCount: myWPs.filter(w => _wpRoles(w, uName, uEmail).includes('Responsible')).length,
+        approverCount:    myWPs.filter(w => _wpRoles(w, uName, uEmail).includes('Approver')).length,
+        supportCount:     myWPs.filter(w => _wpRoles(w, uName, uEmail).includes('Support')).length,
         awardRate:        myWPs.length  ? awarded.length   / myWPs.length    : 0,
         onTimeRate:       withDates.length ? onTime.length / withDates.length : null,
         avgDays,
@@ -493,7 +499,7 @@
   async function loadPerfWPs() {
     if (_perfWPs) { renderPerfTab(); return; }
     document.getElementById('perf-tbody').innerHTML =
-      '<tr><td colspan="9" style="text-align:center;padding:32px;color:#aaa">Loading performance data…</td></tr>';
+      '<tr><td colspan="12" style="text-align:center;padding:32px;color:#aaa">Loading performance data…</td></tr>';
     const isManager = currentProfile?.role === 'manager';
     const permitted = AppAuth.getPermittedProjects(currentProfile, allProjects).filter(p => p.status !== 'archived');
 
@@ -538,7 +544,7 @@
 
     const tbody = document.getElementById('perf-tbody');
     if (!_perfData.length) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#aaa"><i class="ti ti-chart-off" style="font-size:32px;display:block;margin-bottom:8px;opacity:.3"></i>No performance data for the selected filter</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:#aaa"><i class="ti ti-chart-off" style="font-size:32px;display:block;margin-bottom:8px;opacity:.3"></i>No performance data for the selected filter</td></tr>';
       return;
     }
 
@@ -556,6 +562,9 @@
           <div style="margin-top:2px"><span style="${roleSt}">${roleL}</span></div>
         </td>
         <td><span style="font-weight:700;font-size:14px">${d.total}</span> <span style="color:#aaa;font-size:11px">(${d.awardedCount} awarded)</span></td>
+        <td style="text-align:center">${d.responsibleCount ? `<span style="font-weight:700;color:#1D4ED8">${d.responsibleCount}</span>` : '<span style="color:#ccc">—</span>'}</td>
+        <td style="text-align:center">${d.approverCount    ? `<span style="font-weight:700;color:#7C3AED">${d.approverCount}</span>`    : '<span style="color:#ccc">—</span>'}</td>
+        <td style="text-align:center">${d.supportCount     ? `<span style="font-weight:700;color:#059669">${d.supportCount}</span>`     : '<span style="color:#ccc">—</span>'}</td>
         <td>${_perfChip(d.awardRate, _PERF_THRESHOLDS.awardRate, Math.round(d.awardRate*100)+'%')}</td>
         <td>${_perfChip(d.onTimeRate, _PERF_THRESHOLDS.onTimeRate, d.onTimeRate!=null ? Math.round(d.onTimeRate*100)+'%' : null)}</td>
         <td>${_fmtDays(d.avgDays)}</td>
@@ -596,7 +605,7 @@
       }).join('');
 
       const expandRow = `<tr class="perf-expand-row">
-        <td colspan="9">
+        <td colspan="12">
           <div class="perf-wp-sub">
             <table>
               <thead><tr><th>WP No.</th><th>Description</th><th>Project</th><th>WP Role</th><th>Award Status</th><th>Planned Award</th><th>Actual Award</th><th>Variance</th></tr></thead>
