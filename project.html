@@ -998,135 +998,109 @@ function getFilteredSorted(){
 
 function buildTable(){
   const groups=getFilteredSorted(), cols=getActiveCols();
+  const nCols=cols.length;
   const totalWPs=groups.reduce((s,g)=>s+g.wps.length,0);
+  const fmtPct=v=>v!=null?(parseFloat(v)*100).toFixed(0)+'%':'—';
 
-  // Build virtual item list: header + (if not collapsed) WP row items per trade group
+  // Build virtual item list: trade header + WP rows (skip rows when collapsed)
   const items=[];
   groups.forEach(({trade,wps})=>{
     const collapsed=!!_collapseState.get(trade);
-    items.push({type:'header',trade,wps,collapsed});
+    items.push({type:'header',trade,count:wps.length,collapsed});
     if(!collapsed) wps.forEach(w=>items.push({type:'row',trade,wp:w}));
   });
 
-  const totalItems=items.length;
-  const pages=Math.max(1,Math.ceil(totalItems/PAGE));
+  const pages=Math.max(1,Math.ceil(items.length/PAGE));
   curPage=Math.min(curPage,pages);
   const start=(curPage-1)*PAGE, end=curPage*PAGE;
 
   document.getElementById('row-count').textContent=totalWPs+' packages';
-  document.getElementById('pg-info').textContent='Page '+curPage+' of '+pages;
+  document.getElementById('pg-info').textContent=pages>1?'Page '+curPage+' of '+pages:'';
   document.getElementById('btn-prev').disabled=curPage<=1;
   document.getElementById('btn-next').disabled=curPage>=pages;
 
-  // Compute cumulative left offsets for sticky columns
+  // Sticky left offsets — isolated dict, never mutate col objects
   let _sl=0;
-  cols.forEach(c=>{ if(c.sticky){c._left=_sl;_sl+=parseInt(c.w);}});
+  const _stickyLeft={};
+  cols.forEach(c=>{ if(c.sticky){_stickyLeft[c.key]=_sl;_sl+=parseInt(c.w);} });
 
-  // Update colgroup — forces fixed column widths so sticky left offsets match rendered widths
+  // Colgroup — fixed column widths so sticky offsets match rendered widths
   const cg=document.getElementById('proj-wp-colgroup');
   if(cg) cg.innerHTML=cols.map(c=>`<col style="width:${parseInt(c.w)}px;min-width:${parseInt(c.w)}px">`).join('')+'<col style="width:50px;min-width:50px">';
 
-  const thead=document.getElementById('tbl-head'); thead.innerHTML='';
-  const colRow=document.createElement('tr');
-  cols.forEach(c=>{
-    const th=document.createElement('th');
-    th.style.minWidth=c.w;
-    if(c.sticky) th.style.cssText='position:sticky;left:'+c._left+'px;background:#f8f8f8;z-index:3;min-width:'+c.w+';';
-    const sortInd = sortCol===c.key ? `<span style="margin-left:3px;color:#EE3124">${sortDir===1?'↑':'↓'}</span>` : '';
-    th.innerHTML=c.label+sortInd;
-    th.style.cursor='pointer';
-    th.title='Sort by '+c.label;
-    th.style.whiteSpace='nowrap';
-    th.style.userSelect='none';
-    th.addEventListener('mouseenter',()=>{ th.style.color='#EE3124'; });
-    th.addEventListener('mouseleave',()=>{ th.style.color=''; });
-    th.addEventListener('click',()=>{if(sortCol===c.key)sortDir*=-1;else{sortCol=c.key;sortDir=1;}curPage=1;buildTable();});
-    colRow.appendChild(th);
-  });
-  const thEdit=document.createElement('th'); thEdit.textContent=''; colRow.appendChild(thEdit);
-  thead.appendChild(colRow);
+  // Thead — white-space:normal so headers wrap to 2 lines instead of overflowing
+  const thead=document.getElementById('tbl-head');
+  if(thead) thead.innerHTML='<tr>'+cols.map(c=>{
+    const isSorted=sortCol===c.key;
+    const ind=isSorted?`<span style="margin-left:3px;color:#EE3124">${sortDir===1?'↑':'↓'}</span>`:'';
+    const ss=c.sticky?`position:sticky;left:${_stickyLeft[c.key]}px;background:#f8f8f8;z-index:3;`:'';
+    return `<th onclick="if(sortCol==='${c.key}')sortDir*=-1;else{sortCol='${c.key}';sortDir=1;}curPage=1;buildTable()" style="${ss}cursor:pointer;user-select:none;overflow:hidden;vertical-align:bottom;white-space:normal;line-height:1.3" title="Sort by ${c.label}">${c.label}${ind}</th>`;
+  }).join('')+'<th></th></tr>';
 
-  const tbody=document.getElementById('tbl-body'); tbody.innerHTML='';
+  // Cell renderer — sl applied per-cell so sticky style is clean and isolated
+  function renderCell(key,wp){
+    const bud=wp.approved_budget_bcb||0,awd=wp.total_awarded||0,v=bud-awd;
+    const sc=wp.award_status==='Awarded'?'#2D9B6F':wp.award_status==='Partially Awarded'?'#D97706':'#EE3124';
+    const sl=key in _stickyLeft?`position:sticky;left:${_stickyLeft[key]}px;background:#fff;z-index:1;`:'';
+    switch(key){
+      case 'cost_code':   return `<td style="${sl}"><span class="td-code">${wp.cost_code||'—'}</span></td>`;
+      case 'wp_no':       return `<td style="${sl}"><span class="td-code" style="cursor:pointer;color:#EE3124" onclick='openWPDetail("${wp.id}")'>${wp.wp_no||'—'}</span></td>`;
+      case 'works':       return `<td style="${sl}overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(wp.works||'').replace(/"/g,'&quot;')}">${wp.works||'—'}</td>`;
+      case 'description': return `<td style="${sl}max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(wp.description||'').replace(/"/g,'&quot;')}"><span class="td-name">${wp.description||'—'}</span></td>`;
+      case 'trade':       return `<td>${wp.trade||'—'}</td>`;
+      case 'type_of_works': return `<td>${wp.type_of_works||'—'}</td>`;
+      case 'scope':{const s=wp.scope||'';const sh=s.length>55?s.slice(0,55)+'…':s;return `<td style="font-size:10px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${sh||'—'}${s.length>55?`<button onclick='openWPDetail("${wp.id}")' style="margin-left:4px;font-size:9px;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:''}${!s?`<button onclick='openWPDetail("${wp.id}")' title="View details" style="font-size:9px;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`:''}</td>`;}
+      case 'proposed_vendors': return `<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px" title="${(wp.proposed_vendors||'').replace(/"/g,'&quot;')}">${wp.proposed_vendors||'—'}</td>`;
+      case 'po_jo_count': return `<td style="text-align:center">${wp.po_jo_count!=null?wp.po_jo_count:'—'}</td>`;
+      case 'po_jo_numbers': return `<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">${wp.po_jo_numbers||'—'}</td>`;
+      case 'approved_budget_bcb': return `<td style="text-align:right">${fmt(bud)}</td>`;
+      case 'total_awarded': return `<td style="text-align:right">${fmt(awd)}</td>`;
+      case 'variance':    return `<td style="text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}">${(bud||awd)?(v>=0?'+':'')+fmt(v):'—'}</td>`;
+      case 'surety_bond': return `<td style="text-align:center">${wp.surety_bond||'—'}</td>`;
+      case 'performance_bond': return `<td style="text-align:center">${wp.performance_bond||'—'}</td>`;
+      case 'warranty_bond': return `<td style="text-align:center">${wp.warranty_bond||'—'}</td>`;
+      case 'payment_terms_days': return `<td style="text-align:center">${wp.payment_terms_days?wp.payment_terms_days+'d':'—'}</td>`;
+      case 'dp_percent':  return `<td style="text-align:center">${fmtPct(wp.dp_percent)}</td>`;
+      case 'dp_terms':    return `<td>${wp.dp_terms||'—'}</td>`;
+      case 'dp_amount':   return `<td style="text-align:right">${fmt(wp.dp_amount)}</td>`;
+      case 'dp_release_date': return `<td>${fmtDate(wp.dp_release_date)}</td>`;
+      case 'retention_percent': return `<td style="text-align:center">${fmtPct(wp.retention_percent)}</td>`;
+      case 'retention_amount': return `<td style="text-align:right">${fmt(wp.retention_amount)}</td>`;
+      case 'awarding_lead_time': return `<td style="text-align:center">${wp.awarding_lead_time!=null?wp.awarding_lead_time+'d':'—'}</td>`;
+      case 'awarding_date': return `<td>${fmtDate(wp.awarding_date)}</td>`;
+      case 'actual_awarding_date': return `<td>${fmtDate(wp.actual_awarding_date)}</td>`;
+      case 'target_delivery': return `<td>${fmtDate(wp.target_delivery||wp.target_completion)}</td>`;
+      case 'actual_delivery': return `<td>${fmtDate(wp.actual_delivery)}</td>`;
+      case 'target_installation': return `<td>${fmtDate(wp.target_installation)}</td>`;
+      case 'target_completion': return `<td>${fmtDate(wp.target_completion)}</td>`;
+      case 'approver_name': return `<td>${wp.approver_name||'—'}</td>`;
+      case 'approval_date': return `<td>${fmtDate(wp.approval_date)}</td>`;
+      case 'submittal_doc_type': return `<td>${wp.submittal_doc_type||'—'}</td>`;
+      case 'award_status': return `<td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${sc}22;color:${sc}">${wp.award_status||'—'}</span></td>`;
+      case 'remarks': return `<td style="font-size:10px;color:#888;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(wp.remarks||'').replace(/"/g,'&quot;')}">${wp.remarks||'—'}</td>`;
+      default: return '<td>—</td>';
+    }
+  }
+
+  // Tbody — innerHTML for performance; trade header split into sticky + rest cells
+  const nSticky=cols.filter(c=>c.sticky).length;
+  let html='';
   items.slice(start,end).forEach(item=>{
     if(item.type==='header'){
-      const tr=document.createElement('tr');
-      tr.className='trade-group-header'; tr.dataset.trade=item.trade;
-      tr.style.cssText='cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5';
-      tr.onclick=()=>toggleTradeGroup(item.trade);
-      // Split into sticky cell (sticky cols only) + non-sticky cell (rest),
-      // matching index.html pattern — a full-colspan cell can't sticky-scroll.
-      const nSticky=cols.filter(c=>c.sticky).length;
-      const nRest=cols.length+1-nSticky; // +1 for edit col
-      const btn='<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-left:6px;flex-shrink:0">'+(item.collapsed?'+':'−')+'</span>';
-      const tdS=document.createElement('td');
-      tdS.colSpan=nSticky||1;
-      tdS.style.cssText='position:sticky;left:0;z-index:2;background:#f8f8f8;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:table-cell';
-      tdS.innerHTML=item.trade+btn;
-      tr.appendChild(tdS);
-      if(nRest>0){
-        const tdR=document.createElement('td');
-        tdR.colSpan=nRest;
-        tdR.style.cssText='background:#f8f8f8;padding:7px 12px;text-align:right;vertical-align:middle';
-        tdR.innerHTML='<span style="font-size:10px;color:#aaa;font-weight:400;white-space:nowrap">'+item.wps.length+' WPs</span>';
-        tr.appendChild(tdR);
-      }
-      tbody.appendChild(tr);
+      const btn=`<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-left:6px;flex-shrink:0">${item.collapsed?'+':'−'}</span>`;
+      const cnt=`<span style="font-size:10px;color:#aaa;font-weight:400;white-space:nowrap">${item.count} WPs</span>`;
+      const sColspan=nSticky||1;
+      const rColspan=nCols+1-Math.max(nSticky,1); // +1 for edit col; at least 1
+      const tdS=`<td colspan="${sColspan}" style="position:sticky;left:0;z-index:2;background:#f8f8f8;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:table-cell">${item.trade}${btn}</td>`;
+      const tdR=rColspan>0?`<td colspan="${rColspan}" style="background:#f8f8f8;padding:7px 12px;text-align:right;vertical-align:middle">${cnt}</td>`:'';
+      html+=`<tr class="trade-group-header" data-trade="${item.trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5">${tdS}${tdR}</tr>`;
     } else {
-      const w=item.wp;
-      const cellMap={
-        cost_code:'<span class="td-code">'+(w.cost_code||'—')+'</span>',
-        trade:w.trade||'—',
-        works:w.works||'—',
-        type_of_works:w.type_of_works||'—',
-        scope:(()=>{const sc=w.scope||'';const sh=sc.length>55?sc.slice(0,55)+'…':sc;return(sh||'—')+(sc.length>55?`<button onclick='openWPDetail("${w.id}")' style="margin-left:4px;font-size:9px;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:'')+(sc?'':`<button onclick='openWPDetail("${w.id}")' style="font-size:9px;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`)})(),
-        wp_no:`<span class="td-code" style="cursor:pointer;color:#EE3124" onclick='openWPDetail("${w.id}")'>`+(w.wp_no||'—')+'</span>',
-        description:'<span class="td-name">'+(w.description||'—')+'</span>',
-        proposed_vendors:w.proposed_vendors||'—',
-        po_jo_count:w.po_jo_count!=null?w.po_jo_count:'—',
-        po_jo_numbers:w.po_jo_numbers||'—',
-        approved_budget_bcb:fmt(w.approved_budget_bcb),
-        total_awarded:fmt(w.total_awarded),
-        variance:(()=>{const v=(w.approved_budget_bcb||0)-(w.total_awarded||0);return(w.approved_budget_bcb||w.total_awarded)?'<span style="color:'+(v>=0?'#2D9B6F':'#EE3124')+';font-weight:600">'+(v>=0?'+':'')+fmt(v)+'</span>':'—';})(),
-        surety_bond:w.surety_bond||'—',
-        performance_bond:w.performance_bond||'—',
-        warranty_bond:w.warranty_bond||'—',
-        payment_terms_days:w.payment_terms_days?w.payment_terms_days+'d':'—',
-        dp_percent:w.dp_percent!=null?(parseFloat(w.dp_percent)*100).toFixed(0)+'%':'—',
-        dp_terms:w.dp_terms||'—',
-        dp_amount:fmt(w.dp_amount),
-        dp_release_date:fmtDate(w.dp_release_date),
-        retention_percent:w.retention_percent!=null?(parseFloat(w.retention_percent)*100).toFixed(0)+'%':'—',
-        retention_amount:fmt(w.retention_amount),
-        awarding_lead_time:w.awarding_lead_time!=null?w.awarding_lead_time+'d':'—',
-        awarding_date:fmtDate(w.awarding_date),
-        actual_awarding_date:fmtDate(w.actual_awarding_date),
-        target_delivery:fmtDate(w.target_delivery||w.target_completion),
-        actual_delivery:fmtDate(w.actual_delivery),
-        target_installation:fmtDate(w.target_installation),
-        target_completion:fmtDate(w.target_completion),
-        approver_name:w.approver_name||'—',
-        approval_date:fmtDate(w.approval_date),
-        submittal_doc_type:w.submittal_doc_type||'—',
-        award_status:statusBadge(w.award_status),
-        remarks:'<span style="font-size:10px;color:#888">'+(w.remarks||'—')+'</span>',
-      };
-      const _tdExtra={description:'max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap',proposed_vendors:'max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap',scope:'max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#666',remarks:'max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'};
-      const tr=document.createElement('tr'); tr.dataset.tradeRow=item.trade;
-      cols.forEach(c=>{
-        const td=document.createElement('td');
-        td.innerHTML=cellMap[c.key]??'—';
-        if(c.key==='description') td.title=w.description||'';
-        if(c.key==='proposed_vendors') td.title=w.proposed_vendors||'';
-        if(c.key==='remarks') td.title=w.remarks||'';
-        if(c.sticky) td.style.cssText='position:sticky;left:'+c._left+'px;background:#fff;z-index:1;min-width:'+c.w+';'+(_tdExtra[c.key]||'');
-        else if(_tdExtra[c.key]) td.style.cssText=_tdExtra[c.key];
-        tr.appendChild(td);
-      });
-      const tdEdit=document.createElement('td');
-      tdEdit.innerHTML=window.__isViewer?'':`<a href="wp-form.html?id=${w.id}&project=${w.project_id}" style="font-size:11px;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
-      tr.appendChild(tdEdit); tbody.appendChild(tr);
+      const editLink=window.__isViewer?'':`<a href="wp-form.html?id=${item.wp.id}&project=${item.wp.project_id}" style="font-size:11px;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
+      html+=`<tr data-trade-row="${item.trade.replace(/"/g,'&quot;')}">${cols.map(c=>renderCell(c.key,item.wp)).join('')}<td>${editLink}</td></tr>`;
     }
   });
+  const tbody=document.getElementById('tbl-body');
+  tbody.innerHTML=html||`<tr><td colspan="${nCols+1}" style="text-align:center;color:#aaa;padding:20px">No work packages found</td></tr>`;
 }
 
 function changePage(d){curPage+=d;buildTable();}
