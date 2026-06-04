@@ -217,7 +217,7 @@
                 <thead>
                   <tr>
                     <th style="width:28px"></th>
-                    <th>User</th>
+                    <th>Person</th>
                     <th>Total WPs</th>
                     <th>Award Rate</th>
                     <th>On-Time Rate</th>
@@ -426,19 +426,32 @@
       : `<span style="color:#991B1B;font-weight:600">−${str}</span>`;
   }
 
+  // Returns the WP assignment roles for a person (Responsible / Approver / Support)
+  function _wpRoles(w, uName, uEmail) {
+    const r = [];
+    const resp = (w.responsible_team||'').split(',').map(s=>s.trim().toLowerCase());
+    if (resp.some(p=>p&&(p===uName||p===uEmail))) r.push('Responsible');
+    const appr = (w.approver||'').toLowerCase().trim();
+    if (appr&&(appr===uName||appr===uEmail)) r.push('Approver');
+    const supp = (w.support_team||'').split(',').map(s=>s.trim().toLowerCase());
+    if (supp.some(p=>p&&(p===uName||p===uEmail))) r.push('Support');
+    return r;
+  }
+
   function buildPerfData(users, wps, permittedProjectIds) {
     const today = new Date();
     const projSet = new Set(permittedProjectIds);
-    // Only trackable roles
-    const trackable = users.filter(u => ['user','manager','specialist'].includes(u.role));
+    // Track all approved users — any role can be assigned to a WP
+    const trackable = users.filter(u => u.status === 'approved');
 
     return trackable.map(u => {
       const uName  = (u.name  || '').toLowerCase().trim();
       const uEmail = (u.email || '').toLowerCase().trim();
+      if (!uName && !uEmail) return null;
       const myWPs  = wps.filter(w => {
         if (!projSet.has(w.project_id)) return false;
-        const parts = (w.responsible_team || '').split(',').map(s => s.trim().toLowerCase());
-        return parts.some(p => p && (p === uName || p === uEmail));
+        // Match against responsible_team, approver, AND support_team
+        return _wpRoles(w, uName, uEmail).length > 0;
       });
       if (!myWPs.length) return null;
 
@@ -511,7 +524,7 @@
     }
 
     document.getElementById('perf-summary').textContent =
-      `${_perfData.length} user${_perfData.length!==1?'s':''} · ${(filtWPs||[]).length} work packages`;
+      `${_perfData.length} person${_perfData.length!==1?'s':''} · ${(filtWPs||[]).length} work packages`;
 
     const tbody = document.getElementById('perf-tbody');
     if (!_perfData.length) {
@@ -543,7 +556,15 @@
 
       if (!isExpanded) return userRow;
 
+      const uNameL  = (d.user.name  || '').toLowerCase().trim();
+      const uEmailL = (d.user.email || '').toLowerCase().trim();
+      const _roleChip = roles => roles.map(r => {
+        const c = r==='Responsible'?'#1D4ED8':r==='Approver'?'#7C3AED':'#059669';
+        return `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:6px;background:${c}18;color:${c};white-space:nowrap">${r}</span>`;
+      }).join(' ');
+
       const subRows = d.wps.map(w => {
+        const roles   = _wpRoles(w, uNameL, uEmailL);
         const planned = w.awarding_date ? new Date(w.awarding_date).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : '—';
         const actual  = w.actual_awarding_date ? new Date(w.actual_awarding_date).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : '—';
         const variance = (w.approved_budget_bcb != null && w.total_awarded != null)
@@ -556,6 +577,7 @@
           <td>${w.wp_no||'—'}</td>
           <td>${w.description||'—'}</td>
           <td>${w.project_id||'—'}</td>
+          <td style="display:flex;gap:3px;flex-wrap:wrap;padding:8px 12px">${_roleChip(roles)}</td>
           <td style="color:${statusColor};font-weight:600">${w.award_status||'—'}</td>
           <td>${planned}</td>
           <td>${actual}</td>
@@ -567,7 +589,7 @@
         <td colspan="9">
           <div class="perf-wp-sub">
             <table>
-              <thead><tr><th>WP No.</th><th>Description</th><th>Project</th><th>Award Status</th><th>Planned Award</th><th>Actual Award</th><th>Variance</th></tr></thead>
+              <thead><tr><th>WP No.</th><th>Description</th><th>Project</th><th>WP Role</th><th>Award Status</th><th>Planned Award</th><th>Actual Award</th><th>Variance</th></tr></thead>
               <tbody>${subRows}</tbody>
             </table>
           </div>
