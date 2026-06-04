@@ -727,7 +727,7 @@
       financial:  {label:'Award',      keys:['cost_code','wp_no','description','budget','awarded','variance','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt'], cost:true},
       schedule:   {label:'Schedule',   keys:['cost_code','wp_no','description','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp']},
       submittals: {label:'Submittals', keys:['cost_code','wp_no','description','vendors','po_count','po_numbers','approver','appr_date','submittal','status']},
-      all:        {label:'All',        keys:['project','cost_code','wp_no','works','description','type_ow','scope','vendors','po_count','po_numbers','budget','awarded','variance','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp','approver','appr_date','submittal','status','remarks'], cost:true},
+      all:        {label:'All',        keys:['project','cost_code','wp_no','description','works','type_ow','scope','vendors','po_count','po_numbers','budget','awarded','variance','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp','approver','appr_date','submittal','status','remarks'], cost:true},
     };
     // Sort state for WP List table
     let _wpMonSortCol = null, _wpMonSortDir = 1;
@@ -754,16 +754,19 @@
     function _getActiveCols() {
       const v = _WP_VIEWS[_wpListView] || _WP_VIEWS.overview;
       const nonOverview = _wpListView !== 'overview';
+      const isAll = _wpListView === 'all';
       return v.keys
         .filter(k => !(window.__isViewer && _WPC[k]?.cost))
         .map(k => {
           const col = {key:k, ..._WPC[k]};
-          if (nonOverview) {
-            // Freeze WP Description across all non-overview tabs.
-            // In 'all' view, works sits between wp_no and description so it
-            // must also be sticky to keep the frozen chain contiguous.
+          if (isAll) {
+            // All tab: only wp_no and description are frozen; description is
+            // placed immediately after wp_no in the keys array so the chain
+            // is contiguous with no non-sticky gap.
+            col.sticky = (k === 'wp_no' || k === 'description');
+          } else if (nonOverview) {
+            // Other non-overview tabs: freeze description (wp_no already sticky).
             if (k === 'description') col.sticky = true;
-            if (k === 'works' && _wpListView === 'all') col.sticky = true;
           }
           return col;
         });

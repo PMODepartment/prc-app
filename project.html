@@ -481,16 +481,32 @@ const WP_TABLE_VIEWS = {
   financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount']), cost:true},
   schedule:   {keys:new Set(['cost_code','wp_no','description','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion'])},
   submittals: {keys:new Set(['cost_code','wp_no','description','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
-  all:        {keys:new Set(['cost_code','wp_no','works','description','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion','approver_name','approval_date','submittal_doc_type','award_status','remarks']), cost:true},
+  all:        {keys:new Set(['cost_code','wp_no','description','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion','approver_name','approval_date','submittal_doc_type','award_status','remarks']), cost:true},
 };
 function getActiveCols() {
   const v = WP_TABLE_VIEWS[_wpTableView] || WP_TABLE_VIEWS.overview;
   const base = window.__isViewer ? COLS.filter(c=>!COST_KEYS.has(c.key)) : COLS;
   const freezeDesc = _wpTableView !== 'overview';
-  return base.filter(c => v.keys.has(c.key)).map(c => {
+  const isAll = _wpTableView === 'all';
+  let cols = base.filter(c => v.keys.has(c.key)).map(c => {
+    if (isAll) {
+      // All tab: only wp_no and description are frozen
+      return {...c, sticky: (c.key === 'wp_no' || c.key === 'description')};
+    }
     if (c.key === 'description' && freezeDesc) return {...c, sticky: true};
     return c;
   });
+  // All tab: COLS order puts works before description; move description
+  // immediately after wp_no so the two sticky columns are contiguous.
+  if (isAll) {
+    const wpNoIdx = cols.findIndex(c => c.key === 'wp_no');
+    const descIdx = cols.findIndex(c => c.key === 'description');
+    if (wpNoIdx !== -1 && descIdx > wpNoIdx + 1) {
+      const [desc] = cols.splice(descIdx, 1);
+      cols.splice(wpNoIdx + 1, 0, desc);
+    }
+  }
+  return cols;
 }
 function setWPTableView(view) {
   _wpTableView = view;
