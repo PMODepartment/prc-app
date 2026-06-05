@@ -4,8 +4,12 @@
 Work Package Management (WPM) Dashboard for Megawide Construction Corporation EPC projects. Tracks procurement work packages, award status, budgets, and contractors across multiple projects.
 
 **Live URL:** https://pmodepartment.github.io/prc-app (login: `/login.html`)
+**Staging URL:** https://fmlozano-pmo.github.io/prc-app-dev (login: `/login.html`)
 **Stack:** Vanilla HTML/CSS/JS (no build step) + Supabase (PostgreSQL + Auth) + GitHub Pages hosting
-**GitHub:** https://github.com/PMODepartment/prc-app
+**GitHub (prod):** https://github.com/PMODepartment/prc-app
+**GitHub (staging):** https://github.com/fmlozano-pmo/prc-app-dev — branch `staging`, push via `git push dev staging:main`
+**Supabase (prod):** `https://cayjeqeleenizbdzrums.supabase.co`
+**Supabase (staging):** `https://duivwgmjcbxtfagkiqyj.supabase.co`
 
 ---
 
@@ -435,7 +439,10 @@ Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic
 10. **dp_percent**: stored as decimal (0.20 = 20%). Form input accepts percentage (user types "20"), divided by 100 before storing; edit mode multiplies by 100 to display.
 11. **Sticky columns require `table-layout:fixed` + colgroup**: Both `index.html` (`renderWPMonTable`) and `project.html` (`buildTable`) use `<table style="table-layout:fixed">` + a `<colgroup>` rebuilt on every render with explicit pixel widths matching the column defs. Without this, the browser auto-sizes columns narrower than the hardcoded sticky `left` offsets — causing sticky cells to physically overlap adjacent columns. Always keep colgroup in sync: `cg.innerHTML = cols.map(c => \`<col style="width:${c.w}px;min-width:${c.w}px">\`).join('')`.
 12. **Sticky column chain must be contiguous**: All sticky columns must be consecutive from the left with no non-sticky column in between. A non-sticky column between two sticky ones causes the right sticky column to get a wrong `left` offset. In `index.html` overview: project(0)→cost_code(90)→wp_no(180); description NOT sticky. In `project.html` overview: cost_code(0)→wp_no(90)→works(180); description NOT sticky. In non-overview tabs (both pages): description is made sticky immediately after wp_no. In the **All tab** only `wp_no` and `description` are frozen — description is placed right after wp_no in the column order (before works) so the chain is unbroken.
-13. **WP List `buildTable`/`renderWPMonTable` rendering pattern**: Use `_stickyLeft = {}` dict (never mutate col objects with `c._left`). Build thead via `innerHTML` with `white-space:normal;overflow:hidden` on `<th>` — NOT `nowrap`, which overflows adjacent cells. Build tbody via `innerHTML` string concat with a `renderCell(key, wp)` switch. Trade group header: split into `<td colspan=nSticky>` (sticky, `left:0`) + `<td colspan=rest>` (non-sticky, WP count right-aligned) — a full-colspan cell has nothing to stick against horizontally.
+13. **Period chart mode/button mismatch**: `_idxSchPeriodMode` (Schedule), `_idxDashPeriodMode` (Dashboard), `_idxBudPeriodMode` (Budget), `_idxBlPeriodMode` (Backlog) in `index.html` must match the button that is styled active in HTML. Mismatch = chart renders wrong period on first load (fixed: Schedule now defaults to `'monthly'`).
+14. **Staging credential swap**: `git push origin main` (PMODepartment) and `git push dev staging:main` (fmlozano-pmo) use different GitHub accounts. After pushing to one, Windows Credential Manager caches that account and the next push to the other fails with 403. Fix: run `git credential reject` (protocol=https, host=github.com) before each cross-account push, then re-authenticate when prompted.
+15. **Staging schema setup**: New Supabase staging project requires (1) run `supabase-schema.sql` in SQL Editor, (2) run all `ALTER TABLE` migrations from CLAUDE.md, (3) run GRANT statements: `GRANT SELECT,INSERT,UPDATE ON public.users TO authenticated; GRANT INSERT ON public.users TO anon; GRANT ALL ON public.users TO service_role;` (repeat for projects, work_packages, claims). Without GRANTs, all REST API calls return 403 even with valid JWT.
+16. **WP List `buildTable`/`renderWPMonTable` rendering pattern**: Use `_stickyLeft = {}` dict (never mutate col objects with `c._left`). Build thead via `innerHTML` with `white-space:normal;overflow:hidden` on `<th>` — NOT `nowrap`, which overflows adjacent cells. Build tbody via `innerHTML` string concat with a `renderCell(key, wp)` switch. Trade group header: split into `<td colspan=nSticky>` (sticky, `left:0`) + `<td colspan=rest>` (non-sticky, WP count right-aligned) — a full-colspan cell has nothing to stick against horizontally.
 
 ---
 
