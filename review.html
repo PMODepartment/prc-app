@@ -288,9 +288,14 @@
         return true;
       });
     }
-    const pending  = filter(allWPs.filter(w => w.review_status === 'pending_review'));
-    const approved = filter(allWPs.filter(w => w.review_status === 'approved'));
-    const rejected = filter(allWPs.filter(w => w.review_status === 'rejected'));
+    function sortByWpNo(arr) {
+      return arr.slice().sort((a, b) =>
+        (a.wp_no||'').toString().localeCompare((b.wp_no||'').toString(), undefined, { numeric: true, sensitivity: 'base' })
+      );
+    }
+    const pending  = sortByWpNo(filter(allWPs.filter(w => w.review_status === 'pending_review')));
+    const approved = sortByWpNo(filter(allWPs.filter(w => w.review_status === 'approved')));
+    const rejected = sortByWpNo(filter(allWPs.filter(w => w.review_status === 'rejected')));
     document.getElementById('ct-pending').textContent  = pending.length;
     document.getElementById('ct-approved').textContent = approved.length;
     document.getElementById('ct-rejected').textContent = rejected.length;
