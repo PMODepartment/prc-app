@@ -62,15 +62,22 @@
     .role-admin{background:#D1FAE5;color:#065F46}
     .role-user{background:#E0F2FE;color:#0369A1}
     .picker-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;margin-bottom:8px;display:block;margin-top:4px}
-    .search-wrap{position:relative;margin-bottom:8px}
+    .search-wrap{position:relative;margin-bottom:4px}
     .search-wrap input{width:100%;padding:9px 14px 9px 36px;border:1.5px solid #e8e8e8;border-radius:8px;font-size:13px;font-family:'Montserrat',sans-serif;color:#231F20;outline:none;transition:border-color .15s;-webkit-appearance:none}
     .search-wrap input:focus{border-color:#EE3124}
     .search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#bbb;font-size:15px;pointer-events:none;line-height:1}
-    .project-list{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;margin-bottom:14px;padding-right:2px;-webkit-overflow-scrolling:touch}
+    .picker-result-count{font-size:11px;color:#bbb;text-align:right;margin-bottom:6px;min-height:16px}
+    .project-list{display:flex;flex-direction:column;gap:4px;max-height:360px;overflow-y:auto;margin-bottom:14px;padding-right:2px;-webkit-overflow-scrolling:touch}
     .project-list::-webkit-scrollbar{width:4px}
     .project-list::-webkit-scrollbar-track{background:#f5f5f5;border-radius:4px}
     .project-list::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px}
-    .project-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e8e8e8;border-radius:8px;cursor:pointer;transition:border-color .15s,background .15s;user-select:none}
+    .picker-group-header{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#aaa;padding:8px 4px 4px;display:flex;align-items:center;gap:6px;border-top:1px solid #f0f0f0;margin-top:2px}
+    .picker-group-header:first-child{border-top:none;margin-top:0;padding-top:2px}
+    .picker-group-count{background:#e8e8e8;color:#888;border-radius:10px;padding:0 6px;font-size:10px;font-weight:700}
+    .picker-group-count.active{background:#D1FAE5;color:#065F46}
+    .picker-group-count.on_hold{background:#FEF3C7;color:#92400E}
+    .picker-group-count.completed{background:#E0F2FE;color:#0369A1}
+    .project-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid #e8e8e8;border-radius:8px;cursor:pointer;transition:border-color .15s,background .15s;user-select:none}
     .project-item:hover{border-color:#EE3124;background:#fff8f8}
     .project-item.selected{border-color:#EE3124;background:#fff8f8}
     .project-item input[type=radio]{accent-color:#EE3124;width:15px;height:15px;flex-shrink:0;cursor:pointer}
@@ -79,7 +86,7 @@
     .project-item-id.consolidated{background:#231F20}
     .project-item-name{font-size:13px;font-weight:600;color:#231F20;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .project-item-sub{font-size:11px;color:#999}
-    .no-results{text-align:center;color:#bbb;font-size:13px;padding:16px 0}
+    .no-results{text-align:center;color:#bbb;font-size:13px;padding:20px 0}
     .picker-footer{text-align:center;margin-top:12px;font-size:13px;color:#999}
     .picker-footer a{color:#EE3124;text-decoration:none;font-weight:600}
     .msg2{font-size:13px;padding:10px 14px;border-radius:8px;margin-bottom:12px;display:none;border:1px solid #FFD0D0;background:#FEE2E2;color:#991B1B}
@@ -128,7 +135,7 @@
       }
       .form-inner{max-width:100%}
       .form-title{font-size:19px}
-      .project-list{max-height:220px}
+      .project-list{max-height:300px}
       /* Tap target sizes */
       .field input{padding:13px 14px;font-size:16px}
       .btn-primary{padding:14px;font-size:15px;min-height:50px}
@@ -182,11 +189,11 @@
 
         <span class="picker-label">Choose a view</span>
 
-        <!-- Search — shown when > 5 items -->
-        <div class="search-wrap" id="searchWrap" style="display:none">
+        <div class="search-wrap" id="searchWrap">
           <span class="search-icon">🔍</span>
-          <input type="text" id="searchInput" placeholder="Search projects…" autocomplete="off">
+          <input type="text" id="searchInput" placeholder="Search by project name or ID…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         </div>
+        <div class="picker-result-count" id="pickerCount"></div>
 
         <div class="project-list" id="projectList"></div>
 
@@ -353,43 +360,91 @@ async function showProjectPicker(profile) {
     `Hi <strong>${name}</strong>! <span class="role-badge ${roleClass}">${roleLabel}</span><br>Choose which dashboard to open.`;
 
   const isAdmin = ['admin', 'super_admin'].includes(profile.role);
-  // Specialist can see all projects (read-only cross-project visibility)
   const seesAllProjects = ['admin', 'super_admin', 'specialist'].includes(profile.role);
-  const { data: projects } = await sb.from('projects').select('id,name,location').order('id');
+  const { data: projects } = await sb.from('projects').select('id,name,location,status').order('name');
   const visible = seesAllProjects ? (projects || []) : (projects || []).filter(p => (profile.projects || []).includes(p.id));
-
-  allItems = [];
-  // Portfolio overview: all-project roles always; others when assigned to 2+ projects
-  const showPortfolio = seesAllProjects || visible.length >= 2;
-  if (showPortfolio) {
-    const sub = seesAllProjects ? 'All projects & work packages' : `Your ${visible.length} assigned projects`;
-    allItems.push({ value: 'consolidated', id: 'ALL PROJECTS', name: 'Portfolio — Consolidated View', sub, consolidated: true });
-  }
-  visible.forEach(p => allItems.push({ value: p.id, id: p.id, name: p.name || p.id, sub: p.location || '', consolidated: false }));
 
   // User with exactly 1 project: skip picker, go directly
   if (!seesAllProjects && visible.length === 1) {
     window.location.href = `project.html?id=${visible[0].id}`;
     return;
   }
-  if (allItems.length > 5) document.getElementById('searchWrap').style.display = 'block';
+
+  allItems = [];
+  const showPortfolio = seesAllProjects || visible.length >= 2;
+  if (showPortfolio) {
+    const sub = seesAllProjects ? 'All projects & work packages' : `Your ${visible.length} assigned projects`;
+    allItems.push({ value: 'consolidated', id: 'ALL PROJECTS', name: 'Portfolio — Consolidated View', sub, consolidated: true, status: null });
+  }
+  visible.forEach(p => allItems.push({ value: p.id, id: p.id, name: p.name || p.id, sub: p.location || '', consolidated: false, status: p.status || 'active' }));
+
   renderList(allItems);
-  if (allItems.length) selectItem(allItems[0].value);
+  updateCount(allItems);
+
+  // Auto-select Portfolio Overview if available; otherwise require explicit choice
+  if (showPortfolio) selectItem('consolidated');
+
   if (isAdmin) document.getElementById('btnNewProject').style.display = 'flex';
+
+  // Auto-focus search after brief delay (allows picker transition to complete)
+  setTimeout(() => document.getElementById('searchInput').focus(), 150);
+}
+
+const STATUS_ORDER = ['active', 'on_hold', 'completed'];
+const STATUS_LABELS = { active: 'Active', on_hold: 'On Hold', completed: 'Completed' };
+
+function renderItem(item) {
+  return `<div class="project-item ${selectedValue === item.value ? 'selected' : ''}" data-value="${item.value}" onclick="selectItem('${item.value}')">
+    <input type="radio" name="dest" value="${item.value}" ${selectedValue === item.value ? 'checked' : ''}>
+    <div class="project-item-body">
+      <div class="project-item-id ${item.consolidated ? 'consolidated' : ''}">${item.id}</div>
+      <div class="project-item-name">${item.name}</div>
+      ${item.sub ? `<div class="project-item-sub">${item.sub}</div>` : ''}
+    </div>
+  </div>`;
 }
 
 function renderList(items) {
   const list = document.getElementById('projectList');
   if (!items.length) { list.innerHTML = '<div class="no-results">No projects found</div>'; return; }
-  list.innerHTML = items.map(item => `
-    <div class="project-item ${selectedValue === item.value ? 'selected' : ''}" data-value="${item.value}" onclick="selectItem('${item.value}')">
-      <input type="radio" name="dest" value="${item.value}" ${selectedValue === item.value ? 'checked' : ''}>
-      <div class="project-item-body">
-        <div class="project-item-id ${item.consolidated ? 'consolidated' : ''}">${item.id}</div>
-        <div class="project-item-name">${item.name}</div>
-        ${item.sub ? `<div class="project-item-sub">${item.sub}</div>` : ''}
-      </div>
-    </div>`).join('');
+
+  const consolidated = items.filter(i => i.consolidated);
+  const projectItems = items.filter(i => !i.consolidated);
+
+  // Group by status
+  const groups = {};
+  projectItems.forEach(p => {
+    const s = p.status || 'active';
+    if (!groups[s]) groups[s] = [];
+    groups[s].push(p);
+  });
+
+  let html = consolidated.map(renderItem).join('');
+
+  // Render known statuses in order
+  const rendered = new Set();
+  STATUS_ORDER.forEach(status => {
+    const grp = groups[status];
+    if (!grp || !grp.length) return;
+    rendered.add(status);
+    const label = STATUS_LABELS[status] || status;
+    html += `<div class="picker-group-header">${label}<span class="picker-group-count ${status}">${grp.length}</span></div>`;
+    html += grp.map(renderItem).join('');
+  });
+  // Any other statuses not in the standard order
+  Object.keys(groups).filter(s => !rendered.has(s)).forEach(status => {
+    const grp = groups[status];
+    html += `<div class="picker-group-header">${status}<span class="picker-group-count">${grp.length}</span></div>`;
+    html += grp.map(renderItem).join('');
+  });
+
+  list.innerHTML = html;
+}
+
+function updateCount(items) {
+  const n = items.filter(i => !i.consolidated).length;
+  const el = document.getElementById('pickerCount');
+  if (el) el.textContent = n > 0 ? `${n} project${n !== 1 ? 's' : ''}` : '';
 }
 
 window.selectItem = function(value) {
@@ -400,17 +455,19 @@ window.selectItem = function(value) {
   });
 };
 
-// Live search filter
+// Live search — filter before render
 document.getElementById('searchInput').addEventListener('input', function() {
-  const q = this.value.toLowerCase();
-  const filtered = allItems.filter(i =>
+  const q = this.value.trim().toLowerCase();
+  const filtered = q ? allItems.filter(i =>
     i.name.toLowerCase().includes(q) ||
     i.id.toLowerCase().includes(q) ||
     (i.sub || '').toLowerCase().includes(q)
-  );
+  ) : allItems;
   renderList(filtered);
-  if (filtered.find(i => i.value === selectedValue)) selectItem(selectedValue);
-  else if (filtered.length) selectItem(filtered[0].value);
+  updateCount(filtered);
+  // Keep current selection if still visible; otherwise clear
+  if (!filtered.find(i => i.value === selectedValue)) selectedValue = null;
+  if (selectedValue) selectItem(selectedValue);
 });
 
 document.getElementById('btnGo').addEventListener('click', () => {
