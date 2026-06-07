@@ -209,7 +209,16 @@
           </div>
           <!-- Backlog table (not-awarded only) -->
           <div class="panel" style="margin-bottom:14px">
-            <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog — Not Awarded</div>
+            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+              <span><i class="ti ti-list"></i>Work Package Backlog — Not Awarded</span>
+              <select id="dash-bl-sort" onchange="renderDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;background:#fff;color:#555;cursor:pointer;font-weight:500">
+                <option value="aging">Most Overdue First</option>
+                <option value="date">Planned Award Date</option>
+                <option value="budget">Budget (High→Low)</option>
+                <option value="wp_no">WP No.</option>
+                <option value="desc">Description (A→Z)</option>
+              </select>
+            </div>
             <div style="overflow-x:auto">
               <table class="budget-table" id="dash-backlog-table">
                 <thead><tr>
@@ -781,29 +790,41 @@ function renderDashboard(){
   renderDashPeriod(wps);
   Charts.wpByTrade('c-dash-trade', wps);
   Charts.wpStatusDonut('c-dash-status', wps);
+  renderDashBacklog();
+  renderTop5(wps);
+}
 
-  // Backlog table in dashboard: not-awarded, sorted most overdue first
+window.renderDashBacklog = function() {
   const today = new Date();
-  const notAwarded = [...wps.filter(w=>w.award_status!=='Awarded')].sort((a,b)=>{
-    const agA = a.awarding_date ? (today-new Date(a.awarding_date)) : -Infinity;
-    const agB = b.awarding_date ? (today-new Date(b.awarding_date)) : -Infinity;
-    return agB - agA;
+  const sortBy = document.getElementById('dash-bl-sort')?.value || 'aging';
+  const wps = allWPs.filter(w => w.award_status !== 'Awarded');
+  const wpNoSort = (a,b) => (a.wp_no||'').localeCompare((b.wp_no||''), undefined, {numeric:true, sensitivity:'base'});
+  const sorted = [...wps].sort((a,b) => {
+    let cmp = 0;
+    if (sortBy==='date') cmp = (a.awarding_date||'9999') < (b.awarding_date||'9999') ? -1 : (a.awarding_date||'9999') > (b.awarding_date||'9999') ? 1 : 0;
+    else if (sortBy==='budget') cmp = (b.approved_budget_bcb||0) - (a.approved_budget_bcb||0);
+    else if (sortBy==='desc') cmp = (a.description||'').localeCompare(b.description||'');
+    else if (sortBy==='wp_no') cmp = wpNoSort(a,b);
+    else { // aging — most overdue first; null last
+      const agA = a.awarding_date ? (today - new Date(a.awarding_date)) : -Infinity;
+      const agB = b.awarding_date ? (today - new Date(b.awarding_date)) : -Infinity;
+      cmp = agB - agA;
+    }
+    return cmp !== 0 ? cmp : (sortBy === 'wp_no' ? 0 : wpNoSort(a,b));
   });
-  document.getElementById('dash-backlog-tbody').innerHTML = notAwarded.map(w=>{
+  document.getElementById('dash-backlog-tbody').innerHTML = sorted.map(w => {
     const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
     const agCls = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
     return `<tr>
       <td><span class="td-code">${w.wp_no||'—'}</span></td>
       <td style="font-size:11px;max-width:200px">${w.description||'—'}</td>
       <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
-      <td>${fmtDate(w.awarding_date)}</td>
+      <td class="${agCls}">${fmtDate(w.awarding_date)}</td>
       <td style="text-align:right">${((w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
       <td>${statusBadge(w.award_status)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
-
-  renderTop5(wps);
-}
+};
 
 function renderTop5(wps){
   const withBoth = wps.filter(w=>w.approved_budget_bcb>0&&w.total_awarded>0);
