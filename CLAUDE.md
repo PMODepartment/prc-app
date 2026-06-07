@@ -448,7 +448,8 @@ Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic
 
 ## Workflow Rules
 
-- **After every prompt:** Update relevant sections of this CLAUDE.md, then commit and push all modified files (including CLAUDE.md) to `origin/main`.
+- **After every prompt:** Update relevant sections of this CLAUDE.md, then commit and push all modified files (including CLAUDE.md) to **both** production (`git push origin main`) and staging (`git push dev staging:main`).
+- **Cross-account push 403:** Windows Credential Manager caches one GitHub account at a time. Before switching accounts, run `git credential reject` (protocol=https, host=github.com) then re-authenticate when prompted. See Known Issues #14.
 
 ---
 
@@ -457,7 +458,10 @@ Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic
 ```bash
 git add <files>
 git commit -m "description"
+# Push to production (PMODepartment/prc-app)
 git push origin main
+# Push to staging (fmlozano-pmo/prc-app-dev) — clear credentials first if last push was to prod
+git push dev staging:main
 ```
 
 GitHub Pages auto-deploys on push to main (~1–2 min).
