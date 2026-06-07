@@ -537,6 +537,14 @@
   initMobileMenu();
   initExpandableCharts();
 
+  /* Reload when restored from bfcache — bust WP cache so data is always fresh */
+  window.addEventListener('pageshow', e => {
+    if (e.persisted) {
+      try { Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx_')).forEach(k=>sessionStorage.removeItem(k)); } catch(_){}
+      location.reload();
+    }
+  });
+
   // Trade name normalizer — must be at script scope so it's available before the async callback runs
   const _TRADE_NORM = {
     'general requirement':'General Requirements','general requirements':'General Requirements',

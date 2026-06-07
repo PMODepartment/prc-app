@@ -362,9 +362,14 @@
     });
   }
 
+  function _bustWPCache() {
+    try { Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx_')).forEach(k=>sessionStorage.removeItem(k)); } catch(_){}
+  }
+
   async function approveWP(id) {
     try {
       await WPDb.approveWP(id);
+      _bustWPCache();
       await loadAll();
     } catch(e) { alert('Error: ' + e.message); }
   }
@@ -384,6 +389,7 @@
     if (!reason) { alert('Please provide a rejection reason.'); return; }
     try {
       await WPDb.rejectWP(rejectingId, null, reason);
+      _bustWPCache();
       closeRejectModal();
       await loadAll();
     } catch(e) { alert('Error: ' + e.message); }

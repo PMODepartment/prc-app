@@ -1165,6 +1165,8 @@ AppAuth.requireLogin(async (user, profile) => {
       successEl.className = 'alert alert-success';
       successEl.scrollIntoView({ behavior:'smooth' });
       markClean();
+      /* Bust index.html WP cache so Portfolio Overview reflects this change immediately */
+      try { Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx_')).forEach(k=>sessionStorage.removeItem(k)); } catch(_){}
       /* Redirect back to project page after save/update so dashboard reflects changes */
       const returnPid = editId ? (existingWP?.project_id || projId) : projId;
       if (returnPid) {
