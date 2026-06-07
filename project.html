@@ -851,22 +851,10 @@ function renderBacklog(){
   else Charts.budgetAwardedByPeriod('c-backlog-period', notAwarded);
   Charts.wpSubmittalDonut('c-backlog-submittal', allWPs);
 
-  // Sort
-  const sorted = [...notAwarded].sort((a,b)=>{
-    if (sortBy==='date') return (a.awarding_date||'9999') < (b.awarding_date||'9999') ? -1 : 1;
-    if (sortBy==='trade') return (a.trade||'').localeCompare(b.trade||'');
-    if (sortBy==='budget') return (b.approved_budget_bcb||0)-(a.approved_budget_bcb||0);
-    if (sortBy==='desc') return (a.description||'').localeCompare(b.description||'');
-    // default: aging descending (most overdue first)
-    const agA = a.awarding_date ? (today-new Date(a.awarding_date)) : -Infinity;
-    const agB = b.awarding_date ? (today-new Date(b.awarding_date)) : -Infinity;
-    return agB - agA;
-  });
-
-  // Group by TRADE_ORDER, preserving inner sort
+  // Group by trade first, then sort within each group by selected option
   const tradeGroups = new Map();
   const tradeSeq = [];
-  sorted.forEach(w => {
+  notAwarded.forEach(w => {
     const t = w.trade||'(No Trade)';
     if (!tradeGroups.has(t)) { tradeGroups.set(t, []); tradeSeq.push(t); }
     tradeGroups.get(t).push(w);
@@ -875,10 +863,20 @@ function renderBacklog(){
     const oa=TRADE_ORDER.indexOf(a), ob=TRADE_ORDER.indexOf(b);
     return (oa<0?999:oa)-(ob<0?999:ob);
   });
-  // Within each trade group, always sort by WP No. (natural numeric)
-  tradeGroups.forEach(arr => arr.sort((a,b) =>
-    (a.wp_no||'').localeCompare((b.wp_no||''), undefined, {numeric:true, sensitivity:'base'})
-  ));
+  // Sort within each trade group by selected option; WP No. as tiebreaker
+  const wpNoSort = (a,b) => (a.wp_no||'').localeCompare((b.wp_no||''), undefined, {numeric:true, sensitivity:'base'});
+  tradeGroups.forEach(arr => arr.sort((a,b) => {
+    let cmp = 0;
+    if (sortBy==='date') cmp = (a.awarding_date||'9999') < (b.awarding_date||'9999') ? -1 : (a.awarding_date||'9999') > (b.awarding_date||'9999') ? 1 : 0;
+    else if (sortBy==='budget') cmp = (b.approved_budget_bcb||0)-(a.approved_budget_bcb||0);
+    else if (sortBy==='desc') cmp = (a.description||'').localeCompare(b.description||'');
+    else { // aging (default) — most overdue first; null dates last
+      const agA = a.awarding_date ? (today-new Date(a.awarding_date)) : -Infinity;
+      const agB = b.awarding_date ? (today-new Date(b.awarding_date)) : -Infinity;
+      cmp = agB - agA;
+    }
+    return cmp !== 0 ? cmp : wpNoSort(a, b);
+  }));
 
   const tbody = document.getElementById('backlog-tbody');
   let html = '';

@@ -1064,30 +1064,13 @@
           let rows = notAwarded.slice();
           if (tradeF) rows = rows.filter(w=>w.trade===tradeF);
           if (search) rows = rows.filter(w=>(w.description||'').toLowerCase().includes(search)||(w.wp_no||'').toLowerCase().includes(search)||(w.project_id||'').toLowerCase().includes(search)||(w.trade||'').toLowerCase().includes(search));
-          rows.sort((a,b)=>{
-            if(sortBy==='date') return (a.awarding_date||'9999')<(b.awarding_date||'9999')?-1:1;
-            if(sortBy==='trade'){const od=TRADE_ORDER.indexOf(a.trade||'')-TRADE_ORDER.indexOf(b.trade||'');return od!==0?od:(a.trade||'').localeCompare(b.trade||'');}
-            if(sortBy==='budget') return (b.approved_budget_bcb||0)-(a.approved_budget_bcb||0);
-            if(sortBy==='desc') return (a.description||'').localeCompare(b.description||'');
-            const agA=a.awarding_date?(now-new Date(a.awarding_date)):-Infinity;
-            const agB=b.awarding_date?(now-new Date(b.awarding_date)):-Infinity;
-            return agB-agA;
-          });
           const tbody = document.getElementById('bl-tbody');
           if (!tbody) return;
           const totalBudget = rows.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
 
-          // Group by trade in TRADE_ORDER sequence
+          // Group by trade first, then sort within each group by selected option
           const tradeGroups = new Map();
           const tradeSeq = [];
-          const orderedRows = sortBy === 'trade'
-            ? rows // already sorted by trade
-            : [...rows].sort((a,b)=>{
-                const oa=TRADE_ORDER.indexOf(a.trade||''); const ob=TRADE_ORDER.indexOf(b.trade||'');
-                const od=(oa<0?999:oa)-(ob<0?999:ob);
-                return od!==0?od:0; // preserve inner sort within each trade
-              });
-          // Build groups preserving sort within each trade
           const tradeOf = w => normTrade(w.trade)||'(No Trade)';
           rows.forEach(w => {
             const t=tradeOf(w);
@@ -1096,10 +1079,16 @@
           });
           // Sort tradeSeq by TRADE_ORDER
           tradeSeq.sort((a,b)=>{const oa=TRADE_ORDER.indexOf(a),ob=TRADE_ORDER.indexOf(b);return(oa<0?999:oa)-(ob<0?999:ob);});
-          // Within each trade group, always sort by WP No. (natural numeric)
-          tradeGroups.forEach(arr => arr.sort((a,b) =>
-            (a.wp_no||'').localeCompare((b.wp_no||''), undefined, {numeric:true, sensitivity:'base'})
-          ));
+          // Sort within each trade group by selected option; WP No. as tiebreaker
+          const wpNoSort = (a,b) => (a.wp_no||'').localeCompare((b.wp_no||''), undefined, {numeric:true, sensitivity:'base'});
+          tradeGroups.forEach(arr => arr.sort((a,b) => {
+            let cmp = 0;
+            if(sortBy==='date') cmp = (a.awarding_date||'9999')<(b.awarding_date||'9999')?-1:(a.awarding_date||'9999')>(b.awarding_date||'9999')?1:0;
+            else if(sortBy==='budget') cmp = (b.approved_budget_bcb||0)-(a.approved_budget_bcb||0);
+            else if(sortBy==='desc') cmp = (a.description||'').localeCompare(b.description||'');
+            else { const agA=a.awarding_date?(now-new Date(a.awarding_date)):-Infinity; const agB=b.awarding_date?(now-new Date(b.awarding_date)):-Infinity; cmp=agB-agA; }
+            return cmp!==0?cmp:wpNoSort(a,b);
+          }));
 
           let html = '';
           tradeSeq.forEach(trade => {
