@@ -274,7 +274,10 @@ function buildRankList(id, items, colorClass, fmtVal) {
         <div style="font-size:12px;font-weight:600;color:#231F20;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
         <div style="font-size:10px;color:#888">${item.sub}</div>
       </div>
-      <span style="font-size:12px;font-weight:700;color:${item.color};white-space:nowrap">${fmtVal(item.val)}</span>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:12px;font-weight:700;color:${item.color};white-space:nowrap">${fmtVal(item.val)}</div>
+        ${item.pct!=null?`<div style="font-size:10px;font-weight:600;color:${item.color};opacity:.75;white-space:nowrap">${item.pct}</div>`:''}
+      </div>
     </div>`).join('');
 }
 

@@ -990,7 +990,10 @@
             <div style="font-size:11px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.name}</div>
             <div style="font-size:10px;color:#aaa">${it.sub||''}</div>
           </div>
-          <span style="font-size:11px;font-weight:700;color:${it.color||'#231F20'};white-space:nowrap">${fmt(it.val)}</span>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:11px;font-weight:700;color:${it.color||'#231F20'};white-space:nowrap">${fmt(it.val)}</div>
+            ${it.pct!=null?`<div style="font-size:10px;font-weight:600;color:${it.color||'#231F20'};opacity:.75;white-space:nowrap">${it.pct}</div>`:''}
+          </div>
         </div>`).join('');
     }
 
@@ -1035,11 +1038,13 @@
           v=>Fmt.money(v));
         idxBuildRankList('idx-rank-gains',
           withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
-            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),val:variance(w),color:'#2D9B6F'})),
+            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),val:variance(w),color:'#2D9B6F',
+              pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
           v=>'+'+Fmt.money(v));
         idxBuildRankList('idx-rank-losses',
           withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
-            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),val:Math.abs(variance(w)),color:'#EE3124'})),
+            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),val:Math.abs(variance(w)),color:'#EE3124',
+              pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
           v=>'-'+Fmt.money(v));
 
       } else if (tab === 'backlog') {
