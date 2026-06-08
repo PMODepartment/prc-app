@@ -481,7 +481,7 @@
             <div class="form-grid">
               <div class="form-group">
                 <label>Procurement Status</label>
-                <select id="f-proc-status">
+                <select id="f-proc-status" onchange="onProcStatusChange()">
                   <option value="Not Started">Not Started</option>
                   <option value="Sourcing">Sourcing</option>
                   <option value="Solicitation">Solicitation</option>
@@ -701,6 +701,19 @@
     } else {
       typeEl.value = '';
     }
+  }
+
+  /* Sync Award Status with Procurement Status so dashboard KPIs stay accurate */
+  function onProcStatusChange() {
+    const proc = document.getElementById('f-proc-status').value;
+    const awardEl = document.getElementById('f-award-status');
+    if (proc === 'Awarded') {
+      awardEl.value = 'Awarded';
+    } else if (awardEl.value === 'Awarded') {
+      // Revert only if it was auto-set (not Partially Awarded which user set manually)
+      awardEl.value = 'Not Yet Awarded';
+    }
+    markDirty();
   }
 
   function onChargingChange() {
@@ -1037,6 +1050,10 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-retention-amount', existingWP.retention_amount);
       fill('f-retention-period', existingWP.retention_period);
       fill('f-proc-status', existingWP.procurement_status);
+      // On load: if proc_status is Awarded but award_status wasn't synced, fix it now
+      if (existingWP.procurement_status === 'Awarded' && existingWP.award_status !== 'Awarded') {
+        document.getElementById('f-award-status').value = 'Awarded';
+      }
       fill('f-submittal', existingWP.submittal_type);
       fill('f-delivery-status', existingWP.delivery_status);
       fill('f-contractor', existingWP.contractor);
