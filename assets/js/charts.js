@@ -251,6 +251,22 @@ const Charts = (() => {
     make(id,{type:'doughnut',data:{labels:['Awarded','Due but Not Awarded','Not Due'],datasets:[{data:[awarded,due,notDue],backgroundColor:['#EE3124','#282C28','#DCDBDB'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} (${total?((ctx.raw/total)*100).toFixed(1):'0'}%)`}},datalabels:dl}}});
   }
 
+  // Work Package by Status — donut by BCB value
+  function wpStatusDonutValue(id, wps){
+    const today=new Date();
+    const awardedBCB=wps.filter(w=>w.award_status==='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    const na=wps.filter(w=>w.award_status!=='Awarded');
+    const dueBCB=na.filter(w=>w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    const notDueBCB=na.filter(w=>!w.awarding_date||new Date(w.awarding_date)>=today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    const totalBCB=awardedBCB+dueBCB+notDueBCB;
+    const fmt=v=>totalBCB?(v/1e6).toFixed(1)+'M':'0';
+    const dl = _dlDonut((v,ctx) => {
+      const tot = ctx.dataset.data.reduce((a,b)=>a+(b||0),0);
+      return (tot ? Math.round(v/tot*100) : 0) + '%';
+    });
+    make(id,{type:'doughnut',data:{labels:['Awarded','Due but Not Awarded','Not Due'],datasets:[{data:[awardedBCB,dueBCB,notDueBCB],backgroundColor:['#EE3124','#282C28','#DCDBDB'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ₱${fmt(ctx.raw)} (${totalBCB?((ctx.raw/totalBCB)*100).toFixed(1):'0'}%)`}},datalabels:dl}}});
+  }
+
   // Work Package by Submittal Status — donut
   function wpSubmittalDonut(id, wps){
     const approved=wps.filter(w=>w.review_status==='approved').length;
@@ -424,5 +440,5 @@ const Charts = (() => {
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'No. of Work Packages',font:{size:9}}}}}});
   }
 
-  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject,wpCountByPeriodMonthly,wpCountByPeriod,expand,collapse};
+  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpStatusDonutValue,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject,wpCountByPeriodMonthly,wpCountByPeriod,expand,collapse};
 })();
