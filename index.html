@@ -143,9 +143,20 @@
               <div class="cost-overview-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Cost Overview</div>
               <div id="metrics-cost" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
             </div>
-            <div style="flex:1;min-width:280px">
+            <div style="flex:1;min-width:300px">
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Work Package Status</div>
-              <div id="metrics-wp" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
+              <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+                <!-- Compact per-project cards -->
+                <div id="metrics-wp" style="flex:1;min-width:220px;max-height:280px;overflow-y:auto;border:1px solid var(--border-md);border-radius:var(--radius-md);background:#fff"></div>
+                <!-- Toggleable chart -->
+                <div style="flex:0 0 auto">
+                  <div style="display:flex;gap:4px;margin-bottom:10px">
+                    <button id="idx-ov-btn-wp" onclick="setIdxOvChartMode('wp')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">% by WP</button>
+                    <button id="idx-ov-btn-val" onclick="setIdxOvChartMode('val')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">% by Value</button>
+                  </div>
+                  <div style="position:relative;width:200px;height:200px"><canvas id="c-idx-ov-donut"></canvas></div>
+                </div>
+              </div>
             </div>
           </div>
           <!-- Hidden metrics-grid kept for JS compatibility -->
@@ -897,6 +908,71 @@
     let _idxBlPeriodMode = 'quarterly';
     let _idxBudPeriodMode = 'monthly';
     let _idxSchPeriodMode = 'monthly';
+    let _idxOvChartMode = 'wp';
+    let _idxOvChartInst = null;
+
+    function renderIdxOvDonut(wps) {
+      const canvas = document.getElementById('c-idx-ov-donut');
+      if(!canvas) return;
+      if(_idxOvChartInst) { _idxOvChartInst.destroy(); _idxOvChartInst = null; }
+      const mode = _idxOvChartMode;
+      const now = new Date();
+      const total = wps.length;
+      const awardedWPs = wps.filter(w=>w.award_status==='Awarded');
+      const dueN = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<=now).length;
+      const notDueN = total - awardedWPs.length - dueN;
+      let data, pct;
+      if(mode==='wp') {
+        data = [awardedWPs.length, dueN, notDueN];
+        pct = total ? Math.round(awardedWPs.length/total*100) : 0;
+      } else {
+        const bcb = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+        const awd = awardedWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
+        const dueBcb = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<=now).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+        const notDueBcb = Math.max(0, bcb - awd - dueBcb);
+        data = [awd, dueBcb, notDueBcb];
+        pct = bcb ? Math.round(awd/bcb*100) : 0;
+      }
+      _idxOvChartInst = new Chart(canvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Awarded','Due Not Awarded','Not Due'],
+          datasets: [{ data, backgroundColor: ['#2D9B6F','#EE3124','#D1D5DB'], borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: {
+          responsive: false, cutout: '68%',
+          plugins: {
+            legend: { display: true, position: 'bottom', labels: { font:{size:10}, boxWidth:11, padding:8 } },
+            datalabels: { display: false }
+          }
+        },
+        plugins: [{
+          id: 'idxOvCenter',
+          afterDraw(chart) {
+            const {width, height, ctx} = chart;
+            ctx.save();
+            const cy = (height - (chart.legend?.height||50)) / 2;
+            ctx.font = `700 ${Math.round(height*0.13)}px Montserrat,sans-serif`;
+            ctx.fillStyle = '#231F20'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(pct+'%', width/2, cy - 5);
+            ctx.font = `500 ${Math.round(height*0.065)}px Montserrat,sans-serif`;
+            ctx.fillStyle = '#888';
+            ctx.fillText('Awarded', width/2, cy + height*0.085);
+            ctx.restore();
+          }
+        }]
+      });
+    }
+
+    window.setIdxOvChartMode = function(mode) {
+      _idxOvChartMode = mode;
+      const on = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
+      const off = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+      const bw = document.getElementById('idx-ov-btn-wp'), bv = document.getElementById('idx-ov-btn-val');
+      if(bw) bw.style.cssText = mode==='wp' ? on : off;
+      if(bv) bv.style.cssText = mode==='val' ? on : off;
+      if(window._idxOvWPs) renderIdxOvDonut(window._idxOvWPs);
+    };
 
     window.setIdxDashPeriodMode = function(mode) {
       _idxDashPeriodMode = mode;
@@ -1661,39 +1737,58 @@
       if (_activeTab === 'claims') renderClaimsTab();
 
       // Shared KPIs (Overview)
-      const now        = new Date();
-      const awarded    = filtWPs.filter(w => w.award_status === 'Awarded');
-      const totalBCB   = filtWPs.reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
-      const totalAwd   = filtWPs.reduce((s,w) => s + (w.total_awarded||0), 0);
-      const ctc        = filtWPs.filter(w => w.award_status !== 'Awarded').reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
-      const eac        = totalAwd + ctc;
-      const variance   = totalBCB - eac;
-      const pctVar     = totalBCB ? ((variance / totalBCB) * 100).toFixed(1) : '0.0';
-      const dueNotAwd  = filtWPs.filter(w => w.award_status !== 'Awarded' && w.awarding_date && new Date(w.awarding_date) <= now).length;
-      const notDue     = filtWPs.filter(w => w.award_status !== 'Awarded' && (!w.awarding_date || new Date(w.awarding_date) > now)).length;
-      const pctAwdWP   = filtWPs.length ? ((awarded.length / filtWPs.length) * 100).toFixed(1) : '0.0';
-      const pctAwdVal  = totalBCB ? ((totalAwd / totalBCB) * 100).toFixed(1) : '0.0';
+      const now             = new Date();
+      const awarded         = filtWPs.filter(w => w.award_status === 'Awarded');
+      const totalBCB        = filtWPs.reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
+      const plannedAward    = filtWPs.filter(w => w.awarding_date && new Date(w.awarding_date) <= now)
+                                     .reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
+      const budgetForAwarded = awarded.reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
+      const totalAwd        = awarded.reduce((s,w) => s + (w.total_awarded||0), 0);
+      const variance        = budgetForAwarded - totalAwd;
+      const pctVar          = budgetForAwarded ? ((variance / budgetForAwarded) * 100) : 0;
+      const dueNotAwd       = filtWPs.filter(w => w.award_status !== 'Awarded' && w.awarding_date && new Date(w.awarding_date) <= now).length;
+      const notDue          = filtWPs.length - awarded.length - dueNotAwd;
 
-      // Two-group KPI layout
+      // Cost Overview KPI cards
       const card = (lbl,val,cls) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls}">${val}</div></div>`;
       const costEl = document.getElementById('metrics-cost');
-      const wpEl = document.getElementById('metrics-wp');
       if(costEl) costEl.innerHTML = [
         card('Procurement Budget (BCB)', Fmt.moneyFull(totalBCB), ''),
-        card('Awarded Cost', Fmt.moneyFull(totalAwd), 'green'),
-        card('Procurement Cost to Complete', Fmt.moneyFull(ctc), ''),
-        card('Procurement Estimate at Completion', Fmt.moneyFull(eac), ''),
+        card('Planned Award', Fmt.moneyFull(plannedAward), ''),
+        card('Actual Award', Fmt.moneyFull(totalAwd), 'green'),
+        card('Budget for Awarded WP', Fmt.moneyFull(budgetForAwarded), ''),
         card('Variance', (variance>=0?'+₱':'-₱')+Fmt.moneyFull(Math.abs(variance)).replace('₱',''), variance>=0?'green':'red'),
-        card('% Variance', (parseFloat(pctVar)>=0?'+':'')+pctVar+'%', parseFloat(pctVar)>=0?'green':'red'),
+        card('%Variance', (pctVar>=0?'+':'')+pctVar.toFixed(1)+'%', pctVar>=0?'green':'red'),
       ].join('');
-      if(wpEl) wpEl.innerHTML = [
-        card('Total WP', filtWPs.length, ''),
-        card('Awarded WP', awarded.length, 'green'),
-        card('Due Not Awarded', dueNotAwd, dueNotAwd>0?'red':''),
-        card('WP Not Due', notDue, ''),
-        card('% Awarded by WP', pctAwdWP+'%', ''),
-        card('% Awarded by Value', pctAwdVal+'%', ''),
-      ].join('');
+
+      // WP Status — compact per-project cards
+      const wpEl = document.getElementById('metrics-wp');
+      if(wpEl) {
+        if(!filt.length) {
+          wpEl.innerHTML = '<div style="padding:16px;text-align:center;color:#aaa;font-size:11px">No projects selected</div>';
+        } else {
+          const rowStyle = 'display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border-bottom:1px solid #f0f0f0;font-size:11px';
+          wpEl.innerHTML = filt.filter(p=>p.status!=='archived').map((p,i) => {
+            const s = allStats[i];
+            const pDue = s.late || 0;
+            const pNotDue = (s.total||0) - (s.awarded||0) - pDue;
+            return `<div style="border-bottom:2px solid #f0f0f0">
+              <div style="padding:7px 12px;background:#f8f8f8;display:flex;align-items:center;gap:6px">
+                <span style="font-size:10px;font-weight:700;color:#EE3124">${p.id}</span>
+                <span style="font-size:10px;color:#555;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name&&p.name!==p.id?p.name.split('—')[0].trim():''}</span>
+              </div>
+              <div style="${rowStyle}"><span style="color:#555;font-weight:600">Total WP</span><strong style="color:#231F20">${s.total}</strong></div>
+              <div style="${rowStyle}"><span style="color:#555;font-weight:600">Awarded WP</span><strong style="color:#2D9B6F">${s.awarded}</strong></div>
+              <div style="${rowStyle}"><span style="color:#555;font-weight:600">Due Not Awarded</span><strong style="color:${pDue>0?'#EE3124':'#231F20'}">${pDue}</strong></div>
+              <div style="${rowStyle.replace('border-bottom:1px solid #f0f0f0','border-bottom:none')}"><span style="color:#555;font-weight:600">Not Due</span><strong style="color:#888">${pNotDue}</strong></div>
+            </div>`;
+          }).join('');
+        }
+      }
+
+      // Portfolio donut chart
+      window._idxOvWPs = filtWPs;
+      renderIdxOvDonut(filtWPs);
 
       // Project Cards
       const cardsEl = document.getElementById('project-cards');
