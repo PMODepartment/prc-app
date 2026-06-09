@@ -223,9 +223,9 @@
             </div>
             <div style="position:relative;height:240px"><canvas id="c-dash-period"></canvas></div>
           </div>
-          <!-- WP Status — split: donut card + stats card -->
+          <!-- WP Status — split: donut card (60%) + stats card (40%) -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">
-            <div class="panel" style="flex:0 0 auto;min-width:200px">
+            <div class="panel" style="flex:3;min-width:220px">
               <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
               <div style="display:flex;flex-direction:column;align-items:center">
                 <div style="display:flex;gap:4px;margin-bottom:8px">
@@ -235,7 +235,7 @@
                 <div style="position:relative;width:180px;height:180px"><canvas id="c-dash-status"></canvas></div>
               </div>
             </div>
-            <div class="panel" style="flex:1;min-width:200px">
+            <div class="panel" style="flex:2;min-width:160px">
               <div class="panel-title"><i class="ti ti-table"></i>Status Summary</div>
               <div id="dash-status-table"></div>
             </div>
@@ -261,17 +261,17 @@
               </table>
             </div>
           </div>
-          <!-- Top 5 panels -->
-          <div class="grid-3">
-            <div class="panel">
+          <!-- Top 5 panels — Contract Value wider; align-items:flex-start removes uneven height -->
+          <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px">
+            <div class="panel" style="flex:5;min-width:200px">
               <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
               <div class="rank-list" id="rank-value"></div>
             </div>
-            <div class="panel">
+            <div class="panel" style="flex:4;min-width:180px">
               <div class="panel-title"><i class="ti ti-trending-up"></i>Top 5 Savings</div>
               <div class="rank-list" id="rank-gains"></div>
             </div>
-            <div class="panel">
+            <div class="panel" style="flex:4;min-width:180px">
               <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
               <div class="rank-list" id="rank-losses"></div>
             </div>
@@ -308,7 +308,7 @@
             <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog</div>
             <div style="overflow-x:auto">
               <table class="budget-table" id="backlog-table">
-                <thead><tr>
+                <thead id="backlog-thead"><tr>
                   <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th>
                   <th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th>
                 </tr></thead>
@@ -1098,9 +1098,13 @@ function renderBacklog(){
 
   // Cols: WP No., Description, [Trade], Planned Award, Aging, Budget, Status, Submittal
   const nCols = _blGroupByTrade ? 7 : 8;
-  // Toggle trade <th> visibility
-  const blTradeTh = document.querySelector('#backlog-table thead th:nth-child(3)');
-  if (blTradeTh) blTradeTh.style.display = _blGroupByTrade ? 'none' : '';
+  // Rebuild thead to add/remove Trade column reliably (CSS display:none unreliable in tables)
+  const blThead = document.getElementById('backlog-thead');
+  if (blThead) {
+    blThead.innerHTML = _blGroupByTrade
+      ? '<tr><th>WP No.</th><th>Description</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>'
+      : '<tr><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>';
+  }
 
   const tbody = document.getElementById('backlog-tbody');
   const _renderRow = w => {

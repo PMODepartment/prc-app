@@ -211,9 +211,9 @@
             </div>
             <div style="position:relative;height:240px"><canvas id="c-idx-dash-period"></canvas></div>
           </div>
-          <!-- WP Status — split: donut card + stats card -->
+          <!-- WP Status — split: donut card (60%) + stats card (40%) -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">
-            <div class="panel" style="flex:0 0 auto;min-width:200px">
+            <div class="panel" style="flex:3;min-width:220px">
               <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
               <div style="display:flex;flex-direction:column;align-items:center">
                 <div style="display:flex;gap:4px;margin-bottom:8px">
@@ -223,7 +223,7 @@
                 <div style="position:relative;width:180px;height:180px"><canvas id="c-idx-dash-status"></canvas></div>
               </div>
             </div>
-            <div class="panel" style="flex:1;min-width:200px">
+            <div class="panel" style="flex:2;min-width:160px">
               <div class="panel-title"><i class="ti ti-table"></i>Status Summary</div>
               <div id="idx-dash-status-table"></div>
             </div>
@@ -240,17 +240,17 @@
               </table>
             </div>
           </div>
-          <!-- Top 5 panels -->
-          <div class="grid-3">
-            <div class="panel">
+          <!-- Top 5 panels — Contract Value wider; align-items:flex-start removes uneven height -->
+          <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px">
+            <div class="panel" style="flex:5;min-width:200px">
               <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
               <div class="rank-list" id="idx-rank-value"></div>
             </div>
-            <div class="panel">
+            <div class="panel" style="flex:4;min-width:180px">
               <div class="panel-title"><i class="ti ti-trending-up"></i>Top 5 Savings</div>
               <div class="rank-list" id="idx-rank-gains"></div>
             </div>
-            <div class="panel">
+            <div class="panel" style="flex:4;min-width:180px">
               <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
               <div class="rank-list" id="idx-rank-losses"></div>
             </div>
@@ -281,7 +281,7 @@
             </div>
             <div style="overflow-x:auto">
               <table class="data-table" id="bl-table" style="font-size:11px">
-                <thead><tr><th>Project</th><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr></thead>
+                <thead id="bl-thead"><tr><th>Project</th><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr></thead>
                 <tbody id="bl-tbody"></tbody>
               </table>
             </div>
@@ -1306,9 +1306,13 @@
           // Cols: Project, WP No., Desc, [Trade], Planned Award, Aging, Budget, Status, Submittal
           const nCols = _idxBlGroupByTrade ? 8 : 9;
           const preBudgetCols = nCols - 3; // cols before Budget (excl. Budget, Status, Submittal)
-          // Toggle trade <th> visibility
-          const blTradeTh = document.querySelector('#bl-table thead th:nth-child(4)');
-          if (blTradeTh) blTradeTh.style.display = _idxBlGroupByTrade ? 'none' : '';
+          // Rebuild thead to add/remove Trade column reliably (CSS display:none unreliable in tables)
+          const blThead = document.getElementById('bl-thead');
+          if (blThead) {
+            blThead.innerHTML = _idxBlGroupByTrade
+              ? '<tr><th>Project</th><th>WP No.</th><th>Description</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>'
+              : '<tr><th>Project</th><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>';
+          }
 
           const _renderBlRow = w => {
             const aging = w.awarding_date ? Math.floor((now-new Date(w.awarding_date))/86400000) : null;
