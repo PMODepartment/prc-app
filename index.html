@@ -200,23 +200,23 @@
           <!-- Period chart with toggle -->
           <div class="panel" style="margin-bottom:14px">
             <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <span><i class="ti ti-chart-bar"></i>Procurement Budget (BCB) and Awarded Cost by Period</span>
-              <div style="display:flex;gap:4px">
+              <span><i class="ti ti-chart-bar"></i><span id="idx-dash-period-title">Procurement Budget (BCB) and Awarded Cost by Period</span></span>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
                 <button id="idx-dash-btn-monthly" onclick="setIdxDashPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
                 <button id="idx-dash-btn-quarterly" onclick="setIdxDashPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
+                <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
+                <button id="idx-dash-btn-budget" onclick="setIdxDashDataMode('budget')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Budget</button>
+                <button id="idx-dash-btn-count" onclick="setIdxDashDataMode('count')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600"># WPs</button>
               </div>
             </div>
             <div style="position:relative;height:240px"><canvas id="c-idx-dash-period"></canvas></div>
           </div>
-          <!-- WP by Trade + WP Status donut -->
-          <div class="grid-2" style="margin-bottom:14px">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-list"></i>Work Package by Trade</div>
-              <div style="position:relative;height:240px"><canvas id="c-idx-dash-trade"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
-              <div style="position:relative;height:240px"><canvas id="c-idx-dash-status"></canvas></div>
+          <!-- WP Status donut + summary table (Trade card removed) -->
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+            <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+              <div style="flex:1;min-width:200px;position:relative;height:220px"><canvas id="c-idx-dash-status"></canvas></div>
+              <div style="flex:1;min-width:180px" id="idx-dash-status-table"></div>
             </div>
           </div>
           <!-- Backlog table -->
@@ -905,6 +905,7 @@
     const ALL_TABS = ['overview','dashboard','backlog','budget','schedule','works','wplist','claims'];
     let _activeTab = 'overview';
     let _idxDashPeriodMode = 'monthly';
+    let _idxDashDataMode = 'budget';
     let _idxBlPeriodMode = 'quarterly';
     let _idxBudPeriodMode = 'monthly';
     let _idxSchPeriodMode = 'monthly';
@@ -974,18 +975,38 @@
       if(window._idxOvWPs) renderIdxOvDonut(window._idxOvWPs);
     };
 
+    function _idxDashRenderPeriod(wps) {
+      const titleEl = document.getElementById('idx-dash-period-title');
+      if(_idxDashDataMode === 'count') {
+        if(titleEl) titleEl.textContent = 'Work Packages by Period — Planned vs Actual';
+        if(_idxDashPeriodMode==='monthly') Charts.wpCountByPeriodMonthly('c-idx-dash-period', wps);
+        else Charts.wpCountByPeriod('c-idx-dash-period', wps);
+      } else {
+        if(titleEl) titleEl.textContent = 'Procurement Budget (BCB) and Awarded Cost by Period';
+        if(_idxDashPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-dash-period', wps);
+        else Charts.budgetAwardedByPeriod('c-idx-dash-period', wps);
+      }
+    }
+
+    const _idxDashBtnStyle = a => a
+      ? 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600'
+      : 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+
     window.setIdxDashPeriodMode = function(mode) {
       _idxDashPeriodMode = mode;
       const btnM = document.getElementById('idx-dash-btn-monthly');
       const btnQ = document.getElementById('idx-dash-btn-quarterly');
-      const onStyle = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
-      const offStyle = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
-      if(btnM) btnM.style.cssText = mode==='monthly' ? onStyle : offStyle;
-      if(btnQ) btnQ.style.cssText = mode==='quarterly' ? onStyle : offStyle;
-      if(_lastWPs) {
-        if(mode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-dash-period', _lastWPs);
-        else Charts.budgetAwardedByPeriod('c-idx-dash-period', _lastWPs);
-      }
+      if(btnM) btnM.style.cssText = _idxDashBtnStyle(mode==='monthly');
+      if(btnQ) btnQ.style.cssText = _idxDashBtnStyle(mode==='quarterly');
+      if(_lastWPs) _idxDashRenderPeriod(_lastWPs);
+    };
+
+    window.setIdxDashDataMode = function(mode) {
+      _idxDashDataMode = mode;
+      const bBud = document.getElementById('idx-dash-btn-budget'), bCnt = document.getElementById('idx-dash-btn-count');
+      if(bBud) bBud.style.cssText = _idxDashBtnStyle(mode==='budget');
+      if(bCnt) bCnt.style.cssText = _idxDashBtnStyle(mode==='count');
+      if(_lastWPs) _idxDashRenderPeriod(_lastWPs);
     };
 
     window.setIdxBlPeriodMode = function(mode) {
@@ -1076,6 +1097,7 @@
           </div>
           <div style="text-align:right;flex-shrink:0">
             <div style="font-size:11px;font-weight:700;color:${it.color||'#231F20'};white-space:nowrap">${fmt(it.val)}</div>
+            ${it.bcb!=null?`<div style="font-size:10px;color:#aaa;white-space:nowrap">BCB: ${Fmt.money(it.bcb)}</div>`:''}
             ${it.pct!=null?`<div style="font-size:10px;font-weight:600;color:${it.color||'#231F20'};opacity:.75;white-space:nowrap">${it.pct}</div>`:''}
           </div>
         </div>`).join('');
@@ -1086,11 +1108,32 @@
       if (tab === 'overview') {
         // Overview: just KPI groups — rendered in renderAll
       } else if (tab === 'dashboard') {
-        _destroyCharts(['c-idx-dash-period','c-idx-dash-trade','c-idx-dash-status']);
-        if(_idxDashPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-dash-period', wps);
-        else Charts.budgetAwardedByPeriod('c-idx-dash-period', wps);
-        Charts.wpByTrade('c-idx-dash-trade', wps);
+        _destroyCharts(['c-idx-dash-period','c-idx-dash-status']);
+        _idxDashRenderPeriod(wps);
         Charts.wpStatusDonut('c-idx-dash-status', wps);
+        // Status summary table
+        (function renderIdxStatusTable() {
+          const today = new Date();
+          const total = wps.length;
+          const awarded = wps.filter(w=>w.award_status==='Awarded').length;
+          const due = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+          const notDue = total - awarded - due;
+          const pct = v => total ? Math.round(v/total*100)+'%' : '—';
+          const dot = c => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};margin-right:5px"></span>`;
+          const el = document.getElementById('idx-dash-status-table');
+          if(el) el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead><tr style="border-bottom:2px solid #f0f0f0">
+              <th style="text-align:left;padding:6px 8px;color:#888;font-size:10px;font-weight:600;text-transform:uppercase">Status</th>
+              <th style="text-align:right;padding:6px 8px;color:#888;font-size:10px;font-weight:600">Count</th>
+              <th style="text-align:right;padding:6px 8px;color:#888;font-size:10px;font-weight:600">%</th>
+            </tr></thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #f5f5f5"><td style="padding:8px 8px">${dot('#EE3124')}Awarded</td><td style="padding:8px 8px;text-align:right;font-weight:700;color:#EE3124">${awarded}</td><td style="padding:8px 8px;text-align:right;color:#888">${pct(awarded)}</td></tr>
+              <tr style="border-bottom:1px solid #f5f5f5"><td style="padding:8px 8px">${dot('#282C28')}Due Not Awarded</td><td style="padding:8px 8px;text-align:right;font-weight:700;color:#282C28">${due}</td><td style="padding:8px 8px;text-align:right;color:#888">${pct(due)}</td></tr>
+              <tr style="border-bottom:2px solid #f0f0f0"><td style="padding:8px 8px">${dot('#DCDBDB')}Not Due</td><td style="padding:8px 8px;text-align:right;font-weight:700;color:#888">${notDue}</td><td style="padding:8px 8px;text-align:right;color:#888">${pct(notDue)}</td></tr>
+              <tr style="background:#f8f8f8"><td style="padding:8px 8px;font-weight:700;color:#231F20">Total</td><td style="padding:8px 8px;text-align:right;font-weight:700;color:#231F20">${total}</td><td style="padding:8px 8px;text-align:right;color:#888">100%</td></tr>
+            </tbody></table>`;
+        })();
 
         // Backlog table
         const notAwarded = [...wps.filter(w => w.award_status !== 'Awarded')].sort((a,b) => {
@@ -1123,11 +1166,13 @@
         idxBuildRankList('idx-rank-gains',
           withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
             .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),val:variance(w),color:'#2D9B6F',
+              bcb:w.approved_budget_bcb,
               pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
           v=>'+'+Fmt.money(v));
         idxBuildRankList('idx-rank-losses',
           withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
             .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),val:Math.abs(variance(w)),color:'#EE3124',
+              bcb:w.approved_budget_bcb,
               pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
           v=>'-'+Fmt.money(v));
 

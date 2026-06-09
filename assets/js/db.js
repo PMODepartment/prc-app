@@ -276,6 +276,7 @@ function buildRankList(id, items, colorClass, fmtVal) {
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div style="font-size:12px;font-weight:700;color:${item.color};white-space:nowrap">${fmtVal(item.val)}</div>
+        ${item.bcb!=null?`<div style="font-size:10px;color:#aaa;white-space:nowrap">BCB: ${Fmt.money(item.bcb)}</div>`:''}
         ${item.pct!=null?`<div style="font-size:10px;font-weight:600;color:${item.color};opacity:.75;white-space:nowrap">${item.pct}</div>`:''}
       </div>
     </div>`).join('');

@@ -375,5 +375,54 @@ const Charts = (() => {
     make(id,{type:'doughnut',data:{labels:trades,datasets:[{data:vals,backgroundColor:COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}},datalabels:dl}}});
   }
 
-  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject,expand,collapse};
+  // WP Count by Period — Monthly (Planned vs Actual)
+  function wpCountByPeriodMonthly(id, wps) {
+    const mSet=new Set();
+    wps.forEach(w=>{
+      if(w.awarding_date){const d=new Date(w.awarding_date);mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0'));}
+      if(w.actual_awarding_date){const d=new Date(w.actual_awarding_date);mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0'));}
+    });
+    if(!mSet.size){destroy(id);return;}
+    const months=[...mSet].sort();
+    const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const mLabel=k=>{const[y,m]=k.split('-');return MONTH_NAMES[parseInt(m)-1]+'\''+y.slice(2);};
+    const getMKey=d=>d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
+    const planned=months.map(mk=>wps.filter(w=>w.awarding_date&&getMKey(new Date(w.awarding_date))===mk).length);
+    const actual=months.map(mk=>wps.filter(w=>w.actual_awarding_date&&getMKey(new Date(w.actual_awarding_date))===mk).length);
+    let cp=0,ca=0;
+    const cumP=planned.map(v=>(cp+=v,cp));
+    const cumA=actual.map(v=>(ca+=v,ca));
+    const dl=_dlBar(v=>v>0?v:'','v');
+    make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
+      {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
+      {label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
+      {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'No. of Work Packages',font:{size:9}}}}}});
+  }
+
+  // WP Count by Period — Quarterly (Planned vs Actual)
+  function wpCountByPeriod(id, wps) {
+    const qSet=new Set();
+    wps.forEach(w=>{
+      if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date)));
+      if(w.actual_awarding_date) qSet.add(getQKey(new Date(w.actual_awarding_date)));
+    });
+    if(!qSet.size){destroy(id);return;}
+    const quarters=[...qSet].sort();
+    const planned=quarters.map(qk=>wps.filter(w=>w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).length);
+    const actual=quarters.map(qk=>wps.filter(w=>w.actual_awarding_date&&getQKey(new Date(w.actual_awarding_date))===qk).length);
+    let cp=0,ca=0;
+    const cumP=planned.map(v=>(cp+=v,cp));
+    const cumA=actual.map(v=>(ca+=v,ca));
+    const dl=_dlBar(v=>v>0?v:'','v');
+    make(id,{type:'bar',data:{labels:quarters.map(qLabel),datasets:[
+      {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
+      {label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
+      {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'No. of Work Packages',font:{size:9}}}}}});
+  }
+
+  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject,wpCountByPeriodMonthly,wpCountByPeriod,expand,collapse};
 })();

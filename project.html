@@ -197,22 +197,22 @@
           <div class="panel" style="margin-bottom:14px">
             <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
               <span><i class="ti ti-chart-bar"></i><span id="dash-period-title">Procurement Budget (BCB) and Awarded Cost by Period</span></span>
-              <div style="display:flex;gap:4px">
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
                 <button id="dash-btn-monthly" onclick="setDashPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
                 <button id="dash-btn-quarterly" onclick="setDashPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
+                <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
+                <button id="dash-btn-budget" onclick="setDashDataMode('budget')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Budget</button>
+                <button id="dash-btn-count" onclick="setDashDataMode('count')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600"># WPs</button>
               </div>
             </div>
             <div style="position:relative;height:240px"><canvas id="c-dash-period"></canvas></div>
           </div>
-          <!-- WP by Trade + WP Status donut -->
-          <div class="grid-2" style="margin-bottom:14px">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-list"></i>Work Package by Trade</div>
-              <div style="position:relative;height:240px"><canvas id="c-dash-trade"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
-              <div style="position:relative;height:240px"><canvas id="c-dash-status"></canvas></div>
+          <!-- WP Status donut + summary table (Trade card removed) -->
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+            <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+              <div style="flex:1;min-width:200px;position:relative;height:220px"><canvas id="c-dash-status"></canvas></div>
+              <div style="flex:1;min-width:180px" id="dash-status-table"></div>
             </div>
           </div>
           <!-- Backlog table (not-awarded only) -->
@@ -849,6 +849,7 @@ function renderOverview(){
 }
 
 let _dashPeriodMode = 'monthly';
+let _dashDataMode = 'budget';
 let _blPeriodMode = 'quarterly';
 
 function setDashPeriodMode(mode) {
@@ -876,15 +877,76 @@ function setBlPeriodMode(mode) {
 }
 
 function renderDashPeriod(wps) {
-  if(_dashPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-dash-period', wps);
-  else Charts.budgetAwardedByPeriod('c-dash-period', wps);
+  const titleEl = document.getElementById('dash-period-title');
+  if(_dashDataMode === 'count') {
+    if(titleEl) titleEl.textContent = 'Work Packages by Period — Planned vs Actual';
+    if(_dashPeriodMode==='monthly') Charts.wpCountByPeriodMonthly('c-dash-period', wps);
+    else Charts.wpCountByPeriod('c-dash-period', wps);
+  } else {
+    if(titleEl) titleEl.textContent = 'Procurement Budget (BCB) and Awarded Cost by Period';
+    if(_dashPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-dash-period', wps);
+    else Charts.budgetAwardedByPeriod('c-dash-period', wps);
+  }
+}
+
+const _dashBtnStyle = (active) => active
+  ? 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600'
+  : 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+
+window.setDashDataMode = function(mode) {
+  _dashDataMode = mode;
+  const bBud = document.getElementById('dash-btn-budget'), bCnt = document.getElementById('dash-btn-count');
+  if(bBud) bBud.style.cssText = _dashBtnStyle(mode==='budget');
+  if(bCnt) bCnt.style.cssText = _dashBtnStyle(mode==='count');
+  renderDashPeriod(allWPs);
+};
+
+function renderStatusTable(wps, tableId) {
+  const today = new Date();
+  const total = wps.length;
+  const awarded = wps.filter(w=>w.award_status==='Awarded').length;
+  const due = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+  const notDue = total - awarded - due;
+  const pct = v => total ? Math.round(v/total*100)+'%' : '—';
+  const dot = c => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};margin-right:5px;flex-shrink:0"></span>`;
+  const el = document.getElementById(tableId);
+  if(!el) return;
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:11px">
+    <thead><tr style="border-bottom:2px solid #f0f0f0">
+      <th style="text-align:left;padding:6px 8px;color:#888;font-size:10px;font-weight:600;text-transform:uppercase">Status</th>
+      <th style="text-align:right;padding:6px 8px;color:#888;font-size:10px;font-weight:600">Count</th>
+      <th style="text-align:right;padding:6px 8px;color:#888;font-size:10px;font-weight:600">%</th>
+    </tr></thead>
+    <tbody>
+      <tr style="border-bottom:1px solid #f5f5f5">
+        <td style="padding:8px 8px;display:flex;align-items:center">${dot('#EE3124')}Awarded</td>
+        <td style="padding:8px 8px;text-align:right;font-weight:700;color:#EE3124">${awarded}</td>
+        <td style="padding:8px 8px;text-align:right;color:#888">${pct(awarded)}</td>
+      </tr>
+      <tr style="border-bottom:1px solid #f5f5f5">
+        <td style="padding:8px 8px;display:flex;align-items:center">${dot('#282C28')}Due Not Awarded</td>
+        <td style="padding:8px 8px;text-align:right;font-weight:700;color:#282C28">${due}</td>
+        <td style="padding:8px 8px;text-align:right;color:#888">${pct(due)}</td>
+      </tr>
+      <tr style="border-bottom:2px solid #f0f0f0">
+        <td style="padding:8px 8px;display:flex;align-items:center">${dot('#DCDBDB')}Not Due</td>
+        <td style="padding:8px 8px;text-align:right;font-weight:700;color:#888">${notDue}</td>
+        <td style="padding:8px 8px;text-align:right;color:#888">${pct(notDue)}</td>
+      </tr>
+      <tr style="background:#f8f8f8">
+        <td style="padding:8px 8px;font-weight:700;color:#231F20">Total</td>
+        <td style="padding:8px 8px;text-align:right;font-weight:700;color:#231F20">${total}</td>
+        <td style="padding:8px 8px;text-align:right;color:#888">100%</td>
+      </tr>
+    </tbody>
+  </table>`;
 }
 
 function renderDashboard(){
   const wps = allWPs;
   renderDashPeriod(wps);
-  Charts.wpByTrade('c-dash-trade', wps);
   Charts.wpStatusDonut('c-dash-status', wps);
+  renderStatusTable(wps, 'dash-status-table');
   renderDashBacklog();
   renderTop5(wps);
 }
@@ -931,11 +993,13 @@ function renderTop5(wps){
   buildRankList('rank-gains',
     withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
       .map(w=>({name:w.description,sub:w.wp_no+' · '+w.trade,val:variance(w),color:'#2D9B6F',
+        bcb:w.approved_budget_bcb,
         pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
     'green', v=>'+'+Fmt.money(v));
   buildRankList('rank-losses',
     withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
       .map(w=>({name:w.description,sub:w.wp_no+' · '+w.trade,val:Math.abs(variance(w)),color:'#EE3124',
+        bcb:w.approved_budget_bcb,
         pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
     'red', v=>'-'+Fmt.money(v));
 }
