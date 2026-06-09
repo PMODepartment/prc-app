@@ -40,7 +40,7 @@
     .sched-wp {width:60px;font-weight:600;color:#231F20;flex-shrink:0}
     .sched-bar-wrap {flex:1;height:10px;background:#f0f0f0;border-radius:5px;position:relative;overflow:hidden}
     .sched-bar {height:100%;border-radius:5px;position:absolute}
-    /* ── WP Status integrated card ── */
+    /* ── WP Status integrated card (Dashboard tab) ── */
     .wp-status-card { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
     .wp-status-bars { flex:1; min-width:200px; }
     .wp-status-donut { flex:0 0 auto; display:flex; align-items:center; justify-content:center; }
@@ -48,6 +48,21 @@
     @media (max-width:767px) {
       .wp-status-card { flex-direction:column; }
       .wp-status-donut { align-self:center; }
+    }
+    /* ── Overview tab layout ── */
+    .ov-top-row { display:flex; gap:16px; flex-wrap:wrap; }
+    .ov-top-row > div { flex:1; min-width:280px; }
+    .ov-cost-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    .ov-cost-grid .metric-card { padding:12px 14px; }
+    .ov-cost-grid .metric-value { font-size:16px !important; }
+    .ov-wp-split { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start; }
+    .ov-donut-card { flex:0 0 auto; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); padding:12px; display:flex; flex-direction:column; align-items:center; }
+    .ov-stats-card { flex:1; min-width:160px; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); overflow:hidden; }
+    @media (max-width:767px) {
+      .ov-cost-grid { grid-template-columns:repeat(2,1fr); }
+      .ov-cost-grid .metric-value { font-size:15px !important; }
+      .ov-wp-split { flex-direction:column; align-items:stretch; }
+      .ov-donut-card { align-items:center; }
     }
     /* ── Works analysis ── */
     .works-summary {display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px}
@@ -177,24 +192,24 @@
 
         <!-- ══ OVERVIEW VIEW ══ -->
         <div id="view-overview">
-          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
-            <!-- Cost Overview -->
-            <div id="metrics-cost-group" style="flex:1;min-width:280px">
+          <div class="ov-top-row" style="margin-bottom:16px">
+            <!-- Left: Cost Overview — 6 KPIs -->
+            <div id="metrics-cost-group">
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Cost Overview</div>
-              <div class="metrics-group" id="metrics-cost" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
+              <div class="metrics-group ov-cost-grid" id="metrics-cost"></div>
             </div>
-            <!-- WP Status: compact card + toggleable chart -->
-            <div style="flex:1;min-width:280px">
+            <!-- Right: WP Status — donut chart card + stats table card -->
+            <div>
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Work Package Status</div>
-              <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
-                <div id="metrics-wp" style="flex:0 0 auto;min-width:190px"></div>
-                <div style="flex:1;min-width:160px">
-                  <div style="display:flex;gap:4px;margin-bottom:10px">
+              <div class="ov-wp-split">
+                <div class="ov-donut-card">
+                  <div style="display:flex;gap:4px;margin-bottom:8px">
                     <button id="ov-btn-wp" onclick="setOvChartMode('wp')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">% by WP</button>
                     <button id="ov-btn-val" onclick="setOvChartMode('val')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">% by Value</button>
                   </div>
-                  <div style="position:relative;max-width:220px"><canvas id="c-ov-donut"></canvas></div>
+                  <div style="position:relative;width:170px;height:170px"><canvas id="c-ov-donut"></canvas></div>
                 </div>
+                <div id="metrics-wp" class="ov-stats-card"></div>
               </div>
             </div>
           </div>
@@ -727,60 +742,58 @@ function submittalLabel(w){
 function buildMetrics(wps){
   const today = new Date();
   const total = wps.length;
-  const awarded = wps.filter(w=>w.award_status==='Awarded').length;
+  const awardedWPs = wps.filter(w=>w.award_status==='Awarded');
+  const awarded = awardedWPs.length;
   const totalBudget = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-  const budgetForAwarded = wps.filter(w=>w.award_status==='Awarded')
-                              .reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-  const actualAward = wps.filter(w=>w.award_status==='Awarded')
-                         .reduce((s,w)=>s+(w.total_awarded||0),0);
-  const variance = budgetForAwarded - actualAward;
+  const actualAward = awardedWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
+  const ctc = wps.filter(w=>w.award_status!=='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const eac = actualAward + ctc;
+  const variance = totalBudget - eac;
+  const pctVar = totalBudget ? ((variance/totalBudget)*100).toFixed(1) : '0.0';
   const dueNotAwarded = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
   const notDue = total - awarded - dueNotAwarded;
+  const pctByWP = total ? Math.round(awarded/total*100) : 0;
+  const pctByVal = totalBudget ? Math.round(actualAward/totalBudget*100) : 0;
 
   const card = (lbl,val,cls) => '<div class="metric-card"><div class="metric-label">'+lbl+'</div><div class="metric-value '+cls+'">'+val+'</div></div>';
 
   const costCards = [
     card('Procurement Budget (BCB)', fmt(totalBudget), ''),
     card('Actual Award', fmt(actualAward), 'green'),
-    card('Budget for Awarded WP', fmt(budgetForAwarded), ''),
+    card('Cost to Complete', fmt(ctc), ''),
+    card('Estimate at Completion', fmt(eac), ''),
     card('Variance', (variance>=0?'+₱':'-₱')+(Math.abs(variance)/1e6).toFixed(2)+'M', variance>=0?'green':'red'),
+    card('% Variance', (parseFloat(pctVar)>=0?'+':'')+pctVar+'%', parseFloat(pctVar)>=0?'green':'red'),
   ].join('');
 
   const costEl = document.getElementById('metrics-cost');
   if(costEl) costEl.innerHTML = costCards;
 
-  // WP Status — optimized compact card with progress bar
-  const awardRate = total ? Math.round(awarded/total*100) : 0;
+  // WP Status — stats table card
   const wpEl = document.getElementById('metrics-wp');
-  if(wpEl) wpEl.innerHTML = `
-    <div style="background:#fff;border:1px solid var(--border-md);border-radius:var(--radius-md);overflow:hidden">
-      <div style="padding:10px 14px;background:#fafafa;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em">Total WP</span>
-        <span style="font-size:20px;font-weight:700;color:#231F20">${total}</span>
-      </div>
-      <div style="padding:8px 14px;border-bottom:1px solid #f0f0f0">
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:#888;margin-bottom:5px">
-          <span style="font-weight:600">Award Rate</span><span style="font-weight:700;color:#2D9B6F">${awardRate}%</span>
-        </div>
-        <div style="height:5px;background:#f0f0f0;border-radius:3px;overflow:hidden">
-          <div style="height:100%;width:${awardRate}%;background:#2D9B6F;border-radius:3px;transition:width .4s"></div>
-        </div>
-      </div>
-      <table style="width:100%;border-collapse:collapse">
-        <tr style="border-bottom:1px solid #f0f0f0">
-          <td style="padding:8px 14px;font-size:11px;color:#555;font-weight:600"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#2D9B6F;margin-right:7px;vertical-align:middle"></span>Awarded</td>
-          <td style="padding:8px 14px;font-size:15px;font-weight:700;color:#2D9B6F;text-align:right">${awarded}</td>
-        </tr>
-        <tr style="border-bottom:1px solid #f0f0f0">
-          <td style="padding:8px 14px;font-size:11px;color:#555;font-weight:600"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#EE3124;margin-right:7px;vertical-align:middle"></span>Due Not Awarded</td>
-          <td style="padding:8px 14px;font-size:15px;font-weight:700;color:${dueNotAwarded>0?'#EE3124':'#231F20'};text-align:right">${dueNotAwarded}</td>
-        </tr>
-        <tr>
-          <td style="padding:8px 14px;font-size:11px;color:#555;font-weight:600"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#D1D5DB;margin-right:7px;vertical-align:middle"></span>Not Due</td>
-          <td style="padding:8px 14px;font-size:15px;font-weight:700;color:#888;text-align:right">${notDue}</td>
-        </tr>
-      </table>
+  if(wpEl) {
+    const cell = (label, val, color) => `<div style="padding:10px 14px">
+      <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">${label}</div>
+      <div style="font-size:22px;font-weight:700;color:${color}">${val}</div>
     </div>`;
+    const cellSm = (label, val, color) => `<div style="padding:8px 14px">
+      <div style="font-size:10px;color:#888;font-weight:600;margin-bottom:3px">${label}</div>
+      <div style="font-size:18px;font-weight:700;color:${color}">${val}</div>
+    </div>`;
+    wpEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #f0f0f0">
+        <div style="border-right:1px solid #f0f0f0">${cell('Total WP', total, '#231F20')}</div>
+        <div>${cell('Awarded WP', awarded, '#2D9B6F')}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #f0f0f0">
+        <div style="border-right:1px solid #f0f0f0">${cellSm('WP Due Not Awarded', dueNotAwarded, dueNotAwarded>0?'#EE3124':'#888')}</div>
+        <div>${cellSm('WP Not Due', notDue, '#888')}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr">
+        <div style="border-right:1px solid #f0f0f0">${cellSm('% Awarded by WP', pctByWP+'%', '#2D9B6F')}</div>
+        <div>${cellSm('% Awarded by Value', pctByVal+'%', '#2D9B6F')}</div>
+      </div>`;
+  }
 
   // Keep legacy metrics-grid empty
   const grid = document.getElementById('metrics-grid');

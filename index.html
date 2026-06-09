@@ -137,24 +137,25 @@
             <div style="flex:1"><strong>Portfolio view is read-only.</strong> Click any project card to enter its dashboard and manage work packages.</div>
             <button onclick="document.getElementById('readonly-notice').style.display='none'" style="background:none;border:none;cursor:pointer;color:#D97706;font-size:16px;line-height:1;padding:0;flex-shrink:0;margin-top:-1px" title="Dismiss">×</button>
           </div>
-          <!-- Cost Overview: full-width compact 4-card row -->
-          <div id="metrics-cost-group" style="margin-bottom:14px">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Cost Overview</div>
-            <div id="metrics-cost" class="ov-cost-grid"></div>
-          </div>
-          <!-- WP Status: full-width panel -->
-          <div class="ov-wp-panel" style="margin-bottom:16px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:6px">
-              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888">Work Package Status</div>
-              <div style="display:flex;gap:4px">
-                <button id="idx-ov-btn-wp" onclick="setIdxOvChartMode('wp')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">% by WP</button>
-                <button id="idx-ov-btn-val" onclick="setIdxOvChartMode('val')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">% by Value</button>
-              </div>
+          <!-- Cost Overview (left) + WP Status (right) -->
+          <div class="ov-top-row" style="margin-bottom:16px">
+            <!-- Left: Cost Overview — 6 KPIs in 3-column grid -->
+            <div id="metrics-cost-group">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Cost Overview</div>
+              <div id="metrics-cost" class="ov-cost-grid"></div>
             </div>
-            <div class="ov-wp-body">
-              <div id="metrics-wp" style="flex:1;min-width:220px;max-height:260px;overflow-y:auto;border:1px solid var(--border-md);border-radius:var(--radius-md);background:#fff"></div>
-              <div class="ov-donut-wrap">
-                <canvas id="c-idx-ov-donut" width="200" height="200"></canvas>
+            <!-- Right: WP Status — donut chart card + stats table card -->
+            <div>
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Work Package Status</div>
+              <div class="ov-wp-split">
+                <div class="ov-donut-card">
+                  <div style="display:flex;gap:4px;margin-bottom:8px">
+                    <button id="idx-ov-btn-wp" onclick="setIdxOvChartMode('wp')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">% by WP</button>
+                    <button id="idx-ov-btn-val" onclick="setIdxOvChartMode('val')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">% by Value</button>
+                  </div>
+                  <div style="position:relative;width:170px;height:170px"><canvas id="c-idx-ov-donut"></canvas></div>
+                </div>
+                <div id="metrics-wp" class="ov-stats-card"></div>
               </div>
             </div>
           </div>
@@ -348,11 +349,15 @@
         <!-- ══ SCHEDULE TAB ══ -->
         <div id="tab-schedule" style="display:none">
           <div class="panel" style="margin-bottom:14px">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Period (Planned vs Actual)
-              <span style="margin-left:auto;display:flex;gap:4px">
+            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span><i class="ti ti-chart-bar"></i><span id="idx-sch-period-title">Work Package by Period (Planned vs Actual)</span></span>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
                 <button id="sch-btn-monthly" onclick="setIdxSchPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
                 <button id="sch-btn-quarterly" onclick="setIdxSchPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
-              </span>
+                <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
+                <button id="sch-btn-count" onclick="setIdxSchDataMode('count')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600"># WPs</button>
+                <button id="sch-btn-budget" onclick="setIdxSchDataMode('budget')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Budget</button>
+              </div>
             </div>
             <div style="position:relative;height:260px"><canvas id="c-idx-sch-period"></canvas></div>
           </div>
@@ -1053,18 +1058,43 @@
       }
     };
 
+    let _idxSchDataMode = 'count';
+
+    function _renderIdxSchPeriodChart() {
+      if(!_lastWPs) return;
+      const titleEl = document.getElementById('idx-sch-period-title');
+      if(_idxSchDataMode === 'count') {
+        if(titleEl) titleEl.textContent = 'Work Package by Period (Planned vs Actual)';
+        if(_idxSchPeriodMode === 'monthly') Charts.wpCountByPeriodMonthly('c-idx-sch-period', _lastWPs);
+        else Charts.wpCountByPeriod('c-idx-sch-period', _lastWPs);
+      } else {
+        if(titleEl) titleEl.textContent = 'Procurement Budget (BCB) and Awarded Cost by Period';
+        if(_idxSchPeriodMode === 'monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-sch-period', _lastWPs);
+        else Charts.budgetAwardedByPeriod('c-idx-sch-period', _lastWPs);
+      }
+    }
+
+    const _schBtnStyle = (active) => active
+      ? 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600'
+      : 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+
     window.setIdxSchPeriodMode = function(mode) {
       _idxSchPeriodMode = mode;
-      const onStyle = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
-      const offStyle = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
       ['monthly','quarterly'].forEach(m => {
         const btn = document.getElementById('sch-btn-'+m);
-        if(btn) btn.style.cssText = m===mode ? onStyle : offStyle;
+        if(btn) btn.style.cssText = _schBtnStyle(m===mode);
       });
-      if(_lastWPs) {
-        if(mode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-sch-period', _lastWPs);
-        else Charts.wpByPeriodQuarterly('c-idx-sch-period', _lastWPs);
-      }
+      _destroyCharts(['c-idx-sch-period']);
+      _renderIdxSchPeriodChart();
+    };
+
+    window.setIdxSchDataMode = function(mode) {
+      _idxSchDataMode = mode;
+      const bC = document.getElementById('sch-btn-count'), bB = document.getElementById('sch-btn-budget');
+      if(bC) bC.style.cssText = _schBtnStyle(mode==='count');
+      if(bB) bB.style.cssText = _schBtnStyle(mode==='budget');
+      _destroyCharts(['c-idx-sch-period']);
+      _renderIdxSchPeriodChart();
     };
 
     window.switchTab = function(tab) {
@@ -1367,8 +1397,7 @@
         }
       } else if (tab === 'schedule') {
         _destroyCharts(['c-idx-sch-period','c-idx-sch-trade','c-idx-sch-status']);
-        if(_idxSchPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-sch-period', wps);
-        else Charts.wpByPeriodQuarterly('c-idx-sch-period', wps);
+        _renderIdxSchPeriodChart();
         Charts.wpByTrade('c-idx-sch-trade', wps);
         Charts.wpStatusDonut('c-idx-sch-status', wps);
         const schTbody = document.getElementById('idx-sch-tbody');
@@ -1834,53 +1863,55 @@
       const now             = new Date();
       const awarded         = filtWPs.filter(w => w.award_status === 'Awarded');
       const totalBCB        = filtWPs.reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
-      const budgetForAwarded = awarded.reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
       const totalAwd        = awarded.reduce((s,w) => s + (w.total_awarded||0), 0);
-      const variance        = budgetForAwarded - totalAwd;
+      const ctc             = filtWPs.filter(w => w.award_status !== 'Awarded').reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
+      const eac             = totalAwd + ctc;
+      const ovVariance      = totalBCB - eac;
+      const ovPctVar        = totalBCB ? ((ovVariance/totalBCB)*100).toFixed(1) : '0.0';
       const dueNotAwd       = filtWPs.filter(w => w.award_status !== 'Awarded' && w.awarding_date && new Date(w.awarding_date) <= now).length;
       const notDue          = filtWPs.length - awarded.length - dueNotAwd;
+      const pctByWP         = filtWPs.length ? Math.round(awarded.length/filtWPs.length*100) : 0;
+      const pctByVal        = totalBCB ? Math.round(totalAwd/totalBCB*100) : 0;
 
-      // Cost Overview KPI cards — 4 cards: BCB, Actual Award, Budget for Awarded WP, Variance
+      // Cost Overview KPI cards — 6 cards: BCB, Actual Award, CTC, EAC, Variance, %Variance
       const card = (lbl,val,cls) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls}">${val}</div></div>`;
       const costEl = document.getElementById('metrics-cost');
       if(costEl) costEl.innerHTML = [
         card('Procurement Budget (BCB)', Fmt.moneyFull(totalBCB), ''),
         card('Actual Award', Fmt.moneyFull(totalAwd), 'green'),
-        card('Budget for Awarded WP', Fmt.moneyFull(budgetForAwarded), ''),
-        card('Variance', (variance>=0?'+₱':'-₱')+Fmt.moneyFull(Math.abs(variance)).replace('₱',''), variance>=0?'green':'red'),
+        card('Cost to Complete', Fmt.moneyFull(ctc), ''),
+        card('Estimate at Completion', Fmt.moneyFull(eac), ''),
+        card('Variance', (ovVariance>=0?'+₱':'-₱')+Fmt.moneyFull(Math.abs(ovVariance)).replace('₱',''), ovVariance>=0?'green':'red'),
+        card('% Variance', (parseFloat(ovPctVar)>=0?'+':'')+ovPctVar+'%', parseFloat(ovPctVar)>=0?'green':'red'),
       ].join('');
 
-      // WP Status — compact per-project cards
+      // WP Status — aggregate portfolio stats table
       const wpEl = document.getElementById('metrics-wp');
       if(wpEl) {
         if(!filt.length) {
           wpEl.innerHTML = '<div style="padding:16px;text-align:center;color:#aaa;font-size:11px">No projects selected</div>';
         } else {
-          const rowStyle = 'display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border-bottom:1px solid #f0f0f0;font-size:11px';
-          wpEl.innerHTML = filt.filter(p=>p.status!=='archived').map((p,i) => {
-            const s = allStats[i];
-            const pDue = s.late || 0;
-            const pNotDue = (s.total||0) - (s.awarded||0) - pDue;
-            const rate = s.total ? Math.round((s.awarded||0)/s.total*100) : 0;
-            return `<div style="border-bottom:2px solid #f0f0f0">
-              <div style="padding:7px 12px;background:#f8f8f8;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:6px">
-                <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
-                  <span style="font-size:10px;font-weight:700;color:#EE3124;flex-shrink:0">${p.id}</span>
-                  <span style="font-size:10px;color:#555;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name&&p.name!==p.id?p.name.split('—')[0].trim():''}</span>
-                </div>
-                <span style="font-size:11px;font-weight:700;color:#2D9B6F;flex-shrink:0">${rate}%</span>
-              </div>
-              <div style="padding:5px 12px;border-bottom:1px solid #f0f0f0">
-                <div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden">
-                  <div style="height:100%;width:${rate}%;background:#2D9B6F;border-radius:2px"></div>
-                </div>
-              </div>
-              <div style="${rowStyle}"><span style="color:#555;font-weight:600">Total WP</span><strong style="color:#231F20">${s.total}</strong></div>
-              <div style="${rowStyle}"><span style="color:#555;font-weight:600">Awarded WP</span><strong style="color:#2D9B6F">${s.awarded}</strong></div>
-              <div style="${rowStyle}"><span style="color:#555;font-weight:600">Due Not Awarded</span><strong style="color:${pDue>0?'#EE3124':'#231F20'}">${pDue}</strong></div>
-              <div style="${rowStyle.replace('border-bottom:1px solid #f0f0f0','border-bottom:none')}"><span style="color:#555;font-weight:600">Not Due</span><strong style="color:#888">${pNotDue}</strong></div>
+          const cell = (label, val, color) => `<div style="padding:10px 14px">
+            <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">${label}</div>
+            <div style="font-size:22px;font-weight:700;color:${color}">${val}</div>
+          </div>`;
+          const cellSm = (label, val, color) => `<div style="padding:8px 14px">
+            <div style="font-size:10px;color:#888;font-weight:600;margin-bottom:3px">${label}</div>
+            <div style="font-size:18px;font-weight:700;color:${color}">${val}</div>
+          </div>`;
+          wpEl.innerHTML = `
+            <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #f0f0f0">
+              <div style="border-right:1px solid #f0f0f0">${cell('Total WP', filtWPs.length, '#231F20')}</div>
+              <div>${cell('Awarded WP', awarded.length, '#2D9B6F')}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #f0f0f0">
+              <div style="border-right:1px solid #f0f0f0">${cellSm('WP Due Not Awarded', dueNotAwd, dueNotAwd>0?'#EE3124':'#888')}</div>
+              <div>${cellSm('WP Not Due', notDue, '#888')}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr">
+              <div style="border-right:1px solid #f0f0f0">${cellSm('% Awarded by WP', pctByWP+'%', '#2D9B6F')}</div>
+              <div>${cellSm('% Awarded by Value', pctByVal+'%', '#2D9B6F')}</div>
             </div>`;
-          }).join('');
         }
       }
 
@@ -2305,19 +2336,20 @@
     .wp-status-donut { align-self:center; }
   }
 
-  /* ── Overview tab compact layout ── */
-  .ov-cost-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  /* ── Overview tab layout ── */
+  .ov-top-row { display:flex; gap:16px; flex-wrap:wrap; }
+  .ov-top-row > div { flex:1; min-width:280px; }
+  .ov-cost-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
   .ov-cost-grid .metric-card { padding:12px 14px; }
-  .ov-cost-grid .metric-value { font-size:18px !important; }
-  .ov-wp-panel { background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); padding:14px 16px; }
-  .ov-wp-body { display:flex; gap:16px; align-items:flex-start; }
-  .ov-donut-wrap { flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .ov-cost-grid .metric-value { font-size:16px !important; }
+  .ov-wp-split { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start; }
+  .ov-donut-card { flex:0 0 auto; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); padding:12px; display:flex; flex-direction:column; align-items:center; }
+  .ov-stats-card { flex:1; min-width:160px; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); overflow:hidden; }
   @media (max-width:767px) {
     .ov-cost-grid { grid-template-columns:repeat(2,1fr); }
-    .ov-cost-grid .metric-value { font-size:16px !important; }
-    .ov-wp-body { flex-direction:column; }
-    .ov-donut-wrap { align-self:center; }
-    .ov-donut-wrap canvas { width:180px !important; height:180px !important; }
+    .ov-cost-grid .metric-value { font-size:15px !important; }
+    .ov-wp-split { flex-direction:column; align-items:stretch; }
+    .ov-donut-card { align-items:center; }
   }
 
   /* Viewer mode — hide all cost data */
