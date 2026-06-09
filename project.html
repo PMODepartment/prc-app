@@ -218,17 +218,15 @@
             </div>
             <div style="position:relative;height:240px"><canvas id="c-dash-period"></canvas></div>
           </div>
-          <!-- WP Status — split: donut card (60%) + stats card (40%) -->
+          <!-- WP Status — 3 separate cards -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">
-            <div class="panel" style="flex:3;min-width:220px">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
-              <div style="display:flex;flex-direction:column;align-items:center">
-                <div style="display:flex;gap:4px;margin-bottom:8px">
-                  <button id="dash-status-btn-wp" onclick="setDashStatusMode('wp')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">% by WP</button>
-                  <button id="dash-status-btn-val" onclick="setDashStatusMode('val')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">% by Value</button>
-                </div>
-                <div style="position:relative;width:180px;height:180px"><canvas id="c-dash-status"></canvas></div>
-              </div>
+            <div class="panel" style="flex:2;min-width:160px">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>WP Status — by Count</div>
+              <div style="display:flex;justify-content:center"><div style="position:relative;width:180px;height:180px"><canvas id="c-dash-status-wp"></canvas></div></div>
+            </div>
+            <div class="panel" style="flex:2;min-width:160px">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>WP Status — by Value</div>
+              <div style="display:flex;justify-content:center"><div style="position:relative;width:180px;height:180px"><canvas id="c-dash-status-val"></canvas></div></div>
             </div>
             <div class="panel" style="flex:2;min-width:160px">
               <div class="panel-title"><i class="ti ti-table"></i>Status Summary</div>
@@ -930,25 +928,11 @@ function renderStatusTable(wps, tableId) {
     </div>`;
 }
 
-let _dashStatusMode = 'wp';
-const _dashStatusBtnStyle = active => active
-  ? 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600'
-  : 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
-
-window.setDashStatusMode = function(mode) {
-  _dashStatusMode = mode;
-  const bWP = document.getElementById('dash-status-btn-wp'), bVal = document.getElementById('dash-status-btn-val');
-  if(bWP) bWP.style.cssText = _dashStatusBtnStyle(mode==='wp');
-  if(bVal) bVal.style.cssText = _dashStatusBtnStyle(mode==='val');
-  _destroyCharts(['c-dash-status']);
-  if(mode==='val') Charts.wpStatusDonutValue('c-dash-status', allWPs);
-  else Charts.wpStatusDonut('c-dash-status', allWPs);
-};
-
 function renderDashboard(){
   const wps = allWPs;
   renderDashPeriod(wps);
-  Charts.wpStatusDonut('c-dash-status', wps);
+  Charts.wpStatusDonut('c-dash-status-wp', wps);
+  Charts.wpStatusDonutValue('c-dash-status-val', wps);
   renderStatusTable(wps, 'dash-status-table');
   renderDashBacklog();
   renderTop5(wps);
