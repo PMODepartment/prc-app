@@ -282,6 +282,162 @@ function buildRankList(id, items, colorClass, fmtVal) {
     </div>`).join('');
 }
 
+/* ── PDF Export (jsPDF + AutoTable, lazy-loaded) ──────────────────────── */
+async function _loadPDFLibs() {
+  if (window.jspdf) return;
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+async function exportPDF(wps, label, titleStr) {
+  await _loadPDFLibs();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pgW = doc.internal.pageSize.getWidth();
+  const pgH = doc.internal.pageSize.getHeight();
+  const mg  = 14;
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
+  const multiProject = new Set((wps||[]).map(w=>w.project_id).filter(Boolean)).size > 1;
+
+  // ── Computed stats ──
+  const awarded    = wps.filter(w=>w.award_status==='Awarded').length;
+  const totalBCB   = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const totalAwd   = wps.reduce((s,w)=>s+(w.total_awarded||0),0);
+  const variance   = totalBCB - totalAwd;
+  const awardRate  = wps.length ? Math.round(awarded/wps.length*100) : 0;
+  const fmtM = v => v != null ? (v>=0?'+':'−')+'₱'+((Math.abs(v))/1e6).toFixed(2)+'M' : '—';
+  const fmtV = v => v != null ? '₱'+((v)/1e6).toFixed(2)+'M' : '—';
+  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-PH',{year:'2-digit',month:'short',day:'numeric'}) : '—';
+
+  // ── Page header (repeated each page via didDrawPage) ──
+  const drawHeader = () => {
+    doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(35,31,32);
+    doc.text('MEGAWIDE CONSTRUCTION CORPORATION', mg, 14);
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(110,110,110);
+    doc.text('EPC Procurement · Work Package Management System', mg, 20);
+    doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(35,31,32);
+    doc.text(`Work Package Summary${titleStr ? ' — '+titleStr : ''}`, mg, 27);
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(130);
+    doc.text(`Generated: ${dateStr}   |   Total WPs: ${wps.length}   |   Awarded: ${awarded} (${awardRate}%)   |   BCB: ${fmtV(totalBCB)}   |   Variance: ${fmtM(variance)}`, mg, 33);
+    doc.setDrawColor(238,49,36); doc.setLineWidth(0.6);
+    doc.line(mg, 36, pgW - mg, 36);
+  };
+  drawHeader();
+
+  // ── Signature footer (on every page) ──
+  const sigH = 30;
+  const drawFooter = (pageNum, totalPages) => {
+    const fy = pgH - sigH;
+    doc.setDrawColor(210,210,210); doc.setLineWidth(0.3);
+    doc.line(mg, fy, pgW - mg, fy);
+    const bW = (pgW - mg*2 - 16) / 3;
+    ['Prepared by','Confirmed by','Approved by'].forEach((lbl, i) => {
+      const bx = mg + i * (bW + 8);
+      doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(80);
+      doc.text(lbl+':', bx, fy + 5.5);
+      doc.setDrawColor(160); doc.setLineWidth(0.4);
+      doc.line(bx, fy + 15, bx + bW - 4, fy + 15);
+      doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(140);
+      doc.text('Name & Signature over Printed Name', bx, fy + 19);
+      doc.text('Date: _________________________', bx, fy + 24.5);
+    });
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(160);
+    doc.text(`Page ${pageNum}${totalPages?' of '+totalPages:''}`, pgW - mg, fy + 5.5, { align:'right' });
+  };
+
+  // ── Table data ──
+  const sorted = [...wps].sort((a,b) => {
+    const pc = (a.project_id||'').localeCompare(b.project_id||'');
+    if (pc!==0) return pc;
+    return (parseInt((a.wp_no||'').replace(/\D/g,''))||0) - (parseInt((b.wp_no||'').replace(/\D/g,''))||0);
+  });
+
+  const baseCols = [
+    ...(multiProject ? [{ header:'Project', dataKey:'project_id' }] : []),
+    { header:'WP No.', dataKey:'wp_no' },
+    { header:'Trade', dataKey:'trade' },
+    { header:'Works', dataKey:'works' },
+    { header:'Description', dataKey:'description' },
+    { header:'BCB (₱M)', dataKey:'bcb' },
+    { header:'Awarded (₱M)', dataKey:'awarded' },
+    { header:'Variance (₱M)', dataKey:'var' },
+    { header:'Award Status', dataKey:'award_status' },
+    { header:'Contractor', dataKey:'contractor' },
+    { header:'Planned Award', dataKey:'plan_date' },
+    { header:'Actual Award', dataKey:'act_date' },
+    { header:'Proc. Status', dataKey:'proc_status' },
+  ];
+
+  const fmtMM = v => v != null ? ((v)/1e6).toFixed(2) : '—';
+  const tableRows = sorted.map(w => {
+    const v = (w.approved_budget_bcb||0) - (w.total_awarded||0);
+    return {
+      project_id: w.project_id||'—',
+      wp_no: w.wp_no||'—',
+      trade: w.trade||'—',
+      works: w.works||'—',
+      description: w.description||'—',
+      bcb: fmtMM(w.approved_budget_bcb),
+      awarded: w.total_awarded ? fmtMM(w.total_awarded) : '—',
+      var: w.approved_budget_bcb ? (v>=0?'+':'')+fmtMM(v) : '—',
+      award_status: w.award_status||'—',
+      contractor: w.contractor||'—',
+      plan_date: fmtDate(w.awarding_date),
+      act_date: fmtDate(w.actual_awarding_date),
+      proc_status: w.procurement_status||'—',
+    };
+  });
+
+  doc.autoTable({
+    columns: baseCols,
+    body: tableRows,
+    startY: 40,
+    margin: { left:mg, right:mg, bottom: sigH + 6 },
+    theme: 'grid',
+    headStyles: { fillColor:[35,31,32], textColor:[255,255,255], fontSize:7, fontStyle:'bold', halign:'center', cellPadding:2.2 },
+    bodyStyles: { fontSize:7, cellPadding:2, textColor:[50,50,50] },
+    alternateRowStyles: { fillColor:[250,250,250] },
+    columnStyles: {
+      project_id:  { halign:'center', cellWidth:18 },
+      wp_no:       { halign:'center', cellWidth:14 },
+      trade:       { cellWidth:26 },
+      works:       { cellWidth:22 },
+      description: { cellWidth:46 },
+      bcb:         { halign:'right',  cellWidth:17 },
+      awarded:     { halign:'right',  cellWidth:17 },
+      var:         { halign:'right',  cellWidth:17 },
+      award_status:{ halign:'center', cellWidth:21 },
+      contractor:  { cellWidth:30 },
+      plan_date:   { halign:'center', cellWidth:20 },
+      act_date:    { halign:'center', cellWidth:20 },
+      proc_status: { halign:'center', cellWidth:20 },
+    },
+    didDrawPage: (data) => {
+      drawFooter(data.pageNumber, null);
+    },
+  });
+
+  // fix page numbers now that we know total pages
+  const totalPg = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPg; i++) {
+    doc.setPage(i);
+    drawFooter(i, totalPg);
+  }
+
+  doc.save(`WPM_${label}_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
 function updatePendingBadge() {
   WPDb.getPendingWPs().then(wps=>{
     const badge=document.getElementById('review-badge');
