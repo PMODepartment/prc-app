@@ -313,11 +313,15 @@
             </div>
           </div>
           <div class="panel" style="margin-bottom:14px">
-            <div class="panel-title"><i class="ti ti-chart-bar"></i>Procurement Budget (BCB) and Awarded by Period
-              <span style="margin-left:auto;display:flex;gap:4px">
+            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span><i class="ti ti-chart-bar"></i><span id="idx-bud-period-title">Procurement Budget (BCB) and Awarded by Period</span></span>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
                 <button id="bud-btn-monthly" onclick="setIdxBudPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
                 <button id="bud-btn-quarterly" onclick="setIdxBudPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
-              </span>
+                <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
+                <button id="bud-btn-budget" onclick="setIdxBudDataMode('budget')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Budget</button>
+                <button id="bud-btn-count" onclick="setIdxBudDataMode('count')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600"># WPs</button>
+              </div>
             </div>
             <div style="position:relative;height:300px"><canvas id="c-idx-bud-period"></canvas></div>
           </div>
@@ -924,6 +928,7 @@
     let _idxDashDataMode = 'budget';
     let _idxBlPeriodMode = 'quarterly';
     let _idxBudPeriodMode = 'monthly';
+    let _idxBudDataMode = 'budget';
     let _idxSchPeriodMode = 'monthly';
     function renderIdxOvBattery(wps) {
       const today = new Date();
@@ -1018,18 +1023,33 @@
       }
     };
 
-    window.setIdxBudPeriodMode = function(mode) {
-      _idxBudPeriodMode = mode;
-      const onStyle = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
-      const offStyle = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
-      ['monthly','quarterly'].forEach(m => {
-        const btn = document.getElementById('bud-btn-'+m);
-        if(btn) btn.style.cssText = m===mode ? onStyle : offStyle;
-      });
-      if(_lastWPs) {
-        if(mode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-bud-period', _lastWPs);
+    function _renderIdxBudPeriodChart() {
+      if (!_lastWPs) return;
+      const on  = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
+      const off = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+      const titleEl = document.getElementById('idx-bud-period-title');
+      if (_idxBudDataMode === 'count') {
+        if (titleEl) titleEl.textContent = 'Work Packages by Period — Planned vs Actual';
+        if (_idxBudPeriodMode === 'monthly') Charts.wpCountByPeriodMonthly('c-idx-bud-period', _lastWPs);
+        else Charts.wpCountByPeriod('c-idx-bud-period', _lastWPs);
+      } else {
+        if (titleEl) titleEl.textContent = 'Procurement Budget (BCB) and Awarded by Period';
+        if (_idxBudPeriodMode === 'monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-bud-period', _lastWPs);
         else Charts.budgetAwardedByPeriod('c-idx-bud-period', _lastWPs);
       }
+      ['monthly','quarterly'].forEach(m => { const b=document.getElementById('bud-btn-'+m); if(b) b.style.cssText=m===_idxBudPeriodMode?on:off; });
+      ['budget','count'].forEach(m => { const b=document.getElementById('bud-btn-'+m); if(b) b.style.cssText=m===_idxBudDataMode?on:off; });
+    }
+
+    window.setIdxBudPeriodMode = function(mode) {
+      _idxBudPeriodMode = mode;
+      _renderIdxBudPeriodChart();
+    };
+
+    window.setIdxBudDataMode = function(mode) {
+      _idxBudDataMode = mode;
+      _destroyCharts(['c-idx-bud-period']);
+      _renderIdxBudPeriodChart();
     };
 
     let _idxSchDataMode = 'count';
@@ -1392,8 +1412,7 @@
           ].join('');
         }
         _destroyCharts(['c-idx-bud-period','c-idx-bud-trade','c-idx-bud-by-proj']);
-        if(_idxBudPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-bud-period', wps);
-        else Charts.budgetAwardedByPeriod('c-idx-bud-period', wps);
+        _renderIdxBudPeriodChart();
         Charts.budgetByTradeHBar('c-idx-bud-trade', wps);
         if(filt) Charts.budgetAwardedByProject('c-idx-bud-by-proj', wps, filt);
         const trades = IDX_TRADE_ORDER.filter(t => wps.some(w=>w.trade===t))
