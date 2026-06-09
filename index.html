@@ -148,9 +148,9 @@
             <div>
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Work Package Status</div>
               <div class="ov-wp-split">
-                <div class="ov-donut-card" style="flex:0 0 auto;padding:14px 16px" id="idx-ov-battery-wp"></div>
-                <div class="ov-donut-card" style="flex:0 0 auto;padding:14px 16px" id="idx-ov-battery-val"></div>
-                <div id="metrics-wp" class="ov-stats-card" style="flex:1;min-width:180px"></div>
+                <div class="ov-donut-card" id="idx-ov-battery-wp"></div>
+                <div class="ov-donut-card" id="idx-ov-battery-val"></div>
+                <div id="metrics-wp" class="ov-stats-card"></div>
               </div>
             </div>
           </div>
@@ -942,33 +942,34 @@
       const wpDuePct  = total ? Math.round(dueN/total*100) : 0;
       const valDuePct = bcb   ? Math.round(dueBcb/bcb*100) : 0;
 
-      const LEGEND = `<div style="display:flex;flex-direction:column;gap:4px;margin-top:8px">
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;flex-shrink:0;background:#2D9B6F"></div><span style="font-size:10px;color:#555">Awarded</span></div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;flex-shrink:0;background:#EE3124"></div><span style="font-size:10px;color:#555">Due Not Awarded</span></div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;flex-shrink:0;background:#D1D5DB"></div><span style="font-size:10px;color:#555">Not Due Yet</span></div>
+      const LEGEND = `<div style="display:flex;flex-direction:column;gap:3px;margin-top:10px;align-self:flex-start">
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:#2D9B6F"></div><span style="font-size:9px;color:#777;white-space:nowrap">Awarded</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:#EE3124"></div><span style="font-size:9px;color:#777;white-space:nowrap">Due Not Awarded</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:#D1D5DB"></div><span style="font-size:9px;color:#777;white-space:nowrap">Not Due Yet</span></div>
       </div>`;
 
-      function batteryCard(elId, pctAwd, pctDue, title, countLine, valLine) {
+      function batteryCard(elId, pctAwd, pctDue, title, line1, line2) {
         const el = document.getElementById(elId);
         if(!el) return;
         const pctND = Math.max(0, 100 - pctAwd - pctDue);
         const textColor = pctAwd > 55 ? '#fff' : '#231F20';
-        el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-          <div style="font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;text-align:center">${title}</div>
-          <div style="position:relative;width:72px;height:170px;border:2.5px solid #bbb;border-radius:12px;overflow:hidden;background:#e8e8e8">
+        el.innerHTML = `
+          <div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.08em;text-align:center;margin-bottom:10px">${title}</div>
+          <div style="position:relative;width:72px;height:160px;border:2px solid #ccc;border-radius:12px;overflow:hidden;background:#ebebeb;flex-shrink:0">
             <div style="position:absolute;top:0;left:0;right:0;height:${pctND}%;background:#D1D5DB;min-height:${pctND>0?2:0}px"></div>
-            <div style="position:absolute;top:${pctND}%;left:0;right:0;height:${pctDue}%;background:#EE3124;opacity:.9;min-height:${pctDue>0?2:0}px"></div>
+            <div style="position:absolute;top:${pctND}%;left:0;right:0;height:${pctDue}%;background:#EE3124;opacity:.85;min-height:${pctDue>0?2:0}px"></div>
             <div style="position:absolute;bottom:0;left:0;right:0;height:${pctAwd}%;background:linear-gradient(to top,#1a7a50,#2D9B6F,#4ac98a);min-height:${pctAwd>0?2:0}px"></div>
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px;font-weight:700;color:${textColor};text-shadow:0 1px 3px rgba(0,0,0,.25);white-space:nowrap;pointer-events:none">${pctAwd}%</div>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px;font-weight:800;color:${textColor};text-shadow:0 1px 4px rgba(0,0,0,.3);white-space:nowrap;pointer-events:none;letter-spacing:-.5px">${pctAwd}%</div>
           </div>
-          <div style="font-size:11px;color:#231F20;font-weight:700;text-align:center">${countLine}</div>
-          ${valLine ? `<div style="font-size:10px;color:#888;text-align:center">${valLine}</div>` : ''}
-          ${LEGEND}
-        </div>`;
+          <div style="margin-top:10px;text-align:center">
+            <div style="font-size:12px;font-weight:700;color:#231F20;line-height:1.2">${line1}</div>
+            <div style="font-size:10px;color:#999;margin-top:2px;line-height:1.2">${line2}</div>
+          </div>
+          ${LEGEND}`;
       }
 
-      batteryCard('idx-ov-battery-wp',  wpPct,  wpDuePct,  '% by WP',    `${awardedN} / ${total} WPs`, '');
-      batteryCard('idx-ov-battery-val', valPct, valDuePct, '% by Value',  `${Fmt.money(awd)}`, `of ${Fmt.money(bcb)} BCB`);
+      batteryCard('idx-ov-battery-wp',  wpPct,  wpDuePct,  '% Awarded by WP',    `${awardedN} / ${total} WPs`, `${wpPct}% award rate`);
+      batteryCard('idx-ov-battery-val', valPct, valDuePct, '% Awarded by Value',  `${Fmt.money(awd)} awarded`, `of ${Fmt.money(bcb)} BCB`);
     }
 
     function _idxDashRenderPeriod(wps) {
@@ -1880,18 +1881,18 @@
           const row = (label1, val1, color1, label2, val2, color2, last) => `
             <div style="display:grid;grid-template-columns:1fr 1fr;flex:1;${last?'':'border-bottom:1px solid #f0f0f0'}">
               <div style="border-right:1px solid #f0f0f0;padding:12px 14px;display:flex;flex-direction:column;justify-content:center">
-                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#aaa;margin-bottom:4px">${label1}</div>
-                <div style="font-size:22px;font-weight:700;color:${color1};line-height:1">${val1}</div>
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#bbb;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label1}</div>
+                <div style="font-size:24px;font-weight:800;color:${color1};line-height:1;letter-spacing:-.5px">${val1}</div>
               </div>
               <div style="padding:12px 14px;display:flex;flex-direction:column;justify-content:center">
-                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#aaa;margin-bottom:4px">${label2}</div>
-                <div style="font-size:22px;font-weight:700;color:${color2};line-height:1">${val2}</div>
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#bbb;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label2}</div>
+                <div style="font-size:24px;font-weight:800;color:${color2};line-height:1;letter-spacing:-.5px">${val2}</div>
               </div>
             </div>`;
           wpEl.innerHTML =
-            row('Total WP', filtWPs.length, '#231F20', 'Awarded WP', awarded.length, '#2D9B6F', false) +
-            row('WP Due Not Awarded', dueNotAwd, dueNotAwd>0?'#EE3124':'#888', 'WP Not Due', notDue, '#888', false) +
-            row('% Awarded by WP', pctByWP+'%', '#2D9B6F', '% Awarded by Value', pctByVal+'%', '#2D9B6F', true);
+            row('Total WPs', filtWPs.length, '#231F20', 'Awarded', awarded.length, '#2D9B6F', false) +
+            row('Due Not Awarded', dueNotAwd, dueNotAwd>0?'#EE3124':'#aaa', 'Not Due Yet', notDue, '#aaa', false) +
+            row('Rate by WP', pctByWP+'%', '#2D9B6F', 'Rate by Value', pctByVal+'%', '#2D9B6F', true);
         }
       }
 
@@ -2308,19 +2309,22 @@
   @keyframes spin { to { transform:rotate(360deg); } }
 
   /* ── Overview tab layout ── */
-  .ov-top-row { display:flex; gap:16px; flex-wrap:wrap; }
+  .ov-top-row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
   .ov-top-row > div { flex:1; min-width:280px; }
   .ov-cost-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
-  .ov-cost-grid .metric-card { padding:12px 14px; }
-  .ov-cost-grid .metric-value { font-size:14px !important; letter-spacing:-.2px; }
-  .ov-wp-split { display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; }
-  .ov-donut-card { flex:0 0 auto; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); padding:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-  .ov-stats-card { flex:1; min-width:160px; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); overflow:hidden; display:flex; flex-direction:column; }
+  .ov-cost-grid .metric-card { padding:14px 16px; }
+  .ov-cost-grid .metric-label { min-height:auto; margin-bottom:6px; }
+  .ov-cost-grid .metric-value { font-size:14px !important; letter-spacing:-.2px; line-height:1.3; }
+  .ov-wp-split { display:flex; gap:10px; align-items:stretch; }
+  .ov-donut-card { flex:1; min-width:110px; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); padding:16px 12px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; }
+  .ov-stats-card { flex:1.4; min-width:160px; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); overflow:hidden; display:flex; flex-direction:column; }
+  @media (max-width:900px) {
+    .ov-wp-split { flex-wrap:wrap; }
+  }
   @media (max-width:767px) {
     .ov-cost-grid { grid-template-columns:repeat(2,1fr); }
-    .ov-cost-grid .metric-value { font-size:15px !important; }
+    .ov-cost-grid .metric-value { font-size:13px !important; }
     .ov-wp-split { flex-direction:column; align-items:stretch; }
-    .ov-donut-card { align-items:center; justify-content:center; }
   }
 
   /* Viewer mode — hide all cost data */
