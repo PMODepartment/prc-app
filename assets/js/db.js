@@ -268,18 +268,16 @@ function buildRankList(id, items, colorClass, fmtVal) {
   if (!el) return;
   if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:12px;padding:8px 0">No data</div>'; return; }
   el.innerHTML = items.map((item,i) => {
-    // Merge BCB/Awd into sub line so each item stays 2 lines max
-    const bcbAwd = item.bcb!=null&&item.awarded!=null
-      ? `<span style="color:#ccc;margin:0 3px">·</span>BCB ${Fmt.money(item.bcb)}<span style="color:#ccc;margin:0 3px">→</span>Awd ${Fmt.money(item.awarded)}`
-      : '';
-    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5">
-      <span style="font-size:11px;color:#aaa;font-weight:600;width:16px;flex-shrink:0;margin-top:2px">${i+1}</span>
+    const hasBcbAwd = item.bcb!=null && item.awarded!=null;
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f5f5f5">
+      <span style="font-size:11px;color:#aaa;font-weight:600;width:16px;flex-shrink:0;padding-top:2px">${i+1}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
-        <div style="font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub}${bcbAwd}</div>
+        <div style="font-size:12px;font-weight:600;color:#231F20;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${item.name}</div>
+        <div style="font-size:10px;color:#999;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub}</div>
+        ${hasBcbAwd?`<div style="font-size:10px;color:#bbb;margin-top:1px;white-space:nowrap">BCB ${Fmt.money(item.bcb)} <span style="color:#ddd">→</span> Awd ${Fmt.money(item.awarded)}</div>`:''}
       </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:12px;font-weight:700;color:${item.color};white-space:nowrap">${fmtVal(item.val)}</div>
+      <div style="text-align:right;flex-shrink:0;padding-top:2px">
+        <div style="font-size:13px;font-weight:700;color:${item.color};white-space:nowrap">${fmtVal(item.val)}</div>
         ${item.pct!=null?`<div style="font-size:10px;font-weight:600;color:${item.color};white-space:nowrap">${item.pct}</div>`:''}
       </div>
     </div>`;

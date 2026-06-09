@@ -206,17 +206,13 @@
             </div>
             <div style="position:relative;height:240px"><canvas id="c-idx-dash-period"></canvas></div>
           </div>
-          <!-- WP Status — 3 separate cards -->
+          <!-- WP Status — progress bars + stats -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">
-            <div class="panel" style="flex:2;min-width:160px">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>WP Status — by Count</div>
-              <div style="display:flex;justify-content:center"><div style="position:relative;width:180px;height:180px"><canvas id="c-idx-dash-status-wp"></canvas></div></div>
+            <div class="panel" style="flex:3;min-width:240px">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>WP Status</div>
+              <div id="idx-dash-status-bars" style="padding:4px 0"></div>
             </div>
-            <div class="panel" style="flex:2;min-width:160px">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>WP Status — by Value</div>
-              <div style="display:flex;justify-content:center"><div style="position:relative;width:180px;height:180px"><canvas id="c-idx-dash-status-val"></canvas></div></div>
-            </div>
-            <div class="panel" style="flex:2;min-width:160px">
+            <div class="panel" style="flex:2;min-width:180px">
               <div class="panel-title"><i class="ti ti-table"></i>Status Summary</div>
               <div id="idx-dash-status-table"></div>
             </div>
@@ -233,17 +229,17 @@
               </table>
             </div>
           </div>
-          <!-- Top 5 panels — Contract Value wider; align-items:flex-start removes uneven height -->
+          <!-- Top 5 panels — equal widths -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px">
-            <div class="panel" style="flex:5;min-width:200px">
+            <div class="panel" style="flex:1;min-width:200px">
               <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
               <div class="rank-list" id="idx-rank-value"></div>
             </div>
-            <div class="panel" style="flex:4;min-width:180px">
+            <div class="panel" style="flex:1;min-width:200px">
               <div class="panel-title"><i class="ti ti-trending-up"></i>Top 5 Savings</div>
               <div class="rank-list" id="idx-rank-gains"></div>
             </div>
-            <div class="panel" style="flex:4;min-width:180px">
+            <div class="panel" style="flex:1;min-width:200px">
               <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
               <div class="rank-list" id="idx-rank-losses"></div>
             </div>
@@ -1131,10 +1127,58 @@
       if (tab === 'overview') {
         // Overview: just KPI groups — rendered in renderAll
       } else if (tab === 'dashboard') {
-        _destroyCharts(['c-idx-dash-period','c-idx-dash-status-wp','c-idx-dash-status-val']);
+        _destroyCharts(['c-idx-dash-period']);
         _idxDashRenderPeriod(wps);
-        Charts.wpStatusDonut('c-idx-dash-status-wp', wps);
-        Charts.wpStatusDonutValue('c-idx-dash-status-val', wps);
+        (function renderIdxDashStatusBars(wps) {
+          const today = new Date();
+          const total = wps.length;
+          const awarded = wps.filter(w=>w.award_status==='Awarded').length;
+          const due = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+          const notDue = Math.max(0, total - awarded - due);
+          const bcbTotal = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+          const bcbAwd = wps.filter(w=>w.award_status==='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+          const bcbDue = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+          const bcbNotDue = Math.max(0, bcbTotal - bcbAwd - bcbDue);
+          const wpPct  = total    ? Math.round(awarded/total*100)    : 0;
+          const valPct = bcbTotal ? Math.round(bcbAwd/bcbTotal*100)  : 0;
+          const wpDuePct  = total    ? Math.round(due/total*100)       : 0;
+          const valDuePct = bcbTotal ? Math.round(bcbDue/bcbTotal*100) : 0;
+          const el = document.getElementById('idx-dash-status-bars');
+          if (!el) return;
+          function bar(label, pctAwd, pctDue, items) {
+            const pctND = Math.max(0, 100 - pctAwd - pctDue);
+            return `<div style="margin-bottom:18px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px">
+                <span style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.07em">${label}</span>
+                <span style="font-size:22px;font-weight:800;color:#2D9B6F;letter-spacing:-.5px;line-height:1">${pctAwd}%<span style="font-size:11px;font-weight:500;color:#aaa;margin-left:3px">awarded</span></span>
+              </div>
+              <div style="height:18px;border-radius:6px;overflow:hidden;background:#e8e8e8;display:flex">
+                <div style="width:${pctAwd}%;background:linear-gradient(to right,#1a7a50,#2D9B6F);min-width:${pctAwd>0?2:0}px"></div>
+                <div style="width:${pctDue}%;background:#EE3124;opacity:.85;min-width:${pctDue>0?2:0}px"></div>
+                <div style="width:${pctND}%;background:#D1D5DB;min-width:${pctND>0?2:0}px"></div>
+              </div>
+              <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
+                ${items.map(it=>`<div style="display:flex;align-items:center;gap:5px">
+                  <div style="width:8px;height:8px;border-radius:2px;background:${it.color};flex-shrink:0"></div>
+                  <span style="font-size:10px;color:#777">${it.label}</span>
+                  <span style="font-size:11px;font-weight:700;color:#231F20">${it.val}</span>
+                </div>`).join('')}
+              </div>
+            </div>`;
+          }
+          el.innerHTML =
+            bar('By WP Count', wpPct, wpDuePct, [
+              {color:'#2D9B6F', label:'Awarded', val:awarded},
+              {color:'#EE3124', label:'Due Not Awarded', val:due},
+              {color:'#D1D5DB', label:'Not Due', val:notDue}
+            ]) +
+            `<div style="height:1px;background:#f0f0f0;margin-bottom:18px"></div>` +
+            bar('By BCB Value', valPct, valDuePct, [
+              {color:'#2D9B6F', label:'Awarded', val:Fmt.money(bcbAwd)},
+              {color:'#EE3124', label:'Due Not Awarded', val:Fmt.money(bcbDue)},
+              {color:'#D1D5DB', label:'Not Due', val:Fmt.money(bcbNotDue)}
+            ]);
+        })(wps);
         // Status summary table
         (function renderIdxStatusTable() {
           const today = new Date();
