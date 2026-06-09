@@ -41,13 +41,14 @@
     .sched-bar-wrap {flex:1;height:10px;background:#f0f0f0;border-radius:5px;position:relative;overflow:hidden}
     .sched-bar {height:100%;border-radius:5px;position:absolute}
     /* ── WP Status integrated card (Dashboard tab) ── */
-    .wp-status-card { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+    .wp-status-card { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
     .wp-status-bars { flex:1; min-width:200px; }
     .wp-status-donut { flex:0 0 auto; display:flex; align-items:center; justify-content:center; }
     @keyframes spin { to { transform:rotate(360deg); } }
     @media (max-width:767px) {
-      .wp-status-card { flex-direction:column; }
+      .wp-status-card { flex-direction:column-reverse; gap:16px; }
       .wp-status-donut { align-self:center; }
+      .wp-status-donut canvas { width:160px !important; height:160px !important; }
     }
     /* ── Overview tab layout ── */
     .ov-top-row { display:flex; gap:16px; flex-wrap:wrap; }
@@ -237,7 +238,7 @@
             <div class="wp-status-card">
               <div class="wp-status-bars" id="dash-status-table"></div>
               <div class="wp-status-donut">
-                <div style="position:relative;width:150px;height:150px"><canvas id="c-dash-status"></canvas></div>
+                <div style="position:relative;width:180px;height:180px"><canvas id="c-dash-status"></canvas></div>
               </div>
             </div>
           </div>
@@ -1085,6 +1086,12 @@ function renderBacklog(){
     return cmp !== 0 ? cmp : wpNoSort(a, b);
   }));
 
+  // Cols: WP No., Description, [Trade], Planned Award, Aging, Budget, Status, Submittal
+  const nCols = _blGroupByTrade ? 7 : 8;
+  // Toggle trade <th> visibility
+  const blTradeTh = document.querySelector('#backlog-table thead th:nth-child(3)');
+  if (blTradeTh) blTradeTh.style.display = _blGroupByTrade ? 'none' : '';
+
   const tbody = document.getElementById('backlog-tbody');
   const _renderRow = w => {
     const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
@@ -1092,7 +1099,7 @@ function renderBacklog(){
     return `<tr>
       <td><span class="td-code">${w.wp_no||'—'}</span></td>
       <td style="font-size:11px;max-width:200px">${w.description||'—'}</td>
-      <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
+      ${_blGroupByTrade ? '' : `<td style="font-size:11px;color:#888">${w.trade||'—'}</td>`}
       <td>${fmtDate(w.awarding_date)}</td>
       <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
       <td style="text-align:right">${((w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
@@ -1109,14 +1116,14 @@ function renderBacklog(){
       const ind = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;float:right;margin-left:4px">${collapsed?'+':'−'}</span>`;
       const budgeLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:10px;color:#888;font-weight:400">${((tBudget)/1e6).toFixed(1)} M</span>`;
       html += `<tr onclick="toggleBlGroup(this.dataset.trade)" data-trade="${trade.replace(/"/g,'&quot;')}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
-        <td colspan="8" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
+        <td colspan="${nCols}" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
           ${trade}${ind}
           <span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${tWps.length} WPs</span>
           ${budgeLabel}
         </td></tr>`;
       if (!collapsed) tWps.forEach(w => { html += _renderRow(w); });
     });
-    tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+    tbody.innerHTML = html || `<tr><td colspan="${nCols}" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>`;
   } else {
     // Flat mode: combine all groups, re-sort across trades by selected option
     const flat = [];
@@ -1130,7 +1137,7 @@ function renderBacklog(){
       else { const agA=a.awarding_date?(today-new Date(a.awarding_date)):-Infinity; const agB=b.awarding_date?(today-new Date(b.awarding_date)):-Infinity; cmp=agB-agA; }
       return cmp !== 0 ? cmp : wpNoSort(a, b);
     });
-    tbody.innerHTML = flat.map(_renderRow).join('') || '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+    tbody.innerHTML = flat.map(_renderRow).join('') || `<tr><td colspan="${nCols}" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>`;
   }
 }
 

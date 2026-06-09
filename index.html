@@ -217,7 +217,7 @@
             <div class="wp-status-card">
               <div class="wp-status-bars" id="idx-dash-status-table"></div>
               <div class="wp-status-donut">
-                <div style="position:relative;width:150px;height:150px"><canvas id="c-idx-dash-status"></canvas></div>
+                <div style="position:relative;width:180px;height:180px"><canvas id="c-idx-dash-status"></canvas></div>
               </div>
             </div>
           </div>
@@ -1220,18 +1220,18 @@
         const variance = w => (w.approved_budget_bcb||0)-(w.total_awarded||0);
         idxBuildRankList('idx-rank-value',
           [...wps].filter(w=>w.total_awarded>0).sort((a,b)=>(b.total_awarded||0)-(a.total_awarded||0)).slice(0,5)
-            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),val:w.total_awarded,color:'#282C28'})),
+            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:''),val:w.total_awarded,color:'#282C28'})),
           v=>Fmt.money(v));
         idxBuildRankList('idx-rank-gains',
           withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
-            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),
+            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:''),
               val:variance(w),color:'#2D9B6F',
               bcb:w.approved_budget_bcb, awarded:w.total_awarded,
               pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
           v=>'+'+Fmt.money(v));
         idxBuildRankList('idx-rank-losses',
           withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
-            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),
+            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:''),
               val:Math.abs(variance(w)),color:'#EE3124',
               bcb:w.approved_budget_bcb, awarded:w.total_awarded,
               pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
@@ -1285,6 +1285,13 @@
             return cmp!==0?cmp:wpNoSort(a,b);
           }));
 
+          // Cols: Project, WP No., Desc, [Trade], Planned Award, Aging, Budget, Status, Submittal
+          const nCols = _idxBlGroupByTrade ? 8 : 9;
+          const preBudgetCols = nCols - 3; // cols before Budget (excl. Budget, Status, Submittal)
+          // Toggle trade <th> visibility
+          const blTradeTh = document.querySelector('#bl-table thead th:nth-child(4)');
+          if (blTradeTh) blTradeTh.style.display = _idxBlGroupByTrade ? 'none' : '';
+
           const _renderBlRow = w => {
             const aging = w.awarding_date ? Math.floor((now-new Date(w.awarding_date))/86400000) : null;
             const agStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : '';
@@ -1293,7 +1300,7 @@
               <td style="font-weight:600;font-size:11px">${w.project_id||'—'}</td>
               <td>${w.wp_no||'—'}</td>
               <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.description||'—'}</td>
-              <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
+              ${_idxBlGroupByTrade ? '' : `<td style="font-size:11px;color:#888">${w.trade||'—'}</td>`}
               <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
               <td style="${agStyle}">${aging!=null?(aging>0?'+'+aging+'d':aging===0?'today':aging+'d'):'—'}</td>
               <td>${w.approved_budget_bcb?Fmt.money(w.approved_budget_bcb):'—'}</td>
@@ -1302,7 +1309,7 @@
             </tr>`;
           };
           const _totalRow = (cnt, budget) => cnt ? `<tr style="background:#fafafa;font-weight:700;border-top:2px solid #e5e5e5">
-            <td colspan="6" style="font-size:11px;padding:8px 10px">TOTAL (${cnt} WPs)</td>
+            <td colspan="${preBudgetCols}" style="font-size:11px;padding:8px 10px">TOTAL (${cnt} WPs)</td>
             <td style="font-size:11px;padding:8px 10px">${window.__isViewer?'—':Fmt.money(budget)}</td>
             <td colspan="2"></td>
           </tr>` : '';
@@ -1316,7 +1323,7 @@
               const ind = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;float:right;margin-left:4px">${collapsed?'+':'−'}</span>`;
               const budgeLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:10px;color:#888;font-weight:400">${Fmt.money(tBudget)}</span>`;
               html += `<tr onclick="toggleBlGroup(this.dataset.trade)" data-trade="${trade.replace(/"/g,'&quot;')}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
-                <td colspan="9" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
+                <td colspan="${nCols}" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
                   ${trade}${ind}
                   <span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${tWps.length} WPs</span>
                   ${budgeLabel}
@@ -1324,7 +1331,7 @@
               if (!collapsed) tWps.forEach(w => { html += _renderBlRow(w); });
             });
             html += _totalRow(rows.length, totalBudget);
-            tbody.innerHTML = html || '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+            tbody.innerHTML = html || `<tr><td colspan="${nCols}" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>`;
           } else {
             // Flat mode: combine all groups, re-sort by selected sort option
             const flat = [];
@@ -1339,7 +1346,7 @@
               return cmp !== 0 ? cmp : wpNoSortFlat(a,b);
             });
             const flatBudget = flat.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-            tbody.innerHTML = flat.map(_renderBlRow).join('') + _totalRow(flat.length, flatBudget) || '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+            tbody.innerHTML = flat.map(_renderBlRow).join('') + _totalRow(flat.length, flatBudget) || `<tr><td colspan="${nCols}" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>`;
           }
         };
         window.renderBlTable();
@@ -2327,13 +2334,14 @@
   @media(max-width:480px) { .hide-mobile { display:none; } }
 
   /* ── WP Status integrated card ── */
-  .wp-status-card { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+  .wp-status-card { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
   .wp-status-bars { flex:1; min-width:200px; }
   .wp-status-donut { flex:0 0 auto; display:flex; align-items:center; justify-content:center; }
   @keyframes spin { to { transform:rotate(360deg); } }
   @media (max-width:767px) {
-    .wp-status-card { flex-direction:column; }
+    .wp-status-card { flex-direction:column-reverse; gap:16px; }
     .wp-status-donut { align-self:center; }
+    .wp-status-donut canvas { width:160px !important; height:160px !important; }
   }
 
   /* ── Overview tab layout ── */
