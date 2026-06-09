@@ -258,6 +258,7 @@
           <!-- Budget filter -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
             <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;flex:1;min-width:140px">WORK PACKAGES — NOT AWARDED ONLY</div>
+            <button id="bl-group-toggle" onclick="toggleBlGroupMode()" style="font-size:10px;padding:4px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px;flex-shrink:0"><i class="ti ti-layout-rows" style="font-size:12px"></i><span>Grouped</span></button>
             <select id="bl-trade-filter" onchange="renderBacklog()" style="font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff">
               <option value="">All Trades</option>
             </select>
@@ -997,13 +998,13 @@ function renderTop5(wps){
   buildRankList('rank-gains',
     withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
       .map(w=>({name:w.description,sub:w.wp_no+' · '+w.trade,val:variance(w),color:'#2D9B6F',
-        bcb:w.approved_budget_bcb,
+        bcb:w.approved_budget_bcb, awarded:w.total_awarded,
         pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
     'green', v=>'+'+Fmt.money(v));
   buildRankList('rank-losses',
     withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
       .map(w=>({name:w.description,sub:w.wp_no+' · '+w.trade,val:Math.abs(variance(w)),color:'#EE3124',
-        bcb:w.approved_budget_bcb,
+        bcb:w.approved_budget_bcb, awarded:w.total_awarded,
         pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
     'red', v=>'-'+Fmt.money(v));
 }
@@ -1065,37 +1066,52 @@ function renderBacklog(){
   }));
 
   const tbody = document.getElementById('backlog-tbody');
-  let html = '';
-  tradeSeq.forEach(trade => {
-    const tWps = tradeGroups.get(trade);
-    const collapsed = !!_blCollapseState.get(trade);
-    const tBudget = tWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-    const ind = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;float:right;margin-left:4px">${collapsed?'+':'−'}</span>`;
-    const budgeLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:10px;color:#888;font-weight:400">${((tBudget)/1e6).toFixed(1)} M</span>`;
-    html += `<tr onclick="toggleBlGroup(this.dataset.trade)" data-trade="${trade.replace(/"/g,'&quot;')}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
-      <td colspan="8" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
-        ${trade}${ind}
-        <span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${tWps.length} WPs</span>
-        ${budgeLabel}
-      </td></tr>`;
-    if (!collapsed) {
-      tWps.forEach(w => {
-        const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
-        const agCls = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
-        html += `<tr>
-          <td><span class="td-code">${w.wp_no||'—'}</span></td>
-          <td style="font-size:11px;max-width:200px">${w.description||'—'}</td>
-          <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
-          <td>${fmtDate(w.awarding_date)}</td>
-          <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
-          <td style="text-align:right">${((w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
-          <td>${statusBadge(w.award_status)}</td>
-          <td style="font-size:11px;color:#555">${submittalLabel(w)}</td>
-        </tr>`;
-      });
-    }
-  });
-  tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+  const _renderRow = w => {
+    const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
+    const agCls = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
+    return `<tr>
+      <td><span class="td-code">${w.wp_no||'—'}</span></td>
+      <td style="font-size:11px;max-width:200px">${w.description||'—'}</td>
+      <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
+      <td>${fmtDate(w.awarding_date)}</td>
+      <td class="${agCls}">${aging!=null?aging+'d':'—'}</td>
+      <td style="text-align:right">${((w.approved_budget_bcb||0)/1e6).toFixed(1)} M</td>
+      <td>${statusBadge(w.award_status)}</td>
+      <td style="font-size:11px;color:#555">${submittalLabel(w)}</td>
+    </tr>`;
+  };
+  if (_blGroupByTrade) {
+    let html = '';
+    tradeSeq.forEach(trade => {
+      const tWps = tradeGroups.get(trade);
+      const collapsed = !!_blCollapseState.get(trade);
+      const tBudget = tWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+      const ind = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;float:right;margin-left:4px">${collapsed?'+':'−'}</span>`;
+      const budgeLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:10px;color:#888;font-weight:400">${((tBudget)/1e6).toFixed(1)} M</span>`;
+      html += `<tr onclick="toggleBlGroup(this.dataset.trade)" data-trade="${trade.replace(/"/g,'&quot;')}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
+        <td colspan="8" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
+          ${trade}${ind}
+          <span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${tWps.length} WPs</span>
+          ${budgeLabel}
+        </td></tr>`;
+      if (!collapsed) tWps.forEach(w => { html += _renderRow(w); });
+    });
+    tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+  } else {
+    // Flat mode: combine all groups, re-sort across trades by selected option
+    const flat = [];
+    tradeSeq.forEach(t => flat.push(...(tradeGroups.get(t)||[])));
+    flat.sort((a,b) => {
+      let cmp = 0;
+      if (sortBy==='date') cmp = (a.awarding_date||'9999') < (b.awarding_date||'9999') ? -1 : (a.awarding_date||'9999') > (b.awarding_date||'9999') ? 1 : 0;
+      else if (sortBy==='budget') cmp = (b.approved_budget_bcb||0)-(a.approved_budget_bcb||0);
+      else if (sortBy==='desc') cmp = (a.description||'').localeCompare(b.description||'');
+      else if (sortBy==='trade') cmp = (a.trade||'').localeCompare(b.trade||'');
+      else { const agA=a.awarding_date?(today-new Date(a.awarding_date)):-Infinity; const agB=b.awarding_date?(today-new Date(b.awarding_date)):-Infinity; cmp=agB-agA; }
+      return cmp !== 0 ? cmp : wpNoSort(a, b);
+    });
+    tbody.innerHTML = flat.map(_renderRow).join('') || '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+  }
 }
 
 // Dynamic WP sort — respects current sortCol/sortDir; falls back to wp_no natural sort
@@ -1132,8 +1148,21 @@ function normTrade(t){ if(!t)return t; const k=t.trim().toLowerCase(); return _T
 
 const _collapseState = new Map();
 const _blCollapseState = new Map();
+let _blGroupByTrade = true;
 window.toggleBlGroup = function(trade) {
   _blCollapseState.set(trade, !(_blCollapseState.get(trade)||false));
+  renderBacklog();
+};
+window.toggleBlGroupMode = function() {
+  _blGroupByTrade = !_blGroupByTrade;
+  const btn = document.getElementById('bl-group-toggle');
+  if (btn) {
+    btn.style.background = _blGroupByTrade ? '#EE3124' : '#fff';
+    btn.style.color = _blGroupByTrade ? '#fff' : '#888';
+    btn.style.borderColor = _blGroupByTrade ? '#EE3124' : '#e5e5e5';
+    const lbl = btn.querySelector('span');
+    if (lbl) lbl.textContent = _blGroupByTrade ? 'Grouped' : 'Flat';
+  }
   renderBacklog();
 };
 

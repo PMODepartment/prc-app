@@ -137,25 +137,24 @@
             <div style="flex:1"><strong>Portfolio view is read-only.</strong> Click any project card to enter its dashboard and manage work packages.</div>
             <button onclick="document.getElementById('readonly-notice').style.display='none'" style="background:none;border:none;cursor:pointer;color:#D97706;font-size:16px;line-height:1;padding:0;flex-shrink:0;margin-top:-1px" title="Dismiss">×</button>
           </div>
-          <!-- Two KPI groups side by side -->
-          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
-            <div id="metrics-cost-group" style="flex:1;min-width:280px">
-              <div class="cost-overview-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Cost Overview</div>
-              <div id="metrics-cost" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
+          <!-- Cost Overview: full-width compact 4-card row -->
+          <div id="metrics-cost-group" style="margin-bottom:14px">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Cost Overview</div>
+            <div id="metrics-cost" class="ov-cost-grid"></div>
+          </div>
+          <!-- WP Status: full-width panel -->
+          <div class="ov-wp-panel" style="margin-bottom:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:6px">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888">Work Package Status</div>
+              <div style="display:flex;gap:4px">
+                <button id="idx-ov-btn-wp" onclick="setIdxOvChartMode('wp')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">% by WP</button>
+                <button id="idx-ov-btn-val" onclick="setIdxOvChartMode('val')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">% by Value</button>
+              </div>
             </div>
-            <div style="flex:1;min-width:300px">
-              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Work Package Status</div>
-              <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
-                <!-- Compact per-project cards -->
-                <div id="metrics-wp" style="flex:1;min-width:220px;max-height:280px;overflow-y:auto;border:1px solid var(--border-md);border-radius:var(--radius-md);background:#fff"></div>
-                <!-- Toggleable chart -->
-                <div style="flex:0 0 auto">
-                  <div style="display:flex;gap:4px;margin-bottom:10px">
-                    <button id="idx-ov-btn-wp" onclick="setIdxOvChartMode('wp')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">% by WP</button>
-                    <button id="idx-ov-btn-val" onclick="setIdxOvChartMode('val')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">% by Value</button>
-                  </div>
-                  <div style="position:relative;width:200px;height:200px"><canvas id="c-idx-ov-donut"></canvas></div>
-                </div>
+            <div class="ov-wp-body">
+              <div id="metrics-wp" style="flex:1;min-width:220px;max-height:260px;overflow-y:auto;border:1px solid var(--border-md);border-radius:var(--radius-md);background:#fff"></div>
+              <div class="ov-donut-wrap">
+                <canvas id="c-idx-ov-donut" width="200" height="200"></canvas>
               </div>
             </div>
           </div>
@@ -254,6 +253,7 @@
           <div class="panel" style="margin-bottom:14px;padding:0;overflow:hidden">
             <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <div class="panel-title" style="margin:0;flex-shrink:0"><i class="ti ti-list"></i>Backlog — Not Awarded WPs</div>
+              <button id="idx-bl-group-toggle" onclick="toggleIdxBlGroupMode()" style="font-size:10px;padding:4px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px;flex-shrink:0"><i class="ti ti-layout-rows" style="font-size:12px"></i><span>Grouped</span></button>
               <select id="bl-trade-filter" onchange="renderBlTable()" style="font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff">
                 <option value="">All Trades</option>
               </select>
@@ -805,8 +805,21 @@
       renderWPMonTable(_wpMonFiltered);
     };
     const _blCollapseState = new Map();
+    let _idxBlGroupByTrade = true;
     window.toggleBlGroup = function(trade) {
       _blCollapseState.set(trade, !(_blCollapseState.get(trade)||false));
+      if (window.renderBlTable) window.renderBlTable();
+    };
+    window.toggleIdxBlGroupMode = function() {
+      _idxBlGroupByTrade = !_idxBlGroupByTrade;
+      const btn = document.getElementById('idx-bl-group-toggle');
+      if (btn) {
+        btn.style.background = _idxBlGroupByTrade ? '#EE3124' : '#fff';
+        btn.style.color = _idxBlGroupByTrade ? '#fff' : '#888';
+        btn.style.borderColor = _idxBlGroupByTrade ? '#EE3124' : '#e5e5e5';
+        const lbl = btn.querySelector('span');
+        if (lbl) lbl.textContent = _idxBlGroupByTrade ? 'Grouped' : 'Flat';
+      }
       if (window.renderBlTable) window.renderBlTable();
     };
     window.toggleTradeGroup = function(trade) {
@@ -1089,16 +1102,16 @@
       if (!el) return;
       if (!items.length) { el.innerHTML = '<div style="color:#aaa;font-size:11px;padding:10px">No data</div>'; return; }
       el.innerHTML = items.map((it,i) => `
-        <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f5f5f5">
-          <span style="font-size:11px;font-weight:700;color:#888;min-width:16px">${i+1}</span>
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid #f5f5f5">
+          <span style="font-size:11px;font-weight:700;color:#888;min-width:16px;flex-shrink:0;margin-top:2px">${i+1}</span>
           <div style="flex:1;min-width:0">
             <div style="font-size:11px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.name}</div>
             <div style="font-size:10px;color:#aaa">${it.sub||''}</div>
+            ${it.bcb!=null&&it.awarded!=null?`<div style="font-size:10px;color:#aaa;margin-top:2px;white-space:nowrap">BCB ${Fmt.money(it.bcb)} → Awd ${Fmt.money(it.awarded)}</div>`:''}
           </div>
           <div style="text-align:right;flex-shrink:0">
             <div style="font-size:11px;font-weight:700;color:${it.color||'#231F20'};white-space:nowrap">${fmt(it.val)}</div>
-            ${it.bcb!=null?`<div style="font-size:10px;color:#aaa;white-space:nowrap">BCB: ${Fmt.money(it.bcb)}</div>`:''}
-            ${it.pct!=null?`<div style="font-size:10px;font-weight:600;color:${it.color||'#231F20'};opacity:.75;white-space:nowrap">${it.pct}</div>`:''}
+            ${it.pct!=null?`<div style="font-size:10px;font-weight:600;color:${it.color||'#231F20'};white-space:nowrap">${it.pct}</div>`:''}
           </div>
         </div>`).join('');
     }
@@ -1165,14 +1178,16 @@
           v=>Fmt.money(v));
         idxBuildRankList('idx-rank-gains',
           withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
-            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),val:variance(w),color:'#2D9B6F',
-              bcb:w.approved_budget_bcb,
+            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),
+              val:variance(w),color:'#2D9B6F',
+              bcb:w.approved_budget_bcb, awarded:w.total_awarded,
               pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
           v=>'+'+Fmt.money(v));
         idxBuildRankList('idx-rank-losses',
           withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
-            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),val:Math.abs(variance(w)),color:'#EE3124',
-              bcb:w.approved_budget_bcb,
+            .map(w=>({name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:'')+(w.project_id?' · '+w.project_id:''),
+              val:Math.abs(variance(w)),color:'#EE3124',
+              bcb:w.approved_budget_bcb, awarded:w.total_awarded,
               pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
           v=>'-'+Fmt.money(v));
 
@@ -1224,44 +1239,62 @@
             return cmp!==0?cmp:wpNoSort(a,b);
           }));
 
-          let html = '';
-          tradeSeq.forEach(trade => {
-            const tWps = tradeGroups.get(trade);
-            const collapsed = !!_blCollapseState.get(trade);
-            const tBudget = tWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-            const ind = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;float:right;margin-left:4px">${collapsed?'+':'−'}</span>`;
-            const budgeLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:10px;color:#888;font-weight:400">${Fmt.money(tBudget)}</span>`;
-            html += `<tr onclick="toggleBlGroup(this.dataset.trade)" data-trade="${trade.replace(/"/g,'&quot;')}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
-              <td colspan="9" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
-                ${trade}${ind}
-                <span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${tWps.length} WPs</span>
-                ${budgeLabel}
-              </td></tr>`;
-            if (!collapsed) {
-              tWps.forEach(w => {
-                const aging = w.awarding_date ? Math.floor((now-new Date(w.awarding_date))/86400000) : null;
-                const agStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : '';
-                const slbl = w.submittal_type||(w.review_status==='approved'?'Approved':w.review_status==='pending_review'?'Submitted':'Not Required');
-                html += `<tr>
-                  <td style="font-weight:600;font-size:11px">${w.project_id||'—'}</td>
-                  <td>${w.wp_no||'—'}</td>
-                  <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.description||'—'}</td>
-                  <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
-                  <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
-                  <td style="${agStyle}">${aging!=null?(aging>0?'+'+aging+'d':aging===0?'today':aging+'d'):'—'}</td>
-                  <td>${w.approved_budget_bcb?Fmt.money(w.approved_budget_bcb):'—'}</td>
-                  <td><span style="font-size:10px;font-weight:600;color:${w.award_status==='Awarded'?'#2D9B6F':w.award_status==='Partially Awarded'?'#D97706':'#EE3124'}">${w.award_status||'—'}</span></td>
-                  <td style="font-size:10px;color:#888">${slbl}</td>
-                </tr>`;
-              });
-            }
-          });
-          html += rows.length ? `<tr style="background:#fafafa;font-weight:700;border-top:2px solid #e5e5e5">
-            <td colspan="6" style="font-size:11px;padding:8px 10px">TOTAL (${rows.length} WPs)</td>
-            <td style="font-size:11px;padding:8px 10px">${window.__isViewer?'—':Fmt.money(totalBudget)}</td>
+          const _renderBlRow = w => {
+            const aging = w.awarding_date ? Math.floor((now-new Date(w.awarding_date))/86400000) : null;
+            const agStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : '';
+            const slbl = w.submittal_type||(w.review_status==='approved'?'Approved':w.review_status==='pending_review'?'Submitted':'Not Required');
+            return `<tr>
+              <td style="font-weight:600;font-size:11px">${w.project_id||'—'}</td>
+              <td>${w.wp_no||'—'}</td>
+              <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.description||'—'}</td>
+              <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
+              <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
+              <td style="${agStyle}">${aging!=null?(aging>0?'+'+aging+'d':aging===0?'today':aging+'d'):'—'}</td>
+              <td>${w.approved_budget_bcb?Fmt.money(w.approved_budget_bcb):'—'}</td>
+              <td><span style="font-size:10px;font-weight:600;color:${w.award_status==='Awarded'?'#2D9B6F':w.award_status==='Partially Awarded'?'#D97706':'#EE3124'}">${w.award_status||'—'}</span></td>
+              <td style="font-size:10px;color:#888">${slbl}</td>
+            </tr>`;
+          };
+          const _totalRow = (cnt, budget) => cnt ? `<tr style="background:#fafafa;font-weight:700;border-top:2px solid #e5e5e5">
+            <td colspan="6" style="font-size:11px;padding:8px 10px">TOTAL (${cnt} WPs)</td>
+            <td style="font-size:11px;padding:8px 10px">${window.__isViewer?'—':Fmt.money(budget)}</td>
             <td colspan="2"></td>
           </tr>` : '';
-          tbody.innerHTML = html || '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+          const wpNoSortFlat = (a,b) => (a.wp_no||'').localeCompare((b.wp_no||''), undefined, {numeric:true, sensitivity:'base'});
+          if (_idxBlGroupByTrade) {
+            let html = '';
+            tradeSeq.forEach(trade => {
+              const tWps = tradeGroups.get(trade);
+              const collapsed = !!_blCollapseState.get(trade);
+              const tBudget = tWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+              const ind = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;float:right;margin-left:4px">${collapsed?'+':'−'}</span>`;
+              const budgeLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:10px;color:#888;font-weight:400">${Fmt.money(tBudget)}</span>`;
+              html += `<tr onclick="toggleBlGroup(this.dataset.trade)" data-trade="${trade.replace(/"/g,'&quot;')}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
+                <td colspan="9" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
+                  ${trade}${ind}
+                  <span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${tWps.length} WPs</span>
+                  ${budgeLabel}
+                </td></tr>`;
+              if (!collapsed) tWps.forEach(w => { html += _renderBlRow(w); });
+            });
+            html += _totalRow(rows.length, totalBudget);
+            tbody.innerHTML = html || '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+          } else {
+            // Flat mode: combine all groups, re-sort by selected sort option
+            const flat = [];
+            tradeSeq.forEach(t => flat.push(...(tradeGroups.get(t)||[])));
+            flat.sort((a,b) => {
+              let cmp = 0;
+              if(sortBy==='date') cmp = (a.awarding_date||'9999')<(b.awarding_date||'9999')?-1:(a.awarding_date||'9999')>(b.awarding_date||'9999')?1:0;
+              else if(sortBy==='budget') cmp = (b.approved_budget_bcb||0)-(a.approved_budget_bcb||0);
+              else if(sortBy==='desc') cmp = (a.description||'').localeCompare(b.description||'');
+              else if(sortBy==='trade') cmp = (a.trade||'').localeCompare(b.trade||'');
+              else { const agA=a.awarding_date?(now-new Date(a.awarding_date)):-Infinity; const agB=b.awarding_date?(now-new Date(b.awarding_date)):-Infinity; cmp=agB-agA; }
+              return cmp !== 0 ? cmp : wpNoSortFlat(a,b);
+            });
+            const flatBudget = flat.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+            tbody.innerHTML = flat.map(_renderBlRow).join('') + _totalRow(flat.length, flatBudget) || '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+          }
         };
         window.renderBlTable();
       } else if (tab === 'budget') {
@@ -2232,6 +2265,21 @@
 <style>
   .hide-mobile { }
   @media(max-width:480px) { .hide-mobile { display:none; } }
+
+  /* ── Overview tab compact layout ── */
+  .ov-cost-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .ov-cost-grid .metric-card { padding:12px 14px; }
+  .ov-cost-grid .metric-value { font-size:18px !important; }
+  .ov-wp-panel { background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); padding:14px 16px; }
+  .ov-wp-body { display:flex; gap:16px; align-items:flex-start; }
+  .ov-donut-wrap { flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  @media (max-width:767px) {
+    .ov-cost-grid { grid-template-columns:repeat(2,1fr); }
+    .ov-cost-grid .metric-value { font-size:16px !important; }
+    .ov-wp-body { flex-direction:column; }
+    .ov-donut-wrap { align-self:center; }
+    .ov-donut-wrap canvas { width:180px !important; height:180px !important; }
+  }
 
   /* Viewer mode — hide all cost data */
   body.viewer-mode #metrics-cost-group { display:none !important; }

@@ -268,16 +268,16 @@ function buildRankList(id, items, colorClass, fmtVal) {
   if (!el) return;
   if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:12px;padding:8px 0">No data</div>'; return; }
   el.innerHTML = items.map((item,i)=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5">
-      <span style="font-size:11px;color:#aaa;font-weight:600;width:16px">${i+1}</span>
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5">
+      <span style="font-size:11px;color:#aaa;font-weight:600;width:16px;flex-shrink:0;margin-top:2px">${i+1}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:600;color:#231F20;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
         <div style="font-size:10px;color:#888">${item.sub}</div>
+        ${item.bcb!=null&&item.awarded!=null?`<div style="font-size:10px;color:#aaa;margin-top:2px;white-space:nowrap">BCB ${Fmt.money(item.bcb)} → Awd ${Fmt.money(item.awarded)}</div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div style="font-size:12px;font-weight:700;color:${item.color};white-space:nowrap">${fmtVal(item.val)}</div>
-        ${item.bcb!=null?`<div style="font-size:10px;color:#aaa;white-space:nowrap">BCB: ${Fmt.money(item.bcb)}</div>`:''}
-        ${item.pct!=null?`<div style="font-size:10px;font-weight:600;color:${item.color};opacity:.75;white-space:nowrap">${item.pct}</div>`:''}
+        ${item.pct!=null?`<div style="font-size:10px;font-weight:600;color:${item.color};white-space:nowrap">${item.pct}</div>`:''}
       </div>
     </div>`).join('');
 }
