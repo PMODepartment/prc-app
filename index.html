@@ -148,12 +148,8 @@
             <div>
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Work Package Status</div>
               <div class="ov-wp-split">
-                <div class="ov-donut-card">
-                  <div style="display:flex;gap:4px;margin-bottom:8px">
-                    <button id="idx-ov-btn-wp" onclick="setIdxOvChartMode('wp')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">% by WP</button>
-                    <button id="idx-ov-btn-val" onclick="setIdxOvChartMode('val')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">% by Value</button>
-                  </div>
-                  <div style="position:relative;width:170px;height:170px"><canvas id="c-idx-ov-donut"></canvas></div>
+                <div class="ov-donut-card" style="flex:0 0 auto;padding:14px 18px">
+                  <div id="idx-ov-battery-charts"></div>
                 </div>
                 <div id="metrics-wp" class="ov-stats-card"></div>
               </div>
@@ -937,71 +933,47 @@
     let _idxBlPeriodMode = 'quarterly';
     let _idxBudPeriodMode = 'monthly';
     let _idxSchPeriodMode = 'monthly';
-    let _idxOvChartMode = 'wp';
-    let _idxOvChartInst = null;
-
-    function renderIdxOvDonut(wps) {
-      const canvas = document.getElementById('c-idx-ov-donut');
-      if(!canvas) return;
-      if(_idxOvChartInst) { _idxOvChartInst.destroy(); _idxOvChartInst = null; }
-      const mode = _idxOvChartMode;
-      const now = new Date();
+    function renderIdxOvBattery(wps) {
+      const el = document.getElementById('idx-ov-battery-charts');
+      if(!el) return;
+      const today = new Date();
       const total = wps.length;
-      const awardedWPs = wps.filter(w=>w.award_status==='Awarded');
-      const dueN = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<=now).length;
-      const notDueN = total - awardedWPs.length - dueN;
-      let data, pct;
-      if(mode==='wp') {
-        data = [awardedWPs.length, dueN, notDueN];
-        pct = total ? Math.round(awardedWPs.length/total*100) : 0;
-      } else {
-        const bcb = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-        const awd = awardedWPs.reduce((s,w)=>s+(w.total_awarded||0),0);
-        const dueBcb = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<=now).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-        const notDueBcb = Math.max(0, bcb - awd - dueBcb);
-        data = [awd, dueBcb, notDueBcb];
-        pct = bcb ? Math.round(awd/bcb*100) : 0;
-      }
-      _idxOvChartInst = new Chart(canvas.getContext('2d'), {
-        type: 'doughnut',
-        data: {
-          labels: ['Awarded','Due Not Awarded','Not Due'],
-          datasets: [{ data, backgroundColor: ['#2D9B6F','#EE3124','#D1D5DB'], borderWidth: 2, borderColor: '#fff' }]
-        },
-        options: {
-          responsive: false, cutout: '68%',
-          plugins: {
-            legend: { display: true, position: 'bottom', labels: { font:{size:10}, boxWidth:11, padding:8 } },
-            datalabels: { display: false }
-          }
-        },
-        plugins: [{
-          id: 'idxOvCenter',
-          afterDraw(chart) {
-            const {width, height, ctx} = chart;
-            ctx.save();
-            const cy = (height - (chart.legend?.height||50)) / 2;
-            ctx.font = `700 ${Math.round(height*0.13)}px Montserrat,sans-serif`;
-            ctx.fillStyle = '#231F20'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(pct+'%', width/2, cy - 5);
-            ctx.font = `500 ${Math.round(height*0.065)}px Montserrat,sans-serif`;
-            ctx.fillStyle = '#888';
-            ctx.fillText('Awarded', width/2, cy + height*0.085);
-            ctx.restore();
-          }
-        }]
-      });
-    }
+      const awardedN = wps.filter(w=>w.award_status==='Awarded').length;
+      const dueN = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+      const bcb = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+      const awd = wps.filter(w=>w.award_status==='Awarded').reduce((s,w)=>s+(w.total_awarded||0),0);
+      const dueBcb = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+      const wpPct   = total ? Math.round(awardedN/total*100) : 0;
+      const valPct  = bcb   ? Math.round(awd/bcb*100) : 0;
+      const wpDuePct  = total ? Math.round(dueN/total*100) : 0;
+      const valDuePct = bcb   ? Math.round(dueBcb/bcb*100) : 0;
 
-    window.setIdxOvChartMode = function(mode) {
-      _idxOvChartMode = mode;
-      const on = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
-      const off = 'font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
-      const bw = document.getElementById('idx-ov-btn-wp'), bv = document.getElementById('idx-ov-btn-val');
-      if(bw) bw.style.cssText = mode==='wp' ? on : off;
-      if(bv) bv.style.cssText = mode==='val' ? on : off;
-      if(window._idxOvWPs) renderIdxOvDonut(window._idxOvWPs);
-    };
+      function battery(pctAwd, pctDue, title, sub) {
+        const pctND = Math.max(0, 100 - pctAwd - pctDue);
+        const textColor = pctAwd > 55 ? '#fff' : '#231F20';
+        return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div style="font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;text-align:center">${title}</div>
+          <div style="position:relative;width:68px;height:160px;border:2.5px solid #bbb;border-radius:12px;overflow:hidden;background:#e8e8e8">
+            <div style="position:absolute;top:0;left:0;right:0;height:${pctND}%;background:#D1D5DB;min-height:${pctND>0?2:0}px"></div>
+            <div style="position:absolute;top:${pctND}%;left:0;right:0;height:${pctDue}%;background:#EE3124;opacity:.9;min-height:${pctDue>0?2:0}px"></div>
+            <div style="position:absolute;bottom:0;left:0;right:0;height:${pctAwd}%;background:linear-gradient(to top,#1a7a50,#2D9B6F,#4ac98a);min-height:${pctAwd>0?2:0}px"></div>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:20px;font-weight:700;color:${textColor};text-shadow:0 1px 3px rgba(0,0,0,.25);white-space:nowrap;pointer-events:none">${pctAwd}%</div>
+          </div>
+          <div style="font-size:10px;color:#666;text-align:center;font-weight:600">${sub}</div>
+        </div>`;
+      }
+
+      el.innerHTML = `
+        <div style="display:flex;gap:22px;justify-content:center;align-items:flex-start">
+          ${battery(wpPct,  wpDuePct,  '% by WP',   `${awardedN} / ${total} WPs`)}
+          ${battery(valPct, valDuePct, '% by Value', `${Fmt.money(awd)} / ${Fmt.money(bcb)}`)}
+        </div>
+        <div style="display:flex;gap:12px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:4px"><div style="width:9px;height:9px;border-radius:2px;background:#2D9B6F"></div><span style="font-size:10px;color:#555">Awarded</span></div>
+          <div style="display:flex;align-items:center;gap:4px"><div style="width:9px;height:9px;border-radius:2px;background:#EE3124"></div><span style="font-size:10px;color:#555">Due Not Awarded</span></div>
+          <div style="display:flex;align-items:center;gap:4px"><div style="width:9px;height:9px;border-radius:2px;background:#D1D5DB"></div><span style="font-size:10px;color:#555">Not Due Yet</span></div>
+        </div>`;
+    }
 
     function _idxDashRenderPeriod(wps) {
       const titleEl = document.getElementById('idx-dash-period-title');
@@ -1945,8 +1917,7 @@
       }
 
       // Portfolio donut chart
-      window._idxOvWPs = filtWPs;
-      renderIdxOvDonut(filtWPs);
+      renderIdxOvBattery(filtWPs);
 
       // Project Cards
       const cardsEl = document.getElementById('project-cards');
