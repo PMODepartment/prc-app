@@ -717,14 +717,11 @@ function buildMetrics(wps){
   const total = wps.length;
   const awarded = wps.filter(w=>w.award_status==='Awarded').length;
   const totalBudget = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-  const plannedAward = wps.filter(w=>w.awarding_date&&new Date(w.awarding_date)<=today)
-                          .reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   const budgetForAwarded = wps.filter(w=>w.award_status==='Awarded')
                               .reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   const actualAward = wps.filter(w=>w.award_status==='Awarded')
                          .reduce((s,w)=>s+(w.total_awarded||0),0);
   const variance = budgetForAwarded - actualAward;
-  const pctVar = budgetForAwarded ? ((variance/budgetForAwarded)*100) : 0;
   const dueNotAwarded = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
   const notDue = total - awarded - dueNotAwarded;
 
@@ -732,36 +729,43 @@ function buildMetrics(wps){
 
   const costCards = [
     card('Procurement Budget (BCB)', fmt(totalBudget), ''),
-    card('Planned Award', fmt(plannedAward), ''),
     card('Actual Award', fmt(actualAward), 'green'),
     card('Budget for Awarded WP', fmt(budgetForAwarded), ''),
     card('Variance', (variance>=0?'+₱':'-₱')+(Math.abs(variance)/1e6).toFixed(2)+'M', variance>=0?'green':'red'),
-    card('%Variance', (pctVar>=0?'+':'')+pctVar.toFixed(1)+'%', pctVar>=0?'green':'red'),
   ].join('');
 
   const costEl = document.getElementById('metrics-cost');
   if(costEl) costEl.innerHTML = costCards;
 
-  // WP Status — compact table card
+  // WP Status — optimized compact card with progress bar
+  const awardRate = total ? Math.round(awarded/total*100) : 0;
   const wpEl = document.getElementById('metrics-wp');
   if(wpEl) wpEl.innerHTML = `
     <div style="background:#fff;border:1px solid var(--border-md);border-radius:var(--radius-md);overflow:hidden">
+      <div style="padding:10px 14px;background:#fafafa;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em">Total WP</span>
+        <span style="font-size:20px;font-weight:700;color:#231F20">${total}</span>
+      </div>
+      <div style="padding:8px 14px;border-bottom:1px solid #f0f0f0">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#888;margin-bottom:5px">
+          <span style="font-weight:600">Award Rate</span><span style="font-weight:700;color:#2D9B6F">${awardRate}%</span>
+        </div>
+        <div style="height:5px;background:#f0f0f0;border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${awardRate}%;background:#2D9B6F;border-radius:3px;transition:width .4s"></div>
+        </div>
+      </div>
       <table style="width:100%;border-collapse:collapse">
         <tr style="border-bottom:1px solid #f0f0f0">
-          <td style="padding:9px 14px;font-size:11px;color:#555;font-weight:600">Total WP</td>
-          <td style="padding:9px 14px;font-size:15px;font-weight:700;color:#231F20;text-align:right">${total}</td>
+          <td style="padding:8px 14px;font-size:11px;color:#555;font-weight:600"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#2D9B6F;margin-right:7px;vertical-align:middle"></span>Awarded</td>
+          <td style="padding:8px 14px;font-size:15px;font-weight:700;color:#2D9B6F;text-align:right">${awarded}</td>
         </tr>
         <tr style="border-bottom:1px solid #f0f0f0">
-          <td style="padding:9px 14px;font-size:11px;color:#555;font-weight:600">Awarded WP</td>
-          <td style="padding:9px 14px;font-size:15px;font-weight:700;color:#2D9B6F;text-align:right">${awarded}</td>
-        </tr>
-        <tr style="border-bottom:1px solid #f0f0f0">
-          <td style="padding:9px 14px;font-size:11px;color:#555;font-weight:600">Due Not Awarded</td>
-          <td style="padding:9px 14px;font-size:15px;font-weight:700;color:${dueNotAwarded>0?'#EE3124':'#231F20'};text-align:right">${dueNotAwarded}</td>
+          <td style="padding:8px 14px;font-size:11px;color:#555;font-weight:600"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#EE3124;margin-right:7px;vertical-align:middle"></span>Due Not Awarded</td>
+          <td style="padding:8px 14px;font-size:15px;font-weight:700;color:${dueNotAwarded>0?'#EE3124':'#231F20'};text-align:right">${dueNotAwarded}</td>
         </tr>
         <tr>
-          <td style="padding:9px 14px;font-size:11px;color:#555;font-weight:600">Not Due</td>
-          <td style="padding:9px 14px;font-size:15px;font-weight:700;color:#888;text-align:right">${notDue}</td>
+          <td style="padding:8px 14px;font-size:11px;color:#555;font-weight:600"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#D1D5DB;margin-right:7px;vertical-align:middle"></span>Not Due</td>
+          <td style="padding:8px 14px;font-size:15px;font-weight:700;color:#888;text-align:right">${notDue}</td>
         </tr>
       </table>
     </div>`;

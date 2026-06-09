@@ -1785,25 +1785,20 @@
       const now             = new Date();
       const awarded         = filtWPs.filter(w => w.award_status === 'Awarded');
       const totalBCB        = filtWPs.reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
-      const plannedAward    = filtWPs.filter(w => w.awarding_date && new Date(w.awarding_date) <= now)
-                                     .reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
       const budgetForAwarded = awarded.reduce((s,w) => s + (w.approved_budget_bcb||0), 0);
       const totalAwd        = awarded.reduce((s,w) => s + (w.total_awarded||0), 0);
       const variance        = budgetForAwarded - totalAwd;
-      const pctVar          = budgetForAwarded ? ((variance / budgetForAwarded) * 100) : 0;
       const dueNotAwd       = filtWPs.filter(w => w.award_status !== 'Awarded' && w.awarding_date && new Date(w.awarding_date) <= now).length;
       const notDue          = filtWPs.length - awarded.length - dueNotAwd;
 
-      // Cost Overview KPI cards
+      // Cost Overview KPI cards — 4 cards: BCB, Actual Award, Budget for Awarded WP, Variance
       const card = (lbl,val,cls) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls}">${val}</div></div>`;
       const costEl = document.getElementById('metrics-cost');
       if(costEl) costEl.innerHTML = [
         card('Procurement Budget (BCB)', Fmt.moneyFull(totalBCB), ''),
-        card('Planned Award', Fmt.moneyFull(plannedAward), ''),
         card('Actual Award', Fmt.moneyFull(totalAwd), 'green'),
         card('Budget for Awarded WP', Fmt.moneyFull(budgetForAwarded), ''),
         card('Variance', (variance>=0?'+₱':'-₱')+Fmt.moneyFull(Math.abs(variance)).replace('₱',''), variance>=0?'green':'red'),
-        card('%Variance', (pctVar>=0?'+':'')+pctVar.toFixed(1)+'%', pctVar>=0?'green':'red'),
       ].join('');
 
       // WP Status — compact per-project cards
@@ -1817,10 +1812,19 @@
             const s = allStats[i];
             const pDue = s.late || 0;
             const pNotDue = (s.total||0) - (s.awarded||0) - pDue;
+            const rate = s.total ? Math.round((s.awarded||0)/s.total*100) : 0;
             return `<div style="border-bottom:2px solid #f0f0f0">
-              <div style="padding:7px 12px;background:#f8f8f8;display:flex;align-items:center;gap:6px">
-                <span style="font-size:10px;font-weight:700;color:#EE3124">${p.id}</span>
-                <span style="font-size:10px;color:#555;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name&&p.name!==p.id?p.name.split('—')[0].trim():''}</span>
+              <div style="padding:7px 12px;background:#f8f8f8;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:6px">
+                <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
+                  <span style="font-size:10px;font-weight:700;color:#EE3124;flex-shrink:0">${p.id}</span>
+                  <span style="font-size:10px;color:#555;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name&&p.name!==p.id?p.name.split('—')[0].trim():''}</span>
+                </div>
+                <span style="font-size:11px;font-weight:700;color:#2D9B6F;flex-shrink:0">${rate}%</span>
+              </div>
+              <div style="padding:5px 12px;border-bottom:1px solid #f0f0f0">
+                <div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden">
+                  <div style="height:100%;width:${rate}%;background:#2D9B6F;border-radius:2px"></div>
+                </div>
               </div>
               <div style="${rowStyle}"><span style="color:#555;font-weight:600">Total WP</span><strong style="color:#231F20">${s.total}</strong></div>
               <div style="${rowStyle}"><span style="color:#555;font-weight:600">Awarded WP</span><strong style="color:#2D9B6F">${s.awarded}</strong></div>
