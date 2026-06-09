@@ -233,7 +233,7 @@ Lazy rendering: `_rendered` flags per tab — charts render on first open, reset
 
 | Tab | Key content |
 |---|---|
-| Overview | Cost KPIs (6) + WP Status KPIs (6) + project cards/table |
+| Overview | Cost KPIs (6): Procurement Budget (BCB), Planned Award, Actual Award, Budget for Awarded WP, Variance, %Variance. WP Status: compact per-project cards (Total WP / Awarded WP / Due Not Awarded / Not Due) + toggleable donut chart (% by WP / % by Value). Then project cards/table below. |
 | Dashboard | Period chart + WP by Trade bar + WP by Status donut + backlog table + Top 5 panels |
 | Backlog | Backlog table + aging chart + status donut + period chart + submittal donut |
 | Budget | Cost KPIs + budget-by-period + budget-by-trade HBar + Budget vs Awarded by Project grouped bar + budget table by trade |
@@ -264,7 +264,7 @@ Lazy rendering: `_rendered` flags per tab — charts render on first open, reset
 
 Tabs: Overview → Dashboard → Backlog → WP List
 
-- **Overview**: Cost KPIs (6) + WP Status KPIs (6). No charts.
+- **Overview**: Cost KPIs (6): Procurement Budget (BCB), Planned Award, Actual Award, Budget for Awarded WP, Variance, %Variance. WP Status: compact card (Total WP / Awarded WP / Due Not Awarded / Not Due) + toggleable donut chart (% by WP / % by Value, canvas `c-ov-donut`, instance `_ovChartInst`, toggle `setOvChartMode()`). Donut renders in `renderOvDonut(wps)`, called from `buildMetrics`.
 - **Dashboard**: Period chart + WP by Trade + WP by Status donut + backlog table + Top 5 panels
 - **Backlog**: Filter bar (Trade, Sort, Search, Budget min/max) + backlog table + aging/status/period/submittal charts. `renderBacklog()` applies filters. Collapsible trade groups.
 - **WP List**: 5 view tabs (Overview/Award/Schedule/Submittals/All). `WP_TABLE_VIEWS` + `getActiveCols()`. `setWPTableView(view)`. `buildTable()` renders colgroup + thead + tbody via `innerHTML` exactly like `renderWPMonTable()` in `index.html` — uses `_stickyLeft` dict (never mutates col objects), `renderCell` switch, `white-space:normal` on `<th>`. Trade group header splits into sticky + non-sticky cells. Also populates `#proj-wp-cards` (mobile card view — same paged items, CSS toggles visibility). `openWPDetail(w)` slide-in panel.
