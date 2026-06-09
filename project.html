@@ -254,8 +254,8 @@
               </table>
             </div>
           </div>
-          <!-- Top 5 panels — equal widths -->
-          <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px">
+          <!-- Top 5 panels — equal widths, equal heights -->
+          <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:14px">
             <div class="panel" style="flex:1;min-width:200px">
               <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
               <div class="rank-list" id="rank-value"></div>
@@ -1018,22 +1018,22 @@ window.renderDashBacklog = function() {
 function renderTop5(wps){
   const withBoth = wps.filter(w=>w.approved_budget_bcb>0&&w.total_awarded>0);
   const variance = w => (w.approved_budget_bcb||0)-(w.total_awarded||0);
-  buildRankList('rank-value',
+  buildRankTable('rank-value',
     [...wps].filter(w=>w.total_awarded>0).sort((a,b)=>(b.total_awarded||0)-(a.total_awarded||0)).slice(0,5)
-      .map(w=>({name:w.description,sub:w.wp_no+(w.trade?' · '+w.trade:''),val:w.total_awarded,color:'#282C28'})),
-    'dark', v=>Fmt.money(v));
-  buildRankList('rank-gains',
+      .map(w=>({name:w.description,sub:w.wp_no+(w.trade?' · '+w.trade:''),val:w.total_awarded})),
+    'value');
+  buildRankTable('rank-gains',
     withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
-      .map(w=>({name:w.description,sub:w.wp_no+' · '+w.trade,val:variance(w),color:'#2D9B6F',
+      .map(w=>({name:w.description,sub:w.wp_no+' · '+w.trade,val:variance(w),
         bcb:w.approved_budget_bcb, awarded:w.total_awarded,
         pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
-    'green', v=>'+'+Fmt.money(v));
-  buildRankList('rank-losses',
+    'savings');
+  buildRankTable('rank-losses',
     withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
-      .map(w=>({name:w.description,sub:w.wp_no+' · '+w.trade,val:Math.abs(variance(w)),color:'#EE3124',
+      .map(w=>({name:w.description,sub:w.wp_no+' · '+w.trade,val:Math.abs(variance(w)),
         bcb:w.approved_budget_bcb, awarded:w.total_awarded,
         pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%'})),
-    'red', v=>'-'+Fmt.money(v));
+    'loss');
 }
 
 function renderBacklog(){
