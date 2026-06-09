@@ -148,10 +148,9 @@
             <div>
               <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:8px;padding-left:2px">Work Package Status</div>
               <div class="ov-wp-split">
-                <div class="ov-donut-card" style="flex:0 0 auto;padding:14px 18px">
-                  <div id="idx-ov-battery-charts"></div>
-                </div>
-                <div id="metrics-wp" class="ov-stats-card"></div>
+                <div class="ov-donut-card" style="flex:0 0 auto;padding:14px 16px" id="idx-ov-battery-wp"></div>
+                <div class="ov-donut-card" style="flex:0 0 auto;padding:14px 16px" id="idx-ov-battery-val"></div>
+                <div id="metrics-wp" class="ov-stats-card" style="flex:1;min-width:180px"></div>
               </div>
             </div>
           </div>
@@ -934,8 +933,6 @@
     let _idxBudPeriodMode = 'monthly';
     let _idxSchPeriodMode = 'monthly';
     function renderIdxOvBattery(wps) {
-      const el = document.getElementById('idx-ov-battery-charts');
-      if(!el) return;
       const today = new Date();
       const total = wps.length;
       const awardedN = wps.filter(w=>w.award_status==='Awarded').length;
@@ -943,36 +940,38 @@
       const bcb = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
       const awd = wps.filter(w=>w.award_status==='Awarded').reduce((s,w)=>s+(w.total_awarded||0),0);
       const dueBcb = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-      const wpPct   = total ? Math.round(awardedN/total*100) : 0;
-      const valPct  = bcb   ? Math.round(awd/bcb*100) : 0;
+      const wpPct     = total ? Math.round(awardedN/total*100) : 0;
+      const valPct    = bcb   ? Math.round(awd/bcb*100) : 0;
       const wpDuePct  = total ? Math.round(dueN/total*100) : 0;
       const valDuePct = bcb   ? Math.round(dueBcb/bcb*100) : 0;
 
-      function battery(pctAwd, pctDue, title, sub) {
+      const LEGEND = `<div style="display:flex;flex-direction:column;gap:4px;margin-top:8px">
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;flex-shrink:0;background:#2D9B6F"></div><span style="font-size:10px;color:#555">Awarded</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;flex-shrink:0;background:#EE3124"></div><span style="font-size:10px;color:#555">Due Not Awarded</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;flex-shrink:0;background:#D1D5DB"></div><span style="font-size:10px;color:#555">Not Due Yet</span></div>
+      </div>`;
+
+      function batteryCard(elId, pctAwd, pctDue, title, countLine, valLine) {
+        const el = document.getElementById(elId);
+        if(!el) return;
         const pctND = Math.max(0, 100 - pctAwd - pctDue);
         const textColor = pctAwd > 55 ? '#fff' : '#231F20';
-        return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:6px">
           <div style="font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;text-align:center">${title}</div>
-          <div style="position:relative;width:68px;height:160px;border:2.5px solid #bbb;border-radius:12px;overflow:hidden;background:#e8e8e8">
+          <div style="position:relative;width:72px;height:170px;border:2.5px solid #bbb;border-radius:12px;overflow:hidden;background:#e8e8e8">
             <div style="position:absolute;top:0;left:0;right:0;height:${pctND}%;background:#D1D5DB;min-height:${pctND>0?2:0}px"></div>
             <div style="position:absolute;top:${pctND}%;left:0;right:0;height:${pctDue}%;background:#EE3124;opacity:.9;min-height:${pctDue>0?2:0}px"></div>
             <div style="position:absolute;bottom:0;left:0;right:0;height:${pctAwd}%;background:linear-gradient(to top,#1a7a50,#2D9B6F,#4ac98a);min-height:${pctAwd>0?2:0}px"></div>
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:20px;font-weight:700;color:${textColor};text-shadow:0 1px 3px rgba(0,0,0,.25);white-space:nowrap;pointer-events:none">${pctAwd}%</div>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px;font-weight:700;color:${textColor};text-shadow:0 1px 3px rgba(0,0,0,.25);white-space:nowrap;pointer-events:none">${pctAwd}%</div>
           </div>
-          <div style="font-size:10px;color:#666;text-align:center;font-weight:600">${sub}</div>
+          <div style="font-size:11px;color:#231F20;font-weight:700;text-align:center">${countLine}</div>
+          ${valLine ? `<div style="font-size:10px;color:#888;text-align:center">${valLine}</div>` : ''}
+          ${LEGEND}
         </div>`;
       }
 
-      el.innerHTML = `
-        <div style="display:flex;gap:22px;justify-content:center;align-items:flex-start">
-          ${battery(wpPct,  wpDuePct,  '% by WP',   `${awardedN} / ${total} WPs`)}
-          ${battery(valPct, valDuePct, '% by Value', `${Fmt.money(awd)} / ${Fmt.money(bcb)}`)}
-        </div>
-        <div style="display:flex;gap:12px;justify-content:center;margin-top:10px;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:4px"><div style="width:9px;height:9px;border-radius:2px;background:#2D9B6F"></div><span style="font-size:10px;color:#555">Awarded</span></div>
-          <div style="display:flex;align-items:center;gap:4px"><div style="width:9px;height:9px;border-radius:2px;background:#EE3124"></div><span style="font-size:10px;color:#555">Due Not Awarded</span></div>
-          <div style="display:flex;align-items:center;gap:4px"><div style="width:9px;height:9px;border-radius:2px;background:#D1D5DB"></div><span style="font-size:10px;color:#555">Not Due Yet</span></div>
-        </div>`;
+      batteryCard('idx-ov-battery-wp',  wpPct,  wpDuePct,  '% by WP',    `${awardedN} / ${total} WPs`, '');
+      batteryCard('idx-ov-battery-val', valPct, valDuePct, '% by Value',  `${Fmt.money(awd)}`, `of ${Fmt.money(bcb)} BCB`);
     }
 
     function _idxDashRenderPeriod(wps) {
