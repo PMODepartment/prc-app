@@ -1877,27 +1877,21 @@
         if(!filt.length) {
           wpEl.innerHTML = '<div style="padding:16px;text-align:center;color:#aaa;font-size:11px">No projects selected</div>';
         } else {
-          const cell = (label, val, color) => `<div style="padding:10px 14px">
-            <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">${label}</div>
-            <div style="font-size:22px;font-weight:700;color:${color}">${val}</div>
-          </div>`;
-          const cellSm = (label, val, color) => `<div style="padding:8px 14px">
-            <div style="font-size:10px;color:#888;font-weight:600;margin-bottom:3px">${label}</div>
-            <div style="font-size:18px;font-weight:700;color:${color}">${val}</div>
-          </div>`;
-          wpEl.innerHTML = `
-            <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #f0f0f0">
-              <div style="border-right:1px solid #f0f0f0">${cell('Total WP', filtWPs.length, '#231F20')}</div>
-              <div>${cell('Awarded WP', awarded.length, '#2D9B6F')}</div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #f0f0f0">
-              <div style="border-right:1px solid #f0f0f0">${cellSm('WP Due Not Awarded', dueNotAwd, dueNotAwd>0?'#EE3124':'#888')}</div>
-              <div>${cellSm('WP Not Due', notDue, '#888')}</div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr">
-              <div style="border-right:1px solid #f0f0f0">${cellSm('% Awarded by WP', pctByWP+'%', '#2D9B6F')}</div>
-              <div>${cellSm('% Awarded by Value', pctByVal+'%', '#2D9B6F')}</div>
+          const row = (label1, val1, color1, label2, val2, color2, last) => `
+            <div style="display:grid;grid-template-columns:1fr 1fr;flex:1;${last?'':'border-bottom:1px solid #f0f0f0'}">
+              <div style="border-right:1px solid #f0f0f0;padding:12px 14px;display:flex;flex-direction:column;justify-content:center">
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#aaa;margin-bottom:4px">${label1}</div>
+                <div style="font-size:22px;font-weight:700;color:${color1};line-height:1">${val1}</div>
+              </div>
+              <div style="padding:12px 14px;display:flex;flex-direction:column;justify-content:center">
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#aaa;margin-bottom:4px">${label2}</div>
+                <div style="font-size:22px;font-weight:700;color:${color2};line-height:1">${val2}</div>
+              </div>
             </div>`;
+          wpEl.innerHTML =
+            row('Total WP', filtWPs.length, '#231F20', 'Awarded WP', awarded.length, '#2D9B6F', false) +
+            row('WP Due Not Awarded', dueNotAwd, dueNotAwd>0?'#EE3124':'#888', 'WP Not Due', notDue, '#888', false) +
+            row('% Awarded by WP', pctByWP+'%', '#2D9B6F', '% Awarded by Value', pctByVal+'%', '#2D9B6F', true);
         }
       }
 
@@ -2319,14 +2313,14 @@
   .ov-cost-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
   .ov-cost-grid .metric-card { padding:12px 14px; }
   .ov-cost-grid .metric-value { font-size:16px !important; }
-  .ov-wp-split { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start; }
-  .ov-donut-card { flex:0 0 auto; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); padding:12px; display:flex; flex-direction:column; align-items:center; }
-  .ov-stats-card { flex:1; min-width:160px; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); overflow:hidden; }
+  .ov-wp-split { display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; }
+  .ov-donut-card { flex:0 0 auto; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); padding:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .ov-stats-card { flex:1; min-width:160px; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); overflow:hidden; display:flex; flex-direction:column; }
   @media (max-width:767px) {
     .ov-cost-grid { grid-template-columns:repeat(2,1fr); }
     .ov-cost-grid .metric-value { font-size:15px !important; }
     .ov-wp-split { flex-direction:column; align-items:stretch; }
-    .ov-donut-card { align-items:center; }
+    .ov-donut-card { align-items:center; justify-content:center; }
   }
 
   /* Viewer mode — hide all cost data */
