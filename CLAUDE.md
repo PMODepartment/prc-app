@@ -423,6 +423,8 @@ Public pages (login, register, pending, forgot-password) load UMD bundle inline 
 
 Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net, cdnjs.cloudflare.com; `dns-prefetch` for Supabase URL; `preload as="script"` for all body scripts.
 
+**Cache-busting (`?v=` query param)**: `charts.js` and `dashboard.css` includes (both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags) carry a `?v=YYYYMMDD<letter>` param in `index.html` and `project.html`. GitHub Pages + browser caching can serve a **stale** `assets/js/*.js` / `dashboard.css` for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees the old behavior — e.g. dark-mode chart bars still dark because the browser cached the previous `charts.js`). **When you change `charts.js` or `dashboard.css`, bump the `?v=` value in BOTH files** (`assets/js/charts.js?v=…` ×2 per file incl. preload, `assets/css/dashboard.css?v=…`) so browsers fetch the new file immediately. Current version: `20260610b`.
+
 ---
 
 ## Known Issues / Gotchas
