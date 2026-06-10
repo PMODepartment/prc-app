@@ -79,9 +79,34 @@
       .field-row{grid-template-columns:1fr}
       .field input{font-size:16px} /* prevent iOS zoom */
     }
+    /* ── Theme toggle ── */
+    .login-theme-toggle{position:fixed;top:16px;right:16px;z-index:60;width:40px;height:40px;border-radius:50%;border:1px solid #e5e5e5;background:#fff;color:#231F20;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.1);transition:background .18s,color .18s,border-color .18s}
+    .login-theme-toggle:hover{background:#f5f5f5}
+    /* ── Dark mode (html.dark-mode set by anti-flash before render) ── */
+    html.dark-mode,html.dark-mode body{background:#1C1C1C}
+    html.dark-mode .form-wrap{background:#161616}
+    html.dark-mode .form-title{color:#F0EFEF}
+    html.dark-mode .form-sub{color:#9B9999}
+    html.dark-mode .field label{color:#9B9999}
+    html.dark-mode .field input{background:#2B2C2B;color:#F0EFEF;border-color:rgba(255,255,255,.16)}
+    html.dark-mode .field input::placeholder{color:#777}
+    html.dark-mode .field input.error-field{background:#3D1A19;border-color:#EE3124}
+    html.dark-mode .field-hint{color:#888}
+    html.dark-mode .pw-toggle{color:#888}
+    html.dark-mode .pw-toggle:hover{color:#bbb}
+    html.dark-mode .strength-bar{background:#333433}
+    html.dark-mode .form-footer{color:#9B9999}
+    html.dark-mode .msg.error{background:#3D1A19;color:#FCA5A5}
+    html.dark-mode .msg.success{background:#102B1F;color:#6EE7B7}
+    html.dark-mode .login-theme-toggle{background:#2B2C2B;color:#DCDBDB;border-color:rgba(255,255,255,.16)}
+    html.dark-mode .login-theme-toggle:hover{background:#333433}
   </style>
+  <script>
+    (function(){ try { var t=localStorage.getItem('wpm_theme_last'); var dark=t==='dark'||(t===null&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches); if(dark)document.documentElement.classList.add('dark-mode'); } catch(e){} })();
+  </script>
 </head>
 <body>
+<button class="login-theme-toggle" id="loginThemeToggle" onclick="toggleLoginTheme()" aria-label="Toggle dark mode" title="Switch to dark mode"></button>
 <div class="page">
 
   <!-- Left: branding -->
@@ -156,6 +181,19 @@ const sb = window.supabase.createClient(
   'https://cayjeqeleenizbdzrums.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw'
 );
+
+/* ── Theme toggle (per-device, shares wpm_theme_last with the dashboard) ── */
+var _SUN='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg>';
+var _MOON='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+function _loginApply(dark, persist){
+  document.documentElement.classList.toggle('dark-mode', dark);
+  document.body.classList.toggle('dark-mode', dark);
+  var b=document.getElementById('loginThemeToggle');
+  if(b){ b.innerHTML = dark?_SUN:_MOON; b.title = dark?'Switch to light mode':'Switch to dark mode'; }
+  if(persist){ try{ localStorage.setItem('wpm_theme_last', dark?'dark':'light'); }catch(e){} }
+}
+function toggleLoginTheme(){ _loginApply(!document.documentElement.classList.contains('dark-mode'), true); }
+_loginApply(document.documentElement.classList.contains('dark-mode'), false);
 
 // ── Password show/hide ─────────────────────────────────────────
 window.togglePw = function(id, btn) {
