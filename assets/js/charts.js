@@ -12,9 +12,11 @@ const Charts = (() => {
     destroy(id);
     const ctx=document.getElementById(id);
     if(!ctx)return;
+    // Apply dark-mode colours to the CONFIG before construction. Chart.js v4 caches bar element options,
+    // so mutating dataset.backgroundColor after creation + update() fails to recolour bar fills (only line
+    // strokes re-resolve). Baking the colours into the config before `new Chart()` avoids that entirely.
+    if (document.body.classList.contains('dark-mode')) _themeConfig(cfg, true);
     reg[id]=new Chart(ctx.getContext('2d'),cfg);
-    // Charts created while dark mode is active (lazy tab render) need the dark transforms applied immediately
-    if (document.body.classList.contains('dark-mode')) { _applyThemeToChart(reg[id], true); reg[id].update('none'); }
     return reg[id];
   }
 
@@ -31,26 +33,31 @@ const Charts = (() => {
     return c;
   }
 
-  // Apply (or revert) dark-mode colors to a single chart's options + datasets.
-  // Originals are cached on the dataset (_origBg / _origBorder) so light mode restores exactly.
-  function _applyThemeToChart(chart, dark) {
+  // Apply (or revert) dark-mode colours to a chart CONFIG — used both before construction (in make)
+  // and before re-creation on theme toggle (in updateTheme). Operating on the config rather than a live
+  // chart sidesteps Chart.js v4's bar element-option caching, which otherwise leaves bar FILLS stuck at
+  // their original colour after update() (the line STROKES re-resolve, the bars don't — hence the bug
+  // where Budget(BCB)/Planned bars stayed near-black on dark). Originals are cached on each dataset
+  // (_origBg / _origBorder) so light mode restores exactly, and re-running is idempotent.
+  function _themeConfig(cfg, dark) {
     const text = dark ? '#DCDBDB' : '#231F20';
     const grid = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
-    if (chart.options.scales) {
-      Object.values(chart.options.scales).forEach(s => {
+    const opts = cfg.options || {};
+    if (opts.scales) {
+      Object.values(opts.scales).forEach(s => {
         if (s.ticks) s.ticks.color = s.ticks.color === 'rgba(0,0,0,0)' ? s.ticks.color : text;
         if (s.grid)  s.grid.color  = grid;
         if (s.title) s.title.color = text;
       });
     }
-    const leg = chart.options.plugins && chart.options.plugins.legend;
+    const leg = opts.plugins && opts.plugins.legend;
     if (leg && leg.labels) leg.labels.color = text;
     // Outside-bar value labels sit on the canvas background → must follow the theme (stacked/donut labels stay white)
-    const dl = chart.options.plugins && chart.options.plugins.datalabels;
+    const dl = opts.plugins && opts.plugins.datalabels;
     if (dl && (dl.color === '#231F20' || dl.color === '#DCDBDB')) dl.color = dark ? '#DCDBDB' : '#231F20';
     // Donut/pie arcs, bar fills, and combo-chart cumulative lines: remap near-black hues; add arc separators in dark
-    const type = chart.config.type;
-    (chart.data.datasets || []).forEach(ds => {
+    const type = cfg.type;
+    ((cfg.data && cfg.data.datasets) || []).forEach(ds => {
       if (type === 'doughnut' || type === 'pie') {
         if (!ds._origBg && Array.isArray(ds.backgroundColor)) ds._origBg = ds.backgroundColor.slice();
         if (ds._origBg) ds.backgroundColor = dark ? ds._origBg.map(_darkRemap) : ds._origBg.slice();
@@ -70,14 +77,19 @@ const Charts = (() => {
     });
   }
 
-  // Called by AppTheme.apply() — updates Chart.defaults and re-renders all active charts
+  // Called by AppTheme.apply() on theme toggle — re-creates every active chart with the re-themed config.
+  // A destroy+rebuild is required (not mutate+update) because Chart.js v4 won't recolour cached bar fills.
   function updateTheme(dark) {
     Chart.defaults.color = dark ? '#DCDBDB' : '#231F20';
     Chart.defaults.borderColor = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
-    Object.values(reg).forEach(chart => {
-      if (!chart) return;
-      _applyThemeToChart(chart, dark);
-      chart.update('none');
+    Object.keys(reg).forEach(id => {
+      const chart = reg[id];
+      if (!chart || !chart.canvas) return;
+      const canvas = chart.canvas;
+      const cfg = { type: chart.config.type, data: chart.config.data, options: chart.config.options };
+      _themeConfig(cfg, dark);
+      chart.destroy();
+      reg[id] = new Chart(canvas.getContext('2d'), cfg);
     });
   }
 
