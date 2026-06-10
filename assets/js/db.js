@@ -360,8 +360,8 @@ async function exportPDF(wps, label, titleStr) {
   const fmtV = v => v != null ? ((v)/1e6).toFixed(2)+'M' : '-';
   const fmtDate = d => d ? new Date(d).toLocaleDateString('en-PH',{year:'2-digit',month:'short',day:'numeric'}) : '-';
 
-  // ── Page header (repeated each page via didDrawPage) ──
-  const drawHeader = () => {
+  // ── Page header (drawn before table content via willDrawPage) ──
+  const drawHeader = (pgNum) => {
     doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(35,31,32);
     doc.text('MEGAWIDE CONSTRUCTION CORPORATION', mg, 14);
     doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(110,110,110);
@@ -372,12 +372,20 @@ async function exportPDF(wps, label, titleStr) {
     doc.text(`Generated: ${dateStr}   |   Total WPs: ${wps.length}   |   Awarded: ${awarded} (${awardRate}%)   |   BCB: ${fmtV(totalBCB)}   |   Variance: ${fmtM(variance)}`, mg, 33);
     doc.setDrawColor(238,49,36); doc.setLineWidth(0.6);
     doc.line(mg, 36, pgW - mg, 36);
+    if (pgNum === 1) {
+      doc.setFontSize(7); doc.setFont('helvetica','italic'); doc.setTextColor(160);
+      doc.text('All monetary values in PHP Millions (M). Variance = BCB - Awarded (positive = under budget).', mg, 39);
+    }
   };
-  drawHeader();
 
-  // ── Signature footer (on every page) ──
+  // ── Footer: page number on all pages; signatures only on last page ──
   const sigH = 30;
-  const drawFooter = (pageNum, totalPages) => {
+  const drawPageNum = (pageNum, totalPages) => {
+    const fy = pgH - sigH;
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(160);
+    doc.text(`Page ${pageNum} of ${totalPages}`, pgW - mg, fy + 5.5, { align:'right' });
+  };
+  const drawSignatures = () => {
     const fy = pgH - sigH;
     doc.setDrawColor(210,210,210); doc.setLineWidth(0.3);
     doc.line(mg, fy, pgW - mg, fy);
@@ -392,8 +400,6 @@ async function exportPDF(wps, label, titleStr) {
       doc.text('Name & Signature over Printed Name', bx, fy + 19);
       doc.text('Date: _________________________', bx, fy + 24.5);
     });
-    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(160);
-    doc.text(`Page ${pageNum}${totalPages?' of '+totalPages:''}`, pgW - mg, fy + 5.5, { align:'right' });
   };
 
   // ── Table data ──
@@ -402,10 +408,6 @@ async function exportPDF(wps, label, titleStr) {
     if (pc!==0) return pc;
     return (parseInt((a.wp_no||'').replace(/\D/g,''))||0) - (parseInt((b.wp_no||'').replace(/\D/g,''))||0);
   });
-
-  // Note under header — amounts in PHP Millions
-  doc.setFontSize(7); doc.setFont('helvetica','italic'); doc.setTextColor(160);
-  doc.text('All monetary values in PHP Millions (M). Variance = BCB - Awarded (positive = under budget).', mg, 39);
 
   const baseCols = [
     ...(multiProject ? [{ header:'Project', dataKey:'project_id' }] : []),
@@ -450,7 +452,7 @@ async function exportPDF(wps, label, titleStr) {
     body: tableRows,
     startY: 43,
     tableWidth: avail,
-    margin: { left:mg, right:mg, bottom: sigH + 6 },
+    margin: { top: 43, left:mg, right:mg, bottom: sigH + 6 },
     theme: 'grid',
     headStyles: { fillColor:[35,31,32], textColor:[255,255,255], fontSize:6.5, fontStyle:'bold', halign:'center', cellPadding:2, minCellHeight:8 },
     bodyStyles: { fontSize:6.5, cellPadding:[2,2,2,2], textColor:[50,50,50], minCellHeight:7 },
@@ -471,17 +473,17 @@ async function exportPDF(wps, label, titleStr) {
       act_date:    { halign:'center', cellWidth:18 },
       proc_status: { halign:'center', cellWidth:18 },
     },
-    didDrawPage: (data) => {
-      drawHeader();
-      drawFooter(data.pageNumber, null);
+    willDrawPage: (data) => {
+      drawHeader(data.pageNumber);
     },
   });
 
-  // fix page numbers now that we know total pages
+  // Draw page numbers and signatures now that we know total pages
   const totalPg = doc.getNumberOfPages();
   for (let i = 1; i <= totalPg; i++) {
     doc.setPage(i);
-    drawFooter(i, totalPg);
+    drawPageNum(i, totalPg);
+    if (i === totalPg) drawSignatures();
   }
 
   doc.save(`WPM_${label}_${new Date().toISOString().slice(0,10)}.pdf`);
