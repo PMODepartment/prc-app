@@ -13,6 +13,8 @@ const Charts = (() => {
     const ctx=document.getElementById(id);
     if(!ctx)return;
     reg[id]=new Chart(ctx.getContext('2d'),cfg);
+    // Charts created while dark mode is active (lazy tab render) need the dark transforms applied immediately
+    if (document.body.classList.contains('dark-mode')) { _applyThemeToChart(reg[id], true); reg[id].update('none'); }
     return reg[id];
   }
 
@@ -20,24 +22,50 @@ const Charts = (() => {
   function expand(id) { const c=reg[id]; if(c) c.update('none'); }
   function collapse(id) { const c=reg[id]; if(c) c.update('none'); }
 
+  // Near-black brand hues (#282C28 etc.) vanish on a dark canvas → remap to a visible gray in dark mode
+  function _darkRemap(c) {
+    return (c === '#282C28' || c === '#231F20' || c === '#2B2C2B') ? '#9B9999' : c;
+  }
+
+  // Apply (or revert) dark-mode colors to a single chart's options + datasets.
+  // Originals are cached on the dataset (_origBg / _origBorder) so light mode restores exactly.
+  function _applyThemeToChart(chart, dark) {
+    const text = dark ? '#DCDBDB' : '#231F20';
+    const grid = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
+    if (chart.options.scales) {
+      Object.values(chart.options.scales).forEach(s => {
+        if (s.ticks) s.ticks.color = s.ticks.color === 'rgba(0,0,0,0)' ? s.ticks.color : text;
+        if (s.grid)  s.grid.color  = grid;
+        if (s.title) s.title.color = text;
+      });
+    }
+    const leg = chart.options.plugins && chart.options.plugins.legend;
+    if (leg && leg.labels) leg.labels.color = text;
+    // Outside-bar value labels sit on the canvas background → must follow the theme (stacked/donut labels stay white)
+    const dl = chart.options.plugins && chart.options.plugins.datalabels;
+    if (dl && (dl.color === '#231F20' || dl.color === '#DCDBDB')) dl.color = dark ? '#DCDBDB' : '#231F20';
+    // Donut/pie arcs and combo-chart cumulative lines: remap near-black hues; add arc separators in dark
+    const type = chart.config.type;
+    (chart.data.datasets || []).forEach(ds => {
+      if (type === 'doughnut' || type === 'pie') {
+        if (!ds._origBg && Array.isArray(ds.backgroundColor)) ds._origBg = ds.backgroundColor.slice();
+        if (ds._origBg) ds.backgroundColor = dark ? ds._origBg.map(_darkRemap) : ds._origBg.slice();
+        ds.borderColor = dark ? '#2B2C2B' : '#fff';
+        ds.borderWidth = dark ? 2 : 0;
+      } else if (typeof ds.borderColor === 'string') {
+        if (!('_origBorder' in ds)) ds._origBorder = ds.borderColor;
+        ds.borderColor = dark ? _darkRemap(ds._origBorder) : ds._origBorder;
+      }
+    });
+  }
+
   // Called by AppTheme.apply() — updates Chart.defaults and re-renders all active charts
   function updateTheme(dark) {
-    const text  = dark ? '#DCDBDB' : '#231F20';
-    const hint  = dark ? '#9B9999' : '#6B7280';
-    const grid  = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
-    Chart.defaults.color = text;
-    Chart.defaults.borderColor = grid;
+    Chart.defaults.color = dark ? '#DCDBDB' : '#231F20';
+    Chart.defaults.borderColor = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
     Object.values(reg).forEach(chart => {
       if (!chart) return;
-      if (chart.options.scales) {
-        Object.values(chart.options.scales).forEach(s => {
-          if (s.ticks)  s.ticks.color  = s.ticks.color  === 'rgba(0,0,0,0)' ? s.ticks.color : text;
-          if (s.grid)   s.grid.color   = grid;
-          if (s.title)  s.title.color  = text;
-        });
-      }
-      const leg = chart.options.plugins && chart.options.plugins.legend;
-      if (leg && leg.labels) leg.labels.color = text;
+      _applyThemeToChart(chart, dark);
       chart.update('none');
     });
   }
@@ -60,7 +88,7 @@ const Charts = (() => {
       offset: 2,
       clamp: false,
       clip: false,
-      color: '#231F20',
+      color: document.body.classList.contains('dark-mode') ? '#DCDBDB' : '#231F20',
       font: { size: _mob() ? 7 : 9, weight: '600', family: 'Montserrat' },
       formatter: fmtFn
     };
