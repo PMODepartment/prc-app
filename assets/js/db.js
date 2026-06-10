@@ -268,32 +268,36 @@ function buildRankTable(id, items, type) {
   if (!el) return;
   if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:12px;padding:10px 0">No data</div>'; return; }
 
-  // Inject hover-animation + mobile-scroll styles once per page
   if (!document.getElementById('_rankTblStyle')) {
     const s = document.createElement('style');
     s.id = '_rankTblStyle';
     s.textContent = [
       '.rank-row{cursor:default}',
       '.rank-row .rank-side{transition:opacity .18s ease,transform .18s ease}',
-      '.rank-row:hover .rank-side{opacity:0;transform:translateX(10px)}',
+      '.rank-row:hover .rank-side{opacity:0;transform:translateX(6px)}',
       '.rank-row .rank-short,.rank-row .rank-sub{transition:opacity .15s ease}',
       '.rank-row:hover .rank-short,.rank-row:hover .rank-sub{opacity:0}',
-      /* WP cell creates stacking context on hover so overlay paints above side cells */
-      '.rank-row .rank-wp-cell{position:relative}',
-      '.rank-row:hover .rank-wp-cell{z-index:20}',
-      '.rank-full{position:absolute;left:20px;right:-400px;top:50%;',
-      'transform:translateY(-50%) translateX(-8px);opacity:0;',
-      'transition:opacity .2s ease,transform .2s ease;background:#EE3124;color:#fff;',
-      'padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;',
-      'pointer-events:none;z-index:5;white-space:normal;line-height:1.35;',
-      'box-shadow:0 3px 10px rgba(238,49,36,.25)}',
-      '.rank-row:hover .rank-full{opacity:1;transform:translateY(-50%) translateX(0)}',
-      /* Clip overlay at card boundary; horizontal scroll only on mobile */
-      '.rank-table-scroll{overflow:hidden}',
       '@media(max-width:600px){.rank-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}',
       '.rank-table-scroll table{min-width:340px}}',
     ].join('');
     document.head.appendChild(s);
+  }
+
+  // Shared fixed tooltip — one instance per page, reused across all rank tables
+  if (!document.getElementById('_rankTip')) {
+    const tip = document.createElement('div');
+    tip.id = '_rankTip';
+    tip.style.cssText = [
+      'position:fixed;z-index:9999;pointer-events:none',
+      'background:#EE3124;color:#fff',
+      'padding:6px 12px 6px 10px;border-radius:6px',
+      'font-size:11px;font-weight:600;line-height:1.4',
+      'white-space:normal;word-break:break-word',
+      'box-shadow:0 3px 12px rgba(238,49,36,.28)',
+      'opacity:0;transition:opacity .18s ease,transform .18s ease',
+      'transform:translateY(-50%) translateX(-6px)',
+    ].join(';');
+    document.body.appendChild(tip);
   }
 
   const isValue  = type === 'value';
@@ -306,22 +310,22 @@ function buildRankTable(id, items, type) {
     ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true)}</tr>`
     : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Awd',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)}</tr>`;
   const rows = items.map((item, i) => {
-    const wpCell = `<td class="rank-wp-cell" style="padding:9px 8px 9px 0;vertical-align:middle;max-width:1px;width:99%">
-      <div style="display:flex;align-items:center;gap:6px;position:relative">
+    const safe = item.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:middle;max-width:1px;width:99%">
+      <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:10px;color:#ccc;font-weight:700;flex-shrink:0;min-width:14px">${i+1}</span>
         <div style="min-width:0;overflow:hidden;flex:1">
           <div class="rank-short" style="font-size:11px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
           <div class="rank-sub" style="font-size:9px;color:#bbb;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub||''}</div>
         </div>
-        <div class="rank-full">${item.name}</div>
       </div>
     </td>`;
     if (isValue) {
-      return `<tr class="rank-row" style="border-bottom:1px solid #f5f5f5">${wpCell}
+      return `<tr class="rank-row" data-rn="${safe}" style="border-bottom:1px solid #f5f5f5">${wpCell}
         <td class="rank-side" style="font-size:12px;font-weight:700;color:#231F20;padding:9px 0 9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.val)}</td>
       </tr>`;
     }
-    return `<tr class="rank-row" style="border-bottom:1px solid #f5f5f5">${wpCell}
+    return `<tr class="rank-row" data-rn="${safe}" style="border-bottom:1px solid #f5f5f5">${wpCell}
       <td class="rank-side" style="font-size:10px;color:#ccc;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.bcb)}</td>
       <td class="rank-side" style="font-size:10px;color:#aaa;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
       <td class="rank-side" style="font-size:12px;font-weight:700;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${valSign}${Fmt.money(item.val)}</td>
@@ -329,6 +333,26 @@ function buildRankTable(id, items, type) {
     </tr>`;
   }).join('');
   el.innerHTML = `<div class="rank-table-scroll"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead>${thead}</thead><tbody>${rows}</tbody></table></div>`;
+
+  // Attach fixed-position tooltip events (avoids any overflow/table containment issues)
+  const tip = document.getElementById('_rankTip');
+  const scroll = el.querySelector('.rank-table-scroll');
+  el.querySelectorAll('.rank-row').forEach(row => {
+    row.addEventListener('mouseenter', () => {
+      const rb = row.getBoundingClientRect();
+      const sb = scroll.getBoundingClientRect();
+      tip.textContent = row.dataset.rn;
+      tip.style.left = (sb.left + 10) + 'px';
+      tip.style.maxWidth = (sb.width - 20) + 'px';
+      tip.style.top = (rb.top + rb.height / 2) + 'px';
+      tip.style.opacity = '1';
+      tip.style.transform = 'translateY(-50%) translateX(0)';
+    });
+    row.addEventListener('mouseleave', () => {
+      tip.style.opacity = '0';
+      tip.style.transform = 'translateY(-50%) translateX(-6px)';
+    });
+  });
 }
 
 function buildRankList(id, items, colorClass, fmtVal) {
