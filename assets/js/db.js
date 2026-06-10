@@ -307,6 +307,12 @@ function buildRankTable(id, items, type) {
       'transform:translateY(-50%) translateX(-6px)',
     ].join(';');
     document.body.appendChild(tip);
+    // Mobile: the tip is fixed-positioned at tap time, so once the page scrolls it would otherwise stay
+    // floating and overlap content. Hide it the instant any scroll/drag starts (capture catches nested
+    // scroll containers too; touchmove fires the moment a scroll gesture begins on touch devices).
+    const _hideRankTip = () => { tip.style.opacity = '0'; tip.style.transform = 'translateY(-50%) translateX(-6px)'; };
+    window.addEventListener('scroll', _hideRankTip, true);
+    window.addEventListener('touchmove', _hideRankTip, { passive: true });
   }
 
   const isValue  = type === 'value';
