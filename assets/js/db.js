@@ -267,28 +267,46 @@ function buildRankTable(id, items, type) {
   const el = document.getElementById(id);
   if (!el) return;
   if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:12px;padding:10px 0">No data</div>'; return; }
-  const isValue = type === 'value';
-  const accent = type === 'savings' ? '#2D9B6F' : '#EE3124';
+  const isValue  = type === 'value';
+  const accent   = type === 'savings' ? '#2D9B6F' : '#EE3124';
   const valLabel = type === 'savings' ? 'Savings' : type === 'loss' ? 'Overbudget' : 'Contract Value';
   const valSign  = type === 'savings' ? '+' : type === 'loss' ? '-' : '';
+  const mob      = window.innerWidth <= 600;
   const th = (txt, right, color) =>
     `<th style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${color||'#ccc'};padding:7px ${right?'0':'8px'} 7px ${right?'8px':'0'};text-align:${right?'right':'left'};border-bottom:2px solid #f0f0f0;white-space:nowrap">${txt}</th>`;
+
+  // On mobile: 3-col (name+BCB/Awd stacked | value | %)
+  // On desktop: 5-col (name | BCB | Awd | value | %)
   const thead = isValue
     ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true)}</tr>`
-    : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Awd',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)}</tr>`;
+    : mob
+      ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true,accent)} ${th('%',true,accent)}</tr>`
+      : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Awd',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)}</tr>`;
+
   const rows = items.map((item, i) => {
+    const hasBcbAwd = !isValue && item.bcb != null;
+    // Mobile sub-line: trade info + BCB → Awd inline
+    const mobSub = mob && hasBcbAwd
+      ? `<div style="font-size:9px;color:#bbb;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.sub||''}&nbsp;&nbsp;·&nbsp;&nbsp;BCB&nbsp;${Fmt.money(item.bcb)}&nbsp;→&nbsp;Awd&nbsp;${Fmt.money(item.awarded)}</div>`
+      : `<div style="font-size:9px;color:#bbb;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub||''}</div>`;
     const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:middle;max-width:1px;width:99%">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:10px;color:#ccc;font-weight:700;flex-shrink:0;min-width:14px">${i+1}</span>
         <div style="min-width:0;overflow:hidden">
           <div style="font-size:11px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
-          <div style="font-size:9px;color:#bbb;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub||''}</div>
+          ${mobSub}
         </div>
       </div>
     </td>`;
     if (isValue) {
       return `<tr style="border-bottom:1px solid #f5f5f5">${wpCell}
         <td style="font-size:12px;font-weight:700;color:#231F20;padding:9px 0 9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.val)}</td>
+      </tr>`;
+    }
+    if (mob) {
+      return `<tr style="border-bottom:1px solid #f5f5f5">${wpCell}
+        <td style="font-size:12px;font-weight:700;color:${accent};padding:9px 6px;text-align:right;vertical-align:middle;white-space:nowrap">${valSign}${Fmt.money(item.val)}</td>
+        <td style="font-size:11px;font-weight:600;color:${accent};padding:9px 0 9px 6px;text-align:right;vertical-align:middle;white-space:nowrap">${item.pct}</td>
       </tr>`;
     }
     return `<tr style="border-bottom:1px solid #f5f5f5">${wpCell}
