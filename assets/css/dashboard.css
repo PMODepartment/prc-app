@@ -1307,7 +1307,14 @@ body.dark-mode [style*="color:#ccc"] { color: var(--text-hint) !important; }
 body.dark-mode [style*="background:#fff"],
 body.dark-mode [style*="background: #fff"],
 body.dark-mode [style*="background:#ffffff"],
-body.dark-mode [style*="background:#FFFFFF"] { background: var(--surface) !important; }
+body.dark-mode [style*="background:#FFFFFF"],
+/* When JS sets any element.style.* the browser RESERIALISES the whole inline style, turning authored
+   #fff into rgb(255, 255, 255) — which escapes the #fff selectors above (e.g. #proj-filter-btn after
+   toggleProjFilter touches its style). Catch the reserialised form too. */
+body.dark-mode [style*="background: rgb(255, 255, 255)"],
+body.dark-mode [style*="background:rgb(255,255,255)"] { background: var(--surface) !important; }
+/* Project filter button — bg + border explicitly (its style is JS-reserialised, so attr selectors are unreliable) */
+body.dark-mode #proj-filter-btn { background: var(--surface-2) !important; border-color: var(--border-md) !important; }
 body.dark-mode [style*="background:#f5f5f5"],
 body.dark-mode [style*="background:#f9f9f9"],
 body.dark-mode [style*="background:#F5F5F5"],
