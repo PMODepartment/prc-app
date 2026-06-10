@@ -294,6 +294,7 @@ function buildRankTable(id, items, type) {
       'font-size:11px;font-weight:600;line-height:1.4',
       'white-space:normal;word-break:break-word',
       'box-shadow:0 3px 12px rgba(238,49,36,.28)',
+      'min-width:160px',
       'opacity:0;transition:opacity .18s ease,transform .18s ease',
       'transform:translateY(-50%) translateX(-6px)',
     ].join(';');
