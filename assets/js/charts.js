@@ -195,13 +195,14 @@ const Charts = (() => {
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
-    const dl = _dlBar(v => v > 0 ? v.toFixed(1)+'M' : '', 'v');
+    const mob=_mob();
+    const dl=mob?{display:false}:_dlBar(v=>v>0?v.toFixed(1)+'M':'','v');
     make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
       {label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2},
-      {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}}}}});
+      {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},callback:v=>v.toFixed(0)+'M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
   // Budget (BCB) and Awarded by Period — quarterly combo chart
@@ -216,13 +217,14 @@ const Charts = (() => {
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
-    const dl = _dlBar(v => v > 0 ? v.toFixed(1)+'M' : '', 'v');
+    const mob=_mob();
+    const dl=mob?{display:false}:_dlBar(v=>v>0?v.toFixed(1)+'M':'','v');
     make(id,{type:'bar',data:{labels,datasets:[
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
       {label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2},
-      {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}}}}});
+      {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},callback:v=>v.toFixed(0)+'M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
   // Work Package by Trade — horizontal grouped bar
@@ -408,13 +410,14 @@ const Charts = (() => {
     let cp=0,ca=0;
     const cumP=planned.map(v=>(cp+=v,cp));
     const cumA=actual.map(v=>(ca+=v,ca));
-    const dl=_dlBar(v=>v>0?v:'','v');
+    const mob=_mob();
+    const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
     make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
       {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
       {label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
-      {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'No. of Work Packages',font:{size:9}}}}}});
+      {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
 
   // WP Count by Period — Quarterly (Planned vs Actual)
@@ -431,13 +434,14 @@ const Charts = (() => {
     let cp=0,ca=0;
     const cumP=planned.map(v=>(cp+=v,cp));
     const cumA=actual.map(v=>(ca+=v,ca));
-    const dl=_dlBar(v=>v>0?v:'','v');
+    const mob=_mob();
+    const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
     make(id,{type:'bar',data:{labels:quarters.map(qLabel),datasets:[
       {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
       {label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
-      {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'No. of Work Packages',font:{size:9}}}}}});
+      {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
 
   return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpStatusDonutValue,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject,wpCountByPeriodMonthly,wpCountByPeriod,expand,collapse};
