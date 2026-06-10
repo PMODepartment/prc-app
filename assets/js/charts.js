@@ -22,9 +22,11 @@ const Charts = (() => {
   function expand(id) { const c=reg[id]; if(c) c.update('none'); }
   function collapse(id) { const c=reg[id]; if(c) c.update('none'); }
 
-  // Near-black brand hues (#282C28 etc.) vanish on a dark canvas → remap to a visible gray in dark mode
+  // Near-black brand hues (#282C28 etc. + its translucent bar variant) vanish on a dark canvas → remap to a visible gray
   function _darkRemap(c) {
-    return (c === '#282C28' || c === '#231F20' || c === '#2B2C2B') ? '#9B9999' : c;
+    if (c === '#282C28' || c === '#231F20' || c === '#2B2C2B') return '#9B9999';
+    if (c === 'rgba(40,44,40,0.55)' || c === 'rgba(40,44,40,0.7)') return 'rgba(155,153,153,0.75)';
+    return c;
   }
 
   // Apply (or revert) dark-mode colors to a single chart's options + datasets.
@@ -44,7 +46,7 @@ const Charts = (() => {
     // Outside-bar value labels sit on the canvas background → must follow the theme (stacked/donut labels stay white)
     const dl = chart.options.plugins && chart.options.plugins.datalabels;
     if (dl && (dl.color === '#231F20' || dl.color === '#DCDBDB')) dl.color = dark ? '#DCDBDB' : '#231F20';
-    // Donut/pie arcs and combo-chart cumulative lines: remap near-black hues; add arc separators in dark
+    // Donut/pie arcs, bar fills, and combo-chart cumulative lines: remap near-black hues; add arc separators in dark
     const type = chart.config.type;
     (chart.data.datasets || []).forEach(ds => {
       if (type === 'doughnut' || type === 'pie') {
@@ -52,9 +54,16 @@ const Charts = (() => {
         if (ds._origBg) ds.backgroundColor = dark ? ds._origBg.map(_darkRemap) : ds._origBg.slice();
         ds.borderColor = dark ? '#2B2C2B' : '#fff';
         ds.borderWidth = dark ? 2 : 0;
-      } else if (typeof ds.borderColor === 'string') {
-        if (!('_origBorder' in ds)) ds._origBorder = ds.borderColor;
-        ds.borderColor = dark ? _darkRemap(ds._origBorder) : ds._origBorder;
+      } else {
+        // bar fills (Budget(BCB)/Planned/Total WP use #282C28 — invisible on dark) and line strokes
+        if (typeof ds.backgroundColor === 'string') {
+          if (!('_origBg' in ds)) ds._origBg = ds.backgroundColor;
+          ds.backgroundColor = dark ? _darkRemap(ds._origBg) : ds._origBg;
+        }
+        if (typeof ds.borderColor === 'string') {
+          if (!('_origBorder' in ds)) ds._origBorder = ds.borderColor;
+          ds.borderColor = dark ? _darkRemap(ds._origBorder) : ds._origBorder;
+        }
       }
     });
   }
