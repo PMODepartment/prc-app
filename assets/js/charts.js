@@ -20,6 +20,28 @@ const Charts = (() => {
   function expand(id) { const c=reg[id]; if(c) c.update('none'); }
   function collapse(id) { const c=reg[id]; if(c) c.update('none'); }
 
+  // Called by AppTheme.apply() — updates Chart.defaults and re-renders all active charts
+  function updateTheme(dark) {
+    const text  = dark ? '#DCDBDB' : '#231F20';
+    const hint  = dark ? '#9B9999' : '#6B7280';
+    const grid  = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
+    Chart.defaults.color = text;
+    Chart.defaults.borderColor = grid;
+    Object.values(reg).forEach(chart => {
+      if (!chart) return;
+      if (chart.options.scales) {
+        Object.values(chart.options.scales).forEach(s => {
+          if (s.ticks)  s.ticks.color  = s.ticks.color  === 'rgba(0,0,0,0)' ? s.ticks.color : text;
+          if (s.grid)   s.grid.color   = grid;
+          if (s.title)  s.title.color  = text;
+        });
+      }
+      const leg = chart.options.plugins && chart.options.plugins.legend;
+      if (leg && leg.labels) leg.labels.color = text;
+      chart.update('none');
+    });
+  }
+
   // ── Data label helpers ───────────────────────────────────────
   function _mob() { return window.innerWidth < 640; }
 
@@ -444,5 +466,5 @@ const Charts = (() => {
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
 
-  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpStatusDonutValue,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject,wpCountByPeriodMonthly,wpCountByPeriod,expand,collapse};
+  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpStatusDonutValue,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject,wpCountByPeriodMonthly,wpCountByPeriod,expand,collapse,updateTheme};
 })();

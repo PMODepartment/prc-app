@@ -20,6 +20,7 @@ const AppAuth = (() => {
     if (!profile || profile.status !== 'approved') { await sb.auth.signOut(); window.location.href = 'login.html'; return; }
     window.__profile = profile; window.__session = session;
     if (typeof WPDb !== 'undefined' && WPDb.updateLastLogin) WPDb.updateLastLogin(session.user.id).catch(()=>{});
+    if (typeof AppTheme !== 'undefined') AppTheme.init(session.user.id);
     onReady(session.user, profile);
   }
   async function requireAdmin(onReady) { requireLogin((user, profile) => { if (!['admin','super_admin'].includes(profile.role)) { window.location.href = 'index.html'; return; } onReady(user, profile); }); }

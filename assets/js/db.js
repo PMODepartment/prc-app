@@ -214,29 +214,37 @@ function renderUserBar(id, profile) {
   const el = document.getElementById(id);
   if (!el || !profile) return;
   const initials = (profile.name||profile.email||'U').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+  const dark = typeof AppTheme !== 'undefined' && AppTheme.isDark(profile.id);
   el.innerHTML = `
-    <div style="position:relative">
-      <button id="avatar-btn" onclick="toggleUserMenu()" title="${profile.name||profile.email}" style="
-        width:36px;height:36px;border-radius:50%;background:#EE3124;color:#fff;
-        border:none;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;
-        display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initials}</button>
-      <div id="user-menu" style="
-        display:none;position:absolute;right:0;top:44px;
-        background:#fff;border:1px solid #f0f0f0;border-radius:12px;
-        box-shadow:0 8px 32px rgba(0,0,0,.12);width:220px;z-index:9999;overflow:hidden;">
-        <div style="padding:14px 16px;border-bottom:1px solid #f5f5f5;">
-          <div style="font-size:13px;font-weight:600;color:#231F20">${profile.name||profile.email}</div>
-          <div style="font-size:11px;color:#888;margin-top:2px;text-transform:capitalize">${(profile.role||'').replace(/_/g,' ')}</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button id="theme-toggle-btn" class="theme-toggle"
+        onclick="AppTheme.toggle('${profile.id}')"
+        title="${dark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}">
+        <i class="ti ${dark ? 'ti-sun' : 'ti-moon-stars'}" style="font-size:17px;line-height:1"></i>
+      </button>
+      <div style="position:relative">
+        <button id="avatar-btn" onclick="toggleUserMenu()" title="${profile.name||profile.email}" style="
+          width:36px;height:36px;border-radius:50%;background:#EE3124;color:#fff;
+          border:none;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;
+          display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initials}</button>
+        <div id="user-menu" style="
+          display:none;position:absolute;right:0;top:44px;
+          background:#fff;border:1px solid #f0f0f0;border-radius:12px;
+          box-shadow:0 8px 32px rgba(0,0,0,.12);width:220px;z-index:9999;overflow:hidden;">
+          <div style="padding:14px 16px;border-bottom:1px solid #f5f5f5;">
+            <div style="font-size:13px;font-weight:600;color:#231F20">${profile.name||profile.email}</div>
+            <div style="font-size:11px;color:#888;margin-top:2px;text-transform:capitalize">${(profile.role||'').replace(/_/g,' ')}</div>
+          </div>
+          <a href="login.html" onclick="event.preventDefault();AppAuth.logout()" style="
+            display:flex;align-items:center;gap:8px;padding:12px 16px;
+            font-size:13px;color:#EE3124;font-weight:600;text-decoration:none;
+            font-family:inherit;cursor:pointer;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>Sign out
+          </a>
         </div>
-        <a href="login.html" onclick="event.preventDefault();AppAuth.logout()" style="
-          display:flex;align-items:center;gap:8px;padding:12px 16px;
-          font-size:13px;color:#EE3124;font-weight:600;text-decoration:none;
-          font-family:inherit;cursor:pointer;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>Sign out
-        </a>
       </div>
     </div>`;
 }

@@ -1,5 +1,15 @@
 /* ui.js — shared UI helpers */
 
+/* ── Theme: apply saved preference immediately on script load (minimises flash) ── */
+(function() {
+  try {
+    if (localStorage.getItem('wpm_theme_last') === 'dark') {
+      document.body.classList.add('dark-mode');
+      document.documentElement.classList.add('dark-mode');
+    }
+  } catch(e) {}
+})();
+
 /* ── Prevent pinch-zoom on iOS (Safari ignores viewport user-scalable since iOS 10) ── */
 (function() {
   document.addEventListener('touchmove', function(e) {
@@ -192,3 +202,64 @@ function initExpandableCharts() {
     });
   });
 }
+
+/* ── AppTheme — dark / light mode ──────────────────────────────────────
+   Stores preference in localStorage:
+     wpm_theme_{userId}  — per-user authoritative preference
+     wpm_theme_last      — most-recent theme for instant apply on next load
+   ─────────────────────────────────────────────────────────────────── */
+const AppTheme = (() => {
+  const _key  = id => 'wpm_theme_' + (id || 'guest');
+  const _last = 'wpm_theme_last';
+
+  function _read(userId) {
+    try { return localStorage.getItem(_key(userId)); } catch(e) { return null; }
+  }
+  function _save(userId, val) {
+    try {
+      localStorage.setItem(_key(userId), val);
+      localStorage.setItem(_last, val);          // fast-path for next load
+    } catch(e) {}
+  }
+
+  function isDark(userId) { return _read(userId) === 'dark'; }
+
+  function _applyClasses(dark) {
+    document.body.classList.toggle('dark-mode', dark);
+    document.documentElement.classList.toggle('dark-mode', dark);
+  }
+
+  function _syncIcon(dark) {
+    const btn = document.getElementById('theme-toggle-btn');
+    if (!btn) return;
+    // sun = switch to light; moon = switch to dark
+    btn.innerHTML = dark
+      ? '<i class="ti ti-sun"    style="font-size:17px;line-height:1"></i>'
+      : '<i class="ti ti-moon-stars" style="font-size:17px;line-height:1"></i>';
+    btn.title = dark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+  }
+
+  function apply(dark) {
+    _applyClasses(dark);
+    _syncIcon(dark);
+    if (typeof Charts !== 'undefined' && Charts.updateTheme) Charts.updateTheme(dark);
+  }
+
+  /* Called by auth.js once userId is known */
+  function init(userId) {
+    const saved = _read(userId);
+    // First time: default to system preference
+    const dark = saved === 'dark' || (saved === null && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (saved === null && dark) _save(userId, 'dark');   // persist system default
+    apply(dark);
+  }
+
+  function toggle(userId) {
+    const next = !isDark(userId);
+    _save(userId, next ? 'dark' : 'light');
+    apply(next);
+  }
+
+  return { init, toggle, isDark, apply };
+})();
+window.AppTheme = AppTheme;
