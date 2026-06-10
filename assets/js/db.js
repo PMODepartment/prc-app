@@ -267,6 +267,27 @@ function buildRankTable(id, items, type) {
   const el = document.getElementById(id);
   if (!el) return;
   if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:12px;padding:10px 0">No data</div>'; return; }
+
+  // Inject hover-animation styles once per page
+  if (!document.getElementById('_rankTblStyle')) {
+    const s = document.createElement('style');
+    s.id = '_rankTblStyle';
+    s.textContent = [
+      '.rank-row{cursor:default}',
+      '.rank-row .rank-side{transition:opacity .18s ease,transform .18s ease}',
+      '.rank-row:hover .rank-side{opacity:0;transform:translateX(10px)}',
+      '.rank-row .rank-short,.rank-row .rank-sub{transition:opacity .15s ease}',
+      '.rank-row:hover .rank-short,.rank-row:hover .rank-sub{opacity:0}',
+      '.rank-full{position:absolute;left:20px;right:0;top:50%;transform:translateY(-50%) translateX(-8px);opacity:0;',
+      'transition:opacity .2s ease,transform .2s ease;background:#EE3124;color:#fff;',
+      'padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;',
+      'pointer-events:none;z-index:5;white-space:normal;line-height:1.35;',
+      'box-shadow:0 3px 10px rgba(238,49,36,.25)}',
+      '.rank-row:hover .rank-full{opacity:1;transform:translateY(-50%) translateX(0)}',
+    ].join('');
+    document.head.appendChild(s);
+  }
+
   const isValue  = type === 'value';
   const accent   = type === 'savings' ? '#2D9B6F' : '#EE3124';
   const valLabel = type === 'savings' ? 'Savings' : type === 'loss' ? 'Overbudget' : 'Contract Value';
@@ -277,25 +298,26 @@ function buildRankTable(id, items, type) {
     ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true)}</tr>`
     : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Awd',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)}</tr>`;
   const rows = items.map((item, i) => {
-    const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:middle;max-width:1px;width:99%">
-      <div style="display:flex;align-items:center;gap:6px">
+    const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:middle;max-width:1px;width:99%;overflow:visible">
+      <div style="display:flex;align-items:center;gap:6px;position:relative">
         <span style="font-size:10px;color:#ccc;font-weight:700;flex-shrink:0;min-width:14px">${i+1}</span>
-        <div style="min-width:0;overflow:hidden">
-          <div title="${item.name}" style="font-size:11px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
-          <div style="font-size:9px;color:#bbb;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub||''}</div>
+        <div style="min-width:0;overflow:hidden;flex:1">
+          <div class="rank-short" style="font-size:11px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
+          <div class="rank-sub" style="font-size:9px;color:#bbb;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub||''}</div>
         </div>
+        <div class="rank-full">${item.name}</div>
       </div>
     </td>`;
     if (isValue) {
-      return `<tr style="border-bottom:1px solid #f5f5f5">${wpCell}
-        <td style="font-size:12px;font-weight:700;color:#231F20;padding:9px 0 9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.val)}</td>
+      return `<tr class="rank-row" style="border-bottom:1px solid #f5f5f5">${wpCell}
+        <td class="rank-side" style="font-size:12px;font-weight:700;color:#231F20;padding:9px 0 9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.val)}</td>
       </tr>`;
     }
-    return `<tr style="border-bottom:1px solid #f5f5f5">${wpCell}
-      <td style="font-size:10px;color:#ccc;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.bcb)}</td>
-      <td style="font-size:10px;color:#aaa;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
-      <td style="font-size:12px;font-weight:700;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${valSign}${Fmt.money(item.val)}</td>
-      <td style="font-size:11px;font-weight:600;color:${accent};padding:9px 0 9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${item.pct}</td>
+    return `<tr class="rank-row" style="border-bottom:1px solid #f5f5f5">${wpCell}
+      <td class="rank-side" style="font-size:10px;color:#ccc;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.bcb)}</td>
+      <td class="rank-side" style="font-size:10px;color:#aaa;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
+      <td class="rank-side" style="font-size:12px;font-weight:700;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${valSign}${Fmt.money(item.val)}</td>
+      <td class="rank-side" style="font-size:11px;font-weight:600;color:${accent};padding:9px 0 9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${item.pct}</td>
     </tr>`;
   }).join('');
   el.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;min-width:340px;border-collapse:collapse;font-family:inherit"><thead>${thead}</thead><tbody>${rows}</tbody></table></div>`;
