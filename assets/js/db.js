@@ -288,7 +288,8 @@ function buildRankTable(id, items, type) {
       'pointer-events:none;z-index:5;white-space:normal;line-height:1.35;',
       'box-shadow:0 3px 10px rgba(238,49,36,.25)}',
       '.rank-row:hover .rank-full{opacity:1;transform:translateY(-50%) translateX(0)}',
-      /* Horizontal scroll only on mobile */
+      /* Clip overlay at card boundary; horizontal scroll only on mobile */
+      '.rank-table-scroll{overflow:hidden}',
       '@media(max-width:600px){.rank-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}',
       '.rank-table-scroll table{min-width:340px}}',
     ].join('');
