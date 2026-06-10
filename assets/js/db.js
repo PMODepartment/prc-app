@@ -268,7 +268,7 @@ function buildRankTable(id, items, type) {
   if (!el) return;
   if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:12px;padding:10px 0">No data</div>'; return; }
 
-  // Inject hover-animation styles once per page
+  // Inject hover-animation + mobile-scroll styles once per page
   if (!document.getElementById('_rankTblStyle')) {
     const s = document.createElement('style');
     s.id = '_rankTblStyle';
@@ -278,12 +278,19 @@ function buildRankTable(id, items, type) {
       '.rank-row:hover .rank-side{opacity:0;transform:translateX(10px)}',
       '.rank-row .rank-short,.rank-row .rank-sub{transition:opacity .15s ease}',
       '.rank-row:hover .rank-short,.rank-row:hover .rank-sub{opacity:0}',
-      '.rank-full{position:absolute;left:20px;right:0;top:50%;transform:translateY(-50%) translateX(-8px);opacity:0;',
+      /* WP cell creates stacking context on hover so overlay paints above side cells */
+      '.rank-row .rank-wp-cell{position:relative}',
+      '.rank-row:hover .rank-wp-cell{z-index:20}',
+      '.rank-full{position:absolute;left:20px;right:-400px;top:50%;',
+      'transform:translateY(-50%) translateX(-8px);opacity:0;',
       'transition:opacity .2s ease,transform .2s ease;background:#EE3124;color:#fff;',
       'padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;',
       'pointer-events:none;z-index:5;white-space:normal;line-height:1.35;',
       'box-shadow:0 3px 10px rgba(238,49,36,.25)}',
       '.rank-row:hover .rank-full{opacity:1;transform:translateY(-50%) translateX(0)}',
+      /* Horizontal scroll only on mobile */
+      '@media(max-width:600px){.rank-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}',
+      '.rank-table-scroll table{min-width:340px}}',
     ].join('');
     document.head.appendChild(s);
   }
@@ -298,7 +305,7 @@ function buildRankTable(id, items, type) {
     ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true)}</tr>`
     : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Awd',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)}</tr>`;
   const rows = items.map((item, i) => {
-    const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:middle;max-width:1px;width:99%;overflow:visible">
+    const wpCell = `<td class="rank-wp-cell" style="padding:9px 8px 9px 0;vertical-align:middle;max-width:1px;width:99%">
       <div style="display:flex;align-items:center;gap:6px;position:relative">
         <span style="font-size:10px;color:#ccc;font-weight:700;flex-shrink:0;min-width:14px">${i+1}</span>
         <div style="min-width:0;overflow:hidden;flex:1">
@@ -320,7 +327,7 @@ function buildRankTable(id, items, type) {
       <td class="rank-side" style="font-size:11px;font-weight:600;color:${accent};padding:9px 0 9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${item.pct}</td>
     </tr>`;
   }).join('');
-  el.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;min-width:340px;border-collapse:collapse;font-family:inherit"><thead>${thead}</thead><tbody>${rows}</tbody></table></div>`;
+  el.innerHTML = `<div class="rank-table-scroll"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead>${thead}</thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function buildRankList(id, items, colorClass, fmtVal) {
