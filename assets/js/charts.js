@@ -22,10 +22,12 @@ const Charts = (() => {
   function expand(id) { const c=reg[id]; if(c) c.update('none'); }
   function collapse(id) { const c=reg[id]; if(c) c.update('none'); }
 
-  // Near-black brand hues (#282C28 etc. + its translucent bar variant) vanish on a dark canvas → remap to a visible gray
+  // Near-black brand hues (#282C28 etc. + its translucent bar variant) vanish on a dark canvas → remap to a
+  // clearly-visible light gray. #B8B7B7 (~7:1 contrast on the panel) stays distinct from #DCDBDB, which is
+  // reused for the "Future"/"Not Due" buckets, so stacked bars and donut segments don't collide.
   function _darkRemap(c) {
-    if (c === '#282C28' || c === '#231F20' || c === '#2B2C2B') return '#9B9999';
-    if (c === 'rgba(40,44,40,0.55)' || c === 'rgba(40,44,40,0.7)') return 'rgba(155,153,153,0.75)';
+    if (c === '#282C28' || c === '#231F20' || c === '#2B2C2B') return '#B8B7B7';
+    if (c === 'rgba(40,44,40,0.55)' || c === 'rgba(40,44,40,0.7)') return 'rgba(184,183,183,0.92)';
     return c;
   }
 
