@@ -306,7 +306,7 @@ function buildRankTable(id, items, type) {
   const valLabel = type === 'savings' ? 'Savings' : type === 'loss' ? 'Overbudget' : 'Contract Value';
   const valSign  = type === 'savings' ? '+' : type === 'loss' ? '-' : '';
   const th = (txt, right, color) =>
-    `<th style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${color||'#ccc'};padding:7px ${right?'0':'8px'} 7px ${right?'8px':'0'};text-align:${right?'right':'left'};border-bottom:2px solid #f0f0f0;white-space:nowrap">${txt}</th>`;
+    `<th style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${color||'#777'};padding:7px ${right?'0':'8px'} 7px ${right?'8px':'0'};text-align:${right?'right':'left'};border-bottom:2px solid #ebebeb;white-space:nowrap">${txt}</th>`;
   const thead = isValue
     ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true)}</tr>`
     : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Awd',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)}</tr>`;
@@ -314,10 +314,10 @@ function buildRankTable(id, items, type) {
     const safe = item.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:middle;max-width:1px;width:99%">
       <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:10px;color:#ccc;font-weight:700;flex-shrink:0;min-width:14px">${i+1}</span>
+        <span style="font-size:10px;color:#999;font-weight:700;flex-shrink:0;min-width:14px">${i+1}</span>
         <div style="min-width:0;overflow:hidden;flex:1">
           <div class="rank-short" style="font-size:11px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
-          <div class="rank-sub" style="font-size:9px;color:#bbb;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub||''}</div>
+          <div class="rank-sub" style="font-size:9px;color:#888;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub||''}</div>
         </div>
       </div>
     </td>`;
@@ -327,8 +327,8 @@ function buildRankTable(id, items, type) {
       </tr>`;
     }
     return `<tr class="rank-row" data-rn="${safe}" style="border-bottom:1px solid #f5f5f5">${wpCell}
-      <td class="rank-side" style="font-size:10px;color:#ccc;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.bcb)}</td>
-      <td class="rank-side" style="font-size:10px;color:#aaa;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
+      <td class="rank-side" style="font-size:10px;color:#888;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.bcb)}</td>
+      <td class="rank-side" style="font-size:10px;color:#777;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
       <td class="rank-side" style="font-size:12px;font-weight:700;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${valSign}${Fmt.money(item.val)}</td>
       <td class="rank-side" style="font-size:11px;font-weight:600;color:${accent};padding:9px 0 9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${item.pct}</td>
     </tr>`;
