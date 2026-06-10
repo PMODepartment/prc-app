@@ -281,7 +281,7 @@ function buildRankTable(id, items, type) {
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:10px;color:#ccc;font-weight:700;flex-shrink:0;min-width:14px">${i+1}</span>
         <div style="min-width:0;overflow:hidden">
-          <div style="font-size:11px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
+          <div title="${item.name}" style="font-size:11px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
           <div style="font-size:9px;color:#bbb;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub||''}</div>
         </div>
       </div>
