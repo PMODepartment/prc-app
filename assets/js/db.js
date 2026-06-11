@@ -696,3 +696,258 @@ function updatePendingBadge() {
     document.getElementById('gnp-id')?.focus();
   };
 })();
+
+/* ──────────────────────────────────────────────────────────────────────────
+   WPCsv — shared Work Package CSV import (used by wp-form.html & project.html)
+   Header-name driven so the existing Work Package Monitoring layout imports
+   directly. Falls back to position-based mapping for the native 54-col template
+   and the legacy 25-col files. Handles quoted fields with embedded newlines
+   (the cause of the "705 rows" bug) and Excel serial-number dates.
+   ────────────────────────────────────────────────────────────────────────── */
+window.WPCsv = (function(){
+  'use strict';
+
+  // RFC-4180-style tokenizer: respects quotes, "" escapes, and newlines inside quotes
+  function parse(text){
+    text = String(text || '').replace(/^﻿/, '');   // strip BOM
+    const rows = []; let row = [], cur = '', inQ = false;
+    for (let i = 0; i < text.length; i++){
+      const ch = text[i];
+      if (inQ){
+        if (ch === '"'){ if (text[i+1] === '"'){ cur += '"'; i++; } else inQ = false; }
+        else cur += ch;
+      } else {
+        if (ch === '"') inQ = true;
+        else if (ch === ',') { row.push(cur); cur = ''; }
+        else if (ch === '\r') { /* swallow — \n closes the row */ }
+        else if (ch === '\n') { row.push(cur); cur = ''; rows.push(row); row = []; }
+        else cur += ch;
+      }
+    }
+    if (cur !== '' || row.length){ row.push(cur); rows.push(row); }
+    // drop fully-blank rows (trailing newlines, spacer rows)
+    return rows.filter(r => r.some(c => (c || '').trim() !== ''));
+  }
+
+  const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // normalized-header → canonical field. Covers BOTH the WP-Monitoring adopted
+  // layout and the native template. Generated columns (TOTAL, VARIANCE,
+  // *LEAD TIME) are intentionally absent so they are skipped.
+  const HMAP = {
+    costcodeno:'cost_code', costcode:'cost_code',
+    trade:'trade', tradediscipline:'trade',
+    works:'works',
+    typeofworks:'type_of_works',
+    workpackageno:'wp_no', wpno:'wp_no', workpackagenumber:'wp_no',
+    workpackagedescription:'description', workpackagedesc:'description',
+    description:'detailed_description', detaileddescription:'detailed_description',
+    detaileddescriptionscopeofwork:'detailed_description',
+    scopeofwork:'scope', scope:'scope',
+    zone:'zone',
+    typeofservice:'type_of_service',
+    typeofprocurement:'type_of_procurement',
+    typeofcontract:'type_of_contract',
+    chargingtype:'charging_type',
+    contractpackageno:'contract_package_no',
+    codescription:'co_description',
+    proposedvendors:'proposed_vendors', proposedvendorssuppliers:'proposed_vendors',
+    noofpojo:'po_jo_count',
+    pojonos:'po_jo_numbers', pojonumbers:'po_jo_numbers',
+    responsible:'responsible_team', responsibleteam:'responsible_team',
+    approver:'approver',
+    support:'support_team', supportteam:'support_team',
+    surety:'surety_bond', suretybond:'surety_bond', suretybondyesno:'surety_bond',
+    performance:'performance_bond', performancebond:'performance_bond', performancebondyesno:'performance_bond',
+    warranty:'warranty_bond', warrantybond:'warranty_bond', warrantybondyesno:'warranty_bond',
+    budgetbcbnet:'approved_budget_bcb', budgetbcb:'approved_budget_bcb',
+    procurementbudgetbcbphp:'approved_budget_bcb', procurementbudgetbcb:'approved_budget_bcb',
+    awardedcostnet:'awarded_cost', awardedcost:'awarded_cost',
+    contractamountawardedphp:'awarded_cost', contractamountawarded:'awarded_cost', contractamount:'awarded_cost',
+    additionals:'additionals',
+    awarded:'award_status', awardstatus:'award_status',
+    vendorcontractor:'contractor', contractor:'contractor', vendors:'contractor', vendor:'contractor',
+    termsdays:'payment_terms_days', terms:'payment_terms_days', paymentterms:'payment_terms_days', paymenttermsdays:'payment_terms_days',
+    ofdp:'dp_percent', dp:'dp_percent', downpayment:'dp_percent', downpaymentpct:'dp_percent', dppercent:'dp_percent',
+    dpterms:'dp_terms',
+    notes:'dp_notes', paymentnotes:'dp_notes',
+    dateofrelease:'dp_release_date', dateofdprelease:'dp_release_date',
+    dpamount:'dp_amount', dpamountphp:'dp_amount',
+    retention:'retention_percent', retentionpct:'retention_percent', retentionpercent:'retention_percent',
+    retentionamount:'retention_amount', retentionamountphp:'retention_amount',
+    retentionperiod:'retention_period',
+    reqdapproval:'requires_approval', requiressubmittalapproval:'requires_approval', requiresapproval:'requires_approval',
+    reqdapprovalyesno:'requires_approval', requiressubmittalapprovalyesno:'requires_approval',
+    nameofapprover:'approver_name', submittalsapprovername:'approver_name',
+    dateofapproval:'approval_date',
+    typeofsubmittal:'submittal_type', submittalstatus:'submittal_type',
+    submittaldocumenttype:'submittal_document_type',
+    leadtimedays:'lead_time', leadtime:'lead_time',
+    awardingdate:'awarding_date', plannedawarddate:'awarding_date',
+    actualawardingdate:'actual_awarding_date', actualawarddate:'actual_awarding_date',
+    targetdeliverydate:'target_delivery', targetdelivery:'target_delivery',
+    actualdeliverydate:'actual_delivery',
+    targetinstndate:'target_installation', targetinstallationdate:'target_installation',
+    targetcompndate:'target_completion', targetcompletiondate:'target_completion',
+    remarks:'remarks',
+    awardingstatus:'awarding_status',
+    deliverystatus:'delivery_status',
+    purchaserequest:'purchase_request',
+    procurementstatus:'procurement_status',
+  };
+
+  // Procurement-status stage columns (WP Monitoring). The right-most marked stage wins.
+  const STAGES = [
+    ['sourcing','Sourcing'], ['rfq','RFQ'], ['bidopen','Bid Open'],
+    ['bidclosed','Bid Closed'], ['loa','LOA'], ['contract','Contract'], ['mobdel','Mob / Del'],
+  ];
+
+  function buildIdx(header){
+    const idx = {}, stageIdx = {};
+    (header || []).forEach((h, i) => {
+      const n = norm(h);
+      if (HMAP[n] !== undefined && idx[HMAP[n]] === undefined) idx[HMAP[n]] = i;
+      const st = STAGES.find(s => s[0] === n);
+      if (st && stageIdx[st[0]] === undefined) stageIdx[st[0]] = i;
+    });
+    return { idx, stageIdx };
+  }
+
+  // ── value parsers ──
+  const pStr  = v => { v = (v == null ? '' : String(v)).trim(); return v === '' ? null : v; };
+  const pNum  = v => { if (v == null) return null; const n = parseFloat(String(v).replace(/[,\s₱]/g, '')); return isNaN(n) ? null : n; };
+  const pInt  = v => { const n = parseInt(String(v == null ? '' : v).replace(/[,\s]/g, ''), 10); return isNaN(n) ? null : n; };
+  const pPct  = v => { const n = pNum(v); if (n == null || n === 0) return null; return n > 1 ? n / 100 : n; };
+  const pBond = v => { v = (v || '').trim().toLowerCase(); if (['yes','true','y','1'].includes(v)) return 'Yes'; if (['no','false','n','0',''].includes(v)) return 'No'; return v; };
+  const pBool = v => ['yes','true','y','x','1'].includes((v || '').trim().toLowerCase());
+  function pAward(v){ v = (v || '').trim().toLowerCase(); if (!v) return null; if (v.includes('partial')) return 'Partially Awarded'; if (v.includes('not')) return 'Not Yet Awarded'; if (v.includes('award')) return 'Awarded'; return null; }
+  function pDate(v){
+    v = (v == null ? '' : String(v)).trim();
+    if (!v || /^(n\/a|na|tbd|-|—)$/i.test(v)) return null;
+    if (/^\d+(\.\d+)?$/.test(v)) {                       // bare number → Excel serial date
+      const s = parseFloat(v);
+      if (s > 20000 && s < 80000) { const d = new Date(Date.UTC(1899,11,30) + s * 86400000); return isNaN(d) ? null : d.toISOString().split('T')[0]; }
+    }
+    const d = new Date(v);
+    return isNaN(d) ? null : d.toISOString().split('T')[0];
+  }
+  const stageOn = v => { v = (v || '').trim().toLowerCase(); return !(['', 'false', 'no', '0', 'n/a', 'na', '-'].includes(v)); };
+
+  function deriveProc(row, stageIdx){
+    let last = null;
+    for (const [k, label] of STAGES) if (stageIdx[k] !== undefined && stageOn(row[stageIdx[k]])) last = label;
+    return last;
+  }
+
+  // Position-based fallback: native 54-col template, or legacy <40-col files
+  function positionMap(r, pid){
+    const is54 = r.length >= 40;
+    if (is54) return {
+      project_id:pid,
+      cost_code:pStr(r[0]), trade:pStr(r[1]), works:pStr(r[2]), type_of_works:pStr(r[3]),
+      wp_no:pStr(r[4]), description:pStr(r[5])||pStr(r[4]), detailed_description:pStr(r[6]), scope:pStr(r[7]),
+      zone:pStr(r[8]), type_of_service:pStr(r[9]), type_of_procurement:pStr(r[10]),
+      type_of_contract:pStr(r[11]), charging_type:pStr(r[12]),
+      contract_package_no:pStr(r[13]), co_description:pStr(r[14]),
+      proposed_vendors:pStr(r[15]), po_jo_count:pInt(r[16]), po_jo_numbers:pStr(r[17]),
+      responsible_team:pStr(r[18]), approver:pStr(r[19]), support_team:pStr(r[20]),
+      surety_bond:pBond(r[21]), performance_bond:pBond(r[22]), warranty_bond:pBond(r[23]),
+      requires_approval:pBool(r[24]), submittal_document_type:pStr(r[25]), approver_name:pStr(r[26]),
+      approval_date:pDate(r[27]), submittal_type:pStr(r[28])||'Not Required',
+      lead_time:pInt(r[29]), awarding_date:pDate(r[30]), actual_awarding_date:pDate(r[31]),
+      target_delivery:pDate(r[32]), actual_delivery:pDate(r[33]), target_installation:pDate(r[34]),
+      target_completion:pDate(r[35]),
+      approved_budget_bcb:pNum(r[36])||0, awarded_cost:pNum(r[37]),
+      award_status:pStr(r[38])||'Not Yet Awarded', contractor:pStr(r[39]),
+      payment_terms_days:pInt(r[40]), dp_percent:pPct(r[41]), dp_terms:pStr(r[42]),
+      dp_amount:pNum(r[43]), dp_release_date:pDate(r[44]), dp_notes:pStr(r[45]),
+      retention_percent:pPct(r[46]), retention_amount:pNum(r[47]), retention_period:pStr(r[48]),
+      procurement_status:pStr(r[49])||'Not Started', awarding_status:pStr(r[50]),
+      delivery_status:pStr(r[51])||'Not Awarded', remarks:pStr(r[52])||'', purchase_request:pStr(r[53]),
+    };
+    return {
+      project_id:pid,
+      cost_code:pStr(r[0]), trade:pStr(r[1]), works:pStr(r[2]),
+      wp_no:pStr(r[3]), description:pStr(r[4])||pStr(r[3]), zone:pStr(r[5]), scope:pStr(r[6]),
+      charging_type:pStr(r[7]), contract_package_no:pStr(r[8]), co_description:pStr(r[9]),
+      proposed_vendors:pStr(r[10]), po_jo_count:pInt(r[11]), po_jo_numbers:pStr(r[12]),
+      approved_budget_bcb:pNum(r[13])||0, awarded_cost:pNum(r[14]),
+      award_status:pStr(r[15])||'Not Yet Awarded', procurement_status:pStr(r[16])||'Not Started',
+      awarding_date:pDate(r[17]), actual_awarding_date:pDate(r[18]),
+      target_delivery:pDate(r[19]), actual_delivery:pDate(r[20]),
+      target_completion:pDate(r[21]), target_installation:pDate(r[22]),
+      lead_time:pInt(r[23]), remarks:pStr(r[24])||'',
+    };
+  }
+
+  // Returns true when the header row contains recognizable WP column names
+  function isHeaderMode(table){ return buildIdx(table[0]).idx.wp_no !== undefined; }
+
+  function dataRowCount(table){
+    if (!table || table.length < 2) return 0;
+    const { idx } = buildIdx(table[0]);
+    const header = idx.wp_no !== undefined;
+    let n = 0;
+    for (let i = 1; i < table.length; i++){
+      const r = table[i];
+      const cell = header ? r[idx.wp_no] : r[r.length >= 40 ? 4 : 3];
+      if ((cell || '').trim() !== '') n++;
+    }
+    return n;
+  }
+
+  function toWPData(table, pid){
+    const { idx, stageIdx } = buildIdx(table[0]);
+    const header = idx.wp_no !== undefined;
+    const out = [];
+    for (let i = 1; i < table.length; i++){
+      const r = table[i];
+      if (!header){
+        const wp = positionMap(r, pid);
+        if (wp.wp_no) out.push(wp);
+        continue;
+      }
+      const g = f => idx[f] !== undefined ? r[idx[f]] : '';
+      const wpno = pStr(g('wp_no'));
+      if (!wpno) continue;
+      const proc = deriveProc(r, stageIdx) || pStr(g('procurement_status')) || 'Not Started';
+      const awardedCost = pNum(g('awarded_cost'));
+      const award_status = pAward(g('award_status'))
+        || ((proc === 'Contract' || proc === 'Mob / Del') ? 'Awarded' : null)
+        || (awardedCost > 0 ? 'Awarded' : 'Not Yet Awarded');
+      out.push({
+        project_id:pid,
+        cost_code:pStr(g('cost_code')), trade:pStr(g('trade')), works:pStr(g('works')),
+        type_of_works:pStr(g('type_of_works')), wp_no:wpno,
+        description:pStr(g('description')) || wpno, detailed_description:pStr(g('detailed_description')),
+        scope:pStr(g('scope')), zone:pStr(g('zone')),
+        type_of_service:pStr(g('type_of_service')), type_of_procurement:pStr(g('type_of_procurement')),
+        type_of_contract:pStr(g('type_of_contract')), charging_type:pStr(g('charging_type')),
+        contract_package_no:pStr(g('contract_package_no')), co_description:pStr(g('co_description')),
+        proposed_vendors:pStr(g('proposed_vendors')), po_jo_count:pInt(g('po_jo_count')), po_jo_numbers:pStr(g('po_jo_numbers')),
+        responsible_team:pStr(g('responsible_team')), approver:pStr(g('approver')), support_team:pStr(g('support_team')),
+        surety_bond:pBond(g('surety_bond')), performance_bond:pBond(g('performance_bond')), warranty_bond:pBond(g('warranty_bond')),
+        requires_approval:pBool(g('requires_approval')),
+        submittal_document_type:pStr(g('submittal_document_type')), approver_name:pStr(g('approver_name')),
+        approval_date:pDate(g('approval_date')), submittal_type:pStr(g('submittal_type')) || 'Not Required',
+        lead_time:pInt(g('lead_time')), awarding_date:pDate(g('awarding_date')),
+        actual_awarding_date:pDate(g('actual_awarding_date')), target_delivery:pDate(g('target_delivery')),
+        actual_delivery:pDate(g('actual_delivery')), target_installation:pDate(g('target_installation')),
+        target_completion:pDate(g('target_completion')),
+        approved_budget_bcb:pNum(g('approved_budget_bcb')) || 0, awarded_cost:awardedCost,
+        additionals:pNum(g('additionals')),
+        award_status, contractor:pStr(g('contractor')),
+        payment_terms_days:pInt(g('payment_terms_days')), dp_percent:pPct(g('dp_percent')),
+        dp_terms:pStr(g('dp_terms')), dp_amount:pNum(g('dp_amount')), dp_release_date:pDate(g('dp_release_date')),
+        dp_notes:pStr(g('dp_notes')), retention_percent:pPct(g('retention_percent')),
+        retention_amount:pNum(g('retention_amount')), retention_period:pStr(g('retention_period')),
+        procurement_status:proc, awarding_status:pStr(g('awarding_status')),
+        delivery_status:pStr(g('delivery_status')) || 'Not Awarded', remarks:pStr(g('remarks')) || '',
+        purchase_request:pStr(g('purchase_request')),
+      });
+    }
+    return out;
+  }
+
+  return { parse, dataRowCount, toWPData, isHeaderMode };
+})();

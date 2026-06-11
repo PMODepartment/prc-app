@@ -59,6 +59,30 @@
     @media(max-width:767px){
       .ms-dd{position:fixed;left:12px;right:12px;top:auto;z-index:500;border-radius:12px}
     }
+    /* ── Dark mode ── */
+    body.dark-mode .form-group input:focus,
+    body.dark-mode .form-group select:focus,
+    body.dark-mode .form-group textarea:focus{background:var(--surface);border-color:#5B9DEA}
+    body.dark-mode .form-group input[readonly],
+    body.dark-mode #f-type{background:#262726!important;color:var(--text-hint)!important}
+    body.dark-mode .form-section-title{color:#9DBDF0;border-bottom-color:rgba(157,189,240,.28)}
+    body.dark-mode .ms-trigger:hover,
+    body.dark-mode .ms-trigger.open{background:var(--surface)}
+    body.dark-mode .ms-dd{background:var(--surface);border-color:#5B9DEA}
+    body.dark-mode .ms-dd-header{border-bottom-color:rgba(255,255,255,.09)}
+    body.dark-mode .ms-opt{color:var(--text-primary);border-bottom-color:rgba(255,255,255,.06)}
+    body.dark-mode .ms-opt:active,
+    body.dark-mode .ms-opt.checked{background:rgba(91,157,234,.16)}
+    body.dark-mode .ms-pill{background:#22304a;color:#9DBDF0}
+    body.dark-mode .ms-placeholder{color:var(--text-hint)}
+    body.dark-mode .status-info{background:#1B2533;border-color:#2A3F5F;color:#9DBDF0}
+    body.dark-mode .alert-error,
+    body.dark-mode .rejection-box{background:var(--mw-red-light);border-color:#5A2422;color:#FF8A80}
+    body.dark-mode .alert-success{background:var(--green-light);border-color:#1E4A35;color:#7FD3A3}
+    body.dark-mode .bulk-import-card{background:#1B2533!important;border-color:#2A3F5F!important}
+    body.dark-mode .modal-surface{background:var(--surface)!important;color:var(--text-primary)}
+    body.dark-mode .modal-surface [style*="color:#231F20"]{color:var(--text-primary)!important}
+    body.dark-mode .modal-surface [style*="border-bottom:1px solid #f0f0f0"]{border-bottom-color:rgba(255,255,255,.09)!important}
   </style>
 </head>
 <body>
@@ -126,7 +150,7 @@
         </div>
 
         <!-- Bulk Import banner -->
-        <div id="import-banner" style="display:none;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div id="import-banner" class="bulk-import-card" style="display:none;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <i class="ti ti-table-import" style="font-size:20px;color:#2563EB;flex-shrink:0"></i>
           <div style="flex:1;min-width:180px">
             <div style="font-size:12px;font-weight:700;color:#1e40af">Bulk Import via CSV</div>
@@ -484,9 +508,12 @@
                 <select id="f-proc-status" onchange="onProcStatusChange()">
                   <option value="Not Started">Not Started</option>
                   <option value="Sourcing">Sourcing</option>
-                  <option value="Solicitation">Solicitation</option>
-                  <option value="Evaluation">Evaluation</option>
-                  <option value="Negotiation">Negotiation</option>
+                  <option value="RFQ">RFQ</option>
+                  <option value="Bid Open">Bid Open</option>
+                  <option value="Bid Closed">Bid Closed</option>
+                  <option value="LOA">LOA</option>
+                  <option value="Contract">Contract</option>
+                  <option value="Mob / Del">Mob / Del</option>
                   <option value="Awarded">Awarded</option>
                 </select>
               </div>
@@ -707,7 +734,8 @@
   function onProcStatusChange() {
     const proc = document.getElementById('f-proc-status').value;
     const awardEl = document.getElementById('f-award-status');
-    if (proc === 'Awarded') {
+    // Reaching a contract stage means the package is awarded — keep KPIs accurate
+    if (proc === 'Awarded' || proc === 'Contract' || proc === 'Mob / Del') {
       awardEl.value = 'Awarded';
     } else if (awardEl.value === 'Awarded') {
       // Revert only if it was auto-set (not Partially Awarded which user set manually)
@@ -1305,10 +1333,11 @@ AppAuth.requireLogin(async (user, profile) => {
     const reader = new FileReader();
     reader.onload = e => {
       try {
-        const lines = e.target.result.trim().split('\n');
-        if (lines.length < 2) throw new Error('CSV must have a header row and at least one data row.');
-        _wpCsvData = lines;
-        document.getElementById('wp-csv-status').textContent = `✓ Ready to import ${lines.length - 1} work package(s)`;
+        const table = WPCsv.parse(e.target.result);
+        if (table.length < 2) throw new Error('CSV must have a header row and at least one data row.');
+        _wpCsvData = table; // array of row-arrays (header row at [0])
+        const n = WPCsv.dataRowCount(table);
+        document.getElementById('wp-csv-status').textContent = `✓ Ready to import ${n} work package(s)`;
         errEl.style.display = 'none';
         const btn = document.getElementById('wp-csv-btn'); btn.disabled = false; btn.style.opacity = '1';
       } catch(err) { errEl.textContent = 'Error: ' + err.message; errEl.style.display = 'block'; _wpCsvData = null; }
@@ -1320,78 +1349,15 @@ AppAuth.requireLogin(async (user, profile) => {
     const btn = document.getElementById('wp-csv-btn');
     const errEl = document.getElementById('wp-csv-error');
     btn.textContent = 'Importing…'; btn.disabled = true; errEl.style.display = 'none';
-    function parseRow(line) {
-      const cells = []; let cur = '', inQ = false;
-      for (const ch of line) { if (ch==='"') inQ=!inQ; else if (ch===','&&!inQ){cells.push(cur.trim());cur='';}else cur+=ch; }
-      cells.push(cur.trim()); return cells;
-    }
-    function pDate(v) { if(!v) return null; try{const d=new Date(v);return isNaN(d)?null:d.toISOString().split('T')[0];}catch{return null;} }
-    function pNum(v) { const n=parseFloat((v||'').replace(/,/g,'')); return isNaN(n)?null:n; }
-    function pPct(v) { const n=parseFloat((v||'').replace(/[,%]/g,'')); return isNaN(n)||n===0?null:n/100; }
     try {
       const pid = new URLSearchParams(location.search).get('project');
       if (!pid) throw new Error('No project in URL. Open this form from a project page.');
       const sb = await getSB();
       const userId = (await sb.auth.getUser()).data.user.id;
       const role = window.__wpmRole || 'user';
-      // 54-col template: WP No. is at col 4; legacy 25-col had WP No. at col 3
-      const is54 = _wpCsvData.length > 1 && parseRow(_wpCsvData[1]).length >= 40;
-      const rows = _wpCsvData.slice(1).map(parseRow).filter(r => r[is54 ? 4 : 3]);
-      for (const r of rows) {
-        let wpData;
-        if (is54) {
-          // 54-column template (positions 0-53)
-          wpData = {
-            project_id: pid,
-            // 0-17: Identity
-            cost_code:r[0]||null, trade:r[1]||null, works:r[2]||null, type_of_works:r[3]||null,
-            wp_no:r[4], description:r[5], detailed_description:r[6]||null, scope:r[7]||null,
-            zone:r[8]||null, type_of_service:r[9]||null, type_of_procurement:r[10]||null,
-            type_of_contract:r[11]||null, charging_type:r[12]||null,
-            contract_package_no:r[13]||null, co_description:r[14]||null,
-            proposed_vendors:r[15]||null, po_jo_count:parseInt(r[16])||null, po_jo_numbers:r[17]||null,
-            // 18-20: Approval Matrix
-            responsible_team:r[18]||null, approver:r[19]||null, support_team:r[20]||null,
-            // 21-23: Bonds
-            surety_bond:r[21]||'No', performance_bond:r[22]||'No', warranty_bond:r[23]||'No',
-            // 24-28: Submittals
-            requires_approval:(r[24]||'').toLowerCase()==='yes',
-            submittal_document_type:r[25]||null, approver_name:r[26]||null,
-            approval_date:pDate(r[27]), submittal_type:r[28]||'Not Required',
-            // 29-35: Schedule
-            lead_time:parseInt(r[29])||null, awarding_date:pDate(r[30]),
-            actual_awarding_date:pDate(r[31]), target_delivery:pDate(r[32]),
-            actual_delivery:pDate(r[33]), target_installation:pDate(r[34]),
-            target_completion:pDate(r[35]),
-            // 36-39: Budget
-            approved_budget_bcb:pNum(r[36])||0, awarded_cost:pNum(r[37]),
-            award_status:r[38]||'Not Yet Awarded', contractor:r[39]||null,
-            // 40-48: Payment Terms
-            payment_terms_days:parseInt(r[40])||null, dp_percent:pPct(r[41]),
-            dp_terms:r[42]||null, dp_amount:pNum(r[43]), dp_release_date:pDate(r[44]),
-            dp_notes:r[45]||null, retention_percent:pPct(r[46]),
-            retention_amount:pNum(r[47]), retention_period:r[48]||null,
-            // 49-53: Status
-            procurement_status:r[49]||'Not Started', awarding_status:r[50]||null,
-            delivery_status:r[51]||'Not Awarded', remarks:r[52]||'',
-            purchase_request:r[53]||null,
-          };
-        } else {
-          // Legacy 25-column fallback
-          wpData = {
-            project_id:pid,
-            cost_code:r[0]||null, trade:r[1]||null, works:r[2]||null,
-            wp_no:r[3], description:r[4], zone:r[5]||null, scope:r[6]||null,
-            charging_type:r[7]||null, contract_package_no:r[8]||null, co_description:r[9]||null,
-            proposed_vendors:r[10]||null, po_jo_count:parseInt(r[11])||null, po_jo_numbers:r[12]||null,
-            approved_budget_bcb:pNum(r[13])||0, awarded_cost:pNum(r[14]),
-            award_status:r[15]||'Not Yet Awarded', procurement_status:r[16]||'Not Started',
-            awarding_date:pDate(r[17]), actual_awarding_date:pDate(r[18]),
-            target_delivery:pDate(r[19]), actual_delivery:pDate(r[20]),
-            target_completion:pDate(r[21]), target_installation:pDate(r[22]),
-            lead_time:parseInt(r[23])||null, remarks:r[24]||'',
-          };
-        }
+      const rows = WPCsv.toWPData(_wpCsvData, pid);
+      if (!rows.length) throw new Error('No rows with a WP No. found. Check that the WP No. column is filled.');
+      for (const wpData of rows) {
         const newWP = await WPDb.submitWP(wpData, { id: userId });
         if (AppAuth.isAutoApprove({role}) && newWP?.id) await WPDb.approveWP(newWP.id);
       }
@@ -1406,7 +1372,7 @@ AppAuth.requireLogin(async (user, profile) => {
 
 <!-- ── Template Picker Modal ── -->
 <div id="template-picker-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeTemplatePickerModal()">
-  <div style="background:#fff;border-radius:14px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden">
+  <div class="modal-surface" style="background:#fff;border-radius:14px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden">
     <div style="padding:20px 20px 16px;border-bottom:1px solid #f0f0f0">
       <div style="font-size:15px;font-weight:700;color:#231F20">Download CSV Template</div>
       <div style="font-size:12px;color:#888;margin-top:2px">Select which template you need</div>
@@ -1445,7 +1411,7 @@ AppAuth.requireLogin(async (user, profile) => {
 
 <!-- ── WP CSV Import Modal ── -->
 <div id="wp-import-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeWPImportModal()">
-  <div style="background:#fff;border-radius:12px;width:100%;max-width:500px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+  <div class="modal-surface" style="background:#fff;border-radius:12px;width:100%;max-width:500px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
     <div style="padding:20px 20px 16px">
       <div style="font-size:15px;font-weight:700;color:#231F20;margin-bottom:3px">Import Work Packages</div>
       <div style="font-size:12px;color:#888;margin-bottom:14px">Upload a CSV file. <button onclick="downloadCSVTemplate()" style="background:none;border:none;color:#2563EB;font-size:12px;cursor:pointer;padding:0;font-family:inherit;text-decoration:underline">Download template</button></div>
