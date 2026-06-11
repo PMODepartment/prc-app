@@ -1,5 +1,5 @@
 ﻿
-/* â”€â”€ WPDb â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── WPDb ─────────────────────────────────────────────────────────── */
 const WPDb = (() => {
   function mapWP(w) {
     if (!w) return null;
@@ -84,7 +84,7 @@ const WPDb = (() => {
   return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getAllApprovedWPs,getApprovedWPsForProjects,getPendingWPs,getAllWPsForAdmin,getAllWPsForProjects,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,deleteWP,getAllUsers,getUsersForAdmin,getAdminUsers,getManagerUsers,updateUser,updateLastLogin,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
 })();
 
-/* â”€â”€ Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Stats ─────────────────────────────────────────────────────────── */
 function computeStats(wps) {
   const total=wps.length;
   const awarded=wps.filter(w=>w.award_status==='Awarded').length;
@@ -98,7 +98,7 @@ function computeStats(wps) {
   return {total,awarded,partial,notAwarded,totalBudget,totalContract,variance,late,awardRate:total?Math.round(awarded/total*100):0};
 }
 
-/* â”€â”€ Formatting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Formatting ─────────────────────────────────────────────────────── */
 const Fmt = {
   money(v, decimals=2) {
     if (v==null||isNaN(v)) return '\u2014';
@@ -119,7 +119,7 @@ const Calc = {
   variance(w) { return (w.approved_budget_bcb??0)-(w.total_awarded??0); }
 };
 
-/* â”€â”€ CSV Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── CSV Export ─────────────────────────────────────────────────────── */
 function exportCSV(wps, label) {
   // Sort by project then WP number for clean consolidated output
   const sorted = [...wps].sort((a,b) => {
@@ -195,7 +195,7 @@ function exportCSV(wps, label) {
     w.purchase_request, w.remarks,
   ].map(cell).join(','));
 
-  // BOM + header + data â€” BOM ensures Excel opens UTF-8 correctly (handles â‚± etc)
+  // BOM + header + data — BOM ensures Excel opens UTF-8 correctly (handles ₱ etc)
   const BOM = '\uFEFF';
   const csv = BOM + [h.join(','), ...rows].join('\n');
 
@@ -210,7 +210,7 @@ function exportCSV(wps, label) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-/* â”€â”€ User bar â€” avatar only, role in dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── User bar — avatar only, role in dropdown ───────────────────────── */
 function renderUserBar(id, profile) {
   const el = document.getElementById(id);
   if (!el || !profile) return;
@@ -260,7 +260,7 @@ document.addEventListener('click', function(e) {
     menu.style.display = 'none';
 });
 
-/* â”€â”€ Metrics & Rank helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Metrics & Rank helpers ─────────────────────────────────────────── */
 function buildMetrics(containerId, items) {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -566,7 +566,7 @@ function updatePendingBadge() {
   }).catch(()=>{});
 }
 
-/* â”€â”€ Global New Project Modal (overridden by admin.html's own version) â”€â”€ */
+/* ── Global New Project Modal (overridden by admin.html's own version) ── */
 (function() {
   let _gnpUsers = [];
 
@@ -604,13 +604,13 @@ function updatePendingBadge() {
               style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Budget BCB (â‚±)</div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Budget BCB (₱)</div>
             <input id="gnp-budget" type="number" placeholder="e.g. 274900000"
               style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
             <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Assign Users (optional)</div>
-            <div id="gnp-user-list"><div style="color:#aaa;font-size:12px">Loadingâ€¦</div></div>
+            <div id="gnp-user-list"><div style="color:#aaa;font-size:12px">Loading…</div></div>
           </div>
           <div id="gnp-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 12px;font-size:13px"></div>
         </div>
@@ -646,7 +646,7 @@ function updatePendingBadge() {
     const budget = parseFloat(document.getElementById('gnp-budget')?.value)||null;
     const selectedUsers = [...document.querySelectorAll('#gnp-user-rows input:checked')].map(cb=>cb.value);
     const btn = document.getElementById('gnp-create-btn');
-    btn.textContent='Creatingâ€¦'; btn.disabled=true; errEl.style.display='none';
+    btn.textContent='Creating…'; btn.disabled=true; errEl.style.display='none';
     try {
       await WPDb.createProject({id, name, location:v('gnp-location'), description:v('gnp-description'), budget_bcb:budget, status:'active'});
       for (const uid of selectedUsers) {
@@ -655,7 +655,7 @@ function updatePendingBadge() {
       }
       window._gnpClose();
       const toast = document.createElement('div');
-      toast.innerHTML=`<div style="position:fixed;bottom:24px;right:24px;background:#2D9B6F;color:#fff;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:9999">âœ“ Project ${id} created</div>`;
+      toast.innerHTML=`<div style="position:fixed;bottom:24px;right:24px;background:#2D9B6F;color:#fff;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:9999">✓ Project ${id} created</div>`;
       document.body.appendChild(toast); setTimeout(()=>toast.remove(),3000);
       if (typeof loadData==='function') setTimeout(loadData,500);
       if (typeof loadAll==='function') setTimeout(loadAll,500);
@@ -672,7 +672,7 @@ function updatePendingBadge() {
     const modal = _gnpGetOrCreate();
     modal.style.display = 'flex';
     const list = document.getElementById('gnp-user-list');
-    if (list) list.innerHTML = '<div style="color:#aaa;font-size:12px">Loadingâ€¦</div>';
+    if (list) list.innerHTML = '<div style="color:#aaa;font-size:12px">Loading…</div>';
     try {
       _gnpUsers = await WPDb.getAllUsers();
       const approved = _gnpUsers.filter(u=>u.status==='approved');
@@ -680,7 +680,7 @@ function updatePendingBadge() {
         list.innerHTML = `
           <div style="position:relative;margin-bottom:8px">
             <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:13px"></i>
-            <input type="text" placeholder="Search usersâ€¦" oninput="document.querySelectorAll('.gnpu-row').forEach(r=>r.style.display=r.textContent.toLowerCase().includes(this.value.toLowerCase())?'':'none')"
+            <input type="text" placeholder="Search users…" oninput="document.querySelectorAll('.gnpu-row').forEach(r=>r.style.display=r.textContent.toLowerCase().includes(this.value.toLowerCase())?'':'none')"
               style="width:100%;padding:6px 10px 6px 28px;border:1px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div id="gnp-user-rows" style="display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto">
