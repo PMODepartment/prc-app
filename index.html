@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260611b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260611b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260611b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260611c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260611c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260611c"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260611b"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260611c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260611b"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260611c"/>
 </head>
 <body>
 
@@ -545,12 +545,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260611b"></script>
-<script src="assets/js/db.js?v=20260611b"></script>
-<script src="assets/js/ui.js?v=20260611b"></script>
+<script src="assets/js/auth.js?v=20260611c"></script>
+<script src="assets/js/db.js?v=20260611c"></script>
+<script src="assets/js/ui.js?v=20260611c"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260611b"></script>
+<script src="assets/js/charts.js?v=20260611c"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -912,6 +912,13 @@
           ${row('Approval Date',fmtD(w.approval_date))}
           ${row('Submittal Type',w.submittal_doc_type||'—')}
         </div>`;
+      if (!isViewer) {
+        const safeNo = String(w.wp_no||'').replace(/['\\]/g,'');
+        html += `<div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0">
+          <a href="wp-form.html?id=${w.id}&project=${w.project_id}" style="flex:1;text-align:center;padding:10px;background:#EE3124;color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none"><i class="ti ti-edit" style="font-size:13px;vertical-align:middle"></i> Edit</a>
+          <button onclick="deleteWPFromDetail('${w.id}','${safeNo}')" style="padding:10px 16px;background:#fff;color:#EE3124;border:1.5px solid #EE3124;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer"><i class="ti ti-trash" style="font-size:13px;vertical-align:middle"></i> Delete</button>
+        </div>`;
+      }
       document.getElementById('wp-detail-modal-title').textContent = w.wp_no||'Work Package Detail';
       document.getElementById('wp-detail-modal-sub').textContent = w.description||'';
       document.getElementById('wp-detail-modal-body').innerHTML = html;
@@ -920,6 +927,17 @@
     };
     window.closeWPDetailModal = function() {
       document.getElementById('wp-detail-modal').style.display = 'none';
+    };
+    window.deleteWPFromDetail = async function(id, wpNo) {
+      if (!confirm(`Delete work package ${wpNo||''}?\n\nThis permanently removes it and cannot be undone.`)) return;
+      try {
+        await WPDb.deleteWP(id);
+        try { Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx')).forEach(k=>sessionStorage.removeItem(k)); } catch(e){}
+        closeWPDetailModal();
+        location.reload();
+      } catch(e) {
+        alert('Delete failed: ' + (e.message || e));
+      }
     };
     // ── Tab switching ─────────────────────────────────────────────
     const ALL_TABS = ['overview','dashboard','backlog','budget','schedule','works','wplist','claims'];

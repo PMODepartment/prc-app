@@ -76,6 +76,7 @@ WPDb.updateWP(id, data)                    // update (resets to pending_review);
 WPDb.updateWPDirect(id, data)             // update without status change; throws on error
 WPDb.approveWP(id)
 WPDb.rejectWP(id, _, reason)
+WPDb.deleteWP(id)                          // permanently deletes one WP; throws on error
 WPDb.getAllUsers()
 WPDb.updateUser(id, updates)
 WPDb.updateLastLogin(userId)
@@ -298,6 +299,9 @@ Tabs: Overview → Dashboard → Backlog → WP List
 ### Unsaved Changes Guard
 `formDirty` flag. `markDirty()` on input/change events. `markClean()` called on successful save. `beforeunload` fires only if `formDirty`.
 
+### Delete WP
+A WP can be deleted from three places (non-viewers only): the **WP detail slide-in panel** on `index.html` and `project.html` (`deleteWPFromDetail(id, wpNo)` — Edit + Delete buttons in the panel footer), and **`wp-form.html` edit mode** (`#btn-delete` → `deleteCurrentWP()`, shown only when `editId` is set). All confirm first, call `WPDb.deleteWP(id)`, bust the `wpm_wps_idx*` sessionStorage cache, then reload (index: `location.reload()`; project: `loadData()`; form: redirect to `project.html?id=`). Requires DELETE granted on `work_packages` (already present — `deleteProject` uses it).
+
 ---
 
 ## CSV Import (Work Packages)
@@ -436,7 +440,7 @@ Public pages (login, register, pending, forgot-password) load UMD bundle inline 
 
 Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net, cdnjs.cloudflare.com; `dns-prefetch` for Supabase URL; `preload as="script"` for all body scripts.
 
-**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` — on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior — e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260611b`. (Other pages — admin/review/wp-form/etc. — are not versioned; they rely on ETag revalidation and don't host the chart/rank features.)
+**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` — on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior — e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260611c`. (Other pages — admin/review/wp-form/etc. — are not versioned; they rely on ETag revalidation and don't host the chart/rank features.)
 
 ---
 

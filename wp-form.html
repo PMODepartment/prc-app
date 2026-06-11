@@ -570,6 +570,9 @@
             <button class="btn" onclick="history.back()">
               <i class="ti ti-arrow-left" style="font-size:13px"></i> Cancel
             </button>
+            <button class="btn" id="btn-delete" onclick="deleteCurrentWP()" style="display:none;margin-left:auto;color:#EE3124;border-color:#EE3124">
+              <i class="ti ti-trash" style="font-size:13px"></i> Delete WP
+            </button>
             <div id="save-spinner" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary)">
               <div class="spinner" style="width:18px;height:18px;border-width:2px"></div> Saving…
             </div>
@@ -736,6 +739,23 @@
   function onProcStatusChange() {
     markDirty();
   }
+
+  window.deleteCurrentWP = async function() {
+    if (!editId) return;
+    const label = (existingWP && existingWP.wp_no) ? existingWP.wp_no : 'this work package';
+    if (!confirm(`Delete ${label}?\n\nThis permanently removes it and cannot be undone.`)) return;
+    const btn = document.getElementById('btn-delete');
+    if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+    try {
+      await WPDb.deleteWP(editId);
+      try { Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx')).forEach(k=>sessionStorage.removeItem(k)); } catch(e){}
+      markClean();
+      location.href = 'project.html?id=' + (existingWP ? existingWP.project_id : (projId||''));
+    } catch(e) {
+      alert('Delete failed: ' + (e.message || e));
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    }
+  };
 
   function onChargingChange() {
     const v = document.getElementById('f-charging').value;
@@ -995,6 +1015,8 @@ AppAuth.requireLogin(async (user, profile) => {
 
       document.getElementById('page-title').textContent = 'Edit Work Package';
       document.getElementById('page-sub').textContent = existingWP.wp_no + ' — ' + existingWP.description;
+      const delBtn = document.getElementById('btn-delete');
+      if (delBtn && profile.role !== 'viewer') delBtn.style.display = '';
       document.getElementById('btn-submit-text').textContent =
         ['admin','super_admin'].includes(profile.role) ? 'Save Changes' : 'Submit Update for Review';
 
