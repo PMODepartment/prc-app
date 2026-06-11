@@ -299,6 +299,9 @@ Tabs: Overview → Dashboard → Backlog → WP List
 ### Unsaved Changes Guard
 `formDirty` flag. `markDirty()` on input/change events. `markClean()` called on successful save. `beforeunload` fires only if `formDirty`.
 
+### Cost Overview KPI auto-fit
+The 6 Cost Overview KPIs (`#metrics-cost`, `.ov-cost-grid`) use `Fmt.moneyFull` (full digits), which for multi-project portfolios reaches billions (e.g. `₱16,521,423,165`) and used to wrap mid-number. Fix: `.ov-cost-grid .metric-value` is `white-space:nowrap;overflow:hidden`, and `fitMetricValues(container)` (in both `index.html` and `project.html`) shrinks each value's font from its CSS size down to a floor of 11px until it fits on one line. Called after the metrics render and on a debounced `resize`. Scoped to `.ov-cost-grid` only — the Dashboard/Budget/Claims `.metric-value` cards use abbreviated `Fmt.money` (₱X.XXM) and are not nowrapped, so they are unaffected.
+
 ### Delete WP
 A WP can be deleted from three places (non-viewers only): the **WP detail slide-in panel** on `index.html` and `project.html` (`deleteWPFromDetail(id, wpNo)` — Edit + Delete buttons in the panel footer), and **`wp-form.html` edit mode** (`#btn-delete` → `deleteCurrentWP()`, shown only when `editId` is set). All confirm first, call `WPDb.deleteWP(id)`, bust the `wpm_wps_idx*` sessionStorage cache, then reload (index: `location.reload()`; project: `loadData()`; form: redirect to `project.html?id=`). Requires DELETE granted on `work_packages` (already present — `deleteProject` uses it).
 
