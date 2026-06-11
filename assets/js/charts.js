@@ -97,6 +97,23 @@ const Charts = (() => {
   // ── Data label helpers ───────────────────────────────────────
   function _mob() { return window.innerWidth < 640; }
 
+  // Abbreviate a value already expressed in MILLIONS → "16.5B" / "2.4B" / "350M" / "5.1M".
+  // Keeps billion-scale portfolio figures distinguishable from millions on charts.
+  function _mAbbr(vM) {
+    if (vM == null || isNaN(vM)) return '';
+    const a = Math.abs(vM);
+    if (a >= 1000) return (vM / 1000).toFixed(a >= 10000 ? 1 : 2) + 'B';
+    if (a >= 100)  return Math.round(vM) + 'M';
+    return (+vM.toFixed(1)) + 'M';
+  }
+  // Axis-tick variant (no decimals for millions): "16B" / "1.5B" / "350M".
+  function _axM(vM) {
+    if (vM == null || isNaN(vM)) return '';
+    const a = Math.abs(vM);
+    if (a >= 1000) return (vM / 1000).toFixed(a >= 10000 ? 0 : 1) + 'B';
+    return Math.round(vM) + 'M';
+  }
+
   // Outside-end labels for non-stacked bar charts
   // axis: 'v' (vertical) or 'h' (horizontal)
   function _dlBar(fmtFn, axis) {
@@ -225,7 +242,7 @@ const Charts = (() => {
   }
 
   function consolidatedBudget(id,projects,allStats){
-    const dl = _dlBar(v => v > 0 ? v.toFixed(1)+'M' : '', 'v');
+    const dl = _dlBar(v => v > 0 ? _mAbbr(v) : '', 'v');
     make(id,{type:'bar',data:{labels:projects.map(p=>p.id),datasets:[
       {label:'Budget',data:allStats.map(s=>+((s.totalBudget||0)/1e6).toFixed(1)),backgroundColor:'rgba(40,44,40,0.55)',borderRadius:4},
       {label:'Awarded',data:allStats.map(s=>+((s.totalContract||0)/1e6).toFixed(1)),backgroundColor:'rgba(45,155,111,0.75)',borderRadius:4}
@@ -235,7 +252,7 @@ const Charts = (() => {
   function budgetByTrade(id,wps,trades){
     const data=trades.map(t=>+(wps.filter(w=>w.trade===t).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6).toFixed(1));
     const awardedData=trades.map(t=>+(wps.filter(w=>w.trade===t).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6).toFixed(1));
-    const dl = _dlBar(v => v > 0 ? v.toFixed(1)+'M' : '', 'h');
+    const dl = _dlBar(v => v > 0 ? _mAbbr(v) : '', 'h');
     make(id,{type:'bar',data:{labels:trades,datasets:[
       {label:'Budget',data:data,backgroundColor:'rgba(40,44,40,0.55)',borderRadius:4},
       {label:'Awarded',data:awardedData,backgroundColor:'rgba(45,155,111,0.7)',borderRadius:4}
@@ -272,14 +289,14 @@ const Charts = (() => {
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
     const mob=_mob();
-    const dl=mob?{display:false}:_dlBar(v=>v>0?v.toFixed(1)+'M':'','v');
+    const dl=mob?{display:false}:_dlBar(v=>v>0?_mAbbr(v):'','v');
     const hideAwd=!!(opts&&opts.hideAwarded);
     make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
       ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1}]),
-    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},callback:v=>v.toFixed(0)+'M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
   // Budget (BCB) and Awarded by Period — quarterly combo chart (opts.hideAwarded: see monthly variant)
@@ -295,14 +312,14 @@ const Charts = (() => {
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
     const mob=_mob();
-    const dl=mob?{display:false}:_dlBar(v=>v>0?v.toFixed(1)+'M':'','v');
+    const dl=mob?{display:false}:_dlBar(v=>v>0?_mAbbr(v):'','v');
     const hideAwd=!!(opts&&opts.hideAwarded);
     make(id,{type:'bar',data:{labels,datasets:[
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
       ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1}]),
-    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},callback:v=>v.toFixed(0)+'M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
   // Work Package by Trade — horizontal grouped bar
@@ -339,7 +356,7 @@ const Charts = (() => {
     const dueBCB=na.filter(w=>w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
     const notDueBCB=na.filter(w=>!w.awarding_date||new Date(w.awarding_date)>=today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
     const totalBCB=awardedBCB+dueBCB+notDueBCB;
-    const fmt=v=>totalBCB?(v/1e6).toFixed(1)+'M':'0';
+    const fmt=v=>totalBCB?_mAbbr(v/1e6):'0';
     const dl = _dlDonut((v,ctx) => {
       const tot = ctx.dataset.data.reduce((a,b)=>a+(b||0),0);
       return (tot ? Math.round(v/tot*100) : 0) + '%';
@@ -392,7 +409,7 @@ const Charts = (() => {
     const b3=aging.filter(a=>a>=0&&a<=30).length;
     const b4=aging.filter(a=>a<0).length;
     const proj=projectName||'Project';
-    const dl = _dlStacked(v => v > 0 ? v : '');
+    const dl = _dlStacked(v => v > 0 ? _mAbbr(v) : '');
     make(id,{type:'bar',data:{labels:[proj],datasets:[
       {label:'>60d overdue',data:[b1],backgroundColor:'#EE3124',borderRadius:3},
       {label:'30–60d overdue',data:[b2],backgroundColor:'#D97706',borderRadius:3},
@@ -405,11 +422,11 @@ const Charts = (() => {
   function budgetByTradeHBar(id, wps){
     const trades=[...new Set(wps.map(w=>w.trade).filter(Boolean))];
     const data=trades.map(t=>({t,budget:wps.filter(w=>w.trade===t).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6,awarded:wps.filter(w=>w.trade===t).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6})).sort((a,b)=>b.budget-a.budget);
-    const dl = _dlBar(v => v > 0 ? v.toFixed(1)+'M' : '', 'h');
+    const dl = _dlBar(v => v > 0 ? _mAbbr(v) : '', 'h');
     make(id,{type:'bar',data:{labels:data.map(d=>d.t),datasets:[
       {label:'Budget (BCB)',data:data.map(d=>+d.budget.toFixed(1)),backgroundColor:'#282C28',borderRadius:3},
       {label:'Awarded',data:data.map(d=>+d.awarded.toFixed(1)),backgroundColor:'#EE3124',borderRadius:3},
-    ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:_pad('h')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},datalabels:dl},scales:{x:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+    ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:_pad('h')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},datalabels:dl},scales:{x:{ticks:{font:{size:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
   }
 
   // Budget (BCB) by Period per Trade — stacked bar (many trades × periods: labels off)
@@ -420,24 +437,24 @@ const Charts = (() => {
     const quarters=[...qSet].sort();
     const labels=quarters.map(qLabel);
     const trades=[...new Set(wps.map(w=>w.trade).filter(Boolean))].sort();
-    const COLORS=['#EE3124','#282C28','#2D9B6F','#D97706','#DCDBDB','#5A5858','#C42127','#3B6D11','#92400E','#6B7280'];
+    const COLORS=['#EE3124','#2D9B6F','#2563EB','#D97706','#7C3AED','#0EA5E9','#DB2777','#65A30D','#EA580C','#0D9488','#9333EA','#CA8A04','#DC2626','#16A34A','#4F46E5','#F59E0B','#BE185D','#0891B2','#84CC16','#92400E'];
     const datasets=trades.map((t,i)=>({
       label:t,
       data:quarters.map(qk=>+(wps.filter(w=>w.trade===t&&w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6).toFixed(1)),
       backgroundColor:COLORS[i%COLORS.length],
       borderRadius:2,stack:'bgt'
     }));
-    make(id,{type:'bar',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10,padding:6}},datalabels:{display:false}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}}}}});
+    make(id,{type:'bar',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10,padding:6}},datalabels:{display:false}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,ticks:{font:{size:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}}}}});
   }
 
   // Budget (BCB) by Trade — donut
   function budgetByTradeDonut(id, wps){
     const trades=[...new Set(wps.map(w=>w.trade).filter(Boolean))].sort();
-    const COLORS=['#EE3124','#282C28','#2D9B6F','#D97706','#DCDBDB','#5A5858','#C42127','#3B6D11','#92400E','#6B7280'];
+    const COLORS=['#EE3124','#2D9B6F','#2563EB','#D97706','#7C3AED','#0EA5E9','#DB2777','#65A30D','#EA580C','#0D9488','#9333EA','#CA8A04','#DC2626','#16A34A','#4F46E5','#F59E0B','#BE185D','#0891B2','#84CC16','#92400E'];
     const vals=trades.map(t=>+(wps.filter(w=>w.trade===t).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6).toFixed(1));
     const dl = _dlDonut((v,ctx) => {
       const tot = ctx.dataset.data.reduce((a,b)=>a+(b||0),0);
-      return v.toFixed(1)+'M\n'+(tot ? Math.round(v/tot*100) : 0)+'%';
+      return _mAbbr(v)+'\n'+(tot ? Math.round(v/tot*100) : 0)+'%';
     });
     make(id,{type:'doughnut',data:{labels:trades,datasets:[{data:vals,backgroundColor:COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}},datalabels:dl}}});
   }
@@ -447,7 +464,7 @@ const Charts = (() => {
     const labels=projects.map(p=>p.id);
     const budgets=projects.map(p=>wps.filter(w=>w.project_id===p.id).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
     const awarded=projects.map(p=>wps.filter(w=>w.project_id===p.id).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
-    const dl = _dlBar(v => v > 0 ? v.toFixed(1)+'M' : '', 'v');
+    const dl = _dlBar(v => v > 0 ? _mAbbr(v) : '', 'v');
     make(id,{type:'bar',data:{labels,datasets:[
       {label:'Budget (BCB)',data:budgets,backgroundColor:'#282C28',borderRadius:3},
       {label:'Awarded',data:awarded,backgroundColor:'#EE3124',borderRadius:3},
@@ -455,7 +472,7 @@ const Charts = (() => {
       plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}},datalabels:dl},
       scales:{
         x:{grid:{display:false},ticks:{font:{size:9}}},
-        y:{ticks:{font:{size:9},callback:v=>v.toFixed(0)+' M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}}
+        y:{ticks:{font:{size:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'₱ Million',font:{size:9}}}
       }
     }});
   }
@@ -463,11 +480,11 @@ const Charts = (() => {
   // Awarded by Trade — donut
   function awardedByTradeDonut(id, wps){
     const trades=[...new Set(wps.filter(w=>w.total_awarded>0).map(w=>w.trade).filter(Boolean))].sort();
-    const COLORS=['#EE3124','#282C28','#2D9B6F','#D97706','#DCDBDB','#5A5858','#C42127','#3B6D11','#92400E','#6B7280'];
+    const COLORS=['#EE3124','#2D9B6F','#2563EB','#D97706','#7C3AED','#0EA5E9','#DB2777','#65A30D','#EA580C','#0D9488','#9333EA','#CA8A04','#DC2626','#16A34A','#4F46E5','#F59E0B','#BE185D','#0891B2','#84CC16','#92400E'];
     const vals=trades.map(t=>+(wps.filter(w=>w.trade===t).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6).toFixed(1));
     const dl = _dlDonut((v,ctx) => {
       const tot = ctx.dataset.data.reduce((a,b)=>a+(b||0),0);
-      return v.toFixed(1)+'M\n'+(tot ? Math.round(v/tot*100) : 0)+'%';
+      return _mAbbr(v)+'\n'+(tot ? Math.round(v/tot*100) : 0)+'%';
     });
     make(id,{type:'doughnut',data:{labels:trades,datasets:[{data:vals,backgroundColor:COLORS,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}},datalabels:dl}}});
   }

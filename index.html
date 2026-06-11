@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260611e"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260611e"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260611e"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260611f"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260611f"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260611f"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260611e"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260611f"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260611e"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260611f"/>
 </head>
 <body>
 
@@ -339,7 +339,7 @@
             <div class="panel-title"><i class="ti ti-table"></i>Budget Summary by Trade</div>
             <div style="overflow-x:auto">
               <table class="data-table" id="idx-bud-table" style="font-size:11px">
-                <thead><tr><th>Trade</th><th>WP Count</th><th>Procurement Budget (BCB)</th><th>Awarded</th><th>Variance</th><th>% Var</th><th>Award Rate</th></tr></thead>
+                <thead><tr><th>Trade</th><th style="text-align:center">WP Count</th><th style="text-align:right">Procurement Budget (BCB)</th><th style="text-align:right">Awarded</th><th style="text-align:right">Variance</th><th style="text-align:center">% Var</th><th style="text-align:center">Award Rate</th></tr></thead>
                 <tbody id="idx-bud-tbody"></tbody>
               </table>
             </div>
@@ -545,12 +545,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260611e"></script>
-<script src="assets/js/db.js?v=20260611e"></script>
-<script src="assets/js/ui.js?v=20260611e"></script>
+<script src="assets/js/auth.js?v=20260611f"></script>
+<script src="assets/js/db.js?v=20260611f"></script>
+<script src="assets/js/ui.js?v=20260611f"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260611e"></script>
+<script src="assets/js/charts.js?v=20260611f"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -1284,8 +1284,9 @@
           </tr>`;
         }).join('') || '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
 
-        // Top 5
-        const withBoth = wps.filter(w=>w.approved_budget_bcb>0&&w.total_awarded>0);
+        // Top 5 — Savings/Overbudget only count fully Awarded WPs (closed), so an
+        // in-progress (Not Yet / Partially Awarded) WP can't show phantom savings.
+        const withBoth = wps.filter(w=>w.award_status==='Awarded'&&w.approved_budget_bcb>0&&w.total_awarded>0);
         const variance = w => (w.approved_budget_bcb||0)-(w.total_awarded||0);
         buildRankTable('idx-rank-value',
           [...wps].filter(w=>w.total_awarded>0).sort((a,b)=>(b.total_awarded||0)-(a.total_awarded||0)).slice(0,5)
@@ -1430,13 +1431,13 @@
         const pctVar = totalBCB ? ((variance/totalBCB)*100).toFixed(1) : '0.0';
         const budCards = document.getElementById('bud-cost-cards');
         if (budCards) {
-          const card = (lbl,val,cls) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls}">${val}</div></div>`;
+          const card = (lbl,val,cls,full) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls}"${full?` title="${full}"`:''}>${val}</div></div>`;
           budCards.innerHTML = [
-            card('Procurement Budget (BCB)', Fmt.money(totalBCB), ''),
-            card('Awarded Cost', Fmt.money(totalAwd), 'green'),
-            card('Procurement Cost to Complete', Fmt.money(ctc), ''),
-            card('Procurement Estimate at Completion', Fmt.money(eac), ''),
-            card('Variance', (variance>=0?'+₱':'-₱')+(Math.abs(variance)/1e6).toFixed(1)+'M', variance>=0?'green':'red'),
+            card('Procurement Budget (BCB)', Fmt.moneyShort(totalBCB), '', Fmt.moneyFull(totalBCB)),
+            card('Awarded Cost', Fmt.moneyShort(totalAwd), 'green', Fmt.moneyFull(totalAwd)),
+            card('Procurement Cost to Complete', Fmt.moneyShort(ctc), '', Fmt.moneyFull(ctc)),
+            card('Procurement Estimate at Completion', Fmt.moneyShort(eac), '', Fmt.moneyFull(eac)),
+            card('Variance', (variance>=0?'+':'-')+Fmt.moneyShort(variance), variance>=0?'green':'red', (variance>=0?'+':'-')+Fmt.moneyFull(variance)),
             card('% Variance', (parseFloat(pctVar)>=0?'+':'')+pctVar+'%', parseFloat(pctVar)>=0?'green':'red'),
           ].join('');
         }
@@ -1582,7 +1583,7 @@
         const ctx = document.getElementById('c-idx-wk-count');
         if (ctx) {
           const existing = Chart.getChart(ctx); if(existing) existing.destroy();
-          new Chart(ctx, {type:'doughnut',data:{labels:wkTrades,datasets:[{data:wkCounts,backgroundColor:['#282C28','#EE3124','#D97706','#2D9B6F','#6366F1','#0EA5E9','#F97316','#EC4899','#14B8A6','#8B5CF6','#F59E0B'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},padding:8}}}}});
+          new Chart(ctx, {type:'doughnut',data:{labels:wkTrades,datasets:[{data:wkCounts,backgroundColor:['#EE3124','#2D9B6F','#2563EB','#D97706','#7C3AED','#0EA5E9','#DB2777','#65A30D','#EA580C','#0D9488','#9333EA','#CA8A04','#DC2626','#16A34A','#4F46E5','#F59E0B','#BE185D','#0891B2','#84CC16','#92400E'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},padding:8}}}}});
         }
         // Period table helpers
         function wkGetQKey(d){const q=Math.ceil((d.getMonth()+1)/3);return `${d.getFullYear()}-${q}`;}

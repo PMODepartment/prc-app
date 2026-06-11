@@ -102,7 +102,10 @@ function computeStats(wps) {
 const Fmt = {
   money(v, decimals=2) {
     if (v==null||isNaN(v)) return '\u2014';
-    return '\u20B1'+(Math.abs(v)/1e6).toFixed(decimals)+'M';
+    const a=Math.abs(v);
+    // Auto-scale so billions read as B (\u20B11.50B) instead of an ambiguous \u20B11500.00M
+    if (a>=1e9) return '\u20B1'+(a/1e9).toFixed(decimals)+'B';
+    return '\u20B1'+(a/1e6).toFixed(decimals)+'M';
   },
   moneyFull(v) {
     if (v==null||isNaN(v)) return '\u2014';
