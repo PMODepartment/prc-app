@@ -357,7 +357,8 @@ const Charts = (() => {
       const tot = ctx.dataset.data.reduce((a,b)=>a+(b||0),0);
       return v + '\n' + (tot ? Math.round(v/tot*100) : 0) + '%';
     });
-    make(id,{type:'doughnut',data:{labels:['Submitted','Approved','Rejected','Draft'],datasets:[{data:[pending,approved,rejected,noDraft],backgroundColor:['#EE3124','#282C28','#DCDBDB','#D97706'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},datalabels:dl}}});
+    // Brand red marks the terminal milestone (Approved); Submitted = in-progress neutral dark/gray
+    make(id,{type:'doughnut',data:{labels:['Submitted','Approved','Rejected','Draft'],datasets:[{data:[pending,approved,rejected,noDraft],backgroundColor:['#282C28','#EE3124','#DCDBDB','#D97706'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},datalabels:dl}}});
   }
 
   // Work Package by Period — quarterly bar + cumulative line
