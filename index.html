@@ -564,15 +564,42 @@
   });
 
   // Trade name normalizer — must be at script scope so it's available before the async callback runs
+  // Every WP trade is collapsed into one of 10 canonical trades (no separate "Electrical" —
+  // electrical/auxiliary fold into Auxiliary Works; OPW101 architectural sub-trades fold into
+  // Architectural Works; service trades fold into General Requirements).
   const _TRADE_NORM = {
     'general requirement':'General Requirements','general requirements':'General Requirements',
-    'structural works':'Structural Works','architectural works':'Architectural Works',
-    'site works':'Site Works','site development':'Site Development Works',
-    'mechanical works':'Mechanical Works','electrical works':'Electrical Works',
+    'housekeeping & sanitation services':'General Requirements','housekeeping and sanitation services':'General Requirements',
+    'drawing services':'General Requirements','security services':'General Requirements',
+    'site works':'Site Works',
+    'site development':'Site Development Works','site development works':'Site Development Works',
+    'structural works':'Structural Works','structural labor and services':'Structural Works',
+    'architectural works':'Architectural Works','aluminum and glazing works':'Architectural Works',
+    'masonry works':'Architectural Works','drywall & ceiling works':'Architectural Works',
+    'drywall and ceiling works':'Architectural Works','tiling works':'Architectural Works',
+    'painting works':'Architectural Works','stoneworks':'Architectural Works','metal works':'Architectural Works',
+    'mechanical works':'Mechanical Works',
+    'auxiliary works':'Auxiliary Works','electrical works':'Auxiliary Works',
+    'electrical and auxiliary works':'Auxiliary Works','electrical & auxiliary works':'Auxiliary Works',
     'plumbing works':'Plumbing Works','fire protection works':'Fire Protection Works',
-    'auxiliary works':'Auxiliary Works','allied services':'Allied Services',
+    'allied services':'Allied Services','other allied services':'Allied Services',
   };
-  function normTrade(t){ if(!t)return t; const k=t.trim().toLowerCase(); return _TRADE_NORM[k]||t.trim(); }
+  function normTrade(t){
+    if(!t) return t;
+    const k=t.trim().toLowerCase();
+    if(_TRADE_NORM[k]) return _TRADE_NORM[k];
+    // Keyword fallback so future/unknown trade strings still land in a canonical bucket
+    if(/electr|auxiliary/.test(k)) return 'Auxiliary Works';
+    if(/fire/.test(k)) return 'Fire Protection Works';
+    if(/plumb/.test(k)) return 'Plumbing Works';
+    if(/mechanic|hvac|elevator|\blift\b|escalator/.test(k)) return 'Mechanical Works';
+    if(/structural/.test(k)) return 'Structural Works';
+    if(/site develop/.test(k)) return 'Site Development Works';
+    if(/masonry|tiling|tile|drywall|ceiling|glazing|aluminum|aluminium|paint|stone|metal|finish|architectural/.test(k)) return 'Architectural Works';
+    if(/general requirement|services$/.test(k)) return 'General Requirements';
+    if(/\bsite\b/.test(k)) return 'Site Works';
+    return t.trim();
+  }
 
   // Show a retry prompt if loading takes more than 20 s (Supabase cold-start)
   const _loadTimeout = setTimeout(() => {
@@ -698,12 +725,12 @@
 
     // ── Trade ordering constants ──────────────────────────────────
     const IDX_TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
-      'Architectural Works','Mechanical Works','Electrical Works','Auxiliary Works',
+      'Architectural Works','Mechanical Works','Auxiliary Works',
       'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
     // ── Trade ordering + collapse state ──────────────────────────
     const TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
-      'Architectural Works','Mechanical Works','Electrical Works','Auxiliary Works',
+      'Architectural Works','Mechanical Works','Auxiliary Works',
       'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
     const _collapseState = new Map();
 

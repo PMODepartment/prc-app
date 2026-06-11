@@ -245,7 +245,7 @@ Lazy rendering: `_rendered` flags per tab — charts render on first open, reset
 **IDX_TRADE_ORDER** (used for Budget, Schedule, Works tables):
 ```js
 ['General Requirements','Site Works','Structural Works','Architectural Works',
- 'Mechanical Works','Electrical Works','Auxiliary Works','Plumbing Works',
+ 'Mechanical Works','Auxiliary Works','Plumbing Works',
  'Fire Protection Works','Allied Services','Site Development Works']
 ```
 
@@ -455,7 +455,7 @@ Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic
 4. **N+1 query**: never use `Promise.all(projects.map(p => WPDb.getApprovedWPs(p.id)))` — use `getAllApprovedWPs()` or `getApprovedWPsForProjects(ids)`.
 5. **Role caching**: `window.__wpmRole` set once at login. Role/project changes require the user to log out and back in.
 6. **Chart.js leaks**: always `chartInstance.destroy()` before re-rendering.
-7. **Trade name consistency**: use exact strings from the Trade dropdown. `normTrade(t)` in `index.html` and `project.html` maps legacy casing to canonical names — applied at data load time.
+7. **Trade name consistency — 10 canonical trades only**: `normTrade(t)` in `index.html` and `project.html` (identical) collapses EVERY trade string into one of exactly 10: General Requirements, Site Works, Structural Works, Architectural Works, Mechanical Works, **Auxiliary Works** (no separate "Electrical" — electrical/auxiliary fold here), Plumbing Works, Fire Protection Works, Allied Services, Site Development Works. Explicit map covers all imported variants (OPW101 granular arch sub-trades → Architectural; Structural Labor And Services → Structural; Housekeeping & Sanitation / Drawing / Security Services → General Requirements; Other Allied Services → Allied Services), with a keyword-regex fallback for future unknowns. Applied at data load time. `IDX_TRADE_ORDER`/`TRADE_ORDER` list the same 10 (drives chart colour order). Keep the explicit map + keyword fallback in sync across both files.
 8. **Supabase cold start**: free tier pauses after 7 days → 5–30s delay. UptimeRobot ping every 3–4 days prevents this.
 9. **Duplicate `saveProject` in db.js**: second definition shadows first — harmless but note when editing.
 10. **dp_percent**: stored as decimal (0.20 = 20%). Form input accepts percentage (user types "20"), divided by 100 before storing; edit mode multiplies by 100 to display.
