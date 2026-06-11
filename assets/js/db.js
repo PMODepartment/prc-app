@@ -108,6 +108,15 @@ const Fmt = {
     if (v==null||isNaN(v)) return '\u2014';
     return '\u20B1'+Math.round(Math.abs(v)).toLocaleString('en-US');
   },
+  // Compact headline figure: auto-scales to B / M, else full. Sign is dropped
+  // (callers prepend +/-); pair with moneyFull(v) in a title for the exact value.
+  moneyShort(v) {
+    if (v==null||isNaN(v)) return '\u2014';
+    const a=Math.abs(v);
+    if (a>=1e9) return '\u20B1'+(a/1e9).toFixed(2)+'B';
+    if (a>=1e6) return '\u20B1'+(a/1e6).toFixed(2)+'M';
+    return '\u20B1'+Math.round(a).toLocaleString('en-US');
+  },
   date(d) {
     if (!d) return '\u2014';
     try { return new Date(d).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}); }
