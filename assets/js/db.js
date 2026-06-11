@@ -339,6 +339,9 @@ function buildRankTable(id, items, type) {
     : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Awd',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)}</tr>`;
   const rows = items.map((item, i) => {
     const safe = item.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    // Clicking a row opens the WP detail slide-in panel (full details + Edit/Delete)
+    const click = item.id ? ` onclick="if(window.openWPDetail)openWPDetail('${item.id}')"` : '';
+    const cursor = item.id ? 'cursor:pointer;' : '';
     const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:middle;max-width:1px;width:99%">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:10px;color:#999;font-weight:700;flex-shrink:0;min-width:14px">${i+1}</span>
@@ -349,11 +352,11 @@ function buildRankTable(id, items, type) {
       </div>
     </td>`;
     if (isValue) {
-      return `<tr class="rank-row" data-rn="${safe}" style="border-bottom:1px solid #f5f5f5">${wpCell}
+      return `<tr class="rank-row" data-rn="${safe}"${click} style="${cursor}border-bottom:1px solid #f5f5f5">${wpCell}
         <td class="rank-side" style="font-size:12px;font-weight:700;color:#231F20;padding:9px 0 9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.val)}</td>
       </tr>`;
     }
-    return `<tr class="rank-row" data-rn="${safe}" style="border-bottom:1px solid #f5f5f5">${wpCell}
+    return `<tr class="rank-row" data-rn="${safe}"${click} style="${cursor}border-bottom:1px solid #f5f5f5">${wpCell}
       <td class="rank-side" style="font-size:10px;color:#888;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.bcb)}</td>
       <td class="rank-side" style="font-size:10px;color:#777;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
       <td class="rank-side" style="font-size:12px;font-weight:700;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${valSign}${Fmt.money(item.val)}</td>
