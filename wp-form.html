@@ -514,7 +514,6 @@
                   <option value="LOA">LOA</option>
                   <option value="Contract">Contract</option>
                   <option value="Mob / Del">Mob / Del</option>
-                  <option value="Awarded">Awarded</option>
                 </select>
               </div>
               <div class="form-group">
@@ -730,17 +729,11 @@
     }
   }
 
-  /* Sync Award Status with Procurement Status so dashboard KPIs stay accurate */
+  /* Procurement Status (the WP-Monitoring stage) is independent of Award Status.
+     Whether a WP is awarded is determined solely by the Award Status field under
+     Budget & Contract (which mirrors the "Not yet Awarded / Awarded" Remarks column
+     in the monitoring files), not by the procurement stage. */
   function onProcStatusChange() {
-    const proc = document.getElementById('f-proc-status').value;
-    const awardEl = document.getElementById('f-award-status');
-    // Reaching a contract stage means the package is awarded — keep KPIs accurate
-    if (proc === 'Awarded' || proc === 'Contract' || proc === 'Mob / Del') {
-      awardEl.value = 'Awarded';
-    } else if (awardEl.value === 'Awarded') {
-      // Revert only if it was auto-set (not Partially Awarded which user set manually)
-      awardEl.value = 'Not Yet Awarded';
-    }
     markDirty();
   }
 
@@ -1078,10 +1071,6 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-retention-amount', existingWP.retention_amount);
       fill('f-retention-period', existingWP.retention_period);
       fill('f-proc-status', existingWP.procurement_status);
-      // On load: if proc_status is Awarded but award_status wasn't synced, fix it now
-      if (existingWP.procurement_status === 'Awarded' && existingWP.award_status !== 'Awarded') {
-        document.getElementById('f-award-status').value = 'Awarded';
-      }
       fill('f-submittal', existingWP.submittal_type);
       fill('f-delivery-status', existingWP.delivery_status);
       fill('f-contractor', existingWP.contractor);
@@ -1289,7 +1278,7 @@ AppAuth.requireLogin(async (user, profile) => {
       '14','06/15/2026','07/01/2026','07/08/2026','07/15/2026','09/15/2026','08/31/2026',
       '2000000','1850000','Awarded','ABC Construction Inc.',
       '30','20','Monthly progress billing','370000','07/15/2026','','10','185000','Until completion',
-      'Awarded','Awarded','Delivered','','',
+      'Contract','Awarded','Delivered','','',
     ];
     _downloadBlob([headers, ex1, ex2].map(r => r.map(v => `"${v}"`).join(',')).join('\n'), 'WPM_Import_Template.csv');
   };

@@ -910,10 +910,13 @@ window.WPCsv = (function(){
       const g = f => idx[f] !== undefined ? r[idx[f]] : '';
       const wpno = pStr(g('wp_no'));
       if (!wpno) continue;
-      const proc = deriveProc(r, stageIdx) || pStr(g('procurement_status')) || 'Not Started';
+      const proc = pStr(g('procurement_status')) || deriveProc(r, stageIdx) || 'Not Started';
       const awardedCost = pNum(g('awarded_cost'));
+      // Award status comes from the explicit AWARDED / REMARKS text (the WP-Monitoring
+      // "Not yet Awarded / Awarded" in Column P). The procurement stage is NOT a reliable
+      // award signal, so it is only used as a last resort via awarded_cost.
       const award_status = pAward(g('award_status'))
-        || ((proc === 'Contract' || proc === 'Mob / Del') ? 'Awarded' : null)
+        || pAward(g('remarks'))
         || (awardedCost > 0 ? 'Awarded' : 'Not Yet Awarded');
       out.push({
         project_id:pid,
