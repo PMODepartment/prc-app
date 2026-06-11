@@ -255,7 +255,9 @@ const Charts = (() => {
   function qLabel(k){ const[y,q]=k.split('-'); return `Q${q} '${y.slice(2)}`; }
 
   // Budget (BCB) and Awarded by Period — MONTHLY combo chart
-  function budgetAwardedByPeriodMonthly(id, wps){
+  // opts.hideAwarded: backlog instances pass only not-awarded WPs, whose awarded cost is ₱0 by
+  // definition — drop the two always-zero Awarded series instead of drawing a flat line at 0M.
+  function budgetAwardedByPeriodMonthly(id, wps, opts){
     const mSet=new Set();
     wps.forEach(w=>{ if(w.awarding_date){ const d=new Date(w.awarding_date); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } });
     if(!mSet.size){ destroy(id); return; }
@@ -270,16 +272,17 @@ const Charts = (() => {
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
     const mob=_mob();
     const dl=mob?{display:false}:_dlBar(v=>v>0?v.toFixed(1)+'M':'','v');
+    const hideAwd=!!(opts&&opts.hideAwarded);
     make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
-      {label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2},
+      ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},callback:v=>v.toFixed(0)+'M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
-  // Budget (BCB) and Awarded by Period — quarterly combo chart
-  function budgetAwardedByPeriod(id, wps){
+  // Budget (BCB) and Awarded by Period — quarterly combo chart (opts.hideAwarded: see monthly variant)
+  function budgetAwardedByPeriod(id, wps, opts){
     const qSet=new Set();
     wps.forEach(w=>{ if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date))); });
     if(!qSet.size){ destroy(id); return; }
@@ -292,11 +295,12 @@ const Charts = (() => {
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
     const mob=_mob();
     const dl=mob?{display:false}:_dlBar(v=>v>0?v.toFixed(1)+'M':'','v');
+    const hideAwd=!!(opts&&opts.hideAwarded);
     make(id,{type:'bar',data:{labels,datasets:[
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
-      {label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2},
+      ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},callback:v=>v.toFixed(0)+'M'},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
