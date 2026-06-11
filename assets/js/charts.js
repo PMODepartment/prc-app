@@ -25,11 +25,12 @@ const Charts = (() => {
   function collapse(id) { const c=reg[id]; if(c) c.update('none'); }
 
   // Near-black brand hues (#282C28 etc. + its translucent bar variant) vanish on a dark canvas → remap to a
-  // clearly-visible light gray. #B8B7B7 (~7:1 contrast on the panel) stays distinct from #DCDBDB, which is
-  // reused for the "Future"/"Not Due" buckets, so stacked bars and donut segments don't collide.
+  // visible MID gray. #9B9999 (~4.5:1 on the panel) is deliberately 65 levels below #DCDBDB — which is
+  // reused for the "Future"/"Not Due" buckets — so adjacent donut segments and stacked bars stay
+  // distinguishable (at #B8B7B7 the two grays were nearly identical in the Status donut).
   function _darkRemap(c) {
-    if (c === '#282C28' || c === '#231F20' || c === '#2B2C2B') return '#B8B7B7';
-    if (c === 'rgba(40,44,40,0.55)' || c === 'rgba(40,44,40,0.7)') return 'rgba(184,183,183,0.92)';
+    if (c === '#282C28' || c === '#231F20' || c === '#2B2C2B') return '#9B9999';
+    if (c === 'rgba(40,44,40,0.55)' || c === 'rgba(40,44,40,0.7)') return 'rgba(155,153,153,0.92)';
     return c;
   }
 
