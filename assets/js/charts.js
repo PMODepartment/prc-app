@@ -540,5 +540,35 @@ const Charts = (() => {
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
 
-  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpStatusDonutValue,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject,wpCountByPeriodMonthly,wpCountByPeriod,expand,collapse,updateTheme};
+  // Procurement S-curve (project Overview): cumulative WP count by month.
+  // Planned = WPs whose Planned Award Date (awarding_date) is on/before each month-end.
+  // Actual  = Awarded WPs whose Actual Award Date is on/before each month-end; the actual
+  // line stops at the current month (no future projection). Mirrors the Excel S-Curve sheet —
+  // updates automatically as WPs are marked Awarded with an actual award date.
+  function sCurve(id, wps) {
+    const dates = [];
+    wps.forEach(w => { if (w.awarding_date) dates.push(new Date(w.awarding_date)); if (w.actual_awarding_date) dates.push(new Date(w.actual_awarding_date)); });
+    const valid = dates.filter(d => !isNaN(d));
+    if (!valid.length) { destroy(id); return; }
+    const min = new Date(Math.min(...valid)), max = new Date(Math.max(...valid));
+    const months = [];
+    let d = new Date(min.getFullYear(), min.getMonth(), 1);
+    const last = new Date(max.getFullYear(), max.getMonth(), 1);
+    while (d <= last && months.length < 240) {
+      months.push(new Date(d.getFullYear(), d.getMonth() + 1, 0));   // month-end
+      d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    }
+    const now = new Date();
+    const total = wps.length;
+    const planned = months.map(me => wps.filter(w => w.awarding_date && new Date(w.awarding_date) <= me).length);
+    const actual  = months.map(me => me > now ? null : wps.filter(w => w.award_status === 'Awarded' && w.actual_awarding_date && new Date(w.actual_awarding_date) <= me).length);
+    const labels = months.map(me => me.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
+    const mob = _mob();
+    make(id, { type:'line', data:{ labels, datasets:[
+      { label:'Cumulative Planned', data:planned, borderColor:'#282C28', backgroundColor:'rgba(40,44,40,0.06)', fill:true, tension:.3, pointRadius:mob?0:2, borderWidth:2, order:2 },
+      { label:'Cumulative Actual (Awarded)', data:actual, borderColor:'#EE3124', backgroundColor:'rgba(238,49,36,0.07)', fill:true, tension:.3, pointRadius:mob?0:2, borderWidth:2, borderDash:[5,3], spanGaps:false, order:1 },
+    ]}, options:{ responsive:true, maintainAspectRatio:false, interaction:{ intersect:false, mode:'index' }, plugins:{ legend:{ position:'bottom', labels:{ font:{ size:mob?8:10 }, boxWidth:mob?10:12 } }, datalabels:{ display:false }, tooltip:{ callbacks:{ label:ctx=>` ${ctx.dataset.label}: ${ctx.raw==null?'—':ctx.raw} / ${total} WP` } } }, scales:{ x:{ grid:{ display:false }, ticks:{ font:{ size:mob?7:9 }, maxRotation:45, autoSkip:true, maxTicksLimit:mob?8:18 } }, y:{ beginAtZero:true, suggestedMax:total, ticks:{ font:{ size:mob?8:9 }, stepSize:1, precision:0 }, grid:{ color:'rgba(0,0,0,.05)' }, title:{ display:!mob, text:'Cumulative WPs', font:{ size:9 } } } } } });
+  }
+
+  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpStatusDonutValue,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject,wpCountByPeriodMonthly,wpCountByPeriod,sCurve,expand,collapse,updateTheme};
 })();
