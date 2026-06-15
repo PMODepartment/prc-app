@@ -374,11 +374,14 @@ const Charts = (() => {
     const due=na.filter(w=>w.awarding_date&&new Date(w.awarding_date)<today).length;
     const notDue=na.filter(w=>!w.awarding_date||new Date(w.awarding_date)>=today).length;
     const total=wps.length;
+    // Only include categories that actually have WPs — e.g. a backlog (not-awarded only) set has
+    // zero Awarded, so "Awarded" shouldn't appear in the donut or its legend.
+    const cats=[['Awarded',awarded,'#EE3124'],['Due but Not Awarded',due,'#282C28'],['Not Due',notDue,'#DCDBDB']].filter(c=>c[1]>0);
     const dl = _dlDonut((v,ctx) => {
       const tot = ctx.dataset.data.reduce((a,b)=>a+(b||0),0);
       return v + '\n' + (tot ? Math.round(v/tot*100) : 0) + '%';
     });
-    make(id,{type:'doughnut',data:{labels:['Awarded','Due but Not Awarded','Not Due'],datasets:[{data:[awarded,due,notDue],backgroundColor:['#EE3124','#282C28','#DCDBDB'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} (${total?((ctx.raw/total)*100).toFixed(1):'0'}%)`}},datalabels:dl}}});
+    make(id,{type:'doughnut',data:{labels:cats.map(c=>c[0]),datasets:[{data:cats.map(c=>c[1]),backgroundColor:cats.map(c=>c[2]),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} (${total?((ctx.raw/total)*100).toFixed(1):'0'}%)`}},datalabels:dl}}});
   }
 
   // Work Package by Status — donut by BCB value

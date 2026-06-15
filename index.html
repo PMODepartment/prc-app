@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260615g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615h"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260615h"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615h"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615g"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615h"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615h"/>
 </head>
 <body>
 
@@ -220,7 +220,7 @@
           <!-- Top 5 panels — equal widths, equal heights -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:14px">
             <div class="panel" style="flex:1;min-width:200px">
-              <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
+              <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 High Value Packages</div>
               <div class="rank-list" id="idx-rank-value"></div>
             </div>
             <div class="panel" style="flex:1;min-width:200px">
@@ -451,7 +451,6 @@
             <select id="wp-mon-status" onchange="filterWPTable()">
               <option value="">All Statuses</option>
               <option value="Awarded">Awarded</option>
-              <option value="Partially Awarded">Partially Awarded</option>
               <option value="Not Yet Awarded">Not Yet Awarded</option>
             </select>
             <div style="position:relative;flex:1;min-width:140px">
@@ -558,12 +557,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260615g"></script>
-<script src="assets/js/db.js?v=20260615g"></script>
-<script src="assets/js/ui.js?v=20260615g"></script>
+<script src="assets/js/auth.js?v=20260615h"></script>
+<script src="assets/js/db.js?v=20260615h"></script>
+<script src="assets/js/ui.js?v=20260615h"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260615g"></script>
+<script src="assets/js/charts.js?v=20260615h"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -788,15 +787,16 @@
       approver:   {h:'Approver',            w:120},
       appr_date:  {h:'Approval Date',        w:95},
       submittal:  {h:'Submittal Type',      w:105},
-      status:     {h:'Status',              w:105},
+      proc_status:{h:'Procurement Status',  w:120},
+      status:     {h:'Award Status',        w:105},
       remarks:    {h:'Remarks',             w:130},
     };
     const _WP_VIEWS = {
-      overview:   {label:'Overview',   keys:['cost_code','wp_no','works','scope','description','vendors','status','remarks']},
+      overview:   {label:'Overview',   keys:['cost_code','wp_no','works','scope','description','vendors','proc_status','status','remarks']},
       financial:  {label:'Award',      keys:['cost_code','wp_no','description','budget','awarded','variance','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt'], cost:true},
       schedule:   {label:'Schedule',   keys:['cost_code','wp_no','description','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp']},
       submittals: {label:'Submittals', keys:['cost_code','wp_no','description','vendors','po_count','po_numbers','approver','appr_date','submittal','status']},
-      all:        {label:'All',        keys:['cost_code','wp_no','description','works','type_ow','scope','vendors','po_count','po_numbers','budget','awarded','variance','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp','approver','appr_date','submittal','status','remarks'], cost:true},
+      all:        {label:'All',        keys:['cost_code','wp_no','description','works','type_ow','scope','vendors','po_count','po_numbers','budget','awarded','variance','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp','approver','appr_date','submittal','proc_status','status','remarks'], cost:true},
     };
     // Sort state for WP List table
     let _wpMonSortCol = null, _wpMonSortDir = 1;
@@ -808,7 +808,7 @@
       budget:'approved_budget_bcb', awarded:'total_awarded', variance:'variance', lead_time:'awarding_lead_time',
       tgt_award:'awarding_date', act_award:'actual_awarding_date', tgt_deliv:'target_delivery',
       act_deliv:'actual_delivery', tgt_inst:'target_installation', tgt_comp:'target_completion',
-      status:'award_status', remarks:'remarks', approver:'approver_name', appr_date:'approval_date',
+      status:'award_status', proc_status:'procurement_status', remarks:'remarks', approver:'approver_name', appr_date:'approval_date',
       submittal:'submittal_doc_type', surety:'surety_bond', perf_bond:'performance_bond',
       warranty:'warranty_bond', pay_terms:'payment_terms_days', dp_pct:'dp_percent',
       dp_terms:'dp_terms', dp_amount:'dp_amount', dp_release:'dp_release_date',
@@ -1893,6 +1893,7 @@
           case 'approver':   return `<td>${w.approver_name||'—'}</td>`;
           case 'appr_date':  return `<td>${fmtD(w.approval_date)}</td>`;
           case 'submittal':  return `<td>${w.submittal_doc_type||'—'}</td>`;
+          case 'proc_status':return `<td style="font-size:11px;color:#666">${w.procurement_status||'—'}</td>`;
           case 'status':     return `<td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${sc}22;color:${sc}">${w.award_status||'—'}</span></td>`;
           case 'remarks':    return `<td style="font-size:10px;color:#888;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(w.remarks||'').replace(/"/g,'&quot;')}">${w.remarks||'—'}</td>`;
           default:           return '<td>—</td>';
@@ -2289,7 +2290,7 @@
           <td>${clPartyBadge(c.party)}</td>
           <td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(c.description||'').replace(/"/g,'&quot;')}">${(c.description||'—').slice(0,50)}${(c.description||'').length>50?'…':''}</td>
           <td style="font-size:11px;color:#888">${c.wp_no||'—'}</td>
-          <td style="font-size:11px;white-space:nowrap">${c.date_filed?new Date(c.date_filed).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}):'—'}</td>
+          <td style="font-size:11px;white-space:nowrap">${c.date_filed?new Date(c.date_filed).toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'}):'—'}</td>
           <td style="text-align:right;font-weight:600">${c.amount_claimed?'&#x20B1;'+(c.amount_claimed/1e6).toFixed(2)+'M':'—'}</td>
           <td>${clStatusBadge(c.status)}</td>
           <td style="text-align:right;color:#2D9B6F;font-weight:600">${c.approved_amount?'&#x20B1;'+(c.approved_amount/1e6).toFixed(2)+'M':'—'}</td>

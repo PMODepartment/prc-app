@@ -162,7 +162,7 @@ const Fmt = {
   },
   date(d) {
     if (!d) return '\u2014';
-    try { return new Date(d).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}); }
+    try { return new Date(d).toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'}); }
     catch { return d; }
   }
 };
@@ -483,7 +483,7 @@ async function exportPDF(wps, label, titleStr) {
   const awardRate  = wps.length ? Math.round(awarded/wps.length*100) : 0;
   const fmtM = v => v != null ? (v>=0?'+':'-')+((Math.abs(v))/1e6).toFixed(2)+'M' : '-';
   const fmtV = v => v != null ? ((v)/1e6).toFixed(2)+'M' : '-';
-  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-PH',{year:'2-digit',month:'short',day:'numeric'}) : '-';
+  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'}) : '-';
 
   // ── Page header (drawn before table content via willDrawPage) ──
   const drawHeader = (pgNum) => {

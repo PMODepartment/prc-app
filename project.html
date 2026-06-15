@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260615g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615h"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260615h"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615h"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615g"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615h"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615h"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -242,7 +242,7 @@
           <!-- Top 5 panels — equal widths, equal heights -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:14px">
             <div class="panel" style="flex:1;min-width:200px">
-              <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 by Contract Value</div>
+              <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 High Value Packages</div>
               <div class="rank-list" id="rank-value"></div>
             </div>
             <div class="panel" style="flex:1;min-width:200px">
@@ -354,7 +354,6 @@
             <select id="f-status" style="flex-shrink:0">
               <option value="all">All statuses</option>
               <option value="Awarded">Awarded</option>
-              <option value="Partially Awarded">Partially Awarded</option>
               <option value="Not Yet Awarded">Not Yet Awarded</option>
             </select>
             <select id="f-trade" style="flex-shrink:0"><option value="all">All trades</option></select>
@@ -470,12 +469,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260615g"></script>
-<script src="assets/js/ui.js?v=20260615g"></script>
-<script src="assets/js/db.js?v=20260615g"></script>
+<script src="assets/js/auth.js?v=20260615h"></script>
+<script src="assets/js/ui.js?v=20260615h"></script>
+<script src="assets/js/db.js?v=20260615h"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260615g"></script>
+<script src="assets/js/charts.js?v=20260615h"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -516,7 +515,8 @@ const COLS=[
   {key:'approver_name',    label:'Submittals Approver', w:'130px'},
   {key:'approval_date',    label:'Date of Approval',   w:'100px'},
   {key:'submittal_doc_type', label:'Type of Submittal', w:'120px'},
-  {key:'award_status',     label:'Status',             w:'110px'},
+  {key:'procurement_status', label:'Procurement Status', w:'120px'},
+  {key:'award_status',     label:'Award Status',       w:'110px'},
   {key:'remarks',          label:'Remarks',            w:'150px'},
 ];
 
@@ -524,11 +524,11 @@ const COST_KEYS = new Set(['approved_budget_bcb','total_awarded','variance','dp_
 
 let _wpTableView = 'overview';
 const WP_TABLE_VIEWS = {
-  overview:   {keys:new Set(['cost_code','wp_no','works','description','scope','proposed_vendors','award_status','remarks'])},
+  overview:   {keys:new Set(['cost_code','wp_no','works','description','scope','proposed_vendors','procurement_status','award_status','remarks'])},
   financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount']), cost:true},
   schedule:   {keys:new Set(['cost_code','wp_no','description','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion'])},
   submittals: {keys:new Set(['cost_code','wp_no','description','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
-  all:        {keys:new Set(['cost_code','wp_no','description','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion','approver_name','approval_date','submittal_doc_type','award_status','remarks']), cost:true},
+  all:        {keys:new Set(['cost_code','wp_no','description','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion','approver_name','approval_date','submittal_doc_type','procurement_status','award_status','remarks']), cost:true},
 };
 function getActiveCols() {
   const v = WP_TABLE_VIEWS[_wpTableView] || WP_TABLE_VIEWS.overview;
@@ -575,7 +575,7 @@ function openWPDetail(idOrObj) {
   if (!w) return;
   const isViewer = window.__isViewer;
   const fmtM = v => v ? '₱'+(Math.abs(v)/1e6).toFixed(1)+'M' : '—';
-  const fmtD = d => { if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});}catch{return d;} };
+  const fmtD = d => { if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'});}catch{return d;} };
   const fmtPct = v => v != null ? (parseFloat(v)*100).toFixed(0)+'%' : '—';
   const row = (label, val) => val && val !== '—' ? `<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f5f5f5"><span style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;min-width:140px;flex-shrink:0">${label}</span><span style="font-size:12px;color:#231F20;word-break:break-word">${val}</span></div>` : '';
   const bud=w.approved_budget_bcb||0, awd=w.total_awarded||0, vari=bud-awd;
@@ -678,7 +678,7 @@ async function deleteWPFromDetail(id, wpNo) {
 }
 
 function fmt(n){ if(n==null)return'—'; return'₱'+(Math.abs(n)/1e6).toFixed(1)+'M'; }
-function fmtDate(d){ if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});}catch{return d;} }
+function fmtDate(d){ if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'});}catch{return d;} }
 function claimTagBadge(t) {
   if (!t) return '<span style="color:#bbb">—</span>';
   const map = {
@@ -1428,6 +1428,7 @@ function buildTable(){
       case 'approver_name': return `<td>${wp.approver_name||'—'}</td>`;
       case 'approval_date': return `<td>${fmtDate(wp.approval_date)}</td>`;
       case 'submittal_doc_type': return `<td>${wp.submittal_doc_type||'—'}</td>`;
+      case 'procurement_status': return `<td style="font-size:11px;color:#555">${wp.procurement_status||'—'}</td>`;
       case 'award_status': return `<td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${sc}22;color:${sc}">${wp.award_status||'—'}</span></td>`;
       case 'remarks': return `<td style="font-size:10px;color:#888;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(wp.remarks||'').replace(/"/g,'&quot;')}">${wp.remarks||'—'}</td>`;
       default: return '<td>—</td>';
