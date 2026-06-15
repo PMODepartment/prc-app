@@ -125,11 +125,16 @@ const Charts = (() => {
     if (a >= 100)  return Math.round(vM) + 'M';
     return (+vM.toFixed(1)) + 'M';
   }
-  // Axis-tick variant (no decimals for millions): "16B" / "1.5B" / "350M".
-  function _axM(vM) {
+  // Axis-tick formatter (value already in MILLIONS). Picks ONE unit for the whole axis from its
+  // range so ticks don't mix M and B (e.g. "0M, 1.0B, 2.0B" → "0, 1B, 2B"). When Chart.js passes the
+  // full `ticks` array we read its max; zero always renders as a bare "0".
+  function _axM(vM, index, ticks) {
     if (vM == null || isNaN(vM)) return '';
-    const a = Math.abs(vM);
-    if (a >= 1000) return (vM / 1000).toFixed(a >= 10000 ? 0 : 1) + 'B';
+    if (vM === 0) return '0';
+    let max = Math.abs(vM);
+    if (ticks && ticks.length) { for (const t of ticks) { const v=Math.abs(t.value); if (v>max) max=v; } }
+    else if (this && this.max != null) { max = Math.abs(this.max); }
+    if (max >= 1000) { const b = vM / 1000; return (Math.abs(b) >= 10 ? b.toFixed(0) : b.toFixed(1)) + 'B'; }
     return Math.round(vM) + 'M';
   }
 
