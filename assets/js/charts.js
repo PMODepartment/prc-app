@@ -276,15 +276,20 @@ const Charts = (() => {
   // opts.hideAwarded: backlog instances pass only not-awarded WPs, whose awarded cost is ₱0 by
   // definition — drop the two always-zero Awarded series instead of drawing a flat line at 0M.
   function budgetAwardedByPeriodMonthly(id, wps, opts){
+    // Awarded amount is placed by its actual award date, falling back to the PLANNED award date when
+    // actual_awarding_date isn't captured (WP-Monitoring imports record award_status + total_awarded but
+    // no actual date — without the fallback the Awarded bars / Cumulative Awarded line are flat at 0).
+    const awDate=w=>w.actual_awarding_date||w.awarding_date;
+    const isAwd=w=>(w.total_awarded||0)>0;
     const mSet=new Set();
-    wps.forEach(w=>{ if(w.awarding_date){ const d=new Date(w.awarding_date); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } });
+    wps.forEach(w=>{ if(w.awarding_date){ const d=new Date(w.awarding_date); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } if(isAwd(w)&&awDate(w)){ const d=new Date(awDate(w)); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } });
     if(!mSet.size){ destroy(id); return; }
     const months=[...mSet].sort();
     const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const mLabel=k=>{ const[y,m]=k.split('-'); return MONTH_NAMES[parseInt(m)-1]+' \''+y.slice(2); };
     const getMKey=d=>d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
     const budgetData=months.map(mk=>wps.filter(w=>w.awarding_date&&getMKey(new Date(w.awarding_date))===mk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
-    const awardedData=months.map(mk=>wps.filter(w=>w.actual_awarding_date&&getMKey(new Date(w.actual_awarding_date))===mk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
+    const awardedData=months.map(mk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getMKey(new Date(awDate(w)))===mk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
@@ -301,13 +306,17 @@ const Charts = (() => {
 
   // Budget (BCB) and Awarded by Period — quarterly combo chart (opts.hideAwarded: see monthly variant)
   function budgetAwardedByPeriod(id, wps, opts){
+    // Awarded amount falls back to the PLANNED award date when actual_awarding_date isn't captured
+    // (see budgetAwardedByPeriodMonthly for the why) so the Awarded series isn't flat at 0.
+    const awDate=w=>w.actual_awarding_date||w.awarding_date;
+    const isAwd=w=>(w.total_awarded||0)>0;
     const qSet=new Set();
-    wps.forEach(w=>{ if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date))); });
+    wps.forEach(w=>{ if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date))); if(isAwd(w)&&awDate(w)) qSet.add(getQKey(new Date(awDate(w)))); });
     if(!qSet.size){ destroy(id); return; }
     const quarters=[...qSet].sort();
     const labels=quarters.map(qLabel);
     const budgetData=quarters.map(qk=>wps.filter(w=>w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
-    const awardedData=quarters.map(qk=>wps.filter(w=>w.actual_awarding_date&&getQKey(new Date(w.actual_awarding_date))===qk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
+    const awardedData=quarters.map(qk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getQKey(new Date(awDate(w)))===qk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
@@ -587,8 +596,12 @@ const Charts = (() => {
     }
     const now = new Date();
     const total = wps.length;
+    // Actual award date falls back to the PLANNED award date when actual_awarding_date is not
+    // captured (the WP-Monitoring imports populate award_status + total_awarded from the Remarks
+    // column but never an actual award date — so without this fallback the Actual line is flat/empty
+    // for every imported project).
     const planned = months.map(me => wps.filter(w => { const dd=pd(w.awarding_date); return dd && dd<=me; }).length);
-    const actual  = months.map(me => { if(me>now) return null; return wps.filter(w => { const dd=pd(w.actual_awarding_date); return w.award_status==='Awarded' && dd && dd<=me; }).length; });
+    const actual  = months.map(me => { if(me>now) return null; return wps.filter(w => { const dd=pd(w.actual_awarding_date)||pd(w.awarding_date); return w.award_status==='Awarded' && dd && dd<=me; }).length; });
     const labels = months.map(me => me.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
     const mob = _mob();
     make(id, { type:'line', data:{ labels, datasets:[
