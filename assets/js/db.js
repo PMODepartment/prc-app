@@ -87,15 +87,55 @@ const WPDb = (() => {
 /* ── Stats ─────────────────────────────────────────────────────────── */
 function computeStats(wps) {
   const total=wps.length;
-  const awarded=wps.filter(w=>w.award_status==='Awarded').length;
+  // Awarded count / budget / awarded cost come from the WP-Monitoring Helping Sheet (authoritative)
+  // via helpingMetrics; falls back to row-derived values for projects not in HELPING_FIGURES.
+  const hm=helpingMetrics(wps);
+  const awarded=hm.awarded;
   const partial=wps.filter(w=>w.award_status==='Partially Awarded').length;
-  const notAwarded=wps.filter(w=>!['Awarded','Partially Awarded'].includes(w.award_status)).length;
-  const totalBudget=wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-  const totalContract=wps.reduce((s,w)=>s+(w.total_awarded||0),0);
+  const notAwarded=Math.max(0,total-awarded);
+  const totalBudget=hm.totalBudget;
+  const totalContract=hm.awardedCost;
   const variance=totalBudget-totalContract;
   const today=new Date();
   const late=wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
   return {total,awarded,partial,notAwarded,totalBudget,totalContract,variance,late,awardRate:total?Math.round(awarded/total*100):0};
+}
+
+/* ── Authoritative figures from each project's WP-Monitoring "Helping Sheet" ──
+   These override the row-derived Awarded count / Actual Award (Awarded Cost) so the dashboards
+   match the source Helping Sheets exactly. A Helping Sheet counts a WP as awarded only when its
+   Actual Award Date falls within the report window — a frozen, TODAY()-gated snapshot a live
+   formula can't reproduce — so the totals are stored. Refresh when re-importing updated monitoring
+   files. UTM101 uses its Helping Sheet figure pending investigation of a source inconsistency
+   (Helping Sheet awarded ₱1.86B vs its own per-WP awarded-cost column ₱1.34B). */
+const HELPING_FIGURES = {
+  AVR101:{total:114,awarded:105,budget:274911191,  budgetAwarded:259205835, awardedCost:257191155},
+  GPR101:{total:80, awarded:31, budget:2314076781, budgetAwarded:1093266486,awardedCost:687257935},
+  OPW101:{total:104,awarded:59, budget:2416925390, budgetAwarded:1546254687,awardedCost:1511441915},
+  SLN101:{total:87, awarded:20, budget:2050628606, budgetAwarded:862989224, awardedCost:867357895},
+  SLT101:{total:87, awarded:27, budget:4352251374, budgetAwarded:1817073942,awardedCost:1784582902},
+  UTM101:{total:84, awarded:37, budget:5485533873, budgetAwarded:1852729610,awardedCost:1857107596},
+};
+// Aggregate Helping-Sheet metrics over a set of WPs (grouped by project). Projects not present in
+// HELPING_FIGURES (e.g. newly added) fall back to row-derived values so the dashboard still works.
+function helpingMetrics(wps) {
+  const byProj = {};
+  (wps||[]).forEach(w => { (byProj[w.project_id] = byProj[w.project_id] || []).push(w); });
+  let awarded=0, totalBudget=0, awardedCost=0, budgetAwarded=0, hsCovered=true;
+  Object.keys(byProj).forEach(pid => {
+    const arr = byProj[pid], hs = HELPING_FIGURES[pid];
+    if (hs) {
+      awarded += hs.awarded; totalBudget += hs.budget;
+      awardedCost += hs.awardedCost; budgetAwarded += hs.budgetAwarded;
+    } else {
+      hsCovered = false;
+      awarded += arr.filter(w=>w.award_status==='Awarded').length;
+      totalBudget += arr.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+      awardedCost += arr.reduce((s,w)=>s+(w.total_awarded||0),0);
+      budgetAwarded += arr.filter(w=>w.award_status==='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    }
+  });
+  return {awarded, totalBudget, awardedCost, budgetAwarded, hsCovered};
 }
 
 /* ── Formatting ─────────────────────────────────────────────────────── */
