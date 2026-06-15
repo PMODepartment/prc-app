@@ -205,7 +205,7 @@
               </div>
               <div class="form-group">
                 <label>Type</label>
-                <input type="text" id="f-type" readonly style="background:#f5f5f5;color:#888;cursor:default"/>
+                <select id="f-type" onchange="markDirty&&markDirty()"><option value=""></option></select>
               </div>
               <div class="form-group">
                 <label>WP No. *</label>
@@ -716,9 +716,8 @@
   function onTradeChange() {
     const trade = document.getElementById('f-trade').value;
     const worksEl = document.getElementById('f-works');
-    const typeEl = document.getElementById('f-type');
     worksEl.innerHTML = '<option value="">Select works…</option>';
-    typeEl.value = '';
+    _setTypeOptions('');
     if (trade && TRADE_WORKS[trade]) {
       TRADE_WORKS[trade].forEach(([works]) => {
         const opt = document.createElement('option');
@@ -728,16 +727,30 @@
     }
   }
 
+  // Type is now a dropdown: "Materials & Labor" is split into selectable "Materials" / "Labor"
+  // (combined kept for back-compat). Service works only offer "Service".
+  function _setTypeOptions(base, selected) {
+    const typeEl = document.getElementById('f-type');
+    if (!typeEl) return;
+    let opts;
+    if (base === 'Service') opts = ['Service'];
+    else if (base) opts = ['Materials & Labor','Materials','Labor'];
+    else opts = [''];
+    const val = selected != null ? selected : (base === 'Service' ? 'Service' : (base ? 'Materials & Labor' : ''));
+    if (val && !opts.includes(val)) opts.unshift(val);   // preserve any stored legacy value
+    typeEl.innerHTML = opts.map(o => `<option value="${o}">${o || '—'}</option>`).join('');
+    typeEl.value = val;
+  }
+
   function onWorksChange() {
     const trade = document.getElementById('f-trade').value;
     const works = document.getElementById('f-works').value;
-    const typeEl = document.getElementById('f-type');
+    let base = '';
     if (trade && works && TRADE_WORKS[trade]) {
       const entry = TRADE_WORKS[trade].find(([w]) => w === works);
-      typeEl.value = entry ? entry[1] : '';
-    } else {
-      typeEl.value = '';
+      base = entry ? entry[1] : '';
     }
+    _setTypeOptions(base);
   }
 
   /* Procurement Status (the WP-Monitoring stage) is independent of Award Status.
@@ -1063,7 +1076,8 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-trade', existingWP.trade);
       onTradeChange();
       fill('f-works', existingWP.works || '');
-      fill('f-type', existingWP.type_of_works || '');
+      onWorksChange();                                   // populate the Type dropdown options
+      (function(){ const t=document.getElementById('f-type'); const val=existingWP.type_of_works||''; if(val && ![...t.options].some(o=>o.value===val)) t.add(new Option(val,val)); t.value=val; })();
       fill('f-scope', existingWP.scope || '');
       fill('f-type-service', existingWP.type_of_service);
       fill('f-type-procurement', existingWP.type_of_procurement);
