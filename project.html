@@ -172,9 +172,6 @@
           <button class="view-tab active" data-view="overview" onclick="switchView('overview')">
             <i class="ti ti-layout-dashboard"></i>Overview
           </button>
-          <button class="view-tab" data-view="dashboard" onclick="switchView('dashboard')">
-            <i class="ti ti-chart-bar"></i>Dashboard
-          </button>
           <button class="view-tab" data-view="backlog" onclick="switchView('backlog')">
             <i class="ti ti-clock"></i>Backlog
           </button>
@@ -205,17 +202,8 @@
               </div>
             </div>
           </div>
-          <!-- Procurement S-Curve — Planned vs Actual cumulative WP awarding -->
-          <div class="panel" style="margin-top:16px">
-            <div class="panel-title"><i class="ti ti-chart-line"></i>Procurement S-Curve — Planned vs Actual Awarding</div>
-            <div class="chart-mob-h" style="position:relative;height:280px"><canvas id="c-ov-scurve"></canvas></div>
-          </div>
-        </div>
-
-        <!-- ══ DASHBOARD VIEW ══ -->
-        <div id="view-dashboard" style="display:none">
-          <!-- Period chart with toggle -->
-          <div class="panel" style="margin-bottom:14px">
+          <!-- Procurement Budget (BCB) and Awarded Cost by Period (moved from Dashboard) -->
+          <div class="panel" style="margin-top:16px;margin-bottom:14px">
             <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
               <span><i class="ti ti-chart-bar"></i><span id="dash-period-title">Procurement Budget (BCB) and Awarded Cost by Period</span></span>
               <div style="display:flex;gap:4px;flex-wrap:wrap">
@@ -228,18 +216,7 @@
             </div>
             <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-dash-period"></canvas></div>
           </div>
-          <!-- WP Status — progress bars + stats -->
-          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">
-            <div class="panel" style="flex:3;min-width:240px">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>WP Status</div>
-              <div id="dash-status-bars" style="padding:4px 0"></div>
-            </div>
-            <div class="panel" style="flex:2;min-width:180px">
-              <div class="panel-title"><i class="ti ti-table"></i>Status Summary</div>
-              <div id="dash-status-table"></div>
-            </div>
-          </div>
-          <!-- Top 5 panels — equal widths, equal heights -->
+          <!-- Top 5 panels -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:14px">
             <div class="panel" style="flex:1;min-width:200px">
               <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 High Value Packages</div>
@@ -252,32 +229,6 @@
             <div class="panel" style="flex:1;min-width:200px">
               <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
               <div class="rank-list" id="rank-losses"></div>
-            </div>
-          </div>
-          <!-- Backlog table (not-awarded only) -->
-          <div class="panel" style="margin-bottom:14px">
-            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-              <span><i class="ti ti-list"></i>Work Package Backlog — Not Awarded</span>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-                <select id="dash-bl-trade" onchange="renderDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;background:#fff;color:#555;cursor:pointer;font-weight:500"><option value="all">All Trades</option></select>
-                <select id="dash-bl-sort" onchange="renderDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;background:#fff;color:#555;cursor:pointer;font-weight:500">
-                  <option value="aging">Most Overdue First</option>
-                  <option value="date">Planned Award Date</option>
-                  <option value="budget">Budget (High→Low)</option>
-                  <option value="wp_no">WP No.</option>
-                  <option value="desc">Description (A→Z)</option>
-                </select>
-                <input id="dash-bl-bmin" type="text" inputmode="numeric" placeholder="Min ₱M" oninput="renderDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;background:#fff;color:#555;width:70px">
-                <input id="dash-bl-bmax" type="text" inputmode="numeric" placeholder="Max ₱M" oninput="renderDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;background:#fff;color:#555;width:70px">
-              </div>
-            </div>
-            <div style="overflow-x:auto">
-              <table class="budget-table" id="dash-backlog-table">
-                <thead><tr>
-                  <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Procurement Budget (BCB)</th><th>Status</th>
-                </tr></thead>
-                <tbody id="dash-backlog-tbody"></tbody>
-              </table>
             </div>
           </div>
         </div>
@@ -495,6 +446,7 @@ const COLS=[
   {key:'approved_budget_bcb', label:'Procurement Budget (BCB) Net', w:'110px'},
   {key:'total_awarded',    label:'Awarded Net',        w:'100px'},
   {key:'variance',         label:'Variance',           w:'100px'},
+  {key:'pct_wt',           label:'% WT',               w:'70px'},
   {key:'surety_bond',      label:'Surety Bond',        w:'90px'},
   {key:'performance_bond', label:'Perf. Bond',         w:'90px'},
   {key:'warranty_bond',    label:'Warranty Bond',      w:'90px'},
@@ -520,15 +472,15 @@ const COLS=[
   {key:'remarks',          label:'Remarks',            w:'150px'},
 ];
 
-const COST_KEYS = new Set(['approved_budget_bcb','total_awarded','variance','dp_amount','retention_percent','retention_amount']);
+const COST_KEYS = new Set(['approved_budget_bcb','total_awarded','variance','pct_wt','dp_amount','retention_percent','retention_amount']);
 
 let _wpTableView = 'overview';
 const WP_TABLE_VIEWS = {
   overview:   {keys:new Set(['cost_code','wp_no','works','description','scope','proposed_vendors','procurement_status','award_status','remarks'])},
-  financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount']), cost:true},
+  financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount']), cost:true},
   schedule:   {keys:new Set(['cost_code','wp_no','description','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion'])},
   submittals: {keys:new Set(['cost_code','wp_no','description','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
-  all:        {keys:new Set(['cost_code','wp_no','description','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion','approver_name','approval_date','submittal_doc_type','procurement_status','award_status','remarks']), cost:true},
+  all:        {keys:new Set(['cost_code','wp_no','description','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion','approver_name','approval_date','submittal_doc_type','procurement_status','award_status','remarks']), cost:true},
 };
 function getActiveCols() {
   const v = WP_TABLE_VIEWS[_wpTableView] || WP_TABLE_VIEWS.overview;
@@ -736,7 +688,7 @@ const _rendered = { overview: false, dashboard: false, backlog: false, table: fa
 function switchView(v) {
   currentView = v;
   document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
-  ['overview','dashboard','backlog','table','claims-register'].forEach(id => {
+  ['overview','backlog','table','claims-register'].forEach(id => {
     const el = document.getElementById('view-'+id);
     if(el) el.style.display = id === v ? '' : 'none';
   });
@@ -746,7 +698,6 @@ function switchView(v) {
     if (el) el.style.display = '';
   }
   if(v==='overview') { if(!_rendered.overview){renderOverview();_rendered.overview=true;} }
-  else if(v==='dashboard') { if(!_rendered.dashboard){renderDashboard();_rendered.dashboard=true;} else renderDashboard(); }
   else if(v==='backlog') { if(!_rendered.backlog){renderBacklog();_rendered.backlog=true;} }
   else if(v==='table') buildTable();
   else if(v==='claims-register' || v==='claims' || v==='change-orders') { renderClaimsRegisterKPIs(); renderClaimsRegister(); }
@@ -788,15 +739,18 @@ function buildMetrics(wps){
   const pctByWP = total ? Math.round(awarded/total*100) : 0;
   const pctByVal = totalBudget ? Math.round(actualAward/totalBudget*100) : 0;
 
-  const card = (lbl,val,cls,full) => '<div class="metric-card"><div class="metric-label">'+lbl+'</div><div class="metric-value '+cls+'"'+(full?' title="'+full+'"':'')+'>'+val+'</div></div>';
+  const card = (lbl,val,cls,full,sub) => '<div class="metric-card"><div class="metric-label">'+lbl+'</div><div class="metric-value '+cls+'"'+(full?' title="'+full+'"':'')+'>'+val+'</div>'+(sub?'<div style="font-size:12px;font-weight:600;color:#888;margin-top:3px">'+sub+'</div>':'')+'</div>';
 
+  // 4-card Cost Overview: BCB, Actual Award, Balance to Award (amount + WP qty), Savings/Loss (₱ + %)
+  const balanceAmt = totalBudget - hm.budgetAwarded;          // budget remaining to award
+  const balanceQty = Math.max(0, total - awarded);            // WPs not yet awarded
+  const savings    = hm.budgetAwarded - actualAward;          // Helping-Sheet savings (budget for awarded − awarded cost)
+  const savingsPct = hm.budgetAwarded ? (savings/hm.budgetAwarded*100) : 0;
   const costCards = [
     card('Procurement Budget (BCB)', Fmt.moneyShort(totalBudget), '', Fmt.moneyFull(totalBudget)),
     card('Actual Award', Fmt.moneyShort(actualAward), 'green', Fmt.moneyFull(actualAward)),
-    card('Cost to Complete', Fmt.moneyShort(ctc), '', Fmt.moneyFull(ctc)),
-    card('Estimate at Completion', Fmt.moneyShort(eac), '', Fmt.moneyFull(eac)),
-    card('Variance', (variance>=0?'+':'-')+Fmt.moneyShort(variance), variance>=0?'green':'red', (variance>=0?'+':'-')+Fmt.moneyFull(variance)),
-    card('% Variance', (parseFloat(pctVar)>=0?'+':'')+pctVar+'%', parseFloat(pctVar)>=0?'green':'red'),
+    card('Balance to Award', Fmt.moneyShort(balanceAmt), '', Fmt.moneyFull(balanceAmt), balanceQty+' WP'+(balanceQty===1?'':'s')+' remaining'),
+    card('Savings / Loss', (savings>=0?'+':'-')+Fmt.moneyShort(Math.abs(savings)), savings>=0?'green':'red', (savings>=0?'+':'-')+Fmt.moneyFull(Math.abs(savings)), (savings>=0?'+':'')+savingsPct.toFixed(1)+'%'),
   ].join('');
 
   const costEl = document.getElementById('metrics-cost');
@@ -821,17 +775,20 @@ function buildMetrics(wps){
       row('Due Not Awarded', dueNotAwarded, dueNotAwarded>0?'#EE3124':'#aaa', 'Not Due Yet', notDue, '#aaa', true);
   }
 
+  // Total BCB for the %WT (savings weight) column in the WP List
+  window._projTotalBCB = totalBudget;
+
   // Keep legacy metrics-grid empty
   const grid = document.getElementById('metrics-grid');
   if(grid) grid.innerHTML = '';
 
   // Render battery charts
   renderOvBattery(wps);
-  // Procurement S-curve (Planned vs Actual cumulative awarding)
-  // NOTE: guard on `typeof Charts`, NOT `window.Charts` — Charts is a top-level `const` in charts.js,
-  // which does NOT create a window property, so `window.Charts` is always undefined and previously
-  // skipped this call entirely (blank S-curve panel on every project).
-  if (typeof Charts !== 'undefined' && Charts.sCurve) Charts.sCurve('c-ov-scurve', wps);
+  // Period chart (Procurement Budget BCB & Awarded by Period) + Top 5 panels — moved into Overview
+  // (the Dashboard tab was removed). renderDashPeriod/renderTop5 still own the c-dash-period canvas
+  // and the rank-* lists, which now live in the Overview view.
+  if (typeof renderDashPeriod === 'function') renderDashPeriod(wps);
+  if (typeof renderTop5 === 'function') renderTop5(wps);
 }
 
 function renderOvBattery(wps) {
@@ -1408,6 +1365,7 @@ function buildTable(){
       case 'approved_budget_bcb': return `<td style="text-align:right">${fmt(bud)}</td>`;
       case 'total_awarded': return `<td style="text-align:right">${fmt(awd)}</td>`;
       case 'variance':    return `<td style="text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}">${(bud||awd)?(v>=0?'+':'')+fmt(v):'—'}</td>`;
+      case 'pct_wt': { const tb=window._projTotalBCB||0; const pw=tb?(v/tb*100):0; return `<td style="text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}" title="Savings ÷ Total BCB">${(bud||awd)?(v>=0?'+':'')+pw.toFixed(2)+'%':'—'}</td>`; }
       case 'surety_bond': return `<td style="text-align:center">${wp.surety_bond||'—'}</td>`;
       case 'performance_bond': return `<td style="text-align:center">${wp.performance_bond||'—'}</td>`;
       case 'warranty_bond': return `<td style="text-align:center">${wp.warranty_bond||'—'}</td>`;
@@ -2494,7 +2452,6 @@ AppAuth.requireLogin(async (user, profile) => {
             <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Award Status</label>
             <select id="wqm-award-status" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;outline:none">
               <option value="Not Yet Awarded">Not Yet Awarded</option>
-              <option value="Partially Awarded">Partially Awarded</option>
               <option value="Awarded">Awarded</option>
             </select>
           </div>

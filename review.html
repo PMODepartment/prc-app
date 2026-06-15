@@ -412,8 +412,8 @@
         <div id="wqm-success" style="display:none;background:#D1FAE5;color:#065F46;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px"></div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
           <div>
-            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Cost Code *</label>
-            <input id="wqm-cost-code" type="text" placeholder="e.g. 03-001" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Cost Code</label>
+            <input id="wqm-cost-code" type="text" inputmode="numeric" maxlength="5" placeholder="e.g. 00000" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
           </div>
           <div>
             <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">WP No. *</label>
@@ -457,7 +457,6 @@
             <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Award Status</label>
             <select id="wqm-award-status" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;outline:none">
               <option value="Not Yet Awarded">Not Yet Awarded</option>
-              <option value="Partially Awarded">Partially Awarded</option>
               <option value="Awarded">Awarded</option>
             </select>
           </div>
@@ -526,7 +525,6 @@ window.saveQuickWP = async function() {
   const sucEl = document.getElementById('wqm-success');
   errEl.style.display = 'none'; sucEl.style.display = 'none';
 
-  if (!v('wqm-cost-code')) { errEl.textContent='Cost Code is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-wp-no')) { errEl.textContent='WP No. is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-description')) { errEl.textContent='Description is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-trade')) { errEl.textContent='Trade is required.'; errEl.style.display='block'; return; }
@@ -541,7 +539,7 @@ window.saveQuickWP = async function() {
 
   const data = {
     project_id: _wqmProjectId,
-    cost_code: v('wqm-cost-code'), wp_no: v('wqm-wp-no'),
+    cost_code: (() => { const c=v('wqm-cost-code'); return c ? (/^\d+$/.test(c) ? c.padStart(5,'0') : c) : null; })(), wp_no: v('wqm-wp-no'),
     description: v('wqm-description'), zone: v('wqm-zone') || null,
     trade: v('wqm-trade'), awarding_date: v('wqm-award-date') || null,
     target_completion: v('wqm-completion') || null,
