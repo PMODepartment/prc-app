@@ -2149,14 +2149,29 @@ AppAuth.requireLogin(async (user, profile) => {
       const role = window.__wpmRole || 'user';
       const sb = await getSB();
       const userId = (await sb.auth.getUser()).data.user.id;
+      // De-duplicate by WP No.: re-importing a CSV that already contains existing WPs (plus a few new
+      // ones) UPDATES the matching rows in place instead of inserting duplicates. Match is on the
+      // normalized WP No. (trailing ".0" stripped, case-insensitive) within this project.
+      const _wpKey = v => String(v==null?'':v).trim().replace(/\.0+$/,'').toLowerCase();
+      const _existing = await WPDb.getAllWPs(projId);
+      const _byNo = {};
+      _existing.forEach(w => { const k=_wpKey(w.wp_no); if(k) _byNo[k]=w.id; });
+      let _inserted=0, _updated=0;
       for (const wpData of wps) {
-        const newWP = await WPDb.submitWP(wpData, { id: userId });
-        if (AppAuth.isAutoApprove({role}) && newWP?.id) {
-          await WPDb.approveWP(newWP.id);
+        const k = _wpKey(wpData.wp_no);
+        const existId = k ? _byNo[k] : null;
+        if (existId) {
+          await WPDb.updateWPDirect(existId, wpData);   // keeps approved status; no duplicate
+          _updated++;
+        } else {
+          const newWP = await WPDb.submitWP(wpData, { id: userId });
+          if (AppAuth.isAutoApprove({role}) && newWP?.id) await WPDb.approveWP(newWP.id);
+          if (k && newWP?.id) _byNo[k] = newWP.id;       // guard against repeats within the same CSV
+          _inserted++;
         }
       }
 
-      document.getElementById('csv-status').textContent = `✓ Imported ${wps.length} work package(s) successfully`;
+      document.getElementById('csv-status').textContent = `✓ Import complete — ${_inserted} new, ${_updated} updated (no duplicates)`;
       setTimeout(() => { closeCSVImportModal(); if (typeof loadData === 'function') loadData(); }, 1500);
     } catch(err) {
       errEl.textContent = `Import error: ${err.message}`;

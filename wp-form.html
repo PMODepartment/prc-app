@@ -1367,11 +1367,27 @@ AppAuth.requireLogin(async (user, profile) => {
       const role = window.__wpmRole || 'user';
       const rows = WPCsv.toWPData(_wpCsvData, pid);
       if (!rows.length) throw new Error('No rows with a WP No. found. Check that the WP No. column is filled.');
+      // De-duplicate by WP No.: re-importing existing WPs UPDATES them in place instead of inserting
+      // duplicates. Match on normalized WP No. (trailing ".0" stripped, case-insensitive) per project.
+      const _wpKey = v => String(v==null?'':v).trim().replace(/\.0+$/,'').toLowerCase();
+      const _existing = await WPDb.getAllWPs(pid);
+      const _byNo = {};
+      _existing.forEach(w => { const k=_wpKey(w.wp_no); if(k) _byNo[k]=w.id; });
+      let _inserted=0, _updated=0;
       for (const wpData of rows) {
-        const newWP = await WPDb.submitWP(wpData, { id: userId });
-        if (AppAuth.isAutoApprove({role}) && newWP?.id) await WPDb.approveWP(newWP.id);
+        const k = _wpKey(wpData.wp_no);
+        const existId = k ? _byNo[k] : null;
+        if (existId) {
+          await WPDb.updateWPDirect(existId, wpData);
+          _updated++;
+        } else {
+          const newWP = await WPDb.submitWP(wpData, { id: userId });
+          if (AppAuth.isAutoApprove({role}) && newWP?.id) await WPDb.approveWP(newWP.id);
+          if (k && newWP?.id) _byNo[k] = newWP.id;
+          _inserted++;
+        }
       }
-      document.getElementById('wp-csv-status').textContent = `✓ Imported ${rows.length} work package(s) successfully`;
+      document.getElementById('wp-csv-status').textContent = `✓ Import complete — ${_inserted} new, ${_updated} updated (no duplicates)`;
       setTimeout(() => { closeWPImportModal(); location.href = 'project.html?id=' + pid; }, 1400);
     } catch(err) {
       errEl.textContent = 'Import error: ' + err.message; errEl.style.display = 'block';
