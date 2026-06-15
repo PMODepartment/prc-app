@@ -99,9 +99,19 @@
       </a>
     </div>
 
+    <!-- Project switcher — searchable list of the user's assigned projects (all views) -->
+    <div class="sidebar-section" id="sidebar-projlist-section" style="display:none">
+      <div class="sidebar-section-label">Projects</div>
+      <div style="position:relative;margin:0 10px 8px">
+        <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#888;font-size:13px;pointer-events:none"></i>
+        <input id="sidebar-proj-search" type="text" placeholder="Search projects…" oninput="renderSidebarProjects()" style="width:100%;box-sizing:border-box;padding:6px 8px 6px 26px;border:1.5px solid rgba(255,255,255,.15);border-radius:7px;background:rgba(255,255,255,.06);color:inherit;font-size:12px;font-family:inherit;outline:none">
+      </div>
+      <div id="sidebar-proj-list" style="max-height:240px;overflow-y:auto;-webkit-overflow-scrolling:touch"></div>
+    </div>
+
     <div id="sidebar-projects" style="display:none">
       <div class="sidebar-section">
-        <div class="sidebar-section-label">Projects</div>
+        <div class="sidebar-section-label">Manage Project</div>
         <button class="nav-item" onclick="openNewProjectModal()"><i class="ti ti-folder-plus"></i>New Project</button>
         <button class="nav-item" id="btn-edit-project" onclick="openEditProjectModal()" style="display:none"><i class="ti ti-edit"></i>Edit Project</button>
         <button class="nav-item" id="btn-archive-project" onclick="archiveCurrentProject()" style="display:none;color:rgba(255,200,100,0.85)"><i class="ti ti-archive"></i><span id="archive-btn-label">Archive Project</span></button>
@@ -709,6 +719,23 @@ function switchView(v) {
   else if(v==='table') buildTable();
   else if(v==='claims-register' || v==='claims' || v==='change-orders') { renderClaimsRegisterKPIs(); renderClaimsRegister(); }
 }
+
+// Sidebar project switcher list (filtered by the search box; current project highlighted)
+window.renderSidebarProjects = function() {
+  const list = document.getElementById('sidebar-proj-list');
+  if (!list) return;
+  const q = (document.getElementById('sidebar-proj-search')?.value || '').toLowerCase();
+  const projs = (window._sidebarProjects || []).filter(p => {
+    if (!q) return true;
+    return ((p.name||'') + ' ' + (p.id||'')).toLowerCase().includes(q);
+  });
+  if (!projs.length) { list.innerHTML = '<div style="padding:6px 12px;font-size:11px;color:#888">No matches</div>'; return; }
+  list.innerHTML = projs.map(p => {
+    const active = p.id === projId;
+    const disp = (p.name && p.name !== p.id) ? (p.id + ' — ' + p.name.split('—')[0].trim()) : p.id;
+    return `<a class="nav-item${active?' active':''}" href="project.html?id=${encodeURIComponent(p.id)}" style="font-size:12px${active?'':';opacity:.8'}" title="${disp.replace(/"/g,'&quot;')}"><i class="ti ti-building-skyscraper"></i><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${disp}</span></a>`;
+  }).join('');
+};
 
 function getFiltered(){
   const st=document.getElementById('f-status').value;
@@ -1716,6 +1743,18 @@ AppAuth.requireLogin(async (user, profile) => {
   }
 
   const isAdmin = ['admin','super_admin'].includes(profile.role);
+
+  // Sidebar project switcher — list the user's assigned projects (respects account assignments)
+  (async () => {
+    try {
+      const all = await WPDb.getProjects();
+      window._sidebarProjects = (AppAuth.getPermittedProjects(profile, all) || [])
+        .filter(p => p.status !== 'archived')
+        .sort((a,b) => String(a.id).localeCompare(String(b.id)));
+      const sec = document.getElementById('sidebar-projlist-section');
+      if (window._sidebarProjects.length > 1 && sec) { sec.style.display = 'block'; renderSidebarProjects(); }
+    } catch(e) { /* non-fatal */ }
+  })();
 
   // Work Packages section always visible for all roles
   document.getElementById('sidebar-workpkgs').style.display='block';
