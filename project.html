@@ -239,27 +239,6 @@
               <div id="dash-status-table"></div>
             </div>
           </div>
-          <!-- Backlog table (not-awarded only) -->
-          <div class="panel" style="margin-bottom:14px">
-            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-              <span><i class="ti ti-list"></i>Work Package Backlog — Not Awarded</span>
-              <select id="dash-bl-sort" onchange="renderDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;background:#fff;color:#555;cursor:pointer;font-weight:500">
-                <option value="aging">Most Overdue First</option>
-                <option value="date">Planned Award Date</option>
-                <option value="budget">Budget (High→Low)</option>
-                <option value="wp_no">WP No.</option>
-                <option value="desc">Description (A→Z)</option>
-              </select>
-            </div>
-            <div style="overflow-x:auto">
-              <table class="budget-table" id="dash-backlog-table">
-                <thead><tr>
-                  <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Procurement Budget (BCB)</th><th>Status</th>
-                </tr></thead>
-                <tbody id="dash-backlog-tbody"></tbody>
-              </table>
-            </div>
-          </div>
           <!-- Top 5 panels — equal widths, equal heights -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:14px">
             <div class="panel" style="flex:1;min-width:200px">
@@ -273,6 +252,32 @@
             <div class="panel" style="flex:1;min-width:200px">
               <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
               <div class="rank-list" id="rank-losses"></div>
+            </div>
+          </div>
+          <!-- Backlog table (not-awarded only) -->
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+              <span><i class="ti ti-list"></i>Work Package Backlog — Not Awarded</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                <select id="dash-bl-trade" onchange="renderDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;background:#fff;color:#555;cursor:pointer;font-weight:500"><option value="all">All Trades</option></select>
+                <select id="dash-bl-sort" onchange="renderDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;background:#fff;color:#555;cursor:pointer;font-weight:500">
+                  <option value="aging">Most Overdue First</option>
+                  <option value="date">Planned Award Date</option>
+                  <option value="budget">Budget (High→Low)</option>
+                  <option value="wp_no">WP No.</option>
+                  <option value="desc">Description (A→Z)</option>
+                </select>
+                <input id="dash-bl-bmin" type="text" inputmode="numeric" placeholder="Min ₱M" oninput="renderDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;background:#fff;color:#555;width:70px">
+                <input id="dash-bl-bmax" type="text" inputmode="numeric" placeholder="Max ₱M" oninput="renderDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-family:inherit;background:#fff;color:#555;width:70px">
+              </div>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="budget-table" id="dash-backlog-table">
+                <thead><tr>
+                  <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Procurement Budget (BCB)</th><th>Status</th>
+                </tr></thead>
+                <tbody id="dash-backlog-tbody"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1026,7 +1031,24 @@ function renderDashboard(){
 window.renderDashBacklog = function() {
   const today = new Date();
   const sortBy = document.getElementById('dash-bl-sort')?.value || 'aging';
-  const wps = allWPs.filter(w => w.award_status !== 'Awarded');
+  let wps = allWPs.filter(w => w.award_status !== 'Awarded');
+  // Populate the Trade filter once (from the not-awarded set)
+  const trSel = document.getElementById('dash-bl-trade');
+  if (trSel && trSel.options.length <= 1) {
+    const trades = [...new Set(wps.map(w=>normTrade(w.trade)).filter(Boolean))].sort();
+    trSel.insertAdjacentHTML('beforeend', trades.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join(''));
+  }
+  // Apply Trade + Budget (₱M) filters
+  const trF = trSel?.value || 'all';
+  const bmin = parseFloat((document.getElementById('dash-bl-bmin')?.value||'').replace(/,/g,''));
+  const bmax = parseFloat((document.getElementById('dash-bl-bmax')?.value||'').replace(/,/g,''));
+  wps = wps.filter(w => {
+    if (trF!=='all' && (normTrade(w.trade)||'')!==trF) return false;
+    const bM = (w.approved_budget_bcb||0)/1e6;
+    if (!isNaN(bmin) && bM < bmin) return false;
+    if (!isNaN(bmax) && bM > bmax) return false;
+    return true;
+  });
   const wpNoSort = (a,b) => (a.wp_no||'').localeCompare((b.wp_no||''), undefined, {numeric:true, sensitivity:'base'});
   const sorted = [...wps].sort((a,b) => {
     let cmp = 0;
@@ -2380,6 +2402,8 @@ AppAuth.requireLogin(async (user, profile) => {
   body.viewer-mode #sidebar-tools { display:none !important; }
   body.viewer-mode #dash-backlog-table th:nth-child(5),
   body.viewer-mode #dash-backlog-table td:nth-child(5),
+  body.viewer-mode #dash-bl-bmin,
+  body.viewer-mode #dash-bl-bmax,
   body.viewer-mode #backlog-min-budget,
   body.viewer-mode #backlog-max-budget,
   body.viewer-mode label[for="backlog-min-budget"] { display:none !important; }

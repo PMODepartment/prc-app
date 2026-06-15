@@ -217,18 +217,6 @@
               <div id="idx-dash-status-table"></div>
             </div>
           </div>
-          <!-- Backlog table -->
-          <div class="panel" style="margin-bottom:14px">
-            <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog — Not Awarded</div>
-            <div style="overflow-x:auto">
-              <table class="data-table" id="idx-dash-backlog-table" style="font-size:11px">
-                <thead><tr>
-                  <th>Project</th><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Procurement Budget (BCB)</th><th>Status</th>
-                </tr></thead>
-                <tbody id="idx-dash-backlog-tbody"></tbody>
-              </table>
-            </div>
-          </div>
           <!-- Top 5 panels — equal widths, equal heights -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:14px">
             <div class="panel" style="flex:1;min-width:200px">
@@ -242,6 +230,31 @@
             <div class="panel" style="flex:1;min-width:200px">
               <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
               <div class="rank-list" id="idx-rank-losses"></div>
+            </div>
+          </div>
+          <!-- Backlog table — grouped by project (collapsible), filterable -->
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+              <span><i class="ti ti-list"></i>Work Package Backlog — Not Awarded</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                <select id="idx-dbl-trade" onchange="renderIdxDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff;color:#555;cursor:pointer"><option value="all">All Trades</option></select>
+                <select id="idx-dbl-sort" onchange="renderIdxDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff;color:#555;cursor:pointer">
+                  <option value="aging">Most Overdue First</option>
+                  <option value="award">Planned Award Date</option>
+                  <option value="budget">Budget (High→Low)</option>
+                  <option value="trade">Trade</option>
+                </select>
+                <input id="idx-dbl-bmin" type="text" inputmode="numeric" placeholder="Min ₱M" oninput="renderIdxDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff;color:#555;width:68px">
+                <input id="idx-dbl-bmax" type="text" inputmode="numeric" placeholder="Max ₱M" oninput="renderIdxDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff;color:#555;width:68px">
+              </div>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="data-table" id="idx-dash-backlog-table" style="font-size:11px">
+                <thead><tr>
+                  <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Procurement Budget (BCB)</th><th>Status</th>
+                </tr></thead>
+                <tbody id="idx-dash-backlog-tbody"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -779,11 +792,11 @@
       remarks:    {h:'Remarks',             w:130},
     };
     const _WP_VIEWS = {
-      overview:   {label:'Overview',   keys:['project','cost_code','wp_no','works','scope','description','vendors','status','remarks']},
+      overview:   {label:'Overview',   keys:['cost_code','wp_no','works','scope','description','vendors','status','remarks']},
       financial:  {label:'Award',      keys:['cost_code','wp_no','description','budget','awarded','variance','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt'], cost:true},
       schedule:   {label:'Schedule',   keys:['cost_code','wp_no','description','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp']},
       submittals: {label:'Submittals', keys:['cost_code','wp_no','description','vendors','po_count','po_numbers','approver','appr_date','submittal','status']},
-      all:        {label:'All',        keys:['project','cost_code','wp_no','description','works','type_ow','scope','vendors','po_count','po_numbers','budget','awarded','variance','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp','approver','appr_date','submittal','status','remarks'], cost:true},
+      all:        {label:'All',        keys:['cost_code','wp_no','description','works','type_ow','scope','vendors','po_count','po_numbers','budget','awarded','variance','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp','approver','appr_date','submittal','status','remarks'], cost:true},
     };
     // Sort state for WP List table
     let _wpMonSortCol = null, _wpMonSortDir = 1;
@@ -841,6 +854,74 @@
       });
       _wpMonPage = 1;
       renderWPMonTable(_wpMonFiltered);
+    };
+    // ── Dashboard-tab Backlog (Not Awarded): filterable + grouped by Project (collapsible) ──
+    let _idxDashBlWPs = [];
+    const _idxDashBlProjCollapse = new Map();
+    window.toggleIdxDashBlProj = function(pid) {
+      _idxDashBlProjCollapse.set(pid, !(_idxDashBlProjCollapse.get(pid) || false));
+      window.renderIdxDashBacklog();
+    };
+    window.renderIdxDashBacklog = function() {
+      const tbody = document.getElementById('idx-dash-backlog-tbody');
+      if (!tbody) return;
+      const now = new Date();
+      const isViewer = window.__isViewer;
+      // Populate Trade filter once
+      const trSel = document.getElementById('idx-dbl-trade');
+      if (trSel && trSel.options.length <= 1) {
+        const trades = [...new Set(_idxDashBlWPs.map(w=>normTrade(w.trade)).filter(Boolean))].sort();
+        trSel.insertAdjacentHTML('beforeend', trades.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join(''));
+      }
+      const trF = trSel?.value || 'all';
+      const sortBy = document.getElementById('idx-dbl-sort')?.value || 'aging';
+      const bmin = parseFloat((document.getElementById('idx-dbl-bmin')?.value||'').replace(/,/g,''));
+      const bmax = parseFloat((document.getElementById('idx-dbl-bmax')?.value||'').replace(/,/g,''));
+      const rows = _idxDashBlWPs.filter(w => {
+        if (trF!=='all' && (normTrade(w.trade)||'')!==trF) return false;
+        const bM = (w.approved_budget_bcb||0)/1e6;
+        if (!isNaN(bmin) && bM < bmin) return false;
+        if (!isNaN(bmax) && bM > bmax) return false;
+        return true;
+      });
+      const sortFn = {
+        aging:  (a,b)=>{const x=a.awarding_date?(now-new Date(a.awarding_date)):-Infinity,y=b.awarding_date?(now-new Date(b.awarding_date)):-Infinity;return y-x;},
+        award:  (a,b)=>{const x=a.awarding_date?+new Date(a.awarding_date):Infinity,y=b.awarding_date?+new Date(b.awarding_date):Infinity;return x-y;},
+        budget: (a,b)=>(b.approved_budget_bcb||0)-(a.approved_budget_bcb||0),
+        trade:  (a,b)=>String(normTrade(a.trade)||'').localeCompare(String(normTrade(b.trade)||'')),
+      }[sortBy] || (()=>0);
+      const rowHtml = w => {
+        const aging = w.awarding_date ? Math.round((now-new Date(w.awarding_date))/86400000) : null;
+        const agStyle = aging>60?'color:#EE3124;font-weight:700':aging>30?'color:#D97706;font-weight:600':'';
+        return `<tr>
+          <td>${w.wp_no||'—'}</td>
+          <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.description||'—'}</td>
+          <td style="font-size:11px;color:#888">${normTrade(w.trade)||'—'}</td>
+          <td style="${agStyle}">${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
+          <td style="white-space:nowrap">${w.approved_budget_bcb?Fmt.moneyFull(w.approved_budget_bcb):'—'}</td>
+          <td><span style="font-size:10px;font-weight:600;color:${w.award_status==='Partially Awarded'?'#D97706':'#EE3124'}">${w.award_status||'—'}</span></td>
+        </tr>`;
+      };
+      // Group by Project (greater collapsible header — mirrors the WP List project header)
+      const projGroups = new Map(), projOrder = [];
+      rows.forEach(w => { const pid=w.project_id||'(No Project)'; if(!projGroups.has(pid)){projGroups.set(pid,[]);projOrder.push(pid);} projGroups.get(pid).push(w); });
+      const _permIdx = id => { const i=permitted.findIndex(p=>p.id===id); return i<0?9999:i; };
+      projOrder.sort((a,b)=>(_permIdx(a)-_permIdx(b))||String(a).localeCompare(String(b)));
+      const _projLabel = id => { const p=permitted.find(p=>p.id===id); return (p&&p.name&&p.name!==p.id)?(id+' — '+p.name.split('—')[0].trim()):id; };
+      let html = '';
+      projOrder.forEach(pid => {
+        const arr = projGroups.get(pid).sort(sortFn);
+        const collapsed = !!_idxDashBlProjCollapse.get(pid);
+        const totBud = arr.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+        const btn = `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:3px;background:#EE3124;color:#fff;font-size:13px;font-weight:700;margin-left:8px">${collapsed?'+':'−'}</span>`;
+        const meta = `${arr.length} WP${isViewer?'':' · '+Fmt.moneyShort(totBud)}`;
+        html += `<tr class="idx-dbl-projhdr" onclick="toggleIdxDashBlProj('${String(pid).replace(/'/g,"\\'")}')" style="cursor:pointer;background:#f0f0f0;border-top:3px solid #EE3124">
+          <td colspan="5" style="padding:9px 12px;font-size:12px;font-weight:800;color:#EE3124">${_projLabel(pid)}${btn}</td>
+          <td style="padding:9px 12px;text-align:right;font-size:11px;font-weight:700;color:#EE3124;white-space:nowrap">${meta}</td>
+        </tr>`;
+        if (!collapsed) html += arr.map(rowHtml).join('');
+      });
+      tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
     };
     const _blCollapseState = new Map();
     let _idxBlGroupByTrade = false;
@@ -1299,26 +1380,9 @@
             </div>`;
         })();
 
-        // Backlog table
-        const notAwarded = [...wps.filter(w => w.award_status !== 'Awarded')].sort((a,b) => {
-          const agA = a.awarding_date ? (now-new Date(a.awarding_date)) : -Infinity;
-          const agB = b.awarding_date ? (now-new Date(b.awarding_date)) : -Infinity;
-          return agB - agA;
-        });
-        const dbt = document.getElementById('idx-dash-backlog-tbody');
-        if(dbt) dbt.innerHTML = notAwarded.map(w => {
-          const aging = w.awarding_date ? Math.round((now-new Date(w.awarding_date))/86400000) : null;
-          const agStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : '';
-          return `<tr>
-            <td style="font-weight:600;font-size:11px">${w.project_id||'—'}</td>
-            <td>${w.wp_no||'—'}</td>
-            <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${w.description||'—'}</td>
-            <td style="font-size:11px;color:#888">${w.trade||'—'}</td>
-            <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
-            <td style="white-space:nowrap">${w.approved_budget_bcb?Fmt.moneyFull(w.approved_budget_bcb):'—'}</td>
-            <td><span style="font-size:10px;font-weight:600;color:${w.award_status==='Awarded'?'#2D9B6F':w.award_status==='Partially Awarded'?'#D97706':'#EE3124'}">${w.award_status||'—'}</span></td>
-          </tr>`;
-        }).join('') || '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
+        // Backlog table — stored for the filterable, project-grouped renderer
+        _idxDashBlWPs = wps.filter(w => w.award_status !== 'Awarded');
+        window.renderIdxDashBacklog();
 
         // Top 5 — Savings/Overbudget only count fully Awarded WPs (closed), so an
         // in-progress (Not Yet / Partially Awarded) WP can't show phantom savings.
@@ -2537,8 +2601,10 @@
   /* Hide Budget column in backlog tables and dashboard backlog */
   body.viewer-mode #bl-table th:nth-child(7),
   body.viewer-mode #bl-table td:nth-child(7),
-  body.viewer-mode #idx-dash-backlog-table th:nth-child(6),
-  body.viewer-mode #idx-dash-backlog-table td:nth-child(6) { display:none !important; }
+  body.viewer-mode #idx-dash-backlog-table th:nth-child(5),
+  body.viewer-mode #idx-dash-backlog-table td:nth-child(5) { display:none !important; }
+  /* Hide budget (₱M) filter inputs from viewers */
+  body.viewer-mode #idx-dbl-bmin, body.viewer-mode #idx-dbl-bmax { display:none !important; }
 </style>
 
 <!-- WP Detail Modal -->
