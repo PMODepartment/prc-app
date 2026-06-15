@@ -546,10 +546,19 @@ const Charts = (() => {
   // line stops at the current month (no future projection). Mirrors the Excel S-Curve sheet —
   // updates automatically as WPs are marked Awarded with an actual award date.
   function sCurve(id, wps) {
-    // Parse ISO date strings as LOCAL time to avoid timezone-shifted comparisons.
-    // new Date('2026-06-30') is UTC midnight = June 29 evening in UTC+8, causing month-end
-    // comparisons to push that date into the next bucket. Local parsing fixes this.
-    const pd = s => { if (!s) return null; const p = s.split('-'); const d = new Date(+p[0], +p[1]-1, +p[2]); return isNaN(d) ? null : d; };
+    // Parse a date value as LOCAL midnight, robust to every format the DB may return:
+    // date-only 'YYYY-MM-DD', full ISO timestamps ('...T00:00:00+00:00' / '...Z'),
+    // space-separated timestamps, and Date objects. We extract just the YYYY-MM-DD prefix
+    // and build a local Date — this both avoids the UTC-midnight off-by-one (new Date('2026-06-30')
+    // is June 29 evening in UTC+8, pushing month-end comparisons into the wrong bucket) AND avoids
+    // returning null for timestamp-typed columns (which previously hid the entire curve).
+    const pd = v => {
+      if (!v) return null;
+      if (v instanceof Date) return isNaN(v) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());
+      const m = String(v).match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+      const d = new Date(v); return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    };
     const dates = [];
     wps.forEach(w => { const d1=pd(w.awarding_date),d2=pd(w.actual_awarding_date); if(d1)dates.push(d1); if(d2)dates.push(d2); });
     const valid = dates.filter(Boolean);
