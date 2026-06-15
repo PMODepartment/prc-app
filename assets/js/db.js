@@ -333,39 +333,14 @@ function buildRankTable(id, items, type) {
     const s = document.createElement('style');
     s.id = '_rankTblStyle';
     s.textContent = [
+      // Full WP names are shown inline (wrapping); the card body scrolls vertically if the rows
+      // exceed its height — no hover/tooltip needed.
       '.rank-row{cursor:default}',
-      '.rank-row .rank-side{transition:opacity .18s ease,transform .18s ease}',
-      '.rank-row:hover .rank-side{opacity:0;transform:translateX(6px)}',
-      '.rank-row .rank-short,.rank-row .rank-sub{transition:opacity .15s ease}',
-      '.rank-row:hover .rank-short,.rank-row:hover .rank-sub{opacity:0}',
-      '@media(max-width:600px){.rank-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}',
-      '.rank-table-scroll table{min-width:340px}}',
+      '.rank-table-scroll{max-height:240px;overflow-y:auto;-webkit-overflow-scrolling:touch}',
+      '.rank-table-scroll thead th{position:sticky;top:0;background:var(--surface,#fff);z-index:1}',
+      '@media(max-width:600px){.rank-table-scroll{overflow-x:auto}.rank-table-scroll table{min-width:300px}}',
     ].join('');
     document.head.appendChild(s);
-  }
-
-  // Shared fixed tooltip — one instance per page, reused across all rank tables
-  if (!document.getElementById('_rankTip')) {
-    const tip = document.createElement('div');
-    tip.id = '_rankTip';
-    tip.style.cssText = [
-      'position:fixed;z-index:9999;pointer-events:none',
-      'background:#EE3124;color:#fff',
-      'padding:6px 12px 6px 10px;border-radius:6px',
-      'font-size:11px;font-weight:600;line-height:1.4',
-      'white-space:normal;word-break:break-word',
-      'box-shadow:0 3px 12px rgba(238,49,36,.28)',
-      'min-width:160px',
-      'opacity:0;transition:opacity .18s ease,transform .18s ease',
-      'transform:translateY(-50%) translateX(-6px)',
-    ].join(';');
-    document.body.appendChild(tip);
-    // Mobile: the tip is fixed-positioned at tap time, so once the page scrolls it would otherwise stay
-    // floating and overlap content. Hide it the instant any scroll/drag starts (capture catches nested
-    // scroll containers too; touchmove fires the moment a scroll gesture begins on touch devices).
-    const _hideRankTip = () => { tip.style.opacity = '0'; tip.style.transform = 'translateY(-50%) translateX(-6px)'; };
-    window.addEventListener('scroll', _hideRankTip, true);
-    window.addEventListener('touchmove', _hideRankTip, { passive: true });
   }
 
   const isValue  = type === 'value';
@@ -382,12 +357,12 @@ function buildRankTable(id, items, type) {
     // Clicking a row opens the WP detail slide-in panel (full details + Edit/Delete)
     const click = item.id ? ` onclick="if(window.openWPDetail)openWPDetail('${item.id}')"` : '';
     const cursor = item.id ? 'cursor:pointer;' : '';
-    const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:middle;max-width:1px;width:99%">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:10px;color:#999;font-weight:700;flex-shrink:0;min-width:14px">${i+1}</span>
-        <div style="min-width:0;overflow:hidden;flex:1">
-          <div class="rank-short" style="font-size:11px;font-weight:600;color:#231F20;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
-          <div class="rank-sub" style="font-size:9px;color:#888;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub||''}</div>
+    const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:top">
+      <div style="display:flex;align-items:flex-start;gap:6px">
+        <span style="font-size:10px;color:#999;font-weight:700;flex-shrink:0;min-width:14px;padding-top:1px">${i+1}</span>
+        <div style="min-width:0;flex:1">
+          <div class="rank-short" style="font-size:11px;font-weight:600;color:#231F20;line-height:1.35;white-space:normal;word-break:break-word">${item.name}</div>
+          <div class="rank-sub" style="font-size:9px;color:#888;margin-top:1px;white-space:normal;word-break:break-word">${item.sub||''}</div>
         </div>
       </div>
     </td>`;
@@ -404,26 +379,6 @@ function buildRankTable(id, items, type) {
     </tr>`;
   }).join('');
   el.innerHTML = `<div class="rank-table-scroll"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead>${thead}</thead><tbody>${rows}</tbody></table></div>`;
-
-  // Attach fixed-position tooltip events (avoids any overflow/table containment issues)
-  const tip = document.getElementById('_rankTip');
-  const scroll = el.querySelector('.rank-table-scroll');
-  el.querySelectorAll('.rank-row').forEach(row => {
-    row.addEventListener('mouseenter', () => {
-      const rb = row.getBoundingClientRect();
-      const sb = scroll.getBoundingClientRect();
-      tip.textContent = row.dataset.rn;
-      tip.style.left = (sb.left + 10) + 'px';
-      tip.style.maxWidth = (sb.width - 20) + 'px';
-      tip.style.top = (rb.top + rb.height / 2) + 'px';
-      tip.style.opacity = '1';
-      tip.style.transform = 'translateY(-50%) translateX(0)';
-    });
-    row.addEventListener('mouseleave', () => {
-      tip.style.opacity = '0';
-      tip.style.transform = 'translateY(-50%) translateX(-6px)';
-    });
-  });
 }
 
 function buildRankList(id, items, colorClass, fmtVal) {
