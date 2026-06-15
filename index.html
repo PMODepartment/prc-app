@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260611h"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260611h"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260611h"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260615a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260611h"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260611h"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615a"/>
 </head>
 <body>
 
@@ -545,12 +545,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260611h"></script>
-<script src="assets/js/db.js?v=20260611h"></script>
-<script src="assets/js/ui.js?v=20260611h"></script>
+<script src="assets/js/auth.js?v=20260615a"></script>
+<script src="assets/js/db.js?v=20260615a"></script>
+<script src="assets/js/ui.js?v=20260615a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260611h"></script>
+<script src="assets/js/charts.js?v=20260615a"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -564,9 +564,8 @@
   });
 
   // Trade name normalizer — must be at script scope so it's available before the async callback runs
-  // Every WP trade is collapsed into one of 10 canonical trades (no separate "Electrical" —
-  // electrical/auxiliary fold into Auxiliary Works; OPW101 architectural sub-trades fold into
-  // Architectural Works; service trades fold into General Requirements).
+  // Every WP trade is collapsed into one of 10 canonical trades. Electrical Works and Auxiliary Works
+  // are combined into a single "Electrical Works" bucket.
   const _TRADE_NORM = {
     'general requirement':'General Requirements','general requirements':'General Requirements',
     'housekeeping & sanitation services':'General Requirements','housekeeping and sanitation services':'General Requirements',
@@ -579,7 +578,7 @@
     'drywall and ceiling works':'Architectural Works','tiling works':'Architectural Works',
     'painting works':'Architectural Works','stoneworks':'Architectural Works','metal works':'Architectural Works',
     'mechanical works':'Mechanical Works',
-    'electrical works':'Electrical Works','auxiliary works':'Auxiliary Works',
+    'electrical works':'Electrical Works','auxiliary works':'Electrical Works',
     'electrical and auxiliary works':'Electrical Works','electrical & auxiliary works':'Electrical Works',
     'plumbing works':'Plumbing Works','fire protection works':'Fire Protection Works',
     'allied services':'Allied Services','other allied services':'Allied Services',
@@ -590,7 +589,7 @@
     if(_TRADE_NORM[k]) return _TRADE_NORM[k];
     // Keyword fallback so future/unknown trade strings still land in a canonical bucket
     if(/electr/.test(k)) return 'Electrical Works';
-    if(/auxiliary/.test(k)) return 'Auxiliary Works';
+    if(/auxiliary/.test(k)) return 'Electrical Works';
     if(/fire/.test(k)) return 'Fire Protection Works';
     if(/plumb/.test(k)) return 'Plumbing Works';
     if(/mechanic|hvac|elevator|\blift\b|escalator/.test(k)) return 'Mechanical Works';
@@ -712,8 +711,8 @@
         <div class="pc-spacer"></div>
         <div class="pc-stats">
           <div><div class="pc-stat-val" style="color:var(--green)">${s.awarded}</div><div class="pc-stat-lbl">Awarded</div></div>
-          <div><div class="pc-stat-val" style="color:var(--amber)">${s.partial}</div><div class="pc-stat-lbl">Partial</div></div>
-          <div><div class="pc-stat-val" style="color:var(--mw-red)">${s.notAwarded}</div><div class="pc-stat-lbl">Not Yet</div></div>
+          <div><div class="pc-stat-val" style="color:var(--mw-red)">${s.late}</div><div class="pc-stat-lbl">Due Not Awarded</div></div>
+          <div><div class="pc-stat-val" style="color:#aaa">${s.total-s.awarded-s.late}</div><div class="pc-stat-lbl">Not Due Yet</div></div>
         </div>
         <div style="display:flex;gap:10px;margin:8px 0 4px;font-size:11px;flex-wrap:wrap">
           <span style="color:#888">Budget: <strong style="color:#231F20">${budgetM}</strong></span>
@@ -726,12 +725,12 @@
 
     // ── Trade ordering constants ──────────────────────────────────
     const IDX_TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
-      'Architectural Works','Mechanical Works','Electrical Works','Auxiliary Works',
+      'Architectural Works','Mechanical Works','Electrical Works',
       'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
     // ── Trade ordering + collapse state ──────────────────────────
     const TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
-      'Architectural Works','Mechanical Works','Electrical Works','Auxiliary Works',
+      'Architectural Works','Mechanical Works','Electrical Works',
       'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
     const _collapseState = new Map();
 

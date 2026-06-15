@@ -546,22 +546,40 @@ const Charts = (() => {
   // line stops at the current month (no future projection). Mirrors the Excel S-Curve sheet —
   // updates automatically as WPs are marked Awarded with an actual award date.
   function sCurve(id, wps) {
+    // Parse ISO date strings as LOCAL time to avoid timezone-shifted comparisons.
+    // new Date('2026-06-30') is UTC midnight = June 29 evening in UTC+8, causing month-end
+    // comparisons to push that date into the next bucket. Local parsing fixes this.
+    const pd = s => { if (!s) return null; const p = s.split('-'); const d = new Date(+p[0], +p[1]-1, +p[2]); return isNaN(d) ? null : d; };
     const dates = [];
-    wps.forEach(w => { if (w.awarding_date) dates.push(new Date(w.awarding_date)); if (w.actual_awarding_date) dates.push(new Date(w.actual_awarding_date)); });
-    const valid = dates.filter(d => !isNaN(d));
-    if (!valid.length) { destroy(id); return; }
+    wps.forEach(w => { const d1=pd(w.awarding_date),d2=pd(w.actual_awarding_date); if(d1)dates.push(d1); if(d2)dates.push(d2); });
+    const valid = dates.filter(Boolean);
+    const canvasEl = document.getElementById(id);
+    const wrap = canvasEl && canvasEl.parentElement;
+    if (!valid.length) {
+      destroy(id);
+      if (wrap) {
+        let msg = wrap.querySelector('.scurve-nodata');
+        if (!msg) { msg = document.createElement('div'); msg.className='scurve-nodata'; msg.style.cssText='display:flex;align-items:center;justify-content:center;height:100%;color:#bbb;font-size:12px;font-style:italic;text-align:center;padding:0 16px'; wrap.appendChild(msg); }
+        msg.textContent = 'No planned award dates found. Set Planned Award Dates on work packages to display the S-Curve.';
+        if (canvasEl) canvasEl.style.display = 'none';
+      }
+      return;
+    }
+    // Clear any previous no-data placeholder and restore canvas visibility
+    if (wrap) { const msg=wrap.querySelector('.scurve-nodata'); if(msg)msg.remove(); }
+    if (canvasEl) canvasEl.style.display = '';
     const min = new Date(Math.min(...valid)), max = new Date(Math.max(...valid));
     const months = [];
     let d = new Date(min.getFullYear(), min.getMonth(), 1);
     const last = new Date(max.getFullYear(), max.getMonth(), 1);
     while (d <= last && months.length < 240) {
-      months.push(new Date(d.getFullYear(), d.getMonth() + 1, 0));   // month-end
+      months.push(new Date(d.getFullYear(), d.getMonth() + 1, 0));   // month-end (local time)
       d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
     }
     const now = new Date();
     const total = wps.length;
-    const planned = months.map(me => wps.filter(w => w.awarding_date && new Date(w.awarding_date) <= me).length);
-    const actual  = months.map(me => me > now ? null : wps.filter(w => w.award_status === 'Awarded' && w.actual_awarding_date && new Date(w.actual_awarding_date) <= me).length);
+    const planned = months.map(me => wps.filter(w => { const dd=pd(w.awarding_date); return dd && dd<=me; }).length);
+    const actual  = months.map(me => { if(me>now) return null; return wps.filter(w => { const dd=pd(w.actual_awarding_date); return w.award_status==='Awarded' && dd && dd<=me; }).length; });
     const labels = months.map(me => me.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
     const mob = _mob();
     make(id, { type:'line', data:{ labels, datasets:[
