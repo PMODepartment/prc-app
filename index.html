@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260615c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260615d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615d"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615c"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615d"/>
 </head>
 <body>
 
@@ -545,12 +545,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260615c"></script>
-<script src="assets/js/db.js?v=20260615c"></script>
-<script src="assets/js/ui.js?v=20260615c"></script>
+<script src="assets/js/auth.js?v=20260615d"></script>
+<script src="assets/js/db.js?v=20260615d"></script>
+<script src="assets/js/ui.js?v=20260615d"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260615c"></script>
+<script src="assets/js/charts.js?v=20260615d"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -691,7 +691,10 @@
       try { sessionStorage.setItem(_WP_CACHE_KEY, JSON.stringify({ wps: rawWPs, ts: Date.now() })); } catch(e) {}
     }
 
-    const _allWPs = rawWPs.map(w => ({...w, trade: normTrade(w.trade)}));
+    // Normalize WP No. display: some projects (e.g. SLN101) store numbers as "2.0" — show "2".
+    // Only strips a trailing .0/.00 from a pure-numeric value; preserves real decimals like "2.1".
+    const _normWpNo = v => { if (v==null) return v; const s=String(v).trim(); return /^\d+\.0+$/.test(s) ? s.replace(/\.0+$/,'') : s; };
+    const _allWPs = rawWPs.map(w => ({...w, trade: normTrade(w.trade), wp_no: _normWpNo(w.wp_no)}));
     // ID-keyed lookup for WP detail modal (avoids JSON.stringify in every table cell)
     window._wpById = Object.fromEntries(_allWPs.map(w => [w.id, w]));
     let _allClaims = []; // Claims register hidden — skip fetch
@@ -732,7 +735,8 @@
     const TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
       'Architectural Works','Mechanical Works','Electrical and Auxiliary Works',
       'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
-    const _collapseState = new Map();
+    const _collapseState = new Map();      // key: `${project_id}||${trade}` (trades nest under projects in the WP List)
+    const _projCollapseState = new Map();  // key: project_id — collapses an entire project group
 
     // ── WP List column definitions ────────────────────────────────
     let _wpListView = 'overview';
@@ -856,17 +860,22 @@
       }
       if (window.renderBlTable) window.renderBlTable();
     };
-    window.toggleTradeGroup = function(trade) {
-      _collapseState.set(trade, !(_collapseState.get(trade) || false));
+    window.toggleTradeGroup = function(key) {   // key = `${project_id}||${trade}`
+      _collapseState.set(key, !(_collapseState.get(key) || false));
+      _wpMonPage = 1;
+      renderWPMonTable(_wpMonFiltered);
+    };
+    window.toggleProjectGroup = function(pid) {
+      _projCollapseState.set(pid, !(_projCollapseState.get(pid) || false));
       _wpMonPage = 1;
       renderWPMonTable(_wpMonFiltered);
     };
     window.collapseAllTrades = function() {
-      [...new Set((_wpMonFiltered||[]).map(w=>w.trade||'(No Trade)'))].forEach(t=>_collapseState.set(t,true));
+      (_wpMonFiltered||[]).forEach(w=>{ const pid=w.project_id||'(No Project)'; const t=normTrade(w.trade)||'(No Trade)'; _collapseState.set(pid+'||'+t,true); });
       _wpMonPage = 1; renderWPMonTable(_wpMonFiltered);
     };
     window.expandAllTrades = function() {
-      _collapseState.clear();
+      _collapseState.clear(); _projCollapseState.clear();
       _wpMonPage = 1; renderWPMonTable(_wpMonFiltered);
     };
     window.openWPDetail = function(idOrObj) {
@@ -1823,33 +1832,45 @@
         }
       }
 
-      // Group rows by trade
-      const tradeGroups = new Map(), tradeOrder = [];
+      // Group rows by PROJECT, then by trade within each project (Project → Trade → WPs)
+      const projOrder = [];
+      const projGroups = new Map(); // project_id -> Map(trade -> [wps])
       rows.forEach(w => {
+        const pid = w.project_id || '(No Project)';
         const t = normTrade(w.trade)||'(No Trade)';
-        if (!tradeGroups.has(t)) { tradeGroups.set(t,[]); tradeOrder.push(t); }
-        tradeGroups.get(t).push(w);
+        if (!projGroups.has(pid)) { projGroups.set(pid, new Map()); projOrder.push(pid); }
+        const tg = projGroups.get(pid);
+        if (!tg.has(t)) tg.set(t, []);
+        tg.get(t).push(w);
       });
-      // Sort tradeOrder by TRADE_ORDER
-      tradeOrder.sort((a,b)=>{const oa=TRADE_ORDER.indexOf(a),ob=TRADE_ORDER.indexOf(b);return(oa<0?999:oa)-(ob<0?999:ob);});
-      // Sort WPs within each group by active column
-      if (_wpMonSortCol && _WPC_SORT_FIELD[_wpMonSortCol]) {
-        const field = _WPC_SORT_FIELD[_wpMonSortCol];
-        const dir = _wpMonSortDir;
-        tradeGroups.forEach(arr => arr.sort((a, b) => {
-          let av = a[field] ?? '', bv = b[field] ?? '';
-          if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
-          return String(av).localeCompare(String(bv)) * dir;
-        }));
-      }
+      // Order projects by the `permitted` order (unknowns last, then alphabetical)
+      const _permIdx = id => { const i = permitted.findIndex(p=>p.id===id); return i<0?9999:i; };
+      projOrder.sort((a,b)=> (_permIdx(a)-_permIdx(b)) || String(a).localeCompare(String(b)));
+      const _projLabel = id => { const p = permitted.find(p=>p.id===id); return (p && p.name && p.name!==p.id) ? (id+' — '+p.name.split('—')[0].trim()) : id; };
+      const _sortField = (_wpMonSortCol && _WPC_SORT_FIELD[_wpMonSortCol]) ? _WPC_SORT_FIELD[_wpMonSortCol] : null;
+      const _sortDir = _wpMonSortDir;
 
-      // Build virtual items (header + WP rows, skip WP rows when collapsed)
+      // Build virtual items: project header → trade header → WP rows (skipping collapsed groups)
       const items = [];
-      tradeOrder.forEach(trade => {
-        const wps = tradeGroups.get(trade);
-        const collapsed = !!_collapseState.get(trade);
-        items.push({type:'header', trade, count:wps.length, collapsed});
-        if (!collapsed) wps.forEach(w => items.push({type:'row', trade, wp:w}));
+      projOrder.forEach(pid => {
+        const tg = projGroups.get(pid);
+        const tradeOrder = [...tg.keys()].sort((a,b)=>{const oa=TRADE_ORDER.indexOf(a),ob=TRADE_ORDER.indexOf(b);return(oa<0?999:oa)-(ob<0?999:ob);});
+        const projCount = [...tg.values()].reduce((s,arr)=>s+arr.length,0);
+        const projCollapsed = !!_projCollapseState.get(pid);
+        items.push({type:'projheader', project:pid, projLabel:_projLabel(pid), count:projCount, collapsed:projCollapsed});
+        if (projCollapsed) return;
+        tradeOrder.forEach(trade => {
+          const wps = tg.get(trade);
+          if (_sortField) wps.sort((a, b) => {
+            let av = a[_sortField] ?? '', bv = b[_sortField] ?? '';
+            if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * _sortDir;
+            return String(av).localeCompare(String(bv)) * _sortDir;
+          });
+          const tkey = pid+'||'+trade;
+          const collapsed = !!_collapseState.get(tkey);
+          items.push({type:'header', project:pid, trade, tkey, count:wps.length, collapsed});
+          if (!collapsed) wps.forEach(w => items.push({type:'row', trade, tkey, wp:w}));
+        });
       });
 
       const totalWPs = rows.length;
@@ -1863,14 +1884,21 @@
 
       let html = '';
       pageItems.forEach(item => {
-        if (item.type === 'header') {
+        if (item.type === 'projheader') {
+          // Greater (top-level) group header for the Project — more prominent than trade headers
+          const btn = `<span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:3px;background:#EE3124;color:#fff;font-size:14px;font-weight:700;margin-left:8px;flex-shrink:0">${item.collapsed?'+':'−'}</span>`;
+          const cnt = `<span style="font-size:11px;color:#EE3124;font-weight:700;white-space:nowrap">${item.count} WPs</span>`;
+          const tdSticky = `<td colspan="${nStickyCount||1}" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:10px 12px;font-size:12px;font-weight:800;letter-spacing:.03em;color:#EE3124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:table-cell">${item.projLabel}${btn}</td>`;
+          const tdRest = nNonStickyCount > 0 ? `<td colspan="${nNonStickyCount}" style="background:#f0f0f0;padding:10px 12px;text-align:right;vertical-align:middle">${cnt}</td>` : '';
+          html += `<tr class="proj-group-header" data-project="${String(item.project).replace(/"/g,'&quot;')}" onclick="toggleProjectGroup(this.dataset.project)" style="cursor:pointer;background:#f0f0f0;border-top:3px solid #EE3124">${tdSticky}${tdRest}</tr>`;
+        } else if (item.type === 'header') {
           const btn = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;margin-left:6px;flex-shrink:0">${item.collapsed?'+':'−'}</span>`;
           const cnt = `<span style="font-size:10px;color:#aaa;font-weight:400;white-space:nowrap">${item.count} WPs</span>`;
-          const tdSticky = `<td colspan="${nStickyCount||1}" style="position:sticky;left:0;z-index:2;background:#f8f8f8;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:table-cell">${item.trade}${btn}</td>`;
+          const tdSticky = `<td colspan="${nStickyCount||1}" style="position:sticky;left:0;z-index:2;background:#f8f8f8;padding:7px 12px 7px 24px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:table-cell">${item.trade}${btn}</td>`;
           const tdRest = nNonStickyCount > 0 ? `<td colspan="${nNonStickyCount}" style="background:#f8f8f8;padding:7px 12px;text-align:right;vertical-align:middle">${cnt}</td>` : '';
-          html += `<tr class="trade-group-header" data-trade="${item.trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5">${tdSticky}${tdRest}</tr>`;
+          html += `<tr class="trade-group-header" data-tkey="${String(item.tkey).replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.tkey)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5">${tdSticky}${tdRest}</tr>`;
         } else {
-          html += `<tr data-trade-row="${item.trade.replace(/"/g,'&quot;')}">${cols.map(c=>renderCell(c.key,item.wp)).join('')}</tr>`;
+          html += `<tr data-trade-row="${String(item.tkey).replace(/"/g,'&quot;')}">${cols.map(c=>renderCell(c.key,item.wp)).join('')}</tr>`;
         }
       });
       tbody.innerHTML = html || `<tr><td colspan="${nCols}" style="text-align:center;color:#aaa;padding:20px">No work packages found</td></tr>`;
@@ -1927,7 +1955,9 @@
         }
         let ch = '';
         pageItems.forEach(item => {
-          if (item.type === 'header') {
+          if (item.type === 'projheader') {
+            ch += `<div class="wpc-projgroup" onclick="toggleProjectGroup('${String(item.project).replace(/'/g,"\\'")}')">${item.projLabel}<span class="wpc-projgroup-count">${item.collapsed?'+ ':''}${item.count} WPs</span></div>`;
+          } else if (item.type === 'header') {
             ch += `<div class="wpc-trade">${item.trade}<span class="wpc-trade-count">${item.count} WPs</span></div>`;
           } else {
             const w = item.wp;
@@ -2479,7 +2509,10 @@
       border-radius:8px !important;
     }
   }
-  .wpc-trade { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666;padding:10px 0 4px;border-top:2px solid #e8e8e8;margin-top:6px; }
+  .wpc-projgroup { display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:800;letter-spacing:.03em;color:#EE3124;padding:11px 10px;margin:10px 0 4px;background:#f0f0f0;border-radius:7px;border-left:4px solid #EE3124;cursor:pointer; }
+  .wpc-projgroup:first-child { margin-top:0; }
+  .wpc-projgroup-count { font-size:11px;font-weight:700;color:#EE3124;white-space:nowrap; }
+  .wpc-trade { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#666;padding:10px 0 4px 8px;border-top:2px solid #e8e8e8;margin-top:6px; }
   .wpc-trade:first-child { border-top:none;margin-top:0; }
   .wpc-trade-count { font-weight:400;color:#aaa;margin-left:6px; }
   .wpc { background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.07);margin-bottom:8px;padding:11px 12px;border-left:3px solid #e5e5e5; }

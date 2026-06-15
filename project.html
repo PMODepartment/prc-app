@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260615c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260615d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615d"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615c"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615d"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -466,12 +466,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260615c"></script>
-<script src="assets/js/ui.js?v=20260615c"></script>
-<script src="assets/js/db.js?v=20260615c"></script>
+<script src="assets/js/auth.js?v=20260615d"></script>
+<script src="assets/js/ui.js?v=20260615d"></script>
+<script src="assets/js/db.js?v=20260615d"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260615c"></script>
+<script src="assets/js/charts.js?v=20260615d"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -1251,6 +1251,10 @@ function normTrade(t){
   return t.trim();
 }
 
+// Normalize WP No. display: some projects (e.g. SLN101) store numbers as "2.0" — show "2".
+// Only strips a trailing .0/.00 from a pure-numeric value; preserves real decimals like "2.1".
+function normWpNo(v){ if(v==null) return v; const s=String(v).trim(); return /^\d+\.0+$/.test(s) ? s.replace(/\.0+$/,'') : s; }
+
 const _collapseState = new Map();
 const _blCollapseState = new Map();
 let _blGroupByTrade = false;
@@ -1762,8 +1766,8 @@ AppAuth.requireLogin(async (user, profile) => {
 
   // Load data in parallel (WPs + Claims)
   const [meta, wps] = await Promise.all([WPDb.getProject(projId), WPDb.getAllWPs(projId)]);
-  allWPs = wps;
-  window._wpById = Object.fromEntries((wps||[]).map(w => [w.id, w]));
+  allWPs = (wps||[]).map(w => ({...w, wp_no: normWpNo(w.wp_no)}));
+  window._wpById = Object.fromEntries(allWPs.map(w => [w.id, w]));
   loadClaims(); // async — loads in background
 
   if (meta) {
@@ -1831,7 +1835,7 @@ AppAuth.requireLogin(async (user, profile) => {
 
   // Re-fetch WPs and refresh view after quick-add modal saves
   window.__wpmReloadFn = async () => {
-    allWPs = (await WPDb.getAllWPs(projId)).map(w => ({...w, trade: normTrade(w.trade)}));
+    allWPs = (await WPDb.getAllWPs(projId)).map(w => ({...w, trade: normTrade(w.trade), wp_no: normWpNo(w.wp_no)}));
     window._wpById = Object.fromEntries(allWPs.map(w => [w.id, w]));
     buildMetrics(allWPs);
     Object.keys(_rendered).forEach(k=>_rendered[k]=false);
