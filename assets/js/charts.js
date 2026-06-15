@@ -8,10 +8,29 @@ const Charts = (() => {
   }
 
   function destroy(id) { if(reg[id]){reg[id].destroy();delete reg[id];} }
+
+  // Legend: render LINE datasets as a line (not the default hollow box). Chart.js draws legend keys
+  // as filled/bordered rectangles unless `usePointStyle` is on, in which case it uses each dataset's
+  // `pointStyle`. So for any chart that has line datasets we enable usePointStyle and give line
+  // datasets pointStyle 'line' (a short stroke) while non-line datasets (bars) keep a square 'rect'
+  // so their legend key still reads as a box. Pure bar/donut charts are left untouched.
+  function _lineLegendStyle(cfg) {
+    const ds = (cfg.data && cfg.data.datasets) || [];
+    const isLine = d => d.type === 'line' || (cfg.type === 'line' && !d.type);
+    if (!ds.some(isLine)) return;
+    const opts = cfg.options = cfg.options || {};
+    const plugins = opts.plugins = opts.plugins || {};
+    const legend = plugins.legend = plugins.legend || {};
+    const labels = legend.labels = legend.labels || {};
+    labels.usePointStyle = true;
+    ds.forEach(d => { d.pointStyle = isLine(d) ? 'line' : (d.pointStyle || 'rect'); });
+  }
+
   function make(id,cfg) {
     destroy(id);
     const ctx=document.getElementById(id);
     if(!ctx)return;
+    _lineLegendStyle(cfg);
     // Apply dark-mode colours to the CONFIG before construction. Chart.js v4 caches bar element options,
     // so mutating dataset.backgroundColor after creation + update() fails to recolour bar fills (only line
     // strokes re-resolve). Baking the colours into the config before `new Chart()` avoids that entirely.
