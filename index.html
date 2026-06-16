@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260616h"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260616h"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260616h"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260616i"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260616i"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260616i"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260616h"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260616i"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260616h"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260616i"/>
 </head>
 <body>
 
@@ -472,6 +472,11 @@
             <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
               <span><i class="ti ti-chart-bar"></i>Filtered Analysis — Budget &amp; Awarded by Period</span>
               <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <div style="display:flex;gap:4px;align-items:center">
+                  <select id="wpmon-year" onchange="onWpMonAnalysisFilterChange()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1.5px solid var(--border-md);background:var(--surface-2);color:var(--text-primary);font-family:inherit;font-weight:600;cursor:pointer"><option value="all">All Years</option></select>
+                  <select id="wpmon-period-sel" onchange="onWpMonAnalysisFilterChange()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1.5px solid var(--border-md);background:var(--surface-2);color:var(--text-primary);font-family:inherit;font-weight:600;cursor:pointer"><option value="all">All Months</option></select>
+                </div>
+                <div style="width:1px;height:18px;background:var(--border-md)"></div>
                 <div style="display:flex;gap:4px">
                   <button id="wpmon-btn-monthly" onclick="setWpMonPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
                   <button id="wpmon-btn-quarterly" onclick="setWpMonPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
@@ -608,12 +613,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260616h"></script>
-<script src="assets/js/db.js?v=20260616h"></script>
-<script src="assets/js/ui.js?v=20260616h"></script>
+<script src="assets/js/auth.js?v=20260616i"></script>
+<script src="assets/js/db.js?v=20260616i"></script>
+<script src="assets/js/ui.js?v=20260616i"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260616h"></script>
+<script src="assets/js/charts.js?v=20260616i"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -1875,11 +1880,54 @@
       const mb=document.getElementById('wpmon-btn-monthly'), qb=document.getElementById('wpmon-btn-quarterly');
       if(mb) mb.style.cssText = m==='monthly'?on:off;
       if(qb) qb.style.cssText = m==='quarterly'?on:off;
+      fillWpMonPeriodOptions();   // Month↔Quarter options switch; resets to "all" if incompatible
       renderWPMonAnalysis();
     };
+    // Year + Month/Quarter scope for the Filtered Analysis (KPIs + chart + table). A WP is in scope
+    // when its PLANNED award date (awarding_date) falls in the selected year and month/quarter.
+    // When both are "all" the scope is unrestricted (keeps null-date rows, original behaviour).
+    let _wpMonYear = 'all', _wpMonPeriodSel = 'all';
+    const _wpMonPdate = v => { if(!v) return null; const m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; };
+    function _wpMonPeriodMatch(d){
+      if(_wpMonYear==='all' && _wpMonPeriodSel==='all') return true;
+      if(!d) return false;
+      if(_wpMonYear!=='all' && d.getFullYear()!=+_wpMonYear) return false;
+      if(_wpMonPeriodSel!=='all'){
+        if(_wpMonPeriodMode==='quarterly'){ if(('Q'+(Math.floor(d.getMonth()/3)+1))!==_wpMonPeriodSel) return false; }
+        else if((d.getMonth()+1)!=+_wpMonPeriodSel) return false;
+      }
+      return true;
+    }
+    window.onWpMonAnalysisFilterChange = function(){
+      _wpMonYear = document.getElementById('wpmon-year')?.value || 'all';
+      _wpMonPeriodSel = document.getElementById('wpmon-period-sel')?.value || 'all';
+      renderWPMonAnalysis();
+    };
+    // Year options from the data; period options depend on Monthly/Quarterly mode.
+    function populateWpMonAnalysisFilters(){
+      const ysel=document.getElementById('wpmon-year');
+      if(ysel){
+        const years=new Set();
+        (_wpMonData||[]).forEach(w=>{ [w.awarding_date,w.actual_awarding_date].forEach(v=>{ const d=_wpMonPdate(v); if(d) years.add(d.getFullYear()); }); });
+        const cur=ysel.value;
+        ysel.innerHTML='<option value="all">All Years</option>'+[...years].sort().map(y=>`<option value="${y}">${y}</option>`).join('');
+        ysel.value=[...ysel.options].some(o=>o.value===cur)?cur:'all'; _wpMonYear=ysel.value;
+      }
+      fillWpMonPeriodOptions();
+    }
+    function fillWpMonPeriodOptions(){
+      const psel=document.getElementById('wpmon-period-sel'); if(!psel) return;
+      const cur=psel.value;
+      if(_wpMonPeriodMode==='quarterly') psel.innerHTML='<option value="all">All Quarters</option>'+['Q1','Q2','Q3','Q4'].map(q=>`<option value="${q}">${q}</option>`).join('');
+      else { const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; psel.innerHTML='<option value="all">All Months</option>'+MN.map((m,i)=>`<option value="${i+1}">${m}</option>`).join(''); }
+      psel.value=[...psel.options].some(o=>o.value===cur)?cur:'all'; _wpMonPeriodSel=psel.value;
+    }
+
     // Totals + budget/awarded period chart (with cumulative lines) for the current WP-List filter
     function renderWPMonAnalysis() {
-      const rows = _wpMonFiltered || [];
+      const allRows = _wpMonFiltered || [];
+      const rows = (_wpMonYear==='all' && _wpMonPeriodSel==='all') ? allRows
+                 : allRows.filter(w=>_wpMonPeriodMatch(_wpMonPdate(w.awarding_date)));
       const tb = rows.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
       const ta = rows.reduce((s,w)=>s+(w.total_awarded||0),0);
       // Budget of WPs not yet awarded — the value still to be awarded
@@ -1966,6 +2014,7 @@
       }
       _msfSel.works.clear(); _msfSel.vendor.clear();
       _recomputeFilterOptions();
+      populateWpMonAnalysisFilters();
     }
 
     // Recompute the Works/Vendor option lists from the selected Trade (and Works for Vendor),
@@ -2852,6 +2901,7 @@
 
 </body>
 </html>
+
 
 
 
