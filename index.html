@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615n"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260615n"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615n"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260616a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260616a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260616a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615n"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260616a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615n"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260616a"/>
 </head>
 <body>
 
@@ -445,16 +445,18 @@
         <!-- ══ WP LIST TAB ══ -->
         <div id="tab-wplist" style="display:none">
           <div class="filter-bar" style="flex-wrap:wrap;margin-bottom:12px">
-            <select id="wp-mon-trade" onchange="filterWPTable()">
+            <select id="wp-mon-trade" onchange="onWpMonTradeChange()" style="flex:0 0 auto;min-width:150px;max-width:190px">
               <option value="">All Trades</option>
             </select>
-            <select id="wp-mon-works" onchange="filterWPTable()">
-              <option value="">All Works</option>
-            </select>
-            <select id="wp-mon-vendor" onchange="filterWPTable()">
-              <option value="">All Vendors</option>
-            </select>
-            <select id="wp-mon-status" onchange="filterWPTable()">
+            <div class="msf" id="msf-works" style="flex:0 0 auto">
+              <button type="button" class="msf-btn" onclick="msfToggle('works')"><span id="msf-works-label">All Works</span><i class="ti ti-chevron-down"></i></button>
+              <div class="msf-pop" id="msf-works-pop"></div>
+            </div>
+            <div class="msf" id="msf-vendor" style="flex:0 0 auto">
+              <button type="button" class="msf-btn" onclick="msfToggle('vendor')"><span id="msf-vendor-label">All Vendors</span><i class="ti ti-chevron-down"></i></button>
+              <div class="msf-pop" id="msf-vendor-pop"></div>
+            </div>
+            <select id="wp-mon-status" onchange="filterWPTable()" style="flex:0 0 auto;min-width:150px;max-width:190px">
               <option value="">All Statuses</option>
               <option value="Awarded">Awarded</option>
               <option value="Not Yet Awarded">Not Yet Awarded</option>
@@ -486,6 +488,10 @@
               <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border-md);border-radius:8px;padding:9px 12px">
                 <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888">Total Awarded</div>
                 <div id="wpmon-sum-awarded" style="font-size:18px;font-weight:800;color:#2D9B6F;margin-top:2px">—</div>
+              </div>
+              <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border-md);border-radius:8px;padding:9px 12px">
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888">Total to be Awarded</div>
+                <div id="wpmon-sum-tba" style="font-size:18px;font-weight:800;color:#D97706;margin-top:2px">—</div>
               </div>
             </div>
             <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-wpmon-period"></canvas></div>
@@ -589,12 +595,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260615n"></script>
-<script src="assets/js/db.js?v=20260615n"></script>
-<script src="assets/js/ui.js?v=20260615n"></script>
+<script src="assets/js/auth.js?v=20260616a"></script>
+<script src="assets/js/db.js?v=20260616a"></script>
+<script src="assets/js/ui.js?v=20260616a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260615n"></script>
+<script src="assets/js/charts.js?v=20260616a"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -1822,13 +1828,13 @@
     window.filterWPTable = function() {
       const q      = (document.getElementById('wp-mon-search')?.value || '').toLowerCase().trim();
       const trade  = document.getElementById('wp-mon-trade')?.value  || '';
-      const works  = document.getElementById('wp-mon-works')?.value  || '';
-      const vendor = document.getElementById('wp-mon-vendor')?.value || '';
+      const works  = _msfSel.works;   // Set (empty = all)
+      const vendor = _msfSel.vendor;  // Set (empty = all)
       const status = document.getElementById('wp-mon-status')?.value || '';
       _wpMonFiltered = _wpMonData.filter(w => {
         if (trade  && w.trade        !== trade)  return false;
-        if (works  && (w.works||'')  !== works)  return false;
-        if (vendor) { const vs=String(w.contractor||w.proposed_vendors||'').split(/\r?\n/).map(s=>s.trim()); if(!vs.includes(vendor)) return false; }
+        if (works.size  && !works.has(w.works||'')) return false;
+        if (vendor.size) { const vs=_wpVendors(w); if(!vs.some(v=>vendor.has(v))) return false; }
         if (status && w.award_status !== status) return false;
         if (q && !(
           (w.wp_no||'').toLowerCase().includes(q) ||
@@ -1842,8 +1848,10 @@
       renderWPMonAnalysis();
     };
     window.resetWPMonFilters = function() {
-      ['wp-mon-trade','wp-mon-works','wp-mon-vendor','wp-mon-status'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='';});
+      ['wp-mon-trade','wp-mon-status'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='';});
+      _msfSel.works.clear(); _msfSel.vendor.clear();
       const s=document.getElementById('wp-mon-search'); if(s) s.value='';
+      _recomputeFilterOptions();
       filterWPTable();
     };
     let _wpMonPeriodMode = 'monthly';
@@ -1861,12 +1869,15 @@
       const rows = _wpMonFiltered || [];
       const tb = rows.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
       const ta = rows.reduce((s,w)=>s+(w.total_awarded||0),0);
+      // Budget of WPs not yet awarded — the value still to be awarded
+      const tba = rows.filter(w=>w.award_status!=='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
       const cEl=document.getElementById('wpmon-sum-count'); if(cEl) cEl.textContent = rows.length;
       const bEl=document.getElementById('wpmon-sum-budget'); if(bEl){ bEl.textContent = tb?Fmt.moneyShort(tb):'—'; bEl.title = Fmt.moneyFull(tb); }
       const aEl=document.getElementById('wpmon-sum-awarded'); if(aEl){ aEl.textContent = ta?Fmt.moneyShort(ta):'—'; aEl.title = Fmt.moneyFull(ta); }
+      const tEl=document.getElementById('wpmon-sum-tba'); if(tEl){ tEl.textContent = tba?Fmt.moneyShort(tba):'—'; tEl.title = Fmt.moneyFull(tba); }
       if (typeof Charts !== 'undefined') {
-        if (_wpMonPeriodMode === 'quarterly') Charts.budgetAwardedByPeriod('c-wpmon-period', rows);
-        else Charts.budgetAwardedByPeriodMonthly('c-wpmon-period', rows);
+        if (_wpMonPeriodMode === 'quarterly') Charts.budgetAwardedByPeriod('c-wpmon-period', rows, {tidyLabels:true});
+        else Charts.budgetAwardedByPeriodMonthly('c-wpmon-period', rows, {tidyLabels:true});
       }
     }
 
@@ -1878,21 +1889,81 @@
       _wpMonPage++; renderWPMonTable(_wpMonFiltered); // renderWPMonTable clamps to totalPages
     };
 
+    // ── Cascading multiselect filters (Trade → Works → Vendor) ──
+    const _msfSel = { works: new Set(), vendor: new Set() };
+    const _wpVendors = w => String(w.contractor||w.proposed_vendors||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+
     function populateWPMonTradeFilter() {
       if (!_wpMonData) return;
-      const fill = (id, allLabel, vals) => {
-        const sel = document.getElementById(id); if (!sel) return;
+      const sel = document.getElementById('wp-mon-trade');
+      if (sel) {
         const cur = sel.value;
-        sel.innerHTML = `<option value="">${allLabel}</option>` +
-          vals.map(v => `<option value="${String(v).replace(/"/g,'&quot;')}" ${v===cur?'selected':''}>${v}</option>`).join('');
-      };
-      fill('wp-mon-trade',  'All Trades',  [...new Set(_wpMonData.map(w=>w.trade).filter(Boolean))].sort());
-      fill('wp-mon-works',  'All Works',   [...new Set(_wpMonData.map(w=>w.works).filter(Boolean))].sort());
-      // Vendors live in contractor (awarded) or proposed_vendors (one per line) — split & dedupe
-      const vendors = new Set();
-      _wpMonData.forEach(w => String(w.contractor||w.proposed_vendors||'').split(/\r?\n/).forEach(v=>{ const t=v.trim(); if(t) vendors.add(t); }));
-      fill('wp-mon-vendor', 'All Vendors', [...vendors].sort());
+        sel.innerHTML = `<option value="">All Trades</option>` +
+          [...new Set(_wpMonData.map(w=>w.trade).filter(Boolean))].sort()
+            .map(v => `<option value="${String(v).replace(/"/g,'&quot;')}" ${v===cur?'selected':''}>${v}</option>`).join('');
+      }
+      _msfSel.works.clear(); _msfSel.vendor.clear();
+      _recomputeFilterOptions();
     }
+
+    // Recompute the Works/Vendor option lists from the selected Trade (and Works for Vendor),
+    // dropping any current selections that are no longer valid. Re-renders the popovers + labels.
+    function _recomputeFilterOptions() {
+      const trade = document.getElementById('wp-mon-trade')?.value || '';
+      const tradeSet = _wpMonData.filter(w => !trade || w.trade === trade);
+      // Works options come from the trade-filtered set
+      const worksOpts = [...new Set(tradeSet.map(w=>w.works).filter(Boolean))].sort();
+      _msfSel.works.forEach(v => { if (!worksOpts.includes(v)) _msfSel.works.delete(v); });
+      // Vendor options come from the trade- + works-filtered set
+      const workSel = _msfSel.works;
+      const vendBase = tradeSet.filter(w => workSel.size===0 || workSel.has(w.works));
+      const vendorOpts = [...new Set(vendBase.flatMap(_wpVendors))].sort();
+      _msfSel.vendor.forEach(v => { if (!vendorOpts.includes(v)) _msfSel.vendor.delete(v); });
+      _msfRender('works', worksOpts, 'All Works');
+      _msfRender('vendor', vendorOpts, 'All Vendors');
+    }
+
+    function _msfRender(field, opts, allLabel) {
+      const pop = document.getElementById(`msf-${field}-pop`);
+      const lab = document.getElementById(`msf-${field}-label`);
+      const sel = _msfSel[field];
+      if (lab) lab.textContent = sel.size===0 ? allLabel : (sel.size===1 ? [...sel][0] : `${sel.size} selected`);
+      if (!pop) return;
+      const esc = s => String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;');
+      pop.innerHTML =
+        `<input class="msf-search" type="text" placeholder="Search…" oninput="msfFilterOpts('${field}', this.value)"/>` +
+        `<label class="msf-opt msf-allrow"><input type="checkbox" ${sel.size===0?'checked':''} onchange="msfSelectAll('${field}')"/><span>${allLabel}</span></label>` +
+        opts.map(o => `<label class="msf-opt" data-val="${esc(o)}"><input type="checkbox" ${sel.has(o)?'checked':''} onchange="msfOnToggle('${field}', this)"/><span>${esc(o)}</span></label>`).join('');
+    }
+
+    window.msfFilterOpts = function(field, q){
+      q = (q||'').toLowerCase();
+      document.querySelectorAll(`#msf-${field}-pop .msf-opt[data-val]`).forEach(el=>{
+        el.style.display = el.getAttribute('data-val').toLowerCase().includes(q) ? '' : 'none';
+      });
+    };
+    function _updateMsfLabel(field){ const sel=_msfSel[field]; const lab=document.getElementById(`msf-${field}-label`); if(lab) lab.textContent = sel.size===0?(field==='works'?'All Works':'All Vendors'):(sel.size===1?[...sel][0]:`${sel.size} selected`); }
+    window.msfSelectAll = function(field){
+      _msfSel[field].clear();
+      if (field==='works') _recomputeFilterOptions();   // clearing works re-expands the vendor list
+      else { document.querySelectorAll('#msf-vendor-pop .msf-opt[data-val] input').forEach(i=>i.checked=false); _updateMsfLabel('vendor'); }
+      filterWPTable();
+    };
+    window.msfOnToggle = function(field, cb){
+      const val = cb.closest('.msf-opt').getAttribute('data-val');
+      if (cb.checked) _msfSel[field].add(val); else _msfSel[field].delete(val);
+      if (field==='works') _recomputeFilterOptions();   // selecting works narrows the vendor list
+      else _updateMsfLabel('vendor');
+      filterWPTable();
+    };
+    window.msfToggle = function(field){
+      const box = document.getElementById(`msf-${field}`);
+      const wasOpen = box.classList.contains('open');
+      document.querySelectorAll('.msf.open').forEach(b=>b.classList.remove('open'));
+      if (!wasOpen) box.classList.add('open');
+    };
+    window.onWpMonTradeChange = function(){ _msfSel.works.clear(); _msfSel.vendor.clear(); _recomputeFilterOptions(); filterWPTable(); };
+    document.addEventListener('click', e => { if (!e.target.closest('.msf')) document.querySelectorAll('.msf.open').forEach(b=>b.classList.remove('open')); });
 
     function renderWPMonTable(rows) {
       const tbody = document.getElementById('wp-mon-body');
@@ -2600,6 +2671,20 @@
 <style>
   .hide-mobile { }
   @media(max-width:480px) { .hide-mobile { display:none; } }
+
+  /* ── Multiselect filter (WP List: Works / Vendor) ── */
+  .msf { position:relative; }
+  .msf-btn { display:flex; align-items:center; gap:6px; min-width:150px; max-width:190px; padding:6px 10px; font-size:12px; font-family:inherit; font-weight:500; border:1.5px solid var(--border-md); border-radius:var(--radius-md); background:var(--surface-2); color:var(--text-primary); cursor:pointer; white-space:nowrap; }
+  .msf-btn span { flex:1; overflow:hidden; text-overflow:ellipsis; text-align:left; }
+  .msf-btn i { font-size:13px; color:#999; flex-shrink:0; }
+  .msf-pop { display:none; position:absolute; top:calc(100% + 4px); left:0; z-index:50; min-width:240px; max-width:340px; max-height:320px; overflow-y:auto; background:var(--surface); border:1.5px solid var(--border-md); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.18); padding:6px; }
+  .msf.open .msf-pop { display:block; }
+  .msf-search { width:100%; box-sizing:border-box; padding:6px 9px; margin-bottom:6px; font-size:12px; font-family:inherit; border:1.5px solid var(--border-md); border-radius:6px; background:var(--surface-2); color:var(--text-primary); outline:none; }
+  .msf-opt { display:flex; align-items:center; gap:8px; padding:5px 7px; font-size:12px; color:var(--text-primary); border-radius:5px; cursor:pointer; }
+  .msf-opt:hover { background:var(--surface-2); }
+  .msf-opt input { accent-color:#EE3124; cursor:pointer; flex-shrink:0; }
+  .msf-opt span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .msf-allrow { font-weight:700; border-bottom:1px solid var(--border-md); margin-bottom:4px; }
 
   @keyframes spin { to { transform:rotate(360deg); } }
 

@@ -202,6 +202,28 @@ const Charts = (() => {
     return axis === 'h' ? { right: 42 } : { top: 20 };
   }
 
+  // Decluttered vertical-bar labels for dense period charts (many months × 2 series):
+  // label ONLY the larger series (set via _tidyKeys), rotate vertical, and skip values
+  // below `frac` of that series' max so tiny bars don't pile up and overlap.
+  function _dlTidy(fmtFn, labelLabels, frac) {
+    const keep = new Set(labelLabels);
+    const f = frac != null ? frac : 0.06;
+    return {
+      display: ctx => {
+        if (ctx.dataset.type === 'line') return false;
+        if (!keep.has(ctx.dataset.label)) return false;
+        const arr = ctx.dataset.data, v = arr[ctx.dataIndex];
+        if (v == null || v <= 0) return false;
+        const max = arr.reduce((m, x) => x > m ? x : m, 0);
+        return max > 0 && v >= max * f;
+      },
+      anchor: 'end', align: 'top', offset: 2, rotation: -90, clamp: false, clip: false,
+      color: document.body.classList.contains('dark-mode') ? '#DCDBDB' : '#231F20',
+      font: { size: _mob() ? 7 : 8, weight: '600', family: 'Montserrat' },
+      formatter: fmtFn
+    };
+  }
+
   // ── Chart functions ──────────────────────────────────────────
 
   function statusByZone(id,wps){
@@ -318,7 +340,8 @@ const Charts = (() => {
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
     const mob=_mob();
-    const dl=mob?{display:false}:_dlBar(v=>v>0?_mAbbr(v):'','v');
+    const tidy=!!(opts&&opts.tidyLabels);
+    const dl=mob?{display:false}:(tidy?_dlTidy(v=>v>0?_mAbbr(v):'',['Budget (BCB)']):_dlBar(v=>v>0?_mAbbr(v):'','v'));
     const hideAwd=!!(opts&&opts.hideAwarded);
     make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
@@ -345,7 +368,8 @@ const Charts = (() => {
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
     const mob=_mob();
-    const dl=mob?{display:false}:_dlBar(v=>v>0?_mAbbr(v):'','v');
+    const tidy=!!(opts&&opts.tidyLabels);
+    const dl=mob?{display:false}:(tidy?_dlTidy(v=>v>0?_mAbbr(v):'',['Budget (BCB)']):_dlBar(v=>v>0?_mAbbr(v):'','v'));
     const hideAwd=!!(opts&&opts.hideAwarded);
     make(id,{type:'bar',data:{labels,datasets:[
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},

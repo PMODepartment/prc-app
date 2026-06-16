@@ -727,16 +727,16 @@
     }
   }
 
-  // Type is now a dropdown: "Materials & Labor" is split into selectable "Materials" / "Labor"
-  // (combined kept for back-compat). Service works only offer "Service".
+  // Type is a dropdown: "Materials & Labor" was removed — material works offer "Materials" / "Labor".
+  // Service works only offer "Service". Legacy stored values are preserved (unshift below).
   function _setTypeOptions(base, selected) {
     const typeEl = document.getElementById('f-type');
     if (!typeEl) return;
     let opts;
     if (base === 'Service') opts = ['Service'];
-    else if (base) opts = ['Materials & Labor','Materials','Labor'];
+    else if (base) opts = ['Materials','Labor'];
     else opts = [''];
-    const val = selected != null ? selected : (base === 'Service' ? 'Service' : (base ? 'Materials & Labor' : ''));
+    const val = selected != null ? selected : (base === 'Service' ? 'Service' : '');
     if (val && !opts.includes(val)) opts.unshift(val);   // preserve any stored legacy value
     typeEl.innerHTML = opts.map(o => `<option value="${o}">${o || '—'}</option>`).join('');
     typeEl.value = val;
