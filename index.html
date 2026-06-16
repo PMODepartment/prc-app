@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260616e"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260616e"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260616e"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260616f"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260616f"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260616f"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260616e"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260616f"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260616e"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260616f"/>
 </head>
 <body>
 
@@ -471,9 +471,16 @@
           <div class="panel" id="wp-mon-analysis" style="margin-bottom:12px">
             <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
               <span><i class="ti ti-chart-bar"></i>Filtered Analysis — Budget &amp; Awarded by Period</span>
-              <div style="display:flex;gap:4px">
-                <button id="wpmon-btn-monthly" onclick="setWpMonPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
-                <button id="wpmon-btn-quarterly" onclick="setWpMonPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <div style="display:flex;gap:4px">
+                  <button id="wpmon-btn-monthly" onclick="setWpMonPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
+                  <button id="wpmon-btn-quarterly" onclick="setWpMonPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
+                </div>
+                <div style="width:1px;height:18px;background:var(--border-md)"></div>
+                <div style="display:flex;gap:4px">
+                  <button id="wpmon-btn-chart" onclick="setWpMonViewMode('chart')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600"><i class="ti ti-chart-bar" style="font-size:11px"></i> Chart</button>
+                  <button id="wpmon-btn-table" onclick="setWpMonViewMode('table')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600"><i class="ti ti-table" style="font-size:11px"></i> Table</button>
+                </div>
               </div>
             </div>
             <div id="wpmon-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
@@ -494,7 +501,13 @@
                 <div id="wpmon-sum-tba" style="font-size:18px;font-weight:800;color:#D97706;margin-top:2px">—</div>
               </div>
             </div>
-            <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-wpmon-period"></canvas></div>
+            <div id="wpmon-chart-wrap" class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-wpmon-period"></canvas></div>
+            <div id="wpmon-table-wrap" style="display:none;overflow-x:auto;max-height:340px;overflow-y:auto">
+              <table class="data-table" id="wpmon-period-table" style="font-size:11px;width:100%">
+                <thead id="wpmon-period-thead"></thead>
+                <tbody id="wpmon-period-tbody"></tbody>
+              </table>
+            </div>
           </div>
           <div class="panel" style="padding:0">
             <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap">
@@ -595,12 +608,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260616e"></script>
-<script src="assets/js/db.js?v=20260616e"></script>
-<script src="assets/js/ui.js?v=20260616e"></script>
+<script src="assets/js/auth.js?v=20260616f"></script>
+<script src="assets/js/db.js?v=20260616f"></script>
+<script src="assets/js/ui.js?v=20260616f"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260616e"></script>
+<script src="assets/js/charts.js?v=20260616f"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -1875,10 +1888,58 @@
       const bEl=document.getElementById('wpmon-sum-budget'); if(bEl){ bEl.textContent = tb?Fmt.moneyShort(tb):'—'; bEl.title = Fmt.moneyFull(tb); }
       const aEl=document.getElementById('wpmon-sum-awarded'); if(aEl){ aEl.textContent = ta?Fmt.moneyShort(ta):'—'; aEl.title = Fmt.moneyFull(ta); }
       const tEl=document.getElementById('wpmon-sum-tba'); if(tEl){ tEl.textContent = tba?Fmt.moneyShort(tba):'—'; tEl.title = Fmt.moneyFull(tba); }
-      if (typeof Charts !== 'undefined') {
+      if (_wpMonViewMode === 'table') {
+        renderWpMonPeriodTable(rows);
+      } else if (typeof Charts !== 'undefined') {
         if (_wpMonPeriodMode === 'quarterly') Charts.budgetAwardedByPeriod('c-wpmon-period', rows, {tidyLabels:true});
         else Charts.budgetAwardedByPeriodMonthly('c-wpmon-period', rows, {tidyLabels:true});
       }
+    }
+
+    let _wpMonViewMode = 'chart';
+    window.setWpMonViewMode = function(v){
+      _wpMonViewMode = v;
+      const on='font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
+      const off='font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+      const cb=document.getElementById('wpmon-btn-chart'), tb=document.getElementById('wpmon-btn-table');
+      if(cb) cb.style.cssText = v==='chart'?on:off;
+      if(tb) tb.style.cssText = v==='table'?on:off;
+      const cw=document.getElementById('wpmon-chart-wrap'), tw=document.getElementById('wpmon-table-wrap');
+      if(cw) cw.style.display = v==='chart'?'':'none';
+      if(tw) tw.style.display = v==='table'?'':'none';
+      renderWPMonAnalysis();
+    };
+
+    // Period breakdown table — mirrors the chart's buckets (Budget/Awarded + cumulative) per month/quarter.
+    // Awarded amount falls back to planned award date when actual is null (same as the chart).
+    function renderWpMonPeriodTable(rows){
+      const thead=document.getElementById('wpmon-period-thead'), tbody=document.getElementById('wpmon-period-tbody');
+      if(!thead||!tbody) return;
+      const quarterly = _wpMonPeriodMode==='quarterly';
+      const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const pd=v=>{ if(!v) return null; const m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/); if(!m) return null; return new Date(+m[1],+m[2]-1,+m[3]); };
+      const awDate=w=>w.actual_awarding_date||w.awarding_date;
+      const isAwd=w=>(w.total_awarded||0)>0;
+      const keyOf=d=> quarterly ? (d.getFullYear()+'-Q'+(Math.floor(d.getMonth()/3)+1)) : (d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+      const labelOf=k=> quarterly ? (k.split('-')[1]+" '"+k.slice(2,4)) : (MN[+k.split('-')[1]-1]+" '"+k.slice(2,4));
+      const keys=new Set();
+      rows.forEach(w=>{ const bd=pd(w.awarding_date); if(bd) keys.add(keyOf(bd)); if(isAwd(w)){ const ad=pd(awDate(w)); if(ad) keys.add(keyOf(ad)); } });
+      const ordered=[...keys].sort();
+      const fmt=v=>v?Fmt.money(v):'—';
+      let cb=0, ca=0, rowsHtml='';
+      ordered.forEach(k=>{
+        const bud=rows.filter(w=>{const d=pd(w.awarding_date); return d&&keyOf(d)===k;}).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+        const awd=rows.filter(w=>{ if(!isAwd(w))return false; const d=pd(awDate(w)); return d&&keyOf(d)===k;}).reduce((s,w)=>s+(w.total_awarded||0),0);
+        cb+=bud; ca+=awd;
+        rowsHtml+=`<tr><td style="font-weight:600">${labelOf(k)}</td>`+
+          `<td style="text-align:right">${fmt(bud)}</td>`+
+          `<td style="text-align:right;color:#EE3124">${fmt(awd)}</td>`+
+          `<td style="text-align:right;color:#888">${fmt(cb)}</td>`+
+          `<td style="text-align:right;color:#888">${fmt(ca)}</td></tr>`;
+      });
+      thead.innerHTML=`<tr><th style="text-align:left">${quarterly?'Quarter':'Month'}</th><th style="text-align:right">Budget (BCB)</th><th style="text-align:right">Awarded</th><th style="text-align:right">Cum. Budget</th><th style="text-align:right">Cum. Awarded</th></tr>`;
+      tbody.innerHTML = rowsHtml || `<tr><td colspan="5" style="text-align:center;color:#999;padding:14px">No data for the current filter</td></tr>`;
+      if(rowsHtml) tbody.innerHTML += `<tr style="font-weight:800;background:var(--surface-2)"><td>Total</td><td style="text-align:right">${fmt(cb)}</td><td style="text-align:right;color:#EE3124">${fmt(ca)}</td><td></td><td></td></tr>`;
     }
 
     // Global page navigation — accessible from inline onclick
@@ -2790,6 +2851,7 @@
 
 </body>
 </html>
+
 
 
 
