@@ -345,13 +345,14 @@ function buildRankTable(id, items, type) {
 
   const isValue  = type === 'value';
   const accent   = type === 'savings' ? '#2D9B6F' : '#EE3124';
-  const valLabel = type === 'savings' ? 'Savings' : type === 'loss' ? 'Overbudget' : 'Contract Value';
+  const valLabel = type === 'savings' ? 'Savings' : type === 'loss' ? 'Overbudget' : 'Budget';
   const valSign  = type === 'savings' ? '+' : type === 'loss' ? '-' : '';
+  // Right-aligned headers use the SAME 8px horizontal padding as their value cells so they line up.
   const th = (txt, right, color) =>
-    `<th style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${color||'#777'};padding:7px ${right?'0':'8px'} 7px ${right?'8px':'0'};text-align:${right?'right':'left'};border-bottom:2px solid #ebebeb;white-space:nowrap">${txt}</th>`;
+    `<th style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${color||'#777'};padding:7px 8px 7px ${right?'8px':'0'};text-align:${right?'right':'left'};border-bottom:2px solid #ebebeb;white-space:nowrap">${txt}</th>`;
   const thead = isValue
     ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true)}</tr>`
-    : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Awd',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)} ${th('%WT',true,accent)}</tr>`;
+    : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Award',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)} ${th('%WT',true,accent)}</tr>`;
   const rows = items.map((item, i) => {
     const safe = item.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     // Clicking a row opens the WP detail slide-in panel (full details + Edit/Delete)
@@ -368,7 +369,7 @@ function buildRankTable(id, items, type) {
     </td>`;
     if (isValue) {
       return `<tr class="rank-row" data-rn="${safe}"${click} style="${cursor}border-bottom:1px solid #f5f5f5">${wpCell}
-        <td class="rank-side" style="font-size:12px;font-weight:700;color:#231F20;padding:9px 0 9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.val)}</td>
+        <td class="rank-side" style="font-size:12px;font-weight:700;color:#231F20;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.val)}</td>
       </tr>`;
     }
     return `<tr class="rank-row" data-rn="${safe}"${click} style="${cursor}border-bottom:1px solid #f5f5f5">${wpCell}
@@ -376,7 +377,7 @@ function buildRankTable(id, items, type) {
       <td class="rank-side" style="font-size:10px;color:#777;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
       <td class="rank-side" style="font-size:12px;font-weight:700;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${valSign}${Fmt.money(item.val)}</td>
       <td class="rank-side" style="font-size:11px;font-weight:600;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${item.pct}</td>
-      <td class="rank-side" style="font-size:11px;font-weight:600;color:${accent};padding:9px 0 9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Savings ÷ Total BCB">${item.wt!=null?item.wt:'—'}</td>
+      <td class="rank-side" style="font-size:11px;font-weight:600;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Savings ÷ Total BCB">${item.wt!=null?item.wt:'—'}</td>
     </tr>`;
   }).join('');
   el.innerHTML = `<div class="rank-table-scroll"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead>${thead}</thead><tbody>${rows}</tbody></table></div>`;

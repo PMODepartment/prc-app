@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615j"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260615j"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615j"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260615k"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260615k"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260615k"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615j"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260615k"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615j"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260615k"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -235,15 +235,15 @@
           </div>
           <!-- Top 5 panels -->
           <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:14px">
-            <div class="panel" style="flex:1;min-width:200px">
+            <div class="panel" style="flex:0.8;min-width:170px">
               <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 High Value Packages</div>
               <div class="rank-list" id="rank-value"></div>
             </div>
-            <div class="panel" style="flex:1;min-width:200px">
+            <div class="panel" style="flex:1.25;min-width:250px">
               <div class="panel-title"><i class="ti ti-trending-up"></i>Top 5 Savings</div>
               <div class="rank-list" id="rank-gains"></div>
             </div>
-            <div class="panel" style="flex:1;min-width:200px">
+            <div class="panel" style="flex:1.25;min-width:250px">
               <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
               <div class="rank-list" id="rank-losses"></div>
             </div>
@@ -437,12 +437,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260615j"></script>
-<script src="assets/js/ui.js?v=20260615j"></script>
-<script src="assets/js/db.js?v=20260615j"></script>
+<script src="assets/js/auth.js?v=20260615k"></script>
+<script src="assets/js/ui.js?v=20260615k"></script>
+<script src="assets/js/db.js?v=20260615k"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260615j"></script>
+<script src="assets/js/charts.js?v=20260615k"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -773,7 +773,7 @@ function buildMetrics(wps){
   const pctByWP = total ? Math.round(awarded/total*100) : 0;
   const pctByVal = totalBudget ? Math.round(actualAward/totalBudget*100) : 0;
 
-  const card = (lbl,val,cls,full,sub) => '<div class="metric-card"><div class="metric-label">'+lbl+'</div><div class="metric-value '+cls+'"'+(full?' title="'+full+'"':'')+'>'+val+'</div>'+(sub?'<div style="font-size:12px;font-weight:600;color:#888;margin-top:3px">'+sub+'</div>':'')+'</div>';
+  const card = (lbl,val,cls,full,sub,subColor) => '<div class="metric-card"><div class="metric-label">'+lbl+'</div><div class="metric-value '+cls+'"'+(full?' title="'+full+'"':'')+'>'+val+'</div>'+(sub?'<div class="metric-sub" style="font-size:14px;font-weight:700;margin-top:4px;color:'+(subColor||'#888')+'">'+sub+'</div>':'')+'</div>';
 
   // 4-card Cost Overview: BCB, Actual Award, Balance to Award (amount + WP qty), Savings/Loss (₱ + %)
   const balanceAmt = totalBudget - hm.budgetAwarded;          // budget remaining to award
@@ -784,7 +784,7 @@ function buildMetrics(wps){
     card('Procurement Budget (BCB)', Fmt.moneyShort(totalBudget), '', Fmt.moneyFull(totalBudget)),
     card('Actual Award', Fmt.moneyShort(actualAward), 'green', Fmt.moneyFull(actualAward)),
     card('Balance to Award', Fmt.moneyShort(balanceAmt), '', Fmt.moneyFull(balanceAmt), balanceQty+' WP'+(balanceQty===1?'':'s')+' remaining'),
-    card('Savings / Loss', (savings>=0?'+':'-')+Fmt.moneyShort(Math.abs(savings)), savings>=0?'green':'red', (savings>=0?'+':'-')+Fmt.moneyFull(Math.abs(savings)), (savings>=0?'+':'')+savingsPct.toFixed(1)+'%'),
+    card('Savings / Loss', (savings>=0?'+':'-')+Fmt.moneyShort(Math.abs(savings)), savings>=0?'green':'red', (savings>=0?'+':'-')+Fmt.moneyFull(Math.abs(savings)), (savings>=0?'+':'')+savingsPct.toFixed(1)+'%', savings>=0?'#2D9B6F':'#EE3124'),
   ].join('');
 
   const costEl = document.getElementById('metrics-cost');

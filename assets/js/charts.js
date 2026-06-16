@@ -324,7 +324,7 @@ const Charts = (() => {
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1}]),
+      ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
@@ -351,7 +351,7 @@ const Charts = (() => {
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1}]),
+      ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
@@ -632,8 +632,8 @@ const Charts = (() => {
     const labels = months.map(me => me.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
     const mob = _mob();
     make(id, { type:'line', data:{ labels, datasets:[
-      { label:'Cumulative Planned', data:planned, borderColor:'#282C28', backgroundColor:'rgba(40,44,40,0.06)', fill:true, tension:.3, pointRadius:mob?0:2, borderWidth:2, order:2 },
-      { label:'Cumulative Actual (Awarded)', data:actual, borderColor:'#EE3124', backgroundColor:'rgba(238,49,36,0.07)', fill:true, tension:.3, pointRadius:mob?0:2, borderWidth:2, borderDash:[5,3], spanGaps:false, order:1 },
+      { label:'Cumulative Planned', data:planned, borderColor:'#282C28', backgroundColor:'rgba(40,44,40,0.06)', fill:true, tension:.3, pointRadius:mob?0:2, borderWidth:2, borderDash:[5,3], order:2 },
+      { label:'Cumulative Actual (Awarded)', data:actual, borderColor:'#EE3124', backgroundColor:'rgba(238,49,36,0.07)', fill:true, tension:.3, pointRadius:mob?0:2, borderWidth:2, spanGaps:false, order:1 },
     ]}, options:{ responsive:true, maintainAspectRatio:false, interaction:{ intersect:false, mode:'index' }, plugins:{ legend:{ position:'bottom', labels:{ font:{ size:mob?8:10 }, boxWidth:mob?10:12 } }, datalabels:{ display:false }, tooltip:{ callbacks:{ label:ctx=>` ${ctx.dataset.label}: ${ctx.raw==null?'—':ctx.raw} / ${total} WP` } } }, scales:{ x:{ grid:{ display:false }, ticks:{ font:{ size:mob?7:9 }, maxRotation:45, autoSkip:true, maxTicksLimit:mob?8:18 } }, y:{ beginAtZero:true, suggestedMax:total, ticks:{ font:{ size:mob?8:9 }, stepSize:1, precision:0 }, grid:{ color:'rgba(0,0,0,.05)' }, title:{ display:!mob, text:'Cumulative WPs', font:{ size:9 } } } } } });
   }
 

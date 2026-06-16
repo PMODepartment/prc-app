@@ -783,12 +783,12 @@
         WPDb.getProjects(),
         WPDb.getManagerUsers()
       ]);
-      // Populate sidebar project links (with search when > 8 projects)
-      const activeProjects = allProjects.filter(p=>p.status!=='archived');
+      // Populate sidebar project links — respect the user's assigned projects (role + profile.projects)
+      const activeProjects = AppAuth.getPermittedProjects(currentProfile, allProjects).filter(p=>p.status!=='archived');
       window._sidebarProjects = activeProjects;
       const navProj = document.getElementById('nav-projects-admin');
       if (navProj) renderSidebarProjects('');
-      if (activeProjects.length > 8) {
+      if (activeProjects.length > 1) {
         const sw = document.getElementById('sidebar-proj-search-wrap');
         if (sw) sw.style.display = 'block';
       }
