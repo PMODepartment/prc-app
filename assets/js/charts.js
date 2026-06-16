@@ -458,7 +458,8 @@ const Charts = (() => {
       {label:'Planned',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
       {label:'Actual',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
+      {label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'Count',font:{size:9}}}}}});
   }
 
@@ -553,6 +554,38 @@ const Charts = (() => {
   }
 
   // WP Count by Period — Monthly (Planned vs Actual)
+  // ── Forecast (dashed) continuation for Planned-vs-Actual cumulative WP-count charts ──
+  // Projects the not-yet-awarded WPs forward so the red Actual line continues as a dashed
+  // "Forecast" line up to 100% of WPs. Forecast award/completion month per WP:
+  //   • already Awarded            → its actual award month (part of Actual, not Forecast)
+  //   • not awarded, planned in FUTURE (awarding_date ≥ today) → its PLANNED award month (on-schedule)
+  //   • not awarded & OVERDUE (planned date < today) or no planned date → the NEXT period after today
+  //     (the overdue backlog is assumed to be cleared starting the upcoming period)
+  // Returns an array aligned to `keys`: null before the current period, then the cumulative
+  // forecast anchored to the current Actual total so the dashed line joins the solid one seamlessly.
+  function _wpForecastLine(keys, keyOf, wps, cumActual) {
+    if (!keys.length) return [];
+    const now = new Date();
+    const nowKey = keyOf(now);
+    let nowIdx = keys.findIndex(k => k >= nowKey);
+    if (nowIdx < 0) nowIdx = keys.length - 1;
+    const futureIdx = Math.min(nowIdx + 1, keys.length - 1);
+    const anchor = cumActual[nowIdx] || 0;
+    const add = new Array(keys.length).fill(0);
+    wps.forEach(w => {
+      if (w.award_status === 'Awarded') return;
+      let idx = futureIdx;                                   // overdue / no plan → next period
+      const pa = w.awarding_date ? new Date(w.awarding_date) : null;
+      if (pa && pa >= now) { let pi = keys.findIndex(k => k >= keyOf(pa)); if (pi < 0) pi = keys.length - 1; idx = Math.max(pi, futureIdx); }
+      add[idx]++;
+    });
+    const out = new Array(keys.length).fill(null);
+    let run = anchor;
+    for (let i = nowIdx; i < keys.length; i++) { if (i > nowIdx) run += add[i]; out[i] = run; }
+    return out;
+  }
+  const _fcDash = { borderDash: [6, 4] };
+
   function wpCountByPeriodMonthly(id, wps) {
     const mSet=new Set();
     wps.forEach(w=>{
@@ -575,7 +608,8 @@ const Charts = (() => {
       {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
       {label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      {label:'Forecast',data:_wpForecastLine(months,getMKey,wps,cumA),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
 
@@ -599,7 +633,8 @@ const Charts = (() => {
       {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
       {label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderDash:[5,3],borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      {label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
 
@@ -656,11 +691,25 @@ const Charts = (() => {
     // for every imported project).
     const planned = months.map(me => wps.filter(w => { const dd=pd(w.awarding_date); return dd && dd<=me; }).length);
     const actual  = months.map(me => { if(me>now) return null; return wps.filter(w => { const dd=pd(w.actual_awarding_date)||pd(w.awarding_date); return w.award_status==='Awarded' && dd && dd<=me; }).length; });
+    // Forecast (dashed, same red): continue the Actual line by projecting the not-yet-awarded WPs.
+    // Forecast award/completion date per not-awarded WP: PLANNED award date if still in the future
+    // (on-schedule); the NEXT month if OVERDUE (planned date already past) or no planned date —
+    // i.e. the backlog is assumed to be cleared starting next period. Anchored to the last Actual
+    // point so the dashed line joins the solid one and climbs toward 100% of WPs.
+    let lastActualIdx = -1; for (let i=0;i<actual.length;i++){ if(actual[i]!=null) lastActualIdx=i; }
+    const forecast = months.map(()=>null);
+    if (lastActualIdx >= 0) {
+      const anchor = actual[lastActualIdx];
+      const nextME = months[Math.min(lastActualIdx+1, months.length-1)];
+      const fdate = w => { const pa=pd(w.awarding_date); return (pa && pa>now) ? pa : nextME; };
+      for (let i=lastActualIdx;i<months.length;i++){ const me=months[i]; forecast[i]=anchor + wps.filter(w=>w.award_status!=='Awarded' && fdate(w)<=me).length; }
+    }
     const labels = months.map(me => me.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
     const mob = _mob();
     make(id, { type:'line', data:{ labels, datasets:[
-      { label:'Cumulative Planned', data:planned, borderColor:'#282C28', backgroundColor:'rgba(40,44,40,0.06)', fill:true, tension:.3, pointRadius:mob?0:2, borderWidth:2, borderDash:[5,3], order:2 },
+      { label:'Cumulative Planned', data:planned, borderColor:'#282C28', backgroundColor:'rgba(40,44,40,0.06)', fill:true, tension:.3, pointRadius:mob?0:2, borderWidth:2, order:2 },
       { label:'Cumulative Actual (Awarded)', data:actual, borderColor:'#EE3124', backgroundColor:'rgba(238,49,36,0.07)', fill:true, tension:.3, pointRadius:mob?0:2, borderWidth:2, spanGaps:false, order:1 },
+      { label:'Forecast', data:forecast, borderColor:'#EE3124', borderDash:[6,4], fill:false, tension:.3, pointRadius:0, borderWidth:2, spanGaps:false, order:1 },
     ]}, options:{ responsive:true, maintainAspectRatio:false, interaction:{ intersect:false, mode:'index' }, plugins:{ legend:{ position:'bottom', labels:{ font:{ size:mob?8:10 }, boxWidth:mob?10:12 } }, datalabels:{ display:false }, tooltip:{ callbacks:{ label:ctx=>` ${ctx.dataset.label}: ${ctx.raw==null?'—':ctx.raw} / ${total} WP` } } }, scales:{ x:{ grid:{ display:false }, ticks:{ font:{ size:mob?7:9 }, maxRotation:45, autoSkip:true, maxTicksLimit:mob?8:18 } }, y:{ beginAtZero:true, suggestedMax:total, ticks:{ font:{ size:mob?8:9 }, stepSize:1, precision:0 }, grid:{ color:'rgba(0,0,0,.05)' }, title:{ display:!mob, text:'Cumulative WPs', font:{ size:9 } } } } } });
   }
 
