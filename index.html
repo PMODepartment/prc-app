@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260616b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260616b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260616b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260616c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260616c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260616c"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260616b"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260616c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260616b"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260616c"/>
 </head>
 <body>
 
@@ -261,8 +261,35 @@
 
         <!-- ══ BACKLOG TAB ══ -->
         <div id="tab-backlog" style="display:none">
-          <!-- Backlog table first -->
-          <div class="panel" style="margin-bottom:14px;padding:0;overflow:hidden">
+          <!-- Charts first -->
+          <div class="grid-2" style="margin-bottom:14px">
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Aging Bucket</div>
+              <div style="position:relative;height:200px"><canvas id="c-bl-aging"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
+              <div style="position:relative;height:200px"><canvas id="c-bl-status"></canvas></div>
+            </div>
+          </div>
+          <div class="grid-2" style="margin-bottom:14px">
+            <div class="panel">
+              <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                <span><i class="ti ti-chart-bar"></i>Work Package by Period</span>
+                <div style="display:flex;gap:4px">
+                  <button id="idx-bl-btn-quarterly" onclick="setIdxBlPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
+                  <button id="idx-bl-btn-monthly" onclick="setIdxBlPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
+                </div>
+              </div>
+              <div style="position:relative;height:220px"><canvas id="c-bl-period"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-donut"></i>WP by Submittal Status</div>
+              <div style="position:relative;height:220px"><canvas id="c-bl-submittal"></canvas></div>
+            </div>
+          </div>
+          <!-- Backlog table below the charts -->
+          <div class="panel" style="padding:0;overflow:hidden">
             <div style="padding:12px 16px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <div class="panel-title" style="margin:0;flex-shrink:0"><i class="ti ti-list"></i>Backlog — Not Awarded WPs</div>
               <button id="idx-bl-group-toggle" onclick="toggleIdxBlGroupMode()" style="font-size:10px;padding:4px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px;flex-shrink:0"><i class="ti ti-layout-rows" style="font-size:12px"></i><span>Flat</span></button>
@@ -286,33 +313,6 @@
                 <thead id="bl-thead"><tr><th>Project</th><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr></thead>
                 <tbody id="bl-tbody"></tbody>
               </table>
-            </div>
-          </div>
-          <!-- Charts below -->
-          <div class="grid-2" style="margin-bottom:14px">
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Aging Bucket</div>
-              <div style="position:relative;height:200px"><canvas id="c-bl-aging"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
-              <div style="position:relative;height:200px"><canvas id="c-bl-status"></canvas></div>
-            </div>
-          </div>
-          <div class="grid-2">
-            <div class="panel">
-              <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-                <span><i class="ti ti-chart-bar"></i>Work Package by Period</span>
-                <div style="display:flex;gap:4px">
-                  <button id="idx-bl-btn-quarterly" onclick="setIdxBlPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
-                  <button id="idx-bl-btn-monthly" onclick="setIdxBlPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
-                </div>
-              </div>
-              <div style="position:relative;height:220px"><canvas id="c-bl-period"></canvas></div>
-            </div>
-            <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-donut"></i>WP by Submittal Status</div>
-              <div style="position:relative;height:220px"><canvas id="c-bl-submittal"></canvas></div>
             </div>
           </div>
         </div>
@@ -595,12 +595,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260616b"></script>
-<script src="assets/js/db.js?v=20260616b"></script>
-<script src="assets/js/ui.js?v=20260616b"></script>
+<script src="assets/js/auth.js?v=20260616c"></script>
+<script src="assets/js/db.js?v=20260616c"></script>
+<script src="assets/js/ui.js?v=20260616c"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260616b"></script>
+<script src="assets/js/charts.js?v=20260616c"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -2790,4 +2790,5 @@
 
 </body>
 </html>
+
 
