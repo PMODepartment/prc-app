@@ -333,12 +333,12 @@ function buildRankTable(id, items, type) {
     const s = document.createElement('style');
     s.id = '_rankTblStyle';
     s.textContent = [
-      // Full WP names are shown inline (wrapping); the card body scrolls vertically if the rows
-      // exceed its height — no hover/tooltip needed.
+      // All 5 rows are always visible (no vertical scroll). If a long WP name + columns spill past the
+      // card width, the card scrolls LEFT↔RIGHT instead. Names/cells stay on one line (nowrap).
       '.rank-row{cursor:default}',
-      '.rank-table-scroll{max-height:240px;overflow-y:auto;-webkit-overflow-scrolling:touch}',
-      '.rank-table-scroll thead th{position:sticky;top:0;background:var(--surface,#fff);z-index:1}',
-      '@media(max-width:600px){.rank-table-scroll{overflow-x:auto}.rank-table-scroll table{min-width:300px}}',
+      '.rank-table-scroll{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch}',
+      '.rank-table-scroll table{min-width:100%}',
+      '.rank-short,.rank-sub{white-space:nowrap}',
     ].join('');
     document.head.appendChild(s);
   }
@@ -361,9 +361,9 @@ function buildRankTable(id, items, type) {
     const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:top">
       <div style="display:flex;align-items:flex-start;gap:6px">
         <span style="font-size:10px;color:#999;font-weight:700;flex-shrink:0;min-width:14px;padding-top:1px">${i+1}</span>
-        <div style="min-width:0;flex:1">
-          <div class="rank-short" style="font-size:11px;font-weight:600;color:#231F20;line-height:1.35;white-space:normal;word-break:break-word">${item.name}</div>
-          <div class="rank-sub" style="font-size:9px;color:#888;margin-top:1px;white-space:normal;word-break:break-word">${item.sub||''}</div>
+        <div>
+          <div class="rank-short" style="font-size:11px;font-weight:600;color:#231F20;line-height:1.35;white-space:nowrap">${item.name}</div>
+          <div class="rank-sub" style="font-size:9px;color:#888;margin-top:1px;white-space:nowrap">${item.sub||''}</div>
         </div>
       </div>
     </td>`;
