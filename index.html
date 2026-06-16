@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260616i"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260616i"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260616i"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260616j"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260616j"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260616j"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260616i"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260616j"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260616i"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260616j"/>
 </head>
 <body>
 
@@ -613,12 +613,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260616i"></script>
-<script src="assets/js/db.js?v=20260616i"></script>
-<script src="assets/js/ui.js?v=20260616i"></script>
+<script src="assets/js/auth.js?v=20260616j"></script>
+<script src="assets/js/db.js?v=20260616j"></script>
+<script src="assets/js/ui.js?v=20260616j"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260616i"></script>
+<script src="assets/js/charts.js?v=20260616j"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -1966,18 +1966,20 @@
       const quarterly = _wpMonPeriodMode==='quarterly';
       const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       const pd=v=>{ if(!v) return null; const m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/); if(!m) return null; return new Date(+m[1],+m[2]-1,+m[3]); };
-      const awDate=w=>w.actual_awarding_date||w.awarding_date;
+      // Award date (actual→planned fallback) CLAMPED to today — a WP can't be awarded in the future.
+      const _today0=(()=>{const n=new Date();return new Date(n.getFullYear(),n.getMonth(),n.getDate());})();
+      const awDate=w=>{ const d=pd(w.actual_awarding_date||w.awarding_date); return d?(d>_today0?_today0:d):null; };
       const isAwd=w=>(w.total_awarded||0)>0;
       const keyOf=d=> quarterly ? (d.getFullYear()+'-Q'+(Math.floor(d.getMonth()/3)+1)) : (d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
       const labelOf=k=> quarterly ? (k.split('-')[1]+" '"+k.slice(2,4)) : (MN[+k.split('-')[1]-1]+" '"+k.slice(2,4));
       const keys=new Set();
-      rows.forEach(w=>{ const bd=pd(w.awarding_date); if(bd) keys.add(keyOf(bd)); if(isAwd(w)){ const ad=pd(awDate(w)); if(ad) keys.add(keyOf(ad)); } });
+      rows.forEach(w=>{ const bd=pd(w.awarding_date); if(bd) keys.add(keyOf(bd)); if(isAwd(w)){ const ad=awDate(w); if(ad) keys.add(keyOf(ad)); } });
       const ordered=[...keys].sort();
       const fmt=v=>v?Fmt.money(v):'—';
       let cb=0, ca=0, rowsHtml='';
       ordered.forEach(k=>{
         const bud=rows.filter(w=>{const d=pd(w.awarding_date); return d&&keyOf(d)===k;}).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-        const awd=rows.filter(w=>{ if(!isAwd(w))return false; const d=pd(awDate(w)); return d&&keyOf(d)===k;}).reduce((s,w)=>s+(w.total_awarded||0),0);
+        const awd=rows.filter(w=>{ if(!isAwd(w))return false; const d=awDate(w); return d&&keyOf(d)===k;}).reduce((s,w)=>s+(w.total_awarded||0),0);
         cb+=bud; ca+=awd;
         rowsHtml+=`<tr><td style="font-weight:600">${labelOf(k)}</td>`+
           `<td style="text-align:right">${fmt(bud)}</td>`+
@@ -2901,6 +2903,7 @@
 
 </body>
 </html>
+
 
 
 

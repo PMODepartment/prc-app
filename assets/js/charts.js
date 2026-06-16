@@ -321,6 +321,21 @@ const Charts = (() => {
   function getQKey(d){ const q=Math.ceil((d.getMonth()+1)/3); return `${d.getFullYear()}-${q}`; }
   function qLabel(k){ const[y,q]=k.split('-'); return `Q${q} '${y.slice(2)}`; }
 
+  // Effective AWARD date for plotting an awarded WP. Uses the actual award date, falling back to the
+  // PLANNED award date when actual isn't captured (WP-Monitoring imports record award_status +
+  // total_awarded but no actual date). CLAMPED to today — a work package can never be awarded in the
+  // future, so any actual/fallback date beyond today is pulled back to the current day.
+  function _awDate(w){
+    const raw = w.actual_awarding_date || w.awarding_date;
+    if(!raw) return null;
+    const d = new Date(raw);
+    if(isNaN(d)) return null;
+    const now = new Date();
+    return d > now ? now : d;
+  }
+  // Actual award date (no planned fallback) clamped to today — for the Planned-vs-Actual count charts.
+  function _actAwDate(w){ if(!w.actual_awarding_date) return null; const d=new Date(w.actual_awarding_date); if(isNaN(d)) return null; const now=new Date(); return d>now?now:d; }
+
   // Budget (BCB) and Awarded by Period — MONTHLY combo chart
   // opts.hideAwarded: backlog instances pass only not-awarded WPs, whose awarded cost is ₱0 by
   // definition — drop the two always-zero Awarded series instead of drawing a flat line at 0M.
@@ -328,17 +343,17 @@ const Charts = (() => {
     // Awarded amount is placed by its actual award date, falling back to the PLANNED award date when
     // actual_awarding_date isn't captured (WP-Monitoring imports record award_status + total_awarded but
     // no actual date — without the fallback the Awarded bars / Cumulative Awarded line are flat at 0).
-    const awDate=w=>w.actual_awarding_date||w.awarding_date;
+    const awDate=_awDate;   // actual→planned fallback, clamped to today (no future awards)
     const isAwd=w=>(w.total_awarded||0)>0;
     const mSet=new Set();
-    wps.forEach(w=>{ if(w.awarding_date){ const d=new Date(w.awarding_date); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } if(isAwd(w)&&awDate(w)){ const d=new Date(awDate(w)); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } });
+    wps.forEach(w=>{ if(w.awarding_date){ const d=new Date(w.awarding_date); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } if(isAwd(w)&&awDate(w)){ const d=awDate(w); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } });
     if(!mSet.size){ destroy(id); return; }
     const months=[...mSet].sort();
     const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const mLabel=k=>{ const[y,m]=k.split('-'); return MONTH_NAMES[parseInt(m)-1]+' \''+y.slice(2); };
     const getMKey=d=>d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
     const budgetData=months.map(mk=>wps.filter(w=>w.awarding_date&&getMKey(new Date(w.awarding_date))===mk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
-    const awardedData=months.map(mk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getMKey(new Date(awDate(w)))===mk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
+    const awardedData=months.map(mk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getMKey(awDate(w))===mk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
@@ -358,15 +373,15 @@ const Charts = (() => {
   function budgetAwardedByPeriod(id, wps, opts){
     // Awarded amount falls back to the PLANNED award date when actual_awarding_date isn't captured
     // (see budgetAwardedByPeriodMonthly for the why) so the Awarded series isn't flat at 0.
-    const awDate=w=>w.actual_awarding_date||w.awarding_date;
+    const awDate=_awDate;   // actual→planned fallback, clamped to today (no future awards)
     const isAwd=w=>(w.total_awarded||0)>0;
     const qSet=new Set();
-    wps.forEach(w=>{ if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date))); if(isAwd(w)&&awDate(w)) qSet.add(getQKey(new Date(awDate(w)))); });
+    wps.forEach(w=>{ if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date))); if(isAwd(w)&&awDate(w)) qSet.add(getQKey(awDate(w))); });
     if(!qSet.size){ destroy(id); return; }
     const quarters=[...qSet].sort();
     const labels=quarters.map(qLabel);
     const budgetData=quarters.map(qk=>wps.filter(w=>w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
-    const awardedData=quarters.map(qk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getQKey(new Date(awDate(w)))===qk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
+    const awardedData=quarters.map(qk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getQKey(awDate(w))===qk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
@@ -449,7 +464,7 @@ const Charts = (() => {
     const quarters=[...qSet].sort();
     const labels=quarters.map(qLabel);
     const planned=quarters.map(qk=>wps.filter(w=>w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).length);
-    const actual=quarters.map(qk=>wps.filter(w=>w.actual_awarding_date&&getQKey(new Date(w.actual_awarding_date))===qk).length);
+    const actual=quarters.map(qk=>wps.filter(w=>{const ad=_actAwDate(w);return ad&&getQKey(ad)===qk;}).length);
     let cp=0,ca=0;
     const cumP=planned.map(v=>(cp+=v));
     const cumA=actual.map(v=>(ca+=v));
@@ -590,7 +605,7 @@ const Charts = (() => {
     const mSet=new Set();
     wps.forEach(w=>{
       if(w.awarding_date){const d=new Date(w.awarding_date);mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0'));}
-      if(w.actual_awarding_date){const d=new Date(w.actual_awarding_date);mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0'));}
+      const ad=_actAwDate(w); if(ad){mSet.add(ad.getFullYear()+'-'+(ad.getMonth()+1).toString().padStart(2,'0'));}
     });
     if(!mSet.size){destroy(id);return;}
     const months=[...mSet].sort();
@@ -598,7 +613,7 @@ const Charts = (() => {
     const mLabel=k=>{const[y,m]=k.split('-');return MONTH_NAMES[parseInt(m)-1]+'\''+y.slice(2);};
     const getMKey=d=>d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
     const planned=months.map(mk=>wps.filter(w=>w.awarding_date&&getMKey(new Date(w.awarding_date))===mk).length);
-    const actual=months.map(mk=>wps.filter(w=>w.actual_awarding_date&&getMKey(new Date(w.actual_awarding_date))===mk).length);
+    const actual=months.map(mk=>wps.filter(w=>{const ad=_actAwDate(w);return ad&&getMKey(ad)===mk;}).length);
     let cp=0,ca=0;
     const cumP=planned.map(v=>(cp+=v,cp));
     const cumA=actual.map(v=>(ca+=v,ca));
@@ -618,12 +633,12 @@ const Charts = (() => {
     const qSet=new Set();
     wps.forEach(w=>{
       if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date)));
-      if(w.actual_awarding_date) qSet.add(getQKey(new Date(w.actual_awarding_date)));
+      const ad=_actAwDate(w); if(ad) qSet.add(getQKey(ad));
     });
     if(!qSet.size){destroy(id);return;}
     const quarters=[...qSet].sort();
     const planned=quarters.map(qk=>wps.filter(w=>w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).length);
-    const actual=quarters.map(qk=>wps.filter(w=>w.actual_awarding_date&&getQKey(new Date(w.actual_awarding_date))===qk).length);
+    const actual=quarters.map(qk=>wps.filter(w=>{const ad=_actAwDate(w);return ad&&getQKey(ad)===qk;}).length);
     let cp=0,ca=0;
     const cumP=planned.map(v=>(cp+=v,cp));
     const cumA=actual.map(v=>(ca+=v,ca));
@@ -689,8 +704,12 @@ const Charts = (() => {
     // captured (the WP-Monitoring imports populate award_status + total_awarded from the Remarks
     // column but never an actual award date — so without this fallback the Actual line is flat/empty
     // for every imported project).
+    // Award date for the Actual line is CLAMPED to today — an awarded WP can never be awarded in the
+    // future, so a planned-date fallback beyond today is pulled back to now (it then shows at the
+    // current month instead of vanishing past the now-cutoff).
+    const awd = w => { let dd=pd(w.actual_awarding_date)||pd(w.awarding_date); if(dd && dd>now) dd=new Date(now.getFullYear(),now.getMonth(),now.getDate()); return dd; };
     const planned = months.map(me => wps.filter(w => { const dd=pd(w.awarding_date); return dd && dd<=me; }).length);
-    const actual  = months.map(me => { if(me>now) return null; return wps.filter(w => { const dd=pd(w.actual_awarding_date)||pd(w.awarding_date); return w.award_status==='Awarded' && dd && dd<=me; }).length; });
+    const actual  = months.map(me => { if(me>now) return null; return wps.filter(w => { const dd=awd(w); return w.award_status==='Awarded' && dd && dd<=me; }).length; });
     // Forecast (dashed, same red): continue the Actual line by projecting the not-yet-awarded WPs.
     // Forecast award/completion date per not-awarded WP: PLANNED award date if still in the future
     // (on-schedule); the NEXT month if OVERDUE (planned date already past) or no planned date —
