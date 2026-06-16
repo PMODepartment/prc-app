@@ -1222,17 +1222,13 @@ window.addEventListener('beforeunload', function(e) {
       ? window._sidebarProjects.filter(p=>p.id.toLowerCase().includes(q)||((p.name||'').toLowerCase().includes(q)))
       : null;
 
-    if (all) {
-      const MAX_SHOW = 8;
-      navProj.innerHTML = all.slice(0, MAX_SHOW).map(plainProjectLink).join('') +
-        (all.length > MAX_SHOW ? `<div style="font-size:10px;color:rgba(255,255,255,.35);padding:4px 12px">${all.length - MAX_SHOW} more — refine search</div>` : '');
-    } else {
-      const sorted = [...window._sidebarProjects].sort((a,b)=>a.id.localeCompare(b.id));
-      const MAX_REST = 5;
-      navProj.innerHTML = sorted.slice(0, MAX_REST).map(plainProjectLink).join('') +
-        (sorted.length > MAX_REST ? `<div style="font-size:10px;color:rgba(255,255,255,.35);padding:4px 12px">${sorted.length - MAX_REST} more — search above</div>` : '') ||
-        '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:4px 12px">No projects</div>';
-    }
+    // Show the full assigned-project list (container scrolls); the search box filters it.
+    const list = all || [...window._sidebarProjects].sort((a,b)=>a.id.localeCompare(b.id));
+    navProj.style.maxHeight = '240px';
+    navProj.style.overflowY = 'auto';
+    navProj.innerHTML = list.length
+      ? list.map(plainProjectLink).join('')
+      : '<div style="font-size:11px;color:rgba(255,255,255,.3);padding:4px 12px">No matches</div>';
   }
 
   window.filterSidebarProjects = function(q) {
