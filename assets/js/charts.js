@@ -203,23 +203,26 @@ const Charts = (() => {
   }
 
   // Decluttered vertical-bar labels for dense period charts (many months × 2 series):
-  // label ONLY the larger series (set via _tidyKeys), rotate vertical, and skip values
-  // below `frac` of that series' max so tiny bars don't pile up and overlap.
-  function _dlTidy(fmtFn, labelLabels, frac) {
-    const keep = new Set(labelLabels);
+  // Label the named series (rotate vertical, skip values below `frac` of that series' OWN max so
+  // tiny bars don't pile up). `seriesColors` maps dataset.label -> light-mode label colour, letting
+  // each series be visually distinguished (e.g. Budget=dark, Awarded=red). Dark mode brightens them.
+  function _dlTidy(fmtFn, seriesColors, frac) {
     const f = frac != null ? frac : 0.06;
+    const dark = document.body.classList.contains('dark-mode');
+    // Dark-mode remap so labels stay legible on the dark surface (keep the hue distinction)
+    const darkMap = { '#231F20': '#DCDBDB', '#282C28': '#DCDBDB', '#EE3124': '#FF7A6E', '#2D9B6F': '#5FD3A3' };
     return {
       display: ctx => {
         if (ctx.dataset.type === 'line') return false;
-        if (!keep.has(ctx.dataset.label)) return false;
+        if (!(ctx.dataset.label in seriesColors)) return false;
         const arr = ctx.dataset.data, v = arr[ctx.dataIndex];
         if (v == null || v <= 0) return false;
         const max = arr.reduce((m, x) => x > m ? x : m, 0);
         return max > 0 && v >= max * f;
       },
       anchor: 'end', align: 'top', offset: 2, rotation: -90, clamp: false, clip: false,
-      color: document.body.classList.contains('dark-mode') ? '#DCDBDB' : '#231F20',
-      font: { size: _mob() ? 7 : 8, weight: '600', family: 'Montserrat' },
+      color: ctx => { const c = seriesColors[ctx.dataset.label] || '#231F20'; return dark ? (darkMap[c] || '#DCDBDB') : c; },
+      font: { size: _mob() ? 7 : 8, weight: '700', family: 'Montserrat' },
       formatter: fmtFn
     };
   }
@@ -341,7 +344,7 @@ const Charts = (() => {
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
     const mob=_mob();
     const tidy=!!(opts&&opts.tidyLabels);
-    const dl=mob?{display:false}:(tidy?_dlTidy(v=>v>0?_mAbbr(v):'',['Budget (BCB)']):_dlBar(v=>v>0?_mAbbr(v):'','v'));
+    const dl=mob?{display:false}:(tidy?_dlTidy(v=>v>0?_mAbbr(v):'',{'Budget (BCB)':'#231F20','Awarded':'#EE3124'}):_dlBar(v=>v>0?_mAbbr(v):'','v'));
     const hideAwd=!!(opts&&opts.hideAwarded);
     make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
@@ -369,7 +372,7 @@ const Charts = (() => {
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
     const mob=_mob();
     const tidy=!!(opts&&opts.tidyLabels);
-    const dl=mob?{display:false}:(tidy?_dlTidy(v=>v>0?_mAbbr(v):'',['Budget (BCB)']):_dlBar(v=>v>0?_mAbbr(v):'','v'));
+    const dl=mob?{display:false}:(tidy?_dlTidy(v=>v>0?_mAbbr(v):'',{'Budget (BCB)':'#231F20','Awarded':'#EE3124'}):_dlBar(v=>v>0?_mAbbr(v):'','v'));
     const hideAwd=!!(opts&&opts.hideAwarded);
     make(id,{type:'bar',data:{labels,datasets:[
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
