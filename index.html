@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260616j"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260616j"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260616j"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260617a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260617a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260617a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260616j"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260617a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260616j"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260617a"/>
 </head>
 <body>
 
@@ -120,7 +120,6 @@
 
           <div class="view-tabs" id="view-tabs" style="flex:1;margin-bottom:0">
             <button class="view-tab active" onclick="switchTab('overview')"><i class="ti ti-layout-dashboard"></i>Overview</button>
-            <button class="view-tab" onclick="switchTab('dashboard')"><i class="ti ti-chart-bar"></i>Dashboard</button>
             <button class="view-tab" onclick="switchTab('backlog')"><i class="ti ti-clock"></i>Backlog</button>
             <button id="tab-budget-btn" class="view-tab" onclick="switchTab('budget')"><i class="ti ti-report-money"></i>Budget</button>
             <button class="view-tab" onclick="switchTab('schedule')"><i class="ti ti-calendar"></i>Schedule</button>
@@ -156,7 +155,36 @@
           </div>
           <!-- Hidden metrics-grid kept for JS compatibility -->
           <div class="metrics-grid" id="metrics-grid" style="display:none"></div>
-          <!-- Project cards below KPIs -->
+          <!-- Procurement Budget (BCB) and Awarded by Period (merged from the former Dashboard tab) -->
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span><i class="ti ti-chart-bar"></i><span id="idx-dash-period-title">Procurement Budget (BCB) and Awarded Cost by Period</span></span>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                <button id="idx-dash-btn-monthly" onclick="setIdxDashPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
+                <button id="idx-dash-btn-quarterly" onclick="setIdxDashPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
+                <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
+                <button id="idx-dash-btn-budget" onclick="setIdxDashDataMode('budget')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Budget</button>
+                <button id="idx-dash-btn-count" onclick="setIdxDashDataMode('count')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600"># WPs</button>
+              </div>
+            </div>
+            <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-idx-dash-period"></canvas></div>
+          </div>
+          <!-- Top 5 panels -->
+          <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:18px">
+            <div class="panel" style="flex:0.8;min-width:170px">
+              <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 High Value Packages</div>
+              <div class="rank-list" id="idx-rank-value"></div>
+            </div>
+            <div class="panel" style="flex:1.25;min-width:250px">
+              <div class="panel-title"><i class="ti ti-trending-up"></i>Top 5 Savings</div>
+              <div class="rank-list" id="idx-rank-gains"></div>
+            </div>
+            <div class="panel" style="flex:1.25;min-width:250px">
+              <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
+              <div class="rank-list" id="idx-rank-losses"></div>
+            </div>
+          </div>
+          <!-- Project cards below the Top 5 (Portfolio-specific: clickable project cards) -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;margin-top:4px;flex-wrap:wrap">
             <button id="btn-view-cards" onclick="setProjectView('cards')" class="btn" style="background:#231F20;color:#fff;border-color:#231F20"><i class="ti ti-layout-grid"></i><span class="hide-mobile"> Cards</span></button>
             <button id="btn-view-table" onclick="setProjectView('table')" class="btn"><i class="ti ti-table"></i><span class="hide-mobile"> Table</span></button>
@@ -186,75 +214,6 @@
                   <tbody id="proj-table-body"></tbody>
                 </table>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ══ DASHBOARD TAB ══ -->
-        <div id="tab-dashboard" style="display:none">
-          <!-- Period chart with toggle -->
-          <div class="panel" style="margin-bottom:14px">
-            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <span><i class="ti ti-chart-bar"></i><span id="idx-dash-period-title">Procurement Budget (BCB) and Awarded Cost by Period</span></span>
-              <div style="display:flex;gap:4px;flex-wrap:wrap">
-                <button id="idx-dash-btn-monthly" onclick="setIdxDashPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
-                <button id="idx-dash-btn-quarterly" onclick="setIdxDashPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
-                <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
-                <button id="idx-dash-btn-budget" onclick="setIdxDashDataMode('budget')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Budget</button>
-                <button id="idx-dash-btn-count" onclick="setIdxDashDataMode('count')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600"># WPs</button>
-              </div>
-            </div>
-            <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-idx-dash-period"></canvas></div>
-          </div>
-          <!-- WP Status — progress bars + stats -->
-          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">
-            <div class="panel" style="flex:3;min-width:240px">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>WP Status</div>
-              <div id="idx-dash-status-bars" style="padding:4px 0"></div>
-            </div>
-            <div class="panel" style="flex:2;min-width:180px">
-              <div class="panel-title"><i class="ti ti-table"></i>Status Summary</div>
-              <div id="idx-dash-status-table"></div>
-            </div>
-          </div>
-          <!-- Top 5 panels — equal widths, equal heights -->
-          <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:14px">
-            <div class="panel" style="flex:0.8;min-width:170px">
-              <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 High Value Packages</div>
-              <div class="rank-list" id="idx-rank-value"></div>
-            </div>
-            <div class="panel" style="flex:1.25;min-width:250px">
-              <div class="panel-title"><i class="ti ti-trending-up"></i>Top 5 Savings</div>
-              <div class="rank-list" id="idx-rank-gains"></div>
-            </div>
-            <div class="panel" style="flex:1.25;min-width:250px">
-              <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
-              <div class="rank-list" id="idx-rank-losses"></div>
-            </div>
-          </div>
-          <!-- Backlog table — grouped by project (collapsible), filterable -->
-          <div class="panel" style="margin-bottom:14px">
-            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-              <span><i class="ti ti-list"></i>Work Package Backlog — Not Awarded</span>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-                <select id="idx-dbl-trade" onchange="renderIdxDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff;color:#555;cursor:pointer"><option value="all">All Trades</option></select>
-                <select id="idx-dbl-sort" onchange="renderIdxDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff;color:#555;cursor:pointer">
-                  <option value="aging">Most Overdue First</option>
-                  <option value="award">Planned Award Date</option>
-                  <option value="budget">Budget (High→Low)</option>
-                  <option value="trade">Trade</option>
-                </select>
-                <input id="idx-dbl-bmin" type="text" inputmode="numeric" placeholder="Min ₱M" oninput="renderIdxDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff;color:#555;width:68px">
-                <input id="idx-dbl-bmax" type="text" inputmode="numeric" placeholder="Max ₱M" oninput="renderIdxDashBacklog()" style="font-size:10px;padding:3px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff;color:#555;width:68px">
-              </div>
-            </div>
-            <div style="overflow-x:auto">
-              <table class="data-table" id="idx-dash-backlog-table" style="font-size:11px">
-                <thead><tr>
-                  <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Procurement Budget (BCB)</th><th>Status</th>
-                </tr></thead>
-                <tbody id="idx-dash-backlog-tbody"></tbody>
-              </table>
             </div>
           </div>
         </div>
@@ -613,12 +572,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260616j"></script>
-<script src="assets/js/db.js?v=20260616j"></script>
-<script src="assets/js/ui.js?v=20260616j"></script>
+<script src="assets/js/auth.js?v=20260617a"></script>
+<script src="assets/js/db.js?v=20260617a"></script>
+<script src="assets/js/ui.js?v=20260617a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260616j"></script>
+<script src="assets/js/charts.js?v=20260617a"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -1125,7 +1084,7 @@
       }
     };
     // ── Tab switching ─────────────────────────────────────────────
-    const ALL_TABS = ['overview','dashboard','backlog','budget','schedule','works','wplist','claims'];
+    const ALL_TABS = ['overview','backlog','budget','schedule','works','wplist','claims'];
     let _activeTab = 'overview';
     let _idxDashPeriodMode = 'monthly';
     let _idxDashDataMode = 'budget';
@@ -1350,8 +1309,9 @@
     function _renderTab(tab, wps, filt, allStats) {
       const now = new Date();
       if (tab === 'overview') {
-        // Overview: just KPI groups — rendered in renderAll
-      } else if (tab === 'dashboard') {
+        // Cost + WP Status KPI groups render in renderAll; here we render the period chart + Top 5
+        // (merged in from the former Dashboard tab). The old WP-status-bars / status-summary /
+        // dashboard-backlog statements below self-no-op (their DOM now lives only on the Backlog tab).
         _destroyCharts(['c-idx-dash-period']);
         _idxDashRenderPeriod(wps);
         (function renderIdxDashStatusBars(wps) {
@@ -2903,6 +2863,7 @@
 
 </body>
 </html>
+
 
 
 

@@ -35,8 +35,8 @@ No build step â€” edit files directly, push to GitHub, GitHub Pages auto-de
 | `register.html` | public | Self-registration (creates `pending` user) |
 | `pending.html` | public | Shown to unapproved users |
 | `forgot-password.html` | public | Password reset â€” `redirectTo` points to `/prc-app/login.html` |
-| `index.html` | user | Portfolio Overview â€” consolidated dashboard, 7 tabs |
-| `project.html` | user | Single project dashboard â€” 4 tabs |
+| `index.html` | user | Portfolio Overview â€” consolidated dashboard, 6 tabs (Dashboard tab merged into Overview) |
+| `project.html` | user | Single project dashboard â€” 3 tabs |
 | `wp-form.html` | user | Add / edit work package |
 | `review.html` | user+ | View WP submissions for assigned projects; admins can approve/reject |
 | `admin.html` | admin + manager | User management + project management (admin/super_admin); Performance tab (all three roles) |
@@ -234,8 +234,7 @@ Lazy rendering: `_rendered` flags per tab â€” charts render on first open, 
 
 | Tab | Key content |
 |---|---|
-| Overview | Left: Cost Overview 6 KPIs (BCB, Actual Award, Cost to Complete, Estimate at Completion, Variance, %Variance). Right: two WP Status cards â€” donut chart card (% by WP / % by Value toggle) + stats table card (Total WP / Awarded WP / WP Due Not Awarded / WP Not Due / % Awarded by WP / % Awarded by Value). Then project cards/table below. |
-| Dashboard | Period chart + **WP Status split cards** (donut card with % by WP/Value toggle + stats table card) + WP by Trade bar + **Top 5 panels (now ABOVE the backlog)** + **Work Package Backlog â€” Not Awarded** table. The dashboard backlog has its own toolbar (Trade filter, Sort: Most Overdue / Planned Award / Budget / Trade, Min/Max â‚±M budget filter) via `renderIdxDashBacklog()`; rows are **grouped by Project under a greater red collapsible header** (`toggleIdxDashBlProj`, state `_idxDashBlProjCollapse`, source set `_idxDashBlWPs`) â€” the per-row Project column was dropped since the group header shows it |
+| Overview | Mirrors the per-project Overview layout (**Dashboard tab removed** â€” merged here). Top row: Cost Overview 6 KPIs (BCB, Actual Award, Cost to Complete, Estimate at Completion, Variance, %Variance) left + two WP Status cards (donut % by WP/Value toggle + stats table) right. Then **Procurement Budget (BCB) and Awarded by Period** chart (`c-idx-dash-period`, Monthly/Quarterly + Budget/# WPs toggles, `_idxDashRenderPeriod`) + **Top 5 panels** (High Value / Savings / Overbudget). **Portfolio-specific:** clickable **project cards/table** (`setProjectView`) come **last, after the Top 5**. Rendered by the `tab==='overview'` branch of `_renderTab` (the former Dashboard render body was merged in; the old status-bars/summary/dashboard-backlog statements remain but self-no-op since their DOM was removed). |
 | Backlog | **Charts first** (aging chart + status donut + period chart + submittal donut), then the Backlog — Not Awarded WPs table **below** (so charts are visible on tab open) |
 | Budget | Cost KPIs + budget-by-period + budget-by-trade HBar + Budget vs Awarded by Project grouped bar + budget table by trade |
 | Schedule | Period chart (# WPs Planned vs Actual default; Budget toggle available via `_idxSchDataMode`) + WP by Trade + WP by Status + collapsible schedule summary table |
@@ -451,7 +450,7 @@ Public pages (login, register, pending, forgot-password) load UMD bundle inline 
 
 Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net, cdnjs.cloudflare.com; `dns-prefetch` for Supabase URL; `preload as="script"` for all body scripts.
 
-**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260616j`. (Other pages â€” admin/review/wp-form/etc. â€” are not versioned; they rely on ETag revalidation and don't host the chart/rank features.)
+**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260617a`. (Other pages â€” admin/review/wp-form/etc. â€” are not versioned; they rely on ETag revalidation and don't host the chart/rank features.)
 
 ---
 
@@ -532,6 +531,7 @@ GitHub Pages auto-deploys on push to main (~1â€“2 min).
   - **Mobile WP List cards (`.wpc*`)**: built in JS (`#proj-wp-cards`/`#wp-mon-cards`) but styled by `.wpc`/`.wpc-desc`/`.wpc-kv`/`.wpc-actions` etc. class rules (identical in both files). Dark overrides in the "Mobile WP List cards" section of `dashboard.css` (`.wpc` bgâ†’surface, textâ†’primary/secondary/hint, action buttonsâ†’surface-2).
   - **Top 5 rank tables**: do NOT add a blanket `body.dark-mode .rank-side { color }` rule â€” it kills the inline Savings(green `#2D9B6F`)/Overbudget(red `#EE3124`) accent colors. Let the inline-color attribute selectors recolor only neutral cells; accents are left untouched.
   - **Public-page dark mode (self-contained)**: `login.html`, `register.html`, `pending.html`, `forgot-password.html` don't load `ui.js`/`dashboard.css`, so each has its OWN inline dark mode (identical pattern): inline anti-flash `<script>` in `<head>` adds `dark-mode` to `<html>` from `wpm_theme_last` (or system pref if unset); CSS rules prefixed `html.dark-mode` (set early enough to avoid a white flash on `.form-wrap`/`.card`); a fixed top-right `.login-theme-toggle` (sun/moon inline SVG) calls `toggleLoginTheme()` which persists `wpm_theme_last`. Shares the `wpm_theme_last` key with the dashboard so the theme carries across the whole auth flow â†’ dashboard. Gotcha: `forgot-password.html`'s logo has an inline `filter:invert(1) brightness(0)` (black logo for the white card) â€” dark mode overrides it with `html.dark-mode .logo-wrap img{filter:none!important}` so the white logo shows. These are inline (no `?v=` needed; HTML revalidates via ETag).
+
 
 
 
