@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260617d"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260617d"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260617d"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260617e"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260617e"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260617e"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260617d"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260617e"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260617d"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260617e"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -332,6 +332,56 @@
             </div>
           </div>
 
+          <!-- Filtered analysis: totals + budget/awarded over a monthly/quarterly timeline (cumulative incl.) -->
+          <div class="panel cost-only" id="pwa-analysis" style="margin-bottom:12px">
+            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span><i class="ti ti-chart-bar"></i>Filtered Analysis — Budget &amp; Awarded by Period</span>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <div style="display:flex;gap:4px;align-items:center">
+                  <span style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em">From</span>
+                  <select id="pwa-from" onchange="onPwaFilterChange()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1.5px solid var(--border-md);background:var(--surface-2);color:var(--text-primary);font-family:inherit;font-weight:600;cursor:pointer"><option value="all">Earliest</option></select>
+                  <span style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em">To</span>
+                  <select id="pwa-to" onchange="onPwaFilterChange()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1.5px solid var(--border-md);background:var(--surface-2);color:var(--text-primary);font-family:inherit;font-weight:600;cursor:pointer"><option value="all">Latest</option></select>
+                </div>
+                <div style="width:1px;height:18px;background:var(--border-md)"></div>
+                <div style="display:flex;gap:4px">
+                  <button id="pwa-btn-monthly" onclick="setPwaPeriodMode('monthly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
+                  <button id="pwa-btn-quarterly" onclick="setPwaPeriodMode('quarterly')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600">Quarterly</button>
+                </div>
+                <div style="width:1px;height:18px;background:var(--border-md)"></div>
+                <div style="display:flex;gap:4px">
+                  <button id="pwa-btn-chart" onclick="setPwaViewMode('chart')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600"><i class="ti ti-chart-bar" style="font-size:11px"></i> Chart</button>
+                  <button id="pwa-btn-table" onclick="setPwaViewMode('table')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600"><i class="ti ti-table" style="font-size:11px"></i> Table</button>
+                </div>
+              </div>
+            </div>
+            <div id="pwa-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+              <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border-md);border-radius:8px;padding:9px 12px">
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888">Work Packages</div>
+                <div id="pwa-sum-count" style="font-size:18px;font-weight:800;color:#231F20;margin-top:2px">0</div>
+              </div>
+              <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border-md);border-radius:8px;padding:9px 12px">
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888">Total Budget (BCB)</div>
+                <div id="pwa-sum-budget" style="font-size:18px;font-weight:800;color:#231F20;margin-top:2px">—</div>
+              </div>
+              <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border-md);border-radius:8px;padding:9px 12px">
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888">Total Awarded</div>
+                <div id="pwa-sum-awarded" style="font-size:18px;font-weight:800;color:#2D9B6F;margin-top:2px">—</div>
+              </div>
+              <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border-md);border-radius:8px;padding:9px 12px">
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888">Total to be Awarded</div>
+                <div id="pwa-sum-tba" style="font-size:18px;font-weight:800;color:#D97706;margin-top:2px">—</div>
+              </div>
+            </div>
+            <div id="pwa-chart-wrap" class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-pwa-period"></canvas></div>
+            <div id="pwa-table-wrap" style="display:none;overflow-x:auto;max-height:340px;overflow-y:auto">
+              <table class="data-table" id="pwa-period-table" style="font-size:11px;width:100%">
+                <thead id="pwa-period-thead"></thead>
+                <tbody id="pwa-period-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
           <div class="panel" style="padding:0">
             <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap">
               <span id="row-count" style="font-size:12px;font-weight:600;color:#888;flex:1"></span>
@@ -437,12 +487,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260617d"></script>
-<script src="assets/js/ui.js?v=20260617d"></script>
-<script src="assets/js/db.js?v=20260617d"></script>
+<script src="assets/js/auth.js?v=20260617e"></script>
+<script src="assets/js/ui.js?v=20260617e"></script>
+<script src="assets/js/db.js?v=20260617e"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260617d"></script>
+<script src="assets/js/charts.js?v=20260617e"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -716,7 +766,7 @@ function switchView(v) {
   }
   if(v==='overview') { if(!_rendered.overview){renderOverview();_rendered.overview=true;} }
   else if(v==='backlog') { if(!_rendered.backlog){renderBacklog();_rendered.backlog=true;} }
-  else if(v==='table') buildTable();
+  else if(v==='table') { buildTable(); renderPwaAnalysis(); }
   else if(v==='claims-register' || v==='claims' || v==='change-orders') { renderClaimsRegisterKPIs(); renderClaimsRegister(); }
 }
 
@@ -1341,6 +1391,128 @@ function getFilteredSorted(){
   return sorted;
 }
 
+// ── Filtered Analysis — Budget & Awarded by Period (WP List, project view) ──
+// Mirrors the Portfolio Overview panel: From/To month-to-month range + Monthly/Quarterly + Chart/Table.
+let _pwaPeriodMode='monthly', _pwaViewMode='chart', _pwaFrom='all', _pwaTo='all';
+const _pwaPdate = v => { if(!v) return null; const m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; };
+const _pwaKey = d => _pwaPeriodMode==='quarterly'
+  ? d.getFullYear()+'-Q'+(Math.floor(d.getMonth()/3)+1)
+  : d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+const _pwaKeyLabel = k => {
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  if(k.includes('-Q')){ const [y,q]=k.split('-Q'); return 'Q'+q+" '"+y.slice(2); }
+  const [y,m]=k.split('-'); return MN[+m-1]+" '"+y.slice(2);
+};
+function _pwaPeriodMatch(d){
+  if(_pwaFrom==='all' && _pwaTo==='all') return true;
+  if(!d) return false;
+  const k=_pwaKey(d);
+  if(_pwaFrom!=='all' && k<_pwaFrom) return false;
+  if(_pwaTo!=='all' && k>_pwaTo) return false;
+  return true;
+}
+// Flat filtered WP list (status/trade/zone/search) — same predicates as getFilteredSorted
+function _pwaFilteredWPs(){
+  const st=document.getElementById('f-status')?.value||'all';
+  const tr=document.getElementById('f-trade')?.value||'all';
+  const zn=document.getElementById('f-zone')?.value||'all';
+  const sr=(document.getElementById('f-search')?.value||'').toLowerCase();
+  return allWPs.filter(w=>{
+    if(st!=='all'&&w.award_status!==st)return false;
+    if(tr!=='all'&&w.trade!==tr)return false;
+    if(zn!=='all'&&w.zone!==zn)return false;
+    if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
+    return true;
+  });
+}
+function _populatePwaFilters(srcRows){
+  const fromEl=document.getElementById('pwa-from'), toEl=document.getElementById('pwa-to');
+  if(!fromEl||!toEl) return;
+  const keys=new Set();
+  srcRows.forEach(w=>{ const d=_pwaPdate(w.awarding_date); if(d) keys.add(_pwaKey(d)); });
+  const ordered=[...keys].sort();
+  const optsHtml = allLabel => `<option value="all">${allLabel}</option>` + ordered.map(k=>`<option value="${k}">${_pwaKeyLabel(k)}</option>`).join('');
+  const curF=fromEl.value, curT=toEl.value;
+  fromEl.innerHTML=optsHtml('Earliest'); toEl.innerHTML=optsHtml('Latest');
+  fromEl.value=ordered.includes(curF)?curF:'all'; _pwaFrom=fromEl.value;
+  toEl.value=ordered.includes(curT)?curT:'all'; _pwaTo=toEl.value;
+}
+window.onPwaFilterChange = function(){
+  _pwaFrom=document.getElementById('pwa-from')?.value||'all';
+  _pwaTo=document.getElementById('pwa-to')?.value||'all';
+  renderPwaAnalysis();
+};
+window.setPwaPeriodMode = function(m){
+  _pwaPeriodMode=m;
+  const on='font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
+  const off='font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+  const mb=document.getElementById('pwa-btn-monthly'), qb=document.getElementById('pwa-btn-quarterly');
+  if(mb) mb.style.cssText=m==='monthly'?on:off;
+  if(qb) qb.style.cssText=m==='quarterly'?on:off;
+  _pwaFrom='all'; _pwaTo='all';   // keys change format → reset range
+  const fe=document.getElementById('pwa-from'), te=document.getElementById('pwa-to');
+  if(fe) fe.value='all'; if(te) te.value='all';
+  renderPwaAnalysis();
+};
+window.setPwaViewMode = function(v){
+  _pwaViewMode=v;
+  const on='font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
+  const off='font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+  const cb=document.getElementById('pwa-btn-chart'), tb=document.getElementById('pwa-btn-table');
+  if(cb) cb.style.cssText=v==='chart'?on:off;
+  if(tb) tb.style.cssText=v==='table'?on:off;
+  const cw=document.getElementById('pwa-chart-wrap'), tw=document.getElementById('pwa-table-wrap');
+  if(cw) cw.style.display=v==='chart'?'':'none';
+  if(tw) tw.style.display=v==='table'?'':'none';
+  renderPwaAnalysis();
+};
+function renderPwaAnalysis(){
+  if(window.__isViewer) return;
+  const all=_pwaFilteredWPs();
+  _populatePwaFilters(all);
+  const rows=(_pwaFrom==='all'&&_pwaTo==='all')?all:all.filter(w=>_pwaPeriodMatch(_pwaPdate(w.awarding_date)));
+  const tb=rows.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const ta=rows.reduce((s,w)=>s+(w.total_awarded||0),0);
+  const tba=rows.filter(w=>w.award_status!=='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const set=(id,txt,full)=>{const e=document.getElementById(id); if(e){e.textContent=txt; if(full!=null)e.title=full;}};
+  set('pwa-sum-count', rows.length);
+  set('pwa-sum-budget', tb?Fmt.moneyShort(tb):'—', Fmt.moneyFull(tb));
+  set('pwa-sum-awarded', ta?Fmt.moneyShort(ta):'—', Fmt.moneyFull(ta));
+  set('pwa-sum-tba', tba?Fmt.moneyShort(tba):'—', Fmt.moneyFull(tba));
+  if(_pwaViewMode==='table'){ renderPwaPeriodTable(rows); }
+  else if(typeof Charts!=='undefined'){
+    if(_pwaPeriodMode==='quarterly') Charts.budgetAwardedByPeriod('c-pwa-period', rows, {tidyLabels:true});
+    else Charts.budgetAwardedByPeriodMonthly('c-pwa-period', rows, {tidyLabels:true});
+  }
+}
+function renderPwaPeriodTable(rows){
+  const thead=document.getElementById('pwa-period-thead'), tbody=document.getElementById('pwa-period-tbody');
+  if(!thead||!tbody) return;
+  const quarterly=_pwaPeriodMode==='quarterly';
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const pd=_pwaPdate;
+  const _today0=(()=>{const n=new Date();return new Date(n.getFullYear(),n.getMonth(),n.getDate());})();
+  const awDate=w=>{ const d=pd(w.actual_awarding_date||w.awarding_date); return d?(d>_today0?_today0:d):null; };
+  const isAwd=w=>(w.total_awarded||0)>0;
+  const keyOf=d=> quarterly ? (d.getFullYear()+'-Q'+(Math.floor(d.getMonth()/3)+1)) : (d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  const labelOf=_pwaKeyLabel;
+  const keys=new Set();
+  rows.forEach(w=>{ const bd=pd(w.awarding_date); if(bd) keys.add(keyOf(bd)); if(isAwd(w)){ const ad=awDate(w); if(ad) keys.add(keyOf(ad)); } });
+  const ordered=[...keys].sort();
+  const fmt=v=>v?Fmt.money(v):'—';
+  let cb=0, ca=0, rowsHtml='';
+  ordered.forEach(k=>{
+    const bud=rows.filter(w=>{const d=pd(w.awarding_date); return d&&keyOf(d)===k;}).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    const awd=rows.filter(w=>{ if(!isAwd(w))return false; const d=awDate(w); return d&&keyOf(d)===k;}).reduce((s,w)=>s+(w.total_awarded||0),0);
+    cb+=bud; ca+=awd;
+    rowsHtml+=`<tr><td style="font-weight:600">${labelOf(k)}</td><td style="text-align:right">${fmt(bud)}</td><td style="text-align:right;color:#EE3124">${fmt(awd)}</td><td style="text-align:right;color:#888">${fmt(cb)}</td><td style="text-align:right;color:#888">${fmt(ca)}</td></tr>`;
+  });
+  const thS='position:sticky;top:0;background:var(--surface-2);z-index:2;';
+  thead.innerHTML=`<tr><th style="${thS}text-align:left">${quarterly?'Quarter':'Month'}</th><th style="${thS}text-align:right">Budget (BCB)</th><th style="${thS}text-align:right">Awarded</th><th style="${thS}text-align:right">Cum. Budget</th><th style="${thS}text-align:right">Cum. Awarded</th></tr>`;
+  tbody.innerHTML = rowsHtml || `<tr><td colspan="5" style="text-align:center;color:#999;padding:14px">No data for the current filter</td></tr>`;
+  if(rowsHtml) tbody.innerHTML += `<tr style="font-weight:800;background:var(--surface-2)"><td>Total</td><td style="text-align:right">${fmt(cb)}</td><td style="text-align:right;color:#EE3124">${fmt(ca)}</td><td></td><td></td></tr>`;
+}
+
 function buildTable(){
   const groups=getFilteredSorted(), cols=getActiveCols();
   const nCols=cols.length;
@@ -1732,6 +1904,7 @@ AppAuth.requireLogin(async (user, profile) => {
   if (window.__isViewer) {
     document.body.classList.add('viewer-mode');
     document.querySelectorAll('.proj-vtab[data-view="financial"],.proj-vtab[data-view="all"]').forEach(b=>b.style.display='none');
+    const pwa=document.getElementById('pwa-analysis'); if(pwa) pwa.style.display='none';   // cost panel hidden for viewers
   }
   projId = new URLSearchParams(location.search).get('id');
   if (!projId) { location.href='login.html'; return; }
@@ -1844,12 +2017,12 @@ AppAuth.requireLogin(async (user, profile) => {
       curPage=1;
       // Reset lazy-render flags so tabs re-render with new filter
       Object.keys(_rendered).forEach(k=>_rendered[k]=false);
-      if(currentView==='table') buildTable();
+      if(currentView==='table') { buildTable(); renderPwaAnalysis(); }
       else switchView(currentView);
     });
   });
   const srch = document.getElementById('f-search');
-  if(srch) srch.addEventListener('input',()=>{curPage=1; if(currentView==='table')buildTable();});
+  if(srch) srch.addEventListener('input',()=>{curPage=1; if(currentView==='table'){buildTable(); renderPwaAnalysis();}});
 
   document.getElementById('btn-export').addEventListener('click', async () => {
     const btn = document.getElementById('btn-export');
@@ -2816,6 +2989,7 @@ window.saveQuickWP = async function() {
 
 </body>
 </html>
+
 
 
 
