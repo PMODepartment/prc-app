@@ -24,6 +24,15 @@ const Charts = (() => {
     const labels = legend.labels = legend.labels || {};
     labels.usePointStyle = true;
     ds.forEach(d => { d.pointStyle = isLine(d) ? 'line' : (d.pointStyle || 'rect'); });
+    // Reflect each dashed line (e.g. the Forecast series) as a DASHED key in the legend, not a solid one.
+    labels.generateLabels = (chart) => {
+      const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+      items.forEach(it => {
+        const d = chart.data.datasets[it.datasetIndex];
+        if (d && d.borderDash && d.borderDash.length) it.lineDash = d.borderDash;
+      });
+      return items;
+    };
   }
 
   function make(id,cfg) {
@@ -370,6 +379,7 @@ const Charts = (() => {
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
       ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(months,getMKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
@@ -402,6 +412,7 @@ const Charts = (() => {
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
       ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
@@ -476,12 +487,14 @@ const Charts = (() => {
     let cp=0,ca=0;
     const cumP=planned.map(v=>(cp+=v));
     const cumA=actual.map(v=>(ca+=v));
+    const _nowQK=getQKey(new Date());
+    const cumADisp=quarters.map((qk,i)=> qk>_nowQK ? null : cumA[i]);   // Cumulative Actual stops at today
     const dl = _dlBar(v => v > 0 ? v : '', 'v');
     make(id,{type:'bar',data:{labels,datasets:[
       {label:'Planned',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
       {label:'Actual',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Actual',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1,spanGaps:false},
       {label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'Count',font:{size:9}}}}}});
   }
@@ -586,8 +599,11 @@ const Charts = (() => {
   //     (the overdue backlog is assumed to be cleared starting the upcoming period)
   // Returns an array aligned to `keys`: null before the current period, then the cumulative
   // forecast anchored to the current Actual total so the dashed line joins the solid one seamlessly.
-  function _wpForecastLine(keys, keyOf, wps, cumActual) {
+  // `valFn(w)` is the amount each not-yet-awarded WP contributes (default 1 → counts; pass a budget
+  // function for the ₱ Budget-vs-Awarded charts so the forecast climbs toward total BCB).
+  function _wpForecastLine(keys, keyOf, wps, cumActual, valFn) {
     if (!keys.length) return [];
+    const val = valFn || (() => 1);
     const now = new Date();
     const nowKey = keyOf(now);
     let nowIdx = keys.findIndex(k => k >= nowKey);
@@ -600,11 +616,11 @@ const Charts = (() => {
       let idx = futureIdx;                                   // overdue / no plan → next period
       const pa = w.awarding_date ? new Date(w.awarding_date) : null;
       if (pa && pa >= now) { let pi = keys.findIndex(k => k >= keyOf(pa)); if (pi < 0) pi = keys.length - 1; idx = Math.max(pi, futureIdx); }
-      add[idx]++;
+      add[idx] += val(w);
     });
     const out = new Array(keys.length).fill(null);
     let run = anchor;
-    for (let i = nowIdx; i < keys.length; i++) { if (i > nowIdx) run += add[i]; out[i] = run; }
+    for (let i = nowIdx; i < keys.length; i++) { if (i > nowIdx) run = +(run + add[i]).toFixed(1); out[i] = run; }
     return out;
   }
   const _fcDash = { borderDash: [6, 4] };
@@ -625,13 +641,16 @@ const Charts = (() => {
     let cp=0,ca=0;
     const cumP=planned.map(v=>(cp+=v,cp));
     const cumA=actual.map(v=>(ca+=v,ca));
+    // Cumulative Actual stops at today — null future periods so it doesn't run flat into the future.
+    const _nowMK=getMKey(new Date());
+    const cumADisp=months.map((mk,i)=> mk>_nowMK ? null : cumA[i]);
     const mob=_mob();
     const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
     make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
       {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
       {label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Actual',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false},
       {label:'Forecast',data:_wpForecastLine(months,getMKey,wps,cumA),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
@@ -650,13 +669,16 @@ const Charts = (() => {
     let cp=0,ca=0;
     const cumP=planned.map(v=>(cp+=v,cp));
     const cumA=actual.map(v=>(ca+=v,ca));
+    // Cumulative Actual stops at today — null future quarters so it doesn't run flat into the future.
+    const _nowQK=getQKey(new Date());
+    const cumADisp=quarters.map((qk,i)=> qk>_nowQK ? null : cumA[i]);
     const mob=_mob();
     const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
     make(id,{type:'bar',data:{labels:quarters.map(qLabel),datasets:[
       {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
       {label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Actual',data:cumA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
+      {label:'Cumulative Actual',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false},
       {label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
