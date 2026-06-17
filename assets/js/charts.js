@@ -357,6 +357,10 @@ const Charts = (() => {
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
+    // Cumulative Awarded must NOT run into the future — nothing is awarded after today. Null out the
+    // line past the current month so it ends at today instead of drawing flat to the last budget month.
+    const _nowMK=(()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');})();
+    const cumADisp=months.map((mk,i)=> mk>_nowMK ? null : cumA[i]);
     const mob=_mob();
     const tidy=!!(opts&&opts.tidyLabels);
     const dl=mob?{display:false}:(tidy?_dlTidy(v=>v>0?_mAbbr(v):'',{'Budget (BCB)':'#231F20','Awarded':'#EE3124'}):_dlBar(v=>v>0?_mAbbr(v):'','v'));
@@ -365,7 +369,7 @@ const Charts = (() => {
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1}]),
+      ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
@@ -385,6 +389,10 @@ const Charts = (() => {
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
+    // Cumulative Awarded must NOT run into the future — null it past the current quarter so the line
+    // ends at today instead of drawing flat to the last (future) budget quarter.
+    const _nowQK=getQKey(new Date());
+    const cumADisp=quarters.map((qk,i)=> qk>_nowQK ? null : cumA[i]);
     const mob=_mob();
     const tidy=!!(opts&&opts.tidyLabels);
     const dl=mob?{display:false}:(tidy?_dlTidy(v=>v>0?_mAbbr(v):'',{'Budget (BCB)':'#231F20','Awarded':'#EE3124'}):_dlBar(v=>v>0?_mAbbr(v):'','v'));
@@ -393,7 +401,7 @@ const Charts = (() => {
       {label:'Budget (BCB)',data:budgetData,backgroundColor:'#282C28',borderRadius:3,order:2},
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1}]),
+      ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
