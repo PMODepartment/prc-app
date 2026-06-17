@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260617c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260617c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260617c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260617d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260617d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260617d"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260617c"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260617d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260617c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260617d"/>
 </head>
 <body>
 
@@ -432,8 +432,10 @@
               <span><i class="ti ti-chart-bar"></i>Filtered Analysis — Budget &amp; Awarded by Period</span>
               <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                 <div style="display:flex;gap:4px;align-items:center">
-                  <select id="wpmon-year" onchange="onWpMonAnalysisFilterChange()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1.5px solid var(--border-md);background:var(--surface-2);color:var(--text-primary);font-family:inherit;font-weight:600;cursor:pointer"><option value="all">All Years</option></select>
-                  <select id="wpmon-period-sel" onchange="onWpMonAnalysisFilterChange()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1.5px solid var(--border-md);background:var(--surface-2);color:var(--text-primary);font-family:inherit;font-weight:600;cursor:pointer"><option value="all">All Months</option></select>
+                  <span style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em">From</span>
+                  <select id="wpmon-from" onchange="onWpMonAnalysisFilterChange()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1.5px solid var(--border-md);background:var(--surface-2);color:var(--text-primary);font-family:inherit;font-weight:600;cursor:pointer"><option value="all">Earliest</option></select>
+                  <span style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em">To</span>
+                  <select id="wpmon-to" onchange="onWpMonAnalysisFilterChange()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1.5px solid var(--border-md);background:var(--surface-2);color:var(--text-primary);font-family:inherit;font-weight:600;cursor:pointer"><option value="all">Latest</option></select>
                 </div>
                 <div style="width:1px;height:18px;background:var(--border-md)"></div>
                 <div style="display:flex;gap:4px">
@@ -572,12 +574,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260617c"></script>
-<script src="assets/js/db.js?v=20260617c"></script>
-<script src="assets/js/ui.js?v=20260617c"></script>
+<script src="assets/js/auth.js?v=20260617d"></script>
+<script src="assets/js/db.js?v=20260617d"></script>
+<script src="assets/js/ui.js?v=20260617d"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260617c"></script>
+<script src="assets/js/charts.js?v=20260617d"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -1840,53 +1842,61 @@
       const mb=document.getElementById('wpmon-btn-monthly'), qb=document.getElementById('wpmon-btn-quarterly');
       if(mb) mb.style.cssText = m==='monthly'?on:off;
       if(qb) qb.style.cssText = m==='quarterly'?on:off;
-      fillWpMonPeriodOptions();   // Month↔Quarter options switch; resets to "all" if incompatible
+      // Period keys change format (YYYY-MM ↔ YYYY-Qn), so reset the range; renderWPMonAnalysis rebuilds the lists
+      _wpMonFrom='all'; _wpMonTo='all';
+      const fe=document.getElementById('wpmon-from'), te=document.getElementById('wpmon-to');
+      if(fe) fe.value='all'; if(te) te.value='all';
       renderWPMonAnalysis();
     };
-    // Year + Month/Quarter scope for the Filtered Analysis (KPIs + chart + table). A WP is in scope
-    // when its PLANNED award date (awarding_date) falls in the selected year and month/quarter.
-    // When both are "all" the scope is unrestricted (keeps null-date rows, original behaviour).
-    let _wpMonYear = 'all', _wpMonPeriodSel = 'all';
+    // Month-to-month (or quarter-to-quarter) RANGE scope for the Filtered Analysis (KPIs + chart +
+    // table). A WP is in scope when its PLANNED award month/quarter falls within [From, To] (inclusive;
+    // either end "all" = unbounded). The From/To option lists are derived from the Trade/Works/Vendor-
+    // filtered set, and the range in turn narrows the Trade/Works/Vendor option lists (bidirectional).
+    let _wpMonFrom = 'all', _wpMonTo = 'all';
     const _wpMonPdate = v => { if(!v) return null; const m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/); return m?new Date(+m[1],+m[2]-1,+m[3]):null; };
+    const _wpMonKey = d => _wpMonPeriodMode==='quarterly'
+      ? d.getFullYear()+'-Q'+(Math.floor(d.getMonth()/3)+1)
+      : d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const _wpMonKeyLabel = k => {
+      const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      if(k.includes('-Q')){ const [y,q]=k.split('-Q'); return 'Q'+q+" '"+y.slice(2); }
+      const [y,m]=k.split('-'); return MN[+m-1]+" '"+y.slice(2);
+    };
     function _wpMonPeriodMatch(d){
-      if(_wpMonYear==='all' && _wpMonPeriodSel==='all') return true;
+      if(_wpMonFrom==='all' && _wpMonTo==='all') return true;
       if(!d) return false;
-      if(_wpMonYear!=='all' && d.getFullYear()!=+_wpMonYear) return false;
-      if(_wpMonPeriodSel!=='all'){
-        if(_wpMonPeriodMode==='quarterly'){ if(('Q'+(Math.floor(d.getMonth()/3)+1))!==_wpMonPeriodSel) return false; }
-        else if((d.getMonth()+1)!=+_wpMonPeriodSel) return false;
-      }
+      const k=_wpMonKey(d);
+      if(_wpMonFrom!=='all' && k<_wpMonFrom) return false;
+      if(_wpMonTo!=='all' && k>_wpMonTo) return false;
       return true;
     }
     window.onWpMonAnalysisFilterChange = function(){
-      _wpMonYear = document.getElementById('wpmon-year')?.value || 'all';
-      _wpMonPeriodSel = document.getElementById('wpmon-period-sel')?.value || 'all';
-      renderWPMonAnalysis();
+      _wpMonFrom = document.getElementById('wpmon-from')?.value || 'all';
+      _wpMonTo = document.getElementById('wpmon-to')?.value || 'all';
+      _recomputeFilterOptions();   // range narrows the Trade/Works/Vendor option lists
+      filterWPTable();             // re-filter (then renderWPMonAnalysis remaps the From/To lists)
     };
-    // Year options from the data; period options depend on Monthly/Quarterly mode.
+    // Populate From/To from the periods present in the Trade/Works/Vendor/Status-filtered set so they
+    // map to those filters. Preserves the current selection when still valid (else resets to "all").
     function populateWpMonAnalysisFilters(){
-      const ysel=document.getElementById('wpmon-year');
-      if(ysel){
-        const years=new Set();
-        (_wpMonData||[]).forEach(w=>{ [w.awarding_date,w.actual_awarding_date].forEach(v=>{ const d=_wpMonPdate(v); if(d) years.add(d.getFullYear()); }); });
-        const cur=ysel.value;
-        ysel.innerHTML='<option value="all">All Years</option>'+[...years].sort().map(y=>`<option value="${y}">${y}</option>`).join('');
-        ysel.value=[...ysel.options].some(o=>o.value===cur)?cur:'all'; _wpMonYear=ysel.value;
-      }
-      fillWpMonPeriodOptions();
-    }
-    function fillWpMonPeriodOptions(){
-      const psel=document.getElementById('wpmon-period-sel'); if(!psel) return;
-      const cur=psel.value;
-      if(_wpMonPeriodMode==='quarterly') psel.innerHTML='<option value="all">All Quarters</option>'+['Q1','Q2','Q3','Q4'].map(q=>`<option value="${q}">${q}</option>`).join('');
-      else { const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; psel.innerHTML='<option value="all">All Months</option>'+MN.map((m,i)=>`<option value="${i+1}">${m}</option>`).join(''); }
-      psel.value=[...psel.options].some(o=>o.value===cur)?cur:'all'; _wpMonPeriodSel=psel.value;
+      const fromEl=document.getElementById('wpmon-from'), toEl=document.getElementById('wpmon-to');
+      if(!fromEl||!toEl) return;
+      const src = (Array.isArray(_wpMonFiltered) && _wpMonFiltered.length) ? _wpMonFiltered : (_wpMonData||[]);
+      const keys=new Set();
+      src.forEach(w=>{ const d=_wpMonPdate(w.awarding_date); if(d) keys.add(_wpMonKey(d)); });
+      const ordered=[...keys].sort();
+      const optsHtml = allLabel => `<option value="all">${allLabel}</option>` + ordered.map(k=>`<option value="${k}">${_wpMonKeyLabel(k)}</option>`).join('');
+      const curF=fromEl.value, curT=toEl.value;
+      fromEl.innerHTML=optsHtml('Earliest'); toEl.innerHTML=optsHtml('Latest');
+      fromEl.value=ordered.includes(curF)?curF:'all'; _wpMonFrom=fromEl.value;
+      toEl.value=ordered.includes(curT)?curT:'all'; _wpMonTo=toEl.value;
     }
 
     // Totals + budget/awarded period chart (with cumulative lines) for the current WP-List filter
     function renderWPMonAnalysis() {
+      populateWpMonAnalysisFilters();   // remap From/To options to the current Trade/Works/Vendor set
       const allRows = _wpMonFiltered || [];
-      const rows = (_wpMonYear==='all' && _wpMonPeriodSel==='all') ? allRows
+      const rows = (_wpMonFrom==='all' && _wpMonTo==='all') ? allRows
                  : allRows.filter(w=>_wpMonPeriodMatch(_wpMonPdate(w.awarding_date)));
       const tb = rows.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
       const ta = rows.reduce((s,w)=>s+(w.total_awarded||0),0);
@@ -1979,17 +1989,30 @@
       populateWpMonAnalysisFilters();
     }
 
-    // Recompute the Works/Vendor option lists from the selected Trade (and Works for Vendor),
-    // dropping any current selections that are no longer valid. Re-renders the popovers + labels.
+    // Recompute the Trade/Works/Vendor option lists. All are scoped to the selected period RANGE
+    // (From/To) so the lists map to the chosen month/quarter span; Works cascades from Trade and
+    // Vendor from Trade+Works. Invalid Works/Vendor selections are dropped; the single Trade value is
+    // preserved even if it has no WPs in the range (so the main list filter isn't silently cleared).
     function _recomputeFilterOptions() {
-      const trade = document.getElementById('wp-mon-trade')?.value || '';
-      const tradeSet = _wpMonData.filter(w => !trade || w.trade === trade);
-      // Works options come from the trade-filtered set
-      const worksOpts = [...new Set(tradeSet.map(w=>w.works).filter(Boolean))].sort();
+      const periodOk = w => _wpMonPeriodMatch(_wpMonPdate(w.awarding_date));
+      const inRange = _wpMonData.filter(periodOk);
+      // Trade options = trades present in the period range (keep current value if now out-of-range)
+      const tradeSel = document.getElementById('wp-mon-trade');
+      const trade = tradeSel?.value || '';
+      const tradeOpts = [...new Set(inRange.map(w=>w.trade).filter(Boolean))].sort();
+      if (tradeSel) {
+        const list = (trade && !tradeOpts.includes(trade)) ? [trade, ...tradeOpts] : tradeOpts;
+        tradeSel.innerHTML = `<option value="">All Trades</option>` +
+          list.map(v=>`<option value="${String(v).replace(/"/g,'&quot;')}" ${v===trade?'selected':''}>${v}</option>`).join('');
+        tradeSel.value = trade;
+      }
+      const base = inRange.filter(w => !trade || w.trade === trade);
+      // Works options come from the period+trade-filtered set
+      const worksOpts = [...new Set(base.map(w=>w.works).filter(Boolean))].sort();
       _msfSel.works.forEach(v => { if (!worksOpts.includes(v)) _msfSel.works.delete(v); });
-      // Vendor options come from the trade- + works-filtered set
+      // Vendor options come from the period+trade+works-filtered set
       const workSel = _msfSel.works;
-      const vendBase = tradeSet.filter(w => workSel.size===0 || workSel.has(w.works));
+      const vendBase = base.filter(w => workSel.size===0 || workSel.has(w.works));
       const vendorOpts = [...new Set(vendBase.flatMap(_wpVendors))].sort();
       _msfSel.vendor.forEach(v => { if (!vendorOpts.includes(v)) _msfSel.vendor.delete(v); });
       _msfRender('works', worksOpts, 'All Works');
@@ -2863,6 +2886,7 @@
 
 </body>
 </html>
+
 
 
 
