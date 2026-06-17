@@ -356,6 +356,7 @@ const Charts = (() => {
     const isAwd=w=>(w.total_awarded||0)>0;
     const mSet=new Set();
     wps.forEach(w=>{ if(w.awarding_date){ const d=new Date(w.awarding_date); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } if(isAwd(w)&&awDate(w)){ const d=awDate(w); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } });
+    _extendForecastAxis(mSet, wps, 'm', !!(opts&&opts.hideAwarded));
     if(!mSet.size){ destroy(id); return; }
     const months=[...mSet].sort();
     const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -391,6 +392,7 @@ const Charts = (() => {
     const isAwd=w=>(w.total_awarded||0)>0;
     const qSet=new Set();
     wps.forEach(w=>{ if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date))); if(isAwd(w)&&awDate(w)) qSet.add(getQKey(awDate(w))); });
+    _extendForecastAxis(qSet, wps, 'q', !!(opts&&opts.hideAwarded));
     if(!qSet.size){ destroy(id); return; }
     const quarters=[...qSet].sort();
     const labels=quarters.map(qLabel);
@@ -479,6 +481,7 @@ const Charts = (() => {
   function wpByPeriodQuarterly(id, wps){
     const qSet=new Set();
     wps.forEach(w=>{ if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date))); });
+    _extendForecastAxis(qSet, wps, 'q', false);
     if(!qSet.size){ destroy(id); return; }
     const quarters=[...qSet].sort();
     const labels=quarters.map(qLabel);
@@ -625,12 +628,31 @@ const Charts = (() => {
   }
   const _fcDash = { borderDash: [6, 4] };
 
+  // Ensure the period axis reaches the current + next period when a backlog exists, so the Forecast
+  // line has somewhere to climb (otherwise, for projects whose WP dates are all in the past, the
+  // forecast collapses to a single anchor point and the dashed line/awarded tail are invisible).
+  // mode: 'm' monthly / 'q' quarterly. Skipped when hideAwd (backlog charts have no forecast).
+  function _extendForecastAxis(set, wps, mode, hideAwd) {
+    if (hideAwd) return;
+    if (!wps.some(w => w.award_status !== 'Awarded')) return;   // nothing to forecast
+    const now = new Date();
+    if (mode === 'q') {
+      set.add(getQKey(now));
+      set.add(getQKey(new Date(now.getFullYear(), now.getMonth() + 3, 1)));
+    } else {
+      const k = d => d.getFullYear() + '-' + (d.getMonth() + 1).toString().padStart(2, '0');
+      set.add(k(now));
+      set.add(k(new Date(now.getFullYear(), now.getMonth() + 1, 1)));
+    }
+  }
+
   function wpCountByPeriodMonthly(id, wps) {
     const mSet=new Set();
     wps.forEach(w=>{
       if(w.awarding_date){const d=new Date(w.awarding_date);mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0'));}
       const ad=_actAwDate(w); if(ad){mSet.add(ad.getFullYear()+'-'+(ad.getMonth()+1).toString().padStart(2,'0'));}
     });
+    _extendForecastAxis(mSet, wps, 'm', false);
     if(!mSet.size){destroy(id);return;}
     const months=[...mSet].sort();
     const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -662,6 +684,7 @@ const Charts = (() => {
       if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date)));
       const ad=_actAwDate(w); if(ad) qSet.add(getQKey(ad));
     });
+    _extendForecastAxis(qSet, wps, 'q', false);
     if(!qSet.size){destroy(id);return;}
     const quarters=[...qSet].sort();
     const planned=quarters.map(qk=>wps.filter(w=>w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).length);
