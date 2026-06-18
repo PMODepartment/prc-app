@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260617h"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260617h"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260617h"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260617i"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260617i"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260617i"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260617h"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260617i"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260617h"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260617i"/>
 </head>
 <body>
 
@@ -574,12 +574,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260617h"></script>
-<script src="assets/js/db.js?v=20260617h"></script>
-<script src="assets/js/ui.js?v=20260617h"></script>
+<script src="assets/js/auth.js?v=20260617i"></script>
+<script src="assets/js/db.js?v=20260617i"></script>
+<script src="assets/js/ui.js?v=20260617i"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260617h"></script>
+<script src="assets/js/charts.js?v=20260617i"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -2324,16 +2324,19 @@
       const pctByWP         = filtWPs.length ? Math.round(awardedCount/filtWPs.length*100) : 0;
       const pctByVal        = totalBCB ? Math.round(totalAwd/totalBCB*100) : 0;
 
-      // Cost Overview KPI cards — 6 cards: BCB, Actual Award, CTC, EAC, Variance, %Variance
-      const card = (lbl,val,cls,full) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls}"${full?` title="${full}"`:''}>${val}</div></div>`;
+      // Cost Overview KPI cards — 4 cards (matches the per-project Overview): BCB, Actual Award,
+      // Balance to Award (amount + WP qty), Savings/Loss (₱ + %).
+      const card = (lbl,val,cls,full,sub,subColor) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls}"${full?` title="${full}"`:''}>${val}</div>${sub?`<div class="metric-sub" style="font-size:14px;font-weight:700;margin-top:4px;color:${subColor||'#888'}">${sub}</div>`:''}</div>`;
+      const balanceAmt = ctc;                                       // budget remaining to award (= totalBudget − budgetAwarded)
+      const balanceQty = Math.max(0, filtWPs.length - awardedCount);// WPs not yet awarded
+      const savings    = hm.budgetAwarded - totalAwd;               // Helping-Sheet savings (budget for awarded − awarded cost)
+      const savingsPct = hm.budgetAwarded ? (savings/hm.budgetAwarded*100) : 0;
       const costEl = document.getElementById('metrics-cost');
       if(costEl) costEl.innerHTML = [
         card('Procurement Budget (BCB)', Fmt.moneyShort(totalBCB), '', Fmt.moneyFull(totalBCB)),
         card('Actual Award', Fmt.moneyShort(totalAwd), 'green', Fmt.moneyFull(totalAwd)),
-        card('Cost to Complete', Fmt.moneyShort(ctc), '', Fmt.moneyFull(ctc)),
-        card('Estimate at Completion', Fmt.moneyShort(eac), '', Fmt.moneyFull(eac)),
-        card('Variance', (ovVariance>=0?'+':'-')+Fmt.moneyShort(ovVariance), ovVariance>=0?'green':'red', (ovVariance>=0?'+':'-')+Fmt.moneyFull(ovVariance)),
-        card('% Variance', (parseFloat(ovPctVar)>=0?'+':'')+ovPctVar+'%', parseFloat(ovPctVar)>=0?'green':'red'),
+        card('Balance to Award', Fmt.moneyShort(balanceAmt), '', Fmt.moneyFull(balanceAmt), balanceQty+' WP'+(balanceQty===1?'':'s')+' remaining'),
+        card('Savings / Loss', (savings>=0?'+':'-')+Fmt.moneyShort(Math.abs(savings)), savings>=0?'green':'red', (savings>=0?'+':'-')+Fmt.moneyFull(Math.abs(savings)), (savings>=0?'+':'')+savingsPct.toFixed(1)+'%', savings>=0?'#2D9B6F':'#EE3124'),
       ].join('');
       if(costEl) fitMetricValues(costEl);
 
@@ -2789,10 +2792,10 @@
   /* ── Overview tab layout ── */
   .ov-top-row { display:flex; gap:16px; flex-wrap:wrap; align-items:stretch; }
   .ov-top-row > div { flex:1; min-width:280px; display:flex; flex-direction:column; }
-  .ov-cost-grid { display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(2,1fr); gap:10px; flex:1; align-content:stretch; }
+  .ov-cost-grid { display:grid; grid-template-columns:repeat(2,1fr); grid-template-rows:repeat(2,1fr); gap:10px; flex:1; align-content:stretch; }
   .ov-cost-grid .metric-card { padding:16px 18px; display:flex; flex-direction:column; justify-content:center; }
   .ov-cost-grid .metric-label { min-height:30px; margin-bottom:8px; font-size:10px; display:flex; align-items:flex-end; }
-  .ov-cost-grid .metric-value { font-size:20px !important; letter-spacing:-.4px; line-height:1.2; white-space:nowrap; overflow:hidden; }
+  .ov-cost-grid .metric-value { font-size:22px !important; letter-spacing:-.4px; line-height:1.2; white-space:nowrap; overflow:hidden; }
   .ov-wp-split { display:flex; gap:10px; align-items:stretch; flex:1; }
   .ov-donut-card { flex:1; min-width:110px; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); padding:16px 12px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; }
   .ov-stats-card { flex:1.4; min-width:160px; background:#fff; border:1px solid var(--border-md); border-radius:var(--radius-md); overflow:hidden; display:flex; flex-direction:column; }
@@ -2888,6 +2891,7 @@
 
 </body>
 </html>
+
 
 
 
