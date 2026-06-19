@@ -20,26 +20,54 @@
   });
 })();
 
-/* ── Mobile sidebar toggle ──────────────────────────────────────────── */
+/* ── Sidebar toggle (desktop collapse + mobile drawer) + topbar logo ──── */
 function initMobileMenu() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebar-overlay');
   const btnMenu = document.getElementById('btn-menu');
-  if (!sidebar || !overlay || !btnMenu) return;
+
+  // Inject the Megawide mark into the topbar, just after the menu button (idempotent).
+  const topbarLeft = document.querySelector('.topbar-left');
+  if (topbarLeft && !topbarLeft.querySelector('.topbar-logo')) {
+    const img = document.createElement('img');
+    img.className = 'topbar-logo';
+    img.src = 'assets/img/megawide-mark.png';
+    img.alt = 'Megawide';
+    if (btnMenu && btnMenu.parentElement === topbarLeft) btnMenu.insertAdjacentElement('afterend', img);
+    else topbarLeft.insertBefore(img, topbarLeft.firstChild);
+  }
+
+  if (!sidebar || !btnMenu) return;
+
+  const COLLAPSE_KEY = 'wpm_sidebar_collapsed';
+  const isDesktop = () => window.innerWidth >= 768;
+
+  // Restore the collapsed state on desktop without animating the slide on first paint.
+  if (isDesktop() && localStorage.getItem(COLLAPSE_KEY) === '1') {
+    document.body.classList.add('no-transition', 'sidebar-collapsed');
+    requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.remove('no-transition')));
+  }
 
   btnMenu.addEventListener('click', () => {
-    sidebar.classList.add('open');
-    overlay.classList.add('show');
-    document.body.style.overflow = 'hidden';
+    if (isDesktop()) {
+      // Desktop/tablet: collapse the panel out of the way and reclaim the space (persisted)
+      const collapsed = document.body.classList.toggle('sidebar-collapsed');
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
+    } else {
+      // Mobile: slide-in drawer with overlay
+      sidebar.classList.add('open');
+      if (overlay) overlay.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
   });
 
   function closeMenu() {
     sidebar.classList.remove('open');
-    overlay.classList.remove('show');
+    if (overlay) overlay.classList.remove('show');
     document.body.style.overflow = '';
   }
 
-  overlay.addEventListener('click', closeMenu);
+  if (overlay) overlay.addEventListener('click', closeMenu);
 
   sidebar.querySelectorAll('.nav-item').forEach(el => {
     el.addEventListener('click', () => {

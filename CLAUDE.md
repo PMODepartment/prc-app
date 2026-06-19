@@ -173,6 +173,8 @@ Both approval modal (`modalRoleSelect`) and Change Role modal (`crm-role-select`
 
 ## Navigation & Sidebar
 
+**Collapsible sidebar + topbar logo** (`initMobileMenu` in `ui.js`, central â€” applies to every page with a `.topbar`): the `.btn-menu` hamburger is now visible on **all** sizes. On desktop/tablet (â‰¥768px) it toggles `body.sidebar-collapsed` (CSS slides `.sidebar` out via `translateX(-100%)` and sets `.main { margin-left:0 }` to reclaim the space); state persisted in `localStorage.wpm_sidebar_collapsed` and restored on load with a `.no-transition` guard to avoid a slide animation on first paint. On mobile (<768px) the hamburger still opens the slide-in drawer + overlay. `initMobileMenu` also injects the **Megawide mark** (`assets/img/megawide-mark.png`, `.topbar-logo`, ~26px) into `.topbar-left` right after the menu button (idempotent) â€” mirrors the Planning App topbar (hamburger + mark + title).
+
 **Nav context** (`sessionStorage` key `wpm_nav_ctx`): stores project ID or `'consolidated'`. Set by `project.html` and `index.html`; read by `admin.html` and `review.html` for context-aware sidebar.
 
 ### Sidebar per Page
@@ -453,7 +455,7 @@ Public pages (login, register, pending, forgot-password) load UMD bundle inline 
 
 Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net, cdnjs.cloudflare.com; `dns-prefetch` for Supabase URL; `preload as="script"` for all body scripts.
 
-**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260617i`. (Other pages â€” admin/review/wp-form/etc. â€” are not versioned; they rely on ETag revalidation and don't host the chart/rank features.)
+**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260619a`. (Other pages â€” admin/review/wp-form/etc. â€” are not versioned; they rely on ETag revalidation and don't host the chart/rank features.)
 
 ---
 
@@ -534,6 +536,7 @@ GitHub Pages auto-deploys on push to main (~1â€“2 min).
   - **Mobile WP List cards (`.wpc*`)**: built in JS (`#proj-wp-cards`/`#wp-mon-cards`) but styled by `.wpc`/`.wpc-desc`/`.wpc-kv`/`.wpc-actions` etc. class rules (identical in both files). Dark overrides in the "Mobile WP List cards" section of `dashboard.css` (`.wpc` bgâ†’surface, textâ†’primary/secondary/hint, action buttonsâ†’surface-2).
   - **Top 5 rank tables**: do NOT add a blanket `body.dark-mode .rank-side { color }` rule â€” it kills the inline Savings(green `#2D9B6F`)/Overbudget(red `#EE3124`) accent colors. Let the inline-color attribute selectors recolor only neutral cells; accents are left untouched.
   - **Public-page dark mode (self-contained)**: `login.html`, `register.html`, `pending.html`, `forgot-password.html` don't load `ui.js`/`dashboard.css`, so each has its OWN inline dark mode (identical pattern): inline anti-flash `<script>` in `<head>` adds `dark-mode` to `<html>` from `wpm_theme_last` (or system pref if unset); CSS rules prefixed `html.dark-mode` (set early enough to avoid a white flash on `.form-wrap`/`.card`); a fixed top-right `.login-theme-toggle` (sun/moon inline SVG) calls `toggleLoginTheme()` which persists `wpm_theme_last`. Shares the `wpm_theme_last` key with the dashboard so the theme carries across the whole auth flow â†’ dashboard. Gotcha: `forgot-password.html`'s logo has an inline `filter:invert(1) brightness(0)` (black logo for the white card) â€” dark mode overrides it with `html.dark-mode .logo-wrap img{filter:none!important}` so the white logo shows. These are inline (no `?v=` needed; HTML revalidates via ETag).
+
 
 
 
