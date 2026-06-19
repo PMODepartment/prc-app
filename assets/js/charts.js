@@ -380,7 +380,7 @@ const Charts = (() => {
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
       ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
-      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(months,getMKey,wps,cumA,_fcBudgetValFn(wps, cumA[cumA.length-1]||0)),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(months,getMKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
@@ -414,7 +414,7 @@ const Charts = (() => {
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
       ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
-      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA,_fcBudgetValFn(wps, cumA[cumA.length-1]||0)),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
@@ -627,19 +627,6 @@ const Charts = (() => {
     return out;
   }
   const _fcDash = { borderDash: [6, 4] };
-
-  // For the ₱ Budget-vs-Awarded charts the Forecast must complete a NORMAL S-curve: start from the
-  // actual Cumulative Awarded (cost) at today and climb to meet the total Cumulative Budget at the
-  // completion period. The remaining-to-award WPs only carry `totalNotAwardedBudget`, which would land
-  // short of total budget by the savings already realised on awarded WPs — so we scale each remaining
-  // WP's budget by `remaining-to-total ÷ remaining-budget` to fill the curve exactly to 100%.
-  // Returns a per-WP value function (in ₱M) for _wpForecastLine.
-  function _fcBudgetValFn(wps, awardedCostNowM) {
-    const totBudM = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6;
-    const naBudM  = wps.filter(w=>w.award_status!=='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6;
-    const scale   = naBudM > 0 ? Math.max(0, totBudM - awardedCostNowM) / naBudM : 1;
-    return w => (w.approved_budget_bcb||0)/1e6 * scale;
-  }
 
   // Ensure the period axis reaches the current + next period when a backlog exists, so the Forecast
   // line has somewhere to climb (otherwise, for projects whose WP dates are all in the past, the
