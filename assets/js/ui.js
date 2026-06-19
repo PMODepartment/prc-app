@@ -215,7 +215,10 @@ function initExpandableCharts() {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       expanded = !expanded;
-      wrap.style.height = (expanded ? origH * 2.2 : origH) + 'px';
+      // Expanded height is set inline-!important so it beats the mobile `.chart-mob-h{height:300px!important}`
+      // rule; on collapse a plain inline height restores the default (mobile rule re-applies its 300px).
+      if (expanded) wrap.style.setProperty('height', (origH * 2.2) + 'px', 'important');
+      else wrap.style.height = origH + 'px';
       btn.querySelector('i').className = expanded ? 'ti ti-arrows-diagonal-minimize-2' : 'ti ti-arrows-diagonal';
       btn.style.opacity = '1';
       btn.title = expanded ? 'Collapse chart' : 'Expand chart';
