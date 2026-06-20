@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260619e"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260619e"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260619e"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260619f"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260619f"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260619f"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260619e"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260619f"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260619e"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260619f"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -334,7 +334,14 @@
             </select>
             <select id="f-trade" style="flex-shrink:0"><option value="all">All trades</option></select>
             <select id="f-zone" style="flex-shrink:0"><option value="all">All zones</option></select>
-            <select id="f-vendor" style="flex-shrink:0;max-width:190px"><option value="all">All vendors</option></select>
+            <div class="msf" id="msf-works" style="flex-shrink:0">
+              <button type="button" class="msf-btn" onclick="msfToggle('works')"><span id="msf-works-label">All Works</span><i class="ti ti-chevron-down"></i></button>
+              <div class="msf-pop" id="msf-works-pop"></div>
+            </div>
+            <div class="msf" id="msf-vendor" style="flex-shrink:0">
+              <button type="button" class="msf-btn" onclick="msfToggle('vendor')"><span id="msf-vendor-label">All Vendors</span><i class="ti ti-chevron-down"></i></button>
+              <div class="msf-pop" id="msf-vendor-pop"></div>
+            </div>
             <div style="position:relative;flex:1;min-width:140px">
               <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#aaa;font-size:13px;pointer-events:none"></i>
               <input id="f-search" type="text" placeholder="Search WP / cost code…" style="width:100%;padding:6px 10px 6px 30px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;outline:none;background:var(--surface-2);color:var(--text-primary)"/>
@@ -496,12 +503,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260619e"></script>
-<script src="assets/js/ui.js?v=20260619e"></script>
-<script src="assets/js/db.js?v=20260619e"></script>
+<script src="assets/js/auth.js?v=20260619f"></script>
+<script src="assets/js/ui.js?v=20260619f"></script>
+<script src="assets/js/db.js?v=20260619f"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260619e"></script>
+<script src="assets/js/charts.js?v=20260619f"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -799,17 +806,59 @@ window.renderSidebarProjects = function() {
 // Vendors live in contractor (awarded) or proposed_vendors. Split on explicit delimiters only —
 // newline / semicolon / pipe. NEVER comma or space, so "Company, Inc." and multi-word names stay intact.
 const _projVendors = w => String(w.contractor||w.proposed_vendors||'').split(/[\r\n;|]+/).map(s=>s.trim()).filter(Boolean);
+// Cascading multiselect state for the WP-List Works/Vendor filters (Trade → Works → Vendor)
+const _msfSel = { works: new Set(), vendor: new Set() };
+// Re-apply the WP-List filters (table + Filtered Analysis) after a Works/Vendor/Trade change
+function applyWpListFilters(){
+  curPage=1;
+  Object.keys(_rendered).forEach(k=>_rendered[k]=false);
+  if(currentView==='table'){ buildTable(); renderPwaAnalysis(); }
+  else switchView(currentView);
+}
+// Cascade: Works options come from the selected Trade; Vendor options from Trade+Works. Drops now-invalid selections.
+function _recomputeFilterOptions(){
+  const tr=document.getElementById('f-trade')?.value||'all';
+  const base=allWPs.filter(w=> tr==='all' || w.trade===tr);
+  const worksOpts=[...new Set(base.map(w=>w.works).filter(Boolean))].sort();
+  _msfSel.works.forEach(v=>{ if(!worksOpts.includes(v)) _msfSel.works.delete(v); });
+  const workSel=_msfSel.works;
+  const vendBase=base.filter(w=> workSel.size===0 || workSel.has(w.works));
+  const vendorOpts=[...new Set(vendBase.flatMap(_projVendors))].sort();
+  _msfSel.vendor.forEach(v=>{ if(!vendorOpts.includes(v)) _msfSel.vendor.delete(v); });
+  _msfRender('works', worksOpts, 'All Works');
+  _msfRender('vendor', vendorOpts, 'All Vendors');
+}
+function _msfRender(field, opts, allLabel){
+  const pop=document.getElementById('msf-'+field+'-pop');
+  const lab=document.getElementById('msf-'+field+'-label');
+  const sel=_msfSel[field];
+  if(lab) lab.textContent = sel.size===0?allLabel:(sel.size===1?[...sel][0]:sel.size+' selected');
+  if(!pop) return;
+  const esc=s=>String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  pop.innerHTML =
+    '<input class="msf-search" type="text" placeholder="Search…" oninput="msfFilterOpts(\''+field+'\', this.value)"/>'+
+    '<label class="msf-opt msf-allrow"><input type="checkbox" '+(sel.size===0?'checked':'')+' onchange="msfSelectAll(\''+field+'\')"/><span>'+allLabel+'</span></label>'+
+    opts.map(o=>'<label class="msf-opt" data-val="'+esc(o)+'"><input type="checkbox" '+(sel.has(o)?'checked':'')+' onchange="msfOnToggle(\''+field+'\', this)"/><span>'+esc(o)+'</span></label>').join('');
+}
+window.msfFilterOpts=function(field,q){ q=(q||'').toLowerCase(); document.querySelectorAll('#msf-'+field+'-pop .msf-opt[data-val]').forEach(el=>{ el.style.display=el.getAttribute('data-val').toLowerCase().includes(q)?'':'none'; }); };
+function _updateMsfLabel(field){ const sel=_msfSel[field]; const lab=document.getElementById('msf-'+field+'-label'); if(lab) lab.textContent=sel.size===0?(field==='works'?'All Works':'All Vendors'):(sel.size===1?[...sel][0]:sel.size+' selected'); }
+window.msfSelectAll=function(field){ _msfSel[field].clear(); if(field==='works') _recomputeFilterOptions(); else { document.querySelectorAll('#msf-vendor-pop .msf-opt[data-val] input').forEach(i=>i.checked=false); _updateMsfLabel('vendor'); } applyWpListFilters(); };
+window.msfOnToggle=function(field,cb){ const val=cb.closest('.msf-opt').getAttribute('data-val'); if(cb.checked) _msfSel[field].add(val); else _msfSel[field].delete(val); if(field==='works') _recomputeFilterOptions(); else _updateMsfLabel('vendor'); applyWpListFilters(); };
+window.msfToggle=function(field){ const box=document.getElementById('msf-'+field); const wasOpen=box.classList.contains('open'); document.querySelectorAll('.msf.open').forEach(b=>b.classList.remove('open')); if(!wasOpen) box.classList.add('open'); };
+document.addEventListener('click', e=>{ if(!e.target.closest('.msf')) document.querySelectorAll('.msf.open').forEach(b=>b.classList.remove('open')); });
+
 function getFiltered(){
   const st=document.getElementById('f-status').value;
   const tr=document.getElementById('f-trade').value;
   const zn=document.getElementById('f-zone').value;
-  const vn=document.getElementById('f-vendor')?.value||'all';
+  const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search').value||'').toLowerCase();
   return allWPs.filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
     if(zn!=='all'&&w.zone!==zn)return false;
-    if(vn!=='all'&&!_projVendors(w).includes(vn))return false;
+    if(works.size&&!works.has(w.works||''))return false;
+    if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
     return true;
   });
@@ -1380,13 +1429,14 @@ function getFilteredSorted(){
   const st=document.getElementById('f-status').value;
   const tr=document.getElementById('f-trade').value;
   const zn=document.getElementById('f-zone').value;
-  const vn=document.getElementById('f-vendor')?.value||'all';
+  const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search').value||'').toLowerCase();
   let rows = allWPs.filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
     if(zn!=='all'&&w.zone!==zn)return false;
-    if(vn!=='all'&&!_projVendors(w).includes(vn))return false;
+    if(works.size&&!works.has(w.works||''))return false;
+    if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
     return true;
   });
@@ -1432,13 +1482,14 @@ function _pwaFilteredWPs(){
   const st=document.getElementById('f-status')?.value||'all';
   const tr=document.getElementById('f-trade')?.value||'all';
   const zn=document.getElementById('f-zone')?.value||'all';
-  const vn=document.getElementById('f-vendor')?.value||'all';
+  const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search')?.value||'').toLowerCase();
   return allWPs.filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
     if(zn!=='all'&&w.zone!==zn)return false;
-    if(vn!=='all'&&!_projVendors(w).includes(vn))return false;
+    if(works.size&&!works.has(w.works||''))return false;
+    if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
     return true;
   });
@@ -2028,19 +2079,12 @@ AppAuth.requireLogin(async (user, profile) => {
   document.getElementById('f-trade').innerHTML='<option value="all">All trades</option>'+trades.map(t=>'<option value="'+t+'">'+t+'</option>').join('');
   const zones=[...new Set(allWPs.map(w=>w.zone).filter(Boolean))].sort();
   document.getElementById('f-zone').innerHTML='<option value="all">All zones</option>'+zones.map(z=>'<option value="'+z+'">'+z+'</option>').join('');
-  const vendors=[...new Set(allWPs.flatMap(_projVendors))].sort();
-  document.getElementById('f-vendor').innerHTML='<option value="all">All vendors</option>'+vendors.map(v=>'<option value="'+v.replace(/"/g,'&quot;')+'">'+v+'</option>').join('');
+  _recomputeFilterOptions();   // build the Works/Vendor multiselect options (cascades from Trade)
 
-  ['f-status','f-trade','f-zone','f-vendor'].forEach(id=>{
-    const el = document.getElementById(id);
-    if(el) el.addEventListener('change',()=>{
-      curPage=1;
-      // Reset lazy-render flags so tabs re-render with new filter
-      Object.keys(_rendered).forEach(k=>_rendered[k]=false);
-      if(currentView==='table') { buildTable(); renderPwaAnalysis(); }
-      else switchView(currentView);
-    });
-  });
+  // Status/Zone re-filter only; Trade also recomputes the Works/Vendor cascade
+  ['f-status','f-zone'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', applyWpListFilters); });
+  const trEl=document.getElementById('f-trade');
+  if(trEl) trEl.addEventListener('change',()=>{ _msfSel.works.clear(); _msfSel.vendor.clear(); _recomputeFilterOptions(); applyWpListFilters(); });
   const srch = document.getElementById('f-search');
   if(srch) srch.addEventListener('input',()=>{curPage=1; if(currentView==='table'){buildTable(); renderPwaAnalysis();}});
 
@@ -3009,6 +3053,7 @@ window.saveQuickWP = async function() {
 
 </body>
 </html>
+
 
 
 
