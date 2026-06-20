@@ -282,10 +282,6 @@
         <label class="np-label" for="np-location">Location</label>
         <input class="np-input" id="np-location" type="text" placeholder="e.g. Quezon City">
       </div>
-      <div>
-        <label class="np-label" for="np-budget">Procurement Budget BCB (₱)</label>
-        <input class="np-input" id="np-budget" type="text" inputmode="numeric" placeholder="e.g. 274,900,000">
-      </div>
       <div id="np-err" class="np-err"></div>
     </div>
     <div class="np-foot">
@@ -371,7 +367,7 @@ let _pickerSb = null; // sb reference for NP modal
 
 // ── New Project modal ──────────────────────────────────────────
 function openNPModal() {
-  ['np-id','np-name','np-location','np-budget'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['np-id','np-name','np-location'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   const err = document.getElementById('np-err'); if(err) { err.style.display='none'; err.textContent=''; }
   const btn = document.getElementById('np-btn-create'); if(btn) { btn.textContent='Create & Open'; btn.disabled=false; }
   document.getElementById('npModal').classList.add('active');
@@ -382,8 +378,6 @@ async function submitNP() {
   const id  = (document.getElementById('np-id').value||'').trim();
   const name = (document.getElementById('np-name').value||'').trim();
   const loc  = (document.getElementById('np-location').value||'').trim();
-  const raw  = (document.getElementById('np-budget').value||'').replace(/,/g,'');
-  const budget = parseFloat(raw) || null;
   const err = document.getElementById('np-err');
   err.style.display = 'none';
   if (!id || !name) { err.textContent='Project Code and Name are required.'; err.style.display='block'; return; }
@@ -391,7 +385,8 @@ async function submitNP() {
   const btn = document.getElementById('np-btn-create');
   btn.textContent='Creating…'; btn.disabled=true;
   try {
-    const { error } = await sb.from('projects').insert({ id, name, location: loc||null, budget_bcb: budget, status:'active' });
+    // budget_bcb omitted — a project's BCB is the sum of its work packages' BCB (computed)
+    const { error } = await sb.from('projects').insert({ id, name, location: loc||null, status:'active' });
     if (error) throw error;
     closeNPModal();
     window.location.href = `project.html?id=${id}`;
@@ -406,13 +401,6 @@ document.getElementById('npModal').addEventListener('keydown', e => {
   if (e.key==='Enter') submitNP();
   if (e.key==='Escape') closeNPModal();
 });
-// Budget comma formatting
-(function(){
-  const el = document.getElementById('np-budget');
-  el.addEventListener('blur',  () => { const v=parseFloat(el.value.replace(/,/g,'')); if(!isNaN(v)) el.value=v.toLocaleString('en-US'); });
-  el.addEventListener('focus', () => { el.value=el.value.replace(/,/g,''); });
-})();
-
 async function showProjectPicker(profile) {
   document.getElementById('loginForm').classList.add('hidden');
   document.getElementById('projectPicker').classList.add('visible');

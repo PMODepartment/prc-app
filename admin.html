@@ -348,10 +348,6 @@
           <textarea id="np-description" placeholder="Brief project description..." rows="2" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;resize:vertical"></textarea>
         </div>
         <div>
-          <div class="modal-field-label">Procurement Budget (BCB) (₱)</div>
-          <input id="np-budget" type="text" inputmode="numeric" placeholder="e.g. 274,900,000" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none">
-        </div>
-        <div>
           <div class="modal-field-label">Assign Users (optional)</div>
           <div id="np-user-list" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto"></div>
           <div style="font-size:11px;color:#aaa;margin-top:6px">Selected users will be assigned to this project immediately.</div>
@@ -1147,17 +1143,9 @@
     });
   };
 
-  // Comma formatting for budget input
-  (function() {
-    const el = document.getElementById('np-budget');
-    if (!el) return;
-    el.addEventListener('blur',  () => { const v=parseFloat(el.value.replace(/,/g,'')); if(!isNaN(v)) el.value=v.toLocaleString('en-US'); });
-    el.addEventListener('focus', () => { el.value = el.value.replace(/,/g,''); });
-  })();
-
   window.closeNewProjectModal = function() {
     document.getElementById('newProjectModal').classList.add('hidden');
-    ['np-id','np-name','np-location','np-description','np-budget'].forEach(id=>{
+    ['np-id','np-name','np-location','np-description'].forEach(id=>{
       const el=document.getElementById(id); if(el) el.value='';
     });
     document.getElementById('np-error').style.display='none';
@@ -1168,7 +1156,6 @@
     const name = document.getElementById('np-name').value.trim();
     const location = document.getElementById('np-location').value.trim();
     const description = document.getElementById('np-description').value.trim();
-    const budget = parseFloat(document.getElementById('np-budget').value.replace(/,/g,''))||null;
     const errEl = document.getElementById('np-error');
     if (!id||!name){ errEl.textContent='Project Code and Name are required.'; errEl.style.display='block'; return; }
     if (!/^[A-Z0-9]+$/.test(id)){ errEl.textContent='Project Code must be letters/numbers only (e.g. AVR102).'; errEl.style.display='block'; return; }
@@ -1177,7 +1164,8 @@
     const btn = document.getElementById('btn-create-project');
     btn.textContent='Creating\u2026'; btn.disabled=true; errEl.style.display='none';
     try {
-      await WPDb.createProject({ id, name, location, description, budget_bcb:budget, status:'active' });
+      // budget_bcb omitted — a project's BCB is the sum of its work packages' BCB (computed)
+      await WPDb.createProject({ id, name, location, description, status:'active' });
       for (const uid of selectedUsers) {
         const user = allUsers.find(u=>u.id===uid);
         if (user) await WPDb.updateUser(uid, { projects:[...new Set([...(user.projects||[]),id])] });
@@ -1202,7 +1190,7 @@
 
 // Warn if New Project form has content and user navigates away
 let newProjectDirty = false;
-['np-id','np-name','np-location','np-description','np-budget'].forEach(id => {
+['np-id','np-name','np-location','np-description'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('input', () => { newProjectDirty = el.value.trim() !== ''; });
 });

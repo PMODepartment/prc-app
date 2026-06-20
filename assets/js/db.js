@@ -616,11 +616,6 @@ function updatePendingBadge() {
               style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Budget BCB (₱)</div>
-            <input id="gnp-budget" type="number" placeholder="e.g. 274900000"
-              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
-          </div>
-          <div>
             <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Assign Users (optional)</div>
             <div id="gnp-user-list"><div style="color:#aaa;font-size:12px">Loading…</div></div>
           </div>
@@ -643,7 +638,7 @@ function updatePendingBadge() {
   window._gnpClose = function() {
     const m = document.getElementById('gnp-global-modal');
     if (m) m.style.display = 'none';
-    ['gnp-id','gnp-name','gnp-location','gnp-description','gnp-budget'].forEach(id=>{
+    ['gnp-id','gnp-name','gnp-location','gnp-description'].forEach(id=>{
       const el=document.getElementById(id); if(el) el.value='';
     });
     const err=document.getElementById('gnp-error'); if(err) err.style.display='none';
@@ -655,12 +650,12 @@ function updatePendingBadge() {
     const errEl = document.getElementById('gnp-error');
     if (!id||!name) { errEl.textContent='Project Code and Name are required.'; errEl.style.display='block'; return; }
     if (!/^[A-Z0-9]+$/.test(id)) { errEl.textContent='Project Code must be letters/numbers only (e.g. AVR102).'; errEl.style.display='block'; return; }
-    const budget = parseFloat(document.getElementById('gnp-budget')?.value)||null;
     const selectedUsers = [...document.querySelectorAll('#gnp-user-rows input:checked')].map(cb=>cb.value);
     const btn = document.getElementById('gnp-create-btn');
     btn.textContent='Creating…'; btn.disabled=true; errEl.style.display='none';
     try {
-      await WPDb.createProject({id, name, location:v('gnp-location'), description:v('gnp-description'), budget_bcb:budget, status:'active'});
+      // budget_bcb is intentionally omitted — a project's BCB is the sum of its work packages' BCB (computed)
+      await WPDb.createProject({id, name, location:v('gnp-location'), description:v('gnp-description'), status:'active'});
       for (const uid of selectedUsers) {
         const user = _gnpUsers.find(u=>u.id===uid);
         if (user) await WPDb.updateUser(uid, {projects:[...new Set([...(user.projects||[]),id])]});
