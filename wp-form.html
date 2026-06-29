@@ -1405,6 +1405,12 @@ AppAuth.requireLogin(async (user, profile) => {
       const role = window.__wpmRole || 'user';
       const rows = WPCsv.toWPData(_wpCsvData, pid);
       if (!rows.length) throw new Error('No rows with a WP No. found. Check that the WP No. column is filled.');
+      // Reject future Actual Award Dates — a WP can't be awarded on a date that hasn't happened yet.
+      // Validate up front so nothing is written if any row is invalid (no partial import).
+      const _today0 = new Date(); _today0.setHours(0,0,0,0);
+      const _isFutureAward = v => { if(!v) return false; const m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/); const d=m?new Date(+m[1],+m[2]-1,+m[3]):new Date(v); return !isNaN(d) && d>_today0; };
+      const _futureRows = rows.filter(w => _isFutureAward(w.actual_awarding_date)).map(w => w.wp_no);
+      if (_futureRows.length) throw new Error(`Actual Award Date cannot be in the future. Fix WP No(s): ${_futureRows.join(', ')}`);
       // De-duplicate by WP No.: re-importing existing WPs UPDATES them in place instead of inserting
       // duplicates. Match on normalized WP No. (trailing ".0" stripped, case-insensitive) per project.
       const _wpKey = v => String(v==null?'':v).trim().replace(/\.0+$/,'').toLowerCase();
