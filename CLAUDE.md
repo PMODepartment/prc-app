@@ -437,6 +437,8 @@ Standalone pages (login, register, pending, forgot-password) without sticky tabs
 
 **iOS pinch zoom**: handled in `ui.js` via `touchmove` + `gesturestart` listeners. `user-scalable=no` viewport is ignored by Safari iOS 10+.
 
+**iOS PWA pull-to-refresh**: not available in standalone mode. A `.btn-refresh` button (Tabler `ti-refresh` icon, same style as `.btn-menu`) is added to `.topbar-right` on both `index.html` and `project.html`, left of the Export PDF button. On `project.html` it calls `loadData()` in-place; on `index.html` it busts `wpm_wps_idx_*` sessionStorage cache then reloads. Shows a CSS spin animation while loading; disabled during refresh to prevent double-taps. Style defined in `dashboard.css` (`.btn-refresh`, `.spin`, `@keyframes spin`).
+
 ---
 
 ## Script Loading (Dashboard Pages)
@@ -455,7 +457,7 @@ Public pages (login, register, pending, forgot-password) load UMD bundle inline 
 
 Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net, cdnjs.cloudflare.com; `dns-prefetch` for Supabase URL; `preload as="script"` for all body scripts.
 
-**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260619g`. (Other pages â€” admin/review/wp-form/etc. â€” are not versioned; they rely on ETag revalidation and don't host the chart/rank features.)
+**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260629a`. (Other pages â€” admin/review/wp-form/etc. â€” are not versioned; they rely on ETag revalidation and don't host the chart/rank features.)
 
 ---
 
