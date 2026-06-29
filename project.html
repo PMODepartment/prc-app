@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260629a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260629b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629a"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629a"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629b"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -503,12 +503,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260629a"></script>
-<script src="assets/js/ui.js?v=20260629a"></script>
-<script src="assets/js/db.js?v=20260629a"></script>
+<script src="assets/js/auth.js?v=20260629b"></script>
+<script src="assets/js/ui.js?v=20260629b"></script>
+<script src="assets/js/db.js?v=20260629b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260629a"></script>
+<script src="assets/js/charts.js?v=20260629b"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -1426,13 +1426,11 @@ window.toggleProjWPTableMode = function() {
 function getFilteredSorted(){
   const st=document.getElementById('f-status').value;
   const tr=document.getElementById('f-trade').value;
-  const zn=document.getElementById('f-zone').value;
   const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search').value||'').toLowerCase();
   let rows = allWPs.filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
-    if(zn!=='all'&&w.zone!==zn)return false;
     if(works.size&&!works.has(w.works||''))return false;
     if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
@@ -1475,17 +1473,15 @@ function _pwaPeriodMatch(d){
   if(_pwaTo!=='all' && k>_pwaTo) return false;
   return true;
 }
-// Flat filtered WP list (status/trade/zone/search) — same predicates as getFilteredSorted
+// Flat filtered WP list (status/trade/search) — same predicates as getFilteredSorted
 function _pwaFilteredWPs(){
   const st=document.getElementById('f-status')?.value||'all';
   const tr=document.getElementById('f-trade')?.value||'all';
-  const zn=document.getElementById('f-zone')?.value||'all';
   const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search')?.value||'').toLowerCase();
   return allWPs.filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
-    if(zn!=='all'&&w.zone!==zn)return false;
     if(works.size&&!works.has(w.works||''))return false;
     if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
@@ -2075,12 +2071,10 @@ AppAuth.requireLogin(async (user, profile) => {
   // Populate filters
   const trades=[...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
   document.getElementById('f-trade').innerHTML='<option value="all">All trades</option>'+trades.map(t=>'<option value="'+t+'">'+t+'</option>').join('');
-  const zones=[...new Set(allWPs.map(w=>w.zone).filter(Boolean))].sort();
-  document.getElementById('f-zone').innerHTML='<option value="all">All zones</option>'+zones.map(z=>'<option value="'+z+'">'+z+'</option>').join('');
   _recomputeFilterOptions();   // build the Works/Vendor multiselect options (cascades from Trade)
 
-  // Status/Zone re-filter only; Trade also recomputes the Works/Vendor cascade
-  ['f-status','f-zone'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', applyWpListFilters); });
+  // Status re-filter only; Trade also recomputes the Works/Vendor cascade
+  ['f-status'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', applyWpListFilters); });
   const trEl=document.getElementById('f-trade');
   if(trEl) trEl.addEventListener('change',()=>{ _msfSel.works.clear(); _msfSel.vendor.clear(); _recomputeFilterOptions(); applyWpListFilters(); });
   const srch = document.getElementById('f-search');
