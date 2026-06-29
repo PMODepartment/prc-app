@@ -229,7 +229,7 @@ const Charts = (() => {
         const max = arr.reduce((m, x) => x > m ? x : m, 0);
         return max > 0 && v >= max * f;
       },
-      anchor: 'end', align: 'top', offset: 2, rotation: -90, clamp: false, clip: false,
+      anchor: 'end', align: 'top', offset: 2, rotation: 0, clamp: false, clip: false,
       color: ctx => { const c = seriesColors[ctx.dataset.label] || '#231F20'; return dark ? (darkMap[c] || '#DCDBDB') : c; },
       font: { size: _mob() ? 7 : 8, weight: '700', family: 'Montserrat' },
       formatter: fmtFn

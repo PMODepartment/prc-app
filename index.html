@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260629b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260629c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629c"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629b"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629b"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629c"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -453,6 +453,11 @@
                 </div>
                 <div style="width:1px;height:18px;background:var(--border-md)"></div>
                 <div style="display:flex;gap:4px">
+                  <button id="wpmon-btn-budget" onclick="setWpMonDataMode('budget')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Budget</button>
+                  <button id="wpmon-btn-count" onclick="setWpMonDataMode('count')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600"># WPs</button>
+                </div>
+                <div style="width:1px;height:18px;background:var(--border-md)"></div>
+                <div style="display:flex;gap:4px">
                   <button id="wpmon-btn-chart" onclick="setWpMonViewMode('chart')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600"><i class="ti ti-chart-bar" style="font-size:11px"></i> Chart</button>
                   <button id="wpmon-btn-table" onclick="setWpMonViewMode('table')" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600"><i class="ti ti-table" style="font-size:11px"></i> Table</button>
                 </div>
@@ -583,12 +588,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260629b"></script>
-<script src="assets/js/db.js?v=20260629b"></script>
-<script src="assets/js/ui.js?v=20260629b"></script>
+<script src="assets/js/auth.js?v=20260629c"></script>
+<script src="assets/js/db.js?v=20260629c"></script>
+<script src="assets/js/ui.js?v=20260629c"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260629b"></script>
+<script src="assets/js/charts.js?v=20260629c"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -1918,10 +1923,26 @@
       if (_wpMonViewMode === 'table') {
         renderWpMonPeriodTable(rows);
       } else if (typeof Charts !== 'undefined') {
-        if (_wpMonPeriodMode === 'quarterly') Charts.budgetAwardedByPeriod('c-wpmon-period', rows, {tidyLabels:true});
-        else Charts.budgetAwardedByPeriodMonthly('c-wpmon-period', rows, {tidyLabels:true});
+        if (_wpMonDataMode === 'count') {
+          if (_wpMonPeriodMode === 'quarterly') Charts.wpCountByPeriod('c-wpmon-period', rows);
+          else Charts.wpCountByPeriodMonthly('c-wpmon-period', rows);
+        } else {
+          if (_wpMonPeriodMode === 'quarterly') Charts.budgetAwardedByPeriod('c-wpmon-period', rows, {tidyLabels:true});
+          else Charts.budgetAwardedByPeriodMonthly('c-wpmon-period', rows, {tidyLabels:true});
+        }
       }
     }
+
+    let _wpMonDataMode = 'budget';
+    window.setWpMonDataMode = function(m){
+      _wpMonDataMode = m;
+      const on='font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
+      const off='font-size:10px;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
+      const bb=document.getElementById('wpmon-btn-budget'), cb=document.getElementById('wpmon-btn-count');
+      if(bb) bb.style.cssText = m==='budget'?on:off;
+      if(cb) cb.style.cssText = m==='count'?on:off;
+      renderWPMonAnalysis();
+    };
 
     let _wpMonViewMode = 'chart';
     window.setWpMonViewMode = function(v){
@@ -1951,6 +1972,25 @@
       const isAwd=w=>(w.total_awarded||0)>0;
       const keyOf=d=> quarterly ? (d.getFullYear()+'-Q'+(Math.floor(d.getMonth()/3)+1)) : (d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
       const labelOf=k=> quarterly ? (k.split('-')[1]+" '"+k.slice(2,4)) : (MN[+k.split('-')[1]-1]+" '"+k.slice(2,4));
+      const thS='position:sticky;top:0;background:var(--surface-2);z-index:2;';
+      // ── Count mode: WP counts (Planned by planned award date, Actual by actual award date) ──
+      if(_wpMonDataMode==='count'){
+        const actDate=w=>{ const d=pd(w.actual_awarding_date); return d?(d>_today0?_today0:d):null; };
+        const ks=new Set();
+        rows.forEach(w=>{ const bd=pd(w.awarding_date); if(bd) ks.add(keyOf(bd)); const ad=actDate(w); if(ad) ks.add(keyOf(ad)); });
+        const ord=[...ks].sort();
+        let cp=0, cact=0, html='';
+        ord.forEach(k=>{
+          const pl=rows.filter(w=>{const d=pd(w.awarding_date); return d&&keyOf(d)===k;}).length;
+          const ac=rows.filter(w=>{const d=actDate(w); return d&&keyOf(d)===k;}).length;
+          cp+=pl; cact+=ac;
+          html+=`<tr><td style="font-weight:600">${labelOf(k)}</td><td style="text-align:right">${pl||'—'}</td><td style="text-align:right;color:#EE3124">${ac||'—'}</td><td style="text-align:right;color:#888">${cp}</td><td style="text-align:right;color:#888">${cact}</td></tr>`;
+        });
+        thead.innerHTML=`<tr><th style="${thS}text-align:left">${quarterly?'Quarter':'Month'}</th><th style="${thS}text-align:right">Planned WPs</th><th style="${thS}text-align:right">Actual WPs</th><th style="${thS}text-align:right">Cum. Planned</th><th style="${thS}text-align:right">Cum. Actual</th></tr>`;
+        tbody.innerHTML = html || `<tr><td colspan="5" style="text-align:center;color:#999;padding:14px">No data for the current filter</td></tr>`;
+        if(html) tbody.innerHTML += `<tr style="font-weight:800;background:var(--surface-2)"><td>Total</td><td style="text-align:right">${cp}</td><td style="text-align:right;color:#EE3124">${cact}</td><td></td><td></td></tr>`;
+        return;
+      }
       const keys=new Set();
       rows.forEach(w=>{ const bd=pd(w.awarding_date); if(bd) keys.add(keyOf(bd)); if(isAwd(w)){ const ad=awDate(w); if(ad) keys.add(keyOf(ad)); } });
       const ordered=[...keys].sort();
@@ -1966,7 +2006,6 @@
           `<td style="text-align:right;color:#888">${fmt(cb)}</td>`+
           `<td style="text-align:right;color:#888">${fmt(ca)}</td></tr>`;
       });
-      const thS='position:sticky;top:0;background:var(--surface-2);z-index:2;';
       thead.innerHTML=`<tr><th style="${thS}text-align:left">${quarterly?'Quarter':'Month'}</th><th style="${thS}text-align:right">Budget (BCB)</th><th style="${thS}text-align:right">Awarded</th><th style="${thS}text-align:right">Cum. Budget</th><th style="${thS}text-align:right">Cum. Awarded</th></tr>`;
       tbody.innerHTML = rowsHtml || `<tr><td colspan="5" style="text-align:center;color:#999;padding:14px">No data for the current filter</td></tr>`;
       if(rowsHtml) tbody.innerHTML += `<tr style="font-weight:800;background:var(--surface-2)"><td>Total</td><td style="text-align:right">${fmt(cb)}</td><td style="text-align:right;color:#EE3124">${fmt(ca)}</td><td></td><td></td></tr>`;
