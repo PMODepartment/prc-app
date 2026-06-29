@@ -406,8 +406,8 @@
           <!-- Quick Status Tracker — inline-edit Award / Procurement / Delivery status per WP -->
           <div class="panel" id="status-tracker" style="margin-bottom:14px">
             <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <span><i class="ti ti-list-check"></i> Quick Status Tracker</span>
-              <span style="font-size:11px;font-weight:400;color:#888">Update Award, Procurement &amp; Delivery status inline — saves instantly. Reflects current filters.</span>
+              <span><i class="ti ti-list-check"></i> Work Package Status Tracker</span>
+              <span id="status-tracker-hint" style="font-size:11px;font-weight:400;color:#888">Update Award, Procurement &amp; Delivery status inline. Reflects current filters.</span>
             </div>
             <div style="overflow-x:auto;max-height:360px;overflow-y:auto">
               <table class="data-table" id="status-tracker-table" style="font-size:11px;width:100%;min-width:640px">
@@ -838,6 +838,8 @@ const ST_AWARD_OPTS = ['Not Yet Awarded','Partially Awarded','Awarded'];
 const ST_PROC_OPTS  = ['Not Started','Sourcing','Solicitation','Evaluation & Negotiation','Awarded'];
 const ST_DELIV_OPTS = ['Not Awarded','DP Processing','Detailed Drawings','Production','Delivered','Installed'];
 const _stEsc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+// Auto-approve roles edit live; others' status changes go through the approval flow (pending_review).
+const _stAutoApprove = () => (typeof AppAuth!=='undefined' && AppAuth.isAutoApprove) ? AppAuth.isAutoApprove({role: window.__wpmRole}) : true;
 function _stOptsHtml(opts, cur){
   const c = cur==null ? '' : String(cur);
   const list = (c && !opts.includes(c)) ? [c, ...opts] : opts;   // keep a legacy value visible pre-migration
@@ -852,6 +854,10 @@ function renderStatusTracker(){
   if(window.__isViewer) return;
   const thead=document.getElementById('status-tracker-thead'), tbody=document.getElementById('status-tracker-tbody');
   if(!thead||!tbody) return;
+  const hint=document.getElementById('status-tracker-hint');
+  if(hint) hint.textContent = _stAutoApprove()
+    ? 'Update Award, Procurement & Delivery status inline — saves instantly. Reflects current filters.'
+    : 'Update status inline — changes are submitted to your manager / WP approver for approval. Reflects current filters.';
   const groups=getFilteredSorted();
   const thS='position:sticky;top:0;background:var(--surface-2);z-index:2;text-align:left;';
   thead.innerHTML=`<tr><th style="${thS}width:80px">WP No.</th><th style="${thS}">Description</th><th style="${thS}width:150px">Award Status</th><th style="${thS}width:175px">Procurement Status</th><th style="${thS}width:160px">Delivery Status</th></tr>`;
@@ -884,11 +890,17 @@ window.updateWpStatus = async function(id, field, value, sel){
   const prev = w[field];
   if(prev===value) return;
   sel.disabled=true;
+  const autoApprove = _stAutoApprove();
   try{
-    await WPDb.updateWPDirect(id, {[field]: value});
-    w[field]=value;
+    if(autoApprove){
+      await WPDb.updateWPDirect(id, {[field]: value});   // live — keeps approved status
+      w[field]=value;
+    } else {
+      await WPDb.updateWP(id, {[field]: value});          // non-auto-approve → submit for re-review
+      w[field]=value; w.review_status='pending_review';
+    }
     try{ Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx')).forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
-    _stToast('Saved');
+    _stToast(autoApprove ? 'Saved' : 'Submitted for approval');
     // award_status feeds the KPIs/analysis + the WP table columns — refresh them (leave the tracker as-is)
     Object.keys(_rendered).forEach(k=>_rendered[k]=false);
     renderPwaAnalysis(); buildTable();
