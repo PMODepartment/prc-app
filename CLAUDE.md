@@ -131,6 +131,10 @@ ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS dp_notes text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS retention_period text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS awarding_status text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS purchase_request text DEFAULT NULL;
+-- Users: activity tracking. WITHOUT this, getAllUsers() returns last_login=undefined for
+-- every row and admin.html shows EVERY approved user as "Active" (the activity badge
+-- degrades gracefully when the column is missing). auth.js/login.html already write it.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login timestamptz;
 -- Viewer role
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin','admin','user','viewer'));

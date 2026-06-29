@@ -30,6 +30,7 @@ create table if not exists users (
   status      text not null default 'pending'  -- pending | approved | rejected
                 check (status in ('pending','approved','rejected')),
   projects    text[] default '{}',            -- array of project IDs assigned to user
+  last_login  timestamptz,                     -- stamped by auth.js / login.html on each sign-in (activity tracking)
   created_at  timestamptz default now(),
   updated_at  timestamptz default now()
 );
