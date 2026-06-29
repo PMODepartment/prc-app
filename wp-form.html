@@ -185,7 +185,7 @@
             <div class="form-section-title"><i class="ti ti-id-badge" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Identity & Classification</div>
             <div class="form-grid">
               <div class="form-group">
-                <label>Cost Code No. *</label>
+                <label>Cost Code No.</label>
                 <input type="text" id="f-cost-code"/>
               </div>
               <div class="form-group">
@@ -1156,7 +1156,6 @@ AppAuth.requireLogin(async (user, profile) => {
     const showErr = msg => { document.getElementById('alert-text').textContent=msg; alertEl.className='alert alert-error'; };
 
     /* Validate required fields */
-    if (!getVal('f-cost-code'))      return showErr('Cost Code No. is required.');
     if (!getVal('f-wp-no'))          return showErr('WP No. is required.');
     if (!getVal('f-description'))    return showErr('Work Package Description is required.');
     if (!getVal('f-project'))        return showErr('Please select a project.');
@@ -1166,6 +1165,15 @@ AppAuth.requireLogin(async (user, profile) => {
     if (!getVal('f-target-completion'))return showErr('Target Completion Date is required.');
     if (!getNum('f-budget'))         return showErr('Approved Budget is required.');
     if (!getVal('f-charging'))       return showErr('Charging type is required.');
+
+    /* Actual Award Date cannot be in the future — a WP can't be awarded on a date that hasn't happened yet */
+    const actualAward = getVal('f-actual-awarding-date');
+    if (actualAward) {
+      const today0 = new Date(); today0.setHours(0,0,0,0);
+      const m = String(actualAward).match(/(\d{4})-(\d{2})-(\d{2})/);
+      const ad = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(actualAward);
+      if (!isNaN(ad) && ad > today0) return showErr('Actual Awarding Date cannot be in the future.');
+    }
 
     const data = {
       cost_code:                getVal('f-cost-code'),
