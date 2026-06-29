@@ -909,6 +909,72 @@ window.updateWpStatus = async function(id, field, value, sel){
     _stToast(e.message||'Save failed', true);
   }finally{ sel.disabled=false; }
 };
+
+// ── Forecast diagnostic (opt-in: ?diag=1) ─────────────────────────────
+// Explains why the dashed Forecast can sit above the Cumulative Budget: the chart sums per-WP rows
+// (total_awarded vs approved_budget_bcb) while the KPI savings come from the Helping Sheet. Lists the
+// WPs awarded over their own BCB and cost-bearing rows still flagged "Not Awarded", and reconciles the
+// row totals against the Helping Sheet. Non-viewers only; renders a dismissible panel + console.table.
+window.runForecastDiag = function(){
+  if(window.__isViewer) return;
+  const rows = allWPs||[];
+  const n = v => Number(v)||0;
+  const bcbAll = rows.reduce((s,w)=>s+n(w.approved_budget_bcb),0);
+  const awdRows = rows.filter(w=>n(w.total_awarded)>0);
+  const notAwdRows = rows.filter(w=>!(n(w.total_awarded)>0));
+  const sumAwardedCost = awdRows.reduce((s,w)=>s+n(w.total_awarded),0);
+  const sumRemainingBCB = notAwdRows.reduce((s,w)=>s+n(w.approved_budget_bcb),0);
+  const forecastEnd = sumAwardedCost + sumRemainingBCB;
+  const diff = forecastEnd - bcbAll;   // >0 → forecast above budget line
+  const hm = (typeof helpingMetrics==='function') ? helpingMetrics(rows) : null;
+  const overBudget = awdRows.filter(w=>n(w.total_awarded) > n(w.approved_budget_bcb))
+    .map(w=>({wp_no:w.wp_no, trade:w.trade, BCB:Math.round(n(w.approved_budget_bcb)), awarded:Math.round(n(w.total_awarded)), over:Math.round(n(w.total_awarded)-n(w.approved_budget_bcb)), award_status:w.award_status}))
+    .sort((a,b)=>b.over-a.over);
+  const costBearingNotAwarded = rows.filter(w=>n(w.total_awarded)>0 && w.award_status!=='Awarded')
+    .map(w=>({wp_no:w.wp_no, trade:w.trade, BCB:Math.round(n(w.approved_budget_bcb)), awarded:Math.round(n(w.total_awarded)), award_status:w.award_status}));
+  const noBCB = awdRows.filter(w=>!(n(w.approved_budget_bcb)>0))
+    .map(w=>({wp_no:w.wp_no, trade:w.trade, awarded:Math.round(n(w.total_awarded)), award_status:w.award_status}));
+
+  console.group('%cForecast diagnostic — '+projId,'font-weight:bold;color:#EE3124');
+  console.log('rows:',rows.length,'| total_awarded>0:',awdRows.length,'| remaining:',notAwdRows.length);
+  console.log('Row Σ BCB:',Math.round(bcbAll).toLocaleString(),'| Row Σ awarded:',Math.round(sumAwardedCost).toLocaleString(),'| Row Σ remaining BCB:',Math.round(sumRemainingBCB).toLocaleString());
+  console.log('Forecast end (row) = awarded + remaining BCB:',Math.round(forecastEnd).toLocaleString(),'| Forecast − Budget:',(diff>=0?'+':'')+Math.round(diff).toLocaleString(),diff>0?'(ABOVE budget)':'(under budget)');
+  if(hm) console.log('Helping Sheet → budget:',Math.round(hm.totalBudget).toLocaleString(),'| budgetAwarded:',Math.round(hm.budgetAwarded).toLocaleString(),'| awardedCost:',Math.round(hm.awardedCost).toLocaleString(),'| HS savings:',Math.round(hm.budgetAwarded-hm.awardedCost).toLocaleString());
+  console.log('WPs awarded OVER their own BCB:'); console.table(overBudget);
+  console.log('Cost-bearing rows flagged NOT Awarded:'); console.table(costBearingNotAwarded);
+  if(noBCB.length){ console.log('Awarded rows with NO/zero BCB:'); console.table(noBCB); }
+  console.groupEnd();
+
+  const fmt = v => '₱'+Math.round(v).toLocaleString('en-US');
+  const tbl = (title, arr, cols) => `<div style="margin-top:8px"><div style="font-weight:700;font-size:11px;margin-bottom:3px">${title} (${arr.length})</div>`+
+    (arr.length? `<table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr>${cols.map(c=>`<th style="text-align:${c.r?'right':'left'};border-bottom:1px solid #888;padding:2px 6px">${c.h}</th>`).join('')}</tr></thead><tbody>`+
+      arr.map(o=>`<tr>${cols.map(c=>`<td style="text-align:${c.r?'right':'left'};padding:2px 6px;border-bottom:1px solid #3334">${c.r&&typeof o[c.k]==='number'?o[c.k].toLocaleString():o[c.k]}</td>`).join('')}</tr>`).join('')+
+      `</tbody></table>` : '<div style="font-size:10px;color:#888">none</div>')+`</div>`;
+  const gapAwarded = hm ? sumAwardedCost - hm.awardedCost : 0;
+  const gapRemaining = hm ? sumRemainingBCB - (hm.totalBudget - hm.budgetAwarded) : 0;
+  const panel = document.createElement('div');
+  panel.setAttribute('data-diag','1');
+  panel.style.cssText='background:var(--surface,#fff);color:var(--text-primary,#231F20);border:2px solid #EE3124;border-radius:10px;padding:14px 16px;margin:0 0 16px;font-size:12px;box-shadow:0 4px 20px rgba(0,0,0,.12)';
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <strong style="color:#EE3124">🔧 Forecast Diagnostic — ${projId}</strong>
+      <button onclick="this.closest('[data-diag]').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888;line-height:1">×</button>
+    </div>
+    <div style="line-height:1.7">
+      Row totals — Σ BCB <b>${fmt(bcbAll)}</b> · Σ awarded <b>${fmt(sumAwardedCost)}</b> · Σ remaining BCB <b>${fmt(sumRemainingBCB)}</b><br>
+      Forecast end (row-based) <b>${fmt(forecastEnd)}</b> vs Budget <b>${fmt(bcbAll)}</b> →
+        <b style="color:${diff>0?'#EE3124':'#2D9B6F'}">${diff>0?'+':''}${fmt(diff)} ${diff>0?'ABOVE budget':'under budget'}</b>
+      ${hm?`<br>Helping Sheet — budget <b>${fmt(hm.totalBudget)}</b> · budgetAwarded <b>${fmt(hm.budgetAwarded)}</b> · awardedCost <b>${fmt(hm.awardedCost)}</b> · savings <b style="color:#2D9B6F">${fmt(hm.budgetAwarded-hm.awardedCost)}</b>
+      <br><span style="color:#888">Reconciliation gap (rows − Helping Sheet): awarded ${fmt(gapAwarded)} · remaining BCB ${fmt(gapRemaining)}</span>`:''}
+    </div>
+    ${tbl('WPs awarded OVER their own BCB', overBudget, [{h:'WP',k:'wp_no'},{h:'Trade',k:'trade'},{h:'BCB',k:'BCB',r:1},{h:'Awarded',k:'awarded',r:1},{h:'Over by',k:'over',r:1},{h:'Status',k:'award_status'}])}
+    ${tbl('Cost-bearing rows flagged NOT Awarded', costBearingNotAwarded, [{h:'WP',k:'wp_no'},{h:'Trade',k:'trade'},{h:'BCB',k:'BCB',r:1},{h:'Awarded',k:'awarded',r:1},{h:'Status',k:'award_status'}])}
+    ${noBCB.length?tbl('Awarded rows with NO/zero BCB', noBCB, [{h:'WP',k:'wp_no'},{h:'Trade',k:'trade'},{h:'Awarded',k:'awarded',r:1},{h:'Status',k:'award_status'}]):''}
+  `;
+  const host = document.getElementById('view-overview') || document.querySelector('.content');
+  if(host) host.prepend(panel);
+};
+
 // Cascade: Works options come from the selected Trade; Vendor options from Trade+Works. Drops now-invalid selections.
 function _recomputeFilterOptions(){
   const tr=document.getElementById('f-trade')?.value||'all';
@@ -2194,6 +2260,9 @@ AppAuth.requireLogin(async (user, profile) => {
   }
 
   buildMetrics(allWPs);
+
+  // Opt-in forecast diagnostic (?diag=1) — reconciles chart rows vs Helping Sheet
+  if (new URLSearchParams(location.search).get('diag') === '1' && typeof window.runForecastDiag === 'function') runForecastDiag();
 
   // Populate filters
   const trades=[...new Set(allWPs.map(w=>w.trade).filter(Boolean))].sort();
