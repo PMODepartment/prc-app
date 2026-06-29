@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260629c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260629d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629d"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629c"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629d"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -403,6 +403,20 @@
             </div>
           </div>
 
+          <!-- Quick Status Tracker — inline-edit Award / Procurement / Delivery status per WP -->
+          <div class="panel" id="status-tracker" style="margin-bottom:14px">
+            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span><i class="ti ti-list-check"></i> Quick Status Tracker</span>
+              <span style="font-size:11px;font-weight:400;color:#888">Update Award, Procurement &amp; Delivery status inline — saves instantly. Reflects current filters.</span>
+            </div>
+            <div style="overflow-x:auto;max-height:360px;overflow-y:auto">
+              <table class="data-table" id="status-tracker-table" style="font-size:11px;width:100%;min-width:640px">
+                <thead id="status-tracker-thead"></thead>
+                <tbody id="status-tracker-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
           <div class="panel" style="padding:0">
             <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap">
               <span id="row-count" style="font-size:12px;font-weight:600;color:#888;flex:1"></span>
@@ -508,12 +522,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260629c"></script>
-<script src="assets/js/ui.js?v=20260629c"></script>
-<script src="assets/js/db.js?v=20260629c"></script>
+<script src="assets/js/auth.js?v=20260629d"></script>
+<script src="assets/js/ui.js?v=20260629d"></script>
+<script src="assets/js/db.js?v=20260629d"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260629c"></script>
+<script src="assets/js/charts.js?v=20260629d"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -736,12 +750,11 @@ function statusBadge(s){
 }
 function procStatusBadge(s){
   const map={
-    'Not Started':  {bg:'#F3F4F6',c:'#6B7280'},
-    'Sourcing':     {bg:'#EFF6FF',c:'#3B82F6'},
-    'Solicitation': {bg:'#F0FDF4',c:'#16A34A'},
-    'Evaluation':   {bg:'#FFFBEB',c:'#D97706'},
-    'Negotiation':  {bg:'#FFF7ED',c:'#EA580C'},
-    'Awarded':      {bg:'#F0FDF4',c:'#15803D'},
+    'Not Started':              {bg:'#F3F4F6',c:'#6B7280'},
+    'Sourcing':                 {bg:'#EFF6FF',c:'#3B82F6'},
+    'Solicitation':             {bg:'#F0FDF4',c:'#16A34A'},
+    'Evaluation & Negotiation': {bg:'#FFFBEB',c:'#D97706'},
+    'Awarded':                  {bg:'#F0FDF4',c:'#15803D'},
   };
   const {bg,c}=map[s]||{bg:'#F3F4F6',c:'#9CA3AF'};
   return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+(s||'—')+'</span>';
@@ -758,14 +771,11 @@ function submittalBadge(s){
 function deliveryBadge(s){
   const map={
     'Not Awarded':      {bg:'#FEF2F2',c:'#DC2626'},
-    'Awarded':          {bg:'#F0FDF4',c:'#15803D'},
+    'DP Processing':    {bg:'#F0F9FF',c:'#0369A1'},
     'Detailed Drawings':{bg:'#EFF6FF',c:'#2563EB'},
     'Production':       {bg:'#FFFBEB',c:'#D97706'},
-    'In-Transit Delivery':{bg:'#F5F3FF',c:'#7C3AED'},
-    'Installation':     {bg:'#ECFDF5',c:'#059669'},
     'Delivered':        {bg:'#F0FDF4',c:'#15803D'},
-    'Not Installed':    {bg:'#FFF7ED',c:'#EA580C'},
-    'DP Processing':    {bg:'#F0F9FF',c:'#0369A1'},
+    'Installed':        {bg:'#ECFDF5',c:'#059669'},
   };
   const {bg,c}=map[s]||{bg:'#F3F4F6',c:'#9CA3AF'};
   return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+(s||'—')+'</span>';
@@ -787,7 +797,7 @@ function switchView(v) {
   }
   if(v==='overview') { if(!_rendered.overview){renderOverview();_rendered.overview=true;} }
   else if(v==='backlog') { if(!_rendered.backlog){renderBacklog();_rendered.backlog=true;} }
-  else if(v==='table') { buildTable(); renderPwaAnalysis(); }
+  else if(v==='table') { buildTable(); renderPwaAnalysis(); renderStatusTracker(); }
   else if(v==='claims-register' || v==='claims' || v==='change-orders') { renderClaimsRegisterKPIs(); renderClaimsRegister(); }
 }
 
@@ -817,9 +827,76 @@ const _msfSel = { works: new Set(), vendor: new Set() };
 function applyWpListFilters(){
   curPage=1;
   Object.keys(_rendered).forEach(k=>_rendered[k]=false);
-  if(currentView==='table'){ buildTable(); renderPwaAnalysis(); }
+  if(currentView==='table'){ buildTable(); renderPwaAnalysis(); renderStatusTracker(); }
   else switchView(currentView);
 }
+
+// ── Quick Status Tracker ──────────────────────────────────────────────
+// Inline-edit Award / Procurement / Delivery status per WP. Saves immediately via
+// updateWPDirect (keeps approved status). Scoped to the WP-List filtered set.
+const ST_AWARD_OPTS = ['Not Yet Awarded','Partially Awarded','Awarded'];
+const ST_PROC_OPTS  = ['Not Started','Sourcing','Solicitation','Evaluation & Negotiation','Awarded'];
+const ST_DELIV_OPTS = ['Not Awarded','DP Processing','Detailed Drawings','Production','Delivered','Installed'];
+const _stEsc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+function _stOptsHtml(opts, cur){
+  const c = cur==null ? '' : String(cur);
+  const list = (c && !opts.includes(c)) ? [c, ...opts] : opts;   // keep a legacy value visible pre-migration
+  let html = (c==='') ? '<option value=""></option>' : '';
+  html += list.map(v => `<option value="${_stEsc(v)}"${v===c?' selected':''}>${_stEsc(v)||'—'}</option>`).join('');
+  return html;
+}
+function _stSelect(id, field, opts, cur){
+  return `<select onchange="updateWpStatus('${id}','${field}',this.value,this)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid var(--border-md);border-radius:5px;background:var(--surface-2);color:var(--text-primary);font-family:inherit;cursor:pointer">${_stOptsHtml(opts,cur)}</select>`;
+}
+function renderStatusTracker(){
+  if(window.__isViewer) return;
+  const thead=document.getElementById('status-tracker-thead'), tbody=document.getElementById('status-tracker-tbody');
+  if(!thead||!tbody) return;
+  const groups=getFilteredSorted();
+  const thS='position:sticky;top:0;background:var(--surface-2);z-index:2;text-align:left;';
+  thead.innerHTML=`<tr><th style="${thS}width:80px">WP No.</th><th style="${thS}">Description</th><th style="${thS}width:150px">Award Status</th><th style="${thS}width:175px">Procurement Status</th><th style="${thS}width:160px">Delivery Status</th></tr>`;
+  let html='';
+  groups.forEach(({trade,wps})=>{
+    html+=`<tr><td colspan="5" style="background:var(--surface-2);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#888">${_stEsc(trade||'—')} · ${wps.length}</td></tr>`;
+    wps.forEach(w=>{
+      html+=`<tr>`+
+        `<td style="font-weight:600;color:#EE3124;white-space:nowrap">${_stEsc(w.wp_no)}</td>`+
+        `<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_stEsc(w.description)}">${_stEsc(w.description)||'—'}</td>`+
+        `<td>${_stSelect(w.id,'award_status',ST_AWARD_OPTS,w.award_status)}</td>`+
+        `<td>${_stSelect(w.id,'procurement_status',ST_PROC_OPTS,w.procurement_status)}</td>`+
+        `<td>${_stSelect(w.id,'delivery_status',ST_DELIV_OPTS,w.delivery_status)}</td>`+
+      `</tr>`;
+    });
+  });
+  tbody.innerHTML = html || `<tr><td colspan="5" style="text-align:center;color:#999;padding:14px">No work packages for the current filter</td></tr>`;
+}
+let _stToastT=null;
+function _stToast(msg, isErr){
+  let t=document.getElementById('_st-toast');
+  if(!t){ t=document.createElement('div'); t.id='_st-toast'; t.style.cssText='position:fixed;bottom:24px;right:24px;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.18);z-index:9999;transition:opacity .2s'; document.body.appendChild(t); }
+  t.style.background = isErr ? '#EE3124' : '#2D9B6F';
+  t.textContent = (isErr?'':'✓ ')+msg;
+  t.style.opacity='1';
+  clearTimeout(_stToastT); _stToastT=setTimeout(()=>{ t.style.opacity='0'; }, isErr?4000:1600);
+}
+window.updateWpStatus = async function(id, field, value, sel){
+  const w = allWPs.find(x=>x.id===id); if(!w) return;
+  const prev = w[field];
+  if(prev===value) return;
+  sel.disabled=true;
+  try{
+    await WPDb.updateWPDirect(id, {[field]: value});
+    w[field]=value;
+    try{ Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx')).forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
+    _stToast('Saved');
+    // award_status feeds the KPIs/analysis + the WP table columns — refresh them (leave the tracker as-is)
+    Object.keys(_rendered).forEach(k=>_rendered[k]=false);
+    renderPwaAnalysis(); buildTable();
+  }catch(e){
+    sel.value = prev==null?'':prev;
+    _stToast(e.message||'Save failed', true);
+  }finally{ sel.disabled=false; }
+};
 // Cascade: Works options come from the selected Trade; Vendor options from Trade+Works. Drops now-invalid selections.
 function _recomputeFilterOptions(){
   const tr=document.getElementById('f-trade')?.value||'all';
@@ -2005,6 +2082,7 @@ AppAuth.requireLogin(async (user, profile) => {
     document.body.classList.add('viewer-mode');
     document.querySelectorAll('.proj-vtab[data-view="financial"],.proj-vtab[data-view="all"]').forEach(b=>b.style.display='none');
     const pwa=document.getElementById('pwa-analysis'); if(pwa) pwa.style.display='none';   // cost panel hidden for viewers
+    const st=document.getElementById('status-tracker'); if(st) st.style.display='none';    // viewers can't edit
   }
   projId = new URLSearchParams(location.search).get('id');
   if (!projId) { location.href='login.html'; return; }

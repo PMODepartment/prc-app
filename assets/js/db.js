@@ -805,9 +805,11 @@ window.WPCsv = (function(){
   };
 
   // Procurement-status stage columns (WP Monitoring). The right-most marked stage wins.
+  // Mapped to the updated Procurement Status option set (Not Started | Sourcing |
+  // Solicitation | Evaluation & Negotiation | Awarded) so re-imports stay aligned.
   const STAGES = [
-    ['sourcing','Sourcing'], ['rfq','RFQ'], ['bidopen','Bid Open'],
-    ['bidclosed','Bid Closed'], ['loa','LOA'], ['contract','Contract'], ['mobdel','Mob / Del'],
+    ['sourcing','Sourcing'], ['rfq','Solicitation'], ['bidopen','Solicitation'],
+    ['bidclosed','Evaluation & Negotiation'], ['loa','Awarded'], ['contract','Awarded'], ['mobdel','Awarded'],
   ];
 
   function buildIdx(header){

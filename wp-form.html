@@ -524,12 +524,9 @@
                 <select id="f-proc-status" onchange="onProcStatusChange()">
                   <option value="Not Started">Not Started</option>
                   <option value="Sourcing">Sourcing</option>
-                  <option value="RFQ">RFQ</option>
-                  <option value="Bid Open">Bid Open</option>
-                  <option value="Bid Closed">Bid Closed</option>
-                  <option value="LOA">LOA</option>
-                  <option value="Contract">Contract</option>
-                  <option value="Mob / Del">Mob / Del</option>
+                  <option value="Solicitation">Solicitation</option>
+                  <option value="Evaluation &amp; Negotiation">Evaluation &amp; Negotiation</option>
+                  <option value="Awarded">Awarded</option>
                 </select>
               </div>
               <div class="form-group">
@@ -544,14 +541,11 @@
                 <label>Delivery Status</label>
                 <select id="f-delivery-status">
                   <option value="Not Awarded">Not Awarded</option>
-                  <option value="Awarded">Awarded</option>
+                  <option value="DP Processing">DP Processing</option>
                   <option value="Detailed Drawings">Detailed Drawings</option>
                   <option value="Production">Production</option>
-                  <option value="In-Transit Delivery">In-Transit Delivery</option>
-                  <option value="Installation">Installation</option>
                   <option value="Delivered">Delivered</option>
-                  <option value="Not Installed">Not Installed</option>
-                  <option value="DP Processing">DP Processing</option>
+                  <option value="Installed">Installed</option>
                 </select>
               </div>
               <div class="form-group full">
@@ -1122,9 +1116,16 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-retention-percent', existingWP.retention_percent);
       fill('f-retention-amount', existingWP.retention_amount);
       fill('f-retention-period', existingWP.retention_period);
-      fill('f-proc-status', existingWP.procurement_status);
+      // Procurement/Delivery options were updated; legacy stored values may not be in the new lists.
+      // Append the stored value as a temporary option so the form shows it correctly pre-migration.
+      const fillSelectLegacy = (id, val) => {
+        const el = document.getElementById(id); if (!el || val == null || val === '') return;
+        if (![...el.options].some(o => o.value === val)) el.add(new Option(val + ' (legacy)', val), 0);
+        el.value = val;
+      };
+      fillSelectLegacy('f-proc-status', existingWP.procurement_status);
       fill('f-submittal', existingWP.submittal_type);
-      fill('f-delivery-status', existingWP.delivery_status);
+      fillSelectLegacy('f-delivery-status', existingWP.delivery_status);
       fill('f-contractor', existingWP.contractor);
       fill('f-remarks', existingWP.remarks);
       if (existingWP.charging_type) {
