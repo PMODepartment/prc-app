@@ -132,7 +132,7 @@
             <button class="view-tab" onclick="switchTab('backlog')"><i class="ti ti-clock"></i>Backlog</button>
             <button id="tab-budget-btn" class="view-tab" onclick="switchTab('budget')"><i class="ti ti-report-money"></i>Budget</button>
             <button class="view-tab" onclick="switchTab('schedule')"><i class="ti ti-calendar"></i>Schedule</button>
-            <button class="view-tab" onclick="switchTab('works')"><i class="ti ti-tool"></i>Works</button>
+            <button id="tab-works-btn" class="view-tab" onclick="switchTab('works')"><i class="ti ti-tool"></i>Works</button>
             <button class="view-tab" onclick="switchTab('wplist')"><i class="ti ti-table"></i>WP List</button>
             <button class="view-tab" onclick="switchTab('claims')" style="display:none"><i class="ti ti-file-invoice"></i>Claims</button>
           </div>
@@ -165,7 +165,7 @@
           <!-- Hidden metrics-grid kept for JS compatibility -->
           <div class="metrics-grid" id="metrics-grid" style="display:none"></div>
           <!-- Procurement Budget (BCB) and Awarded by Period (merged from the former Dashboard tab) -->
-          <div class="panel" style="margin-bottom:14px">
+          <div class="panel" id="idx-dash-period-panel" style="margin-bottom:14px">
             <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
               <span><i class="ti ti-chart-bar"></i><span id="idx-dash-period-title">Procurement Budget (BCB) and Awarded Cost by Period</span></span>
               <div style="display:flex;gap:4px;flex-wrap:wrap">
@@ -241,7 +241,7 @@
             </div>
           </div>
           <div class="grid-2" style="margin-bottom:14px">
-            <div class="panel">
+            <div class="panel" id="idx-bl-period-panel">
               <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
                 <span><i class="ti ti-chart-bar"></i>Work Package by Period</span>
                 <div style="display:flex;gap:4px">
@@ -760,10 +760,10 @@
           <div><div class="pc-stat-val" style="color:var(--mw-red)">${s.late}</div><div class="pc-stat-lbl">Due Not Awarded</div></div>
           <div><div class="pc-stat-val" style="color:#aaa">${s.total-s.awarded-s.late}</div><div class="pc-stat-lbl">Not Due Yet</div></div>
         </div>
-        <div style="display:flex;gap:10px;margin:8px 0 4px;font-size:11px;flex-wrap:wrap">
+        ${window.__isViewer ? '' : `<div style="display:flex;gap:10px;margin:8px 0 4px;font-size:11px;flex-wrap:wrap">
           <span style="color:#888">Budget: <strong style="color:#231F20">${budgetM}</strong></span>
           <span style="color:#888">Awarded: <strong style="color:#2D9B6F">${contractM}</strong></span>
-        </div>
+        </div>`}
         <div class="pc-progress-label"><span>Award progress</span><span>${s.awardRate}%</span></div>
         <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${s.awardRate}%;${p.status==='archived'?'background:#aaa':''}"></div></div>
       </a>`;
@@ -1272,7 +1272,7 @@
     };
 
     window.switchTab = function(tab) {
-      if (window.__isViewer && tab === 'budget') tab = 'overview';
+      if (window.__isViewer && (tab === 'budget' || tab === 'works')) tab = 'overview';   // money-only tabs hidden from viewers
       _activeTab = tab;
       ALL_TABS.forEach(t => {
         const el = document.getElementById('tab-' + t);
@@ -2863,6 +2863,18 @@
   body.viewer-mode #tab-budget-btn { display:none !important; }
   body.viewer-mode #idx-wk-scope-budget-panel { display:none !important; }
   body.viewer-mode #idx-wk-scope-budget-panel + div { display:none !important; }
+  /* Viewers: hide all budget/cost/award-amount charts, graphs & money panels */
+  body.viewer-mode #idx-ov-battery-val,
+  body.viewer-mode .top5-row,
+  body.viewer-mode #idx-dash-period-panel,
+  body.viewer-mode #idx-bl-period-panel,
+  body.viewer-mode #tab-works,
+  body.viewer-mode #tab-works-btn,
+  body.viewer-mode #wp-mon-analysis,
+  body.viewer-mode #sch-btn-budget { display:none !important; }
+  /* Project table — hide the Budget (₱M) column */
+  body.viewer-mode #proj-data-table th:nth-child(7),
+  body.viewer-mode #proj-data-table td:nth-child(7) { display:none !important; }
   /* Hide cost columns in consolidated WP list (Budget, Awarded, Variance, DP Amt, Retention%, Retention Amt) */
   body.viewer-mode #wp-mon-table th:nth-child(12),
   body.viewer-mode #wp-mon-table td:nth-child(12),
