@@ -101,15 +101,19 @@ function computeStats(wps) {
   return {total,awarded,partial,notAwarded,totalBudget,totalContract,variance,late,awardRate:total?Math.round(awarded/total*100):0};
 }
 
-/* ── Authoritative figures from each project's WP-Monitoring "Helping Sheet" ──
-   These override the row-derived Awarded count / Actual Award (Awarded Cost) so the dashboards
-   match the source Helping Sheets exactly. A Helping Sheet counts a WP as awarded only when its
-   Actual Award Date falls within the report window — a frozen, TODAY()-gated snapshot a live
-   formula can't reproduce — so the totals are stored. Refresh when re-importing updated monitoring
-   files. UTM101 uses its Helping Sheet figure pending investigation of a source inconsistency
-   (Helping Sheet awarded ₱1.86B vs its own per-WP awarded-cost column ₱1.34B). */
+/* ── Helping-Sheet OVERRIDES (transitional) ──
+   The dashboard now derives awarded figures directly from the imported per-WP rows (see the
+   row-derived branch in helpingMetrics) — that is the default and is self-maintaining for all NEW
+   projects. HELPING_FIGURES is kept ONLY as an override for legacy projects whose Helping-Sheet
+   figures we have not yet reconciled against their rows. CAUTION: a project's Helping Sheet can be
+   WRONG — it builds Awarded Cost from a date-gated cumulative (SUMIFS on Actual Award Date over a
+   hardcoded row range), so it silently DROPS awarded WPs that have a blank actual-award date or sit
+   below the formula's last row. AVR101 was such a case (Helping Sheet ₱257.19M vs true per-WP
+   ₱266.11M — understated by ₱8.9M; it actually runs ~₱10M OVER budget), so AVR101 was REMOVED from
+   this table to use the accurate row-derived values. Audit each remaining project (project.html?id=
+   <PID>&diag=1 shows the row-vs-Helping gap) and remove it here once its rows are trusted. UTM101 has
+   the opposite issue (Helping ₱1.86B vs per-WP ₱1.34B) — keep its override pending investigation. */
 const HELPING_FIGURES = {
-  AVR101:{total:114,awarded:105,budget:274911191,  budgetAwarded:259205835, awardedCost:257191155},
   GPR101:{total:80, awarded:31, budget:2314076781, budgetAwarded:1093266486,awardedCost:687257935},
   OPW101:{total:104,awarded:59, budget:2416925390, budgetAwarded:1546254687,awardedCost:1511441915},
   SLN101:{total:87, awarded:20, budget:2050628606, budgetAwarded:862989224, awardedCost:867357895},
@@ -128,11 +132,18 @@ function helpingMetrics(wps) {
       awarded += hs.awarded; totalBudget += hs.budget;
       awardedCost += hs.awardedCost; budgetAwarded += hs.budgetAwarded;
     } else {
+      // Row-derived (self-maintaining — no Helping Sheet needed). A WP is "awarded" when it carries
+      // an award amount (total_awarded>0); awarded count, Awarded Cost AND Budget-for-Awarded all use
+      // that SAME set so they reconcile with each other and with the chart's forecast (which also keys
+      // off total_awarded>0). The old code summed total_awarded over ALL rows but budget over only
+      // award_status='Awarded' rows — an inconsistent mix that over/under-counted. This basis is also
+      // immune to the Helping-Sheet leaks (blank actual-award dates, hardcoded SUMIFS row caps).
       hsCovered = false;
-      awarded += arr.filter(w=>w.award_status==='Awarded').length;
+      const awd = arr.filter(w => (w.total_awarded||0) > 0);
+      awarded += awd.length;
       totalBudget += arr.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-      awardedCost += arr.reduce((s,w)=>s+(w.total_awarded||0),0);
-      budgetAwarded += arr.filter(w=>w.award_status==='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+      awardedCost += awd.reduce((s,w)=>s+(w.total_awarded||0),0);
+      budgetAwarded += awd.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
     }
   });
   return {awarded, totalBudget, awardedCost, budgetAwarded, hsCovered};
