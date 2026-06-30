@@ -423,12 +423,12 @@
             <div class="form-section-title"><i class="ti ti-coins" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Budget & Contract</div>
             <div class="form-grid">
               <div class="form-group">
-                <label>Approved Budget / ABC (₱) *</label>
+                <label>Budget (BCB) (Net) *</label>
                 <input type="text" inputmode="numeric" id="f-budget" placeholder="e.g. 185,000,000"/>
                 <span class="hint" id="budget-display"></span>
               </div>
               <div class="form-group">
-                <label>Contract Amount (₱)</label>
+                <label>Awarded Cost (Net)</label>
                 <input type="number" id="f-contract" placeholder="Leave blank if not yet awarded" min="0"/>
                 <span class="hint" id="contract-display"></span>
               </div>
@@ -444,7 +444,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Vendor/s</label>
+                <label>Awarded Vendor</label>
                 <input type="text" id="f-contractor" placeholder="Leave blank if not yet awarded"/>
               </div>
             </div>
@@ -456,14 +456,8 @@
             <div class="form-grid">
               <div class="form-group">
                 <label>Terms (Days)</label>
-                <select id="f-payment-terms-days">
-                  <option value="">— Select —</option>
-                  <option value="7">7 Days</option>
-                  <option value="15">15 Days</option>
-                  <option value="30">30 Days</option>
-                  <option value="45">45 Days</option>
-                  <option value="60">60 Days</option>
-                </select>
+                <input type="number" id="f-payment-terms-days" min="0" placeholder="e.g. 30"/>
+                <span class="hint">Number of days (any value)</span>
               </div>
               <div class="form-group">
                 <label>Down Payment %</label>
@@ -496,12 +490,11 @@
               </div>
               <div class="form-group">
                 <label>Retention %</label>
-                <select id="f-retention-percent">
-                  <option value="0">No Retention (0%)</option>
-                  <option value="0.05">5%</option>
-                  <option value="0.10">10%</option>
-                  <option value="0.15">15%</option>
-                </select>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <input type="text" inputmode="decimal" id="f-retention-percent" placeholder="0" style="flex:1"/>
+                  <span style="font-size:12px;color:var(--text-secondary);font-weight:600;flex-shrink:0">%</span>
+                </div>
+                <span class="hint">Enter percentage, e.g. 7 for 7%</span>
               </div>
               <div class="form-group">
                 <label>Retention Amount (₱)</label>
@@ -1113,7 +1106,7 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-dp-amount', existingWP.dp_amount);
       fill('f-dp-release-date', existingWP.dp_release_date);
       fill('f-dp-notes', existingWP.dp_notes);
-      fill('f-retention-percent', existingWP.retention_percent);
+      if (existingWP.retention_percent != null) document.getElementById('f-retention-percent').value = parseFloat((existingWP.retention_percent * 100).toFixed(4)).toString();
       fill('f-retention-amount', existingWP.retention_amount);
       fill('f-retention-period', existingWP.retention_period);
       // Procurement/Delivery options were updated; legacy stored values may not be in the new lists.
@@ -1164,8 +1157,21 @@ AppAuth.requireLogin(async (user, profile) => {
     if (!getVal('f-awarding-date'))  return showErr('Awarding Date is required.');
     if (!getVal('f-target-delivery'))return showErr('Target Delivery Date is required.');
     if (!getVal('f-target-completion'))return showErr('Target Completion Date is required.');
-    if (!getNum('f-budget'))         return showErr('Approved Budget is required.');
+    if (!getNum('f-budget'))         return showErr('Budget (BCB) is required.');
     if (!getVal('f-charging'))       return showErr('Charging type is required.');
+
+    /* Awarded WPs must have an Awarded Cost and an Awarded Vendor */
+    if (getVal('f-award-status') === 'Awarded') {
+      if (!getNum('f-contract'))     return showErr('Awarded Cost (Net) is required when Award Status is "Awarded".');
+      if (!getVal('f-contractor'))   return showErr('Awarded Vendor is required when Award Status is "Awarded".');
+    }
+
+    /* No. of PO/JO must match the count of entries in PO/JO Numbers */
+    const pjCount = parseInt(getVal('f-po-jo-count')) || 0;
+    const pjList = (getVal('f-po-jo-numbers') || '').split(/[\s,;]+/).map(s => s.trim()).filter(Boolean);
+    if (pjCount || pjList.length) {
+      if (pjCount !== pjList.length) return showErr(`No. of PO/JO (${pjCount}) must match the number of PO/JO Numbers listed (${pjList.length}).`);
+    }
 
     /* Actual Award Date cannot be in the future — a WP can't be awarded on a date that hasn't happened yet */
     const actualAward = getVal('f-actual-awarding-date');
@@ -1219,7 +1225,7 @@ AppAuth.requireLogin(async (user, profile) => {
       dp_amount:                getNum('f-dp-amount'),
       dp_release_date:          getVal('f-dp-release-date') || null,
       dp_notes:                 getVal('f-dp-notes') || null,
-      retention_percent:        getNum('f-retention-percent'),
+      retention_percent:        (() => { const v = parseFloat(document.getElementById('f-retention-percent').value); return isNaN(v) ? null : v / 100; })(),
       retention_amount:         getNum('f-retention-amount'),
       retention_period:         getVal('f-retention-period') || null,
       procurement_status:       getVal('f-proc-status'),
