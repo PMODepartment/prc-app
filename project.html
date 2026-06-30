@@ -2583,6 +2583,17 @@ AppAuth.requireLogin(async (user, profile) => {
       const _futureRows = wps.filter(w => _isFutureAward(w.actual_awarding_date)).map(w => w.wp_no);
       if (_futureRows.length) throw new Error(`Actual Award Date cannot be in the future. Fix WP No(s): ${_futureRows.join(', ')}`);
 
+      // Awarded WPs must have an Awarded Cost and an Awarded Vendor; No. of PO/JO must match PO/JO Numbers.
+      const _awErr = [], _pjErr = [];
+      wps.forEach(w => {
+        if ((w.award_status||'') === 'Awarded' && (!(parseFloat(w.awarded_cost) > 0) || !String(w.contractor||'').trim())) _awErr.push(w.wp_no);
+        const _cnt = parseInt(w.po_jo_count) || 0;
+        const _lst = String(w.po_jo_numbers||'').split(/[\s,;]+/).map(s => s.trim()).filter(Boolean);
+        if ((_cnt || _lst.length) && _cnt !== _lst.length) _pjErr.push(w.wp_no);
+      });
+      if (_awErr.length) throw new Error(`Awarded WPs must have an Awarded Cost and Awarded Vendor. Fix WP No(s): ${_awErr.join(', ')}`);
+      if (_pjErr.length) throw new Error(`No. of PO/JO must match the PO/JO Numbers listed. Fix WP No(s): ${_pjErr.join(', ')}`);
+
       const role = window.__wpmRole || 'user';
       const sb = await getSB();
       const userId = (await sb.auth.getUser()).data.user.id;
@@ -2942,6 +2953,14 @@ AppAuth.requireLogin(async (user, profile) => {
               <option value="Awarded">Awarded</option>
             </select>
           </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Awarded Cost (Net) (₱)</label>
+            <input id="wqm-contract" type="number" step="0.01" min="0" placeholder="Required if Awarded" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Awarded Vendor</label>
+            <input id="wqm-contractor" type="text" placeholder="Required if Awarded" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0;flex-wrap:wrap">
           <button id="wqm-save-btn" onclick="saveQuickWP()" style="padding:10px 20px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">
@@ -2965,7 +2984,7 @@ window.openAddWPModal = function(projectId) {
   _wqmProjectId = projectId || null;
   _wqmDirty = false;
   // Clear fields
-  ['wqm-cost-code','wqm-wp-no','wqm-description','wqm-zone','wqm-award-date','wqm-completion','wqm-budget'].forEach(id => {
+  ['wqm-cost-code','wqm-wp-no','wqm-description','wqm-zone','wqm-award-date','wqm-completion','wqm-budget','wqm-contract','wqm-contractor'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   const trade = document.getElementById('wqm-trade'); if(trade) trade.value = '';
@@ -3013,7 +3032,11 @@ window.saveQuickWP = async function() {
   if (!v('wqm-trade')) { errEl.textContent='Trade is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-award-date')) { const _de=document.getElementById('wqm-award-date'); errEl.textContent=_de&&_de.validity.badInput?'Planned Award Date: invalid date — use the calendar picker.':'Planned Award Date is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-completion')) { const _de=document.getElementById('wqm-completion'); errEl.textContent=_de&&_de.validity.badInput?'Target Completion: invalid date — use the calendar picker.':'Target Completion is required.'; errEl.style.display='block'; return; }
-  if (!n('wqm-budget')) { errEl.textContent='Procurement Budget (BCB) is required.'; errEl.style.display='block'; return; }
+  if (!n('wqm-budget')) { errEl.textContent='Budget (BCB) is required.'; errEl.style.display='block'; return; }
+  if (v('wqm-award-status') === 'Awarded') {
+    if (!n('wqm-contract')) { errEl.textContent='Awarded Cost (Net) is required when Award Status is "Awarded".'; errEl.style.display='block'; return; }
+    if (!v('wqm-contractor')) { errEl.textContent='Awarded Vendor is required when Award Status is "Awarded".'; errEl.style.display='block'; return; }
+  }
   if (!_wqmProjectId) { errEl.textContent='No project selected.'; errEl.style.display='block'; return; }
 
   const btn = document.getElementById('wqm-save-btn');
@@ -3027,6 +3050,7 @@ window.saveQuickWP = async function() {
     trade: v('wqm-trade'), awarding_date: v('wqm-award-date') || null,
     target_completion: v('wqm-completion') || null,
     approved_budget_bcb: n('wqm-budget'), award_status: v('wqm-award-status'),
+    awarded_cost: n('wqm-contract'), contractor: v('wqm-contractor') || null,
     awarding_lead_time: 0,
   };
 

@@ -1418,6 +1418,16 @@ AppAuth.requireLogin(async (user, profile) => {
       const _isFutureAward = v => { if(!v) return false; const m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/); const d=m?new Date(+m[1],+m[2]-1,+m[3]):new Date(v); return !isNaN(d) && d>_today0; };
       const _futureRows = rows.filter(w => _isFutureAward(w.actual_awarding_date)).map(w => w.wp_no);
       if (_futureRows.length) throw new Error(`Actual Award Date cannot be in the future. Fix WP No(s): ${_futureRows.join(', ')}`);
+      // Awarded WPs must have an Awarded Cost and an Awarded Vendor; No. of PO/JO must match PO/JO Numbers.
+      const _awErr = [], _pjErr = [];
+      rows.forEach(w => {
+        if ((w.award_status||'') === 'Awarded' && (!(parseFloat(w.awarded_cost) > 0) || !String(w.contractor||'').trim())) _awErr.push(w.wp_no);
+        const _cnt = parseInt(w.po_jo_count) || 0;
+        const _lst = String(w.po_jo_numbers||'').split(/[\s,;]+/).map(s => s.trim()).filter(Boolean);
+        if ((_cnt || _lst.length) && _cnt !== _lst.length) _pjErr.push(w.wp_no);
+      });
+      if (_awErr.length) throw new Error(`Awarded WPs must have an Awarded Cost and Awarded Vendor. Fix WP No(s): ${_awErr.join(', ')}`);
+      if (_pjErr.length) throw new Error(`No. of PO/JO must match the PO/JO Numbers listed. Fix WP No(s): ${_pjErr.join(', ')}`);
       // De-duplicate by WP No.: re-importing existing WPs UPDATES them in place instead of inserting
       // duplicates. Match on normalized WP No. (trailing ".0" stripped, case-insensitive) per project.
       const _wpKey = v => String(v==null?'':v).trim().replace(/\.0+$/,'').toLowerCase();
