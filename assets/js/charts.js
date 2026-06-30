@@ -353,7 +353,7 @@ const Charts = (() => {
     // actual_awarding_date isn't captured (WP-Monitoring imports record award_status + total_awarded but
     // no actual date — without the fallback the Awarded bars / Cumulative Awarded line are flat at 0).
     const awDate=_awDate;   // actual→planned fallback, clamped to today (no future awards)
-    const isAwd=w=>(w.total_awarded||0)>0;
+    const isAwd=w=>w.award_status==='Awarded'&&(w.total_awarded||0)>0;   // awarded = flagged Awarded AND has a cost
     const mSet=new Set();
     wps.forEach(w=>{ if(w.awarding_date){ const d=new Date(w.awarding_date); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } if(isAwd(w)&&awDate(w)){ const d=awDate(w); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } });
     _extendForecastAxis(mSet, wps, 'm', !!(opts&&opts.hideAwarded));
@@ -380,7 +380,7 @@ const Charts = (() => {
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
       ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
-      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(months,getMKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6,w=>(w.total_awarded||0)>0),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(months,getMKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6,w=>w.award_status==='Awarded'&&(w.total_awarded||0)>0),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 
@@ -389,7 +389,7 @@ const Charts = (() => {
     // Awarded amount falls back to the PLANNED award date when actual_awarding_date isn't captured
     // (see budgetAwardedByPeriodMonthly for the why) so the Awarded series isn't flat at 0.
     const awDate=_awDate;   // actual→planned fallback, clamped to today (no future awards)
-    const isAwd=w=>(w.total_awarded||0)>0;
+    const isAwd=w=>w.award_status==='Awarded'&&(w.total_awarded||0)>0;   // awarded = flagged Awarded AND has a cost
     const qSet=new Set();
     wps.forEach(w=>{ if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date))); if(isAwd(w)&&awDate(w)) qSet.add(getQKey(awDate(w))); });
     _extendForecastAxis(qSet, wps, 'q', !!(opts&&opts.hideAwarded));
@@ -414,7 +414,7 @@ const Charts = (() => {
       ...(hideAwd?[]:[{label:'Awarded',data:awardedData,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget',data:cumB,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
       ...(hideAwd?[]:[{label:'Cumulative Awarded',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
-      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6,w=>(w.total_awarded||0)>0),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6,w=>w.award_status==='Awarded'&&(w.total_awarded||0)>0),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},callback:_axM},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'₱ Million',font:{size:9}}}}}});
   }
 

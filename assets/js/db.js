@@ -101,27 +101,17 @@ function computeStats(wps) {
   return {total,awarded,partial,notAwarded,totalBudget,totalContract,variance,late,awardRate:total?Math.round(awarded/total*100):0};
 }
 
-/* ── Helping-Sheet OVERRIDES (transitional) ──
-   The dashboard now derives awarded figures directly from the imported per-WP rows (see the
-   row-derived branch in helpingMetrics) — that is the default and is self-maintaining for all NEW
-   projects. HELPING_FIGURES is kept ONLY as an override for legacy projects whose Helping-Sheet
-   figures we have not yet reconciled against their rows. CAUTION: a project's Helping Sheet can be
-   WRONG — it builds Awarded Cost from a date-gated cumulative (SUMIFS on Actual Award Date over a
-   hardcoded row range), so it silently DROPS awarded WPs that have a blank actual-award date or sit
-   below the formula's last row. AVR101 was such a case (Helping Sheet ₱257.19M vs true per-WP
-   ₱266.11M — understated by ₱8.9M; it actually runs ~₱10M OVER budget), so AVR101 was REMOVED from
-   this table to use the accurate row-derived values. Audit each remaining project (project.html?id=
-   <PID>&diag=1 shows the row-vs-Helping gap) and remove it here once its rows are trusted. UTM101 has
-   the opposite issue (Helping ₱1.86B vs per-WP ₱1.34B) — keep its override pending investigation. */
-const HELPING_FIGURES = {
-  GPR101:{total:80, awarded:31, budget:2314076781, budgetAwarded:1093266486,awardedCost:687257935},
-  OPW101:{total:104,awarded:59, budget:2416925390, budgetAwarded:1546254687,awardedCost:1511441915},
-  SLN101:{total:87, awarded:20, budget:2050628606, budgetAwarded:862989224, awardedCost:867357895},
-  SLT101:{total:87, awarded:27, budget:4352251374, budgetAwarded:1817073942,awardedCost:1784582902},
-  UTM101:{total:84, awarded:37, budget:5485533873, budgetAwarded:1852729610,awardedCost:1857107596},
-};
-// Aggregate Helping-Sheet metrics over a set of WPs (grouped by project). Projects not present in
-// HELPING_FIGURES (e.g. newly added) fall back to row-derived values so the dashboard still works.
+/* ── Awarded metrics are now FULLY ROW-DERIVED (no Helping Sheet) ──
+   All six projects (AVR/GRP/OPW/SLN/SLT/UTM) were reconciled against their WP-Monitoring files and
+   the row-derived basis below reproduces their Helping Sheets (and CORRECTS AVR101, whose Helping
+   Sheet under-counted by ₱8.9M due to a date-gated SUMIFS that dropped awarded WPs with a blank
+   actual-award date or below its hardcoded row range). So HELPING_FIGURES is now EMPTY — every
+   project (incl. all future ones) computes from its rows, self-maintaining and immune to those
+   spreadsheet leaks. The dict + override branch are kept only as an escape hatch if a project's row
+   data is ever found to be unusable; prefer fixing the rows instead. Use project.html?id=<PID>&diag=1
+   to inspect a project's awarded reconciliation. */
+const HELPING_FIGURES = {};
+// Aggregate awarded metrics over a set of WPs (grouped by project), row-derived.
 function helpingMetrics(wps) {
   const byProj = {};
   (wps||[]).forEach(w => { (byProj[w.project_id] = byProj[w.project_id] || []).push(w); });
@@ -132,14 +122,14 @@ function helpingMetrics(wps) {
       awarded += hs.awarded; totalBudget += hs.budget;
       awardedCost += hs.awardedCost; budgetAwarded += hs.budgetAwarded;
     } else {
-      // Row-derived (self-maintaining — no Helping Sheet needed). A WP is "awarded" when it carries
-      // an award amount (total_awarded>0); awarded count, Awarded Cost AND Budget-for-Awarded all use
-      // that SAME set so they reconcile with each other and with the chart's forecast (which also keys
-      // off total_awarded>0). The old code summed total_awarded over ALL rows but budget over only
-      // award_status='Awarded' rows — an inconsistent mix that over/under-counted. This basis is also
-      // immune to the Helping-Sheet leaks (blank actual-award dates, hardcoded SUMIFS row caps).
+      // STRICTER awarded definition: a WP counts as awarded only when award_status==='Awarded' AND it
+      // carries an award amount (total_awarded>0) — "if it's awarded, it must have an awarded cost".
+      // Awarded count, Awarded Cost AND Budget-for-Awarded all use this SAME set so they reconcile
+      // with each other, with the chart/forecast, and with the source Helping Sheets. This rejects
+      // both failure modes seen in the data: provisional costs sitting on "Not yet Awarded" WPs
+      // (GRP/SLN/SLT over-count) and the Helping Sheet's date/row leaks (AVR under-count).
       hsCovered = false;
-      const awd = arr.filter(w => (w.total_awarded||0) > 0);
+      const awd = arr.filter(w => w.award_status==='Awarded' && (w.total_awarded||0) > 0);
       awarded += awd.length;
       totalBudget += arr.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
       awardedCost += awd.reduce((s,w)=>s+(w.total_awarded||0),0);
