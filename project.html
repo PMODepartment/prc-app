@@ -856,8 +856,8 @@ function renderStatusTracker(){
   if(!thead||!tbody) return;
   const hint=document.getElementById('status-tracker-hint');
   if(hint) hint.textContent = _stAutoApprove()
-    ? 'Update Award, Procurement & Delivery status inline — saves instantly. Reflects current filters.'
-    : 'Update status inline — changes are submitted to your manager / WP approver for approval. Reflects current filters.';
+    ? 'Set Procurement & Delivery status inline — saves instantly. Award Status follows Procurement (Awarded → Awarded). Reflects current filters.'
+    : 'Set status inline — changes are submitted to your manager / WP approver. Award Status follows Procurement Status. Reflects current filters.';
   const groups=getFilteredSorted();
   const thS='position:sticky;top:0;background:var(--surface-2);z-index:2;text-align:left;';
   thead.innerHTML=`<tr><th style="${thS}width:80px">WP No.</th><th style="${thS}">Description</th><th style="${thS}width:150px">Award Status</th><th style="${thS}width:175px">Procurement Status</th><th style="${thS}width:160px">Delivery Status</th></tr>`;
@@ -868,7 +868,7 @@ function renderStatusTracker(){
       html+=`<tr>`+
         `<td style="font-weight:600;color:#EE3124;white-space:nowrap">${_stEsc(w.wp_no)}</td>`+
         `<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_stEsc(w.description)}">${_stEsc(w.description)||'—'}</td>`+
-        `<td>${_stSelect(w.id,'award_status',ST_AWARD_OPTS,w.award_status)}</td>`+
+        `<td>${_stAwardBadge(w.id,w.award_status)}</td>`+
         `<td>${_stSelect(w.id,'procurement_status',ST_PROC_OPTS,w.procurement_status)}</td>`+
         `<td>${_stSelect(w.id,'delivery_status',ST_DELIV_OPTS,w.delivery_status)}</td>`+
       `</tr>`;
@@ -907,23 +907,39 @@ async function _stSaveFields(id, fields, sel, onErrRevert){
     return false;
   }finally{ if(sel) sel.disabled=false; }
 }
+// Read-only Award Status badge (derived from Procurement Status; not directly editable in the tracker).
+function _stAwardBadge(id, status){
+  const awd = status==='Awarded';
+  return `<span id="st-aw-${id}" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:${awd?'#D1FAE5':'#FEF3C7'};color:${awd?'#065F46':'#92400E'};white-space:nowrap">${awd?'Awarded':'Not Yet Awarded'}</span>`;
+}
+function _stRefreshAwardBadge(id){
+  const el = document.getElementById('st-aw-'+id), w = allWPs.find(x=>x.id===id);
+  if(el && w) el.outerHTML = _stAwardBadge(id, w.award_status);
+}
 window.updateWpStatus = async function(id, field, value, sel){
   const w = allWPs.find(x=>x.id===id); if(!w) return;
   const prev = w[field];
   if(prev===value) return;
-  // Safeguard: awarding a WP requires an Awarded Cost AND an Awarded Vendor. If either is missing,
-  // open a popup to collect them and commit all together (mirrors the WP form's award safeguard).
-  if(field==='award_status' && value==='Awarded'){
-    const hasCost = (w.total_awarded||0)>0, hasVendor = String(w.contractor||'').trim();
-    if(!hasCost || !hasVendor){ _stOpenAwardModal(id, sel, prev); return; }
+  // Award Status is DERIVED from Procurement Status. Changing Procurement Status drives Award Status:
+  //  • Awarded  → Award Status = Awarded (requires Awarded Cost + Vendor → popup if missing)
+  //  • anything else → Award Status = Not Yet Awarded
+  if(field==='procurement_status'){
+    const targetAward = value==='Awarded' ? 'Awarded' : 'Not Yet Awarded';
+    if(targetAward==='Awarded'){
+      const hasCost = (w.total_awarded||0)>0, hasVendor = String(w.contractor||'').trim();
+      if(!hasCost || !hasVendor){ _stOpenAwardModal(id, sel, prev, {procurement_status:value}); return; }
+    }
+    _stSaveFields(id, {procurement_status:value, award_status:targetAward}, sel, ()=>{ sel.value = prev==null?'':prev; })
+      .then(ok=>{ if(ok) _stRefreshAwardBadge(id); });
+    return;
   }
   _stSaveFields(id, {[field]: value}, sel, ()=>{ sel.value = prev==null?'':prev; });
 };
-// ── Award popup (Status Tracker) ──
+// ── Award popup (Status Tracker) — collects Awarded Cost + Vendor, plus any extra fields (e.g. proc status) ──
 let _stAwardCtx = null;
-function _stOpenAwardModal(id, sel, prev){
+function _stOpenAwardModal(id, sel, prev, extra){
   const w = allWPs.find(x=>x.id===id); if(!w) return;
-  _stAwardCtx = { id, sel, prev };
+  _stAwardCtx = { id, sel, prev, extra: extra||{} };
   const m = document.getElementById('st-award-modal'); if(!m) return;
   document.getElementById('st-award-sub').textContent = 'WP ' + (w.wp_no||'') + ' — enter the awarded cost and vendor';
   const costEl = document.getElementById('st-award-cost'), venEl = document.getElementById('st-award-vendor');
@@ -945,10 +961,10 @@ window.stAwardConfirm = async function(){
   const vendor = (document.getElementById('st-award-vendor').value||'').trim();
   if(!(cost>0)){ err.textContent='Awarded Cost (Net) is required.'; err.style.display='block'; return; }
   if(!vendor){ err.textContent='Awarded Vendor is required.'; err.style.display='block'; return; }
-  const { id, sel, prev } = _stAwardCtx;
-  const ok = await _stSaveFields(id, { award_status:'Awarded', awarded_cost:cost, contractor:vendor }, sel,
+  const { id, sel, prev, extra } = _stAwardCtx;
+  const ok = await _stSaveFields(id, Object.assign({ award_status:'Awarded', awarded_cost:cost, contractor:vendor }, extra), sel,
     ()=>{ if(sel) sel.value = prev==null?'':prev; });
-  if(ok){ _stAwardCtx=null; const m=document.getElementById('st-award-modal'); if(m) m.style.display='none'; }
+  if(ok){ _stRefreshAwardBadge(id); _stAwardCtx=null; const m=document.getElementById('st-award-modal'); if(m) m.style.display='none'; }
 };
 
 // ── Forecast diagnostic (opt-in: ?diag=1) ─────────────────────────────

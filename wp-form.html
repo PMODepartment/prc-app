@@ -438,10 +438,11 @@
               </div>
               <div class="form-group">
                 <label>Award Status *</label>
-                <select id="f-award-status">
+                <select id="f-award-status" disabled style="background:var(--surface-2);cursor:not-allowed">
                   <option value="Not Yet Awarded">Not Yet Awarded</option>
                   <option value="Awarded">Awarded</option>
                 </select>
+                <span class="hint">Set automatically from Procurement Status (Awarded → Awarded)</span>
               </div>
               <div class="form-group">
                 <label>Awarded Vendor</label>
@@ -752,7 +753,12 @@
      Whether a WP is awarded is determined solely by the Award Status field under
      Budget & Contract (which mirrors the "Not yet Awarded / Awarded" Remarks column
      in the monitoring files), not by the procurement stage. */
+  // Award Status is DERIVED from Procurement Status: Awarded stage → Awarded, any earlier stage
+  // (Not Started / Sourcing / Solicitation / Evaluation & Negotiation / legacy) → Not Yet Awarded.
   function onProcStatusChange() {
+    const proc = document.getElementById('f-proc-status').value;
+    const as = document.getElementById('f-award-status');
+    if (as) as.value = (proc === 'Awarded') ? 'Awarded' : 'Not Yet Awarded';
     markDirty();
   }
 
@@ -1117,6 +1123,7 @@ AppAuth.requireLogin(async (user, profile) => {
         el.value = val;
       };
       fillSelectLegacy('f-proc-status', existingWP.procurement_status);
+      onProcStatusChange();   // Award Status is derived from Procurement Status
       fill('f-submittal', existingWP.submittal_type);
       fillSelectLegacy('f-delivery-status', existingWP.delivery_status);
       fill('f-contractor', existingWP.contractor);
