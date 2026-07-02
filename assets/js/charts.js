@@ -242,8 +242,7 @@ const Charts = (() => {
     const zones=[...new Set(wps.map(w=>w.zone))].filter(Boolean);
     make(id,{type:'bar',data:{labels:zones,datasets:[
       {label:'Awarded',data:zones.map(z=>wps.filter(w=>w.zone===z&&w.award_status==='Awarded').length),backgroundColor:'#2D9B6F',borderRadius:4},
-      {label:'Partially Awarded',data:zones.map(z=>wps.filter(w=>w.zone===z&&w.award_status==='Partially Awarded').length),backgroundColor:'#D97706',borderRadius:4},
-      {label:'Not Yet Awarded',data:zones.map(z=>wps.filter(w=>w.zone===z&&w.award_status!=='Awarded'&&w.award_status!=='Partially Awarded').length),backgroundColor:'#DCDBDB',borderRadius:4}
+      {label:'Not Yet Awarded',data:zones.map(z=>wps.filter(w=>w.zone===z&&w.award_status!=='Awarded').length),backgroundColor:'#DCDBDB',borderRadius:4}
     ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},datalabels:_dlStacked(v=>v>0?v:'')},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,ticks:{stepSize:1,font:{size:10}},grid:{color:'rgba(0,0,0,.05)'}}}}});
   }
 
@@ -296,7 +295,7 @@ const Charts = (() => {
       const tot = ctx.dataset.data.reduce((a,b)=>a+(b||0),0);
       return v + '\n' + (tot ? Math.round(v/tot*100) : 0) + '%';
     });
-    make(id,{type:'doughnut',data:{labels:['Awarded','Partial','Not Yet'],datasets:[{data:[stats.awarded,stats.partial,stats.notAwarded],backgroundColor:['#2D9B6F','#D97706','#DCDBDB'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},datalabels:dl}}});
+    make(id,{type:'doughnut',data:{labels:['Awarded','Not Yet'],datasets:[{data:[stats.awarded,stats.notAwarded],backgroundColor:['#2D9B6F','#DCDBDB'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},datalabels:dl}}});
   }
 
   function consolidatedBudget(id,projects,allStats){

@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260629g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629h"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260629h"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629h"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629g"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629h"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629h"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -522,12 +522,12 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260629g"></script>
-<script src="assets/js/ui.js?v=20260629g"></script>
-<script src="assets/js/db.js?v=20260629g"></script>
+<script src="assets/js/auth.js?v=20260629h"></script>
+<script src="assets/js/ui.js?v=20260629h"></script>
+<script src="assets/js/db.js?v=20260629h"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260629g"></script>
+<script src="assets/js/charts.js?v=20260629h"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -834,7 +834,7 @@ function applyWpListFilters(){
 // ── Quick Status Tracker ──────────────────────────────────────────────
 // Inline-edit Award / Procurement / Delivery status per WP. Saves immediately via
 // updateWPDirect (keeps approved status). Scoped to the WP-List filtered set.
-const ST_AWARD_OPTS = ['Not Yet Awarded','Partially Awarded','Awarded'];
+const ST_AWARD_OPTS = ['Not Yet Awarded','Awarded'];
 const ST_PROC_OPTS  = ['Not Started','Sourcing','Solicitation','Evaluation & Negotiation','Awarded'];
 const ST_DELIV_OPTS = ['Not Awarded','DP Processing','Detailed Drawings','Production','Delivered','Installed'];
 const _stEsc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
@@ -885,29 +885,70 @@ function _stToast(msg, isErr){
   t.style.opacity='1';
   clearTimeout(_stToastT); _stToastT=setTimeout(()=>{ t.style.opacity='0'; }, isErr?4000:1600);
 }
+// Persist one or more WP fields from the tracker. Auto-approve roles save live; others submit for
+// re-review. Updates the local allWPs object (incl. generated total_awarded) then refreshes KPIs+table.
+async function _stSaveFields(id, fields, sel, onErrRevert){
+  const w = allWPs.find(x=>x.id===id); if(!w) return false;
+  const autoApprove = _stAutoApprove();
+  if(sel) sel.disabled=true;
+  try{
+    if(autoApprove){ await WPDb.updateWPDirect(id, fields); }
+    else { await WPDb.updateWP(id, fields); w.review_status='pending_review'; }
+    Object.assign(w, fields);
+    if('awarded_cost' in fields) w.total_awarded = (parseFloat(fields.awarded_cost)||0) + (parseFloat(w.additionals)||0);
+    try{ Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx')).forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
+    _stToast(autoApprove ? 'Saved' : 'Submitted for approval');
+    Object.keys(_rendered).forEach(k=>_rendered[k]=false);
+    renderPwaAnalysis(); buildTable();
+    return true;
+  }catch(e){
+    if(onErrRevert) onErrRevert();
+    _stToast(e.message||'Save failed', true);
+    return false;
+  }finally{ if(sel) sel.disabled=false; }
+}
 window.updateWpStatus = async function(id, field, value, sel){
   const w = allWPs.find(x=>x.id===id); if(!w) return;
   const prev = w[field];
   if(prev===value) return;
-  sel.disabled=true;
-  const autoApprove = _stAutoApprove();
-  try{
-    if(autoApprove){
-      await WPDb.updateWPDirect(id, {[field]: value});   // live — keeps approved status
-      w[field]=value;
-    } else {
-      await WPDb.updateWP(id, {[field]: value});          // non-auto-approve → submit for re-review
-      w[field]=value; w.review_status='pending_review';
-    }
-    try{ Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx')).forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
-    _stToast(autoApprove ? 'Saved' : 'Submitted for approval');
-    // award_status feeds the KPIs/analysis + the WP table columns — refresh them (leave the tracker as-is)
-    Object.keys(_rendered).forEach(k=>_rendered[k]=false);
-    renderPwaAnalysis(); buildTable();
-  }catch(e){
-    sel.value = prev==null?'':prev;
-    _stToast(e.message||'Save failed', true);
-  }finally{ sel.disabled=false; }
+  // Safeguard: awarding a WP requires an Awarded Cost AND an Awarded Vendor. If either is missing,
+  // open a popup to collect them and commit all together (mirrors the WP form's award safeguard).
+  if(field==='award_status' && value==='Awarded'){
+    const hasCost = (w.total_awarded||0)>0, hasVendor = String(w.contractor||'').trim();
+    if(!hasCost || !hasVendor){ _stOpenAwardModal(id, sel, prev); return; }
+  }
+  _stSaveFields(id, {[field]: value}, sel, ()=>{ sel.value = prev==null?'':prev; });
+};
+// ── Award popup (Status Tracker) ──
+let _stAwardCtx = null;
+function _stOpenAwardModal(id, sel, prev){
+  const w = allWPs.find(x=>x.id===id); if(!w) return;
+  _stAwardCtx = { id, sel, prev };
+  const m = document.getElementById('st-award-modal'); if(!m) return;
+  document.getElementById('st-award-sub').textContent = 'WP ' + (w.wp_no||'') + ' — enter the awarded cost and vendor';
+  const costEl = document.getElementById('st-award-cost'), venEl = document.getElementById('st-award-vendor');
+  costEl.value = (w.total_awarded||0) > 0 ? w.total_awarded : '';
+  venEl.value = w.contractor || '';
+  document.getElementById('st-award-err').style.display = 'none';
+  m.style.display = 'flex';
+  setTimeout(()=>costEl.focus(), 50);
+}
+window.stAwardCancel = function(){
+  if(_stAwardCtx && _stAwardCtx.sel) _stAwardCtx.sel.value = _stAwardCtx.prev==null?'':_stAwardCtx.prev;  // revert dropdown
+  _stAwardCtx = null;
+  const m = document.getElementById('st-award-modal'); if(m) m.style.display='none';
+};
+window.stAwardConfirm = async function(){
+  if(!_stAwardCtx) return;
+  const err = document.getElementById('st-award-err');
+  const cost = parseFloat(document.getElementById('st-award-cost').value);
+  const vendor = (document.getElementById('st-award-vendor').value||'').trim();
+  if(!(cost>0)){ err.textContent='Awarded Cost (Net) is required.'; err.style.display='block'; return; }
+  if(!vendor){ err.textContent='Awarded Vendor is required.'; err.style.display='block'; return; }
+  const { id, sel, prev } = _stAwardCtx;
+  const ok = await _stSaveFields(id, { award_status:'Awarded', awarded_cost:cost, contractor:vendor }, sel,
+    ()=>{ if(sel) sel.value = prev==null?'':prev; });
+  if(ok){ _stAwardCtx=null; const m=document.getElementById('st-award-modal'); if(m) m.style.display='none'; }
 };
 
 // ── Forecast diagnostic (opt-in: ?diag=1) ─────────────────────────────
@@ -3148,6 +3189,27 @@ window.saveQuickWP = async function() {
     <div style="padding:12px 20px 20px;border-top:1px solid #f0f0f0;display:flex;gap:10px">
       <button id="ep-save-btn" onclick="saveEditProject()" style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Save Changes</button>
       <button onclick="closeEditProjectModal()" style="padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Award popup (Status Tracker: entering Awarded needs cost + vendor) ── -->
+<div id="st-award-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3200;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)stAwardCancel()">
+  <div class="modal-surface" style="background:#fff;border-radius:12px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid #f0f0f0">
+      <div style="font-size:15px;font-weight:700;color:#231F20">Mark as Awarded</div>
+      <div id="st-award-sub" style="font-size:12px;color:#888;margin-top:2px">Enter the awarded cost and vendor</div>
+    </div>
+    <div style="padding:16px 20px">
+      <div id="st-award-err" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:12px"></div>
+      <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Awarded Cost (Net) (₱) *</label>
+      <input id="st-award-cost" type="number" min="0" step="0.01" placeholder="e.g. 2500000" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none;margin-bottom:12px">
+      <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Awarded Vendor *</label>
+      <input id="st-award-vendor" type="text" placeholder="Vendor / contractor name" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+    </div>
+    <div style="padding:0 20px 18px;display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="stAwardCancel()" style="padding:9px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer">Cancel</button>
+      <button onclick="stAwardConfirm()" style="padding:9px 18px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Save as Awarded</button>
     </div>
   </div>
 </div>

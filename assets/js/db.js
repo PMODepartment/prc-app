@@ -831,7 +831,8 @@ window.WPCsv = (function(){
   const pPct  = v => { const n = pNum(v); if (n == null || n === 0) return null; return n > 1 ? n / 100 : n; };
   const pBond = v => { v = (v || '').trim().toLowerCase(); if (['yes','true','y','1'].includes(v)) return 'Yes'; if (['no','false','n','0',''].includes(v)) return 'No'; return v; };
   const pBool = v => ['yes','true','y','x','1'].includes((v || '').trim().toLowerCase());
-  function pAward(v){ v = (v || '').trim().toLowerCase(); if (!v) return null; if (v.includes('partial')) return 'Partially Awarded'; if (v.includes('not')) return 'Not Yet Awarded'; if (v.includes('award')) return 'Awarded'; return null; }
+  // Partial awards are not a valid state — "partially awarded" text maps to Not Yet Awarded (not fully awarded).
+  function pAward(v){ v = (v || '').trim().toLowerCase(); if (!v) return null; if (v.includes('partial')) return 'Not Yet Awarded'; if (v.includes('not')) return 'Not Yet Awarded'; if (v.includes('award')) return 'Awarded'; return null; }
   function pDate(v){
     v = (v == null ? '' : String(v)).trim();
     if (!v || /^(n\/a|na|tbd|-|—)$/i.test(v)) return null;
