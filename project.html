@@ -333,6 +333,11 @@
               <option value="Awarded">Awarded</option>
               <option value="Not Yet Awarded">Not Yet Awarded</option>
             </select>
+            <select id="f-osm" style="flex-shrink:0" onchange="applyWpListFilters()">
+              <option value="all">All (OSM)</option>
+              <option value="Yes">OSM: Yes</option>
+              <option value="No">OSM: No</option>
+            </select>
             <select id="f-trade" style="flex-shrink:0"><option value="all">All trades</option></select>
             <div class="msf" id="msf-works" style="flex-shrink:0">
               <button type="button" class="msf-btn" onclick="msfToggle('works')"><span id="msf-works-label">All Works</span><i class="ti ti-chevron-down"></i></button>
@@ -1078,6 +1083,8 @@ window.msfOnToggle=function(field,cb){ const val=cb.closest('.msf-opt').getAttri
 window.msfToggle=function(field){ const box=document.getElementById('msf-'+field); const wasOpen=box.classList.contains('open'); document.querySelectorAll('.msf.open').forEach(b=>b.classList.remove('open')); if(!wasOpen) box.classList.add('open'); };
 document.addEventListener('click', e=>{ if(!e.target.closest('.msf')) document.querySelectorAll('.msf.open').forEach(b=>b.classList.remove('open')); });
 
+// OSM filter (Yes/No). Legacy rows without an osm value are treated as "No".
+function _osmMatch(w){ const o=document.getElementById('f-osm')?.value||'all'; if(o==='all')return true; const isY=(w.osm==='Yes'); return o==='Yes'?isY:!isY; }
 function getFiltered(){
   const st=document.getElementById('f-status').value;
   const tr=document.getElementById('f-trade').value;
@@ -1085,6 +1092,7 @@ function getFiltered(){
   const sr=(document.getElementById('f-search').value||'').toLowerCase();
   return allWPs.filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
+    if(!_osmMatch(w))return false;
     if(tr!=='all'&&w.trade!==tr)return false;
     if(works.size&&!works.has(w.works||''))return false;
     if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
@@ -1661,6 +1669,7 @@ function getFilteredSorted(){
   const sr=(document.getElementById('f-search').value||'').toLowerCase();
   let rows = allWPs.filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
+    if(!_osmMatch(w))return false;
     if(tr!=='all'&&w.trade!==tr)return false;
     if(works.size&&!works.has(w.works||''))return false;
     if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
@@ -1712,6 +1721,7 @@ function _pwaFilteredWPs(){
   const sr=(document.getElementById('f-search')?.value||'').toLowerCase();
   return allWPs.filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
+    if(!_osmMatch(w))return false;
     if(tr!=='all'&&w.trade!==tr)return false;
     if(works.size&&!works.has(w.works||''))return false;
     if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
@@ -2491,31 +2501,34 @@ AppAuth.requireLogin(async (user, profile) => {
       // 49-53: Status
       'Procurement Status','Awarding Status','Delivery Status','Remarks','Purchase Request',
     ];
-    const ex1 = [
-      '03-001','General Requirements','Mobilization','Service','WP-001','Mobilization/Demobilization',
+    // Two EXAMPLE rows — edit them with your data or delete them entirely before importing.
+    // They are valid, self-consistent samples that pass the import checks (awarded rows have a cost,
+    // vendor and matching PO/JO count; no future actual-award dates). Only WP No. (col 5) is required.
+    const ex1 = [   // a NOT-YET-AWARDED WP — only the essentials filled
+      '03-001','General Requirements','Mobilization','Service','WP-001','EXAMPLE ROW - edit or delete before importing',
       '','','','',
-      '','','Main Contract','CP-001','',
+      '','','Main Contract','','',
       '','','',
       '','','',
       'No','No','No',
       'No','','','','Not Required',
-      '7','05/31/2026','','06/07/2026','','','06/30/2026',
+      '7','05/31/2026','','06/30/2026','','','07/31/2026',
       '500000','','Not Yet Awarded','',
       '','','','','','','','','',
       'Not Started','','Not Awarded','','',
     ];
-    const ex2 = [
-      '03-002','Structural Works','Structural Works','Materials & Labor','WP-002','Tower Foundation Works',
-      '','Piling and foundation per design specs','Tower 1','Subcontract',
-      'Lump Sum','Subcontract','Main Contract','CP-002','',
-      'ABC Construction Inc.','1','JO-2026-001',
+    const ex2 = [   // an AWARDED WP — cost, vendor and PO/JO must all be filled and consistent
+      '05-002','Structural Works','Rebar Supply','Materials','WP-002','EXAMPLE ROW - awarded WP (has cost, vendor, PO/JO)',
+      '','','Tower 1','',
+      'Bidding','Lump Sum','Main Contract','','',
+      'ABC Steel Corp; XYZ Builders','1','JO-2026-001',
       '','','',
       'Yes','Yes','No',
-      'Yes','Technical Data Sheet','Engr. Juan Dela Cruz','07/01/2026','Approved',
-      '14','06/15/2026','07/01/2026','07/08/2026','07/15/2026','09/15/2026','08/31/2026',
-      '2000000','1850000','Awarded','ABC Construction Inc.',
-      '30','20','Monthly progress billing','370000','07/15/2026','','10','185000','Until completion',
-      'Contract','Awarded','Delivered','','',
+      'Yes','Technical Data Sheet','Engr. Juan Dela Cruz','06/25/2026','Approved',
+      '14','06/15/2026','06/20/2026','07/15/2026','','','08/31/2026',
+      '2000000','1850000','Awarded','ABC Steel Corp',
+      '30','20','One-time','370000','06/25/2026','','10','185000','Until completion',
+      'Awarded','','DP Processing','','',
     ];
     _downloadBlob([headers, ex1, ex2].map(r => r.map(v => `"${v}"`).join(',')).join('\n'), 'WPM_Import_Template.csv');
   };
