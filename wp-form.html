@@ -555,7 +555,7 @@
                 </select>
               </div>
               <div class="form-group" id="charging-contract-group" style="display:none">
-                <label>Contract Package Number <span style="color:#EE3124">*</span></label>
+                <label>Contract Package Number</label>
                 <input type="text" id="f-contract-package-no"/>
               </div>
               <div class="form-group full" id="charging-co-group" style="display:none">
@@ -979,7 +979,7 @@ AppAuth.requireLogin(async (user, profile) => {
     // Set button label for new WPs based on role — admins skip review queue
     if (!editId) {
       document.getElementById('btn-submit-text').textContent =
-        ['admin','super_admin'].includes(profile.role) ? 'Save Work Package' : 'Submit for Review';
+        AppAuth.isAutoApprove(profile) ? 'Save Work Package' : 'Submit for Review';
     }
     // Set "Back to Project" link immediately from URL param (new WP flow)
     if (projId) {
@@ -1040,7 +1040,7 @@ AppAuth.requireLogin(async (user, profile) => {
       const delBtn = document.getElementById('btn-delete');
       if (delBtn && profile.role !== 'viewer') delBtn.style.display = '';
       document.getElementById('btn-submit-text').textContent =
-        ['admin','super_admin'].includes(profile.role) ? 'Save Changes' : 'Submit Update for Review';
+        AppAuth.isAutoApprove(profile) ? 'Save Changes' : 'Submit Update for Review';
 
       /* Show review status */
       if (existingWP.review_status === 'rejected') {
@@ -1052,8 +1052,8 @@ AppAuth.requireLogin(async (user, profile) => {
         si.style.display = 'flex';
         document.getElementById('status-info-text').textContent = 'This work package is currently pending admin review. You can update it and resubmit.';
       } else if (existingWP.review_status === 'approved') {
-        if (['admin','super_admin'].includes(profile.role)) {
-          // Admins just edit directly - no re-review needed
+        if (AppAuth.isAutoApprove(profile)) {
+          // Auto-approve roles (incl. user) edit directly - no re-review needed
           document.getElementById('btn-submit-text').textContent = 'Save Changes';
         } else {
           const si = document.getElementById('status-info');

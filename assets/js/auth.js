@@ -40,7 +40,8 @@ const AppAuth = (() => {
   function isViewer(p) { return p?.role === 'viewer'; }
   function isSpecialist(p) { return p?.role === 'specialist'; }
   function isManager(p) { return p?.role === 'manager'; }
-  // Roles whose WP submissions auto-approve (skip pending_review)
-  function isAutoApprove(p) { return ['super_admin','admin','specialist','manager'].includes(p?.role); }
+  // Roles whose WP submissions auto-approve (skip pending_review). `user` was added — regular users
+  // now add/edit/delete WPs freely without manager/approver sign-off. Only `viewer` is read-only.
+  function isAutoApprove(p) { return ['super_admin','admin','specialist','manager','user'].includes(p?.role); }
   return { requireLogin, requireAdmin, logout, getPermittedProjects, canAccessProject, isAdmin, isSuperAdmin, isViewer, isSpecialist, isManager, isAutoApprove };
 })();

@@ -152,10 +152,10 @@ ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin',
 | `admin` | All | All | âœ… | Users + Projects | âœ… |
 | `specialist` | All (read) | Assigned only | âœ… | None | âœ… |
 | `manager` | Assigned | Assigned | âœ… | None | âœ… |
-| `user` | Assigned | Assigned | âŒ â†’ pending_review | None | âœ… |
+| `user` | Assigned | Assigned | ✅ | None | ✅ |
 | `viewer` | Assigned | None | â€” | None | âŒ |
 
-**Auto-approve roles** (`AppAuth.isAutoApprove(profile)`): `super_admin`, `admin`, `specialist`, `manager` â€” WPs save directly as `approved`; no `pending_review` step.
+**Auto-approve roles** (`AppAuth.isAutoApprove(profile)`): `super_admin`, `admin`, `specialist`, `manager`, `user` (added 2026-07 — regular users add/edit/delete WPs freely, no manager/WP-approver sign-off; only `viewer` is read-only) â€” WPs save directly as `approved`; no `pending_review` step.
 
 **Specialist** sees all projects in login picker and `index.html` (same as admin) but `canAccessProject()` still limits editing to `profile.projects`. Uses `getAllApprovedWPs()` (single query, no N+1).
 
