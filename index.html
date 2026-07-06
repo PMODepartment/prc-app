@@ -429,6 +429,11 @@
               <option value="Awarded">Awarded</option>
               <option value="Not Yet Awarded">Not Yet Awarded</option>
             </select>
+            <select id="wp-mon-osm" onchange="filterWPTable()" style="flex:0 0 auto;min-width:120px;max-width:150px">
+              <option value="">All (OSM)</option>
+              <option value="Yes">OSM: Yes</option>
+              <option value="No">OSM: No</option>
+            </select>
             <div style="position:relative;flex:1;min-width:140px">
               <i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#aaa;font-size:13px;pointer-events:none"></i>
               <input id="wp-mon-search" type="text" placeholder="Search WP No. or description…" oninput="filterWPTable()" style="width:100%;padding:6px 10px 6px 30px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);font-size:12px;font-family:inherit;outline:none;background:var(--surface-2);color:var(--text-primary);box-sizing:border-box"/>
@@ -742,8 +747,8 @@
     window._wpById = Object.fromEntries(_allWPs.map(w => [w.id, w]));
     let _allClaims = []; // Claims register hidden — skip fetch
 
-    // Project filter state
-    let _activeIds = new Set(permitted.map(p => p.id));
+    // Project filter state — archived projects start UNSELECTED (excluded from the portfolio view by default)
+    let _activeIds = new Set(permitted.filter(p => p.status !== 'archived').map(p => p.id));
 
     function renderProjectCard(p, s, extraStyle='') {
       const budgetM = s.totalBudget ? '₱'+(s.totalBudget/1e6).toFixed(1)+'M' : '—';
@@ -1825,8 +1830,10 @@
       const works  = _msfSel.works;   // Set (empty = all)
       const vendor = _msfSel.vendor;  // Set (empty = all)
       const status = document.getElementById('wp-mon-status')?.value || '';
+      const osm    = document.getElementById('wp-mon-osm')?.value || '';
       _wpMonFiltered = _wpMonData.filter(w => {
         if (trade  && w.trade        !== trade)  return false;
+        if (osm) { const isY = (w.osm==='Yes'); if (osm==='Yes' ? !isY : isY) return false; }
         if (works.size  && !works.has(w.works||'')) return false;
         if (vendor.size) { const vs=_wpVendors(w); if(!vs.some(v=>vendor.has(v))) return false; }
         if (status && w.award_status !== status) return false;
@@ -1842,7 +1849,7 @@
       renderWPMonAnalysis();
     };
     window.resetWPMonFilters = function() {
-      ['wp-mon-trade','wp-mon-status'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='';});
+      ['wp-mon-trade','wp-mon-status','wp-mon-osm'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='';});
       _msfSel.works.clear(); _msfSel.vendor.clear();
       const s=document.getElementById('wp-mon-search'); if(s) s.value='';
       _recomputeFilterOptions();

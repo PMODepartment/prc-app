@@ -771,6 +771,8 @@
 
   window.deleteCurrentWP = async function() {
     if (!editId) return;
+    const _p = (allProjects||[]).find(p => p.id === (existingWP && existingWP.project_id));
+    if (_p && _p.status === 'archived') { alert('This project is archived and read-only.'); return; }
     const label = (existingWP && existingWP.wp_no) ? existingWP.wp_no : 'this work package';
     if (!confirm(`Delete ${label}?\n\nThis permanently removes it and cannot be undone.`)) return;
     const btn = document.getElementById('btn-delete');
@@ -1168,6 +1170,9 @@ AppAuth.requireLogin(async (user, profile) => {
     if (!getVal('f-wp-no'))          return showErr('WP No. is required.');
     if (!getVal('f-description'))    return showErr('Work Package Description is required.');
     if (!getVal('f-project'))        return showErr('Please select a project.');
+    // Archived projects are read-only for everyone
+    const _selProj = (allProjects||[]).find(p => p.id === getVal('f-project'));
+    if (_selProj && _selProj.status === 'archived') return showErr('This project is archived and read-only. Unarchive it to add or edit work packages.');
     if (!getVal('f-trade'))          return showErr('Trade is required.');
     if (!getVal('f-awarding-date'))  return showErr('Awarding Date is required.');
     if (!getVal('f-target-delivery'))return showErr('Target Delivery Date is required.');

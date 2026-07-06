@@ -698,7 +698,7 @@ function openWPDetail(idOrObj) {
     ${row('Approval Date',fmtD(w.approval_date))}
     ${row('Submittal Type',w.submittal_doc_type||'—')}
   </div>`;
-  if (!isViewer) {
+  if (!isViewer && !window.__archived) {
     const safeNo = String(w.wp_no||'').replace(/['\\]/g,'');
     html += `<div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0">
       <a href="wp-form.html?id=${w.id}&project=${w.project_id}" style="flex:1;text-align:center;padding:10px;background:#EE3124;color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none"><i class="ti ti-edit" style="font-size:13px;vertical-align:middle"></i> Edit</a>
@@ -725,6 +725,7 @@ function fitMetricValues(container) {
 let _fitT;
 window.addEventListener('resize', () => { clearTimeout(_fitT); _fitT = setTimeout(() => fitMetricValues(document.getElementById('metrics-cost')), 150); });
 async function deleteWPFromDetail(id, wpNo) {
+  if (window.__archived) { alert('This project is archived and read-only.'); return; }
   if (!confirm(`Delete work package ${wpNo||''}?\n\nThis permanently removes it and cannot be undone.`)) return;
   try {
     await WPDb.deleteWP(id);
@@ -925,6 +926,7 @@ window.updateWpStatus = async function(id, field, value, sel){
   const w = allWPs.find(x=>x.id===id); if(!w) return;
   const prev = w[field];
   if(prev===value) return;
+  if(window.__archived){ _stToast('Project is archived — read-only', true); sel.value = prev==null?'':prev; return; }
   // Award Status is DERIVED from Procurement Status. Changing Procurement Status drives Award Status:
   //  • Awarded  → Award Status = Awarded (requires Awarded Cost + Vendor → popup if missing)
   //  • anything else → Award Status = Not Yet Awarded
@@ -1950,7 +1952,7 @@ function buildTable(){
       const tdR=rColspan>0?`<td colspan="${rColspan}" style="background:#f8f8f8;padding:7px 12px;text-align:right;vertical-align:middle">${cnt}</td>`:'';
       html+=`<tr class="trade-group-header" data-trade="${item.trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5">${tdS}${tdR}</tr>`;
     } else {
-      const editLink=window.__isViewer?'':`<a href="wp-form.html?id=${item.wp.id}&project=${item.wp.project_id}" style="font-size:11px;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
+      const editLink=(window.__isViewer||window.__archived)?'':`<a href="wp-form.html?id=${item.wp.id}&project=${item.wp.project_id}" style="font-size:11px;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
       html+=`<tr data-trade-row="${item.trade.replace(/"/g,'&quot;')}">${cols.map(c=>renderCell(c.key,item.wp)).join('')}<td>${editLink}</td></tr>`;
     }
   });
@@ -2319,23 +2321,23 @@ AppAuth.requireLogin(async (user, profile) => {
     document.getElementById('page-sub').textContent = (meta.location||'')+(meta.description?' · '+meta.description:'');
     document.getElementById('nav-proj-name').textContent = meta.id;
     document.getElementById('nav-proj-link').href = 'project.html?id='+meta.id;
-    // Show archive button for admins; toggle label based on current status
+    // Archived projects are READ-ONLY for everyone (all roles). Only an admin can unarchive.
+    window.__archived = (meta.status === 'archived');
+    if(window.__archived){
+      document.body.classList.add('archived-readonly');
+      const banner = document.createElement('div');
+      banner.style.cssText='background:#FFF3CD;border:1px solid #FFC107;border-radius:8px;padding:10px 14px;font-size:12px;color:#856404;margin-bottom:16px;display:flex;align-items:center;gap:8px';
+      banner.innerHTML='<i class="ti ti-archive" style="font-size:16px"></i><strong>Archived Project</strong> — This project is read-only. Editing is disabled'+(isAdmin?'; unarchive it to make changes.':'.');
+      document.getElementById('main-content')?.prepend(banner);
+    }
+    // Archive/unarchive button (admins only)
     if(isAdmin) {
       const archBtn = document.getElementById('btn-archive-project');
       const archLabel = document.getElementById('archive-btn-label');
       if(archBtn && archLabel) {
         archBtn.style.display = 'flex';
-        if(meta.status === 'archived') {
-          archLabel.textContent = 'Unarchive Project';
-          archBtn.style.color = 'rgba(100,200,100,0.9)';
-          // Show archived banner
-          const banner = document.createElement('div');
-          banner.style.cssText='background:#FFF3CD;border:1px solid #FFC107;border-radius:8px;padding:10px 14px;font-size:12px;color:#856404;margin-bottom:16px;display:flex;align-items:center;gap:8px';
-          banner.innerHTML='<i class="ti ti-archive" style="font-size:16px"></i><strong>Archived Project</strong> — This project has been archived. Data is read-only.';
-          document.getElementById('main-content')?.prepend(banner);
-        } else {
-          archLabel.textContent = 'Archive Project';
-        }
+        if(window.__archived) { archLabel.textContent = 'Unarchive Project'; archBtn.style.color = 'rgba(100,200,100,0.9)'; }
+        else archLabel.textContent = 'Archive Project';
       }
     }
   }
@@ -2578,6 +2580,7 @@ AppAuth.requireLogin(async (user, profile) => {
 
   window.importWPsFromCSV = async function() {
     if (!csvFileData) return;
+    if (window.__archived) { const e=document.getElementById('csv-error'); if(e){ e.textContent='This project is archived and read-only.'; e.style.display='block'; } return; }
     const btn = document.getElementById('csv-import-btn');
     btn.textContent = 'Importing…'; btn.disabled = true;
     const errEl = document.getElementById('csv-error');
@@ -2966,6 +2969,11 @@ AppAuth.requireLogin(async (user, profile) => {
   body.viewer-mode #backlog-period-panel { display:none !important; }
   body.viewer-mode #backlog-table th:nth-child(6),
   body.viewer-mode #backlog-table td:nth-child(6) { display:none !important; }
+  /* Archived project — read-only for everyone: hide all editing entry points */
+  body.archived-readonly #add-wp-link,
+  body.archived-readonly #sidebar-tools,
+  body.archived-readonly #status-tracker,
+  body.archived-readonly #review-wps-link { display:none !important; }
   .btn-sm {
     font-size:10px;font-weight:600;padding:4px 10px;border:1px solid #e5e5e5;
     border-radius:6px;background:#fff;color:#666;cursor:pointer;font-family:inherit;
@@ -3065,6 +3073,7 @@ let _wqmProjectId = null;
 let _wqmDirty = false;
 
 window.openAddWPModal = function(projectId) {
+  if(window.__archived){ alert('This project is archived and read-only. Unarchive it to add work packages.'); return; }
   _wqmProjectId = projectId || null;
   _wqmDirty = false;
   // Clear fields
@@ -3109,6 +3118,7 @@ window.saveQuickWP = async function() {
   const errEl = document.getElementById('wqm-error');
   const sucEl = document.getElementById('wqm-success');
   errEl.style.display = 'none'; sucEl.style.display = 'none';
+  if (window.__archived) { errEl.textContent='This project is archived and read-only.'; errEl.style.display='block'; return; }
 
   if (!v('wqm-cost-code')) { errEl.textContent='Cost Code is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-wp-no')) { errEl.textContent='WP No. is required.'; errEl.style.display='block'; return; }
