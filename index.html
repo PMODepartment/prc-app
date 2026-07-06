@@ -2751,13 +2751,17 @@
       const lbl = document.getElementById('proj-filter-label');
       const btn = document.getElementById('proj-filter-btn');
       if (!lbl) return;
-      const sel = _activeIds.size;
-      const total = permitted.length;
-      if (sel === 0) {
+      // Count against ACTIVE (non-archived) projects — archived ones are excluded from the tally.
+      const activeIds = new Set(permitted.filter(p => p.status !== 'archived').map(p => p.id));
+      const activeTotal = activeIds.size;
+      const selActive = [..._activeIds].filter(id => activeIds.has(id)).length;
+      const selArchived = _activeIds.size - selActive;
+      if (_activeIds.size === 0) {
         lbl.textContent = 'No projects selected';
         if (btn) { btn.style.borderColor = '#EE3124'; btn.style.color = '#EE3124'; }
       } else {
-        lbl.textContent = sel === total ? 'All projects' : `${sel} of ${total} project${sel !== 1 ? 's' : ''} selected`;
+        lbl.textContent = `${selActive} of ${activeTotal} active project${activeTotal !== 1 ? 's' : ''} selected`
+          + (selArchived ? ` (+${selArchived} archived)` : '');
         if (btn) { btn.style.borderColor = ''; btn.style.color = ''; }
       }
     }

@@ -360,7 +360,7 @@
             <div class="form-grid">
               <div class="form-group">
                 <label>Requires Approval?</label>
-                <select id="f-requires-approval">
+                <select id="f-requires-approval" onchange="onRequiresApprovalChange()">
                   <option value="false">No</option>
                   <option value="true">Yes</option>
                 </select>
@@ -796,6 +796,26 @@
     if(cog) cog.style.display = v === 'Change Order' ? '' : 'none';
   }
 
+  // When "Requires Approval?" is No, the submittal fields are Not Applicable — set them to N/A and
+  // disable them (Date of Approval clears, since a date can't hold "N/A"). Yes re-enables + clears N/A.
+  function onRequiresApprovalChange() {
+    const req = document.getElementById('f-requires-approval').value === 'true';
+    const dt = document.getElementById('f-submittal-doc-type');
+    const nm = document.getElementById('f-approver-name');
+    const dd = document.getElementById('f-approval-date');
+    if (!req) {
+      if (dt && ![...dt.options].some(o => o.value === 'N/A')) dt.add(new Option('N/A', 'N/A'));
+      if (dt) { dt.value = 'N/A'; dt.disabled = true; }
+      if (nm) { nm.value = 'N/A'; nm.disabled = true; nm.placeholder = 'N/A'; }
+      if (dd) { dd.value = ''; dd.disabled = true; }
+    } else {
+      if (dt) { dt.disabled = false; if (dt.value === 'N/A') dt.value = ''; }
+      if (nm) { nm.disabled = false; if (nm.value === 'N/A') nm.value = ''; nm.placeholder = 'e.g. Project Manager'; }
+      if (dd) { dd.disabled = false; }
+    }
+    markDirty();
+  }
+
   const params = new URLSearchParams(location.search);
   const editId = params.get('id');   // firestore_id of WP being edited
   const projId = params.get('project'); // pre-fill project
@@ -1106,6 +1126,7 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-submittal-doc-type', existingWP.submittal_document_type);
       fill('f-approver-name', existingWP.approver_name);
       fill('f-approval-date', existingWP.approval_date);
+      onRequiresApprovalChange();   // sync submittal fields to the Requires-Approval state
       fill('f-lead-time', existingWP.lead_time);
       fill('f-awarding-date', existingWP.awarding_date);
       fill('f-actual-awarding-date', existingWP.actual_awarding_date);
@@ -1151,6 +1172,7 @@ AppAuth.requireLogin(async (user, profile) => {
       document.getElementById('nav-project-link').href = 'project.html?id=' + existingWP.project_id;
     }
 
+    onRequiresApprovalChange();   // apply N/A on first load (new WP defaults to "No")
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
   });
