@@ -511,7 +511,8 @@ const Charts = (() => {
     const b3=aging.filter(a=>a>=0&&a<=30).length;
     const b4=aging.filter(a=>a<0).length;
     const proj=projectName||'Project';
-    const dl = _dlStacked(v => v > 0 ? _mAbbr(v) : '');
+    // Aging buckets are WP COUNTS, not money — show the plain integer (no "M"/"B" suffix).
+    const dl = _dlStacked(v => v > 0 ? String(Math.round(v)) : '');
     make(id,{type:'bar',data:{labels:[proj],datasets:[
       {label:'>60d overdue',data:[b1],backgroundColor:'#EE3124',borderRadius:3},
       {label:'30–60d overdue',data:[b2],backgroundColor:'#D97706',borderRadius:3},
