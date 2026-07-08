@@ -25,6 +25,9 @@ No build step â€” edit files directly, push to GitHub, GitHub Pages auto-de
 | `assets/js/ui.js` | Shared UI helpers â€” sidebar init, modals, toast, hamburger menu, iOS pinch-zoom prevention |
 | `assets/css/dashboard.css` | Global styles, CSS variables, responsive breakpoints, view-tabs, mobile fixes |
 | `supabase-schema.sql` | Full DB schema for reference |
+| `assets/js/onboarding.js` | Role-aware guided-tour modal (`window.Onboarding`) â€” auto-opens on first login, re-openable via topbar **?** button. Self-contained (injects own CSS, follows dark mode via CSS vars). |
+| `onboarding.html` | Standalone 13-slide onboarding deck for training (keyboard nav, F=fullscreen, P=print). Not wired into the app. |
+| `WPM_Dashboard_Onboarding.pptx` | Editable PowerPoint version of the onboarding deck (same content). |
 
 > `assets/js/` files are canonical. Root-level copies (`auth.js`, `db.js`, `ui.js`) are **not referenced by any page** â€” do not edit them.
 
@@ -471,6 +474,23 @@ Public pages (login, register, pending, forgot-password) load UMD bundle inline 
 Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net, cdnjs.cloudflare.com; `dns-prefetch` for Supabase URL; `preload as="script"` for all body scripts.
 
 **Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260629h`. (Other pages â€” admin/review/wp-form/etc. â€” are not versioned; they rely on ETag revalidation and don't host the chart/rank features.)
+
+---
+
+## Onboarding / Guided Tour
+
+Three deliverables share the same copy, organised by **capability tier** (not the 6 raw roles):
+- **admin** = `super_admin`, `admin` · **contributor** = `specialist`, `manager`, `user` · **viewer** = `viewer`.
+- `tierOf(role)` in `onboarding.js` does the mapping; content is personalised to the logged-in user's tier.
+
+1. **In-app modal** (`assets/js/onboarding.js`, `window.Onboarding`) â€” a carousel of ~7 slides (Welcome → Two views → Reading the dashboard → Finding WPs → **your tier** → capability matrix → Tips). Self-contained: injects its own `#ob-css` styles (uses the `--surface`/`--text-*`/`--mw-*` CSS vars so it follows dark mode), builds its own DOM, keyboard nav (←/→/Esc), backdrop-click + **×** to close, progress dots. Viewer variant drops all cost content.
+   - **Auto-open once per user:** `Onboarding.maybeAutoOpen(userId, role)` opens the tour ~650 ms after load unless `localStorage['wpm_onboarded_<userId>']` is set. The **"Don't show on login"** checkbox (checked by default) + finishing on the last slide set that flag.
+   - **Re-open any time:** a **?** `.btn-guide` button is injected into `.topbar-right` (before `#user-bar`, idempotent) on every page that loads the script; `onclick → Onboarding.open()` reads `window.__wpmRole` at open time.
+   - **Wiring:** `index.html` + `project.html` each load `<script src="assets/js/onboarding.js?v=…">` (after ui.js/db.js) and call `Onboarding.maybeAutoOpen(profile.id, profile.role)` inside their `AppAuth.requireLogin` callback. To add to another page: include the script and call `maybeAutoOpen` (or rely on the injected **?** button for manual open). `onboarding.js` is versioned independently (`?v=20260708a`), NOT part of the 5-file shared `?v=` bump.
+2. **Standalone deck** (`onboarding.html`, repo root) â€” 13-slide training deck, self-contained (Montserrat + Tabler via CDN, same as the app), keyboard/dot nav, `F` fullscreen, `P`/print CSS (one slide per page). Covers all three tiers in full (for group training). Not linked from the app.
+3. **PowerPoint** (`WPM_Dashboard_Onboarding.pptx`, repo root) â€” editable pptxgenjs-generated version mirroring the deck (13 slides, Calibri, circle-motif, no icon-font dependency). Regenerate from `scratchpad/gen.js` if content changes.
+
+> `.claude/launch.json` (a `python -m http.server 8765` config) exists only to preview static pages locally â€” not a deploy dependency.
 
 ---
 

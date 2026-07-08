@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WPM Dashboard — Onboarding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<style>
+  :root{
+    --red:#EE3124; --red-dark:#C42127; --red-light:#FDECEA; --red-mid:#F9C8C5;
+    --ink:#231F20; --ink-2:#5A5858; --hint:#9B9999;
+    --bg:#F4F5F6; --surface:#fff; --border:rgba(0,0,0,.10); --border-md:rgba(0,0,0,.16);
+    --admin:#7C3AED; --contrib:#2563EB; --viewer:#0891B2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:Montserrat,system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+  .deck{height:100vh;display:flex;align-items:center;justify-content:center;padding:26px}
+  .slide{width:100%;max-width:960px;aspect-ratio:16/9;max-height:calc(100vh - 52px);background:var(--surface);border-radius:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.14);overflow:hidden;position:relative;display:none;flex-direction:column}
+  .slide.active{display:flex;animation:fade .28s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  /* header band */
+  .s-band{height:8px;background:linear-gradient(90deg,var(--red),var(--red-dark))}
+  .s-inner{flex:1;min-height:0;padding:38px 52px;display:flex;flex-direction:column;overflow:auto}
+  .s-kicker{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--red);margin-bottom:12px}
+  .s-title{font-size:30px;font-weight:800;line-height:1.15;margin:0 0 8px}
+  .s-lead{font-size:15px;line-height:1.6;color:var(--ink-2);margin:0 0 22px;max-width:760px}
+
+  /* title slide */
+  .title-slide{align-items:flex-start;justify-content:center;background:
+    radial-gradient(1200px 500px at 100% -10%,rgba(238,49,36,.10),transparent 60%),var(--surface)}
+  .title-slide .logo{font-size:13px;font-weight:900;letter-spacing:.16em;color:var(--red);text-transform:uppercase;margin-bottom:26px}
+  .title-slide h1{font-size:48px;font-weight:900;line-height:1.05;margin:0 0 14px;letter-spacing:-.5px}
+  .title-slide h1 span{color:var(--red)}
+  .title-slide .sub{font-size:18px;color:var(--ink-2);font-weight:500;max-width:640px;line-height:1.5}
+  .title-tag{margin-top:30px;display:inline-flex;gap:10px;flex-wrap:wrap}
+  .title-tag span{background:var(--red-light);color:var(--red-dark);border:1px solid var(--red-mid);
+    padding:7px 15px;border-radius:22px;font-size:12.5px;font-weight:700}
+
+  ul.pts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+  ul.pts li{display:flex;gap:14px;align-items:flex-start;font-size:15px;line-height:1.5}
+  ul.pts li i{color:var(--red);font-size:22px;flex-shrink:0;background:var(--red-light);width:40px;height:40px;
+    border-radius:11px;display:flex;align-items:center;justify-content:center}
+  ul.pts li b{font-weight:700}
+  ul.pts li .t{padding-top:8px}
+
+  .cards{display:grid;gap:16px;grid-template-columns:repeat(3,1fr)}
+  .cards.two{grid-template-columns:repeat(2,1fr)}
+  .card{border:1px solid var(--border-md);border-radius:14px;padding:20px;background:var(--surface);display:flex;flex-direction:column;gap:8px}
+  .card .ico{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff}
+  .card h3{margin:0;font-size:16px;font-weight:800}
+  .card .roles{font-size:12px;font-weight:700;color:var(--ink)}
+  .card p{margin:0;font-size:13px;line-height:1.5;color:var(--ink-2)}
+  .card ul{margin:4px 0 0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+  .card ul li{font-size:12.5px;line-height:1.4;color:var(--ink-2);display:flex;gap:7px;align-items:flex-start}
+  .card ul li i{color:var(--red);font-size:14px;margin-top:2px}
+
+  .tag-you{font-size:10px;font-weight:800;color:#fff;background:var(--red);border-radius:10px;padding:2px 8px;margin-left:6px}
+  .callout{margin-top:20px;background:var(--red-light);border:1px solid var(--red-mid);border-radius:12px;
+    padding:14px 18px;font-size:13.5px;line-height:1.55;color:var(--red-dark);display:flex;gap:11px;align-items:flex-start}
+  .callout i{font-size:19px;flex-shrink:0;margin-top:1px}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:30px;align-items:start}
+
+  /* footer / nav */
+  .s-foot{display:flex;align-items:center;gap:14px;padding:14px 52px;border-top:1px solid var(--border);flex-shrink:0}
+  .s-foot .who{font-size:11px;font-weight:700;color:var(--hint);letter-spacing:.04em;text-transform:uppercase}
+  .s-foot .sp{flex:1}
+  .pageno{font-size:12px;color:var(--hint);font-weight:600}
+  .nav{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;z-index:20}
+  .nav button{border:none;background:var(--surface);box-shadow:0 4px 16px rgba(0,0,0,.14);width:44px;height:44px;border-radius:50%;
+    cursor:pointer;font-size:19px;color:var(--ink);display:flex;align-items:center;justify-content:center;transition:transform .1s}
+  .nav button:hover{transform:translateY(-2px)}
+  .nav button:disabled{opacity:.35;cursor:default;transform:none}
+  .nav .count{background:var(--surface);box-shadow:0 4px 16px rgba(0,0,0,.14);padding:0 16px;height:44px;border-radius:22px;
+    display:flex;align-items:center;font-size:13px;font-weight:700;color:var(--ink)}
+  .brand-mark{position:fixed;top:22px;right:30px;font-size:11px;font-weight:900;letter-spacing:.14em;color:var(--red);
+    text-transform:uppercase;opacity:.8;z-index:20}
+  .hint{position:fixed;bottom:30px;right:30px;font-size:11px;color:var(--hint);z-index:20}
+  @media(max-width:720px){
+    .s-inner{padding:24px 26px}.s-title{font-size:22px}.title-slide h1{font-size:30px}
+    .cards,.cards.two{grid-template-columns:1fr}.split{grid-template-columns:1fr;gap:16px}.s-foot{padding:12px 26px}
+  }
+  @media print{.nav,.hint,.brand-mark{display:none}.deck{display:block;height:auto;padding:0}
+    .slide{display:flex!important;max-height:none;page-break-after:always;box-shadow:none;border-radius:0;margin:0}}
+</style>
+</head>
+<body>
+<div class="brand-mark">Megawide · Procurement</div>
+<div class="deck" id="deck">
+
+  <!-- 1 · Title -->
+  <section class="slide active">
+    <div class="s-band"></div>
+    <div class="s-inner title-slide">
+      <div class="logo">Megawide EPC · Procurement</div>
+      <h1>WPM Dashboard<br/><span>Onboarding Guide</span></h1>
+      <div class="sub">How to read, navigate and work with the Work Package Management dashboard — tailored to what your role can do.</div>
+      <div class="title-tag"><span><i class="ti ti-shield-check"></i> Administrators</span><span><i class="ti ti-edit"></i> Contributors</span><span><i class="ti ti-eye"></i> Viewers</span></div>
+    </div>
+    <div class="s-foot"><span class="who">Welcome</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 2 · What it is -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner">
+      <div class="s-kicker"><i class="ti ti-layout-dashboard"></i> Overview</div>
+      <h2 class="s-title">What is the WPM Dashboard?</h2>
+      <p class="s-lead">A single place to track procurement work packages across every Megawide EPC project — their award status, budgets, schedule and contractors — all live from a shared database.</p>
+      <ul class="pts">
+        <li><i class="ti ti-database"></i><div class="t"><b>One source of truth.</b> Everyone sees the same live data; no more juggling spreadsheet versions.</div></li>
+        <li><i class="ti ti-chart-arcs"></i><div class="t"><b>Dashboards + detail.</b> Portfolio-wide KPIs and charts, down to individual work-package records.</div></li>
+        <li><i class="ti ti-lock-access"></i><div class="t"><b>Role-based.</b> What you see and can change depends on your role — covered in this guide.</div></li>
+      </ul>
+    </div>
+    <div class="s-foot"><span class="who">Overview</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 3 · Getting started -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner">
+      <div class="s-kicker"><i class="ti ti-login-2"></i> Getting started</div>
+      <h2 class="s-title">Signing in &amp; picking where to go</h2>
+      <p class="s-lead">Log in at the sign-in page, then choose your destination. New here? Register first — the PMO / Procurement team approves accounts and sets your role and project access.</p>
+      <ul class="pts">
+        <li><i class="ti ti-user-check"></i><div class="t"><b>Sign in</b> with your email &amp; password (reset via “Forgot password”).</div></li>
+        <li><i class="ti ti-building-community"></i><div class="t"><b>Portfolio Overview</b> — all projects consolidated (admins &amp; specialists see everything).</div></li>
+        <li><i class="ti ti-folder"></i><div class="t"><b>A specific project</b> — jump straight into one project's dashboard.</div></li>
+      </ul>
+      <div class="callout"><i class="ti ti-info-circle"></i><span>Don't see a project you need? Ask the PMO team to add it to your assignments.</span></div>
+    </div>
+    <div class="s-foot"><span class="who">Getting started</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 4 · Two views -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner">
+      <div class="s-kicker"><i class="ti ti-binoculars"></i> Navigation</div>
+      <h2 class="s-title">Two ways to look at the data</h2>
+      <p class="s-lead">Switch any time from the sidebar (the ☰ hamburger opens/collapses it). The top bar carries Refresh, Export PDF, a dark-mode toggle and your profile.</p>
+      <div class="cards two">
+        <div class="card"><div class="ico" style="background:var(--red)"><i class="ti ti-building-community"></i></div>
+          <h3>Portfolio Overview</h3>
+          <p>All projects in one consolidated dashboard.</p>
+          <ul>
+            <li><i class="ti ti-point-filled"></i>6 tabs: Overview · Backlog · Budget · Schedule · Works · WP List</li>
+            <li><i class="ti ti-point-filled"></i>Project filter to include/exclude projects</li>
+            <li><i class="ti ti-point-filled"></i>Archived projects start unselected</li>
+          </ul>
+        </div>
+        <div class="card"><div class="ico" style="background:var(--contrib)"><i class="ti ti-folder"></i></div>
+          <h3>Project Dashboard</h3>
+          <p>One project, in full detail.</p>
+          <ul>
+            <li><i class="ti ti-point-filled"></i>3 tabs: Overview · Backlog · WP List</li>
+            <li><i class="ti ti-point-filled"></i>Procurement S-Curve (planned vs actual)</li>
+            <li><i class="ti ti-point-filled"></i>Inline Status Tracker for editors</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="s-foot"><span class="who">Navigation</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 5 · Reading the dashboard -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner">
+      <div class="s-kicker"><i class="ti ti-chart-donut"></i> Reading the data</div>
+      <h2 class="s-title">Making sense of the charts</h2>
+      <p class="s-lead">KPI cards and charts summarise cost and progress at a glance. (Viewers see counts, status &amp; schedule — cost figures are hidden.)</p>
+      <ul class="pts">
+        <li><i class="ti ti-cash"></i><div class="t"><b>Cost Overview KPIs</b> — Budget (BCB), Actual Award, Balance to Award, Savings / Loss.</div></li>
+        <li><i class="ti ti-chart-line"></i><div class="t"><b>Procurement S-Curve</b> — cumulative planned vs actual awarding; the dashed line forecasts the remainder.</div></li>
+        <li><i class="ti ti-chart-bar"></i><div class="t"><b>Budget &amp; Awarded by Period</b> and <b>status donuts</b> — spend and award progress by month/quarter.</div></li>
+        <li><i class="ti ti-trophy"></i><div class="t"><b>Top 5 panels</b> — highest value, biggest savings, most overbudget work packages (click to open a WP).</div></li>
+      </ul>
+    </div>
+    <div class="s-foot"><span class="who">Reading the data</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 6 · Work packages -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner">
+      <div class="s-kicker"><i class="ti ti-list-search"></i> Work packages</div>
+      <h2 class="s-title">Finding work packages fast</h2>
+      <p class="s-lead">The WP List groups records by Project → Trade. Headers are sortable and the list is paginated for speed.</p>
+      <ul class="pts">
+        <li><i class="ti ti-filter"></i><div class="t"><b>Cascading filters</b> — Trade → Works → Vendor narrow each other; plus Status, OSM and free-text search.</div></li>
+        <li><i class="ti ti-click"></i><div class="t"><b>Click a WP No.</b> to open the slide-in detail panel with every field (and Edit / Delete for editors).</div></li>
+        <li><i class="ti ti-calendar-search"></i><div class="t"><b>Filtered Analysis</b> — a period chart + KPIs you can scope to a From/To month range.</div></li>
+      </ul>
+    </div>
+    <div class="s-foot"><span class="who">Work packages</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 7 · Capability tiers -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner">
+      <div class="s-kicker"><i class="ti ti-users-group"></i> Roles</div>
+      <h2 class="s-title">Who can do what</h2>
+      <p class="s-lead">The six roles group into three capability tiers. The next slides cover each in detail.</p>
+      <div class="cards">
+        <div class="card"><div class="ico" style="background:var(--admin)"><i class="ti ti-shield-check"></i></div>
+          <h3>Administrators</h3><div class="roles">Super Admin · Admin</div>
+          <p>Full access, all projects, all cost data — plus user &amp; project management.</p>
+        </div>
+        <div class="card"><div class="ico" style="background:var(--contrib)"><i class="ti ti-edit"></i></div>
+          <h3>Contributors</h3><div class="roles">Specialist · Manager · User</div>
+          <p>Add / edit / delete work packages, CSV import, status tracker. Cost data visible. No admin.</p>
+        </div>
+        <div class="card"><div class="ico" style="background:var(--viewer)"><i class="ti ti-eye"></i></div>
+          <h3>Viewers</h3><div class="roles">Viewer</div>
+          <p>Read-only. Cost, budget &amp; award amounts are hidden.</p>
+        </div>
+      </div>
+    </div>
+    <div class="s-foot"><span class="who">Roles</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 8 · Administrators -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner">
+      <div class="s-kicker" style="color:var(--admin)"><i class="ti ti-shield-check"></i> Administrators</div>
+      <h2 class="s-title">Administrators — the full picture</h2>
+      <p class="s-lead"><b>Super Admin &amp; Admin.</b> The widest access: the entire portfolio plus the tools to manage people and projects.</p>
+      <div class="split">
+        <ul class="pts">
+          <li><i class="ti ti-eye-check"></i><div class="t"><b>See every project</b> and all cost / budget data.</div></li>
+          <li><i class="ti ti-pencil"></i><div class="t"><b>Add, edit, delete</b> any work package — saved immediately.</div></li>
+          <li><i class="ti ti-file-import"></i><div class="t"><b>Bulk CSV import</b> — de-duplicates by WP No.</div></li>
+        </ul>
+        <ul class="pts">
+          <li><i class="ti ti-users"></i><div class="t"><b>User Management</b> — approve sign-ups, set roles, assign projects.</div></li>
+          <li><i class="ti ti-folder-cog"></i><div class="t"><b>Project Management</b> — create, edit, archive projects.</div></li>
+          <li><i class="ti ti-checklist"></i><div class="t"><b>Review queue</b> for any submissions needing sign-off.</div></li>
+        </ul>
+      </div>
+      <div class="callout"><i class="ti ti-crown"></i><span>Only a <b>Super Admin</b> can grant the Super Admin or Specialist roles; Admins manage all other roles.</span></div>
+    </div>
+    <div class="s-foot"><span class="who">Administrators</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 9 · Contributors -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner">
+      <div class="s-kicker" style="color:var(--contrib)"><i class="ti ti-edit"></i> Contributors</div>
+      <h2 class="s-title">Contributors — doing the work</h2>
+      <p class="s-lead"><b>Specialist, Manager &amp; User.</b> The day-to-day editors. Full cost visibility, no user/project administration. Changes save immediately (auto-approved).</p>
+      <div class="split">
+        <ul class="pts">
+          <li><i class="ti ti-pencil-plus"></i><div class="t"><b>Add / edit / delete</b> work packages on your projects.</div></li>
+          <li><i class="ti ti-file-import"></i><div class="t"><b>Import from CSV</b> — re-imports update by WP No. (no duplicates).</div></li>
+        </ul>
+        <ul class="pts">
+          <li><i class="ti ti-adjustments-check"></i><div class="t"><b>Status Tracker</b> — update Award / Procurement / Delivery inline.</div></li>
+          <li><i class="ti ti-cash"></i><div class="t"><b>Full cost &amp; budget</b> visibility on all dashboards.</div></li>
+        </ul>
+      </div>
+      <div class="callout"><i class="ti ti-map-pin"></i><span><b>Specialists</b> can view every project (edit their assigned ones). <b>Managers &amp; Users</b> work within their assigned projects.</span></div>
+    </div>
+    <div class="s-foot"><span class="who">Contributors</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 10 · Viewers -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner">
+      <div class="s-kicker" style="color:var(--viewer)"><i class="ti ti-eye"></i> Viewers</div>
+      <h2 class="s-title">Viewers — read-only insight</h2>
+      <p class="s-lead"><b>Viewer.</b> Browse dashboards and work-package details for assigned projects, with financial figures hidden.</p>
+      <ul class="pts">
+        <li><i class="ti ti-eye"></i><div class="t"><b>Browse</b> dashboards, charts and WP detail for your projects.</div></li>
+        <li><i class="ti ti-lock"></i><div class="t"><b>No editing</b> — Add / Edit / Delete and the WP form are unavailable.</div></li>
+        <li><i class="ti ti-currency-off"></i><div class="t"><b>Cost hidden</b> — budget, awarded amounts and the Budget / Works tabs are not shown.</div></li>
+        <li><i class="ti ti-checkbox"></i><div class="t">You still see <b>status, schedule, counts and progress</b> everywhere else.</div></li>
+      </ul>
+      <div class="callout"><i class="ti ti-arrow-up-right"></i><span>Need to edit or see costs? Ask the PMO team to upgrade your role.</span></div>
+    </div>
+    <div class="s-foot"><span class="who">Viewers</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 11 · Adding / editing -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner">
+      <div class="s-kicker"><i class="ti ti-forms"></i> For editors</div>
+      <h2 class="s-title">Adding &amp; updating work packages</h2>
+      <p class="s-lead">Administrators &amp; Contributors keep the data current. Two ways in — the full form or a bulk import.</p>
+      <div class="cards two">
+        <div class="card"><div class="ico" style="background:var(--red)"><i class="ti ti-plus"></i></div>
+          <h3>The WP Form</h3>
+          <ul>
+            <li><i class="ti ti-point-filled"></i>Guided sections: identity, approval, bonds, submittals, schedule, budget, payment, status</li>
+            <li><i class="ti ti-point-filled"></i>Trade → Works → Type cascade</li>
+            <li><i class="ti ti-point-filled"></i>Safeguards: awarded WPs need cost + vendor; no future award dates</li>
+          </ul>
+        </div>
+        <div class="card"><div class="ico" style="background:var(--contrib)"><i class="ti ti-table-import"></i></div>
+          <h3>CSV Import</h3>
+          <ul>
+            <li><i class="ti ti-point-filled"></i>Download the template, fill, import</li>
+            <li><i class="ti ti-point-filled"></i>De-duplicates by WP No. — existing rows update in place</li>
+            <li><i class="ti ti-point-filled"></i>Whole batch validated before anything is saved</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout"><i class="ti ti-adjustments-check"></i><span>For quick status changes, use the <b>Status Tracker</b> on the WP List — no need to open the form.</span></div>
+    </div>
+    <div class="s-foot"><span class="who">For editors</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 12 · Tips -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner">
+      <div class="s-kicker"><i class="ti ti-bulb"></i> Handy to know</div>
+      <h2 class="s-title">Tips &amp; getting help</h2>
+      <ul class="pts">
+        <li><i class="ti ti-refresh"></i><div class="t"><b>Refresh</b> pulls the latest data without a full reload.</div></li>
+        <li><i class="ti ti-moon"></i><div class="t"><b>Dark mode</b> — toggle in the top bar; your choice is remembered.</div></li>
+        <li><i class="ti ti-file-type-pdf"></i><div class="t"><b>Export PDF</b> — a print-ready table of the current view (editors &amp; admins).</div></li>
+        <li><i class="ti ti-device-mobile"></i><div class="t"><b>Add to Home Screen</b> to install it like an app on your phone.</div></li>
+        <li><i class="ti ti-help"></i><div class="t"><b>In-app guide</b> — the <b>?</b> button in the top bar reopens the tour any time.</div></li>
+      </ul>
+      <div class="callout"><i class="ti ti-mail"></i><span>Questions or access issues? Contact the <b>PMO / Procurement</b> team to update your role or project assignments.</span></div>
+    </div>
+    <div class="s-foot"><span class="who">Handy to know</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+  <!-- 13 · Close -->
+  <section class="slide">
+    <div class="s-band"></div>
+    <div class="s-inner title-slide">
+      <div class="logo">Megawide EPC · Procurement</div>
+      <h1>You're ready to<br/><span>get started.</span></h1>
+      <div class="sub">Explore your dashboards, and reopen the in-app guide (the ? button) whenever you need a refresher.</div>
+      <div class="title-tag"><span><i class="ti ti-login-2"></i> Sign in &amp; explore</span><span><i class="ti ti-help"></i> ? = reopen guide</span><span><i class="ti ti-mail"></i> PMO for access</span></div>
+    </div>
+    <div class="s-foot"><span class="who">Thank you</span><span class="sp"></span><span class="pageno"></span></div>
+  </section>
+
+</div>
+
+<div class="nav">
+  <button id="prev" aria-label="Previous"><i class="ti ti-chevron-left"></i></button>
+  <span class="count" id="count">1 / 1</span>
+  <button id="next" aria-label="Next"><i class="ti ti-chevron-right"></i></button>
+</div>
+<div class="hint">← → arrows to navigate · F for fullscreen · P to print</div>
+
+<script>
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var i = 0;
+  function show(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function(s,x){ s.classList.toggle('active', x === i); });
+    document.getElementById('count').textContent = (i + 1) + ' / ' + slides.length;
+    document.getElementById('prev').disabled = i === 0;
+    document.getElementById('next').disabled = i === slides.length - 1;
+    slides.forEach(function(s){ var p = s.querySelector('.pageno'); if(p) p.textContent = (i+1) + ' / ' + slides.length; });
+    if (location.hash !== '#' + (i+1)) history.replaceState(null, '', '#' + (i + 1));
+  }
+  document.getElementById('prev').onclick = function(){ show(i - 1); };
+  document.getElementById('next').onclick = function(){ show(i + 1); };
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); show(i + 1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); show(i - 1); }
+    else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(slides.length - 1);
+    else if (e.key === 'f' || e.key === 'F') { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+    else if (e.key === 'p' || e.key === 'P') window.print();
+  });
+  var start = parseInt((location.hash || '').replace('#',''), 10);
+  show(isNaN(start) ? 0 : start - 1);
+</script>
+</body>
+</html>
