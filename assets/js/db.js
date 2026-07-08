@@ -263,6 +263,21 @@ function exportCSV(wps, label) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+/* ── KPI help — plain-English definitions shown as hover tooltips on metric labels ── */
+window.KPI_HELP = {
+  'Procurement Budget (BCB)':'Total approved procurement budget (Base Cost Budget, net) across these work packages.',
+  'Actual Award':'Total awarded cost of the WPs already awarded — the sum of their contract amounts.',
+  'Balance to Award':'Budget still to be committed = Total Budget − budget of the awarded WPs. The sub-line shows how many WPs remain.',
+  'Savings / Loss':'Budget for the awarded WPs minus what they were actually awarded for. Green = savings, red = over budget.',
+  'Procurement Cost to Complete':'Budget remaining to award = Total Budget − budget of the awarded WPs.',
+  'Cost to Complete':'Budget remaining to award = Total Budget − budget of the awarded WPs.',
+  'Procurement Estimate at Completion':'Projected total spend = awarded cost so far + budget of the not-yet-awarded WPs.',
+  'Estimate at Completion':'Projected total spend = awarded cost so far + budget of the not-yet-awarded WPs.',
+  'Variance':'Total Budget − Estimate at Completion. Positive = under budget, negative = over budget.'
+};
+// Returns the ` title="…" style="cursor:help"` attributes for a KPI label (empty if no help defined).
+window.kpiLabelAttrs = function(lbl){ const h=(window.KPI_HELP||{})[lbl]; return h ? (' title="'+String(h).replace(/"/g,'&quot;')+'" style="cursor:help"') : ''; };
+
 /* ── User bar — avatar only, role in dropdown ───────────────────────── */
 function renderUserBar(id, profile) {
   const el = document.getElementById(id);
