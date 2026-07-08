@@ -11,16 +11,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629k"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260629k"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629k"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629l"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260629l"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629l"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629k"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629l"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629k"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629l"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -594,13 +595,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260629k"></script>
-<script src="assets/js/db.js?v=20260629k"></script>
-<script src="assets/js/ui.js?v=20260629k"></script>
+<script src="assets/js/auth.js?v=20260629l"></script>
+<script src="assets/js/db.js?v=20260629l"></script>
+<script src="assets/js/ui.js?v=20260629l"></script>
 <script src="assets/js/onboarding.js?v=20260708a"></script>
+<script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260629k"></script>
+<script src="assets/js/charts.js?v=20260629l"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -677,7 +679,21 @@
       document.querySelectorAll('.wp-vtab[data-view="financial"],.wp-vtab[data-view="all"]').forEach(b=>b.style.display='none');
     }
     renderUserBar('user-bar', profile);
-    if (window.Onboarding) Onboarding.maybeAutoOpen(profile.id, profile.role);
+    // Interactive coach-mark tour (spotlights real UI). Auto-runs once per user; re-runnable from the
+    // profile menu. The slide-deck guide (Onboarding) stays available via the topbar ? button.
+    if (window.CoachTour) {
+      const _cv = window.__isViewer;
+      const _cs = [
+        { sel:'#view-tabs', title:'Your dashboard tabs', body:'Switch between <b>Overview</b>, Backlog, Budget, Schedule, Works and the <b>WP List</b> — each is a different view of your work packages.' },
+        { sel:'#proj-filter-btn', title:'Filter projects', body:'Choose which projects feed the charts. <b>Archived</b> projects start unselected — toggle them on if you need them.' },
+      ];
+      if (!_cv) _cs.push({ sel:'#metrics-cost', title:'Cost overview', body:'Your headline figures. <b>Hover any label</b> (Balance to Award, Savings/Loss…) for a plain-English definition.' });
+      _cs.push({ sel:'#idx-ov-battery-wp', title:'Award progress', body:'How much of the portfolio is awarded, by work-package count.' });
+      _cs.push({ sel:'#project-cards', title:'Open a project', body:'Click any project card to jump into its own dashboard and manage its work packages.' });
+      _cs.push({ sel:'.btn-guide', title:'Full training guide', body:'Reopen the complete slide-by-slide guide anytime from this button.' });
+      CoachTour.configure({ key:'coach_portfolio', steps:_cs });
+      CoachTour.maybeAutoStart();
+    }
 
     // Track navigation context — user is viewing consolidated dashboard
     sessionStorage.setItem('wpm_nav_ctx', 'consolidated');

@@ -11,16 +11,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629k"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260629k"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629k"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260629l"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260629l"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260629l"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629k"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260629l"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629k"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260629l"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -528,13 +529,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260629k"></script>
-<script src="assets/js/ui.js?v=20260629k"></script>
-<script src="assets/js/db.js?v=20260629k"></script>
+<script src="assets/js/auth.js?v=20260629l"></script>
+<script src="assets/js/ui.js?v=20260629l"></script>
+<script src="assets/js/db.js?v=20260629l"></script>
 <script src="assets/js/onboarding.js?v=20260708a"></script>
+<script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260629k"></script>
+<script src="assets/js/charts.js?v=20260629l"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -2271,7 +2273,23 @@ AppAuth.requireLogin(async (user, profile) => {
     const pwa=document.getElementById('pwa-analysis'); if(pwa) pwa.style.display='none';   // cost panel hidden for viewers
     const st=document.getElementById('status-tracker'); if(st) st.style.display='none';    // viewers can't edit
   }
-  if (window.Onboarding) Onboarding.maybeAutoOpen(profile.id, profile.role);
+  // Interactive coach-mark tour (spotlights real UI, role-aware). Auto-runs once; re-runnable from the
+  // profile menu. Steps for hidden elements (viewer/archived) are skipped automatically.
+  if (window.CoachTour) {
+    const _cv = window.__isViewer;
+    const _ov = function(){ try{ if(window.switchView) switchView('overview'); }catch(e){} };
+    const _tb = function(){ try{ if(window.switchView) switchView('table'); }catch(e){} };
+    const _cs = [
+      { sel:'.view-tabs', title:'Project views', body:'<b>Overview</b> for the summary, <b>Backlog</b> for not-yet-awarded WPs, and <b>WP List</b> to filter, edit and track work packages.', before:_ov },
+      { sel:'#ov-battery-wp', title:'Award progress', body:'How much of this project is awarded, by work-package count.', before:_ov },
+    ];
+    if (!_cv) _cs.push({ sel:'#metrics-cost', title:'Cost overview', body:'Headline cost figures — <b>hover any label</b> for its definition.', before:_ov });
+    if (!_cv) _cs.push({ sel:'#add-wp-link', title:'Add a work package', body:'Add a single WP here, or use <b>Import from CSV</b> (in Tools) to add many at once.' });
+    _cs.push({ sel:'#f-status', title:'Filter the WP List', body:'Filter by status, <b>OSM</b>, trade, works, vendor or search to find work packages fast.', before:_tb });
+    if (!_cv) _cs.push({ sel:'#status-tracker', title:'Work Package Status Tracker', body:'Update <b>Award, Procurement &amp; Delivery</b> status inline. Setting Procurement to <b>Awarded</b> prompts for the awarded cost &amp; vendor.', before:_tb });
+    CoachTour.configure({ key:'coach_project', steps:_cs });
+    CoachTour.maybeAutoStart();
+  }
   projId = new URLSearchParams(location.search).get('id');
   if (!projId) { location.href='login.html'; return; }
 
