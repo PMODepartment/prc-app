@@ -11,6 +11,11 @@
 -- Safe to re-run: it deletes and re-inserts the DEMO rows each time.
 -- Run in the Supabase SQL Editor (production project).
 --
+-- IMPORTANT: for NON-admin roles to actually SEE the demo, the "wp_select_demo"
+-- RLS policy must exist (it's in supabase-schema.sql and MIGRATION_rls_hardening.sql).
+-- Without it, wp_select only exposes a user's assigned projects and the demo
+-- appears empty. Run MIGRATION_rls_hardening.sql once if you haven't.
+--
 -- NOTE: total_awarded / awarding_lead_time / variance are GENERATED columns —
 -- never inserted. We set awarded_cost and lead_time instead.
 -- ============================================================================

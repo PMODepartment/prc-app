@@ -244,17 +244,34 @@ create policy "users_select" on users
   for select to authenticated
   using (true);
 
--- Own row insert only (registration flow)
+-- Own row insert only (registration flow) — a registrant may ONLY create a
+-- plain pending user; role/status are pinned server-side so the client can't
+-- self-register as an approved admin.
 create policy "users_insert" on users
   for insert to authenticated
-  with check (id = auth.uid());
+  with check (
+    id = auth.uid()
+    and role = 'user'
+    and status = 'pending'
+  );
 
--- Own row update (last_login etc.) OR admin/super_admin (approvals, role changes)
+-- Own row update (last_login, name…) OR admin/super_admin (approvals, role changes).
+-- The WITH CHECK stops self-elevation: a self-update must leave role/status/projects
+-- unchanged (compared to the current stored values); only admins may change them.
 create policy "users_update" on users
   for update to authenticated
   using (
     id = auth.uid()
     or internal.get_my_role() in ('super_admin','admin')
+  )
+  with check (
+    internal.get_my_role() in ('super_admin','admin')
+    or (
+      id = auth.uid()
+      and role = internal.get_my_role()
+      and status = internal.get_my_status()
+      and coalesce(projects, '{}') = internal.get_my_projects()
+    )
   );
 
 -- ── WORK PACKAGES ─────────────────────────────────────────────
@@ -267,6 +284,15 @@ create policy "wp_select" on work_packages
       internal.get_my_role() in ('super_admin','admin','specialist')
       or project_id = any(internal.get_my_projects())
     )
+  );
+
+-- SELECT (DEMO): the read-only sandbox is readable by every approved user
+-- (OR'd with wp_select above — only widens read access to project_id='DEMO')
+create policy "wp_select_demo" on work_packages
+  for select to authenticated
+  using (
+    internal.get_my_status() = 'approved'
+    and project_id = 'DEMO'
   );
 
 -- INSERT: any approved non-viewer can submit WPs for their assigned projects

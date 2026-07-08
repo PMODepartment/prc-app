@@ -3239,13 +3239,18 @@ window.saveQuickWP = async function() {
     const { data: { user } } = await sb.auth.getUser();
 
     const newWP = await WPDb.submitWP(data, { id: user?.id });
-    if (['admin','super_admin'].includes(role) && newWP?.id) {
+    // Auto-approve for ALL auto-approve roles (admin/super_admin/specialist/manager/user),
+    // matching every other write path (wp-form, Status Tracker, CSV import). The old
+    // admin-only gate left regular users' quick-added WPs stuck in pending_review — invisible
+    // on the dashboards (which query review_status='approved') with no self-service approval.
+    const _autoApprove = AppAuth.isAutoApprove({ role });
+    if (_autoApprove && newWP?.id) {
       await WPDb.approveWP(newWP.id);
     }
     if (window.GettingStarted) { GettingStarted.markStep('addWP'); if ((data.award_status||'')==='Awarded') GettingStarted.markStep('awardIt'); }
 
     _wqmDirty = false;
-    sucEl.textContent = ['admin','super_admin'].includes(role)
+    sucEl.textContent = _autoApprove
       ? 'Work package added and approved.'
       : 'Work package submitted for review.';
     sucEl.style.display = 'block';
