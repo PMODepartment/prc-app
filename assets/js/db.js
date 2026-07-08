@@ -289,6 +289,12 @@ function renderUserBar(id, profile) {
             <div style="font-size:13px;font-weight:600;color:#231F20">${profile.name||profile.email}</div>
             <div style="font-size:11px;color:#888;margin-top:2px;text-transform:capitalize">${(profile.role||'').replace(/_/g,' ')}</div>
           </div>
+          <a onclick="event.preventDefault();(function(){var m=document.getElementById('user-menu');if(m)m.style.display='none';if(window.Onboarding&&Onboarding.open){Onboarding.open();}else{window.location.href='onboarding.html';}})()" style="
+            display:flex;align-items:center;gap:8px;padding:12px 16px;
+            font-size:13px;color:#231F20;font-weight:600;text-decoration:none;
+            font-family:inherit;cursor:pointer;border-bottom:1px solid #f5f5f5;">
+            <i class="ti ti-route" style="font-size:16px;color:#888"></i>Restart tour
+          </a>
           <a href="login.html" onclick="event.preventDefault();AppAuth.logout()" style="
             display:flex;align-items:center;gap:8px;padding:12px 16px;
             font-size:13px;color:#EE3124;font-weight:600;text-decoration:none;
