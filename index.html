@@ -1585,12 +1585,17 @@
         };
         window.renderBlTable();
       } else if (tab === 'budget') {
-        const totalBCB = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-        const totalAwd = wps.reduce((s,w)=>s+(w.total_awarded||0),0);
-        const ctc = wps.filter(w=>w.award_status!=='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+        // Use the SAME authoritative basis as the Overview tab (helpingMetrics) so the shared KPI
+        // cards reconcile. The old naive Σ total_awarded over ALL rows over-counted provisional
+        // costs sitting on "Not Yet Awarded" WPs (see CLAUDE.md #17), which made Awarded Cost / CTC /
+        // EAC / Variance disagree with the Overview. Awarded = award_status==='Awarded' && total_awarded>0.
+        const hm = helpingMetrics(wps);
+        const totalBCB = hm.totalBudget;
+        const totalAwd = hm.awardedCost;
+        const ctc = hm.totalBudget - hm.budgetAwarded;         // budget remaining to award
         const eac = totalAwd + ctc;
-        const variance = totalBCB - eac;
-        const pctVar = totalBCB ? ((variance/totalBCB)*100).toFixed(1) : '0.0';
+        const savings = hm.budgetAwarded - totalAwd;           // = totalBCB − eac; matches Overview Savings/Loss
+        const savingsPct = hm.budgetAwarded ? (savings/hm.budgetAwarded*100) : 0;
         const budCards = document.getElementById('bud-cost-cards');
         if (budCards) {
           const card = (lbl,val,cls,full) => `<div class="metric-card"><div class="metric-label"${window.kpiLabelAttrs?window.kpiLabelAttrs(lbl):''}>${lbl}</div><div class="metric-value ${cls}"${full?` title="${full}"`:''}>${val}</div></div>`;
@@ -1599,8 +1604,8 @@
             card('Awarded Cost', Fmt.moneyShort(totalAwd), 'green', Fmt.moneyFull(totalAwd)),
             card('Procurement Cost to Complete', Fmt.moneyShort(ctc), '', Fmt.moneyFull(ctc)),
             card('Procurement Estimate at Completion', Fmt.moneyShort(eac), '', Fmt.moneyFull(eac)),
-            card('Variance', (variance>=0?'+':'-')+Fmt.moneyShort(variance), variance>=0?'green':'red', (variance>=0?'+':'-')+Fmt.moneyFull(variance)),
-            card('% Variance', (parseFloat(pctVar)>=0?'+':'')+pctVar+'%', parseFloat(pctVar)>=0?'green':'red'),
+            card('Savings / Loss', (savings>=0?'+':'-')+Fmt.moneyShort(Math.abs(savings)), savings>=0?'green':'red', (savings>=0?'+':'-')+Fmt.moneyFull(Math.abs(savings))),
+            card('% Savings / Loss', (savingsPct>=0?'+':'')+savingsPct.toFixed(1)+'%', savingsPct>=0?'green':'red'),
           ].join('');
         }
         _destroyCharts(['c-idx-bud-period','c-idx-bud-trade','c-idx-bud-by-proj']);
@@ -1614,7 +1619,8 @@
           const rows = trades.map(t => {
             const tw = wps.filter(w=>w.trade===t);
             const budget = tw.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-            const awarded = tw.reduce((s,w)=>s+(w.total_awarded||0),0);
+            // Awarded uses the strict predicate so the table reconciles with the KPI cards (see CLAUDE.md #17)
+            const awarded = tw.filter(w=>w.award_status==='Awarded' && (w.total_awarded||0)>0).reduce((s,w)=>s+(w.total_awarded||0),0);
             const v = budget-awarded;
             const ar = tw.length ? Math.round(tw.filter(w=>w.award_status==='Awarded').length/tw.length*100) : 0;
             return `<tr><td>${t}</td><td style="text-align:center">${tw.length}</td>
@@ -1625,7 +1631,7 @@
               <td style="text-align:center">${ar}%</td></tr>`;
           });
           const totB = trades.reduce((s,t)=>s+wps.filter(w=>w.trade===t).reduce((ss,w)=>ss+(w.approved_budget_bcb||0),0),0);
-          const totA = trades.reduce((s,t)=>s+wps.filter(w=>w.trade===t).reduce((ss,w)=>ss+(w.total_awarded||0),0),0);
+          const totA = trades.reduce((s,t)=>s+wps.filter(w=>w.trade===t && w.award_status==='Awarded' && (w.total_awarded||0)>0).reduce((ss,w)=>ss+(w.total_awarded||0),0),0);
           const totV = totB - totA;
           budTbody.innerHTML = rows.join('') + `<tr style="font-weight:700;background:#fafafa;border-top:2px solid #e5e5e5">
             <td>TOTAL</td><td style="text-align:center">${wps.length}</td>
