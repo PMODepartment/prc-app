@@ -34,7 +34,7 @@ const AppAuth = (() => {
   const _ALL_PROJECT_ROLES = ['admin','super_admin','specialist'];
   function getPermittedProjects(profile, allProjects) { if (_ALL_PROJECT_ROLES.includes(profile.role)) return allProjects; return allProjects.filter(p => (profile.projects||[]).includes(p.id)); }
   // Specialist can VIEW all projects but can only EDIT assigned ones — editing checks use profile.projects
-  function canAccessProject(profile, projectId) { if (_ALL_PROJECT_ROLES.includes(profile.role)) return true; return (profile.projects||[]).includes(projectId); }
+  function canAccessProject(profile, projectId) { if (projectId === 'DEMO') return true; /* read-only sandbox — open to everyone */ if (_ALL_PROJECT_ROLES.includes(profile.role)) return true; return (profile.projects||[]).includes(projectId); }
   function isAdmin(p) { return ['admin','super_admin'].includes(p?.role); }
   function isSuperAdmin(p) { return p?.role === 'super_admin'; }
   function isViewer(p) { return p?.role === 'viewer'; }

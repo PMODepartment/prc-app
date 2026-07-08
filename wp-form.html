@@ -983,6 +983,8 @@
 let formDirty = false;
 function markDirty() { formDirty = true; }
 function markClean() { formDirty = false; }
+// First-run checklist marker (mirrors GettingStarted.markStep; onboarding.js isn't loaded here).
+function _gsMark(step){ try{ const uid=(userProfile&&userProfile.id)||'anon'; const k='wpm_gs_'+uid; const p=JSON.parse(localStorage.getItem(k)||'{}'); if(!p[step]){ p[step]=true; localStorage.setItem(k,JSON.stringify(p)); } }catch(_){} }
 window.addEventListener('beforeunload', function(e) {
   if (formDirty) { e.preventDefault(); e.returnValue = 'You have unsaved changes. Leave anyway?'; return e.returnValue; }
 });
@@ -1186,33 +1188,41 @@ AppAuth.requireLogin(async (user, profile) => {
     alertEl.className = 'alert alert-error hidden';
     successEl.className = 'alert alert-success hidden';
 
-    const showErr = msg => { document.getElementById('alert-text').textContent=msg; alertEl.className='alert alert-error'; };
+    // Actionable errors: show the message AND jump to the offending field so the user knows
+    // exactly what to fix and where. Pass the field id as the 2nd arg.
+    const showErr = (msg, fieldId) => {
+      document.getElementById('alert-text').textContent = msg;
+      alertEl.className = 'alert alert-error';
+      const f = fieldId && document.getElementById(fieldId);
+      if (f) { f.scrollIntoView({ behavior:'smooth', block:'center' }); try { f.focus({ preventScroll:true }); } catch(_) { try { f.focus(); } catch(__){} } }
+      else alertEl.scrollIntoView({ behavior:'smooth', block:'center' });
+    };
 
-    /* Validate required fields */
-    if (!getVal('f-wp-no'))          return showErr('WP No. is required.');
-    if (!getVal('f-description'))    return showErr('Work Package Description is required.');
-    if (!getVal('f-project'))        return showErr('Please select a project.');
+    /* Validate required fields — each message says what to do and focuses the field */
+    if (!getVal('f-wp-no'))          return showErr('Enter a WP No. (Identity & Classification).', 'f-wp-no');
+    if (!getVal('f-description'))    return showErr('Enter a Work Package Description.', 'f-description');
+    if (!getVal('f-project'))        return showErr('Select a project for this work package.', 'f-project');
     // Archived projects are read-only for everyone
     const _selProj = (allProjects||[]).find(p => p.id === getVal('f-project'));
-    if (_selProj && _selProj.status === 'archived') return showErr('This project is archived and read-only. Unarchive it to add or edit work packages.');
-    if (!getVal('f-trade'))          return showErr('Trade is required.');
-    if (!getVal('f-awarding-date'))  return showErr('Awarding Date is required.');
-    if (!getVal('f-target-delivery'))return showErr('Target Delivery Date is required.');
-    if (!getVal('f-target-completion'))return showErr('Target Completion Date is required.');
-    if (!getNum('f-budget'))         return showErr('Budget (BCB) is required.');
-    if (!getVal('f-charging'))       return showErr('Charging type is required.');
+    if (_selProj && _selProj.status === 'archived') return showErr('This project is archived and read-only. Pick an active project, or ask an admin to unarchive it.', 'f-project');
+    if (!getVal('f-trade'))          return showErr('Select a Trade (drives the Works & Type options).', 'f-trade');
+    if (!getVal('f-awarding-date'))  return showErr('Set the planned Awarding Date (Procurement Schedule).', 'f-awarding-date');
+    if (!getVal('f-target-delivery'))return showErr('Set the Target Delivery Date (Procurement Schedule).', 'f-target-delivery');
+    if (!getVal('f-target-completion'))return showErr('Set the Target Completion Date (Procurement Schedule).', 'f-target-completion');
+    if (!getNum('f-budget'))         return showErr('Enter the Budget (BCB) amount (Budget & Contract).', 'f-budget');
+    if (!getVal('f-charging'))       return showErr('Choose a Charging type (Main Contract or Change Order).', 'f-charging');
 
     /* Awarded WPs must have an Awarded Cost and an Awarded Vendor */
     if (getVal('f-award-status') === 'Awarded') {
-      if (!getNum('f-contract'))     return showErr('Awarded Cost (Net) is required when Award Status is "Awarded".');
-      if (!getVal('f-contractor'))   return showErr('Awarded Vendor is required when Award Status is "Awarded".');
+      if (!getNum('f-contract'))     return showErr('This WP is marked Awarded — enter the Awarded Cost (Net), or set Award Status back to "Not Yet Awarded".', 'f-contract');
+      if (!getVal('f-contractor'))   return showErr('This WP is marked Awarded — enter the Awarded Vendor, or set Award Status back to "Not Yet Awarded".', 'f-contractor');
     }
 
     /* No. of PO/JO must match the count of entries in PO/JO Numbers */
     const pjCount = parseInt(getVal('f-po-jo-count')) || 0;
     const pjList = (getVal('f-po-jo-numbers') || '').split(/[\s,;]+/).map(s => s.trim()).filter(Boolean);
     if (pjCount || pjList.length) {
-      if (pjCount !== pjList.length) return showErr(`No. of PO/JO (${pjCount}) must match the number of PO/JO Numbers listed (${pjList.length}).`);
+      if (pjCount !== pjList.length) return showErr(`No. of PO/JO says ${pjCount} but ${pjList.length} number(s) are listed. Make them match: update the count or the PO/JO Numbers.`, 'f-po-jo-numbers');
     }
 
     /* Actual Award Date cannot be in the future — a WP can't be awarded on a date that hasn't happened yet */
@@ -1221,7 +1231,7 @@ AppAuth.requireLogin(async (user, profile) => {
       const today0 = new Date(); today0.setHours(0,0,0,0);
       const m = String(actualAward).match(/(\d{4})-(\d{2})-(\d{2})/);
       const ad = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(actualAward);
-      if (!isNaN(ad) && ad > today0) return showErr('Actual Awarding Date cannot be in the future.');
+      if (!isNaN(ad) && ad > today0) return showErr('Actual Awarding Date is in the future — use today or an earlier date (a WP can only be awarded once it has happened).', 'f-actual-awarding-date');
     }
 
     const data = {
@@ -1304,6 +1314,10 @@ AppAuth.requireLogin(async (user, profile) => {
           await WPDb.submitWP(data, userProfile);
           document.getElementById('success-text').textContent = 'Work package submitted for review.';
         }
+        // First-run checklist progress (this page doesn't load onboarding.js, so write the
+        // shared localStorage key directly — same convention as GettingStarted.markStep).
+        _gsMark('addWP');
+        if ((data.award_status || '') === 'Awarded') _gsMark('awardIt');
       }
       successEl.className = 'alert alert-success';
       successEl.scrollIntoView({ behavior:'smooth' });

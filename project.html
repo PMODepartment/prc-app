@@ -11,17 +11,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260708m"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260708m"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260708m"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260708n"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260708n"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260708n"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708b"/>
   <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260708m"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260708n"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260708m"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260708n"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -214,6 +214,7 @@
 
         <!-- ══ OVERVIEW VIEW ══ -->
         <div id="view-overview">
+          <div id="gs-checklist"></div>
           <div class="ov-top-row" style="margin-bottom:16px">
             <!-- Left: Cost Overview — 6 KPIs -->
             <div id="metrics-cost-group">
@@ -413,8 +414,13 @@
           <!-- Quick Status Tracker — inline-edit Award / Procurement / Delivery status per WP -->
           <div class="panel" id="status-tracker" style="margin-bottom:14px">
             <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <span><i class="ti ti-list-check"></i> Work Package Status Tracker</span>
+              <span><i class="ti ti-list-check"></i> Work Package Status Tracker <span id="st-new-badge" style="display:none;background:#EE3124;color:#fff;font-size:9px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:10px;vertical-align:middle;margin-left:4px">NEW</span></span>
               <span id="status-tracker-hint" style="font-size:11px;font-weight:400;color:#888">Update Award, Procurement &amp; Delivery status inline. Reflects current filters.</span>
+            </div>
+            <div id="st-new-callout" style="display:none;background:var(--mw-red-light,#FDECEA);border:1px solid var(--mw-red-mid,#F9C8C5);border-radius:8px;padding:9px 12px;margin:2px 0 10px;font-size:12px;color:var(--mw-red-dark,#C42127);display:none;align-items:center;gap:9px">
+              <i class="ti ti-sparkles" style="font-size:16px;flex-shrink:0"></i>
+              <span style="flex:1"><strong>Tip:</strong> change Award, Procurement or Delivery status right here — no need to open the full form. Setting Procurement to <strong>Awarded</strong> prompts for the cost &amp; vendor.</span>
+              <button onclick="dismissStNew()" style="background:none;border:none;color:var(--mw-red-dark,#C42127);cursor:pointer;font-weight:700;font-size:11px;white-space:nowrap">Got it</button>
             </div>
             <div style="overflow-x:auto;max-height:360px;overflow-y:auto">
               <table class="data-table" id="status-tracker-table" style="font-size:11px;width:100%;min-width:640px">
@@ -529,14 +535,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260708m"></script>
-<script src="assets/js/ui.js?v=20260708m"></script>
-<script src="assets/js/db.js?v=20260708m"></script>
-<script src="assets/js/onboarding.js?v=20260708a"></script>
+<script src="assets/js/auth.js?v=20260708n"></script>
+<script src="assets/js/ui.js?v=20260708n"></script>
+<script src="assets/js/db.js?v=20260708n"></script>
+<script src="assets/js/onboarding.js?v=20260708b"></script>
 <script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260708m"></script>
+<script src="assets/js/charts.js?v=20260708n"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -860,10 +866,26 @@ function _stOptsHtml(opts, cur){
 function _stSelect(id, field, opts, cur){
   return `<select onchange="updateWpStatus('${id}','${field}',this.value,this)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid var(--border-md);border-radius:5px;background:var(--surface-2);color:var(--text-primary);font-family:inherit;cursor:pointer">${_stOptsHtml(opts,cur)}</select>`;
 }
+// One-time "NEW" hint on the Status Tracker (dismissed per user via localStorage).
+function _stNewKey(){ return 'wpm_st_seen_' + ((window.__profile&&window.__profile.id)||'anon'); }
+function _stMaybeShowNew(){
+  if(window.__isViewer||window.__demo) return;
+  let seen=false; try{ seen=!!localStorage.getItem(_stNewKey()); }catch(_){}
+  const badge=document.getElementById('st-new-badge'), co=document.getElementById('st-new-callout');
+  if(badge) badge.style.display = seen?'none':'inline-block';
+  if(co) co.style.display = seen?'none':'flex';
+}
+window.dismissStNew=function(){
+  try{ localStorage.setItem(_stNewKey(),'1'); }catch(_){}
+  const badge=document.getElementById('st-new-badge'), co=document.getElementById('st-new-callout');
+  if(badge) badge.style.display='none';
+  if(co) co.style.display='none';
+};
 function renderStatusTracker(){
   if(window.__isViewer) return;
   const thead=document.getElementById('status-tracker-thead'), tbody=document.getElementById('status-tracker-tbody');
   if(!thead||!tbody) return;
+  _stMaybeShowNew();
   const hint=document.getElementById('status-tracker-hint');
   if(hint) hint.textContent = _stAutoApprove()
     ? 'Set Procurement & Delivery status inline — saves instantly. Award Status follows Procurement (Awarded → Awarded). Reflects current filters.'
@@ -931,6 +953,8 @@ window.updateWpStatus = async function(id, field, value, sel){
   const prev = w[field];
   if(prev===value) return;
   if(window.__archived){ _stToast('Project is archived — read-only', true); sel.value = prev==null?'':prev; return; }
+  if(window.dismissStNew) dismissStNew();   // they've discovered the tracker — retire the NEW hint
+  if(window.GettingStarted){ GettingStarted.markStep('setStatus'); if(field==='procurement_status'&&value==='Awarded') GettingStarted.markStep('awardIt'); }
   // Award Status is DERIVED from Procurement Status. Changing Procurement Status drives Award Status:
   //  • Awarded  → Award Status = Awarded (requires Awarded Cost + Vendor → popup if missing)
   //  • anything else → Award Status = Not Yet Awarded
@@ -2367,16 +2391,25 @@ AppAuth.requireLogin(async (user, profile) => {
     document.getElementById('nav-proj-name').textContent = meta.id;
     document.getElementById('nav-proj-link').href = 'project.html?id='+meta.id;
     // Archived projects are READ-ONLY for everyone (all roles). Only an admin can unarchive.
-    window.__archived = (meta.status === 'archived');
+    // The DEMO sandbox is ALSO read-only (for everyone, admins included) — it reuses the same
+    // guards via window.__archived but shows a friendly "demo" banner instead of the archive one.
+    const isDemo = (meta.id === 'DEMO');
+    window.__demo = isDemo;
+    window.__archived = (meta.status === 'archived') || isDemo;
     if(window.__archived){
       document.body.classList.add('archived-readonly');
       const banner = document.createElement('div');
-      banner.style.cssText='background:#FFF3CD;border:1px solid #FFC107;border-radius:8px;padding:10px 14px;font-size:12px;color:#856404;margin-bottom:16px;display:flex;align-items:center;gap:8px';
-      banner.innerHTML='<i class="ti ti-archive" style="font-size:16px"></i><strong>Archived Project</strong> — This project is read-only. Editing is disabled'+(isAdmin?'; unarchive it to make changes.':'.');
+      if(isDemo){
+        banner.style.cssText='background:#EAF3DE;border:1px solid #A7C97F;border-radius:8px;padding:10px 14px;font-size:12px;color:#3B6D11;margin-bottom:16px;display:flex;align-items:center;gap:8px';
+        banner.innerHTML='<i class="ti ti-flask" style="font-size:16px"></i><strong>Demo Project</strong> — Explore freely! This is a read-only sandbox with sample data, so you can\'t break anything.';
+      } else {
+        banner.style.cssText='background:#FFF3CD;border:1px solid #FFC107;border-radius:8px;padding:10px 14px;font-size:12px;color:#856404;margin-bottom:16px;display:flex;align-items:center;gap:8px';
+        banner.innerHTML='<i class="ti ti-archive" style="font-size:16px"></i><strong>Archived Project</strong> — This project is read-only. Editing is disabled'+(isAdmin?'; unarchive it to make changes.':'.');
+      }
       document.getElementById('main-content')?.prepend(banner);
     }
-    // Archive/unarchive button (admins only)
-    if(isAdmin) {
+    // Archive/unarchive button (admins only) — not shown for the demo sandbox
+    if(isAdmin && !isDemo) {
       const archBtn = document.getElementById('btn-archive-project');
       const archLabel = document.getElementById('archive-btn-label');
       if(archBtn && archLabel) {
@@ -2385,6 +2418,13 @@ AppAuth.requireLogin(async (user, profile) => {
         else archLabel.textContent = 'Archive Project';
       }
     }
+  }
+
+  // First-run checklist: opening a project completes step 1. Skip on the read-only demo/archived
+  // projects (you can't add/edit there, so the checklist steps don't apply).
+  if (window.GettingStarted && !window.__isViewer && !window.__archived) {
+    GettingStarted.markStep('pickProject');
+    GettingStarted.render('gs-checklist', { projectId: projId });
   }
 
   buildMetrics(allWPs);
@@ -3202,6 +3242,7 @@ window.saveQuickWP = async function() {
     if (['admin','super_admin'].includes(role) && newWP?.id) {
       await WPDb.approveWP(newWP.id);
     }
+    if (window.GettingStarted) { GettingStarted.markStep('addWP'); if ((data.award_status||'')==='Awarded') GettingStarted.markStep('awardIt'); }
 
     _wqmDirty = false;
     sucEl.textContent = ['admin','super_admin'].includes(role)

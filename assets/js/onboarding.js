@@ -392,3 +392,113 @@
 
   window.Onboarding = { open: open, maybeAutoOpen: maybeAutoOpen };
 })();
+
+/* ============================================================================
+ * GettingStarted — first-run checklist card ("Getting started (n/4)")
+ * ----------------------------------------------------------------------------
+ * A small dismissible card that gives new users a concrete path:
+ *   Pick a project → Add a WP → Set its status → Award it.
+ * Progress persists per user in localStorage and is marked from the real
+ * actions (project open, WP save, status change, award) via markStep().
+ * ========================================================================== */
+(function () {
+  'use strict';
+  var STEPS = [
+    { key: 'pickProject', label: 'Pick a project',      hint: 'Open a project to see its dashboard.' },
+    { key: 'addWP',       label: 'Add a work package',  hint: 'Create your first WP — form or CSV import.' },
+    { key: 'setStatus',   label: 'Set its status',      hint: 'Use the Status Tracker to update procurement status.' },
+    { key: 'awardIt',     label: 'Award it',            hint: 'Set Procurement Status to Awarded (prompts for cost + vendor).' },
+  ];
+  var _last = null;   // remember last render target so markStep can refresh
+
+  function uid() { return (window.__profile && window.__profile.id) || window.__obUserId || 'anon'; }
+  function pKey() { return 'wpm_gs_' + uid(); }
+  function xKey() { return 'wpm_gs_x_' + uid(); }
+  function getProg() { try { return JSON.parse(localStorage.getItem(pKey()) || '{}') || {}; } catch (_) { return {}; } }
+  function setProg(p) { try { localStorage.setItem(pKey(), JSON.stringify(p)); } catch (_) {} }
+  function dismissed() { try { return !!localStorage.getItem(xKey()); } catch (_) { return false; } }
+
+  function injectCss() {
+    if (document.getElementById('gs-css')) return;
+    var s = document.createElement('style');
+    s.id = 'gs-css';
+    s.textContent = [
+      '.gs-card{background:var(--surface,#fff);border:1px solid var(--border-md,rgba(0,0,0,.14));border-left:3px solid var(--mw-red,#EE3124);border-radius:12px;padding:16px 18px;margin-bottom:16px;box-shadow:0 2px 10px rgba(0,0,0,.05)}',
+      '.gs-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}',
+      '.gs-head h3{margin:0;font-size:14.5px;font-weight:800;color:var(--text-primary,#231F20)}',
+      '.gs-prog{font-size:11px;font-weight:700;color:var(--mw-red,#EE3124);background:var(--mw-red-light,#FDECEA);padding:2px 9px;border-radius:20px}',
+      '.gs-x{margin-left:auto;background:none;border:none;color:var(--text-hint,#9B9999);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px}',
+      '.gs-x:hover{color:var(--mw-red,#EE3124)}',
+      '.gs-track{height:5px;border-radius:3px;background:var(--surface-2,#eee);overflow:hidden;margin-bottom:12px}',
+      '.gs-track>i{display:block;height:100%;background:var(--mw-red,#EE3124);transition:width .3s}',
+      '.gs-steps{display:flex;flex-direction:column;gap:8px}',
+      '.gs-step{display:flex;align-items:flex-start;gap:10px;font-size:12.5px}',
+      '.gs-num{width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;background:var(--surface-2,#eee);color:var(--text-hint,#9B9999)}',
+      '.gs-step.done .gs-num{background:#2D9B6F;color:#fff}',
+      '.gs-step.done .gs-label{text-decoration:line-through;color:var(--text-hint,#9B9999)}',
+      '.gs-label{font-weight:700;color:var(--text-primary,#231F20)}',
+      '.gs-hint{color:var(--text-secondary,#5A5858);font-weight:400}',
+      '.gs-act{margin-left:6px;color:var(--mw-red,#EE3124);font-weight:700;text-decoration:none;white-space:nowrap}',
+      '.gs-act:hover{text-decoration:underline}',
+      '.gs-done-msg{font-size:12.5px;color:#2D9B6F;font-weight:700;display:flex;align-items:center;gap:7px}',
+    ].join('\n');
+    document.head.appendChild(s);
+  }
+
+  // Contextual action affordance for the first not-yet-done step
+  function actionFor(key, pid) {
+    if (key === 'addWP')  return pid ? ' <a class="gs-act" href="wp-form.html?project=' + encodeURIComponent(pid) + '">Add now →</a>' : '';
+    if (key === 'setStatus' || key === 'awardIt')
+      return pid ? ' <a class="gs-act" href="javascript:void 0" onclick="document.getElementById(\'status-tracker\')?.scrollIntoView({behavior:\'smooth\',block:\'center\'});return false">Open tracker →</a>' : '';
+    if (key === 'pickProject') return pid ? '' : ' <span class="gs-hint">— choose one from the list or sidebar.</span>';
+    return '';
+  }
+
+  function render(containerId, opts) {
+    opts = opts || {};
+    _last = { containerId: containerId, opts: opts };
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    if (window.__isViewer || dismissed()) { el.innerHTML = ''; el.style.display = 'none'; return; }
+    injectCss();
+    var prog = getProg();
+    var done = STEPS.filter(function (s) { return prog[s.key]; }).length;
+    var pct = Math.round(done / STEPS.length * 100);
+    var pid = opts.projectId || null;
+    var firstOpen = STEPS.find(function (s) { return !prog[s.key]; });
+    var rows = STEPS.map(function (s) {
+      var isDone = !!prog[s.key];
+      var act = (!isDone && firstOpen && s.key === firstOpen.key) ? actionFor(s.key, pid) : '';
+      return '<div class="gs-step' + (isDone ? ' done' : '') + '">' +
+        '<span class="gs-num">' + (isDone ? '<i class="ti ti-check" style="font-size:12px"></i>' : (STEPS.indexOf(s) + 1)) + '</span>' +
+        '<div><span class="gs-label">' + s.label + '</span> <span class="gs-hint">— ' + s.hint + '</span>' + act + '</div></div>';
+    }).join('');
+    var body = (done === STEPS.length)
+      ? '<div class="gs-done-msg"><i class="ti ti-circle-check" style="font-size:17px"></i> All set — you\'ve completed the basics! You can dismiss this.</div>'
+      : '<div class="gs-track"><i style="width:' + pct + '%"></i></div><div class="gs-steps">' + rows + '</div>';
+    el.style.display = '';
+    el.innerHTML =
+      '<div class="gs-card">' +
+        '<div class="gs-head"><i class="ti ti-rocket" style="color:var(--mw-red,#EE3124);font-size:18px"></i>' +
+          '<h3>Getting started</h3><span class="gs-prog">' + done + '/' + STEPS.length + '</span>' +
+          '<button class="gs-x" title="Dismiss" onclick="GettingStarted.dismiss()">&times;</button></div>' +
+        body +
+      '</div>';
+  }
+
+  function markStep(key) {
+    if (window.__isViewer) return;
+    var prog = getProg();
+    if (prog[key]) return;         // already done — no-op
+    prog[key] = true;
+    setProg(prog);
+    if (_last) render(_last.containerId, _last.opts);   // refresh a visible card
+  }
+
+  function dismiss() {
+    try { localStorage.setItem(xKey(), '1'); } catch (_) {}
+    if (_last) { var el = document.getElementById(_last.containerId); if (el) { el.innerHTML = ''; el.style.display = 'none'; } }
+  }
+
+  window.GettingStarted = { render: render, markStep: markStep, dismiss: dismiss };
+})();

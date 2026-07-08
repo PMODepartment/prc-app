@@ -76,12 +76,17 @@ const WPDb = (() => {
       await sb.from('users').update({last_login: new Date().toISOString()}).eq('id',id);
     } catch(e) { /* non-critical — ignore */ }
   }
+  // Hard-delete a user's profile row from public.users (used by admin "Remove user").
+  // NOTE: this removes the app profile only; the underlying auth.users record can only be
+  // deleted with the service-role key (not available client-side). Without a profile the
+  // user fails AppAuth.requireLogin (no profile → signed out), so access is fully revoked.
+  async function deleteUser(id) { const sb=await getSB(); const {error}=await sb.from('users').delete().eq('id',id); if(error) throw error; }
   async function archiveProject(id) { const sb=await getSB(); const {error}=await sb.from('projects').update({status:'archived'}).eq('id',id); if(error) throw error; }
   async function unarchiveProject(id) { const sb=await getSB(); const {error}=await sb.from('projects').update({status:'active'}).eq('id',id); if(error) throw error; }
   async function updateProject(id,data) { const sb=await getSB(); const {data:d,error}=await sb.from('projects').update(data).eq('id',id).select().single(); if(error) throw error; return d; }
   async function deleteProject(id) { const sb=await getSB(); await sb.from('work_packages').delete().eq('project_id',id); const {error}=await sb.from('projects').delete().eq('id',id); if(error) throw error; }
   async function seedWP(d) { return submitWP(d,null); }
-  return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getAllApprovedWPs,getApprovedWPsForProjects,getPendingWPs,getAllWPsForAdmin,getAllWPsForProjects,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,deleteWP,getAllUsers,getUsersForAdmin,getAdminUsers,getManagerUsers,updateUser,updateLastLogin,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
+  return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getAllApprovedWPs,getApprovedWPsForProjects,getPendingWPs,getAllWPsForAdmin,getAllWPsForProjects,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,deleteWP,getAllUsers,getUsersForAdmin,getAdminUsers,getManagerUsers,updateUser,updateLastLogin,deleteUser,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
 })();
 
 /* ── Stats ─────────────────────────────────────────────────────────── */

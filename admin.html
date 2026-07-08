@@ -148,7 +148,7 @@
             <div class="kpi-card"><div class="kpi-value" id="kpiPending">—</div><div class="kpi-label">Pending Approval</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiApproved" style="color:#2D9B6F">—</div><div class="kpi-label">Active (≤7 days)</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiInactive" style="color:#D97706">—</div><div class="kpi-label">Inactive (7+ days)</div></div>
-            <div class="kpi-card"><div class="kpi-value" id="kpiRejected" style="color:#6B7280">—</div><div class="kpi-label">Revoked</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiRejected" style="color:#6B7280">—</div><div class="kpi-label">Rejected</div></div>
           </div>
           <div class="tab-row" id="admin-tab-row">
             <button class="tab-btn active" id="tabAll" onclick="switchTab('all')">All Users</button>
@@ -696,7 +696,7 @@
         <td style="color:#888;font-size:11px;white-space:nowrap">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{day:'2-digit',month:'short',year:'numeric'}):'\u2014'}</td>
         <td>
           ${isSuperAdmin ? `<button class="action-btn" onclick="event.stopPropagation();openReassignModal('${u.id}')" style="font-size:11px;background:#EFF6FF;color:#1D4ED8;margin-right:4px">Reassign</button>` : ''}
-          <button class="action-btn btn-reject-row" onclick="event.stopPropagation();revokeUser('${u.id}')" style="font-size:11px">Revoke</button>
+          <button class="action-btn btn-reject-row" onclick="event.stopPropagation();revokeUser('${u.id}')" style="font-size:11px" title="Permanently delete this user from the database">Remove</button>
         </td>
       </tr>`;
     }).join('');
@@ -955,9 +955,20 @@
     await loadData();
   };
 
+  // Permanently DELETE the user from the database (replaces the old soft "revoke" that only
+  // set status='rejected'). Removes the public.users profile row entirely — the user loses
+  // access immediately and would have to register again. (The auth.users record can only be
+  // purged with the service-role key server-side; without a profile they can't sign in.)
   window.revokeUser = async function(userId) {
-    if (!confirm('Revoke this user\'s access?')) return;
-    await WPDb.updateUser(userId, { status: 'rejected' });
+    const u = (allUsers || []).find(x => x.id === userId);
+    const who = u ? (u.name || u.email || 'this user') : 'this user';
+    if (!confirm(`Permanently remove ${who} from the database?\n\nThis deletes their profile completely. They lose access immediately and would have to register again. This cannot be undone.`)) return;
+    try {
+      await WPDb.deleteUser(userId);
+    } catch (e) {
+      alert('Could not remove user: ' + (e.message || e));
+      return;
+    }
     await loadData();
   };
 
@@ -1005,7 +1016,7 @@
 
   function activityBadge(u) {
     if (u.status === 'rejected') {
-      return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#F3F4F6;color:#6B7280;white-space:nowrap">Revoked</span>';
+      return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#F3F4F6;color:#6B7280;white-space:nowrap">Rejected</span>';
     }
     if (u.status === 'pending') {
       return '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#FEF3C7;color:#92400E;white-space:nowrap">Pending</span>';

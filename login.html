@@ -408,6 +408,11 @@ document.getElementById('npModal').addEventListener('keydown', e => {
   if (e.key==='Escape') closeNPModal();
 });
 async function showProjectPicker(profile) {
+  // Role-aware landing: viewers are read-only and get the most value from the consolidated
+  // Portfolio Overview charts, so drop them straight in (skip the picker). Contributors with a
+  // single project already go direct (below); admins/specialists/multi-project users keep the picker.
+  if (profile.role === 'viewer') { window.location.href = 'index.html'; return; }
+
   document.getElementById('loginForm').classList.add('hidden');
   document.getElementById('projectPicker').classList.add('visible');
 
@@ -421,10 +426,13 @@ async function showProjectPicker(profile) {
   const isAdmin = ['admin', 'super_admin'].includes(profile.role);
   const seesAllProjects = ['admin', 'super_admin', 'specialist'].includes(profile.role);
   const { data: projects } = await sb.from('projects').select('id,name,location,status').order('name');
-  const visible = seesAllProjects ? (projects || []) : (projects || []).filter(p => (profile.projects || []).includes(p.id));
+  // The DEMO sandbox is surfaced to EVERYONE as its own picker item (below), so pull it out of the
+  // normal project list here (avoids showing it twice for admins/specialists who see all projects).
+  const demoProj = (projects || []).find(p => p.id === 'DEMO');
+  const visible = (seesAllProjects ? (projects || []) : (projects || []).filter(p => (profile.projects || []).includes(p.id))).filter(p => p.id !== 'DEMO');
 
   // User with exactly 1 project: skip picker, go directly
-  if (!seesAllProjects && visible.length === 1) {
+  if (!seesAllProjects && visible.length === 1 && !demoProj) {
     window.location.href = `project.html?id=${visible[0].id}`;
     return;
   }
@@ -436,6 +444,8 @@ async function showProjectPicker(profile) {
     allItems.push({ value: 'consolidated', id: 'ALL PROJECTS', name: 'Portfolio — Consolidated View', sub, consolidated: true, status: null });
   }
   visible.forEach(p => allItems.push({ value: p.id, id: p.id, name: p.name || p.id, sub: p.location || '', consolidated: false, status: p.status || 'active' }));
+  // Demo sandbox — read-only, open to all (great for first-time exploration)
+  if (demoProj) allItems.push({ value: 'DEMO', id: 'DEMO', name: demoProj.name || 'Demo Project', sub: '🧪 Explore freely — read-only sandbox', consolidated: false, status: 'active' });
 
   renderList(allItems);
   updateCount(allItems);
