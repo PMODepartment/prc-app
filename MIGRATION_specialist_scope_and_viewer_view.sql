@@ -43,29 +43,34 @@ create policy "wp_update" on public.work_packages
   );
 
 -- ── P1: CLAIMS write policies — same specialist restriction ─────────────────
-drop policy if exists "claims_insert" on public.claims;
-create policy "claims_insert" on public.claims
-  for insert to authenticated
-  with check (
-    internal.get_my_status() = 'approved'
-    and internal.get_my_role() <> 'viewer'
-    and (
-      internal.get_my_role() in ('super_admin','admin')
-      or project_id = any(internal.get_my_projects())
-    )
-  );
-
-drop policy if exists "claims_update" on public.claims;
-create policy "claims_update" on public.claims
-  for update to authenticated
-  using (
-    internal.get_my_status() = 'approved'
-    and internal.get_my_role() <> 'viewer'
-    and (
-      internal.get_my_role() in ('super_admin','admin')
-      or project_id = any(internal.get_my_projects())
-    )
-  );
+-- GUARDED: the `claims` table may not exist in this database (Claims is a hidden,
+-- not-yet-active feature, so the live DB — created from an early schema — has no
+-- claims table). Only touch its policies if the table is actually present.
+do $$
+begin
+  if to_regclass('public.claims') is not null then
+    execute 'drop policy if exists "claims_insert" on public.claims';
+    execute $p$
+      create policy "claims_insert" on public.claims
+        for insert to authenticated
+        with check (
+          internal.get_my_status() = 'approved'
+          and internal.get_my_role() <> 'viewer'
+          and (internal.get_my_role() in ('super_admin','admin') or project_id = any(internal.get_my_projects()))
+        )
+    $p$;
+    execute 'drop policy if exists "claims_update" on public.claims';
+    execute $p$
+      create policy "claims_update" on public.claims
+        for update to authenticated
+        using (
+          internal.get_my_status() = 'approved'
+          and internal.get_my_role() <> 'viewer'
+          and (internal.get_my_role() in ('super_admin','admin') or project_id = any(internal.get_my_projects()))
+        )
+    $p$;
+  end if;
+end $$;
 
 -- ── S4: block viewers from the base table (they read via the view instead) ──
 -- Keep the DEMO read-exception (from MIGRATION_rls_hardening) intact.
@@ -80,6 +85,18 @@ create policy "wp_select" on public.work_packages
       or project_id = any(internal.get_my_projects())
     )
   );
+
+-- Safety: ensure the later-added columns the view lists actually exist (the live DB
+-- was created from an early schema, so some ALTER-added columns may be missing).
+-- All idempotent — no-ops if the column is already present.
+alter table public.work_packages add column if not exists works text;
+alter table public.work_packages add column if not exists type_of_works text;
+alter table public.work_packages add column if not exists scope text;
+alter table public.work_packages add column if not exists actual_delivery date;
+alter table public.work_packages add column if not exists charging_type text;
+alter table public.work_packages add column if not exists contract_package_no text;
+alter table public.work_packages add column if not exists co_description text;
+alter table public.work_packages add column if not exists osm text default 'No';
 
 -- ── S4: cost-free, security-definer view of work_packages ───────────────────
 -- SECURITY DEFINER (default for views) → runs as owner, bypassing the caller's
