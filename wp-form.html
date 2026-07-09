@@ -1493,7 +1493,7 @@ AppAuth.requireLogin(async (user, profile) => {
       if (_pjErr.length) throw new Error(`No. of PO/JO must match the PO/JO Numbers listed. Fix WP No(s): ${_pjErr.join(', ')}`);
       // De-duplicate by WP No.: re-importing existing WPs UPDATES them in place instead of inserting
       // duplicates. Match on normalized WP No. (trailing ".0" stripped, case-insensitive) per project.
-      const _wpKey = v => String(v==null?'':v).trim().replace(/\.0+$/,'').toLowerCase();
+      const _wpKey = v => String(v==null?'':v).trim().replace(/^WP[-\s]?(?=\d)/i,'').replace(/\.0+$/,'').toLowerCase();
       const _existing = await WPDb.getAllWPs(pid);
       const _byNo = {};
       _existing.forEach(w => { const k=_wpKey(w.wp_no); if(k) _byNo[k]=w.id; });
@@ -1573,6 +1573,11 @@ AppAuth.requireLogin(async (user, profile) => {
       <input type="file" id="wp-csv-file" accept=".csv" style="display:none" onchange="handleWPCsvFile(this.files[0])">
       <div id="wp-csv-status" style="margin-top:10px;font-size:12px;color:#166534"></div>
       <div id="wp-csv-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 12px;font-size:12px;margin-top:10px"></div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #eee;font-size:12px;color:#888">
+        Have the raw <b>Excel monitoring sheet</b>? Skip the CSV —
+        <a href="import-monitoring.html" style="color:#EE3124;font-weight:600;text-decoration:none">open the Excel importer →</a>
+        <span style="color:#bbb">(admin only)</span>
+      </div>
     </div>
     <div style="padding:0 20px 20px;display:flex;gap:10px">
       <button id="wp-csv-btn" onclick="importWPsFromCSV()" disabled style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;opacity:.5">Import</button>

@@ -1655,7 +1655,7 @@ function normTrade(t){
 
 // Normalize WP No. display: some projects (e.g. SLN101) store numbers as "2.0" — show "2".
 // Only strips a trailing .0/.00 from a pure-numeric value; preserves real decimals like "2.1".
-function normWpNo(v){ if(v==null) return v; const s=String(v).trim(); return /^\d+\.0+$/.test(s) ? s.replace(/\.0+$/,'') : s; }
+function normWpNo(v){ if(v==null) return v; let s=String(v).trim().replace(/^WP[-\s]?(?=\d)/i,''); return /^\d+\.0+$/.test(s) ? s.replace(/\.0+$/,'') : s; }
 
 const _collapseState = new Map();
 const _blCollapseState = new Map();
@@ -2336,7 +2336,7 @@ AppAuth.requireLogin(async (user, profile) => {
     try {
       const all = await WPDb.getProjects();
       window._sidebarProjects = (AppAuth.getPermittedProjects(profile, all) || [])
-        .filter(p => p.status !== 'archived')
+        .filter(p => p.status !== 'archived' && p.id !== 'DEMO')
         .sort((a,b) => String(a.id).localeCompare(String(b.id)));
       const sec = document.getElementById('sidebar-projlist-section');
       if (window._sidebarProjects.length > 1 && sec) { sec.style.display = 'block'; renderSidebarProjects(); }
@@ -2785,7 +2785,7 @@ AppAuth.requireLogin(async (user, profile) => {
       // De-duplicate by WP No.: re-importing a CSV that already contains existing WPs (plus a few new
       // ones) UPDATES the matching rows in place instead of inserting duplicates. Match is on the
       // normalized WP No. (trailing ".0" stripped, case-insensitive) within this project.
-      const _wpKey = v => String(v==null?'':v).trim().replace(/\.0+$/,'').toLowerCase();
+      const _wpKey = v => String(v==null?'':v).trim().replace(/^WP[-\s]?(?=\d)/i,'').replace(/\.0+$/,'').toLowerCase();
       const _existing = await WPDb.getAllWPs(projId);
       const _byNo = {};
       _existing.forEach(w => { const k=_wpKey(w.wp_no); if(k) _byNo[k]=w.id; });

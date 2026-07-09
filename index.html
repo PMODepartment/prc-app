@@ -765,7 +765,7 @@
 
     // Normalize WP No. display: some projects (e.g. SLN101) store numbers as "2.0" — show "2".
     // Only strips a trailing .0/.00 from a pure-numeric value; preserves real decimals like "2.1".
-    const _normWpNo = v => { if (v==null) return v; const s=String(v).trim(); return /^\d+\.0+$/.test(s) ? s.replace(/\.0+$/,'') : s; };
+    const _normWpNo = v => { if (v==null) return v; let s=String(v).trim().replace(/^WP[-\s]?(?=\d)/i,''); return /^\d+\.0+$/.test(s) ? s.replace(/\.0+$/,'') : s; };
     const _allWPs = rawWPs.map(w => ({...w, trade: normTrade(w.trade), wp_no: _normWpNo(w.wp_no)}));
     // ID-keyed lookup for WP detail modal (avoids JSON.stringify in every table cell)
     window._wpById = Object.fromEntries(_allWPs.map(w => [w.id, w]));
