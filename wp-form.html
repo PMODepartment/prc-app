@@ -14,6 +14,7 @@
   <link rel="preload" as="script" href="assets/js/auth.js?v=20260709b"/>
   <link rel="preload" as="script" href="assets/js/db.js?v=20260709b"/>
   <link rel="preload" as="script" href="assets/js/ui.js?v=20260709b"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260709b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
   <link rel="stylesheet" href="assets/css/dashboard.css?v=20260709b"/>
@@ -144,7 +145,7 @@
         <div class="page-title" id="page-title">New Work Package</div>
         <div class="page-sub" id="page-sub">Fill in the details and submit for review</div>
       </div>
-      <div class="topbar-right"><div id="user-bar"></div></div>
+      <div class="topbar-right"><button id="btn-form-guide" title="Form guide" aria-label="Open form guide" onclick="if(window.CoachTour)CoachTour.start(true)" style="width:34px;height:34px;border-radius:8px;border:1px solid var(--border-md,rgba(0,0,0,.14));background:var(--surface,#fff);color:var(--text-secondary,#5A5858);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-help" style="font-size:17px"></i></button><div id="user-bar"></div></div>
     </div>
     <div class="content">
       <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading…</span></div>
@@ -600,6 +601,7 @@
 <script src="assets/js/auth.js?v=20260709b"></script>
 <script src="assets/js/ui.js?v=20260709b"></script>
 <script src="assets/js/db.js?v=20260709b"></script>
+<script src="assets/js/coachmarks.js?v=20260709b"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -1179,6 +1181,27 @@ AppAuth.requireLogin(async (user, profile) => {
     onRequiresApprovalChange();   // apply N/A on first load (new WP defaults to "No")
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
+
+    // Guided tour of the Add WP form (coach-marks). Auto-runs once per user; re-openable via the
+    // topbar "?" button. Steps auto-skip any field that's hidden for the current role.
+    if (window.CoachTour) {
+      CoachTour.configure({ key: 'coach_wpform', steps: [
+        { sel:'#f-project',     title:'Choose the project',        body:'Every work package belongs to a project — pick it here first.' },
+        { sel:'#f-wp-no',       title:'WP No.',                    body:'A unique number for this work package (digits only).' },
+        { sel:'#f-description', title:'Description',               body:'A short, clear name for the work package.' },
+        { sel:'#f-trade',       title:'Trade → Works → Type',      body:'Pick the <b>Trade</b> first — the <b>Works</b> and <b>Type</b> options update automatically to match.' },
+        { sel:'#f-osm',         title:'OSM flag',                  body:'Mark <b>Yes</b> if this is an OSM item; otherwise leave it No.' },
+        { sel:'#ms-responsible-trigger', title:'Approval Matrix',  body:'Assign the Responsible team (plus Approver / Support). Click to pick people.' },
+        { sel:'#f-requires-approval', title:'Material / Subcon Submittals', body:'Set <b>Requires Approval</b> to Yes if this needs a submittal — otherwise the submittal fields become N/A automatically.' },
+        { sel:'#f-awarding-date', title:'Procurement Schedule',    body:'Set the planned <b>Awarding Date</b> and the target delivery / completion dates.' },
+        { sel:'#f-budget',      title:'Budget (BCB)',              body:'The approved budget for this WP — required.' },
+        { sel:'#f-proc-status', title:'Procurement Status drives Award', body:'Set the stage here. Choosing <b>Awarded</b> auto-sets Award Status and then requires an <b>Awarded Cost</b> + <b>Vendor</b>.' },
+        { sel:'#f-award-status', title:'Award Status',             body:'Auto-set from Procurement Status — you don\'t edit it directly.' },
+        { sel:'#f-charging',    title:'Charging',                  body:'Main Contract or Change Order (a Change Order asks for a CO description).' },
+        { sel:'#btn-submit',    title:'Save',                      body:'Submit the work package. The form validates required fields and jumps you to anything that needs fixing.' },
+      ]});
+      CoachTour.maybeAutoStart();
+    }
   });
 
   function getVal(id) { return document.getElementById(id).value.trim(); }

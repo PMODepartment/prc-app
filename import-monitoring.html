@@ -48,7 +48,7 @@
 <div class="wrap">
   <a class="back" href="login.html">← Back to dashboard</a>
   <h1 style="margin-top:10px"><i class="ti ti-file-spreadsheet"></i> Import from Excel Monitoring Sheet</h1>
-  <p class="sub">Reads a Work-Package Monitoring <b>.xlsx</b> directly (no CSV step) and replaces a project's work packages. Admin only.</p>
+  <p class="sub">Reads a Work-Package Monitoring <b>.xlsx</b> directly (no CSV step) and replaces a project's work packages.</p>
 
   <div id="gate"><i class="ti ti-lock" style="font-size:30px;color:#bbb"></i><p id="gate-msg">Checking access…</p></div>
 
@@ -61,7 +61,11 @@
       </div>
       <div class="row" style="margin-top:12px">
         <div><label>Sheet</label><select id="sheet"><option>— pick a file first —</option></select></div>
+        <div><label>Sheet layout</label><select id="layout" onchange="onLayoutChange()"></select></div>
+      </div>
+      <div class="row" style="margin-top:12px">
         <div><label>Header rows to skip (data starts after)</label><select id="skip"></select></div>
+        <div></div>
       </div>
       <div class="lookouts">
         <b>Import rules applied:</b><br>
@@ -92,19 +96,59 @@ const SB_URL = 'https://cayjeqeleenizbdzrums.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
 
-// Column layout of the "Work Package Monitoring" sheet (0-based), ported from gen_import.py.
-const COL = {
-  cost_code:2, wp_no:4, wp_name:5, detailed_description:8, type_service:9, type_procurement:10,
-  proposed_vendors:11, po_jo_count:12, po_jo_numbers:13, type_contract:14,
-  responsible_team:22, approver:23, support_team:24, surety_bond:26, performance_bond:27, warranty_bond:28,
-  budget_bcb:30, awarded_cost:31, additionals:32, payment_terms_days:36, dp_percent:37, dp_terms:38,
-  dp_notes:39, dp_release_date:40, dp_amount:41, retention_percent:42, retention_amount:43, retention_period:44,
-  requires_approval:113, approver_name:114, approval_date:115, submittal_document_type:116,
-  lead_time:118, awarding_date:119, actual_award_date:120, target_delivery:122, target_installation:124,
-  target_completion:125, sourcing:127, rfq:128, bid_open:129, bid_closed:130, loa:131, contract_col:132,
-  mob_del:133, purchase_request:143, awarding_status:144, remarks:146,
+// Column layouts (0-based) for the monitoring sheets. Different projects use different sheet
+// structures, so each layout is a named profile with its own column map + options.
+//  • "standard" — the AVR / SLN / SLT / GRP / UTM layout (ported from gen_import.py); trade comes
+//    from the type-of-service column; award inferred from awarded cost + stage columns.
+//  • "opw" — One Portwood: VAT-EX cost columns, WP No. in col 3, an explicit award-status text
+//    column (13), and a HIERARCHICAL trade taken from the ALL-CAPS group-header rows
+//    (GENERAL REQUIREMENTS / SITE WORKS / … / MEPF WORKS / OTHER ALLIED SERVICES). MEPF is split
+//    into Mechanical / Electrical & Auxiliary / Plumbing / Fire by keyword on the description.
+const LAYOUTS = {
+  standard: {
+    label: 'Standard (AVR / SLN / SLT / GRP / UTM)', skip: 17, hierTrade: false, awardTextCol: null,
+    col: {
+      cost_code:2, wp_no:4, wp_name:5, detailed_description:8, type_service:9, type_procurement:10,
+      proposed_vendors:11, po_jo_count:12, po_jo_numbers:13, type_contract:14,
+      responsible_team:22, approver:23, support_team:24, surety_bond:26, performance_bond:27, warranty_bond:28,
+      budget_bcb:30, awarded_cost:31, additionals:32, payment_terms_days:36, dp_percent:37, dp_terms:38,
+      dp_notes:39, dp_release_date:40, dp_amount:41, retention_percent:42, retention_amount:43, retention_period:44,
+      requires_approval:113, approver_name:114, approval_date:115, submittal_document_type:116,
+      lead_time:118, awarding_date:119, actual_award_date:120, target_delivery:122, target_installation:124,
+      target_completion:125, sourcing:127, rfq:128, bid_open:129, bid_closed:130, loa:131, contract_col:132,
+      mob_del:133, purchase_request:143, awarding_status:144, remarks:146,
+    },
+  },
+  opw: {
+    label: 'OPW — One Portwood (VAT-EX, hierarchical trade)', skip: 7, hierTrade: true, tradeNameCol: 4, awardTextCol: 13,
+    col: {
+      cost_code:2, wp_no:3, wp_name:4, detailed_description:5, type_service:6, type_procurement:7,
+      proposed_vendors:8, po_jo_count:9, po_jo_numbers:10, type_contract:11,
+      responsible_team:21, approver:22, support_team:23, surety_bond:25, performance_bond:26, warranty_bond:27,
+      budget_bcb:31, awarded_cost:34, additionals:35, payment_terms_days:39, dp_percent:40, dp_terms:41,
+      dp_notes:42, dp_release_date:43, dp_amount:44, retention_percent:45, retention_amount:46, retention_period:47,
+      requires_approval:null, approver_name:null, approval_date:null, submittal_document_type:null,
+      lead_time:136, awarding_date:137, actual_award_date:138, target_delivery:141, target_installation:143,
+      target_completion:144, sourcing:146, rfq:147, bid_open:148, bid_closed:149, loa:150, contract_col:151,
+      mob_del:152, purchase_request:null, awarding_status:null, remarks:175,
+    },
+  },
 };
-const DEFAULT_SKIP = 17;   // gen_import used df.iloc[17:] — WP rows start at Excel row 18
+function curLayout(){ return LAYOUTS[$('layout') && $('layout').value] || LAYOUTS.standard; }
+// Award-status text → canonical (used by the OPW award-text column).
+function pAward(v){ const s=String(v==null?'':v).trim().toLowerCase(); if(!s) return null;
+  if(/not\s*yet|not\s*award|for\s*award|pending|ongoing|sourc|solicit|evaluat|negotiat/.test(s)) return 'Not Yet Awarded';
+  if(/award|loa|contract|mob|deliver/.test(s)) return 'Awarded'; return null; }
+// Split a "MEPF WORKS" trade header into a discipline by keyword on the WP description.
+function mepfSplit(trade, desc){
+  if(!trade || !/mepf|m\.?e\.?p\.?f/i.test(trade)) return trade;
+  const s=(desc||'').toLowerCase();
+  if(/plumb|sanitary|drainage|sewer|water\s*supply|stp\b|septic/.test(s)) return 'Plumbing Works';
+  if(/fire|sprinkler|fdas|suppress|standpipe|hydrant/.test(s)) return 'Fire Protection Works';
+  if(/mechan|hvac|acmv|elevator|\blift\b|escalator|\bpump|ventilation|chiller|genset/.test(s)) return 'Mechanical Works';
+  if(/electr|power|lighting|transformer|\belv\b|auxiliar|cctv|telecom|\bdata\b|pabx|\bbms\b|fire\s*alarm|low\s*current/.test(s)) return 'Electrical and Auxiliary Works';
+  return trade;   // ambiguous → leave as "MEPF WORKS" (visible in preview for review)
+}
 
 let _wb = null, _parsed = null, _profile = null;
 const $ = id => document.getElementById(id);
@@ -129,80 +173,89 @@ function si(v){ const f=cn(v); return f==null?null:Math.round(f); }
 function yn(v){ const s=String(v==null?'':v).trim().toLowerCase(); return (s==='yes'||s==='true'||s==='1'||s==='y')?'Yes':'No'; }
 function truthy(v){ return v!=null && String(v).trim()!==''; }
 
-/* ---- build one WP from a sheet row (array of cell values) ---- */
-function rowToWP(r, projectId, today){
-  const wpRaw = r[COL.wp_no];
-  const wpNum = cn(wpRaw);
+/* ---- build one WP from a sheet row (array of cell values), per layout L ---- */
+function rowToWP(r, projectId, today, L, curTrade){
+  const C = L.col;
+  const g = k => { const c = C[k]; return (c==null) ? null : r[c]; };   // null-safe column read
+  const wpNum = cn(g('wp_no'));
   if(wpNum==null || !isFinite(wpNum)) return null;   // skip non-WP rows (headers, subgroups)
 
-  const budget = cn(r[COL.budget_bcb]);
-  const awarded = cn(r[COL.awarded_cost]);
-  const actualAward = pDate(r[COL.actual_award_date]);
+  const budget = cn(g('budget_bcb'));
+  const awarded = cn(g('awarded_cost'));
+  const actualAward = pDate(g('actual_award_date'));
   const isFutureAward = actualAward && new Date(actualAward) > today;
+  const desc = cs(g('wp_name'));
 
   // Procurement status from the stage columns; a FUTURE actual-award is treated as not-yet-awarded.
   let proc = 'Not Started';
   if(actualAward && !isFutureAward) proc='Awarded';
-  else if(truthy(r[COL.loa])) proc='Evaluation & Negotiation';
-  else if(truthy(r[COL.bid_closed])||truthy(r[COL.bid_open])) proc='Evaluation & Negotiation';
-  else if(truthy(r[COL.rfq])) proc='Solicitation';
-  else if(truthy(r[COL.sourcing])) proc='Sourcing';
+  else if(truthy(g('loa'))||truthy(g('contract_col'))||truthy(g('mob_del'))) proc='Evaluation & Negotiation';
+  else if(truthy(g('bid_closed'))||truthy(g('bid_open'))) proc='Evaluation & Negotiation';
+  else if(truthy(g('rfq'))) proc='Solicitation';
+  else if(truthy(g('sourcing'))) proc='Sourcing';
 
-  // Award status: awarded only if there's an awarded cost AND the award isn't future-dated.
-  let award = (awarded && awarded>0 && !isFutureAward) ? 'Awarded' : 'Not Yet Awarded';
+  // Award status: prefer an explicit award-status text column (OPW); else infer from awarded cost.
+  // A FUTURE actual-award date is always treated as Not Yet Awarded (advance-date lookout).
+  const awardText = L.awardTextCol!=null ? pAward(r[L.awardTextCol]) : null;
+  let award = isFutureAward ? 'Not Yet Awarded'
+            : (awardText || ((awarded && awarded>0) ? 'Awarded' : 'Not Yet Awarded'));
   // Reconcile the one-way invariant (proc 'Awarded' ⇄ award 'Awarded') the app enforces.
   if(proc==='Awarded') award='Awarded'; else if(award==='Awarded') proc='Awarded';
 
-  const remarks = cs(r[COL.remarks]);
-  const dpPct = cn(r[COL.dp_percent]), retPct = cn(r[COL.retention_percent]);
-  let sdt = cs(r[COL.submittal_document_type]); if(sdt && sdt.toLowerCase()==='mock up') sdt='Mock-up';
+  // Trade: hierarchical layouts use the current ALL-CAPS group header (MEPF split by keyword);
+  // otherwise the type-of-service column.
+  const trade = L.hierTrade ? mepfSplit(curTrade, desc) : cs(g('type_service'));
+
+  const remarks = cs(g('remarks'));
+  const dpPct = cn(g('dp_percent')), retPct = cn(g('retention_percent'));
+  let sdt = cs(g('submittal_document_type')); if(sdt && sdt.toLowerCase()==='mock up') sdt='Mock-up';
 
   return {
     project_id: projectId,
     wp_no: String(Math.round(wpNum)),   // store the digit only (agreed format), no 'WP-' prefix
-    description: cs(r[COL.wp_name]) || ('WP-'+Math.round(wpNum)),
-    detailed_description: cs(r[COL.detailed_description]),
+    description: desc || ('WP-'+Math.round(wpNum)),
+    detailed_description: cs(g('detailed_description')),
     zone: null,
-    trade: cs(r[COL.type_service]),
-    type_of_service: cs(r[COL.type_service]),
-    type_of_procurement: cs(r[COL.type_procurement]),
-    type_of_contract: cs(r[COL.type_contract]),
+    trade: trade,
+    type_of_service: cs(g('type_service')),
+    type_of_procurement: cs(g('type_procurement')),
+    type_of_contract: cs(g('type_contract')),
     charging_type: 'Main Contract',                 // lookout: all WPs under Main Contract
-    proposed_vendors: cs(r[COL.proposed_vendors]),
-    po_jo_count: si(r[COL.po_jo_count]) || 0,
-    po_jo_numbers: cs(r[COL.po_jo_numbers]),
-    responsible_team: cs(r[COL.responsible_team]),
-    approver: cs(r[COL.approver]),
-    support_team: cs(r[COL.support_team]),
-    surety_bond: yn(r[COL.surety_bond]),
-    performance_bond: yn(r[COL.performance_bond]),
-    warranty_bond: yn(r[COL.warranty_bond]),
+    proposed_vendors: cs(g('proposed_vendors')),
+    po_jo_count: si(g('po_jo_count')) || 0,
+    po_jo_numbers: cs(g('po_jo_numbers')),
+    responsible_team: cs(g('responsible_team')),
+    approver: cs(g('approver')),
+    support_team: cs(g('support_team')),
+    surety_bond: yn(g('surety_bond')),
+    performance_bond: yn(g('performance_bond')),
+    warranty_bond: yn(g('warranty_bond')),
     approved_budget_bcb: budget!=null ? Math.round(budget*100)/100 : null,
     awarded_cost: (awarded!=null && !isFutureAward) ? Math.round(awarded*100)/100 : null,
-    additionals: Math.round((cn(r[COL.additionals])||0)*100)/100,
-    payment_terms_days: si(r[COL.payment_terms_days]),
+    additionals: Math.round((cn(g('additionals'))||0)*100)/100,
+    payment_terms_days: si(g('payment_terms_days')),
     dp_percent: dpPct!=null ? Math.round(dpPct*10000)/10000 : 0,
-    dp_terms: cs(r[COL.dp_terms]),
-    dp_notes: cs(r[COL.dp_notes]),
-    dp_release_date: pDate(r[COL.dp_release_date]),
-    dp_amount: Math.round((cn(r[COL.dp_amount])||0)*100)/100,
+    dp_terms: cs(g('dp_terms')),
+    dp_notes: cs(g('dp_notes')),
+    dp_release_date: pDate(g('dp_release_date')),
+    dp_amount: Math.round((cn(g('dp_amount'))||0)*100)/100,
     retention_percent: retPct!=null ? Math.round(retPct*10000)/10000 : 0,
-    retention_amount: Math.round((cn(r[COL.retention_amount])||0)*100)/100,
-    retention_period: cs(r[COL.retention_period]),
-    requires_approval: cs(r[COL.requires_approval])==='Yes',
-    approver_name: cs(r[COL.approver_name]),
-    approval_date: pDate(r[COL.approval_date]),
+    retention_amount: Math.round((cn(g('retention_amount'))||0)*100)/100,
+    retention_period: cs(g('retention_period')),
+    requires_approval: cs(g('requires_approval'))==='Yes',
+    approver_name: cs(g('approver_name')),
+    approval_date: pDate(g('approval_date')),
     submittal_document_type: sdt,
-    lead_time: si(r[COL.lead_time]),
-    awarding_date: pDate(r[COL.awarding_date]),
+    lead_time: si(g('lead_time')),
+    awarding_date: pDate(g('awarding_date')),
     actual_awarding_date: isFutureAward ? null : actualAward,   // ignore advance date until it arrives
-    target_delivery: pDate(r[COL.target_delivery]),
-    target_installation: pDate(r[COL.target_installation]),
-    target_completion: pDate(r[COL.target_completion]),
+    target_delivery: pDate(g('target_delivery')),
+    target_installation: pDate(g('target_installation')),
+    target_completion: pDate(g('target_completion')),
     procurement_status: proc,
     award_status: award,
-    awarding_status: cs(r[COL.awarding_status])==='DUE' ? 'DUE' : null,
-    purchase_request: cs(r[COL.purchase_request]),
+    awarding_status: cs(g('awarding_status'))==='DUE' ? 'DUE' : null,
+    purchase_request: cs(g('purchase_request')),
     osm: (remarks && /osm/i.test(remarks)) ? 'Yes' : 'No',      // lookout: No unless Remarks say OSM
     remarks: remarks,
     review_status: 'approved',
@@ -212,13 +265,25 @@ function rowToWP(r, projectId, today){
 
 /* ---- parse the chosen sheet ---- */
 function parse(){
+  const L=curLayout();
   const sheetName=$('sheet').value, skip=parseInt($('skip').value,10)||0;
   const ws=_wb.Sheets[sheetName];
   const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
   const today=new Date(); today.setHours(0,0,0,0);
   const pid=$('project').value;
-  const out=[];
-  for(let i=skip;i<rows.length;i++){ const wp=rowToWP(rows[i]||[],pid,today); if(wp) out.push(wp); }
+  const out=[]; let curTrade=null;
+  for(let i=skip;i<rows.length;i++){
+    const r=rows[i]||[];
+    if(L.hierTrade){
+      // Track the current trade from ALL-CAPS group-header rows (no WP No.). Ignore total rows.
+      const isWP = cn(r[L.col.wp_no])!=null;
+      const hdr = r[L.tradeNameCol];
+      if(!isWP && hdr){ const s=String(hdr).trim();
+        if(/[a-z]/i.test(s) && s===s.toUpperCase()){ if(!/subtotal|grand\s*total|^total$/i.test(s)) curTrade=s; continue; }
+      }
+    }
+    const wp=rowToWP(r,pid,today,L,curTrade); if(wp) out.push(wp);
+  }
   return out;
 }
 
@@ -253,6 +318,10 @@ async function doImport(){
   log(`\nReplacing ${pid} — deleting existing work packages…`,'info');
   const {error:delErr}=await sb.from('work_packages').delete().eq('project_id',pid);
   if(delErr){ log('Delete failed: '+delErr.message,'err'); $('btn-import').disabled=false; $('btn-cancel').disabled=false; return; }
+  // Verify the delete actually cleared them — RLS restricts WP delete to super_admin, and a blocked
+  // delete removes 0 rows silently. Aborting here prevents importing duplicates on top of old data.
+  const {count:remaining}=await sb.from('work_packages').select('id',{count:'exact',head:true}).eq('project_id',pid);
+  if(remaining>0){ log(`Delete removed nothing (${remaining} WPs remain) — you likely lack delete permission (Replace requires a super-admin). Aborting to avoid duplicates.`,'err'); $('btn-import').disabled=false; $('btn-cancel').disabled=false; return; }
   log('Deleted existing WPs.','ok');
   const rows=_parsed.map(w=>{ const c={...w}; delete c._future; return c; });   // strip preview-only flag
   const BATCH=20; let inserted=0;
@@ -267,6 +336,8 @@ async function doImport(){
 }
 
 /* ---- wire up ---- */
+function setSkipOptions(sel){ $('skip').innerHTML=Array.from({length:31},(_,i)=>`<option${i===sel?' selected':''}>${i}</option>`).join(''); }
+function onLayoutChange(){ setSkipOptions(curLayout().skip); }   // reset the data-start default per layout
 $('file').addEventListener('change', e=>{
   const f=e.target.files[0]; if(!f) return;
   const rd=new FileReader();
@@ -274,10 +345,13 @@ $('file').addEventListener('change', e=>{
     _wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array',cellDates:true});
     const names=_wb.SheetNames;
     const pref=names.find(n=>/monitoring/i.test(n))||names[0];
+    // Auto-detect the layout: One Portwood's sheet ("OPW WP Monitoring") uses the OPW profile.
+    const isOPW = /opw/i.test(pref) || (f.name && /opw/i.test(f.name)) || names.some(n=>/opw/i.test(n));
+    $('layout').innerHTML=Object.keys(LAYOUTS).map(k=>`<option value="${k}"${((isOPW?'opw':'standard')===k)?' selected':''}>${LAYOUTS[k].label}</option>`).join('');
     $('sheet').innerHTML=names.map(n=>`<option${n===pref?' selected':''}>${n}</option>`).join('');
-    $('skip').innerHTML=Array.from({length:31},(_,i)=>`<option${i===DEFAULT_SKIP?' selected':''}>${i}</option>`).join('');
+    setSkipOptions(curLayout().skip);
     $('btn-parse').disabled=false;
-    log(`Loaded "${f.name}" — ${names.length} sheet(s). Default sheet: ${pref}.`,'info');
+    log(`Loaded "${f.name}" — ${names.length} sheet(s). Sheet: ${pref}. Layout: ${curLayout().label}.`,'info');
   };
   rd.readAsArrayBuffer(f);
 });
@@ -285,14 +359,14 @@ $('btn-parse').addEventListener('click',()=>{ try{ renderPreview(parse()); }catc
 $('btn-import').addEventListener('click',doImport);
 $('btn-cancel').addEventListener('click',()=>{ $('preview-card').style.display='none'; _parsed=null; });
 
-/* ---- auth gate (admin only) ---- */
+/* ---- auth gate (any approved, signed-in user) ---- */
 (async ()=>{
   const {data:{session}}=await sb.auth.getSession();
   if(!session){ $('gate').style.display='block'; $('gate-msg').innerHTML='You must <a href="login.html">sign in</a> first.'; return; }
   const {data:prof}=await sb.from('users').select('role,status').eq('id',session.user.id).single();
   _profile=prof;
-  if(!prof || !['admin','super_admin'].includes(prof.role)){
-    $('gate').style.display='block'; $('gate-msg').textContent='Admin access required — this tool deletes and re-imports work packages.'; return;
+  if(!prof || prof.status!=='approved'){
+    $('gate').style.display='block'; $('gate-msg').textContent='Your account must be approved before you can import.'; return;
   }
   const {data:projs}=await sb.from('projects').select('id,name').order('id');
   $('project').innerHTML=(projs||[]).map(p=>`<option value="${p.id}">${p.id}${p.name&&p.name!==p.id?' — '+p.name.split('—')[0].trim():''}</option>`).join('');
