@@ -11,17 +11,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260708n"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260708n"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260708n"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260708o"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260708o"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260708o"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708b"/>
   <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260708n"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260708o"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260708n"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260708o"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -535,14 +535,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260708n"></script>
-<script src="assets/js/ui.js?v=20260708n"></script>
-<script src="assets/js/db.js?v=20260708n"></script>
+<script src="assets/js/auth.js?v=20260708o"></script>
+<script src="assets/js/ui.js?v=20260708o"></script>
+<script src="assets/js/db.js?v=20260708o"></script>
 <script src="assets/js/onboarding.js?v=20260708b"></script>
 <script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260708n"></script>
+<script src="assets/js/charts.js?v=20260708o"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -2394,22 +2394,30 @@ AppAuth.requireLogin(async (user, profile) => {
     // The DEMO sandbox is ALSO read-only (for everyone, admins included) — it reuses the same
     // guards via window.__archived but shows a friendly "demo" banner instead of the archive one.
     const isDemo = (meta.id === 'DEMO');
+    const isArchived = (meta.status === 'archived');
+    // EDIT scope (P1): a specialist can VIEW any project but EDIT only assigned ones.
+    // On an unassigned project they get a read-only "view-only" mode (reuses the archived guards).
+    window.__canEdit = AppAuth.canEditProject(userProfile, meta.id);
+    const isViewOnly = !isDemo && !isArchived && !window.__isViewer && !window.__canEdit;
     window.__demo = isDemo;
-    window.__archived = (meta.status === 'archived') || isDemo;
+    window.__archived = isArchived || isDemo || isViewOnly;   // read-only reuse
     if(window.__archived){
       document.body.classList.add('archived-readonly');
       const banner = document.createElement('div');
       if(isDemo){
         banner.style.cssText='background:#EAF3DE;border:1px solid #A7C97F;border-radius:8px;padding:10px 14px;font-size:12px;color:#3B6D11;margin-bottom:16px;display:flex;align-items:center;gap:8px';
         banner.innerHTML='<i class="ti ti-flask" style="font-size:16px"></i><strong>Demo Project</strong> — Explore freely! This is a read-only sandbox with sample data, so you can\'t break anything.';
+      } else if(isViewOnly){
+        banner.style.cssText='background:#EFF6FF;border:1px solid #93C5FD;border-radius:8px;padding:10px 14px;font-size:12px;color:#1D4ED8;margin-bottom:16px;display:flex;align-items:center;gap:8px';
+        banner.innerHTML='<i class="ti ti-eye" style="font-size:16px"></i><strong>View-only</strong> — this project isn\'t assigned to you, so editing is disabled. Ask an admin to assign it if you need to make changes.';
       } else {
         banner.style.cssText='background:#FFF3CD;border:1px solid #FFC107;border-radius:8px;padding:10px 14px;font-size:12px;color:#856404;margin-bottom:16px;display:flex;align-items:center;gap:8px';
         banner.innerHTML='<i class="ti ti-archive" style="font-size:16px"></i><strong>Archived Project</strong> — This project is read-only. Editing is disabled'+(isAdmin?'; unarchive it to make changes.':'.');
       }
       document.getElementById('main-content')?.prepend(banner);
     }
-    // Archive/unarchive button (admins only) — not shown for the demo sandbox
-    if(isAdmin && !isDemo) {
+    // Archive/unarchive button (admins only) — not shown for demo or view-only states
+    if(isAdmin && !isDemo && !isViewOnly) {
       const archBtn = document.getElementById('btn-archive-project');
       const archLabel = document.getElementById('archive-btn-label');
       if(archBtn && archLabel) {

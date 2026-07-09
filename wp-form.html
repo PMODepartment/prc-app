@@ -10,12 +10,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260708n"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260708n"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260708n"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260708o"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260708o"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260708o"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260708n"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260708o"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -596,9 +596,9 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260708n"></script>
-<script src="assets/js/ui.js?v=20260708n"></script>
-<script src="assets/js/db.js?v=20260708n"></script>
+<script src="assets/js/auth.js?v=20260708o"></script>
+<script src="assets/js/ui.js?v=20260708o"></script>
+<script src="assets/js/db.js?v=20260708o"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -1060,9 +1060,10 @@ AppAuth.requireLogin(async (user, profile) => {
       existingWP = await WPDb.getWP(editId);
       if (!existingWP) { alert('Work package not found.'); markClean(); history.back(); return; }
 
-      /* Check permission — any user assigned to the project can view/edit any WP in that project */
-      if (!AppAuth.canAccessProject(profile, existingWP.project_id)) {
-        alert('You do not have access to this project.');
+      /* Check EDIT permission — specialists can view all projects but only edit assigned ones (P1).
+         The WP form is an edit surface, so gate on canEditProject, not canAccessProject. */
+      if (!AppAuth.canEditProject(profile, existingWP.project_id)) {
+        alert('This project isn\'t assigned to you, so you can only view it (not edit its work packages). Ask an admin to assign it.');
         markClean(); history.back(); return;
       }
 
@@ -1205,6 +1206,8 @@ AppAuth.requireLogin(async (user, profile) => {
     // Archived projects are read-only for everyone
     const _selProj = (allProjects||[]).find(p => p.id === getVal('f-project'));
     if (_selProj && _selProj.status === 'archived') return showErr('This project is archived and read-only. Pick an active project, or ask an admin to unarchive it.', 'f-project');
+    // EDIT scope (P1): specialists may only add WPs to their assigned projects (RLS also enforces this).
+    if (!AppAuth.canEditProject(userProfile, getVal('f-project'))) return showErr('This project isn\'t assigned to you, so you can\'t add work packages to it. Ask an admin to assign it.', 'f-project');
     if (!getVal('f-trade'))          return showErr('Select a Trade (drives the Works & Type options).', 'f-trade');
     if (!getVal('f-awarding-date'))  return showErr('Set the planned Awarding Date (Procurement Schedule).', 'f-awarding-date');
     if (!getVal('f-target-delivery'))return showErr('Set the Target Delivery Date (Procurement Schedule).', 'f-target-delivery');

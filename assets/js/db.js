@@ -23,15 +23,27 @@ const WPDb = (() => {
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
   async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
   async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
-  async function getApprovedWPs(pid) { const sb=await getSB(); let q=sb.from('work_packages').select('*').eq('review_status','approved'); if(pid) q=q.eq('project_id',pid); const {data}=await q.order('wp_no'); return (data||[]).map(mapWP); }
-  async function getAllWPs(pid) { const sb=await getSB(); let q=sb.from('work_packages').select('*'); if(pid) q=q.eq('project_id',pid); const {data}=await q.order('wp_no'); return (data||[]).map(mapWP); }
+  // Read relation (S4): non-viewers read the base work_packages table (with cost). Viewers are
+  // blocked from the table by RLS and instead read the cost-free security-definer view
+  // `wp_view_public`. Memoized probe; if the view doesn't exist yet (migration not run) we fall
+  // back to the table so nothing hard-breaks (viewers just still see cost until the DB is migrated).
+  let _wpRelCache=null;
+  async function _wpRel() {
+    if (!(typeof window!=='undefined' && window.__isViewer)) return 'work_packages';
+    if (_wpRelCache) return _wpRelCache;
+    try { const sb=await getSB(); const {error}=await sb.from('wp_view_public').select('id').limit(1); _wpRelCache = error ? 'work_packages' : 'wp_view_public'; }
+    catch(_) { _wpRelCache='work_packages'; }
+    return _wpRelCache;
+  }
+  async function getApprovedWPs(pid) { const sb=await getSB(); let q=sb.from(await _wpRel()).select('*').eq('review_status','approved'); if(pid) q=q.eq('project_id',pid); const {data}=await q.order('wp_no'); return (data||[]).map(mapWP); }
+  async function getAllWPs(pid) { const sb=await getSB(); let q=sb.from(await _wpRel()).select('*'); if(pid) q=q.eq('project_id',pid); const {data}=await q.order('wp_no'); return (data||[]).map(mapWP); }
   async function getAllApprovedWPs() { return getApprovedWPs(null); }
-  async function getApprovedWPsForProjects(ids) { if(!ids||!ids.length) return []; const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('review_status','approved').in('project_id',ids).order('wp_no'); return (data||[]).map(mapWP); }
+  async function getApprovedWPsForProjects(ids) { if(!ids||!ids.length) return []; const sb=await getSB(); const {data}=await sb.from(await _wpRel()).select('*').eq('review_status','approved').in('project_id',ids).order('wp_no'); return (data||[]).map(mapWP); }
   async function getPendingWPs() { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('review_status','pending_review').order('created_at',{ascending:false}); return (data||[]).map(mapWP); }
   async function getAllWPsForAdmin() { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').order('created_at',{ascending:false}); return (data||[]).map(mapWP); }
   async function getAllWPsForProjects(ids) { if(!ids||!ids.length) return []; const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').in('project_id',ids).order('created_at',{ascending:false}); return (data||[]).map(mapWP); }
   async function getOfficerWPs(uid) { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('assigned_officer',uid).order('wp_no'); return (data||[]).map(mapWP); }
-  async function getWP(id) { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('id',id).single(); return mapWP(data); }
+  async function getWP(id) { const sb=await getSB(); const {data}=await sb.from(await _wpRel()).select('*').eq('id',id).single(); return mapWP(data); }
   async function getProjectWPs(pid) { return getAllWPs(pid); }
   async function submitWP(d,p) { const sb=await getSB(); const {data,error}=await sb.from('work_packages').insert({...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null}).select().single(); if(error) throw error; return data; }
   async function updateWP(id,d) { const sb=await getSB(); const {data,error}=await sb.from('work_packages').update({...unmap(d),review_status:'pending_review'}).eq('id',id).select().single(); if(error) throw error; return data; }
@@ -953,9 +965,15 @@ window.WPCsv = (function(){
       // Award status comes from the explicit AWARDED / REMARKS text (the WP-Monitoring
       // "Not yet Awarded / Awarded" in Column P). The procurement stage is NOT a reliable
       // award signal, so it is only used as a last resort via awarded_cost.
-      const award_status = pAward(g('award_status'))
+      let award_status = pAward(g('award_status'))
         || pAward(g('remarks'))
         || (awardedCost > 0 ? 'Awarded' : 'Not Yet Awarded');
+      // Reconcile the one-way invariant (proc 'Awarded' ⇄ award 'Awarded') that the WP form and
+      // Status Tracker enforce, so imported rows don't land with proc/award disagreeing — the
+      // dashboards read award_status, and a mismatch would make the KPIs and the form disagree.
+      let procurement_status = proc;
+      if (procurement_status === 'Awarded') award_status = 'Awarded';
+      else if (award_status === 'Awarded') procurement_status = 'Awarded';
       out.push({
         project_id:pid,
         cost_code:pStr(g('cost_code')), trade:pStr(g('trade')), works:pStr(g('works')),
@@ -982,7 +1000,7 @@ window.WPCsv = (function(){
         dp_terms:pStr(g('dp_terms')), dp_amount:pNum(g('dp_amount')), dp_release_date:pDate(g('dp_release_date')),
         dp_notes:pStr(g('dp_notes')), retention_percent:pPct(g('retention_percent')),
         retention_amount:pNum(g('retention_amount')), retention_period:pStr(g('retention_period')),
-        procurement_status:proc, awarding_status:pStr(g('awarding_status')),
+        procurement_status, awarding_status:pStr(g('awarding_status')),
         delivery_status:pStr(g('delivery_status')) || 'Not Awarded', remarks:pStr(g('remarks')) || '',
         purchase_request:pStr(g('purchase_request')),
       });

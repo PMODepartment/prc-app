@@ -275,11 +275,14 @@ create policy "users_update" on users
   );
 
 -- ── WORK PACKAGES ─────────────────────────────────────────────
--- SELECT: super_admin/admin/specialist see all; others see only assigned projects
+-- SELECT: super_admin/admin/specialist see all; others see only assigned projects.
+-- VIEWERS are blocked from the base table (they read the cost-free wp_view_public
+-- view instead — see below) so cost columns can't be pulled via the REST API.
 create policy "wp_select" on work_packages
   for select to authenticated
   using (
     internal.get_my_status() = 'approved'
+    and internal.get_my_role() <> 'viewer'
     and (
       internal.get_my_role() in ('super_admin','admin','specialist')
       or project_id = any(internal.get_my_projects())
@@ -295,26 +298,27 @@ create policy "wp_select_demo" on work_packages
     and project_id = 'DEMO'
   );
 
--- INSERT: any approved non-viewer can submit WPs for their assigned projects
+-- INSERT: super_admin/admin anywhere; specialist/manager/user only on their
+-- assigned projects (specialist VIEWS all but EDITS assigned-only — P1).
 create policy "wp_insert" on work_packages
   for insert to authenticated
   with check (
     internal.get_my_status() = 'approved'
     and internal.get_my_role() <> 'viewer'
     and (
-      internal.get_my_role() in ('super_admin','admin','specialist')
+      internal.get_my_role() in ('super_admin','admin')
       or project_id = any(internal.get_my_projects())
     )
   );
 
--- UPDATE: approved non-viewers for their project scope
+-- UPDATE: same scope as insert — specialist limited to assigned projects.
 create policy "wp_update" on work_packages
   for update to authenticated
   using (
     internal.get_my_status() = 'approved'
     and internal.get_my_role() <> 'viewer'
     and (
-      internal.get_my_role() in ('super_admin','admin','specialist')
+      internal.get_my_role() in ('super_admin','admin')
       or project_id = any(internal.get_my_projects())
     )
   );
@@ -323,6 +327,40 @@ create policy "wp_update" on work_packages
 create policy "wp_delete" on work_packages
   for delete to authenticated
   using (internal.get_my_role() = 'super_admin');
+
+-- Cost-free, security-definer view for VIEWERS (who are denied on the base table
+-- above). Runs as owner so it bypasses the caller's RLS — therefore it re-implements
+-- the row scope in its WHERE and OMITS every money column (approved_budget_bcb,
+-- awarded_cost, additionals, total_awarded, variance, dp_percent, dp_amount,
+-- retention_percent, retention_amount). Non-viewers read the base table directly;
+-- the client picks the relation by role (db.js _wpRel()).
+-- MAINTENANCE: when you ADD a work_packages column, add it here too — non-cost only.
+create or replace view wp_view_public as
+  select
+    id, project_id, wp_no, cost_code, description, detailed_description,
+    zone, trade, works, type_of_works, scope,
+    type_of_service, type_of_procurement, type_of_contract, proposed_vendors,
+    charging_type, contract_package_no, co_description,
+    lead_time, awarding_date, actual_awarding_date, awarding_lead_time,
+    target_delivery, actual_delivery, target_installation, target_completion,
+    procurement_status, award_status, delivery_status, awarding_status, purchase_request,
+    responsible_team, contractor, po_jo_count, po_jo_numbers,
+    approver, support_team,
+    surety_bond, performance_bond, warranty_bond,
+    requires_approval, approver_name, approval_date, submittal_document_type, submittal_type,
+    payment_terms_days, dp_terms, dp_notes, dp_release_date, retention_period,
+    osm,
+    review_status, review_notes, assigned_officer,
+    remarks, created_at, updated_at
+  from work_packages wp
+  where internal.get_my_status() = 'approved'
+    and (
+      internal.get_my_role() in ('super_admin','admin','specialist')
+      or wp.project_id = any(internal.get_my_projects())
+      or wp.project_id = 'DEMO'
+    );
+
+grant select on wp_view_public to authenticated;
 
 -- ── CLAIMS ────────────────────────────────────────────────────
 create policy "claims_select" on claims
@@ -341,7 +379,7 @@ create policy "claims_insert" on claims
     internal.get_my_status() = 'approved'
     and internal.get_my_role() <> 'viewer'
     and (
-      internal.get_my_role() in ('super_admin','admin','specialist')
+      internal.get_my_role() in ('super_admin','admin')
       or project_id = any(internal.get_my_projects())
     )
   );
@@ -352,7 +390,7 @@ create policy "claims_update" on claims
     internal.get_my_status() = 'approved'
     and internal.get_my_role() <> 'viewer'
     and (
-      internal.get_my_role() in ('super_admin','admin','specialist')
+      internal.get_my_role() in ('super_admin','admin')
       or project_id = any(internal.get_my_projects())
     )
   );
