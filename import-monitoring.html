@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Import from Excel Monitoring Sheet — WPM</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<style>
+  :root{--red:#EE3124;--red-dark:#C42127;--ink:#231F20;--ink2:#5A5858;--line:#e6e6e6;--bg:#f5f5f6}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Montserrat,system-ui,sans-serif;color:var(--ink);background:var(--bg);padding:24px}
+  .wrap{max-width:1100px;margin:0 auto}
+  h1{font-size:20px;font-weight:800;margin:0 0 2px;display:flex;align-items:center;gap:10px}
+  h1 i{color:var(--red)}
+  .sub{font-size:13px;color:var(--ink2);margin:0 0 20px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+  .card h2{font-size:14px;font-weight:800;margin:0 0 12px}
+  label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#888;margin:0 0 5px}
+  select,input[type=file]{width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--ink);outline:none}
+  select:focus{border-color:var(--red)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .btn{border:none;border-radius:9px;padding:11px 20px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:7px}
+  .btn-red{background:var(--red);color:#fff}.btn-red:hover:not(:disabled){background:var(--red-dark)}
+  .btn-gray{background:#eee;color:#444}
+  .btn:disabled{opacity:.45;cursor:default}
+  .lookouts{font-size:12px;color:var(--ink2);line-height:1.7;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:11px 14px;margin-top:12px}
+  .lookouts b{color:var(--ink)}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+  .kpi{background:#fafafa;border:1px solid var(--line);border-radius:9px;padding:9px 14px;min-width:110px}
+  .kpi .v{font-size:19px;font-weight:800}.kpi .l{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em}
+  table{width:100%;border-collapse:collapse;font-size:11.5px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #f0f0f0;white-space:nowrap}
+  th{position:sticky;top:0;background:#fafafa;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:#888}
+  .tbl-wrap{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px}
+  .num{text-align:right}
+  .badge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px}
+  .b-aw{background:#EAF3DE;color:#3B6D11}.b-no{background:#FEE2E2;color:#991B1B}
+  .warn{background:#FFF3CD;border:1px solid #FFC107;color:#856404;border-radius:8px;padding:11px 14px;font-size:12.5px;margin:12px 0;display:flex;gap:9px;align-items:flex-start}
+  #log{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;line-height:1.6;max-height:260px;overflow-y:auto;background:#1a1a1a;color:#ccc;border-radius:8px;padding:12px;margin-top:12px;display:none}
+  .ok{color:#4ade80}.err{color:#f87171}.info{color:#60a5fa}
+  #gate{display:none;text-align:center;padding:60px 20px;color:var(--ink2)}
+  a.back{font-size:12px;color:var(--red);text-decoration:none;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="login.html">← Back to dashboard</a>
+  <h1 style="margin-top:10px"><i class="ti ti-file-spreadsheet"></i> Import from Excel Monitoring Sheet</h1>
+  <p class="sub">Reads a Work-Package Monitoring <b>.xlsx</b> directly (no CSV step) and replaces a project's work packages. Admin only.</p>
+
+  <div id="gate"><i class="ti ti-lock" style="font-size:30px;color:#bbb"></i><p id="gate-msg">Checking access…</p></div>
+
+  <div id="app" style="display:none">
+    <div class="card">
+      <h2>1 · Choose file &amp; project</h2>
+      <div class="row">
+        <div><label>Monitoring workbook (.xlsx)</label><input type="file" id="file" accept=".xlsx,.xls"/></div>
+        <div><label>Target project</label><select id="project"></select></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div><label>Sheet</label><select id="sheet"><option>— pick a file first —</option></select></div>
+        <div><label>Header rows to skip (data starts after)</label><select id="skip"></select></div>
+      </div>
+      <div class="lookouts">
+        <b>Import rules applied:</b><br>
+        • <b>Advance award dates</b> — a WP whose actual award date is in the <b>future</b> is imported as <b>Not Yet Awarded</b> (the advance date is ignored until it arrives).<br>
+        • <b>OSM</b> — every WP is <b>No</b> unless its Remarks mention "OSM".<br>
+        • <b>Charging</b> — every WP is set to <b>Main Contract</b>.
+      </div>
+      <button class="btn btn-red" id="btn-parse" style="margin-top:14px" disabled><i class="ti ti-eye"></i> Parse &amp; Preview</button>
+    </div>
+
+    <div class="card" id="preview-card" style="display:none">
+      <h2>2 · Preview</h2>
+      <div class="kpis" id="kpis"></div>
+      <div class="tbl-wrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+      <div class="warn"><i class="ti ti-alert-triangle" style="font-size:16px"></i>
+        <span><b>Replace</b> will <b>delete ALL current work packages</b> for <b id="wp-proj"></b> and insert the <b id="wp-count"></b> rows above. This cannot be undone. Review the preview first.</span></div>
+      <button class="btn btn-red" id="btn-import" disabled><i class="ti ti-database-import"></i> Replace &amp; Import</button>
+      <button class="btn btn-gray" id="btn-cancel">Cancel</button>
+    </div>
+  </div>
+  <div id="log"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const SB_URL = 'https://cayjeqeleenizbdzrums.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw';
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+// Column layout of the "Work Package Monitoring" sheet (0-based), ported from gen_import.py.
+const COL = {
+  cost_code:2, wp_no:4, wp_name:5, detailed_description:8, type_service:9, type_procurement:10,
+  proposed_vendors:11, po_jo_count:12, po_jo_numbers:13, type_contract:14,
+  responsible_team:22, approver:23, support_team:24, surety_bond:26, performance_bond:27, warranty_bond:28,
+  budget_bcb:30, awarded_cost:31, additionals:32, payment_terms_days:36, dp_percent:37, dp_terms:38,
+  dp_notes:39, dp_release_date:40, dp_amount:41, retention_percent:42, retention_amount:43, retention_period:44,
+  requires_approval:113, approver_name:114, approval_date:115, submittal_document_type:116,
+  lead_time:118, awarding_date:119, actual_award_date:120, target_delivery:122, target_installation:124,
+  target_completion:125, sourcing:127, rfq:128, bid_open:129, bid_closed:130, loa:131, contract_col:132,
+  mob_del:133, purchase_request:143, awarding_status:144, remarks:146,
+};
+const DEFAULT_SKIP = 17;   // gen_import used df.iloc[17:] — WP rows start at Excel row 18
+
+let _wb = null, _parsed = null, _profile = null;
+const $ = id => document.getElementById(id);
+function log(msg, cls){ const l=$('log'); l.style.display='block'; l.innerHTML += '<span class="'+(cls||'')+'">'+msg+'</span>\n'; l.scrollTop=l.scrollHeight; }
+
+/* ---- date / value helpers ---- */
+function pad(n){ return String(n).padStart(2,'0'); }
+function toLocalISO(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function pDate(v){
+  if(v==null||v==='') return null;
+  if(v instanceof Date && !isNaN(v)) return toLocalISO(v);
+  if(typeof v==='number' && v>20000 && v<80000){ // Excel serial → date (1899-12-30 epoch)
+    const d=new Date(Math.round((v-25569)*86400*1000)); return isNaN(d)?null:toLocalISO(new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())); }
+  const s=String(v).trim(); let m=s.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[1]+'-'+m[2]+'-'+m[3];
+  m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return m[3]+'-'+pad(+m[1])+'-'+pad(+m[2]);
+  const d=new Date(s); return isNaN(d)?null:toLocalISO(d);
+}
+function cs(v){ if(v==null) return null; const s=String(v).trim(); return s?s:null; }
+function cn(v){ if(v==null||v==='') return null; const f=parseFloat(String(v).replace(/,/g,'')); return isNaN(f)?null:f; }
+function si(v){ const f=cn(v); return f==null?null:Math.round(f); }
+function yn(v){ const s=String(v==null?'':v).trim().toLowerCase(); return (s==='yes'||s==='true'||s==='1'||s==='y')?'Yes':'No'; }
+function truthy(v){ return v!=null && String(v).trim()!==''; }
+
+/* ---- build one WP from a sheet row (array of cell values) ---- */
+function rowToWP(r, projectId, today){
+  const wpRaw = r[COL.wp_no];
+  const wpNum = cn(wpRaw);
+  if(wpNum==null || !isFinite(wpNum)) return null;   // skip non-WP rows (headers, subgroups)
+
+  const budget = cn(r[COL.budget_bcb]);
+  const awarded = cn(r[COL.awarded_cost]);
+  const actualAward = pDate(r[COL.actual_award_date]);
+  const isFutureAward = actualAward && new Date(actualAward) > today;
+
+  // Procurement status from the stage columns; a FUTURE actual-award is treated as not-yet-awarded.
+  let proc = 'Not Started';
+  if(actualAward && !isFutureAward) proc='Awarded';
+  else if(truthy(r[COL.loa])) proc='Evaluation & Negotiation';
+  else if(truthy(r[COL.bid_closed])||truthy(r[COL.bid_open])) proc='Evaluation & Negotiation';
+  else if(truthy(r[COL.rfq])) proc='Solicitation';
+  else if(truthy(r[COL.sourcing])) proc='Sourcing';
+
+  // Award status: awarded only if there's an awarded cost AND the award isn't future-dated.
+  let award = (awarded && awarded>0 && !isFutureAward) ? 'Awarded' : 'Not Yet Awarded';
+  // Reconcile the one-way invariant (proc 'Awarded' ⇄ award 'Awarded') the app enforces.
+  if(proc==='Awarded') award='Awarded'; else if(award==='Awarded') proc='Awarded';
+
+  const remarks = cs(r[COL.remarks]);
+  const dpPct = cn(r[COL.dp_percent]), retPct = cn(r[COL.retention_percent]);
+  let sdt = cs(r[COL.submittal_document_type]); if(sdt && sdt.toLowerCase()==='mock up') sdt='Mock-up';
+
+  return {
+    project_id: projectId,
+    wp_no: 'WP-' + Math.round(wpNum),
+    description: cs(r[COL.wp_name]) || ('WP-'+Math.round(wpNum)),
+    detailed_description: cs(r[COL.detailed_description]),
+    zone: null,
+    trade: cs(r[COL.type_service]),
+    type_of_service: cs(r[COL.type_service]),
+    type_of_procurement: cs(r[COL.type_procurement]),
+    type_of_contract: cs(r[COL.type_contract]),
+    charging_type: 'Main Contract',                 // lookout: all WPs under Main Contract
+    proposed_vendors: cs(r[COL.proposed_vendors]),
+    po_jo_count: si(r[COL.po_jo_count]) || 0,
+    po_jo_numbers: cs(r[COL.po_jo_numbers]),
+    responsible_team: cs(r[COL.responsible_team]),
+    approver: cs(r[COL.approver]),
+    support_team: cs(r[COL.support_team]),
+    surety_bond: yn(r[COL.surety_bond]),
+    performance_bond: yn(r[COL.performance_bond]),
+    warranty_bond: yn(r[COL.warranty_bond]),
+    approved_budget_bcb: budget!=null ? Math.round(budget*100)/100 : null,
+    awarded_cost: (awarded!=null && !isFutureAward) ? Math.round(awarded*100)/100 : null,
+    additionals: Math.round((cn(r[COL.additionals])||0)*100)/100,
+    payment_terms_days: si(r[COL.payment_terms_days]),
+    dp_percent: dpPct!=null ? Math.round(dpPct*10000)/10000 : 0,
+    dp_terms: cs(r[COL.dp_terms]),
+    dp_notes: cs(r[COL.dp_notes]),
+    dp_release_date: pDate(r[COL.dp_release_date]),
+    dp_amount: Math.round((cn(r[COL.dp_amount])||0)*100)/100,
+    retention_percent: retPct!=null ? Math.round(retPct*10000)/10000 : 0,
+    retention_amount: Math.round((cn(r[COL.retention_amount])||0)*100)/100,
+    retention_period: cs(r[COL.retention_period]),
+    requires_approval: cs(r[COL.requires_approval])==='Yes',
+    approver_name: cs(r[COL.approver_name]),
+    approval_date: pDate(r[COL.approval_date]),
+    submittal_document_type: sdt,
+    lead_time: si(r[COL.lead_time]),
+    awarding_date: pDate(r[COL.awarding_date]),
+    actual_awarding_date: isFutureAward ? null : actualAward,   // ignore advance date until it arrives
+    target_delivery: pDate(r[COL.target_delivery]),
+    target_installation: pDate(r[COL.target_installation]),
+    target_completion: pDate(r[COL.target_completion]),
+    procurement_status: proc,
+    award_status: award,
+    awarding_status: cs(r[COL.awarding_status])==='DUE' ? 'DUE' : null,
+    purchase_request: cs(r[COL.purchase_request]),
+    osm: (remarks && /osm/i.test(remarks)) ? 'Yes' : 'No',      // lookout: No unless Remarks say OSM
+    remarks: remarks,
+    review_status: 'approved',
+    _future: isFutureAward,    // preview flag only (stripped before insert)
+  };
+}
+
+/* ---- parse the chosen sheet ---- */
+function parse(){
+  const sheetName=$('sheet').value, skip=parseInt($('skip').value,10)||0;
+  const ws=_wb.Sheets[sheetName];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  const today=new Date(); today.setHours(0,0,0,0);
+  const pid=$('project').value;
+  const out=[];
+  for(let i=skip;i<rows.length;i++){ const wp=rowToWP(rows[i]||[],pid,today); if(wp) out.push(wp); }
+  return out;
+}
+
+function renderPreview(wps){
+  _parsed=wps;
+  const awarded=wps.filter(w=>w.award_status==='Awarded').length;
+  const future=wps.filter(w=>w._future).length;
+  const osm=wps.filter(w=>w.osm==='Yes').length;
+  const bud=wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  $('kpis').innerHTML=[
+    ['Work packages',wps.length],['Awarded',awarded],['Not Yet Awarded',wps.length-awarded],
+    ['Advance-dated → held',future],['OSM = Yes',osm],['Total Budget (₱M)',(bud/1e6).toFixed(1)]
+  ].map(k=>`<div class="kpi"><div class="v">${k[1]}</div><div class="l">${k[0]}</div></div>`).join('');
+  const cols=['wp_no','description','trade','procurement_status','award_status','approved_budget_bcb','awarded_cost','awarding_date','actual_awarding_date','osm'];
+  $('tbl').querySelector('thead').innerHTML='<tr>'+cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')+'</tr>';
+  $('tbl').querySelector('tbody').innerHTML=wps.map(w=>'<tr>'+cols.map(c=>{
+    let v=w[c]; if(c==='award_status') return `<td><span class="badge ${v==='Awarded'?'b-aw':'b-no'}">${v}</span></td>`;
+    if(c==='approved_budget_bcb'||c==='awarded_cost') return `<td class="num">${v!=null?Number(v).toLocaleString():'—'}</td>`;
+    return `<td>${v==null?'—':String(v)}</td>`;
+  }).join('')+'</tr>').join('');
+  $('wp-proj').textContent=$('project').value;
+  $('wp-count').textContent=wps.length;
+  $('preview-card').style.display='block';
+  $('btn-import').disabled = wps.length===0;
+  $('preview-card').scrollIntoView({behavior:'smooth'});
+}
+
+async function doImport(){
+  const pid=$('project').value;
+  if(!confirm(`Delete ALL work packages for ${pid} and import ${_parsed.length} rows from the sheet?\n\nThis cannot be undone.`)) return;
+  $('btn-import').disabled=true; $('btn-cancel').disabled=true;
+  log(`\nReplacing ${pid} — deleting existing work packages…`,'info');
+  const {error:delErr}=await sb.from('work_packages').delete().eq('project_id',pid);
+  if(delErr){ log('Delete failed: '+delErr.message,'err'); $('btn-import').disabled=false; $('btn-cancel').disabled=false; return; }
+  log('Deleted existing WPs.','ok');
+  const rows=_parsed.map(w=>{ const c={...w}; delete c._future; return c; });   // strip preview-only flag
+  const BATCH=20; let inserted=0;
+  for(let i=0;i<rows.length;i+=BATCH){
+    const batch=rows.slice(i,i+BATCH);
+    const {error}=await sb.from('work_packages').insert(batch);
+    if(error){ log(`Batch ${Math.floor(i/BATCH)+1} error: ${error.message}`,'err'); log('  first WP: '+batch[0].wp_no,'err'); $('btn-cancel').disabled=false; return; }
+    inserted+=batch.length; log(`Inserted ${inserted}/${rows.length}`,'ok');
+  }
+  log(`\n✓ COMPLETE — ${inserted} work packages imported into ${pid}.`,'ok');
+  log('Open the project dashboard (refresh) to see the restored data.','info');
+}
+
+/* ---- wire up ---- */
+$('file').addEventListener('change', e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    _wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array',cellDates:true});
+    const names=_wb.SheetNames;
+    const pref=names.find(n=>/monitoring/i.test(n))||names[0];
+    $('sheet').innerHTML=names.map(n=>`<option${n===pref?' selected':''}>${n}</option>`).join('');
+    $('skip').innerHTML=Array.from({length:31},(_,i)=>`<option${i===DEFAULT_SKIP?' selected':''}>${i}</option>`).join('');
+    $('btn-parse').disabled=false;
+    log(`Loaded "${f.name}" — ${names.length} sheet(s). Default sheet: ${pref}.`,'info');
+  };
+  rd.readAsArrayBuffer(f);
+});
+$('btn-parse').addEventListener('click',()=>{ try{ renderPreview(parse()); }catch(err){ log('Parse error: '+err.message,'err'); } });
+$('btn-import').addEventListener('click',doImport);
+$('btn-cancel').addEventListener('click',()=>{ $('preview-card').style.display='none'; _parsed=null; });
+
+/* ---- auth gate (admin only) ---- */
+(async ()=>{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){ $('gate').style.display='block'; $('gate-msg').innerHTML='You must <a href="login.html">sign in</a> first.'; return; }
+  const {data:prof}=await sb.from('users').select('role,status').eq('id',session.user.id).single();
+  _profile=prof;
+  if(!prof || !['admin','super_admin'].includes(prof.role)){
+    $('gate').style.display='block'; $('gate-msg').textContent='Admin access required — this tool deletes and re-imports work packages.'; return;
+  }
+  const {data:projs}=await sb.from('projects').select('id,name').order('id');
+  $('project').innerHTML=(projs||[]).map(p=>`<option value="${p.id}">${p.id}${p.name&&p.name!==p.id?' — '+p.name.split('—')[0].trim():''}</option>`).join('');
+  $('app').style.display='block';
+})();
+</script>
+</body>
+</html>

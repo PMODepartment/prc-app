@@ -332,6 +332,17 @@ A WP can be deleted from three places (non-viewers only): the **WP detail slide-
 
 ---
 
+## Excel Monitoring-Sheet Importer (`import-monitoring.html`)
+
+A **self-contained, admin-only** tool that reads a raw **Work-Package Monitoring `.xlsx` directly in the browser** (SheetJS via CDN) — no Python extractor, no CSV step. It **replaces** the old `gen_import.py` + generated `avr101-import.html` workflow (both now git-ignored — `avr101-import.html` embeds real data and must never be committed). Loads supabase-js + SheetJS via CDN, creates a client with the public URL/anon key (reuses the existing localStorage session), and **gates on `role in ('admin','super_admin')`**.
+
+- **Layout:** ported from `gen_import.py` — fixed column indices of the "Work Package Monitoring" sheet (`COL` map: cost_code=2, wp_no=4, wp_name=5, …, actual_award_date=120, remarks=146), data rows start after **row 17** (configurable "header rows to skip"; non-numeric `wp_no` rows are skipped so trade/subgroup header rows drop out). `wp_no → 'WP-<n>'`. `trade = type_of_service` column (col 9), as in the original extractor.
+- **Sheet + project pickers:** the workbook's sheet list (defaults to the one matching `/monitoring/i`) and a target-project dropdown (`AVR101` layout, **any project**).
+- **Three import lookouts (per user):** (1) **advance award dates** — a WP whose actual award date is in the **future** is imported as **Not Yet Awarded** with `actual_awarding_date`/`awarded_cost` cleared (the advance date is ignored until it arrives); (2) **OSM** — `osm='No'` for every WP unless its **Remarks** match `/osm/i`; (3) **charging** — every WP `charging_type='Main Contract'`. Also reconciles the proc⇄award invariant.
+- **Preview before write:** parses → shows KPI tiles (count, awarded, advance-held, OSM=Yes, total budget) + a per-WP table, THEN a **Replace** button deletes ALL of the target project's WPs and batch-inserts (20/batch) with `review_status='approved'`. Strong confirm first.
+- Dates handled via a robust `pDate` (JS Date from `cellDates:true`, Excel serial fallback, `YYYY-MM-DD`/`MM/DD/YYYY` strings) using **local** components (no UTC off-by-one). Generated columns are never inserted (the `COL` map omits `total_awarded`/`variance`/`awarding_lead_time`).
+- Linked from the `project.html` CSV-import modal ("open the Excel importer →").
+
 ## CSV Import (Work Packages)
 
 `downloadCSVTemplate()` generates `WPM_Import_Template.csv`. Both `project.html` and `wp-form.html` share the same 54-column template. The two sample rows are clearly marked **EXAMPLE ROW - edit or delete before importing** in the Description and are self-consistent valid samples (one Not-Yet-Awarded minimal row; one Awarded row with cost+vendor+matching PO/JO and no future dates) so they pass the import safeguards; officers edit or delete them freely. `importWPsFromCSV()` calls `WPDb.submitWP()` per row (throws on error), then `WPDb.approveWP()` if auto-approve role.
