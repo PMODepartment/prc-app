@@ -48,7 +48,6 @@ const WPDb = (() => {
   async function submitWP(d,p) { const sb=await getSB(); const {data,error}=await sb.from('work_packages').insert({...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null}).select().single(); if(error) throw error; return data; }
   async function updateWP(id,d) { const sb=await getSB(); const {data,error}=await sb.from('work_packages').update({...unmap(d),review_status:'pending_review'}).eq('id',id).select().single(); if(error) throw error; return data; }
   async function updateWPDirect(id,d) { const sb=await getSB(); const {data,error}=await sb.from('work_packages').update(unmap(d)).eq('id',id).select().single(); if(error) throw error; return data; }
-  async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
   async function createProject(d) { const sb=await getSB(); const {data,error}=await sb.from('projects').insert(d).select().single(); if(error) throw error; return data; }
   async function approveWP(id) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({review_status:'approved'}).eq('id',id).select().single(); return data; }
   async function rejectWP(id,_,reason) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({review_status:'rejected',review_notes:reason}).eq('id',id).select().single(); return data; }

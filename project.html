@@ -11,17 +11,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260708o"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260708o"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260708o"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260708p"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260708p"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260708p"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708b"/>
   <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260708o"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260708p"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260708o"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260708p"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -307,12 +307,12 @@
             </select>
             <div style="position:relative">
               <i class="ti ti-search" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);color:#bbb;font-size:11px;pointer-events:none"></i>
-              <input id="bl-search" type="text" placeholder="Search…" oninput="renderBacklog()" style="font-size:11px;padding:4px 8px 4px 24px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;width:140px">
+              <input id="bl-search" type="text" placeholder="Search…" oninput="dbnc('bl',renderBacklog)" style="font-size:11px;padding:4px 8px 4px 24px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;width:140px">
             </div>
             <label style="font-size:11px;color:#888;font-weight:600">Budget:</label>
-            <input id="backlog-min-budget" type="number" placeholder="Min ₱M" oninput="renderBacklog()" style="width:65px;font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
+            <input id="backlog-min-budget" type="number" placeholder="Min ₱M" oninput="dbnc('bl',renderBacklog)" style="width:65px;font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
             <span style="font-size:11px;color:#aaa">—</span>
-            <input id="backlog-max-budget" type="number" placeholder="Max ₱M" oninput="renderBacklog()" style="width:65px;font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
+            <input id="backlog-max-budget" type="number" placeholder="Max ₱M" oninput="dbnc('bl',renderBacklog)" style="width:65px;font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
           </div>
           <div class="panel">
             <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog</div>
@@ -535,14 +535,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260708o"></script>
-<script src="assets/js/ui.js?v=20260708o"></script>
-<script src="assets/js/db.js?v=20260708o"></script>
+<script src="assets/js/auth.js?v=20260708p"></script>
+<script src="assets/js/ui.js?v=20260708p"></script>
+<script src="assets/js/db.js?v=20260708p"></script>
 <script src="assets/js/onboarding.js?v=20260708b"></script>
 <script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260708o"></script>
+<script src="assets/js/charts.js?v=20260708p"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -839,6 +839,10 @@ window.renderSidebarProjects = function() {
 const _projVendors = w => String(w.contractor||w.proposed_vendors||'').split(/[\r\n;|]+/).map(s=>s.trim()).filter(Boolean);
 // Cascading multiselect state for the WP-List Works/Vendor filters (Trade → Works → Vendor)
 const _msfSel = { works: new Set(), vendor: new Set() };
+// Debounce heavy re-render handlers (text search / number inputs) so they don't rebuild the
+// whole table + analysis panel on every keystroke. Keyed by name; ~180 ms feels instant.
+const _dbT = {};
+window.dbnc = function(key, fn, ms){ clearTimeout(_dbT[key]); _dbT[key] = setTimeout(fn, ms || 180); };
 // Re-apply the WP-List filters (table + Filtered Analysis) after a Works/Vendor/Trade change
 function applyWpListFilters(){
   curPage=1;
@@ -2450,7 +2454,7 @@ AppAuth.requireLogin(async (user, profile) => {
   const trEl=document.getElementById('f-trade');
   if(trEl) trEl.addEventListener('change',()=>{ _msfSel.works.clear(); _msfSel.vendor.clear(); _recomputeFilterOptions(); applyWpListFilters(); });
   const srch = document.getElementById('f-search');
-  if(srch) srch.addEventListener('input',()=>{curPage=1; if(currentView==='table'){buildTable(); renderPwaAnalysis();}});
+  if(srch) srch.addEventListener('input',()=>dbnc('fsearch',()=>{curPage=1; if(currentView==='table'){buildTable(); renderPwaAnalysis();}}));
 
   document.getElementById('btn-export').addEventListener('click', async () => {
     if (window.__isViewer) return;   // viewers must not export cost data (PDF emits BCB/Awarded/Variance)
