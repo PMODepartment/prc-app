@@ -27,6 +27,9 @@
   .btn:disabled{opacity:.45;cursor:default}
   .lookouts{font-size:12px;color:var(--ink2);line-height:1.7;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:11px 14px;margin-top:12px}
   .lookouts b{color:var(--ink)}
+  .detected{font-size:11.5px;color:var(--ink2);background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 13px;margin-top:12px;display:none;line-height:1.6}
+  .detected b{color:var(--ink)}
+  .detected code{background:#dcfce7;padding:0 4px;border-radius:3px}
   .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
   .kpi{background:#fafafa;border:1px solid var(--line);border-radius:9px;padding:9px 14px;min-width:110px}
   .kpi .v{font-size:19px;font-weight:800}.kpi .l{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em}
@@ -39,7 +42,7 @@
   .b-aw{background:#EAF3DE;color:#3B6D11}.b-no{background:#FEE2E2;color:#991B1B}
   .warn{background:#FFF3CD;border:1px solid #FFC107;color:#856404;border-radius:8px;padding:11px 14px;font-size:12.5px;margin:12px 0;display:flex;gap:9px;align-items:flex-start}
   #log{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;line-height:1.6;max-height:260px;overflow-y:auto;background:#1a1a1a;color:#ccc;border-radius:8px;padding:12px;margin-top:12px;display:none}
-  .ok{color:#4ade80}.err{color:#f87171}.info{color:#60a5fa}
+  .ok{color:#4ade80}.err{color:#f87171}.info{color:#60a5fa}.muted{color:#9ca3af}
   #gate{display:none;text-align:center;padding:60px 20px;color:var(--ink2)}
   a.back{font-size:12px;color:var(--red);text-decoration:none;font-weight:600}
 </style>
@@ -48,7 +51,7 @@
 <div class="wrap">
   <a class="back" href="login.html">← Back to dashboard</a>
   <h1 style="margin-top:10px"><i class="ti ti-file-spreadsheet"></i> Import from Excel Monitoring Sheet</h1>
-  <p class="sub">Reads a Work-Package Monitoring <b>.xlsx</b> directly (no CSV step) and replaces a project's work packages.</p>
+  <p class="sub">Reads a Work-Package Monitoring <b>.xlsx</b> directly (no CSV step) and replaces a project's work packages. Columns are matched by their header names, so it adapts to each project's sheet layout automatically.</p>
 
   <div id="gate"><i class="ti ti-lock" style="font-size:30px;color:#bbb"></i><p id="gate-msg">Checking access…</p></div>
 
@@ -61,10 +64,6 @@
       </div>
       <div class="row" style="margin-top:12px">
         <div><label>Sheet</label><select id="sheet"><option>— pick a file first —</option></select></div>
-        <div><label>Sheet layout</label><select id="layout" onchange="onLayoutChange()"></select></div>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <div><label>Header rows to skip (data starts after)</label><select id="skip"></select></div>
         <div></div>
       </div>
       <div class="lookouts">
@@ -73,6 +72,7 @@
         • <b>OSM</b> — every WP is <b>No</b> unless its Remarks mention "OSM".<br>
         • <b>Charging</b> — every WP is set to <b>Main Contract</b>.
       </div>
+      <div class="detected" id="detected"></div>
       <button class="btn btn-red" id="btn-parse" style="margin-top:14px" disabled><i class="ti ti-eye"></i> Parse &amp; Preview</button>
     </div>
 
@@ -95,64 +95,10 @@
 const SB_URL = 'https://cayjeqeleenizbdzrums.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
-
-// Column layouts (0-based) for the monitoring sheets. Different projects use different sheet
-// structures, so each layout is a named profile with its own column map + options.
-//  • "standard" — the AVR / SLN / SLT / GRP / UTM layout (ported from gen_import.py); trade comes
-//    from the type-of-service column; award inferred from awarded cost + stage columns.
-//  • "opw" — One Portwood: VAT-EX cost columns, WP No. in col 3, an explicit award-status text
-//    column (13), and a HIERARCHICAL trade taken from the ALL-CAPS group-header rows
-//    (GENERAL REQUIREMENTS / SITE WORKS / … / MEPF WORKS / OTHER ALLIED SERVICES). MEPF is split
-//    into Mechanical / Electrical & Auxiliary / Plumbing / Fire by keyword on the description.
-const LAYOUTS = {
-  standard: {
-    label: 'Standard (AVR / SLN / SLT / GRP / UTM)', skip: 17, hierTrade: false, awardTextCol: null,
-    col: {
-      cost_code:2, wp_no:4, wp_name:5, detailed_description:8, type_service:9, type_procurement:10,
-      proposed_vendors:11, po_jo_count:12, po_jo_numbers:13, type_contract:14,
-      responsible_team:22, approver:23, support_team:24, surety_bond:26, performance_bond:27, warranty_bond:28,
-      budget_bcb:30, awarded_cost:31, additionals:32, payment_terms_days:36, dp_percent:37, dp_terms:38,
-      dp_notes:39, dp_release_date:40, dp_amount:41, retention_percent:42, retention_amount:43, retention_period:44,
-      requires_approval:113, approver_name:114, approval_date:115, submittal_document_type:116,
-      lead_time:118, awarding_date:119, actual_award_date:120, target_delivery:122, target_installation:124,
-      target_completion:125, sourcing:127, rfq:128, bid_open:129, bid_closed:130, loa:131, contract_col:132,
-      mob_del:133, purchase_request:143, awarding_status:144, remarks:146,
-    },
-  },
-  opw: {
-    label: 'OPW — One Portwood (VAT-EX, hierarchical trade)', skip: 7, hierTrade: true, tradeNameCol: 4, awardTextCol: 13,
-    col: {
-      cost_code:2, wp_no:3, wp_name:4, detailed_description:5, type_service:6, type_procurement:7,
-      proposed_vendors:8, po_jo_count:9, po_jo_numbers:10, type_contract:11,
-      responsible_team:21, approver:22, support_team:23, surety_bond:25, performance_bond:26, warranty_bond:27,
-      budget_bcb:31, awarded_cost:34, additionals:35, payment_terms_days:39, dp_percent:40, dp_terms:41,
-      dp_notes:42, dp_release_date:43, dp_amount:44, retention_percent:45, retention_amount:46, retention_period:47,
-      requires_approval:null, approver_name:null, approval_date:null, submittal_document_type:null,
-      lead_time:136, awarding_date:137, actual_award_date:138, target_delivery:141, target_installation:143,
-      target_completion:144, sourcing:146, rfq:147, bid_open:148, bid_closed:149, loa:150, contract_col:151,
-      mob_del:152, purchase_request:null, awarding_status:null, remarks:175,
-    },
-  },
-};
-function curLayout(){ return LAYOUTS[$('layout') && $('layout').value] || LAYOUTS.standard; }
-// Award-status text → canonical (used by the OPW award-text column).
-function pAward(v){ const s=String(v==null?'':v).trim().toLowerCase(); if(!s) return null;
-  if(/not\s*yet|not\s*award|for\s*award|pending|ongoing|sourc|solicit|evaluat|negotiat/.test(s)) return 'Not Yet Awarded';
-  if(/award|loa|contract|mob|deliver/.test(s)) return 'Awarded'; return null; }
-// Split a "MEPF WORKS" trade header into a discipline by keyword on the WP description.
-function mepfSplit(trade, desc){
-  if(!trade || !/mepf|m\.?e\.?p\.?f/i.test(trade)) return trade;
-  const s=(desc||'').toLowerCase();
-  if(/plumb|sanitary|drainage|sewer|water\s*supply|stp\b|septic/.test(s)) return 'Plumbing Works';
-  if(/fire|sprinkler|fdas|suppress|standpipe|hydrant/.test(s)) return 'Fire Protection Works';
-  if(/mechan|hvac|acmv|elevator|\blift\b|escalator|\bpump|ventilation|chiller|genset/.test(s)) return 'Mechanical Works';
-  if(/electr|power|lighting|transformer|\belv\b|auxiliar|cctv|telecom|\bdata\b|pabx|\bbms\b|fire\s*alarm|low\s*current/.test(s)) return 'Electrical and Auxiliary Works';
-  return trade;   // ambiguous → leave as "MEPF WORKS" (visible in preview for review)
-}
-
-let _wb = null, _parsed = null, _profile = null;
 const $ = id => document.getElementById(id);
 function log(msg, cls){ const l=$('log'); l.style.display='block'; l.innerHTML += '<span class="'+(cls||'')+'">'+msg+'</span>\n'; l.scrollTop=l.scrollHeight; }
+
+let _wb = null, _parsed = null, _profile = null, _detected = null;
 
 /* ---- date / value helpers ---- */
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -160,8 +106,7 @@ function toLocalISO(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d
 function pDate(v){
   if(v==null||v==='') return null;
   if(v instanceof Date && !isNaN(v)) return toLocalISO(v);
-  if(typeof v==='number' && v>20000 && v<80000){ // Excel serial → date (1899-12-30 epoch)
-    const d=new Date(Math.round((v-25569)*86400*1000)); return isNaN(d)?null:toLocalISO(new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())); }
+  if(typeof v==='number' && v>20000 && v<80000){ const d=new Date(Math.round((v-25569)*86400*1000)); return isNaN(d)?null:toLocalISO(new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())); }
   const s=String(v).trim(); let m=s.match(/(\d{4})-(\d{2})-(\d{2})/);
   if(m) return m[1]+'-'+m[2]+'-'+m[3];
   m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return m[3]+'-'+pad(+m[1])+'-'+pad(+m[2]);
@@ -171,14 +116,97 @@ function cs(v){ if(v==null) return null; const s=String(v).trim(); return s?s:nu
 function cn(v){ if(v==null||v==='') return null; const f=parseFloat(String(v).replace(/,/g,'')); return isNaN(f)?null:f; }
 function si(v){ const f=cn(v); return f==null?null:Math.round(f); }
 function yn(v){ const s=String(v==null?'':v).trim().toLowerCase(); return (s==='yes'||s==='true'||s==='1'||s==='y')?'Yes':'No'; }
-function truthy(v){ return v!=null && String(v).trim()!==''; }
+function norm(s){ return String(s==null?'':s).replace(/\s+/g,' ').trim().toLowerCase(); }
 
-/* ---- build one WP from a sheet row (array of cell values), per layout L ---- */
-function rowToWP(r, projectId, today, L, curTrade){
-  const C = L.col;
-  const g = k => { const c = C[k]; return (c==null) ? null : r[c]; };   // null-safe column read
+/* ---- header-name auto-detection ----------------------------------------
+ * The monitoring sheets differ per project (column positions, header rows,
+ * even different templates), so instead of fixed column indices we locate each
+ * field by matching its HEADER TEXT in the header band. This adapts to every
+ * layout (AVR / GRP / SLN / SLT / UTM / OPW) and to future sheets.
+ * Trade is HIERARCHICAL: the discipline is written in the description column on
+ * group-header rows (no WP No.) above the WPs it covers.
+ */
+const TRADE_RE = /general requirement|site works|site development|structural|architectural|mechanical|electrical|auxiliar|plumb|fire protection|mepf|allied|civil works/i;
+// find the first column in the header band whose text matches `incl` (and not `excl`)
+function findCol(band, incl, excl){
+  for(const cells of band){ for(let c=0;c<cells.length;c++){ const v=norm(cells[c]); if(!v) continue;
+    if(incl.test(v) && (!excl || !excl.test(v))) return c; } }
+  return null;
+}
+function detectLayout(rows){
+  let hdr=-1;
+  for(let i=0;i<Math.min(35,rows.length);i++){ if((rows[i]||[]).some(v=>/^work package no/.test(norm(v)))){ hdr=i; break; } }
+  if(hdr<0) return null;
+  const band=[]; for(let i=Math.max(0,hdr-1); i<=hdr+2 && i<rows.length; i++) band.push(rows[i]||[]);
+  const col = {
+    wp_no:                findCol(band,/^work package no/),
+    wp_name:              findCol(band,/^work package description/) ?? findCol(band,/^description$/),
+    cost_code:            findCol(band,/cost code/),
+    detailed_description: findCol(band,/specific scope|detailed desc/),
+    type_service:         findCol(band,/type of service/),
+    type_procurement:     findCol(band,/type of procurement/),
+    proposed_vendors:     findCol(band,/proposed vendor/),
+    po_jo_count:          findCol(band,/no\.? of po/),
+    po_jo_numbers:        findCol(band,/po ?\/ ?jo nos?\.?|po\/jo no/),
+    type_contract:        findCol(band,/type of contract/),
+    responsible_team:     findCol(band,/^responsib/),
+    approver:             findCol(band,/^approver$/),
+    support_team:         findCol(band,/^support/),
+    surety_bond:          findCol(band,/surety/),
+    performance_bond:     findCol(band,/performance/),
+    warranty_bond:        findCol(band,/warranty/),
+    budget_bcb:           findCol(band,/budget.*(bcb|vat ?ex|net)/) ?? findCol(band,/^budget/),
+    awarded_cost:         findCol(band,/awarded cost/),
+    additionals:          findCol(band,/^additional/),
+    payment_terms_days:   findCol(band,/terms.*\(?days|^terms$/),
+    dp_percent:           findCol(band,/% ?of ?dp|down payment ?%|dp ?%/),
+    dp_terms:             findCol(band,/dp terms/),
+    dp_notes:             findCol(band,/dp.*notes?/),
+    dp_release_date:      findCol(band,/date of release|dp.*release/),
+    dp_amount:            findCol(band,/dp amount/),
+    retention_percent:    findCol(band,/% ?of ?reten|retention ?%/),
+    retention_amount:     findCol(band,/retention amount/),
+    retention_period:     findCol(band,/retention period/),
+    requires_approval:    findCol(band,/requires.*approval|material ?\/ ?subcon/),
+    approver_name:        findCol(band,/name of approver|approver name|submittals approver/),
+    approval_date:        findCol(band,/date of approval|approval date/),
+    submittal_document_type: findCol(band,/submittal.*(type|document)|type of submittal/),
+    lead_time:            findCol(band,/lead time/),
+    actual_award_date:    findCol(band,/actual awarding|awarding date.*actual/),
+    awarding_date:        findCol(band,/awarding date/,/actual/),
+    target_delivery:      findCol(band,/target delivery/),
+    target_installation:  findCol(band,/target inst/),
+    target_completion:    findCol(band,/target comp/),
+    sourcing:             findCol(band,/^sourcing$/),
+    rfq:                  findCol(band,/^rfq$/),
+    bid_open:             findCol(band,/^bid open$/),
+    bid_closed:           findCol(band,/^bid closed$/),
+    loa:                  findCol(band,/^loa$/),
+    contract_col:         findCol(band,/^contract$/),
+    mob_del:              findCol(band,/mob ?\/? ?del/),
+    purchase_request:     findCol(band,/purchase request|^pr nos?\.?$/),
+    awarding_status:      findCol(band,/awarding status/),
+    remarks:              findCol(band,/^remarks$/) ?? findCol(band,/procurement remarks/) ?? findCol(band,/remark/),
+  };
+  return { hdrRow:hdr, col, descCol: (col.wp_name!=null ? col.wp_name : col.wp_no) };
+}
+
+// Split a "MEPF WORKS" group header into a discipline by keyword on the WP description.
+function mepfSplit(trade, desc){
+  if(!trade || !/mepf|m\.?e\.?p\.?f/i.test(trade)) return trade;
+  const s=(desc||'').toLowerCase();
+  if(/plumb|sanitary|drainage|sewer|water\s*supply|stp\b|septic/.test(s)) return 'Plumbing Works';
+  if(/fire|sprinkler|fdas|suppress|standpipe|hydrant/.test(s)) return 'Fire Protection Works';
+  if(/mechan|hvac|acmv|elevator|\blift\b|escalator|\bpump|ventilation|chiller|genset/.test(s)) return 'Mechanical Works';
+  if(/electr|power|lighting|transformer|\belv\b|auxiliar|cctv|telecom|\bdata\b|pabx|\bbms\b|fire\s*alarm|low\s*current/.test(s)) return 'Electrical and Auxiliary Works';
+  return trade;
+}
+
+/* ---- build one WP from a sheet row using the detected column map ---- */
+function rowToWP(r, projectId, today, C, curTrade){
+  const g = k => { const c=C[k]; return (c==null) ? null : r[c]; };
   const wpNum = cn(g('wp_no'));
-  if(wpNum==null || !isFinite(wpNum)) return null;   // skip non-WP rows (headers, subgroups)
+  if(wpNum==null || !isFinite(wpNum)) return null;
 
   const budget = cn(g('budget_bcb'));
   const awarded = cn(g('awarded_cost'));
@@ -186,25 +214,18 @@ function rowToWP(r, projectId, today, L, curTrade){
   const isFutureAward = actualAward && new Date(actualAward) > today;
   const desc = cs(g('wp_name'));
 
-  // Procurement status from the stage columns; a FUTURE actual-award is treated as not-yet-awarded.
   let proc = 'Not Started';
   if(actualAward && !isFutureAward) proc='Awarded';
-  else if(truthy(g('loa'))||truthy(g('contract_col'))||truthy(g('mob_del'))) proc='Evaluation & Negotiation';
-  else if(truthy(g('bid_closed'))||truthy(g('bid_open'))) proc='Evaluation & Negotiation';
-  else if(truthy(g('rfq'))) proc='Solicitation';
-  else if(truthy(g('sourcing'))) proc='Sourcing';
+  else if(truthyC(g('loa'))||truthyC(g('contract_col'))||truthyC(g('mob_del'))) proc='Evaluation & Negotiation';
+  else if(truthyC(g('bid_closed'))||truthyC(g('bid_open'))) proc='Evaluation & Negotiation';
+  else if(truthyC(g('rfq'))) proc='Solicitation';
+  else if(truthyC(g('sourcing'))) proc='Sourcing';
 
-  // Award status: prefer an explicit award-status text column (OPW); else infer from awarded cost.
-  // A FUTURE actual-award date is always treated as Not Yet Awarded (advance-date lookout).
-  const awardText = L.awardTextCol!=null ? pAward(r[L.awardTextCol]) : null;
-  let award = isFutureAward ? 'Not Yet Awarded'
-            : (awardText || ((awarded && awarded>0) ? 'Awarded' : 'Not Yet Awarded'));
-  // Reconcile the one-way invariant (proc 'Awarded' ⇄ award 'Awarded') the app enforces.
+  let award = isFutureAward ? 'Not Yet Awarded' : ((awarded && awarded>0) ? 'Awarded' : 'Not Yet Awarded');
   if(proc==='Awarded') award='Awarded'; else if(award==='Awarded') proc='Awarded';
 
-  // Trade: hierarchical layouts use the current ALL-CAPS group header (MEPF split by keyword);
-  // otherwise the type-of-service column.
-  const trade = L.hierTrade ? mepfSplit(curTrade, desc) : cs(g('type_service'));
+  // Trade: hierarchical (from the group header), MEPF split; fall back to type-of-service.
+  const trade = curTrade ? mepfSplit(curTrade, desc) : cs(g('type_service'));
 
   const remarks = cs(g('remarks'));
   const dpPct = cn(g('dp_percent')), retPct = cn(g('retention_percent'));
@@ -212,7 +233,7 @@ function rowToWP(r, projectId, today, L, curTrade){
 
   return {
     project_id: projectId,
-    wp_no: String(Math.round(wpNum)),   // store the digit only (agreed format), no 'WP-' prefix
+    wp_no: String(Math.round(wpNum)),
     description: desc || ('WP-'+Math.round(wpNum)),
     detailed_description: cs(g('detailed_description')),
     zone: null,
@@ -220,7 +241,7 @@ function rowToWP(r, projectId, today, L, curTrade){
     type_of_service: cs(g('type_service')),
     type_of_procurement: cs(g('type_procurement')),
     type_of_contract: cs(g('type_contract')),
-    charging_type: 'Main Contract',                 // lookout: all WPs under Main Contract
+    charging_type: 'Main Contract',
     proposed_vendors: cs(g('proposed_vendors')),
     po_jo_count: si(g('po_jo_count')) || 0,
     po_jo_numbers: cs(g('po_jo_numbers')),
@@ -248,7 +269,7 @@ function rowToWP(r, projectId, today, L, curTrade){
     submittal_document_type: sdt,
     lead_time: si(g('lead_time')),
     awarding_date: pDate(g('awarding_date')),
-    actual_awarding_date: isFutureAward ? null : actualAward,   // ignore advance date until it arrives
+    actual_awarding_date: isFutureAward ? null : actualAward,
     target_delivery: pDate(g('target_delivery')),
     target_installation: pDate(g('target_installation')),
     target_completion: pDate(g('target_completion')),
@@ -256,53 +277,64 @@ function rowToWP(r, projectId, today, L, curTrade){
     award_status: award,
     awarding_status: cs(g('awarding_status'))==='DUE' ? 'DUE' : null,
     purchase_request: cs(g('purchase_request')),
-    osm: (remarks && /osm/i.test(remarks)) ? 'Yes' : 'No',      // lookout: No unless Remarks say OSM
+    osm: (remarks && /osm/i.test(remarks)) ? 'Yes' : 'No',
     remarks: remarks,
     review_status: 'approved',
-    _future: isFutureAward,    // preview flag only (stripped before insert)
+    _future: isFutureAward,
   };
 }
+function truthyC(v){ return v!=null && String(v).trim()!=='' && String(v).trim()!=='0'; }
 
 /* ---- parse the chosen sheet ---- */
 function parse(){
-  const L=curLayout();
-  const sheetName=$('sheet').value, skip=parseInt($('skip').value,10)||0;
-  const ws=_wb.Sheets[sheetName];
+  const ws=_wb.Sheets[$('sheet').value];
   const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  const L=detectLayout(rows);
+  if(!L || L.col.wp_no==null) throw new Error('Could not find a "Work Package No." column header on this sheet — is it the monitoring sheet?');
+  if(L.col.budget_bcb==null) throw new Error('Could not find a Budget (BCB / VAT-EX / Net) column header on this sheet.');
+  _detected=L;
   const today=new Date(); today.setHours(0,0,0,0);
   const pid=$('project').value;
   const out=[]; let curTrade=null;
-  for(let i=skip;i<rows.length;i++){
+  for(let i=L.hdrRow+1;i<rows.length;i++){
     const r=rows[i]||[];
-    if(L.hierTrade){
-      // Track the current trade from ALL-CAPS group-header rows (no WP No.). Ignore total rows.
-      const isWP = cn(r[L.col.wp_no])!=null;
-      const hdr = r[L.tradeNameCol];
-      if(!isWP && hdr){ const s=String(hdr).trim();
-        if(/[a-z]/i.test(s) && s===s.toUpperCase()){ if(!/subtotal|grand\s*total|^total$/i.test(s)) curTrade=s; continue; }
-      }
+    if(cn(r[L.col.wp_no])==null){
+      // group-header row → update the current trade if the description column names a discipline
+      const dv = (L.descCol!=null) ? r[L.descCol] : null;
+      if(dv && TRADE_RE.test(String(dv)) && !/subtotal|grand ?total|^\s*total/i.test(String(dv))) curTrade=String(dv).trim();
+      continue;
     }
-    const wp=rowToWP(r,pid,today,L,curTrade); if(wp) out.push(wp);
+    const wp=rowToWP(r,pid,today,L.col,curTrade); if(wp) out.push(wp);
   }
   return out;
 }
 
+function showDetected(L){
+  const c=L.col, nm=n=>n==null?'<span class="muted">not found</span>':('col '+n);
+  $('detected').style.display='block';
+  $('detected').innerHTML='<b>Auto-detected layout</b> — header row <code>'+(L.hdrRow+1)+'</code>, trade from '+nm(L.descCol)+
+    '. Key columns: WP No <code>'+nm(c.wp_no)+'</code>, Budget <code>'+nm(c.budget_bcb)+'</code>, Awarded Cost <code>'+nm(c.awarded_cost)+
+    '</code>, Awarding Date <code>'+nm(c.awarding_date)+'</code>, Actual Award <code>'+nm(c.actual_award_date)+'</code>, Completion <code>'+nm(c.target_completion)+'</code>, Remarks <code>'+nm(c.remarks)+'</code>.';
+}
+
 function renderPreview(wps){
   _parsed=wps;
+  if(_detected) showDetected(_detected);
   const awarded=wps.filter(w=>w.award_status==='Awarded').length;
   const future=wps.filter(w=>w._future).length;
   const osm=wps.filter(w=>w.osm==='Yes').length;
+  const noTrade=wps.filter(w=>!w.trade).length;
   const bud=wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   $('kpis').innerHTML=[
     ['Work packages',wps.length],['Awarded',awarded],['Not Yet Awarded',wps.length-awarded],
-    ['Advance-dated → held',future],['OSM = Yes',osm],['Total Budget (₱M)',(bud/1e6).toFixed(1)]
+    ['Advance-dated → held',future],['OSM = Yes',osm],['No trade',noTrade],['Total Budget (₱M)',(bud/1e6).toFixed(1)]
   ].map(k=>`<div class="kpi"><div class="v">${k[1]}</div><div class="l">${k[0]}</div></div>`).join('');
-  const cols=['wp_no','description','trade','procurement_status','award_status','approved_budget_bcb','awarded_cost','awarding_date','actual_awarding_date','osm'];
+  const cols=['wp_no','description','trade','procurement_status','award_status','approved_budget_bcb','awarded_cost','awarding_date','actual_awarding_date','target_completion','osm'];
   $('tbl').querySelector('thead').innerHTML='<tr>'+cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')+'</tr>';
   $('tbl').querySelector('tbody').innerHTML=wps.map(w=>'<tr>'+cols.map(c=>{
     let v=w[c]; if(c==='award_status') return `<td><span class="badge ${v==='Awarded'?'b-aw':'b-no'}">${v}</span></td>`;
     if(c==='approved_budget_bcb'||c==='awarded_cost') return `<td class="num">${v!=null?Number(v).toLocaleString():'—'}</td>`;
-    return `<td>${v==null?'—':String(v)}</td>`;
+    return `<td>${v==null?'<span class="muted">—</span>':String(v)}</td>`;
   }).join('')+'</tr>').join('');
   $('wp-proj').textContent=$('project').value;
   $('wp-count').textContent=wps.length;
@@ -318,12 +350,10 @@ async function doImport(){
   log(`\nReplacing ${pid} — deleting existing work packages…`,'info');
   const {error:delErr}=await sb.from('work_packages').delete().eq('project_id',pid);
   if(delErr){ log('Delete failed: '+delErr.message,'err'); $('btn-import').disabled=false; $('btn-cancel').disabled=false; return; }
-  // Verify the delete actually cleared them — RLS restricts WP delete to super_admin, and a blocked
-  // delete removes 0 rows silently. Aborting here prevents importing duplicates on top of old data.
   const {count:remaining}=await sb.from('work_packages').select('id',{count:'exact',head:true}).eq('project_id',pid);
   if(remaining>0){ log(`Delete removed nothing (${remaining} WPs remain) — you likely lack delete permission (Replace requires a super-admin). Aborting to avoid duplicates.`,'err'); $('btn-import').disabled=false; $('btn-cancel').disabled=false; return; }
   log('Deleted existing WPs.','ok');
-  const rows=_parsed.map(w=>{ const c={...w}; delete c._future; return c; });   // strip preview-only flag
+  const rows=_parsed.map(w=>{ const c={...w}; delete c._future; return c; });
   const BATCH=20; let inserted=0;
   for(let i=0;i<rows.length;i+=BATCH){
     const batch=rows.slice(i,i+BATCH);
@@ -336,8 +366,6 @@ async function doImport(){
 }
 
 /* ---- wire up ---- */
-function setSkipOptions(sel){ $('skip').innerHTML=Array.from({length:31},(_,i)=>`<option${i===sel?' selected':''}>${i}</option>`).join(''); }
-function onLayoutChange(){ setSkipOptions(curLayout().skip); }   // reset the data-start default per layout
 $('file').addEventListener('change', e=>{
   const f=e.target.files[0]; if(!f) return;
   const rd=new FileReader();
@@ -345,13 +373,10 @@ $('file').addEventListener('change', e=>{
     _wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array',cellDates:true});
     const names=_wb.SheetNames;
     const pref=names.find(n=>/monitoring/i.test(n))||names[0];
-    // Auto-detect the layout: One Portwood's sheet ("OPW WP Monitoring") uses the OPW profile.
-    const isOPW = /opw/i.test(pref) || (f.name && /opw/i.test(f.name)) || names.some(n=>/opw/i.test(n));
-    $('layout').innerHTML=Object.keys(LAYOUTS).map(k=>`<option value="${k}"${((isOPW?'opw':'standard')===k)?' selected':''}>${LAYOUTS[k].label}</option>`).join('');
     $('sheet').innerHTML=names.map(n=>`<option${n===pref?' selected':''}>${n}</option>`).join('');
-    setSkipOptions(curLayout().skip);
+    $('detected').style.display='none';
     $('btn-parse').disabled=false;
-    log(`Loaded "${f.name}" — ${names.length} sheet(s). Sheet: ${pref}. Layout: ${curLayout().label}.`,'info');
+    log(`Loaded "${f.name}" — ${names.length} sheet(s). Sheet: ${pref}. Columns will be auto-detected on Parse.`,'info');
   };
   rd.readAsArrayBuffer(f);
 });
