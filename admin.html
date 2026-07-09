@@ -10,12 +10,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260708p"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260708p"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260708p"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260709a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260709a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260709a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260708p">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260709a">
   <style>
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
     .modal{background:#fff;border-radius:12px;width:100%;max-width:420px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden}
@@ -365,9 +365,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260708p"></script>
-<script src="assets/js/db.js?v=20260708p"></script>
-<script src="assets/js/ui.js?v=20260708p"></script>
+<script src="assets/js/auth.js?v=20260709a"></script>
+<script src="assets/js/db.js?v=20260709a"></script>
+<script src="assets/js/ui.js?v=20260709a"></script>
 <script>
   let currentTab = 'all';
   let allUsers = [], allProjects = [], allAdmins = [];
@@ -696,7 +696,7 @@
         <td style="color:#888;font-size:11px;white-space:nowrap">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{day:'2-digit',month:'short',year:'numeric'}):'\u2014'}</td>
         <td>
           ${isSuperAdmin ? `<button class="action-btn" onclick="event.stopPropagation();openReassignModal('${u.id}')" style="font-size:11px;background:#EFF6FF;color:#1D4ED8;margin-right:4px">Reassign</button>` : ''}
-          <button class="action-btn btn-reject-row" onclick="event.stopPropagation();revokeUser('${u.id}')" style="font-size:11px" title="Permanently delete this user from the database">Remove</button>
+          <button class="action-btn btn-reject-row" onclick="event.stopPropagation();revokeUser('${u.id}')" style="font-size:11px" title="Completely remove this user — deletes their profile and their login account">Remove</button>
         </td>
       </tr>`;
     }).join('');
@@ -955,14 +955,13 @@
     await loadData();
   };
 
-  // Permanently DELETE the user from the database (replaces the old soft "revoke" that only
-  // set status='rejected'). Removes the public.users profile row entirely — the user loses
-  // access immediately and would have to register again. (The auth.users record can only be
-  // purged with the service-role key server-side; without a profile they can't sign in.)
+  // COMPLETELY remove the user (replaces the old soft "revoke" that only set status='rejected').
+  // WPDb.deleteUser → public.admin_delete_user() RPC purges BOTH the public.users profile AND
+  // the auth.users record (Planning-App parity), so the email is freed for re-registration.
   window.revokeUser = async function(userId) {
     const u = (allUsers || []).find(x => x.id === userId);
     const who = u ? (u.name || u.email || 'this user') : 'this user';
-    if (!confirm(`Permanently remove ${who} from the database?\n\nThis deletes their profile completely. They lose access immediately and would have to register again. This cannot be undone.`)) return;
+    if (!confirm(`Completely remove ${who}?\n\nThis permanently deletes their account — both their profile and their login. They lose access immediately, and the email is freed so they (or someone else) could register again. This cannot be undone.`)) return;
     try {
       await WPDb.deleteUser(userId);
     } catch (e) {

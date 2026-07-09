@@ -87,11 +87,24 @@ const WPDb = (() => {
       await sb.from('users').update({last_login: new Date().toISOString()}).eq('id',id);
     } catch(e) { /* non-critical — ignore */ }
   }
-  // Hard-delete a user's profile row from public.users (used by admin "Remove user").
-  // NOTE: this removes the app profile only; the underlying auth.users record can only be
-  // deleted with the service-role key (not available client-side). Without a profile the
-  // user fails AppAuth.requireLogin (no profile → signed out), so access is fully revoked.
-  async function deleteUser(id) { const sb=await getSB(); const {error}=await sb.from('users').delete().eq('id',id); if(error) throw error; }
+  // COMPLETE user removal (admin "Remove user"). Purges BOTH the public.users profile row
+  // AND the auth.users record via the public.admin_delete_user() SECURITY DEFINER RPC
+  // (MIGRATION_admin_delete_user.sql) — the auth schema isn't writable by the client, so the
+  // server-side function does the auth purge after re-checking the caller is an admin. This
+  // frees the email for re-registration (Planning-App parity). Falls back to a profile-only
+  // delete if the RPC doesn't exist yet (safe to deploy before the migration runs) — without
+  // a profile the user still fails AppAuth.requireLogin (signed out), so access is revoked.
+  async function deleteUser(id) {
+    const sb = await getSB();
+    const { error } = await sb.rpc('admin_delete_user', { target_id: id });
+    if (error) {
+      // 404/PGRST202 = function not created yet → fall back to profile-only delete.
+      const missing = error.code === 'PGRST202' || /not exist|could not find|schema cache/i.test(error.message || '');
+      if (!missing) throw error;
+      const { error: delErr } = await sb.from('users').delete().eq('id', id);
+      if (delErr) throw delErr;
+    }
+  }
   async function archiveProject(id) { const sb=await getSB(); const {error}=await sb.from('projects').update({status:'archived'}).eq('id',id); if(error) throw error; }
   async function unarchiveProject(id) { const sb=await getSB(); const {error}=await sb.from('projects').update({status:'active'}).eq('id',id); if(error) throw error; }
   async function updateProject(id,data) { const sb=await getSB(); const {data:d,error}=await sb.from('projects').update(data).eq('id',id).select().single(); if(error) throw error; return d; }
