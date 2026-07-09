@@ -576,6 +576,8 @@ git push dev staging:main
 
 GitHub Pages auto-deploys on push to main (~1â€“2 min).
 
+**Pages build can silently FAIL to trigger (2026-07):** a real incident — a fix was pushed to `origin/main` (confirmed via `raw.githubusercontent.com`) but GitHub Pages never created a deployment for it, so the live `pmodepartment.github.io` site kept serving the OLD file for 30+ min regardless of hard-refresh. Symptom: the fix is in the raw source but NOT on the live URL, and the served `Last-Modified` header is hours stale. **Diagnosis:** `curl -s "https://api.github.com/repos/PMODepartment/prc-app/deployments?per_page=1"` — if the newest `github-pages` deployment `sha` isn't your commit, the build didn't fire. **Fix:** push an **empty commit** to nudge it: `git commit --allow-empty -m "chore: trigger Pages rebuild" && git push origin main`, then poll the live URL until the new code appears. (Separately, once a build DOES deploy, the Fastly CDN caches HTML `max-age=600` and ignores query strings, so `?x=…` can't bust it — wait out the 10-min TTL. `import-monitoring.html` has no `?v=` cache-buster, so browsers also need a hard refresh.)
+
 ---
 
 ## Development Notes
