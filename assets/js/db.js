@@ -169,6 +169,19 @@ function helpingMetrics(wps) {
 }
 
 /* ── Formatting ─────────────────────────────────────────────────────── */
+// HTML-escape user-entered text before it goes into innerHTML. WP fields (description,
+// remarks, vendor, wp_no…) and self-registered user name/email are attacker-controllable
+// (a contributor can PATCH a WP, a pending registrant sets their own name) — without this,
+// a payload like <img src=x onerror=…> stored in a field runs in an ADMIN's session when
+// they open the list, exfiltrating the Supabase JWT from localStorage → account takeover.
+// Escapes the 5 HTML-significant chars so the value is inert as text AND in a quoted attr.
+// Returns '' for null/undefined so callers can keep `|| '—'` fallbacks.
+window.esc = function (v) {
+  return v == null ? '' : String(v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+};
+
 const Fmt = {
   money(v, decimals=2) {
     if (v==null||isNaN(v)) return '\u2014';
@@ -405,7 +418,7 @@ function buildRankTable(id, items, type) {
     ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true)}</tr>`
     : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Award',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)} ${th('%WT',true,accent)}</tr>`;
   const rows = items.map((item, i) => {
-    const safe = item.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    const safe = esc(item.name);  // data-rn attribute (used by search filter)
     // Clicking a row opens the WP detail slide-in panel (full details + Edit/Delete)
     const click = item.id ? ` onclick="if(window.openWPDetail)openWPDetail('${item.id}')"` : '';
     const cursor = item.id ? 'cursor:pointer;' : '';
@@ -413,8 +426,8 @@ function buildRankTable(id, items, type) {
       <div style="display:flex;align-items:flex-start;gap:6px">
         <span style="font-size:10px;color:#999;font-weight:700;flex-shrink:0;min-width:14px;padding-top:1px">${i+1}</span>
         <div>
-          <div class="rank-short" style="font-size:11px;font-weight:600;color:#231F20;line-height:1.35;white-space:nowrap">${item.name}</div>
-          <div class="rank-sub" style="font-size:9px;color:#888;margin-top:1px;white-space:nowrap">${item.sub||''}</div>
+          <div class="rank-short" style="font-size:11px;font-weight:600;color:#231F20;line-height:1.35;white-space:nowrap">${esc(item.name)}</div>
+          <div class="rank-sub" style="font-size:9px;color:#888;margin-top:1px;white-space:nowrap">${esc(item.sub)||''}</div>
         </div>
       </div>
     </td>`;

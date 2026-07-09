@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https://cayjeqeleenizbdzrums.supabase.co wss://cayjeqeleenizbdzrums.supabase.co; object-src 'none'; base-uri 'self'"/>
   <link rel="icon" type="image/png" href="assets/img/favicon.png"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>User Management — Megawide EPC</title>
@@ -10,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260709a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260709a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260709a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260709b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260709b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260709b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260709a">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260709b">
   <style>
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
     .modal{background:#fff;border-radius:12px;width:100%;max-width:420px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden}
@@ -365,9 +366,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260709a"></script>
-<script src="assets/js/db.js?v=20260709a"></script>
-<script src="assets/js/ui.js?v=20260709a"></script>
+<script src="assets/js/auth.js?v=20260709b"></script>
+<script src="assets/js/db.js?v=20260709b"></script>
+<script src="assets/js/ui.js?v=20260709b"></script>
 <script>
   let currentTab = 'all';
   let allUsers = [], allProjects = [], allAdmins = [];
@@ -591,9 +592,9 @@
           : `<span style="color:#991B1B">${(variance/1e6).toFixed(2)}M</span>`;
         const statusColor = w.award_status==='Awarded'?'#065F46':w.award_status==='Partially Awarded'?'#92400E':'#991B1B';
         return `<tr>
-          <td>${w.wp_no||'—'}</td>
-          <td>${w.description||'—'}</td>
-          <td>${w.project_id||'—'}</td>
+          <td>${esc(w.wp_no)||'—'}</td>
+          <td>${esc(w.description)||'—'}</td>
+          <td>${esc(w.project_id)||'—'}</td>
           <td style="display:flex;gap:3px;flex-wrap:wrap;padding:8px 12px">${_roleChip(roles)}</td>
           <td style="color:${statusColor};font-weight:600">${w.award_status||'—'}</td>
           <td>${planned}</td>
@@ -662,14 +663,14 @@
       if (u.status === 'pending') {
         return `<tr style="${rowStyle}" data-idx="${visIdx}" onclick="handleRowClick(event,${visIdx},'${u.id}')">
           <td><input type="checkbox" ${isSelected?'checked':''} onclick="event.stopPropagation();toggleSelect('${u.id}',${visIdx},event)" style="accent-color:#EE3124;width:15px;height:15px;cursor:pointer"></td>
-          <td><div style="font-size:13px;font-weight:600;color:#231F20">${u.name||'<span style="color:#bbb">\u2014</span>'}</div><div style="font-size:11px;color:#aaa;margin-top:1px">${u.email}</div></td>
+          <td><div style="font-size:13px;font-weight:600;color:#231F20">${esc(u.name)||'<span style="color:#bbb">\u2014</span>'}</div><div style="font-size:11px;color:#aaa;margin-top:1px">${esc(u.email)}</div></td>
           <td><span style="font-size:11px;color:#888;font-style:italic">pending</span></td>
           <td>\u2014</td>
           ${adminCell}
           <td>${activityBadge(u)}</td>
           <td style="color:#888;font-size:11px;white-space:nowrap">${u.created_at?new Date(u.created_at).toLocaleDateString('en-PH',{day:'2-digit',month:'short',year:'numeric'}):'\u2014'}</td>
           <td style="white-space:nowrap">
-            <button class="action-btn btn-approve-row" onclick="event.stopPropagation();openApproveModal('${u.id}','${(u.name||'').replace(/'/g,"\\'")}','${u.email}')">Approve</button>
+            <button class="action-btn btn-approve-row" onclick="event.stopPropagation();openApproveModal('${u.id}')">Approve</button>
             <button class="action-btn btn-reject-row" onclick="event.stopPropagation();rejectUser('${u.id}')" style="margin-left:4px">Reject</button>
           </td>
         </tr>`;
@@ -678,8 +679,8 @@
       return `<tr style="${rowStyle}" data-idx="${visIdx}" onclick="handleRowClick(event,${visIdx},'${u.id}')">
         <td><input type="checkbox" ${isSelected?'checked':''} onclick="event.stopPropagation();toggleSelect('${u.id}',${visIdx},event)" style="accent-color:#EE3124;width:15px;height:15px;cursor:pointer"></td>
         <td style="min-width:160px">
-          <div style="font-size:13px;font-weight:600;color:#231F20">${u.name||'<span style="color:#bbb">\u2014</span>'}</div>
-          <div style="font-size:11px;color:#aaa;margin-top:1px">${u.email}</div>
+          <div style="font-size:13px;font-weight:600;color:#231F20">${esc(u.name)||'<span style="color:#bbb">\u2014</span>'}</div>
+          <div style="font-size:11px;color:#aaa;margin-top:1px">${esc(u.email)}</div>
         </td>
         <td style="white-space:nowrap">
           <div style="display:flex;align-items:center;gap:5px">
@@ -827,10 +828,15 @@
     if (selectedAdminId) sel.value = selectedAdminId;
   }
 
-  window.openApproveModal = function(userId, name, email) {
+  window.openApproveModal = function(userId) {
+    // Look up name/email from the loaded set rather than passing them through the
+    // onclick attribute — inline-handler args can't be safely double-encoded for both
+    // the HTML-attribute and JS-string contexts, and name/email are self-registered
+    // (attacker-controlled) values. textContent below is inherently XSS-safe.
+    const u = (allUsers || []).find(x => x.id === userId) || {};
     pendingUserId = userId;
-    document.getElementById('modalUserName').textContent = name;
-    document.getElementById('modalUserEmail').textContent = email;
+    document.getElementById('modalUserName').textContent = u.name || '';
+    document.getElementById('modalUserEmail').textContent = u.email || '';
     document.getElementById('modalRoleSelect').value = 'user';
     document.getElementById('btnConfirmApprove').textContent = '\u2713 Approve & Assign';
     buildProjectCheckboxes('modalProjectList', []);
@@ -1117,7 +1123,7 @@
         ${approved.length ? approved.map((u,i)=>`
           <div class="project-checkbox-item npu-row" data-idx="${i}" onclick="handleNpUserClick(event,${i},'npu_${u.id}')" style="cursor:pointer">
             <input type="checkbox" id="npu_${u.id}" value="${u.id}" onclick="event.stopPropagation();toggleNpUser(event,${i},'npu_${u.id}')">
-            <label onclick="event.preventDefault()" style="flex:1;cursor:pointer">${u.name||u.email}
+            <label onclick="event.preventDefault()" style="flex:1;cursor:pointer">${esc(u.name||u.email)}
               <span style="font-size:10px;color:#aaa;text-transform:capitalize">(${(u.role||'user').replace('_',' ')})</span>
             </label>
           </div>`).join('') : '<div style="color:#aaa;font-size:12px">No approved users</div>'}
