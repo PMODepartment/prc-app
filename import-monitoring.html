@@ -21,8 +21,16 @@
   .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
   .card h2{font-size:14px;font-weight:800;margin:0 0 12px}
   label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#888;margin:0 0 5px}
-  select,input[type=file]{width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--ink);outline:none}
-  select:focus{border-color:var(--red)}
+  select,input[type=file],input[type=text]{width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--ink);outline:none}
+  select:focus,input[type=text]:focus{border-color:var(--red)}
+  .combo-pop{position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1.5px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.13);max-height:260px;overflow:auto;display:none}
+  .combo-pop.open{display:block}
+  .combo-opt{padding:8px 11px;font-size:13px;cursor:pointer;border-bottom:1px solid #f3f3f3}
+  .combo-opt:last-child{border-bottom:none}
+  .combo-opt:hover,.combo-opt.active{background:#FEECEA}
+  .combo-opt .pid{font-weight:700}
+  .combo-opt .pnm{color:#888;font-size:11.5px;margin-left:6px}
+  .combo-empty{padding:10px 11px;font-size:12px;color:#999}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .btn{border:none;border-radius:9px;padding:11px 20px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:7px}
   .btn-red{background:var(--red);color:#fff}.btn-red:hover:not(:disabled){background:var(--red-dark)}
@@ -63,7 +71,12 @@
       <h2>1 · Choose file &amp; project</h2>
       <div class="row">
         <div><label>Monitoring workbook (.xlsx)</label><input type="file" id="file" accept=".xlsx,.xls"/></div>
-        <div><label>Target project</label><select id="project"></select></div>
+        <div style="position:relative">
+          <label>Target project</label>
+          <input type="text" id="proj-search" placeholder="Search projects…" autocomplete="off"/>
+          <input type="hidden" id="project"/>
+          <div id="proj-options" class="combo-pop"></div>
+        </div>
       </div>
       <div class="row" style="margin-top:12px">
         <div><label>Sheet</label><select id="sheet"><option>— pick a file first —</option></select></div>
@@ -101,7 +114,31 @@ const sb = window.supabase.createClient(SB_URL, SB_KEY);
 const $ = id => document.getElementById(id);
 function log(msg, cls){ const l=$('log'); l.style.display='block'; l.innerHTML += '<span class="'+(cls||'')+'">'+msg+'</span>\n'; l.scrollTop=l.scrollHeight; }
 
-let _wb = null, _parsed = null, _profile = null, _detected = null;
+let _wb = null, _parsed = null, _profile = null, _detected = null, _projs = [];
+
+/* ---- searchable project combobox ---- */
+function _projLabel(p){ return p.name && p.name!==p.id ? p.id+' — '+p.name.split('—')[0].trim() : p.id; }
+function renderProjOptions(q){
+  const term=(q||'').trim().toLowerCase();
+  const pop=$('proj-options');
+  const list=_projs.filter(p=>!term || p.id.toLowerCase().includes(term) || (p.name||'').toLowerCase().includes(term));
+  if(!list.length){ pop.innerHTML='<div class="combo-empty">No matching projects</div>'; return; }
+  const sel=$('project').value;
+  pop.innerHTML=list.map(p=>`<div class="combo-opt${p.id===sel?' active':''}" data-id="${p.id}"><span class="pid">${p.id}</span>${p.name&&p.name!==p.id?`<span class="pnm">${p.name.split('—')[0].trim()}</span>`:''}</div>`).join('');
+}
+function selectProj(id){
+  const p=_projs.find(x=>x.id===id); if(!p) return;
+  $('project').value=p.id;
+  $('proj-search').value=_projLabel(p);
+  $('proj-options').classList.remove('open');
+}
+function initProjCombo(){
+  const inp=$('proj-search'), pop=$('proj-options');
+  inp.addEventListener('focus',()=>{ renderProjOptions(''); pop.classList.add('open'); });
+  inp.addEventListener('input',()=>{ $('project').value=''; renderProjOptions(inp.value); pop.classList.add('open'); });
+  pop.addEventListener('mousedown',e=>{ const o=e.target.closest('.combo-opt'); if(o){ e.preventDefault(); selectProj(o.dataset.id); } });
+  document.addEventListener('click',e=>{ if(!e.target.closest('#proj-search') && !e.target.closest('#proj-options')) pop.classList.remove('open'); });
+}
 
 /* ---- date / value helpers ---- */
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -299,6 +336,7 @@ function parse(){
   _detected=L;
   const today=new Date(); today.setHours(0,0,0,0);
   const pid=$('project').value;
+  if(!pid) throw new Error('Pick a target project first (search and select one from the dropdown).');
   const out=[]; let curTrade=null;
   for(let i=L.hdrRow+1;i<rows.length;i++){
     const r=rows[i]||[];
@@ -349,6 +387,7 @@ function renderPreview(wps){
 
 async function doImport(){
   const pid=$('project').value;
+  if(!pid){ alert('Pick a target project first (search and select one from the dropdown).'); return; }
   // Duplicate WP No. guard — the DB has a (project_id, wp_no) unique constraint, so two rows sharing
   // a WP No. would fail mid-batch and leave a partial import. Abort up front, naming the offenders.
   const _seen={}, _dups={};
@@ -366,7 +405,7 @@ async function doImport(){
   const {error:delErr}=await sb.from('work_packages').delete().eq('project_id',pid);
   if(delErr){ log('Delete failed: '+delErr.message,'err'); $('btn-import').disabled=false; $('btn-cancel').disabled=false; return; }
   const {count:remaining}=await sb.from('work_packages').select('id',{count:'exact',head:true}).eq('project_id',pid);
-  if(remaining>0){ log(`Delete removed nothing (${remaining} WPs remain) — you likely lack delete permission (Replace requires a super-admin). Aborting to avoid duplicates.`,'err'); $('btn-import').disabled=false; $('btn-cancel').disabled=false; return; }
+  if(remaining>0){ log(`Delete removed nothing (${remaining} WPs remain) — you likely lack delete permission for ${pid} (you can Replace only projects you're assigned to; admins any). Aborting to avoid duplicates.`,'err'); $('btn-import').disabled=false; $('btn-cancel').disabled=false; return; }
   log('Deleted existing WPs.','ok');
   const rows=_parsed.map(w=>{ const c={...w}; delete c._future; return c; });
   const BATCH=20; let inserted=0;
@@ -409,7 +448,9 @@ $('btn-cancel').addEventListener('click',()=>{ $('preview-card').style.display='
     $('gate').style.display='block'; $('gate-msg').textContent='Your account must be approved before you can import.'; return;
   }
   const {data:projs}=await sb.from('projects').select('id,name').order('id');
-  $('project').innerHTML=(projs||[]).map(p=>`<option value="${p.id}">${p.id}${p.name&&p.name!==p.id?' — '+p.name.split('—')[0].trim():''}</option>`).join('');
+  _projs=projs||[];
+  initProjCombo();
+  renderProjOptions('');
   $('app').style.display='block';
 })();
 </script>

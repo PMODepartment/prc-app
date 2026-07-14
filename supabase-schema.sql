@@ -323,10 +323,19 @@ create policy "wp_update" on work_packages
     )
   );
 
--- DELETE: super_admin only
+-- DELETE: super_admin/admin anywhere; specialist/manager/user only on their
+-- assigned projects (same edit scope as insert/update). Lets contributors run a
+-- full Replace import (delete-then-insert) on projects they own. Viewer denied.
 create policy "wp_delete" on work_packages
   for delete to authenticated
-  using (internal.get_my_role() = 'super_admin');
+  using (
+    internal.get_my_status() = 'approved'
+    and internal.get_my_role() <> 'viewer'
+    and (
+      internal.get_my_role() in ('super_admin','admin')
+      or project_id = any(internal.get_my_projects())
+    )
+  );
 
 -- Cost-free, security-definer view for VIEWERS (who are denied on the base table
 -- above). Runs as owner so it bypasses the caller's RLS — therefore it re-implements
