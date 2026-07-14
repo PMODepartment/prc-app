@@ -175,9 +175,15 @@
     <div class="topbar">
       <div class="topbar-left">
         <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
-        <div>
-          <div class="page-title" id="page-title">Loading…</div>
+        <div style="position:relative">
+          <div class="page-title" id="page-title" onclick="toggleHdrSwitcher(event)" title="Switch project" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px"><span id="page-title-text">Loading…</span><i class="ti ti-chevron-down" id="hdr-sw-caret" style="font-size:15px;opacity:.6"></i></div>
           <div class="page-sub" id="page-sub" style="font-size:11px;color:#888;margin-top:1px"></div>
+          <div id="hdr-switcher" style="display:none;position:absolute;z-index:60;top:100%;left:0;margin-top:6px;width:300px;max-width:80vw;background:var(--surface,#fff);border:1.5px solid var(--line,#e6e6e6);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);overflow:hidden">
+            <div style="padding:9px 10px;border-bottom:1px solid var(--line,#eee)">
+              <input id="hdr-sw-search" type="text" placeholder="Search projects…" autocomplete="off" oninput="renderHdrSwitcher()" onkeydown="if(event.key==='Escape')toggleHdrSwitcher(event)" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--line,#e6e6e6);border-radius:7px;font-size:13px;font-family:inherit;background:var(--surface-2,#fafafa);color:var(--text-primary,#231F20);outline:none">
+            </div>
+            <div id="hdr-sw-list" style="max-height:320px;overflow:auto;padding:4px"></div>
+          </div>
         </div>
       </div>
       <div class="topbar-right">
@@ -819,6 +825,32 @@ function switchView(v) {
 }
 
 // Sidebar project switcher list (filtered by the search box; current project highlighted)
+// Header project switcher — searchable dropdown on the page title (mirrors the sidebar list)
+window.toggleHdrSwitcher = function(e){
+  if(e) e.stopPropagation();
+  const pop = document.getElementById('hdr-switcher'); if(!pop) return;
+  const open = pop.style.display !== 'none';
+  if(open){ pop.style.display='none'; return; }
+  renderHdrSwitcher();
+  pop.style.display='block';
+  const s = document.getElementById('hdr-sw-search'); if(s){ s.value=''; renderHdrSwitcher(); setTimeout(()=>s.focus(),0); }
+};
+window.renderHdrSwitcher = function(){
+  const list = document.getElementById('hdr-sw-list'); if(!list) return;
+  const q = (document.getElementById('hdr-sw-search')?.value || '').toLowerCase();
+  const projs = (window._sidebarProjects || []).filter(p => !q || ((p.name||'')+' '+(p.id||'')).toLowerCase().includes(q));
+  if(!projs.length){ list.innerHTML = '<div style="padding:9px 11px;font-size:12px;color:#999">No matching projects</div>'; return; }
+  list.innerHTML = projs.map(p => {
+    const active = p.id === projId;
+    const disp = (p.name && p.name !== p.id) ? (p.id + ' — ' + p.name.split('—')[0].trim()) : p.id;
+    return `<a class="nav-item${active?' active':''}" href="project.html?id=${encodeURIComponent(p.id)}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;font-size:13px;text-decoration:none;color:inherit${active?';font-weight:700':''}" title="${disp.replace(/"/g,'&quot;')}"><i class="ti ti-building-skyscraper" style="opacity:.7"></i><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${disp}</span></a>`;
+  }).join('');
+};
+document.addEventListener('click', e=>{
+  const pop = document.getElementById('hdr-switcher');
+  if(pop && pop.style.display!=='none' && !e.target.closest('#hdr-switcher') && !e.target.closest('#page-title')) pop.style.display='none';
+});
+
 window.renderSidebarProjects = function() {
   const list = document.getElementById('sidebar-proj-list');
   if (!list) return;
@@ -2341,6 +2373,12 @@ AppAuth.requireLogin(async (user, profile) => {
         .sort((a,b) => String(a.id).localeCompare(String(b.id)));
       const sec = document.getElementById('sidebar-projlist-section');
       if (window._sidebarProjects.length > 1 && sec) { sec.style.display = 'block'; renderSidebarProjects(); }
+      // Header switcher affordance only makes sense with >1 project to switch to
+      const hdrCaret = document.getElementById('hdr-sw-caret'), hdrTitle = document.getElementById('page-title');
+      if (window._sidebarProjects.length <= 1) {
+        if (hdrCaret) hdrCaret.style.display = 'none';
+        if (hdrTitle) { hdrTitle.style.cursor = 'default'; hdrTitle.onclick = null; hdrTitle.removeAttribute('title'); }
+      }
     } catch(e) { /* non-fatal */ }
   })();
 
@@ -2391,7 +2429,7 @@ AppAuth.requireLogin(async (user, profile) => {
   if (meta) {
     const _dispName = (meta.name && meta.name !== meta.id) ? meta.name.split('—')[0].trim() : '';
     document.title = _dispName ? meta.id+' — '+_dispName+' — WPM' : meta.id+' — WPM';
-    document.getElementById('page-title').textContent = _dispName ? meta.id+' — '+_dispName : meta.id;
+    document.getElementById('page-title-text').textContent = _dispName ? meta.id+' — '+_dispName : meta.id;
     document.getElementById('page-sub').textContent = (meta.location||'')+(meta.description?' · '+meta.description:'');
     document.getElementById('nav-proj-name').textContent = meta.id;
     document.getElementById('nav-proj-link').href = 'project.html?id='+meta.id;
