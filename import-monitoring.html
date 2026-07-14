@@ -349,6 +349,17 @@ function renderPreview(wps){
 
 async function doImport(){
   const pid=$('project').value;
+  // Duplicate WP No. guard — the DB has a (project_id, wp_no) unique constraint, so two rows sharing
+  // a WP No. would fail mid-batch and leave a partial import. Abort up front, naming the offenders.
+  const _seen={}, _dups={};
+  _parsed.forEach(w=>{ const k=String(w.wp_no==null?'':w.wp_no).trim(); if(!k) return; if(_seen[k]) _dups[k]=(_dups[k]||1)+1; else _seen[k]=1; });
+  const dupNos=Object.keys(_dups);
+  if(dupNos.length){
+    log(`Duplicate WP No. in the sheet — cannot import (each WP No. must be unique per project): ${dupNos.map(n=>`"${n}" (×${_dups[n]})`).join(', ')}`,'err');
+    log('  Fix the source .xlsx so every work package has a distinct WP No., then re-parse and import.','err');
+    alert(`This sheet has duplicate WP No.: ${dupNos.map(n=>`"${n}"`).join(', ')}.\n\nEach work package must have a unique WP No. Fix the Excel file and re-import — nothing was changed.`);
+    return;
+  }
   if(!confirm(`Delete ALL work packages for ${pid} and import ${_parsed.length} rows from the sheet?\n\nThis cannot be undone.`)) return;
   $('btn-import').disabled=true; $('btn-cancel').disabled=true;
   log(`\nReplacing ${pid} — deleting existing work packages…`,'info');
