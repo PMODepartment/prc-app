@@ -343,6 +343,9 @@ function parse(){
     if(cn(r[L.col.wp_no])==null){
       // group-header row → update the current trade if the description column names a discipline
       const dv = (L.descCol!=null) ? r[L.descCol] : null;
+      // Stop at the "NON-PO/JO" section — those rows (design/consultancy, bonds, permits,
+      // insurances, project details, etc.) are NOT work packages and must never be imported.
+      if(dv && /non[\s\-]?(po|jo)/i.test(String(dv))) break;
       if(dv && TRADE_RE.test(String(dv)) && !/subtotal|grand ?total|^\s*total/i.test(String(dv))) curTrade=String(dv).trim();
       continue;
     }
