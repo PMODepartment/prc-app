@@ -298,6 +298,9 @@ Tabs: Overview → Backlog → WP List (**Dashboard tab removed** — its period
 
 ## WP Form (wp-form.html)
 
+### Sticky Section Navigator
+The form is a single scroll (NOT tabs — tabs would hide fields from `save()`'s cross-section validation + `showErr` "scroll-to-offending-field"). A **sticky section navigator** (`#form-nav`, `.form-layout` flex wrapper around the nav + `.panel`) gives fast jumping without hiding anything. Each of the 8 `.form-section`s has an id (`sec-identity`/`sec-approval`/`sec-bonds`/`sec-submittals`/`sec-schedule`/`sec-budget`/`sec-payment`/`sec-status`) with `scroll-margin-top` for the sticky-topbar offset. Desktop: a 210px left rail sticky at `top:72px`. Mobile (≤900px): a horizontal sticky scroll-spy strip under the topbar (`top:52px`). A vanilla IntersectionObserver (`rootMargin:'-80px 0px -55% 0px'`) highlights the section nearest the top; clicking a link smooth-scrolls (a 700ms `clickLock` suppresses spy flicker mid-animation). All inline in wp-form.html — no new deps. When you ADD or REORDER a form section, add its `id` + a matching `#form-nav` link.
+
 ### Sections & Key Fields
 1. **Identity & Classification**: Cost Code, Trade â†’ Works â†’ Type (cascade), WP No., Description, Scope, Project, Zone, **OSM (Yes/No, `f-osm` → `osm` column, filterable in the WP List)**, Detailed Description, Type of Service, Type of Procurement, Type of Contract, Proposed Vendors, No. of PO/JO, PO/JO Numbers
 2. **Approval Matrix**: Responsible (multi-select), Approver (single select, admin/super_admin only), Support (multi-select). All from `WPDb.getAllUsers()`. Uses `u.name` for display. Values stored comma-separated in `responsible_team` / `approver` / `support_team`.
