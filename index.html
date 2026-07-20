@@ -275,6 +275,8 @@
                 <option value="budget">Budget (High→Low)</option>
                 <option value="desc">Description (A→Z)</option>
               </select>
+              <input id="bl-bmin" type="number" placeholder="Min ₱M" oninput="dbnc('bl',renderBlTable)" title="Filter by Procurement Budget (BCB), in ₱ millions" style="width:70px;font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
+              <input id="bl-bmax" type="number" placeholder="Max ₱M" oninput="dbnc('bl',renderBlTable)" title="Filter by Procurement Budget (BCB), in ₱ millions" style="width:70px;font-size:11px;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
               <div style="position:relative;margin-left:auto">
                 <i class="ti ti-search" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);color:#bbb;font-size:11px;pointer-events:none"></i>
                 <input id="bl-search" type="text" placeholder="Search…" oninput="dbnc('bl',renderBlTable)" style="font-size:11px;padding:4px 8px 4px 24px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;width:150px">
@@ -1495,8 +1497,11 @@
           const tradeF = document.getElementById('bl-trade-filter')?.value||'';
           const sortBy = document.getElementById('bl-sort-by')?.value||'aging';
           const search = (document.getElementById('bl-search')?.value||'').toLowerCase().trim();
+          const bmin = parseFloat(document.getElementById('bl-bmin')?.value||0)*1e6||0;         // ₱M → ₱
+          const bmax = parseFloat(document.getElementById('bl-bmax')?.value||0)*1e6||Infinity;
           let rows = notAwarded.slice();
           if (tradeF) rows = rows.filter(w=>w.trade===tradeF);
+          if (bmin>0 || bmax<Infinity) rows = rows.filter(w=>{const b=w.approved_budget_bcb||0; return b>=bmin && b<=bmax;});
           if (search) rows = rows.filter(w=>(w.description||'').toLowerCase().includes(search)||(w.wp_no||'').toLowerCase().includes(search)||(w.project_id||'').toLowerCase().includes(search)||(w.trade||'').toLowerCase().includes(search));
           const tbody = document.getElementById('bl-tbody');
           if (!tbody) return;
@@ -2982,7 +2987,8 @@
   body.viewer-mode #idx-dash-backlog-table th:nth-child(5),
   body.viewer-mode #idx-dash-backlog-table td:nth-child(5) { display:none !important; }
   /* Hide budget (₱M) filter inputs from viewers */
-  body.viewer-mode #idx-dbl-bmin, body.viewer-mode #idx-dbl-bmax { display:none !important; }
+  body.viewer-mode #idx-dbl-bmin, body.viewer-mode #idx-dbl-bmax,
+  body.viewer-mode #bl-bmin, body.viewer-mode #bl-bmax { display:none !important; }
 </style>
 
 <!-- WP Detail Modal -->
