@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260709b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260709b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260709b"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260709b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260709c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260709c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260709c"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260709c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260709b"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260709c"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -564,9 +564,9 @@
                 <label>Procurement Status</label>
                 <select id="f-proc-status" onchange="onProcStatusChange()">
                   <option value="Not Started">Not Started</option>
-                  <option value="Sourcing">Sourcing</option>
-                  <option value="Solicitation">Solicitation</option>
-                  <option value="Evaluation &amp; Negotiation">Evaluation &amp; Negotiation</option>
+                  <option value="Sourced">Sourced</option>
+                  <option value="Solicited">Solicited</option>
+                  <option value="Evaluated">Evaluated</option>
                   <option value="Awarded">Awarded</option>
                 </select>
               </div>
@@ -575,18 +575,18 @@
                 <select id="f-submittal">
                   <option value="Not Required">Not Required</option>
                   <option value="Submitted">Submitted</option>
+                  <option value="Approved w/ Comments">Approved w/ Comments</option>
                   <option value="Approved">Approved</option>
                 </select>
               </div>
               <div class="form-group">
                 <label>Delivery Status</label>
                 <select id="f-delivery-status">
-                  <option value="Not Awarded">Not Awarded</option>
-                  <option value="DP Processing">DP Processing</option>
-                  <option value="Detailed Drawings">Detailed Drawings</option>
-                  <option value="Production">Production</option>
+                  <option value="">— Not started —</option>
+                  <option value="DP Paid">DP Paid</option>
+                  <option value="Accomplished Detailed Drawings">Accomplished Detailed Drawings</option>
+                  <option value="Manufactured/Produced">Manufactured/Produced</option>
                   <option value="Delivered">Delivered</option>
-                  <option value="Installed">Installed</option>
                 </select>
               </div>
               <div class="form-group full">
@@ -637,10 +637,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260709b"></script>
-<script src="assets/js/ui.js?v=20260709b"></script>
-<script src="assets/js/db.js?v=20260709b"></script>
-<script src="assets/js/coachmarks.js?v=20260709b"></script>
+<script src="assets/js/auth.js?v=20260709c"></script>
+<script src="assets/js/ui.js?v=20260709c"></script>
+<script src="assets/js/db.js?v=20260709c"></script>
+<script src="assets/js/coachmarks.js?v=20260709c"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -797,7 +797,7 @@
      Budget & Contract (which mirrors the "Not yet Awarded / Awarded" Remarks column
      in the monitoring files), not by the procurement stage. */
   // Award Status is DERIVED from Procurement Status: Awarded stage → Awarded, any earlier stage
-  // (Not Started / Sourcing / Solicitation / Evaluation & Negotiation / legacy) → Not Yet Awarded.
+  // (Not Started / Sourced / Solicited / Evaluated / legacy) → Not Yet Awarded.
   function onProcStatusChange() {
     const proc = document.getElementById('f-proc-status').value;
     const as = document.getElementById('f-award-status');
@@ -1451,7 +1451,7 @@ AppAuth.requireLogin(async (user, profile) => {
       '7','05/31/2026','','06/30/2026','','','07/31/2026',
       '500000','','Not Yet Awarded','',
       '','','','','','','','','',
-      'Not Started','','Not Awarded','','',
+      'Not Started','','','','',
     ];
     const ex2 = [   // an AWARDED WP — cost, vendor and PO/JO must all be filled and consistent
       '05-002','Structural Works','Rebar Supply','Materials','WP-002','EXAMPLE ROW - awarded WP (has cost, vendor, PO/JO)',
@@ -1464,7 +1464,7 @@ AppAuth.requireLogin(async (user, profile) => {
       '14','06/15/2026','06/20/2026','07/15/2026','','','08/31/2026',
       '2000000','1850000','Awarded','ABC Steel Corp',
       '30','20','One-time','370000','06/25/2026','','10','185000','Until completion',
-      'Awarded','','DP Processing','','',
+      'Awarded','','DP Paid','','',
     ];
     _downloadBlob([headers, ex1, ex2].map(r => r.map(v => `"${v}"`).join(',')).join('\n'), 'WPM_Import_Template.csv');
   };

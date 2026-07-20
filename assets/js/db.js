@@ -869,11 +869,11 @@ window.WPCsv = (function(){
   };
 
   // Procurement-status stage columns (WP Monitoring). The right-most marked stage wins.
-  // Mapped to the updated Procurement Status option set (Not Started | Sourcing |
-  // Solicitation | Evaluation & Negotiation | Awarded) so re-imports stay aligned.
+  // Mapped to the Procurement Status option set (Not Started | Sourced | Solicited |
+  // Evaluated | Awarded) so re-imports stay aligned with the WP form.
   const STAGES = [
-    ['sourcing','Sourcing'], ['rfq','Solicitation'], ['bidopen','Solicitation'],
-    ['bidclosed','Evaluation & Negotiation'], ['loa','Awarded'], ['contract','Awarded'], ['mobdel','Awarded'],
+    ['sourcing','Sourced'], ['rfq','Solicited'], ['bidopen','Solicited'],
+    ['bidclosed','Evaluated'], ['loa','Awarded'], ['contract','Awarded'], ['mobdel','Awarded'],
   ];
 
   function buildIdx(header){
@@ -938,7 +938,7 @@ window.WPCsv = (function(){
       dp_amount:pNum(r[43]), dp_release_date:pDate(r[44]), dp_notes:pStr(r[45]),
       retention_percent:pPct(r[46]), retention_amount:pNum(r[47]), retention_period:pStr(r[48]),
       procurement_status:pStr(r[49])||'Not Started', awarding_status:pStr(r[50]),
-      delivery_status:pStr(r[51])||'Not Awarded', remarks:pStr(r[52])||'', purchase_request:pStr(r[53]),
+      delivery_status:pStr(r[51])||'', remarks:pStr(r[52])||'', purchase_request:pStr(r[53]),
     };
     return {
       project_id:pid,
@@ -1026,7 +1026,7 @@ window.WPCsv = (function(){
         dp_notes:pStr(g('dp_notes')), retention_percent:pPct(g('retention_percent')),
         retention_amount:pNum(g('retention_amount')), retention_period:pStr(g('retention_period')),
         procurement_status, awarding_status:pStr(g('awarding_status')),
-        delivery_status:pStr(g('delivery_status')) || 'Not Awarded', remarks:pStr(g('remarks')) || '',
+        delivery_status:pStr(g('delivery_status')) || '', remarks:pStr(g('remarks')) || '',
         purchase_request:pStr(g('purchase_request')),
       });
     }
