@@ -991,20 +991,23 @@
       tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>';
     };
     const _blCollapseState = new Map();
-    let _idxBlGroupByTrade = false;
-    window.toggleBlGroup = function(trade) {
-      _blCollapseState.set(trade, !(_blCollapseState.get(trade)||false));
+    let _idxBlGroupMode = 'flat';   // 'flat' | 'trade' | 'project'
+    window.toggleBlGroup = function(key) {
+      _blCollapseState.set(key, !(_blCollapseState.get(key)||false));
       if (window.renderBlTable) window.renderBlTable();
     };
     window.toggleIdxBlGroupMode = function() {
-      _idxBlGroupByTrade = !_idxBlGroupByTrade;
+      // cycle Flat → By Trade → By Project → Flat
+      _idxBlGroupMode = _idxBlGroupMode==='flat' ? 'trade' : _idxBlGroupMode==='trade' ? 'project' : 'flat';
+      _blCollapseState.clear();   // group keys differ between trade/project modes
       const btn = document.getElementById('idx-bl-group-toggle');
       if (btn) {
-        btn.style.background = _idxBlGroupByTrade ? '#EE3124' : '#fff';
-        btn.style.color = _idxBlGroupByTrade ? '#fff' : '#888';
-        btn.style.borderColor = _idxBlGroupByTrade ? '#EE3124' : '#e5e5e5';
+        const active = _idxBlGroupMode!=='flat';
+        btn.style.background = active ? '#EE3124' : '#fff';
+        btn.style.color = active ? '#fff' : '#888';
+        btn.style.borderColor = active ? '#EE3124' : '#e5e5e5';
         const lbl = btn.querySelector('span');
-        if (lbl) lbl.textContent = _idxBlGroupByTrade ? 'Grouped' : 'Flat';
+        if (lbl) lbl.textContent = _idxBlGroupMode==='flat' ? 'Flat' : _idxBlGroupMode==='trade' ? 'By Trade' : 'By Project';
       }
       if (window.renderBlTable) window.renderBlTable();
     };
@@ -1507,37 +1510,40 @@
           if (!tbody) return;
           const totalBudget = rows.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
 
-          // Group by trade first, then sort within each group by selected option
-          const tradeGroups = new Map();
-          const tradeSeq = [];
-          const tradeOf = w => normTrade(w.trade)||'(No Trade)';
-          rows.forEach(w => {
-            const t=tradeOf(w);
-            if(!tradeGroups.has(t)){tradeGroups.set(t,[]);tradeSeq.push(t);}
-            tradeGroups.get(t).push(w);
-          });
-          // Sort tradeSeq by TRADE_ORDER
-          tradeSeq.sort((a,b)=>{const oa=TRADE_ORDER.indexOf(a),ob=TRADE_ORDER.indexOf(b);return(oa<0?999:oa)-(ob<0?999:ob);});
-          // Sort within each trade group by selected option; WP No. as tiebreaker
+          // Group by the active mode (trade or project), then sort within each group.
           const wpNoSort = (a,b) => (a.wp_no||'').localeCompare((b.wp_no||''), undefined, {numeric:true, sensitivity:'base'});
-          tradeGroups.forEach(arr => arr.sort((a,b) => {
+          const withinSort = (a,b) => {
             let cmp = 0;
             if(sortBy==='date') cmp = (a.awarding_date||'9999')<(b.awarding_date||'9999')?-1:(a.awarding_date||'9999')>(b.awarding_date||'9999')?1:0;
             else if(sortBy==='budget') cmp = (b.approved_budget_bcb||0)-(a.approved_budget_bcb||0);
             else if(sortBy==='desc') cmp = (a.description||'').localeCompare(b.description||'');
+            else if(sortBy==='trade') cmp = (a.trade||'').localeCompare(b.trade||'');
             else { const agA=a.awarding_date?(now-new Date(a.awarding_date)):-Infinity; const agB=b.awarding_date?(now-new Date(b.awarding_date)):-Infinity; cmp=agB-agA; }
             return cmp!==0?cmp:wpNoSort(a,b);
-          }));
+          };
+          const byProject = _idxBlGroupMode==='project';
+          const keyOf = byProject ? (w=>w.project_id||'(No Project)') : (w=>normTrade(w.trade)||'(No Trade)');
+          const groups = new Map(); const groupSeq = [];
+          rows.forEach(w => { const k=keyOf(w); if(!groups.has(k)){groups.set(k,[]);groupSeq.push(k);} groups.get(k).push(w); });
+          if(byProject) groupSeq.sort((a,b)=>{const ia=permitted.findIndex(p=>p.id===a),ib=permitted.findIndex(p=>p.id===b);return (ia<0?999:ia)-(ib<0?999:ib);});
+          else groupSeq.sort((a,b)=>{const oa=TRADE_ORDER.indexOf(a),ob=TRADE_ORDER.indexOf(b);return(oa<0?999:oa)-(ob<0?999:ob);});
+          groups.forEach(arr => arr.sort(withinSort));
+          const _blProjLabel = id => { const p=permitted.find(x=>x.id===id); return (p&&p.name&&p.name!==p.id) ? (id+' — '+p.name.split('—')[0].trim()) : id; };
 
-          // Cols: Project, WP No., Desc, [Trade], Planned Award, Aging, Budget, Status, Submittal
-          const nCols = _idxBlGroupByTrade ? 8 : 9;
+          // Cols: [Project], WP No., Desc, [Trade], Planned Award, Aging, Budget, Status, Submittal.
+          // The grouped-by column is hidden (it's the group header): trade mode hides Trade,
+          // project mode hides Project; flat shows both.
+          const grouped = _idxBlGroupMode !== 'flat';
+          const nCols = grouped ? 8 : 9;
           const preBudgetCols = nCols - 3; // cols before Budget (excl. Budget, Status, Submittal)
-          // Rebuild thead to add/remove Trade column reliably (CSS display:none unreliable in tables)
+          // Rebuild thead per mode (CSS display:none unreliable in tables)
           const blThead = document.getElementById('bl-thead');
           if (blThead) {
-            blThead.innerHTML = _idxBlGroupByTrade
-              ? '<tr><th>Project</th><th>WP No.</th><th>Description</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>'
-              : '<tr><th>Project</th><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>';
+            blThead.innerHTML = byProject
+              ? '<tr><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>'
+              : (_idxBlGroupMode==='trade'
+                ? '<tr><th>Project</th><th>WP No.</th><th>Description</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>'
+                : '<tr><th>Project</th><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>');
           }
 
           const _renderBlRow = w => {
@@ -1545,10 +1551,10 @@
             const agStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : '';
             const slbl = w.submittal_type||(w.review_status==='approved'?'Approved':w.review_status==='pending_review'?'Submitted':'Not Required');
             return `<tr>
-              <td style="font-weight:600;font-size:11px">${esc(w.project_id)||'—'}</td>
+              ${byProject ? '' : `<td style="font-weight:600;font-size:11px">${esc(w.project_id)||'—'}</td>`}
               <td>${esc(w.wp_no)||'—'}</td>
               <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.description)||'—'}</td>
-              ${_idxBlGroupByTrade ? '' : `<td style="font-size:11px;color:#888">${esc(w.trade)||'—'}</td>`}
+              ${_idxBlGroupMode==='trade' ? '' : `<td style="font-size:11px;color:#888">${esc(w.trade)||'—'}</td>`}
               <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
               <td style="${agStyle}">${aging!=null?(aging>0?'+'+aging+'d':aging===0?'today':aging+'d'):'—'}</td>
               <td style="white-space:nowrap">${w.approved_budget_bcb?Fmt.moneyFull(w.approved_budget_bcb):'—'}</td>
@@ -1561,38 +1567,31 @@
             <td style="font-size:11px;padding:8px 10px">${window.__isViewer?'—':Fmt.money(budget)}</td>
             <td colspan="2"></td>
           </tr>` : '';
-          const wpNoSortFlat = (a,b) => (a.wp_no||'').localeCompare((b.wp_no||''), undefined, {numeric:true, sensitivity:'base'});
-          if (_idxBlGroupByTrade) {
+          if (grouped) {
+            // Grouped by Trade OR Project — collapsible group headers (WP count + budget).
             let html = '';
-            tradeSeq.forEach(trade => {
-              const tWps = tradeGroups.get(trade);
-              const collapsed = !!_blCollapseState.get(trade);
-              const tBudget = tWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+            groupSeq.forEach(gk => {
+              const gWps = groups.get(gk);
+              const collapsed = !!_blCollapseState.get(gk);
+              const gBudget = gWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
               const ind = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:13px;font-weight:700;float:right;margin-left:4px">${collapsed?'+':'−'}</span>`;
-              const budgeLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:10px;color:#888;font-weight:400">${Fmt.money(tBudget)}</span>`;
-              html += `<tr onclick="toggleBlGroup(this.dataset.trade)" data-trade="${trade.replace(/"/g,'&quot;')}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
+              const budgeLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:10px;color:#888;font-weight:400">${Fmt.money(gBudget)}</span>`;
+              const label = byProject ? _blProjLabel(gk) : gk;
+              html += `<tr onclick="toggleBlGroup(this.dataset.group)" data-group="${String(gk).replace(/"/g,'&quot;')}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
                 <td colspan="${nCols}" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
-                  ${trade}${ind}
-                  <span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${tWps.length} WPs</span>
+                  ${esc(label)}${ind}
+                  <span style="float:right;margin-right:6px;font-size:10px;color:#aaa;font-weight:400">${gWps.length} WPs</span>
                   ${budgeLabel}
                 </td></tr>`;
-              if (!collapsed) tWps.forEach(w => { html += _renderBlRow(w); });
+              if (!collapsed) gWps.forEach(w => { html += _renderBlRow(w); });
             });
             html += _totalRow(rows.length, totalBudget);
             tbody.innerHTML = html || `<tr><td colspan="${nCols}" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>`;
           } else {
-            // Flat mode: combine all groups, re-sort by selected sort option
+            // Flat mode: consolidate all rows, sorted by the selected sort option.
             const flat = [];
-            tradeSeq.forEach(t => flat.push(...(tradeGroups.get(t)||[])));
-            flat.sort((a,b) => {
-              let cmp = 0;
-              if(sortBy==='date') cmp = (a.awarding_date||'9999')<(b.awarding_date||'9999')?-1:(a.awarding_date||'9999')>(b.awarding_date||'9999')?1:0;
-              else if(sortBy==='budget') cmp = (b.approved_budget_bcb||0)-(a.approved_budget_bcb||0);
-              else if(sortBy==='desc') cmp = (a.description||'').localeCompare(b.description||'');
-              else if(sortBy==='trade') cmp = (a.trade||'').localeCompare(b.trade||'');
-              else { const agA=a.awarding_date?(now-new Date(a.awarding_date)):-Infinity; const agB=b.awarding_date?(now-new Date(b.awarding_date)):-Infinity; cmp=agB-agA; }
-              return cmp !== 0 ? cmp : wpNoSortFlat(a,b);
-            });
+            groupSeq.forEach(t => flat.push(...(groups.get(t)||[])));
+            flat.sort(withinSort);
             const flatBudget = flat.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
             tbody.innerHTML = flat.map(_renderBlRow).join('') + _totalRow(flat.length, flatBudget) || `<tr><td colspan="${nCols}" style="text-align:center;color:#aaa;padding:20px">No backlog items</td></tr>`;
           }
