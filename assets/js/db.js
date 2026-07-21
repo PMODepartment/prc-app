@@ -334,7 +334,7 @@ function renderUserBar(id, profile) {
         <i class="ti ${dark ? 'ti-sun' : 'ti-moon-stars'}" style="font-size:17px;line-height:1"></i>
       </button>
       <div style="position:relative">
-        <button id="avatar-btn" onclick="toggleUserMenu()" title="${profile.name||profile.email}" style="
+        <button id="avatar-btn" onclick="toggleUserMenu()" title="${esc(profile.name||profile.email)}" style="
           width:36px;height:36px;border-radius:50%;background:#EE3124;color:#fff;
           border:none;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;
           display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initials}</button>
@@ -343,7 +343,7 @@ function renderUserBar(id, profile) {
           background:#fff;border:1px solid #f0f0f0;border-radius:12px;
           box-shadow:0 8px 32px rgba(0,0,0,.12);width:220px;z-index:9999;overflow:hidden;">
           <div style="padding:14px 16px;border-bottom:1px solid #f5f5f5;">
-            <div style="font-size:13px;font-weight:600;color:#231F20">${profile.name||profile.email}</div>
+            <div style="font-size:13px;font-weight:600;color:#231F20">${esc(profile.name||profile.email)}</div>
             <div style="font-size:11px;color:#888;margin-top:2px;text-transform:capitalize">${(profile.role||'').replace(/_/g,' ')}</div>
           </div>
           <a onclick="event.preventDefault();(function(){var m=document.getElementById('user-menu');if(m)m.style.display='none';if(window.CoachTour&&CoachTour.available()){CoachTour.start(true);}else if(window.Onboarding&&Onboarding.open){Onboarding.open();}else{window.location.href='onboarding.html';}})()" style="
@@ -456,7 +456,7 @@ function buildRankList(id, items, colorClass, fmtVal) {
     return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f5f5f5">
       <span style="font-size:11px;color:#aaa;font-weight:600;width:16px;flex-shrink:0;padding-top:2px">${i+1}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600;color:#231F20;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${item.name}</div>
+        <div style="font-size:12px;font-weight:600;color:#231F20;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(item.name)}</div>
         <div style="font-size:10px;color:#999;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub}</div>
         ${hasBcbAwd?`<div style="font-size:10px;color:#bbb;margin-top:1px;white-space:nowrap">BCB ${Fmt.money(item.bcb)} <span style="color:#ddd">→</span> Awd ${Fmt.money(item.awarded)}</div>`:''}
       </div>
@@ -758,7 +758,7 @@ function updatePendingBadge() {
             ${approved.length?approved.map(u=>`
               <div class="gnpu-row" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e5e5e5;border-radius:8px;cursor:pointer" onclick="this.querySelector('input').click()">
                 <input type="checkbox" value="${u.id}" onclick="event.stopPropagation()" style="width:16px;height:16px;accent-color:#EE3124;cursor:pointer">
-                <label onclick="event.preventDefault()" style="cursor:pointer;font-size:13px;pointer-events:none">${u.name||u.email} <span style="font-size:10px;color:#aaa">(${(u.role||'user').replace(/_/g,' ')})</span></label>
+                <label onclick="event.preventDefault()" style="cursor:pointer;font-size:13px;pointer-events:none">${esc(u.name||u.email)} <span style="font-size:10px;color:#aaa">(${(u.role||'user').replace(/_/g,' ')})</span></label>
               </div>`).join(''):'<div style="color:#aaa;font-size:12px">No approved users</div>'}
           </div>`;
       }
