@@ -37,7 +37,8 @@ No build step â€” edit files directly, push to GitHub, GitHub Pages auto-de
 | `login.html` | public | Sign-in + Step 2 project picker. Shows Portfolio Overview card (admins), project list, Add New Project (admin/super_admin). On create â†’ `project.html?id=<newId>`. |
 | `register.html` | public | Self-registration (creates `pending` user) |
 | `pending.html` | public | Shown to unapproved users |
-| `forgot-password.html` | public | Password reset â€” `redirectTo` points to `/prc-app/login.html` |
+| `forgot-password.html` | public | Password reset request â€” `redirectTo` points to `/prc-app/reset-password.html` (was `login.html`, which had no recovery handling) |
+| `reset-password.html` | public | **Set-new-password page** â€” the target of the reset email link. Self-contained (own Supabase client + inline dark mode, like `forgot-password.html`). On load, `detectSessionInUrl` (default) parses the recovery token from the URL and fires `onAuthStateChange('PASSWORD_RECOVERY')`; the page then reveals New/Confirm password fields and calls `sb.auth.updateUser({password})`, signs out, and redirects to `login.html`. Shows an "invalid/expired link" error (with a link back to Forgot Password) when no recovery session settles (~1.8s) or the URL carries `error_description`. **REQUIRES** the redirect URL to be allow-listed in Supabase (see below). |
 | `index.html` | user | Portfolio Overview â€” consolidated dashboard, 6 tabs (Dashboard tab merged into Overview) |
 | `project.html` | user | Single project dashboard â€” 3 tabs |
 | `wp-form.html` | user | Add / edit work package |
@@ -97,6 +98,8 @@ WPDb.updateLastLogin(userId)
 - **Email confirmation disabled** â€” users go straight to `pending` for admin approval
 - **Free tier cold start:** Pauses after 7 days inactivity â†’ 5â€“30s delay. Use UptimeRobot (ping every 3â€“4 days) to prevent.
 - **Email rate limit:** ~3 auth emails/hour on free tier. Use custom SMTP (Resend/Brevo) for reliability.
+- **Password-reset flow** (Auth â†’ URL Configuration): the **Redirect URLs allow-list must contain `https://pmodepartment.github.io/prc-app/**`** (wildcard). It was previously **empty**, so Supabase ignored `resetPasswordForEmail`'s `redirectTo` and fell back to the **Site URL** (`/prc-app/` = the portfolio, which needs login and has no reset form) â€” the reset link "went nowhere useful." With the wildcard added, the email link lands on **`reset-password.html`**, which handles the recovery token. If you add other post-auth redirect targets, they must match this allow-list (or add them).
+- **Custom SMTP (Resend)**: configured then **reverted** (toggled OFF 2026-07 at user request) â€” back on the built-in email service. The Resend config (domain `megawide.com.ph` pending verification, `supabase-smtp` API key, sender/host/username) remains **saved** in Supabase; re-enabling is just the "Enable custom SMTP" toggle. DNS records to verify the domain live in the handoff Artifact. This is independent of the reset-link fix above.
 
 ---
 
