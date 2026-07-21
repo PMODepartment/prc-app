@@ -120,14 +120,13 @@ function computeStats(wps) {
   // via helpingMetrics; falls back to row-derived values for projects not in HELPING_FIGURES.
   const hm=helpingMetrics(wps);
   const awarded=hm.awarded;
-  const partial=wps.filter(w=>w.award_status==='Partially Awarded').length;
   const notAwarded=Math.max(0,total-awarded);
   const totalBudget=hm.totalBudget;
   const totalContract=hm.awardedCost;
   const variance=totalBudget-totalContract;
   const today=new Date();
   const late=wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
-  return {total,awarded,partial,notAwarded,totalBudget,totalContract,variance,late,awardRate:total?Math.round(awarded/total*100):0};
+  return {total,awarded,notAwarded,totalBudget,totalContract,variance,late,awardRate:total?Math.round(awarded/total*100):0};
 }
 
 /* ── Awarded metrics are now FULLY ROW-DERIVED (no Helping Sheet) ──
