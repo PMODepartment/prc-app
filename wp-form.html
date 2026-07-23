@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723a"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260723a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723b"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260723b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723a"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723b"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -258,6 +258,7 @@
               <div class="form-group">
                 <label>WP No. *</label>
                 <input type="text" id="f-wp-no"/>
+                <div id="wp-no-hint" style="font-size:10px;color:#999;margin-top:4px;display:none"></div>
               </div>
               <div class="form-group full">
                 <label>Work Package Description *</label>
@@ -637,10 +638,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723a"></script>
-<script src="assets/js/ui.js?v=20260723a"></script>
-<script src="assets/js/db.js?v=20260723a"></script>
-<script src="assets/js/coachmarks.js?v=20260723a"></script>
+<script src="assets/js/auth.js?v=20260723b"></script>
+<script src="assets/js/ui.js?v=20260723b"></script>
+<script src="assets/js/db.js?v=20260723b"></script>
+<script src="assets/js/coachmarks.js?v=20260723b"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -1017,6 +1018,54 @@
 
   // ── Unsaved changes protection ──
 let formDirty = false;
+/* ── WP No. auto-numbering (new WP only) ─────────────────────────────────────
+   Suggests the next number for the selected project = highest existing whole
+   number + 1 (WP Nos. are digits; decimals like 2.1 count toward their whole
+   number, so 2.1 → next is 3). The field stays fully editable: we only
+   overwrite it while the user hasn't typed their own value (_wpNoTouched).
+   Existing numbers are cached per project so switching back is instant. */
+let _wpNoTouched = false;
+let _wpNoSuggested = '';
+const _wpNoCache = {};        // pid -> array of existing wp_no strings
+
+function _wpNoNum(v){
+  const m = String(v==null?'':v).replace(/^wp[-\s]*/i,'').match(/\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0]) : NaN;
+}
+async function _wpNoExisting(pid){
+  if (_wpNoCache[pid]) return _wpNoCache[pid];
+  let list = [];
+  try { list = (await WPDb.getAllWPs(pid) || []).map(w => w.wp_no); } catch(_) { list = []; }
+  _wpNoCache[pid] = list;
+  return list;
+}
+async function suggestWpNo(){
+  if (editId) return;                                   // never renumber an existing WP
+  const el = document.getElementById('f-wp-no');
+  const hint = document.getElementById('wp-no-hint');
+  const pid = document.getElementById('f-project').value;
+  if (!el) return;
+  if (!pid) { if(hint) hint.style.display='none'; return; }
+  // If the user typed their own number, leave it alone (but still show the hint).
+  if (el.value && el.value !== _wpNoSuggested) _wpNoTouched = true;
+  const nums = (await _wpNoExisting(pid)).map(_wpNoNum).filter(n => !isNaN(n));
+  const next = nums.length ? String(Math.floor(Math.max.apply(null, nums)) + 1) : '1';
+  _wpNoSuggested = next;
+  if (!_wpNoTouched) el.value = next;
+  if (hint) {
+    hint.style.display = '';
+    hint.textContent = nums.length
+      ? `Auto-numbered — next available in ${pid} (${nums.length} existing WP${nums.length===1?'':'s'}). You can edit it.`
+      : `First work package in ${pid}. You can edit this number.`;
+  }
+}
+// A manual edit locks the suggestion out; clearing the field re-enables it.
+function onWpNoInput(){
+  const el = document.getElementById('f-wp-no');
+  _wpNoTouched = !!(el && el.value.trim());
+  if (!_wpNoTouched) suggestWpNo();
+}
+
 function markDirty() { formDirty = true; }
 function markClean() { formDirty = false; }
 // First-run checklist marker (mirrors GettingStarted.markStep; onboarding.js isn't loaded here).
@@ -1090,6 +1139,14 @@ AppAuth.requireLogin(async (user, profile) => {
       projSel.innerHTML += `<option value="${p.id}">${p.id} — ${p.name}</option>`;
     });
     if (projId) projSel.value = projId;
+
+    // WP No. auto-numbering (new WP only) — suggest on load + whenever the project changes
+    if (!editId) {
+      const wpNoEl = document.getElementById('f-wp-no');
+      if (wpNoEl) wpNoEl.addEventListener('input', onWpNoInput);
+      projSel.addEventListener('change', suggestWpNo);
+      suggestWpNo();
+    }
 
     /* Load existing WP if editing */
     if (editId) {
@@ -1265,6 +1322,14 @@ AppAuth.requireLogin(async (user, profile) => {
     if (_selProj && _selProj.status === 'archived') return showErr('This project is archived and read-only. Pick an active project, or ask an admin to unarchive it.', 'f-project');
     // EDIT scope (P1): specialists may only add WPs to their assigned projects (RLS also enforces this).
     if (!AppAuth.canEditProject(userProfile, getVal('f-project'))) return showErr('This project isn\'t assigned to you, so you can\'t add work packages to it. Ask an admin to assign it.', 'f-project');
+    // Duplicate WP No. guard — the DB has a (project_id, wp_no) unique constraint, so catch it
+    // here with a clear message instead of a raw Postgres error after the whole form is filled.
+    if (!editId) {
+      const _norm = v => String(v==null?'':v).trim().replace(/^wp[-\s]*/i,'').replace(/\.0+$/,'').toLowerCase();
+      const _mine = _norm(getVal('f-wp-no'));
+      const _taken = (await _wpNoExisting(getVal('f-project'))).some(n => _norm(n) === _mine);
+      if (_taken) return showErr('WP No. ' + getVal('f-wp-no') + ' already exists in ' + getVal('f-project') + '. Pick a different number.', 'f-wp-no');
+    }
     if (!getVal('f-trade'))          return showErr('Select a Trade (drives the Works & Type options).', 'f-trade');
     if (!getVal('f-awarding-date'))  return showErr('Set the planned Awarding Date (Procurement Schedule).', 'f-awarding-date');
     if (!getVal('f-target-delivery'))return showErr('Set the Target Delivery Date (Procurement Schedule).', 'f-target-delivery');

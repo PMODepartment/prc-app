@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723b"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708b"/>
   <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723a"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723a"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723b"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -554,14 +554,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723a"></script>
-<script src="assets/js/ui.js?v=20260723a"></script>
-<script src="assets/js/db.js?v=20260723a"></script>
+<script src="assets/js/auth.js?v=20260723b"></script>
+<script src="assets/js/ui.js?v=20260723b"></script>
+<script src="assets/js/db.js?v=20260723b"></script>
 <script src="assets/js/onboarding.js?v=20260708b"></script>
 <script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260723a"></script>
+<script src="assets/js/charts.js?v=20260723b"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -3189,6 +3189,7 @@ AppAuth.requireLogin(async (user, profile) => {
           <div>
             <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">WP No. *</label>
             <input id="wqm-wp-no" type="text" placeholder="e.g. WP-115" style="width:100%;padding:9px 11px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+            <div id="wqm-wp-no-hint" style="font-size:10px;color:#999;margin-top:4px;display:none"></div>
           </div>
           <div style="grid-column:1/-1">
             <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Description *</label>
@@ -3259,6 +3260,23 @@ AppAuth.requireLogin(async (user, profile) => {
 <script>
 let _wqmProjectId = null;
 let _wqmDirty = false;
+/* Quick-add WP No. auto-numbering — suggests the next whole number from the project's
+   existing WPs (already loaded in `allWPs`), pre-filled but freely editable. `_wqmExtra`
+   holds numbers added during this modal session so "Add Another" keeps counting up
+   before the background reload lands. */
+let _wqmExtra = [];
+function _wqmNum(v){ const m=String(v==null?'':v).replace(/^wp[-\s]*/i,'').match(/\d+(?:\.\d+)?/); return m?parseFloat(m[0]):NaN; }
+function _wqmNextWpNo(){
+  const nums = (allWPs||[]).map(w=>w.wp_no).concat(_wqmExtra).map(_wqmNum).filter(n=>!isNaN(n));
+  return nums.length ? String(Math.floor(Math.max.apply(null,nums))+1) : '1';
+}
+function _wqmSuggestWpNo(){
+  const el = document.getElementById('wqm-wp-no');
+  if(!el) return;
+  el.value = _wqmNextWpNo();
+  const hint = document.getElementById('wqm-wp-no-hint');
+  if(hint){ hint.style.display=''; hint.textContent = 'Auto-numbered — next available. You can edit it.'; }
+}
 
 window.openAddWPModal = function(projectId) {
   if(window.__archived){ alert('This project is archived and read-only. Unarchive it to add work packages.'); return; }
@@ -3270,6 +3288,8 @@ window.openAddWPModal = function(projectId) {
   });
   const trade = document.getElementById('wqm-trade'); if(trade) trade.value = '';
   const status = document.getElementById('wqm-award-status'); if(status) status.value = 'Not Yet Awarded';
+  _wqmExtra = [];
+  _wqmSuggestWpNo();   // pre-fill the next WP No. (editable)
   document.getElementById('wqm-error').style.display = 'none';
   document.getElementById('wqm-success').style.display = 'none';
   document.getElementById('wqm-btn-text').textContent = 'Add Work Package';
@@ -3311,6 +3331,15 @@ window.saveQuickWP = async function() {
   if (!v('wqm-cost-code')) { errEl.textContent='Cost Code is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-wp-no')) { errEl.textContent='WP No. is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-description')) { errEl.textContent='Description is required.'; errEl.style.display='block'; return; }
+  // Duplicate WP No. guard — (project_id, wp_no) is unique in the DB
+  {
+    const _n = x => String(x==null?'':x).trim().replace(/^wp[-\s]*/i,'').replace(/\.0+$/,'').toLowerCase();
+    const _mine = _n(v('wqm-wp-no'));
+    if ((allWPs||[]).map(w=>w.wp_no).concat(_wqmExtra).some(x=>_n(x)===_mine)) {
+      errEl.textContent='WP No. '+v('wqm-wp-no')+' already exists in this project. Pick a different number.';
+      errEl.style.display='block'; return;
+    }
+  }
   if (!v('wqm-trade')) { errEl.textContent='Trade is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-award-date')) { const _de=document.getElementById('wqm-award-date'); errEl.textContent=_de&&_de.validity.badInput?'Planned Award Date: invalid date — use the calendar picker.':'Planned Award Date is required.'; errEl.style.display='block'; return; }
   if (!v('wqm-completion')) { const _de=document.getElementById('wqm-completion'); errEl.textContent=_de&&_de.validity.badInput?'Target Completion: invalid date — use the calendar picker.':'Target Completion is required.'; errEl.style.display='block'; return; }
@@ -3357,6 +3386,7 @@ window.saveQuickWP = async function() {
       : 'Work package submitted for review.';
     sucEl.style.display = 'block';
 
+    _wqmExtra.push(v('wqm-wp-no'));   // keep auto-numbering ahead of the background reload
     document.getElementById('wqm-btn-text').textContent = 'Add Another';
     btn.disabled = false;
 
@@ -3364,6 +3394,7 @@ window.saveQuickWP = async function() {
     ['wqm-cost-code','wqm-wp-no','wqm-description','wqm-zone','wqm-budget'].forEach(id => {
       const el = document.getElementById(id); if(el) el.value = '';
     });
+    _wqmSuggestWpNo();   // next number for the follow-up entry
     _wqmDirty = false;
 
     // Reload page data
