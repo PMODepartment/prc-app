@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723e"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723e"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723e"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723f"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723f"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723f"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723e"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723f"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -51,6 +51,16 @@
     .xl-wrap{border:1px solid var(--border-md);border-radius:var(--radius-md);overflow:auto;max-height:calc(100vh - 250px);background:var(--surface);position:relative}
     table.xl{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:11px;width:max-content}
     table.xl th,table.xl td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:0;height:26px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:var(--surface)}
+    table.xl thead tr.xl-grp th{position:sticky;top:0;z-index:8;height:26px;background:#F3F3F3;color:var(--text-primary);
+      font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;text-align:left;padding:4px 8px;
+      cursor:pointer;user-select:none;border-right:2px solid var(--border-md);white-space:nowrap}
+    table.xl thead tr.xl-grp th:hover{background:#E8E8E8}
+    table.xl thead tr.xl-grp th.collapsed{color:var(--text-hint)}
+    table.xl thead tr.xl-grp .xl-grp-n{font-size:9px;font-weight:700;background:#EE3124;color:#fff;border-radius:8px;padding:0 5px;margin-left:2px}
+    body.dark-mode table.xl thead tr.xl-grp th{background:#3a3a3a}
+    body.dark-mode table.xl thead tr.xl-grp th:hover{background:#454545}
+    table.xl thead th.xl-colh{top:26px}
+    table.xl td.xl-ph{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,transparent 4px,transparent 8px);cursor:default}
     table.xl thead th{position:sticky;top:0;z-index:6;background:var(--surface-2);font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em;padding:5px 6px;text-align:left;white-space:normal;line-height:1.2;height:34px;vertical-align:middle}
     table.xl td{padding:4px 6px;color:var(--text-primary);cursor:cell}
     table.xl td.xl-ro{background:var(--surface-2);color:var(--text-secondary)}
@@ -190,6 +200,9 @@
             </label>
             <span class="xl-legend"><span class="xl-swatch" style="background:#FDECEA;box-shadow:inset 3px 0 0 #EE3124"></span>required, empty</span>
             <span class="xl-legend"><span class="xl-swatch" style="background:#FFF6DA"></span>unsaved</span>
+            <span class="xl-hint">Sections:</span>
+            <button class="xl-btn" style="padding:4px 9px" onclick="xlGroupsAll(false)" title="Show every WP-form section">Expand all</button>
+            <button class="xl-btn" style="padding:4px 9px" onclick="xlGroupsAll(true)" title="Collapse every section to the key columns">Collapse all</button>
             <span style="flex:1"></span>
             <span id="xl-missing-count" class="xl-hint" style="color:#EE3124;font-weight:700;display:none"></span>
             <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
@@ -211,9 +224,9 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723e"></script>
-<script src="assets/js/ui.js?v=20260723e"></script>
-<script src="assets/js/db.js?v=20260723e"></script>
+<script src="assets/js/auth.js?v=20260723f"></script>
+<script src="assets/js/ui.js?v=20260723f"></script>
+<script src="assets/js/db.js?v=20260723f"></script>
 <script>
   let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';
@@ -233,6 +246,7 @@
       const assigned = profile.projects || [];
       if (assigned.length === 1) currentProjId = assigned[0];
     }
+    _xlLoadGroups();          // per-user collapsed-section memory for the grid
     // Track navigation context
     sessionStorage.setItem('wpm_nav_ctx', currentProjId !== 'ALL' ? currentProjId : 'consolidated');
     await loadAll(profile);
@@ -466,47 +480,132 @@
   const XL_DELIV  = ['','DP Paid','Accomplished Detailed Drawings','Manufactured/Produced','Delivered'];
   const XL_YN     = ['No','Yes'];
 
-  // ro:true = read-only (generated/derived columns). type drives the editor + formatting.
-  const XL_COLS = [
-    { k:'project_id',          label:'Project',            w:80,  type:'text',   ro:true },
-    { k:'wp_no',               label:'WP No.',             w:70,  type:'text', req:true  },
-    { k:'cost_code',           label:'Cost Code',          w:90,  type:'text'  },
-    { k:'description',         label:'Description',        w:240, type:'text', req:true  },
-    { k:'trade',               label:'Trade',              w:150, type:'select', opts:XL_TRADES, req:true },
-    { k:'works',               label:'Works',              w:140, type:'text'  },
-    { k:'type_of_works',       label:'Type',               w:90,  type:'text'  },
-    { k:'zone',                label:'Zone',               w:80,  type:'text'  },
-    { k:'osm',                 label:'OSM',                w:60,  type:'select', opts:XL_YN },
-    { k:'charging_type',       label:'Charging',           w:110, type:'select', opts:['Main Contract','Change Order'], req:true },
-    { k:'procurement_status',  label:'Procurement Status', w:130, type:'select', opts:XL_PROC },
-    { k:'award_status',        label:'Award Status',       w:110, type:'text',   ro:true },
-    { k:'submittal_type',      label:'Submittal Status',   w:130, type:'select', opts:XL_SUBM },
-    { k:'delivery_status',     label:'Delivery Status',    w:150, type:'select', opts:XL_DELIV },
-    { k:'awarding_date',       label:'Planned Award',      w:105, type:'date', req:true  },
-    { k:'actual_awarding_date',label:'Actual Award',       w:105, type:'date'  },
-    { k:'target_delivery',     label:'Target Delivery',    w:105, type:'date', req:true  },
-    { k:'actual_delivery',     label:'Actual Delivery',    w:105, type:'date'  },
-    { k:'target_completion',   label:'Target Completion',  w:110, type:'date', req:true  },
-    { k:'lead_time',           label:'Lead Time (d)',      w:80,  type:'num'   },
-    { k:'approved_budget_bcb', label:'Budget (BCB)',       w:120, type:'money', req:true },
-    { k:'awarded_cost',        label:'Awarded Cost',       w:120, type:'money', reqIfAwarded:true },
-    { k:'total_awarded',       label:'Total Awarded',      w:120, type:'money', ro:true },
-    { k:'_variance',           label:'Variance',           w:120, type:'money', ro:true },
-    { k:'contractor',          label:'Awarded Vendor',     w:150, type:'text', reqIfAwarded:true  },
-    { k:'proposed_vendors',    label:'Proposed Vendors',   w:160, type:'text'  },
-    { k:'po_jo_count',         label:'No. PO/JO',          w:80,  type:'num'   },
-    { k:'po_jo_numbers',       label:'PO/JO Numbers',      w:140, type:'text'  },
-    { k:'surety_bond',         label:'Surety Bond',        w:90,  type:'select', opts:XL_YN },
-    { k:'performance_bond',    label:'Perf. Bond',         w:90,  type:'select', opts:XL_YN },
-    { k:'warranty_bond',       label:'Warranty Bond',      w:95,  type:'select', opts:XL_YN },
-    { k:'remarks',             label:'Remarks',            w:180, type:'text'  },
-    { k:'review_status',       label:'Review',             w:95,  type:'text',   ro:true },
+  // Column groups mirror the 8 sections of wp-form.html, in the same order.
+  // `keep:true` columns survive their group being collapsed (they're the frozen keys).
+  const XL_GROUPS = [
+    { g:'identity',   label:'Identity & Classification' },
+    { g:'approval',   label:'Approval Matrix' },
+    { g:'bonds',      label:'Insurance Bonds' },
+    { g:'submittals', label:'Material/Subcon Submittals' },
+    { g:'schedule',   label:'Procurement Schedule' },
+    { g:'budget',     label:'Budget & Contract' },
+    { g:'payment',    label:'Payment Terms' },
+    { g:'status',     label:'Procurement Status' },
   ];
+  // Groups collapsed on a first visit — the wide, less-reviewed sections. The user's own
+  // choice is remembered per user in localStorage.
+  const XL_GROUPS_DEFAULT_COLLAPSED = ['approval','bonds','payment'];
+
+  // ro:true = read-only (generated/derived). req/reqIfAwarded drive the red highlight.
+  const XL_COLS = [
+    /* ── Identity & Classification ─────────────────────────────────────── */
+    { g:'identity', k:'project_id',          label:'Project',              w:80,  type:'text',  ro:true, keep:true },
+    { g:'identity', k:'wp_no',               label:'WP No.',               w:70,  type:'text',  req:true, keep:true },
+    { g:'identity', k:'cost_code',           label:'Cost Code',            w:90,  type:'text'  },
+    { g:'identity', k:'description',         label:'Description',          w:240, type:'text',  req:true },
+    { g:'identity', k:'detailed_description',label:'Detailed Description', w:200, type:'text'  },
+    { g:'identity', k:'scope',               label:'Scope of Work',        w:180, type:'text'  },
+    { g:'identity', k:'trade',               label:'Trade',                w:150, type:'select', opts:XL_TRADES, req:true },
+    { g:'identity', k:'works',               label:'Works',                w:140, type:'text'  },
+    { g:'identity', k:'type_of_works',       label:'Type',                 w:90,  type:'text'  },
+    { g:'identity', k:'zone',                label:'Zone',                 w:80,  type:'text'  },
+    { g:'identity', k:'osm',                 label:'OSM',                  w:60,  type:'select', opts:XL_YN },
+    { g:'identity', k:'type_of_service',     label:'Type of Service',      w:120, type:'text'  },
+    { g:'identity', k:'type_of_procurement', label:'Type of Procurement',  w:130, type:'text'  },
+    { g:'identity', k:'type_of_contract',    label:'Type of Contract',     w:130, type:'text'  },
+    { g:'identity', k:'proposed_vendors',    label:'Proposed Vendors',     w:160, type:'text'  },
+    { g:'identity', k:'po_jo_count',         label:'No. PO/JO',            w:80,  type:'num'   },
+    { g:'identity', k:'po_jo_numbers',       label:'PO/JO Numbers',        w:140, type:'text'  },
+    /* ── Approval Matrix ───────────────────────────────────────────────── */
+    { g:'approval', k:'responsible_team',    label:'Responsible',          w:150, type:'text'  },
+    { g:'approval', k:'approver',            label:'Approver',             w:130, type:'text'  },
+    { g:'approval', k:'support_team',        label:'Support',              w:150, type:'text'  },
+    /* ── Insurance Bonds ───────────────────────────────────────────────── */
+    { g:'bonds',    k:'surety_bond',         label:'Surety Bond',          w:90,  type:'select', opts:XL_YN },
+    { g:'bonds',    k:'performance_bond',    label:'Perf. Bond',           w:90,  type:'select', opts:XL_YN },
+    { g:'bonds',    k:'warranty_bond',       label:'Warranty Bond',        w:95,  type:'select', opts:XL_YN },
+    /* ── Material/Subcon Submittals ────────────────────────────────────── */
+    { g:'submittals', k:'requires_approval',        label:'Requires Approval', w:110, type:'bool' },
+    { g:'submittals', k:'submittal_document_type',  label:'Submittal Type',    w:140, type:'text' },
+    { g:'submittals', k:'approver_name',            label:'Submittal Approver',w:140, type:'text' },
+    { g:'submittals', k:'approval_date',            label:'Date of Approval',  w:110, type:'date' },
+    /* ── Procurement Schedule ──────────────────────────────────────────── */
+    { g:'schedule', k:'lead_time',            label:'Lead Time (d)',       w:80,  type:'num'  },
+    { g:'schedule', k:'awarding_date',        label:'Planned Award',       w:105, type:'date', req:true },
+    { g:'schedule', k:'actual_awarding_date', label:'Actual Award',        w:105, type:'date' },
+    { g:'schedule', k:'target_delivery',      label:'Target Delivery',     w:105, type:'date', req:true },
+    { g:'schedule', k:'actual_delivery',      label:'Actual Delivery',     w:105, type:'date' },
+    { g:'schedule', k:'target_installation',  label:'Target Installation', w:110, type:'date' },
+    { g:'schedule', k:'target_completion',    label:'Target Completion',   w:110, type:'date', req:true },
+    /* ── Budget & Contract ─────────────────────────────────────────────── */
+    { g:'budget',   k:'approved_budget_bcb', label:'Budget (BCB)',         w:120, type:'money', req:true },
+    { g:'budget',   k:'awarded_cost',        label:'Awarded Cost',         w:120, type:'money', reqIfAwarded:true },
+    { g:'budget',   k:'total_awarded',       label:'Total Awarded',        w:120, type:'money', ro:true },
+    { g:'budget',   k:'_variance',           label:'Variance',             w:120, type:'money', ro:true },
+    { g:'budget',   k:'award_status',        label:'Award Status',         w:110, type:'text',  ro:true },
+    { g:'budget',   k:'contractor',          label:'Awarded Vendor',       w:150, type:'text',  reqIfAwarded:true },
+    /* ── Payment Terms ─────────────────────────────────────────────────── */
+    { g:'payment',  k:'payment_terms_days',  label:'Terms (Days)',         w:95,  type:'num'   },
+    { g:'payment',  k:'dp_percent',          label:'Down Payment %',       w:110, type:'pct'   },
+    { g:'payment',  k:'dp_terms',            label:'DP Terms',             w:120, type:'text'  },
+    { g:'payment',  k:'dp_amount',           label:'DP Amount',            w:120, type:'money' },
+    { g:'payment',  k:'dp_release_date',     label:'Date of DP Release',   w:115, type:'date'  },
+    { g:'payment',  k:'dp_notes',            label:'Payment Notes',        w:160, type:'text'  },
+    { g:'payment',  k:'retention_percent',   label:'Retention %',          w:100, type:'pct'   },
+    { g:'payment',  k:'retention_amount',    label:'Retention Amount',     w:120, type:'money' },
+    { g:'payment',  k:'retention_period',    label:'Retention Period',     w:120, type:'text'  },
+    /* ── Procurement Status ────────────────────────────────────────────── */
+    { g:'status',   k:'procurement_status',  label:'Procurement Status',   w:130, type:'select', opts:XL_PROC },
+    { g:'status',   k:'submittal_type',      label:'Submittal Status',     w:130, type:'select', opts:XL_SUBM },
+    { g:'status',   k:'delivery_status',     label:'Delivery Status',      w:150, type:'select', opts:XL_DELIV },
+    { g:'status',   k:'charging_type',       label:'Charging',             w:110, type:'select', opts:['Main Contract','Change Order'], req:true },
+    { g:'status',   k:'contract_package_no', label:'Contract Package No.', w:130, type:'text'  },
+    { g:'status',   k:'co_description',      label:'CO Description',       w:160, type:'text'  },
+    { g:'status',   k:'remarks',             label:'Remarks',              w:180, type:'text'  },
+    { g:'status',   k:'purchase_request',    label:'Purchase Request',     w:130, type:'text'  },
+    { g:'status',   k:'review_status',       label:'Review',               w:95,  type:'text',  ro:true },
+  ];
+
   const XL_FREEZE = 2;                 // Project + WP No. stay pinned left (after the row gutter)
   const XL_GUTTER = 42;
   // Sticky columns need explicit pixel left offsets (Known Issues #11/#12): the chain
   // must be contiguous from the left, so offsets accumulate gutter + each frozen width.
-  function _xlLeft(i){ let l = XL_GUTTER; for (let j=0;j<i;j++) l += XL_COLS[j].w; return l; }
+  // VC = the columns actually on screen (XL_COLS minus collapsed groups). Every r/c
+  // coordinate in the grid — selection, copy/paste, editors — indexes into VC, NOT XL_COLS.
+  let VC = [];
+  let _xlCollapsed = new Set(XL_GROUPS_DEFAULT_COLLAPSED);
+  function _xlGroupKey(){ return 'wpm_grid_groups_' + ((adminProfile&&adminProfile.id)||'anon'); }
+  function _xlLoadGroups(){
+    try {
+      const raw = localStorage.getItem(_xlGroupKey());
+      if (raw) _xlCollapsed = new Set(JSON.parse(raw));
+    } catch(_){}
+  }
+  function _xlSaveGroups(){
+    try { localStorage.setItem(_xlGroupKey(), JSON.stringify([..._xlCollapsed])); } catch(_){}
+  }
+  // A collapsed group keeps only its `keep` columns (the frozen keys). A group with no
+  // `keep` column gets a narrow read-only PLACEHOLDER so its header stays on screen and
+  // stays clickable — otherwise a collapsed section could never be re-opened.
+  function _xlBuildVC(){
+    VC = [];
+    XL_GROUPS.forEach(function(G){
+      const cols = XL_COLS.filter(function(c){ return c.g===G.g; });
+      if (!_xlCollapsed.has(G.g)) { VC = VC.concat(cols); return; }
+      const kept = cols.filter(function(c){ return c.keep; });
+      VC = VC.concat(kept.length ? kept
+        : [{ g:G.g, k:'_ph_'+G.g, label:'', w:34, type:'text', ro:true, ph:true }]);
+    });
+  }
+  window.toggleXlGroup = function(g){
+    if (_xlCollapsed.has(g)) _xlCollapsed.delete(g); else _xlCollapsed.add(g);
+    _xlSaveGroups(); _xlSel = {r:_xlSel.r, c:0}; _xlAnchor = null; renderGrid();
+  };
+  window.xlGroupsAll = function(collapse){
+    _xlCollapsed = collapse ? new Set(XL_GROUPS.map(function(G){ return G.g; })) : new Set();
+    _xlSaveGroups(); _xlSel = {r:_xlSel.r, c:0}; _xlAnchor = null; renderGrid();
+  };
+  function _xlLeft(i){ let l = XL_GUTTER; for (let j=0;j<i;j++) l += VC[j].w; return l; }
 
   let _reviewView = 'grid';        // the grid is the primary surface — this is a bulk-edit page
   let _gridRows   = [];                // WPs currently displayed, in row order
@@ -564,7 +663,11 @@
   }
   function xlNum(v){ if(v===''||v==null) return null; const n=parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?null:n; }
   function xlFmt(v, col){
+    if (col.type==='bool') return v===true?'Yes':v===false?'No':'';
     if (v===''||v==null) return '';
+    // Percents are stored as decimals (0.20 = 20%) — shown and entered as whole percents,
+    // exactly like the WP form.
+    if (col.type==='pct'){ const n=xlNum(v); return n==null?'':String(+(n*100).toFixed(4)); }
     if (col.type==='money'){ const n=xlNum(v); return n==null?'':n.toLocaleString('en-US',{maximumFractionDigits:2}); }
     if (col.type==='date'){ const d=String(v).match(/\d{4}-\d{2}-\d{2}/); return d?d[0]:String(v); }
     return String(v);
@@ -572,7 +675,12 @@
   // Editors give back strings; store the right JS type so the DB patch is clean.
   function xlCoerce(raw, col){
     const s = String(raw==null?'':raw).trim();
+    if (col.type==='bool'){
+      if (s==='') return null;
+      return /^(yes|true|y|1)$/i.test(s);
+    }
     if (s==='') return null;
+    if (col.type==='pct'){ const n=xlNum(s.replace('%','')); return n==null?null:n/100; }
     if (col.type==='money'||col.type==='num') return xlNum(s);
     if (col.type==='date'){
       const m = s.match(/\d{4}-\d{2}-\d{2}/);
@@ -639,6 +747,7 @@
     if (cnt) cnt.textContent = _gridRows.length + ' work package' + (_gridRows.length===1?'':'s')
       + (_gridRows.length!==total ? ' (of '+total+')' : '');
 
+    _xlBuildVC();
     const tbl = document.getElementById('xl-table');
     if (!_gridRows.length){
       tbl.innerHTML = '<tbody><tr><td style="padding:40px;text-align:center;color:#aaa;border:none">No work packages match the current filters.</td></tr></tbody>';
@@ -646,23 +755,39 @@
       return;
     }
     const cg = '<colgroup><col style="width:'+XL_GUTTER+'px">' +
-      XL_COLS.map(function(c){ return '<col style="width:'+c.w+'px">'; }).join('') + '</colgroup>';
-    const thead = '<thead><tr><th class="xl-freeze" style="left:0"></th>' +
-      XL_COLS.map(function(c,i){
+      VC.map(function(c){ return '<col style="width:'+c.w+'px">'; }).join('') + '</colgroup>';
+
+    // Row 1 = WP-form section headers (click to collapse/expand); row 2 = the columns.
+    let grpRow = '<tr class="xl-grp"><th class="xl-freeze" rowspan="2" style="left:0;top:0"></th>';
+    XL_GROUPS.forEach(function(G){
+      const span = VC.filter(function(c){ return c.g===G.g; }).length;
+      if (!span) return;   // can't happen — a collapsed group always keeps a placeholder
+      const collapsed = _xlCollapsed.has(G.g);
+      const hidden    = XL_COLS.filter(function(c){ return c.g===G.g; }).length - span;
+      grpRow += '<th colspan="'+span+'" class="xl-grp-th'+(collapsed?' collapsed':'')+'" '
+        + 'onclick="toggleXlGroup(\'' + G.g + '\')" title="'+(collapsed?'Show':'Hide')+' the '+esc(G.label)+' columns">'
+        + '<i class="ti ti-chevron-'+(collapsed?'right':'down')+'" style="font-size:11px;vertical-align:-1px"></i> '
+        + esc(G.label) + (collapsed && hidden ? ' <span class="xl-grp-n">+'+hidden+'</span>' : '')
+        + '</th>';
+    });
+    grpRow += '</tr>';
+    const colRow = '<tr>' + VC.map(function(c,i){
         const fz = i < XL_FREEZE;
         const rq = (c.req || c.reqIfAwarded) ? ' xl-req' : '';
-        return '<th class="'+(fz?'xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+'</th>';
-      }).join('') + '</tr></thead>';
+        return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+'</th>';
+      }).join('') + '</tr>';
+    const thead = '<thead>' + grpRow + colRow + '</thead>';
     const tbody = '<tbody>' + _gridRows.map(function(w,r){
       const locked = !AppAuth.canEditProject(adminProfile, w.project_id);
       return '<tr data-id="'+w.id+'">' +
         '<td class="xl-freeze xl-ro" style="left:0;text-align:center;font-size:9px;color:#bbb">'+(r+1)+'</td>' +
-        XL_COLS.map(function(c,i){
+        VC.map(function(c,i){
           const fz  = i < XL_FREEZE;
           const ro  = c.ro || locked;
           const cls = ['xl-cell', fz?'xl-freeze':'', ro?'xl-ro':'',
-                       (c.type==='money'||c.type==='num')?'xl-num':'',
-                       _xlMissing(w,c)?'xl-missing':''].filter(Boolean).join(' ');
+                       (c.type==='money'||c.type==='num'||c.type==='pct')?'xl-num':'',
+                       _xlMissing(w,c)?'xl-missing':'',
+                       c.ph?'xl-ph':''].filter(Boolean).join(' ');
           const st  = fz ? ' style="left:'+_xlLeft(i)+'px"' : '';
           return '<td class="'+cls+'" data-r="'+r+'" data-c="'+i+'"'+st+'>'+esc(xlFmt(xlVal(w,c.k), c))+'</td>';
         }).join('') + '</tr>';
@@ -679,7 +804,7 @@
       const r = _gridRows.findIndex(function(w){ return w.id===id; });
       if (r < 0) return;
       Object.keys(_gridEdits[id]).forEach(function(k){
-        const c = XL_COLS.findIndex(function(col){ return col.k===k; });
+        const c = VC.findIndex(function(col){ return col.k===k; });
         if (c >= 0) { const td=_xlTd(r,c); if(td) td.classList.add('xl-dirty'); }
       });
     });
@@ -708,7 +833,7 @@
 
   function _xlSelect(r, c, scroll){
     if (scroll===undefined) scroll = true;
-    if (r<0||c<0||r>=_gridRows.length||c>=XL_COLS.length) return;
+    if (r<0||c<0||r>=_gridRows.length||c>=VC.length) return;
     document.querySelectorAll('#xl-table td.xl-sel').forEach(function(td){ td.classList.remove('xl-sel'); });
     _xlSel = {r:r,c:c};
     const td = _xlTd(r,c);
@@ -728,7 +853,7 @@
 
   // Stage one cell edit (with undo entry). Returns false when the cell is locked.
   function _xlSet(r, c, raw, undoBatch){
-    const w = _gridRows[r], col = XL_COLS[c];
+    const w = _gridRows[r], col = VC[c];
     if (!w || !col || !_xlEditable(w, col)) return false;
     const val  = xlCoerce(raw, col);
     const prev = xlVal(w, col.k);
@@ -754,7 +879,7 @@
   }
   function _xlRefreshRow(r){
     const w = _gridRows[r]; if(!w) return;
-    XL_COLS.forEach(function(col,c){
+    VC.forEach(function(col,c){
       const td = _xlTd(r,c); if(!td) return;
       td.textContent = xlFmt(xlVal(w,col.k), col);
       const edited = !!(_gridEdits[w.id] && Object.prototype.hasOwnProperty.call(_gridEdits[w.id], col.k));
@@ -767,24 +892,24 @@
   /* ── Cell editor ────────────────────────────────────────────────────────── */
   function _xlBeginEdit(seed){
     if (_xlEditing) return;
-    const r = _xlSel.r, c = _xlSel.c, w = _gridRows[r], col = XL_COLS[c];
+    const r = _xlSel.r, c = _xlSel.c, w = _gridRows[r], col = VC[c];
     if (!w || !col || !_xlEditable(w, col)) return;
     const td = _xlTd(r,c); if(!td) return;
     _xlEditing = true;
     const cur = xlVal(w, col.k);
     let ed;
-    if (col.type === 'select'){
+    if (col.type === 'select' || col.type === 'bool'){
       ed = document.createElement('select');
-      const opts = col.opts.slice();
+      const opts = col.type==='bool' ? ['','Yes','No'] : col.opts.slice();
       if (cur!=null && cur!=='' && opts.indexOf(String(cur))<0) opts.unshift(String(cur));   // keep legacy values
       ed.innerHTML = opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o||'— none —')+'</option>'; }).join('');
-      ed.value = cur==null ? '' : String(cur);
+      ed.value = col.type==='bool' ? (cur===true?'Yes':cur===false?'No':'') : (cur==null ? '' : String(cur));
     } else {
       ed = document.createElement('input');
       ed.type = col.type==='date' ? 'date' : 'text';
-      if (col.type==='money'||col.type==='num') ed.inputMode = 'decimal';
+      if (col.type==='money'||col.type==='num'||col.type==='pct') ed.inputMode = 'decimal';
       ed.value = seed != null ? seed
-               : (col.type==='date' ? (xlFmt(cur,col)||'') : (cur==null?'':String(cur)));
+               : (col.type==='date'||col.type==='pct' ? (xlFmt(cur,col)||'') : (cur==null?'':String(cur)));
     }
     ed.className = 'xl-ed';
     const wrap = document.getElementById('xl-wrap');
@@ -814,7 +939,7 @@
       e.stopPropagation();
     });
     ed.addEventListener('blur', function(){ finish(true); });
-    if (col.type==='select') ed.addEventListener('change', function(){ finish(true,'down'); });
+    if (col.type==='select'||col.type==='bool') ed.addEventListener('change', function(){ finish(true,'down'); });
   }
 
   /* ── Mouse + keyboard ───────────────────────────────────────────────────── */
@@ -845,7 +970,7 @@
       e.preventDefault();
       if (e.shiftKey){
         if (!_xlAnchor) _xlAnchor = {r:r,c:c};
-        _xlSel = { r:Math.max(0,Math.min(_gridRows.length-1,r+nav[0])), c:Math.max(0,Math.min(XL_COLS.length-1,c+nav[1])) };
+        _xlSel = { r:Math.max(0,Math.min(_gridRows.length-1,r+nav[0])), c:Math.max(0,Math.min(VC.length-1,c+nav[1])) };
         _xlSelect(_xlSel.r,_xlSel.c,true); _xlPaintRange();
       } else { _xlAnchor=null; _xlPaintRange(); _xlSelect(r+nav[0], c+nav[1]); }
       return;
@@ -863,7 +988,7 @@
       e.preventDefault();
       const R=_xlRange(), b=[];
       for(let cc=R.c1;cc<=R.c2;cc++){
-        const src = xlVal(_gridRows[R.r1], XL_COLS[cc].k);
+        const src = xlVal(_gridRows[R.r1], VC[cc].k);
         for(let rr=R.r1+1;rr<=R.r2;rr++) _xlSet(rr,cc,src==null?'':src,b);
       }
       if(b.length) _xlUndo.push(b);
@@ -881,7 +1006,7 @@
     const R = _xlRange(), out = [];
     for (let r=R.r1;r<=R.r2;r++){
       const row=[];
-      for (let c=R.c1;c<=R.c2;c++) row.push(xlFmt(xlVal(_gridRows[r], XL_COLS[c].k), XL_COLS[c]));
+      for (let c=R.c1;c<=R.c2;c++) row.push(xlFmt(xlVal(_gridRows[r], VC[c].k), VC[c]));
       out.push(row.join('\t'));
     }
     e.clipboardData.setData('text/plain', out.join('\n'));
@@ -896,7 +1021,7 @@
     const b=[]; let blocked=0;
     rows.forEach(function(cells,dr){ cells.forEach(function(v,dc){
       const r=_xlSel.r+dr, c=_xlSel.c+dc;
-      if (r>=_gridRows.length || c>=XL_COLS.length) return;
+      if (r>=_gridRows.length || c>=VC.length) return;
       if (!_xlSet(r,c,v,b)) blocked++;
     }); });
     if (b.length) _xlUndo.push(b);
