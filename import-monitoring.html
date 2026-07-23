@@ -240,6 +240,34 @@ function detectLayout(rows){
     awarding_status:      findCol(band,/awarding status/),
     remarks:              findCol(band,/^remarks$/) ?? findCol(band,/procurement remarks/) ?? findCol(band,/remark/),
   };
+  /* MERGED-HEADER RESCUE (LCR templates): some sheets use "WORK PACKAGE DESCRIPTION" as a
+     MERGED PARENT header whose real sub-columns sit further right (LCR102/LCR352: parent at
+     col 7, WP name at col 9, long description at col 10 under a "DESCRIPTION" sub-header).
+     findCol returns the parent, which is EMPTY on every data row — so every WP imported with
+     the "WP-<n>" fallback name instead of its description. If the detected column is mostly
+     empty on real data rows, adopt the best-filled text column in the span between WP No.
+     and the next known field, and take the next filled column as the detailed description. */
+  const _dataRows = [];
+  for(let i=hdr+1; i<rows.length && _dataRows.length<80; i++){
+    const r=rows[i]||[]; const v=r[col.wp_no];
+    const n=(v==null||v==='')?null:parseFloat(String(v).replace(/[^0-9.\-]/g,''));
+    if(n!=null && isFinite(n)) _dataRows.push(r);
+  }
+  const _fill = c => {
+    if(c==null || !_dataRows.length) return 0;
+    let k=0; _dataRows.forEach(r=>{ const v=r[c]; if(v!=null && String(v).trim()!=='' && isNaN(Number(v))) k++; });
+    return k/_dataRows.length;
+  };
+  if(col.wp_no!=null && _fill(col.wp_name) < 0.3){
+    const limit = [col.type_service, col.type_procurement, col.proposed_vendors, col.cost_code]
+      .filter(c=>c!=null && c>col.wp_no).sort((a,b)=>a-b)[0] ?? (col.wp_no+8);
+    const cands=[];
+    for(let c=col.wp_no+1; c<limit; c++) if(_fill(c) >= 0.5) cands.push(c);
+    if(cands.length){
+      col.wp_name = cands[0];                                   // the WP name / short description
+      if(col.detailed_description==null && cands.length>1) col.detailed_description = cands[1];
+    }
+  }
   const descCol = (col.wp_name!=null ? col.wp_name : col.wp_no);
   // Columns to scan for the hierarchical TRADE group-header text. The discipline header
   // sits in a DIFFERENT column per template: usually the Work-Package-Description column,
