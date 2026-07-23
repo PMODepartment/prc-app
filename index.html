@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723m"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723m"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723m"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723n"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723n"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723n"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708b"/>
   <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723m"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723n"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723m"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723n"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -608,14 +608,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723m"></script>
-<script src="assets/js/db.js?v=20260723m"></script>
-<script src="assets/js/ui.js?v=20260723m"></script>
+<script src="assets/js/auth.js?v=20260723n"></script>
+<script src="assets/js/db.js?v=20260723n"></script>
+<script src="assets/js/ui.js?v=20260723n"></script>
 <script src="assets/js/onboarding.js?v=20260708b"></script>
 <script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260723m"></script>
+<script src="assets/js/charts.js?v=20260723n"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -1119,6 +1119,14 @@
           ${row('Approval Date',fmtD(w.approval_date))}
           ${row('Submittal Type',w.submittal_doc_type||'—')}
         </div>`;
+      if (w.updated_at || w.updated_by_name) {
+        const fmtDT = d => { if(!d) return '—'; try { return new Date(d).toLocaleString('en-US',{month:'short',day:'2-digit',year:'numeric',hour:'numeric',minute:'2-digit'}); } catch { return d; } };
+        html += `<div style="margin-top:14px">
+          <div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Last Change</div>
+          ${row('Updated By',w.updated_by_name||'—')}
+          ${row('Updated On',fmtDT(w.updated_at))}
+        </div>`;
+      }
       if (!isViewer) {
         const safeNo = String(w.wp_no||'').replace(/['"\\<>]/g,'');  // strip chars that could break the JS-string OR the HTML onclick attr
         html += `<div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0">

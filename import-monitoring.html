@@ -120,7 +120,7 @@ const sb = window.supabase.createClient(SB_URL, SB_KEY);
 const $ = id => document.getElementById(id);
 function log(msg, cls){ const l=$('log'); l.style.display='block'; l.innerHTML += '<span class="'+(cls||'')+'">'+msg+'</span>\n'; l.scrollTop=l.scrollHeight; }
 
-let _wb = null, _parsed = null, _profile = null, _detected = null, _projs = [];
+let _wb = null, _parsed = null, _profile = null, _detected = null, _projs = [], _auditUser = null;
 
 /* ---- searchable project combobox ---- */
 function _projLabel(p){ return p.name && p.name!==p.id ? p.id+' — '+p.name.split('—')[0].trim() : p.id; }
@@ -686,12 +686,20 @@ async function doImport(){
   const {count:remaining}=await sb.from('work_packages').select('id',{count:'exact',head:true}).eq('project_id',pid);
   if(remaining>0){ log(`Delete removed nothing (${remaining} WPs remain) — you likely lack delete permission for ${pid} (you can Replace only projects you're assigned to; admins any). Aborting to avoid duplicates.`,'err'); $('btn-import').disabled=false; $('btn-cancel').disabled=false; return; }
   log('Deleted existing WPs.','ok');
-  // strip preview-only keys (any _ prefix) — they are not DB columns
-  const rows=_parsed.map(w=>{ const c={...w}; Object.keys(c).forEach(k=>{ if(k.charAt(0)==='_') delete c[k]; }); return c; });
+  // strip preview-only keys (any _ prefix) — they are not DB columns — then stamp the
+  // per-WP audit trail (who imported, when) so the dashboard shows the last change.
+  const _stamp={ updated_at:new Date().toISOString(), updated_by:(_auditUser&&_auditUser.id)||null, updated_by_name:(_auditUser&&_auditUser.name)||null };
+  let rows=_parsed.map(w=>{ const c={...w,..._stamp}; Object.keys(c).forEach(k=>{ if(k.charAt(0)==='_') delete c[k]; }); return c; });
   const BATCH=20; let inserted=0;
   for(let i=0;i<rows.length;i+=BATCH){
     const batch=rows.slice(i,i+BATCH);
-    const {error}=await sb.from('work_packages').insert(batch);
+    let {error}=await sb.from('work_packages').insert(batch);
+    // audit columns not migrated yet → strip them from ALL remaining rows and retry this batch
+    if(error && (error.code==='42703' || /updated_(at|by)/.test((error.message||'')+(error.details||'')))){
+      log('Audit columns not present yet — importing without last-change stamp.','info');
+      rows=rows.map(r=>{ const c={...r}; delete c.updated_at; delete c.updated_by; delete c.updated_by_name; return c; });
+      ({error}=await sb.from('work_packages').insert(rows.slice(i,i+BATCH)));
+    }
     if(error){ log(`Batch ${Math.floor(i/BATCH)+1} error: ${error.message}`,'err'); log('  first WP: '+batch[0].wp_no,'err'); $('btn-cancel').disabled=false; return; }
     inserted+=batch.length; log(`Inserted ${inserted}/${rows.length}`,'ok');
   }
@@ -722,8 +730,9 @@ $('btn-cancel').addEventListener('click',()=>{ $('preview-card').style.display='
 (async ()=>{
   const {data:{session}}=await sb.auth.getSession();
   if(!session){ $('gate').style.display='block'; $('gate-msg').innerHTML='You must <a href="login.html">sign in</a> first.'; return; }
-  const {data:prof}=await sb.from('users').select('role,status').eq('id',session.user.id).single();
+  const {data:prof}=await sb.from('users').select('role,status,name,email').eq('id',session.user.id).single();
   _profile=prof;
+  _auditUser={ id: session.user.id, name: (prof && (prof.name||prof.email)) || null };
   if(!prof || prof.status!=='approved'){
     $('gate').style.display='block'; $('gate-msg').textContent='Your account must be approved before you can import.'; return;
   }

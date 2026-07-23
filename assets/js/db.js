@@ -18,8 +18,25 @@ const WPDb = (() => {
     if (d.budget_bcb && !d.approved_budget_bcb) d.approved_budget_bcb = d.budget_bcb;
     delete d.firestoreId; delete d.budget_bcb; delete d.contract_amount_php; delete d.id;
     delete d.total_awarded; delete d.variance; delete d.awarding_lead_time;
+    // never let a stale read-back of the audit fields be written back verbatim; the
+    // stamp is applied fresh on every write via _auditStamp()
+    delete d.updated_at; delete d.updated_by; delete d.updated_by_name;
     return d;
   }
+  // Per-WP audit trail: stamp who last changed a work package and when, from the logged-in
+  // profile. Applied on every insert/update so the WP detail panel can show "Last updated by …".
+  // updated_by_name is a snapshot so the display survives even if that user is later removed.
+  function _auditStamp() {
+    const p = (typeof window !== 'undefined' && window.__profile) || {};
+    return { updated_at: new Date().toISOString(), updated_by: p.id || null, updated_by_name: p.name || p.email || null };
+  }
+  // True if the error is a "column does not exist" (audit columns not migrated yet).
+  function _isMissingAuditCol(error) {
+    if (!error) return false;
+    const m = (error.message || '') + (error.details || '');
+    return error.code === '42703' || /updated_by_name|updated_by|updated_at/.test(m) && /column|does not exist|schema cache/i.test(m);
+  }
+  function _stripAudit(obj) { const d = {...obj}; delete d.updated_at; delete d.updated_by; delete d.updated_by_name; return d; }
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
   async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
   async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
@@ -45,9 +62,24 @@ const WPDb = (() => {
   async function getOfficerWPs(uid) { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('assigned_officer',uid).order('wp_no'); return (data||[]).map(mapWP); }
   async function getWP(id) { const sb=await getSB(); const {data}=await sb.from(await _wpRel()).select('*').eq('id',id).single(); return mapWP(data); }
   async function getProjectWPs(pid) { return getAllWPs(pid); }
-  async function submitWP(d,p) { const sb=await getSB(); const {data,error}=await sb.from('work_packages').insert({...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null}).select().single(); if(error) throw error; return data; }
-  async function updateWP(id,d) { const sb=await getSB(); const {data,error}=await sb.from('work_packages').update({...unmap(d),review_status:'pending_review'}).eq('id',id).select().single(); if(error) throw error; return data; }
-  async function updateWPDirect(id,d) { const sb=await getSB(); const {data,error}=await sb.from('work_packages').update(unmap(d)).eq('id',id).select().single(); if(error) throw error; return data; }
+  async function submitWP(d,p) {
+    const sb=await getSB(); const base={...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null};
+    let {data,error}=await sb.from('work_packages').insert({...base,..._auditStamp()}).select().single();
+    if(error && _isMissingAuditCol(error)) ({data,error}=await sb.from('work_packages').insert(_stripAudit(base)).select().single());
+    if(error) throw error; return data;
+  }
+  async function updateWP(id,d) {
+    const sb=await getSB(); const base={...unmap(d),review_status:'pending_review'};
+    let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
+    if(error && _isMissingAuditCol(error)) ({data,error}=await sb.from('work_packages').update(_stripAudit(base)).eq('id',id).select().single());
+    if(error) throw error; return data;
+  }
+  async function updateWPDirect(id,d) {
+    const sb=await getSB(); const base=unmap(d);
+    let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
+    if(error && _isMissingAuditCol(error)) ({data,error}=await sb.from('work_packages').update(_stripAudit(base)).eq('id',id).select().single());
+    if(error) throw error; return data;
+  }
   async function createProject(d) { const sb=await getSB(); const {data,error}=await sb.from('projects').insert(d).select().single(); if(error) throw error; return data; }
   async function approveWP(id) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({review_status:'approved'}).eq('id',id).select().single(); return data; }
   async function rejectWP(id,_,reason) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({review_status:'rejected',review_notes:reason}).eq('id',id).select().single(); return data; }
