@@ -191,6 +191,7 @@
       </div>
       <div class="topbar-right">
         <button class="btn-refresh" id="btn-refresh" title="Refresh data" onclick="(function(){var b=document.getElementById('btn-refresh');b.disabled=true;b.querySelector('i').classList.add('spin');if(typeof loadData==='function')loadData().finally(function(){b.disabled=false;b.querySelector('i').classList.remove('spin');});else{location.reload();}})()"><i class="ti ti-refresh"></i></button>
+        <button class="btn" id="btn-export-xlsx"><i class="ti ti-file-type-xls"></i><span class="hide-mobile"> Export Excel</span></button>
         <button class="btn" id="btn-export"><i class="ti ti-file-type-pdf"></i><span class="hide-mobile"> Export PDF</span></button>
         <div id="user-bar"></div>
       </div>
@@ -619,6 +620,76 @@ const COLS=[
 ];
 
 const COST_KEYS = new Set(['approved_budget_bcb','total_awarded','variance','pct_wt','dp_amount','retention_percent','retention_amount']);
+
+// ── Export to Excel (.xlsx) ──────────────────────────────────────────────────
+// Lazy-load SheetJS only when the user actually exports (keeps the dashboard light).
+// Same CDN + version as the Excel importer; cdn.jsdelivr.net is allow-listed in the CSP.
+function _loadSheetJS(){
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload  = () => resolve(window.XLSX);
+    s.onerror = () => reject(new Error('Could not load the Excel library — check your internet connection.'));
+    document.head.appendChild(s);
+  });
+}
+// One cell value for the export — numbers stay numeric, dates as YYYY-MM-DD, else text.
+// Mirrors renderCell()'s derived values (variance, % WT, percents ×100).
+function _xlsxCellVal(w, key){
+  const bud = w.approved_budget_bcb||0, awd = w.total_awarded||0, v = bud - awd;
+  const dateS = d => { if(!d) return ''; const m = String(d).match(/\d{4}-\d{2}-\d{2}/); return m ? m[0] : String(d); };
+  const numOr = x => (x==null||x==='') ? '' : (typeof x==='number' ? x : (isNaN(parseFloat(x)) ? x : parseFloat(x)));
+  switch(key){
+    case 'approved_budget_bcb': return bud || '';
+    case 'total_awarded':       return awd || '';
+    case 'variance':            return (bud||awd) ? v : '';
+    case 'pct_wt': { const tb = window._projTotalBCB||0; return (bud||awd)&&tb ? +(v/tb*100).toFixed(2) : ''; }
+    case 'dp_percent':          return w.dp_percent!=null ? +(w.dp_percent*100).toFixed(4) : '';
+    case 'retention_percent':   return w.retention_percent!=null ? +(w.retention_percent*100).toFixed(4) : '';
+    case 'po_jo_count':         return numOr(w.po_jo_count);
+    case 'payment_terms_days':  return numOr(w.payment_terms_days);
+    case 'awarding_lead_time':  return numOr(w.awarding_lead_time);
+    case 'dp_amount':           return numOr(w.dp_amount);
+    case 'retention_amount':    return numOr(w.retention_amount);
+    case 'dp_release_date':     return dateS(w.dp_release_date);
+    case 'awarding_date':       return dateS(w.awarding_date);
+    case 'actual_awarding_date':return dateS(w.actual_awarding_date);
+    case 'target_delivery':     return dateS(w.target_delivery||w.target_completion);
+    case 'actual_delivery':     return dateS(w.actual_delivery);
+    case 'target_installation': return dateS(w.target_installation);
+    case 'target_completion':   return dateS(w.target_completion);
+    case 'approval_date':       return dateS(w.approval_date);
+    default:                    return w[key]==null ? '' : w[key];
+  }
+}
+async function exportProjectExcel(){
+  if (window.__isViewer) return;                       // viewers never export cost data
+  const XLSX = await _loadSheetJS();
+  // All columns (cost-aware), full project WP set, sorted by trade then numeric WP No.
+  const cols = window.__isViewer ? COLS.filter(c=>!COST_KEYS.has(c.key)) : COLS;
+  const order = (typeof TRADE_ORDER!=='undefined' && TRADE_ORDER) ? TRADE_ORDER : [];
+  const rows = (allWPs||[]).slice().sort((a,b)=>{
+    const ta = order.indexOf(a.trade), tb = order.indexOf(b.trade);
+    const oa = ta<0?999:ta, ob = tb<0?999:tb;
+    if (oa!==ob) return oa-ob;
+    if ((a.trade||'')!==(b.trade||'')) return (a.trade||'').localeCompare(b.trade||'');
+    const na = parseFloat(a.wp_no), nb = parseFloat(b.wp_no);
+    if (!isNaN(na) && !isNaN(nb) && na!==nb) return na-nb;
+    return String(a.wp_no||'').localeCompare(String(b.wp_no||''), undefined, {numeric:true});
+  });
+  const aoa = [ cols.map(c=>c.label) ];
+  rows.forEach(w => aoa.push(cols.map(c=>_xlsxCellVal(w, c.key))));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = cols.map(c => ({ wch: Math.min(46, Math.max(10, c.label.length + 2)) }));
+  ws['!freeze'] = { xSplit:0, ySplit:1 };              // keep the header row visible
+  const wb = XLSX.utils.book_new();
+  const projName = (document.getElementById('page-title-text')?.textContent || projId).trim();
+  XLSX.utils.book_append_sheet(wb, ws, (projId||'Work Packages').substring(0,31));
+  const d = new Date(), pad = n => String(n).padStart(2,'0');
+  const stamp = d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate());
+  XLSX.writeFile(wb, (projId||'project') + '_WorkPackages_' + stamp + '.xlsx');
+}
 
 let _wpTableView = 'overview';
 const WP_TABLE_VIEWS = {
@@ -2611,6 +2682,19 @@ AppAuth.requireLogin(async (user, profile) => {
     }
   });
 
+  document.getElementById('btn-export-xlsx').addEventListener('click', async () => {
+    if (window.__isViewer) return;   // viewers must not export cost data
+    const btn = document.getElementById('btn-export-xlsx');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i><span class="hide-mobile"> Generating…</span>';
+    try { await exportProjectExcel(); }
+    catch(e) { alert('Excel export failed: ' + (e.message || e)); }
+    finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-file-type-xls"></i><span class="hide-mobile"> Export Excel</span>';
+    }
+  });
+
   // Re-fetch WPs and refresh view after quick-add modal saves
   window.__wpmReloadFn = async () => {
     _rawWPs = (await WPDb.getAllWPs(projId)).map(w => ({...w, trade: normTrade(w.trade), wp_no: normWpNo(w.wp_no)}));
@@ -3194,7 +3278,8 @@ AppAuth.requireLogin(async (user, profile) => {
   .wpc-actions a { font-size:11px;font-weight:600;color:#EE3124;border:1.5px solid #EE3124;border-radius:6px;padding:6px 12px;text-decoration:none;white-space:nowrap; }
   /* Viewer mode — hide all cost data and editing tools */
   body.viewer-mode #metrics-cost-group { display:none !important; }
-  body.viewer-mode #btn-export { display:none !important; }   /* cost data — viewers can't export */
+  body.viewer-mode #btn-export,
+  body.viewer-mode #btn-export-xlsx { display:none !important; }   /* cost data — viewers can't export */
   body.viewer-mode #sidebar-tools { display:none !important; }
   body.viewer-mode #dash-backlog-table th:nth-child(5),
   body.viewer-mode #dash-backlog-table td:nth-child(5),
