@@ -181,6 +181,7 @@
                   <option value="admin">Admin</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
+                <button id="bulk-approve-btn" onclick="bulkApprove()" style="padding:6px 14px;background:#16A34A;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;display:none">✓ Approve</button>
                 <button onclick="applyBulkActions()" style="padding:6px 14px;background:#EE3124;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">Apply</button>
                 <button onclick="clearSelection()" style="padding:6px 10px;background:transparent;color:#888;border:1px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;cursor:pointer">✕ Clear</button>
               </div>
@@ -648,6 +649,12 @@
     if (bulkBar) {
       bulkBar.style.display = selCount > 0 ? 'flex' : 'none';
       document.getElementById('selected-count').textContent = selCount > 0 ? `${selCount} user${selCount>1?'s':''} selected` : '';
+      const pendingSel = allUsers.filter(u => selectedUserIds.has(u.id) && u.status === 'pending').length;
+      const appBtn = document.getElementById('bulk-approve-btn');
+      if (appBtn) {
+        appBtn.style.display = pendingSel > 0 ? 'inline-block' : 'none';
+        appBtn.textContent = `✓ Approve${pendingSel>0 ? ' ('+pendingSel+')' : ''}`;
+      }
     }
 
     const isSuperAdmin = currentProfile?.role === 'super_admin';
@@ -748,16 +755,49 @@
     if (!projId && !role) { alert('Choose a project or role to bulk-assign.'); return; }
     const count = selectedUserIds.size;
     if (!confirm(`Apply to ${count} user(s)?`)) return;
-    for (const uid of selectedUserIds) {
+    for (const uid of [...selectedUserIds]) {
       const user = allUsers.find(u => u.id === uid);
       if (!user) continue;
       const updates = {};
       if (role) updates.role = role;
       if (projId) updates.projects = [...new Set([...(user.projects||[]), projId])];
+      // A bulk-assign on a still-pending user also approves them.
+      if (user.status === 'pending') {
+        updates.status = 'approved';
+        if (currentProfile?.role === 'admin') updates.assigned_admin = currentProfile.id;
+      }
       await WPDb.updateUser(uid, updates);
     }
     selectedUserIds.clear();
     await loadData();
+  };
+
+  // Bulk-approve every selected PENDING user in one go. Keeps each user's existing
+  // projects; applies the chosen role/project from the bulk bar if set (role defaults
+  // to 'user'). Admins auto-assign approved users to themselves so they stay visible.
+  window.bulkApprove = async function() {
+    if (!selectedUserIds.size) { alert('Select at least one user first.'); return; }
+    const pending = allUsers.filter(u => selectedUserIds.has(u.id) && u.status === 'pending');
+    if (!pending.length) { alert('None of the selected users are pending approval.'); return; }
+    const projId = document.getElementById('bulk-project-select').value;
+    const role = document.getElementById('bulk-role-select').value;
+    if (!confirm(`Approve ${pending.length} pending user(s)?`)) return;
+    const btn = document.getElementById('bulk-approve-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Approving…'; }
+    try {
+      for (const user of pending) {
+        const updates = { status: 'approved', role: role || user.role || 'user' };
+        updates.projects = projId ? [...new Set([...(user.projects||[]), projId])] : (user.projects || []);
+        if (currentProfile?.role === 'admin') updates.assigned_admin = currentProfile.id;
+        await WPDb.updateUser(user.id, updates);
+      }
+      selectedUserIds.clear();
+      await loadData();
+    } catch (err) {
+      alert('Error approving users: ' + (err.message || err));
+      if (btn) btn.disabled = false;
+      await loadData();
+    }
   };
 
   // ── KPIs ─────────────────────────────────────────────────────
@@ -838,7 +878,8 @@
     document.getElementById('modalUserName').textContent = u.name || '';
     document.getElementById('modalUserEmail').textContent = u.email || '';
     document.getElementById('modalRoleSelect').value = 'user';
-    document.getElementById('btnConfirmApprove').textContent = '\u2713 Approve & Assign';
+    const _btnA = document.getElementById('btnConfirmApprove');
+    _btnA.textContent = '\u2713 Approve & Assign'; _btnA.disabled = false;
     buildProjectCheckboxes('modalProjectList', []);
     // For admin approving: auto-assign to themselves
     if (currentProfile?.role === 'admin') {
@@ -894,7 +935,8 @@
     document.getElementById('modalUserName').textContent = user.name||user.email;
     document.getElementById('modalUserEmail').textContent = 'Edit role & project assignments';
     document.getElementById('modalRoleSelect').value = user.role||'user';
-    document.getElementById('btnConfirmApprove').textContent = 'Save Changes';
+    const _btnE = document.getElementById('btnConfirmApprove');
+    _btnE.textContent = 'Save Changes'; _btnE.disabled = false;
     if (currentProfile?.role === 'super_admin') {
       document.getElementById('assign-admin-wrap').style.display = 'block';
       populateAdminDropdown(user.assigned_admin);
@@ -1080,6 +1122,8 @@
     // Restrict to user/admin for admin managers
     const superOpt = document.getElementById('crm-opt-super');
     if (superOpt) superOpt.style.display = (currentProfile?.role === 'super_admin') ? '' : 'none';
+    const _btnR = document.getElementById('crm-save-btn');
+    _btnR.textContent = 'Save Role'; _btnR.disabled = false;
     document.getElementById('changeRoleModal').classList.remove('hidden');
   };
 
