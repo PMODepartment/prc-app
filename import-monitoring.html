@@ -53,7 +53,7 @@
   .b-aw{background:#EAF3DE;color:#3B6D11}.b-no{background:#FEE2E2;color:#991B1B}
   .warn{background:#FFF3CD;border:1px solid #FFC107;color:#856404;border-radius:8px;padding:11px 14px;font-size:12.5px;margin:12px 0;display:flex;gap:9px;align-items:flex-start}
   #log{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;line-height:1.6;max-height:260px;overflow-y:auto;background:#1a1a1a;color:#ccc;border-radius:8px;padding:12px;margin-top:12px;display:none}
-  .ok{color:#4ade80}.err{color:#f87171}.info{color:#60a5fa}.muted{color:#9ca3af}
+  .ok{color:#4ade80}.err{color:#f87171}.info{color:#60a5fa}.muted{color:#9ca3af}.warnt{color:#fbbf24}
   #gate{display:none;text-align:center;padding:60px 20px;color:var(--ink2)}
   a.back{font-size:12px;color:var(--red);text-decoration:none;font-weight:600}
 </style>
@@ -455,11 +455,22 @@ function renderPreview(wps){
   const noTrade=wps.filter(w=>!w.trade).length;
   // Rows carrying a cost that the sheet's own Remarks flag says are NOT awarded yet
   const held=wps.filter(w=>w._heldByFlag).length;
+  // Flagged Awarded but with no awarded cost. These import as Awarded, but the dashboard
+  // KPIs require `award_status==='Awarded' && total_awarded>0` so the awarded count/value
+  // reconcile (Known Issues #17) — so they will NOT be counted as awarded on the dashboard
+  // until a cost is entered. Surfaced here so the gap is visible before importing.
+  const awNoCost=wps.filter(w=>w.award_status==='Awarded' && !(w.awarded_cost>0));
   const bud=wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   $('kpis').innerHTML=[
     ['Work packages',wps.length],['Awarded',awarded],['Not Yet Awarded',wps.length-awarded],
-    ['Advance-dated → held',future],['Provisional cost, not awarded',held],['OSM = Yes',osm],['No trade',noTrade],['Total Budget (₱M)',(bud/1e6).toFixed(1)]
+    ['Advance-dated → held',future],['Provisional cost, not awarded',held],
+    ['Awarded, no cost',awNoCost.length],['OSM = Yes',osm],['No trade',noTrade],['Total Budget (₱M)',(bud/1e6).toFixed(1)]
   ].map(k=>`<div class="kpi"><div class="v">${k[1]}</div><div class="l">${k[0]}</div></div>`).join('');
+  if(awNoCost.length){
+    log('Note: '+awNoCost.length+' work package(s) are flagged Awarded in the sheet but have no awarded cost (WP '
+      + awNoCost.map(w=>w.wp_no).join(', ') + '). They import as Awarded, but the dashboard\'s awarded count and '
+      + 'value exclude WPs without a cost — enter the awarded cost in the sheet (or in the app) to have them counted.','warnt');
+  }
   const cols=['wp_no','description','trade','procurement_status','award_status','approved_budget_bcb','awarded_cost','awarding_date','actual_awarding_date','target_completion','osm'];
   $('tbl').querySelector('thead').innerHTML='<tr>'+cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')+'</tr>';
   $('tbl').querySelector('tbody').innerHTML=wps.map(w=>'<tr>'+cols.map(c=>{
