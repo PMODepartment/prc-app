@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723b"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723c"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -47,6 +47,31 @@
     .mactions button{font-size:12px;padding:7px 16px;border-radius:8px;border:1px solid var(--border-md);cursor:pointer;font-weight:500}
     .mactions .mc{background:var(--red-400,#EE3124);color:#fff;border-color:var(--red-400,#EE3124)}
     .mactions .mx{background:transparent;color:var(--text-secondary)}
+    /* ── Excel-like grid view ───────────────────────────────────────────── */
+    .xl-wrap{border:1px solid var(--border-md);border-radius:var(--radius-md);overflow:auto;max-height:calc(100vh - 250px);background:var(--surface);position:relative}
+    table.xl{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:11px;width:max-content}
+    table.xl th,table.xl td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:0;height:26px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:var(--surface)}
+    table.xl thead th{position:sticky;top:0;z-index:6;background:var(--surface-2);font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em;padding:5px 6px;text-align:left;white-space:normal;line-height:1.2;height:34px;vertical-align:middle}
+    table.xl td{padding:4px 6px;color:var(--text-primary);cursor:cell}
+    table.xl td.xl-ro{background:var(--surface-2);color:var(--text-secondary)}
+    table.xl td.xl-num{text-align:right;font-variant-numeric:tabular-nums}
+    table.xl td.xl-sel{outline:2px solid #EE3124;outline-offset:-2px;z-index:3;position:relative}
+    table.xl td.xl-range{background:rgba(238,49,36,.08)}
+    table.xl td.xl-dirty{background:#FFF6DA}
+    table.xl td.xl-dirty::after{content:'';position:absolute;top:0;right:0;border:4px solid transparent;border-top-color:#D97706;border-right-color:#D97706}
+    table.xl td.xl-dirty{position:relative}
+    body.dark-mode table.xl td.xl-dirty{background:#4a3c14}
+    table.xl th.xl-freeze,table.xl td.xl-freeze{position:sticky;z-index:4;background:var(--surface)}
+    table.xl thead th.xl-freeze{z-index:7;background:var(--surface-2)}
+    table.xl td.xl-freeze{background:var(--surface-2);font-weight:600}
+    table.xl tbody tr:hover td:not(.xl-dirty){background:var(--surface-2)}
+    .xl-ed{position:absolute;z-index:20;font-family:inherit;font-size:11px;padding:3px 5px;border:2px solid #EE3124;border-radius:0;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box}
+    .xl-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+    .xl-btn{font-size:11px;padding:6px 13px;border-radius:7px;border:1.5px solid var(--border-md);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;font-weight:600}
+    .xl-btn.primary{background:#EE3124;border-color:#EE3124;color:#fff}
+    .xl-btn:disabled{opacity:.45;cursor:default}
+    .xl-hint{font-size:10px;color:var(--text-hint)}
+    .xl-badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;color:#fff}
   </style>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
@@ -123,6 +148,11 @@
             <input id="review-search" type="text" placeholder="Search WP No. or description…" oninput="applyFilters()"
               style="width:100%;padding:7px 12px 7px 32px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
           </div>
+          <!-- Cards | Grid (Excel) view switcher -->
+          <div style="display:flex;gap:4px;margin-left:auto">
+            <button id="rv-btn-cards" class="xl-btn primary" onclick="setReviewView('cards')"><i class="ti ti-layout-cards"></i> Cards</button>
+            <button id="rv-btn-grid" class="xl-btn" onclick="setReviewView('grid')"><i class="ti ti-table"></i> Grid (Excel)</button>
+          </div>
         </div>
 
         <div class="tab-row">
@@ -139,6 +169,30 @@
         <div id="panel-pending"></div>
         <div id="panel-approved" style="display:none"></div>
         <div id="panel-rejected" style="display:none"></div>
+
+        <!-- ══ EXCEL-LIKE GRID VIEW ══ -->
+        <div id="grid-view" style="display:none">
+          <div class="xl-bar">
+            <label class="xl-hint" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888">Show</label>
+            <select id="xl-status-filter" onchange="renderGrid()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);cursor:pointer">
+              <option value="all">All statuses</option>
+              <option value="pending_review">Pending review</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <span id="xl-count" class="xl-hint"></span>
+            <span style="flex:1"></span>
+            <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
+            <button id="xl-discard" class="xl-btn" onclick="gridDiscard()" disabled>Discard</button>
+            <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled>Save changes</button>
+          </div>
+          <div class="xl-hint" style="margin-bottom:8px">
+            Click a cell to select · type or <b>Enter</b>/<b>F2</b> to edit · <b>Tab</b>/<b>arrows</b> to move ·
+            <b>Ctrl+C</b>/<b>Ctrl+V</b> copy &amp; paste (multi-cell, works with Excel) · <b>Ctrl+D</b> fill down ·
+            <b>Del</b> clear · <b>Ctrl+Z</b> undo · <b>Esc</b> cancel. Edits are staged until you press Save.
+          </div>
+          <div class="xl-wrap" id="xl-wrap" tabindex="0"><table class="xl" id="xl-table"></table></div>
+        </div>
       </div>
     </div>
   </div>
@@ -157,9 +211,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723b"></script>
-<script src="assets/js/ui.js?v=20260723b"></script>
-<script src="assets/js/db.js?v=20260723b"></script>
+<script src="assets/js/auth.js?v=20260723c"></script>
+<script src="assets/js/ui.js?v=20260723c"></script>
+<script src="assets/js/db.js?v=20260723c"></script>
 <script>
   let adminProfile, allWPs=[], currentTab='pending', rejectingId=null;
   let allProjects=[], currentProjId='ALL';
@@ -403,6 +457,491 @@
       await loadAll();
     } catch(e) { alert('Error: ' + e.message); }
   }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     EXCEL-LIKE EDITABLE GRID  (review.html "Grid (Excel)" view)
+     A spreadsheet over the same `allWPs` the card view uses. Only the ACTIVE
+     cell gets a real <input>/<select> (classic spreadsheet technique) so a few
+     thousand cells stay fast. Edits are staged in `_gridEdits` (never written
+     straight to the DB) and committed in one batch by gridSave().
+     ═════════════════════════════════════════════════════════════════════════ */
+  const XL_TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works',
+    'Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works',
+    'Allied Services','Site Development Works'];
+  const XL_PROC   = ['Not Started','Sourced','Solicited','Evaluated','Awarded'];
+  const XL_SUBM   = ['Not Required','Submitted','Approved w/ Comments','Approved'];
+  const XL_DELIV  = ['','DP Paid','Accomplished Detailed Drawings','Manufactured/Produced','Delivered'];
+  const XL_YN     = ['No','Yes'];
+
+  // ro:true = read-only (generated/derived columns). type drives the editor + formatting.
+  const XL_COLS = [
+    { k:'project_id',          label:'Project',            w:80,  type:'text',   ro:true },
+    { k:'wp_no',               label:'WP No.',             w:70,  type:'text'  },
+    { k:'cost_code',           label:'Cost Code',          w:90,  type:'text'  },
+    { k:'description',         label:'Description',        w:240, type:'text'  },
+    { k:'trade',               label:'Trade',              w:150, type:'select', opts:XL_TRADES },
+    { k:'works',               label:'Works',              w:140, type:'text'  },
+    { k:'type_of_works',       label:'Type',               w:90,  type:'text'  },
+    { k:'zone',                label:'Zone',               w:80,  type:'text'  },
+    { k:'osm',                 label:'OSM',                w:60,  type:'select', opts:XL_YN },
+    { k:'charging_type',       label:'Charging',           w:110, type:'select', opts:['Main Contract','Change Order'] },
+    { k:'procurement_status',  label:'Procurement Status', w:130, type:'select', opts:XL_PROC },
+    { k:'award_status',        label:'Award Status',       w:110, type:'text',   ro:true },
+    { k:'submittal_type',      label:'Submittal Status',   w:130, type:'select', opts:XL_SUBM },
+    { k:'delivery_status',     label:'Delivery Status',    w:150, type:'select', opts:XL_DELIV },
+    { k:'awarding_date',       label:'Planned Award',      w:105, type:'date'  },
+    { k:'actual_awarding_date',label:'Actual Award',       w:105, type:'date'  },
+    { k:'target_delivery',     label:'Target Delivery',    w:105, type:'date'  },
+    { k:'actual_delivery',     label:'Actual Delivery',    w:105, type:'date'  },
+    { k:'target_completion',   label:'Target Completion',  w:110, type:'date'  },
+    { k:'lead_time',           label:'Lead Time (d)',      w:80,  type:'num'   },
+    { k:'approved_budget_bcb', label:'Budget (BCB)',       w:120, type:'money' },
+    { k:'awarded_cost',        label:'Awarded Cost',       w:120, type:'money' },
+    { k:'total_awarded',       label:'Total Awarded',      w:120, type:'money', ro:true },
+    { k:'_variance',           label:'Variance',           w:120, type:'money', ro:true },
+    { k:'contractor',          label:'Awarded Vendor',     w:150, type:'text'  },
+    { k:'proposed_vendors',    label:'Proposed Vendors',   w:160, type:'text'  },
+    { k:'po_jo_count',         label:'No. PO/JO',          w:80,  type:'num'   },
+    { k:'po_jo_numbers',       label:'PO/JO Numbers',      w:140, type:'text'  },
+    { k:'surety_bond',         label:'Surety Bond',        w:90,  type:'select', opts:XL_YN },
+    { k:'performance_bond',    label:'Perf. Bond',         w:90,  type:'select', opts:XL_YN },
+    { k:'warranty_bond',       label:'Warranty Bond',      w:95,  type:'select', opts:XL_YN },
+    { k:'remarks',             label:'Remarks',            w:180, type:'text'  },
+    { k:'review_status',       label:'Review',             w:95,  type:'text',   ro:true },
+  ];
+  const XL_FREEZE = 2;                 // Project + WP No. stay pinned left (after the row gutter)
+  const XL_GUTTER = 42;
+  // Sticky columns need explicit pixel left offsets (Known Issues #11/#12): the chain
+  // must be contiguous from the left, so offsets accumulate gutter + each frozen width.
+  function _xlLeft(i){ let l = XL_GUTTER; for (let j=0;j<i;j++) l += XL_COLS[j].w; return l; }
+
+  let _reviewView = 'cards';
+  let _gridRows   = [];                // WPs currently displayed, in row order
+  let _gridEdits  = {};                // { wpId: { field: newValue } }  — staged, unsaved
+  let _xlSel      = { r:0, c:0 };      // active cell
+  let _xlAnchor   = null;              // range anchor (shift-select)
+  let _xlUndo     = [];                // [[{id,k,prev}, …], …]
+  let _xlEditing  = false;
+
+  // Small transient message (no global toast helper on this page)
+  function xlToast(msg){
+    let t = document.getElementById('xl-toast');
+    if(!t){
+      t = document.createElement('div');
+      t.id = 'xl-toast';
+      t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#231F20;color:#fff;'
+        +'font-size:12px;padding:10px 18px;border-radius:8px;z-index:200;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:80vw';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.display='block';
+    clearTimeout(t._h);
+    t._h = setTimeout(function(){ t.style.display='none'; }, 3200);
+  }
+
+  window.setReviewView = function(v){
+    _reviewView = v;
+    document.getElementById('rv-btn-cards').classList.toggle('primary', v==='cards');
+    document.getElementById('rv-btn-grid').classList.toggle('primary', v==='grid');
+    const tabRow = document.querySelector('.tab-row');
+    if (tabRow) tabRow.style.display = v==='cards' ? '' : 'none';
+    ['pending','approved','rejected'].forEach(t=>{
+      const el=document.getElementById('panel-'+t);
+      if(el) el.style.display = (v==='cards' && t===currentTab) ? '' : 'none';
+    });
+    document.getElementById('grid-view').style.display = v==='grid' ? '' : 'none';
+    if(v==='grid') renderGrid();
+  };
+
+  function _xlEditable(w, col){
+    if (col.ro) return false;
+    // Same scope rule as the WP form: you may only edit projects assigned to you
+    // (admins/super_admins anywhere). RLS enforces this server-side too.
+    return AppAuth.canEditProject(adminProfile, w.project_id);
+  }
+  // Staged value if the cell was edited this session, else the stored value.
+  function xlVal(w, k){
+    const e = _gridEdits[w.id];
+    if (e && Object.prototype.hasOwnProperty.call(e, k)) return e[k];
+    if (k === '_variance') {
+      const b = xlNum(xlVal(w,'approved_budget_bcb')), a = xlNum(xlVal(w,'awarded_cost'));
+      return (b==null||a==null) ? null : b - a;
+    }
+    if (k === 'total_awarded') {                       // generated column — mirrors awarded_cost + additionals
+      const a = xlNum(xlVal(w,'awarded_cost'));
+      return a==null ? (w.total_awarded==null?null:w.total_awarded) : a + (w.additionals||0);
+    }
+    return w[k];
+  }
+  function xlNum(v){ if(v===''||v==null) return null; const n=parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?null:n; }
+  function xlFmt(v, col){
+    if (v===''||v==null) return '';
+    if (col.type==='money'){ const n=xlNum(v); return n==null?'':n.toLocaleString('en-US',{maximumFractionDigits:2}); }
+    if (col.type==='date'){ const d=String(v).match(/\d{4}-\d{2}-\d{2}/); return d?d[0]:String(v); }
+    return String(v);
+  }
+  // Editors give back strings; store the right JS type so the DB patch is clean.
+  function xlCoerce(raw, col){
+    const s = String(raw==null?'':raw).trim();
+    if (s==='') return null;
+    if (col.type==='money'||col.type==='num') return xlNum(s);
+    if (col.type==='date'){
+      const m = s.match(/\d{4}-\d{2}-\d{2}/);
+      if (m) return m[0];
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      return null;
+    }
+    if (col.type==='select' && col.opts){                      // accept any case/spacing from a paste
+      const hit = col.opts.find(o => o.toLowerCase() === s.toLowerCase());
+      return hit != null ? hit : s;
+    }
+    return s;
+  }
+
+  window.renderGrid = function(){
+    const statusF = document.getElementById('xl-status-filter') ? document.getElementById('xl-status-filter').value : 'all';
+    const tradeEl = document.getElementById('trade-filter');
+    const trade   = tradeEl ? tradeEl.value : 'ALL';
+    const srchEl  = document.getElementById('review-search');
+    const q       = (srchEl ? srchEl.value : '').toLowerCase().trim();
+    _gridRows = allWPs.filter(function(w){
+      if (statusF!=='all' && w.review_status!==statusF) return false;
+      if (trade!=='ALL' && w.trade!==trade) return false;
+      if (q && !((w.wp_no||'').toString().toLowerCase().indexOf(q)>=0 || (w.description||'').toLowerCase().indexOf(q)>=0)) return false;
+      return true;
+    }).sort(function(a,b){
+      return (a.project_id||'').localeCompare(b.project_id||'') ||
+        (a.wp_no||'').toString().localeCompare((b.wp_no||'').toString(), undefined, {numeric:true, sensitivity:'base'});
+    });
+
+    const cnt = document.getElementById('xl-count');
+    if (cnt) cnt.textContent = _gridRows.length + ' work package' + (_gridRows.length===1?'':'s');
+
+    const tbl = document.getElementById('xl-table');
+    if (!_gridRows.length){
+      tbl.innerHTML = '<tbody><tr><td style="padding:40px;text-align:center;color:#aaa;border:none">No work packages match the current filters.</td></tr></tbody>';
+      _xlUpdateBar();
+      return;
+    }
+    const cg = '<colgroup><col style="width:'+XL_GUTTER+'px">' +
+      XL_COLS.map(function(c){ return '<col style="width:'+c.w+'px">'; }).join('') + '</colgroup>';
+    const thead = '<thead><tr><th class="xl-freeze" style="left:0"></th>' +
+      XL_COLS.map(function(c,i){
+        const fz = i < XL_FREEZE;
+        return '<th'+(fz?' class="xl-freeze" style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+'</th>';
+      }).join('') + '</tr></thead>';
+    const tbody = '<tbody>' + _gridRows.map(function(w,r){
+      const locked = !AppAuth.canEditProject(adminProfile, w.project_id);
+      return '<tr data-id="'+w.id+'">' +
+        '<td class="xl-freeze xl-ro" style="left:0;text-align:center;font-size:9px;color:#bbb">'+(r+1)+'</td>' +
+        XL_COLS.map(function(c,i){
+          const fz  = i < XL_FREEZE;
+          const ro  = c.ro || locked;
+          const cls = ['xl-cell', fz?'xl-freeze':'', ro?'xl-ro':'',
+                       (c.type==='money'||c.type==='num')?'xl-num':''].filter(Boolean).join(' ');
+          const st  = fz ? ' style="left:'+_xlLeft(i)+'px"' : '';
+          return '<td class="'+cls+'" data-r="'+r+'" data-c="'+i+'"'+st+'>'+esc(xlFmt(xlVal(w,c.k), c))+'</td>';
+        }).join('') + '</tr>';
+    }).join('') + '</tbody>';
+    tbl.innerHTML = cg + thead + tbody;
+    _xlPaintEdits();
+    _xlSelect(Math.min(_xlSel.r, _gridRows.length-1), _xlSel.c, false);
+    _xlUpdateBar();
+  };
+
+  function _xlTd(r,c){ return document.querySelector('#xl-table td[data-r="'+r+'"][data-c="'+c+'"]'); }
+  function _xlPaintEdits(){
+    Object.keys(_gridEdits).forEach(function(id){
+      const r = _gridRows.findIndex(function(w){ return w.id===id; });
+      if (r < 0) return;
+      Object.keys(_gridEdits[id]).forEach(function(k){
+        const c = XL_COLS.findIndex(function(col){ return col.k===k; });
+        if (c >= 0) { const td=_xlTd(r,c); if(td) td.classList.add('xl-dirty'); }
+      });
+    });
+  }
+  function _xlUpdateBar(){
+    const n = Object.keys(_gridEdits).reduce(function(s,id){ return s+Object.keys(_gridEdits[id]).length; },0);
+    const rows = Object.keys(_gridEdits).length;
+    const lbl = document.getElementById('xl-dirty-count');
+    if (lbl) lbl.textContent = n ? (n+' unsaved change'+(n===1?'':'s')+' in '+rows+' WP'+(rows===1?'':'s')) : '';
+    const save = document.getElementById('xl-save'), disc = document.getElementById('xl-discard');
+    if (save) { save.disabled = !n; save.textContent = n ? ('Save '+n+' change'+(n===1?'':'s')) : 'Save changes'; }
+    if (disc) disc.disabled = !n;
+  }
+
+  function _xlSelect(r, c, scroll){
+    if (scroll===undefined) scroll = true;
+    if (r<0||c<0||r>=_gridRows.length||c>=XL_COLS.length) return;
+    document.querySelectorAll('#xl-table td.xl-sel').forEach(function(td){ td.classList.remove('xl-sel'); });
+    _xlSel = {r:r,c:c};
+    const td = _xlTd(r,c);
+    if (td){ td.classList.add('xl-sel'); if(scroll) td.scrollIntoView({block:'nearest',inline:'nearest'}); }
+  }
+  function _xlPaintRange(){
+    document.querySelectorAll('#xl-table td.xl-range').forEach(function(td){ td.classList.remove('xl-range'); });
+    if (!_xlAnchor) return;
+    const R = _xlRange();
+    for (let r=R.r1;r<=R.r2;r++) for (let c=R.c1;c<=R.c2;c++){ const td=_xlTd(r,c); if(td) td.classList.add('xl-range'); }
+  }
+  function _xlRange(){
+    const a = _xlAnchor || _xlSel;
+    return { r1:Math.min(a.r,_xlSel.r), r2:Math.max(a.r,_xlSel.r),
+             c1:Math.min(a.c,_xlSel.c), c2:Math.max(a.c,_xlSel.c) };
+  }
+
+  // Stage one cell edit (with undo entry). Returns false when the cell is locked.
+  function _xlSet(r, c, raw, undoBatch){
+    const w = _gridRows[r], col = XL_COLS[c];
+    if (!w || !col || !_xlEditable(w, col)) return false;
+    const val  = xlCoerce(raw, col);
+    const prev = xlVal(w, col.k);
+    if ((prev==null?'':String(prev)) === (val==null?'':String(val))) return true;   // no-op
+    const had = !!(_gridEdits[w.id] && Object.prototype.hasOwnProperty.call(_gridEdits[w.id], col.k));
+    if (undoBatch) undoBatch.push({ id:w.id, k:col.k, had:had, prev:had?_gridEdits[w.id][col.k]:undefined });
+    if (!_gridEdits[w.id]) _gridEdits[w.id] = {};
+    _gridEdits[w.id][col.k] = val;
+    // Award Status is DERIVED from Procurement Status (Known Issues #18) — keep them in step.
+    if (col.k === 'procurement_status'){
+      const aw = (val === 'Awarded') ? 'Awarded' : 'Not Yet Awarded';
+      if ((w.award_status||'') !== aw){
+        const had2 = Object.prototype.hasOwnProperty.call(_gridEdits[w.id], 'award_status');
+        if (undoBatch) undoBatch.push({ id:w.id, k:'award_status', had:had2, prev:had2?_gridEdits[w.id].award_status:undefined });
+        _gridEdits[w.id].award_status = aw;
+      }
+    }
+    _xlRefreshRow(r);
+    return true;
+  }
+  function _xlRefreshRow(r){
+    const w = _gridRows[r]; if(!w) return;
+    XL_COLS.forEach(function(col,c){
+      const td = _xlTd(r,c); if(!td) return;
+      td.textContent = xlFmt(xlVal(w,col.k), col);
+      const edited = !!(_gridEdits[w.id] && Object.prototype.hasOwnProperty.call(_gridEdits[w.id], col.k));
+      td.classList.toggle('xl-dirty', edited);
+    });
+    _xlUpdateBar();
+  }
+
+  /* ── Cell editor ────────────────────────────────────────────────────────── */
+  function _xlBeginEdit(seed){
+    if (_xlEditing) return;
+    const r = _xlSel.r, c = _xlSel.c, w = _gridRows[r], col = XL_COLS[c];
+    if (!w || !col || !_xlEditable(w, col)) return;
+    const td = _xlTd(r,c); if(!td) return;
+    _xlEditing = true;
+    const cur = xlVal(w, col.k);
+    let ed;
+    if (col.type === 'select'){
+      ed = document.createElement('select');
+      const opts = col.opts.slice();
+      if (cur!=null && cur!=='' && opts.indexOf(String(cur))<0) opts.unshift(String(cur));   // keep legacy values
+      ed.innerHTML = opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o||'— none —')+'</option>'; }).join('');
+      ed.value = cur==null ? '' : String(cur);
+    } else {
+      ed = document.createElement('input');
+      ed.type = col.type==='date' ? 'date' : 'text';
+      if (col.type==='money'||col.type==='num') ed.inputMode = 'decimal';
+      ed.value = seed != null ? seed
+               : (col.type==='date' ? (xlFmt(cur,col)||'') : (cur==null?'':String(cur)));
+    }
+    ed.className = 'xl-ed';
+    const wrap = document.getElementById('xl-wrap');
+    const tr = td.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+    ed.style.left   = (tr.left - wr.left + wrap.scrollLeft) + 'px';
+    ed.style.top    = (tr.top  - wr.top  + wrap.scrollTop)  + 'px';
+    ed.style.width  = Math.max(tr.width, 100) + 'px';
+    ed.style.height = tr.height + 'px';
+    wrap.appendChild(ed);
+    ed.focus();
+    if (ed.tagName==='INPUT' && seed==null) ed.select();
+
+    const finish = function(commit, move){
+      if (!_xlEditing) return;
+      _xlEditing = false;
+      const v = ed.value;
+      if (ed.parentNode) ed.parentNode.removeChild(ed);
+      if (commit){ const b=[]; _xlSet(r,c,v,b); if(b.length) _xlUndo.push(b); }
+      if (move==='down')  _xlSelect(r+1, c);
+      if (move==='right') _xlSelect(r, c+1);
+      const wr2 = document.getElementById('xl-wrap'); if(wr2) wr2.focus();
+    };
+    ed.addEventListener('keydown', function(e){
+      if (e.key==='Enter'){ e.preventDefault(); finish(true,'down'); }
+      else if (e.key==='Tab'){ e.preventDefault(); finish(true,'right'); }
+      else if (e.key==='Escape'){ e.preventDefault(); finish(false); }
+      e.stopPropagation();
+    });
+    ed.addEventListener('blur', function(){ finish(true); });
+    if (col.type==='select') ed.addEventListener('change', function(){ finish(true,'down'); });
+  }
+
+  /* ── Mouse + keyboard ───────────────────────────────────────────────────── */
+  document.addEventListener('click', function(e){
+    const td = e.target.closest && e.target.closest('#xl-table td.xl-cell');
+    if (!td) return;
+    const r = +td.dataset.r, c = +td.dataset.c;
+    if (e.shiftKey){
+      if (!_xlAnchor) _xlAnchor = { r:_xlSel.r, c:_xlSel.c };
+      _xlSel = {r:r,c:c}; _xlSelect(r,c,false); _xlPaintRange();
+    } else {
+      _xlAnchor = null; _xlPaintRange(); _xlSelect(r,c);
+    }
+    const wrap = document.getElementById('xl-wrap'); if(wrap) wrap.focus();
+  });
+  document.addEventListener('dblclick', function(e){
+    const td = e.target.closest && e.target.closest('#xl-table td.xl-cell');
+    if (td){ _xlSelect(+td.dataset.r, +td.dataset.c); _xlBeginEdit(); }
+  });
+
+  document.addEventListener('keydown', function(e){
+    if (_reviewView !== 'grid' || _xlEditing) return;
+    const tag = (e.target.tagName||'').toLowerCase();
+    if (tag==='input' || tag==='select' || tag==='textarea') return;   // filter bar has focus
+    const r = _xlSel.r, c = _xlSel.c;
+    const nav = { ArrowUp:[-1,0], ArrowDown:[1,0], ArrowLeft:[0,-1], ArrowRight:[0,1] }[e.key];
+    if (nav){
+      e.preventDefault();
+      if (e.shiftKey){
+        if (!_xlAnchor) _xlAnchor = {r:r,c:c};
+        _xlSel = { r:Math.max(0,Math.min(_gridRows.length-1,r+nav[0])), c:Math.max(0,Math.min(XL_COLS.length-1,c+nav[1])) };
+        _xlSelect(_xlSel.r,_xlSel.c,true); _xlPaintRange();
+      } else { _xlAnchor=null; _xlPaintRange(); _xlSelect(r+nav[0], c+nav[1]); }
+      return;
+    }
+    if (e.key==='Tab'){ e.preventDefault(); _xlAnchor=null; _xlPaintRange(); _xlSelect(r, c + (e.shiftKey?-1:1)); return; }
+    if (e.key==='Enter'||e.key==='F2'){ e.preventDefault(); _xlBeginEdit(); return; }
+    if (e.key==='Delete'||e.key==='Backspace'){
+      e.preventDefault();
+      const R=_xlRange(), b=[];
+      for(let rr=R.r1;rr<=R.r2;rr++) for(let cc=R.c1;cc<=R.c2;cc++) _xlSet(rr,cc,'',b);
+      if(b.length) _xlUndo.push(b);
+      return;
+    }
+    if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='d'){   // fill down from the top row of the range
+      e.preventDefault();
+      const R=_xlRange(), b=[];
+      for(let cc=R.c1;cc<=R.c2;cc++){
+        const src = xlVal(_gridRows[R.r1], XL_COLS[cc].k);
+        for(let rr=R.r1+1;rr<=R.r2;rr++) _xlSet(rr,cc,src==null?'':src,b);
+      }
+      if(b.length) _xlUndo.push(b);
+      return;
+    }
+    if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){ e.preventDefault(); gridUndo(); return; }
+    if (e.ctrlKey||e.metaKey) return;                      // let the copy/paste handlers run
+    // Any printable character starts editing with that character (Excel behaviour)
+    if (e.key.length===1){ e.preventDefault(); _xlBeginEdit(e.key); }
+  });
+
+  document.addEventListener('copy', function(e){
+    if (_reviewView!=='grid' || _xlEditing) return;
+    if (!_gridRows.length) return;
+    const R = _xlRange(), out = [];
+    for (let r=R.r1;r<=R.r2;r++){
+      const row=[];
+      for (let c=R.c1;c<=R.c2;c++) row.push(xlFmt(xlVal(_gridRows[r], XL_COLS[c].k), XL_COLS[c]));
+      out.push(row.join('\t'));
+    }
+    e.clipboardData.setData('text/plain', out.join('\n'));
+    e.preventDefault();
+  });
+  document.addEventListener('paste', function(e){
+    if (_reviewView!=='grid' || _xlEditing) return;
+    const txt = (e.clipboardData||window.clipboardData).getData('text');
+    if (!txt) return;
+    e.preventDefault();
+    const rows = txt.replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n$/,'').split('\n').map(function(l){ return l.split('\t'); });
+    const b=[]; let blocked=0;
+    rows.forEach(function(cells,dr){ cells.forEach(function(v,dc){
+      const r=_xlSel.r+dr, c=_xlSel.c+dc;
+      if (r>=_gridRows.length || c>=XL_COLS.length) return;
+      if (!_xlSet(r,c,v,b)) blocked++;
+    }); });
+    if (b.length) _xlUndo.push(b);
+    if (blocked) xlToast(blocked+' cell'+(blocked===1?'':'s')+" skipped (read-only, or a project you can't edit).");
+  });
+
+  window.gridUndo = function(){
+    const batch = _xlUndo.pop();
+    if (!batch) return;
+    batch.slice().reverse().forEach(function(u){
+      if (!_gridEdits[u.id]) return;
+      if (u.had) _gridEdits[u.id][u.k] = u.prev;
+      else delete _gridEdits[u.id][u.k];
+      if (!Object.keys(_gridEdits[u.id]).length) delete _gridEdits[u.id];
+    });
+    const seen = {};
+    batch.forEach(function(u){
+      if (seen[u.id]) return;
+      seen[u.id] = 1;
+      const r = _gridRows.findIndex(function(w){ return w.id===u.id; });
+      if (r>=0) _xlRefreshRow(r);
+    });
+    _xlUpdateBar();
+  };
+
+  window.gridDiscard = function(){
+    if (!Object.keys(_gridEdits).length) return;
+    if (!confirm('Discard all unsaved grid changes?')) return;
+    _gridEdits = {}; _xlUndo = [];
+    renderGrid();
+  };
+
+  window.gridSave = async function(){
+    const ids = Object.keys(_gridEdits);
+    if (!ids.length) return;
+    // Same safeguard as the WP form: an Awarded WP needs an Awarded Cost and a Vendor.
+    const bad = [];
+    ids.forEach(function(id){
+      const w = _gridRows.find(function(x){ return x.id===id; }) || allWPs.find(function(x){ return x.id===id; });
+      if (!w) return;
+      if (xlVal(w,'award_status')==='Awarded'){
+        if (xlNum(xlVal(w,'awarded_cost'))==null || !String(xlVal(w,'contractor')||'').trim()) bad.push(w.wp_no||id);
+      }
+    });
+    if (bad.length){
+      alert('These WPs are marked Awarded but are missing an Awarded Cost and/or Awarded Vendor:\n\n  '
+        + bad.join(', ') + '\n\nFill those in (or set Procurement Status back below Awarded) and save again.');
+      return;
+    }
+    const btn = document.getElementById('xl-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    // Non-auto-approve roles send edits back through review, exactly like the WP form.
+    const direct = AppAuth.isAutoApprove(adminProfile);
+    let ok=0; const errs=[];
+    for (const id of ids){
+      const patch = Object.assign({}, _gridEdits[id]);
+      delete patch.total_awarded; delete patch._variance;      // generated columns — never write
+      try {
+        if (direct) await WPDb.updateWPDirect(id, patch);
+        else        await WPDb.updateWP(id, patch);
+        ok++;
+      } catch(err){
+        const w = allWPs.find(function(x){ return x.id===id; });
+        errs.push(((w&&w.wp_no)||id) + ': ' + err.message);
+      }
+    }
+    _gridEdits = {}; _xlUndo = [];
+    _bustWPCache();
+    if (errs.length) alert('Saved ' + ok + ' WP(s). ' + errs.length + ' failed:\n\n' + errs.join('\n'));
+    else xlToast(ok + ' work package' + (ok===1?'':'s') + (direct ? ' saved.' : ' submitted for review.'));
+    await loadAll();
+    setReviewView('grid');
+  };
+
+  // Keep the grid in step with the card view's filters and with each reload
+  const _origApplyFilters = window.applyFilters;
+  window.applyFilters = function(){
+    _origApplyFilters();
+    if (_reviewView === 'grid') renderGrid();
+  };
+  window.addEventListener('beforeunload', function(e){
+    if (Object.keys(_gridEdits).length){ e.preventDefault(); e.returnValue='You have unsaved grid changes.'; return e.returnValue; }
+  });
+
 </script>
 
 
