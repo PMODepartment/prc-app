@@ -5,18 +5,18 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https://cayjeqeleenizbdzrums.supabase.co wss://cayjeqeleenizbdzrums.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'"/>
   <link rel="icon" type="image/png" href="assets/img/favicon.png"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Review Work Packages — EPC WPM</title>
+  <title>Work Packages — EPC WPM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723d"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -106,7 +106,7 @@
     <div class="sidebar-section">
       <div class="sidebar-section-label">Work Packages</div>
       <a class="nav-item" id="nav-add-wp-link" href="wp-form.html"><i class="ti ti-circle-plus"></i>Add Work Package</a>
-      <a class="nav-item active" href="review.html"><i class="ti ti-clipboard-check"></i>Review WPs</a>
+      <a class="nav-item active" href="review.html"><i class="ti ti-table"></i>All Work Packages</a>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-section-label">Admin</div>
@@ -119,13 +119,13 @@
     <div class="topbar">
       <div class="topbar-left">
         <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
-        <div class="page-title">Work Package Review</div>
-        <div class="page-sub" style="font-size:11px;color:#888;margin-left:8px">Approve or reject submitted work packages</div>
+        <div class="page-title">Work Packages</div>
+        <div class="page-sub" style="font-size:11px;color:#888;margin-left:8px">View and bulk-edit all work packages</div>
       </div>
       <div class="topbar-right"><div id="user-bar"></div></div>
     </div>
     <div class="content">
-      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading submissions…</span></div>
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading work packages…</span></div>
       <div id="main-content" style="display:none">
 
         <!-- Filter bar: Project (consolidated only) + Trade + Search -->
@@ -150,35 +150,33 @@
           </div>
           <!-- Cards | Grid (Excel) view switcher -->
           <div style="display:flex;gap:4px;margin-left:auto">
-            <button id="rv-btn-cards" class="xl-btn primary" onclick="setReviewView('cards')"><i class="ti ti-layout-cards"></i> Cards</button>
-            <button id="rv-btn-grid" class="xl-btn" onclick="setReviewView('grid')"><i class="ti ti-table"></i> Grid (Excel)</button>
+            <button id="rv-btn-grid" class="xl-btn primary" onclick="setReviewView('grid')"><i class="ti ti-table"></i> Grid (Excel)</button>
+            <button id="rv-btn-cards" class="xl-btn" onclick="setReviewView('cards')"><i class="ti ti-layout-cards"></i> Cards</button>
           </div>
         </div>
 
-        <div class="tab-row">
-          <button class="tab active" id="tab-pending" onclick="switchTab('pending')">
-            Pending Review <span class="tbadge" id="ct-pending">0</span>
-          </button>
-          <button class="tab" id="tab-approved" onclick="switchTab('approved')">
-            Approved <span class="tbadge" id="ct-approved" style="background:#2D9B6F">0</span>
-          </button>
-          <button class="tab" id="tab-rejected" onclick="switchTab('rejected')">
-            Rejected <span class="tbadge" id="ct-rejected" style="background:#888">0</span>
-          </button>
+        <!-- Legacy review-state cleanup (admins only). Nothing can enter pending_review any
+             more — every writing role auto-approves — so these are historical rows only. -->
+        <div id="legacy-strip" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;background:#FFF6DA;border:1px solid #F0D69A;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+          <i class="ti ti-alert-triangle" style="color:#D97706;font-size:18px"></i>
+          <div style="flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:700;color:#8A5A00" id="legacy-title"></div>
+            <div style="font-size:11px;color:#A07520;margin-top:2px">These pre-date the current workflow, where every procurement role saves directly with no sign-off. Approving them makes them visible on the dashboards.</div>
+          </div>
+          <button class="xl-btn" onclick="dismissLegacyStrip()">Dismiss</button>
+          <button class="xl-btn primary" id="legacy-fix" onclick="approveLegacy()">Approve all</button>
         </div>
-        <div id="panel-pending"></div>
-        <div id="panel-approved" style="display:none"></div>
-        <div id="panel-rejected" style="display:none"></div>
+        <div id="panel-cards" style="display:none"></div>
 
         <!-- ══ EXCEL-LIKE GRID VIEW ══ -->
-        <div id="grid-view" style="display:none">
+        <div id="grid-view">
           <div class="xl-bar">
             <label class="xl-hint" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888">Show</label>
             <select id="xl-status-filter" onchange="renderGrid()" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);cursor:pointer">
-              <option value="all">All statuses</option>
-              <option value="pending_review">Pending review</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="all">All work packages</option>
+              <option value="approved">Approved (live)</option>
+              <option value="pending_review">Pending review (legacy)</option>
+              <option value="rejected">Rejected (legacy)</option>
             </select>
             <span id="xl-count" class="xl-hint"></span>
             <span style="flex:1"></span>
@@ -198,24 +196,14 @@
   </div>
 </div>
 
-<div class="modal-bg hidden" id="modal-reject">
-  <div class="modal">
-    <h3>Reject Work Package</h3>
-    <p style="font-size:12px;color:#888;margin-bottom:14px">Please provide a reason so the officer knows what to correct.</p>
-    <textarea id="rejection-reason" placeholder="e.g. Budget figure does not match the approved BCB. Please verify and resubmit."></textarea>
-    <div class="mactions">
-      <button class="mx" onclick="closeRejectModal()">Cancel</button>
-      <button class="mc" onclick="confirmReject()"><i class="ti ti-x" style="font-size:13px;vertical-align:middle"></i> Reject</button>
-    </div>
-  </div>
-</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723c"></script>
-<script src="assets/js/ui.js?v=20260723c"></script>
-<script src="assets/js/db.js?v=20260723c"></script>
+<script src="assets/js/auth.js?v=20260723d"></script>
+<script src="assets/js/ui.js?v=20260723d"></script>
+<script src="assets/js/db.js?v=20260723d"></script>
 <script>
-  let adminProfile, allWPs=[], currentTab='pending', rejectingId=null;
+  let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';
   let _isAdminReviewer = false; // true for admin/super_admin — can approve/reject
   initMobileMenu();
@@ -265,9 +253,7 @@
       if (filterWrap) filterWrap.style.display = 'none';
       const sub = document.querySelector('.page-sub');
       const proj = allProjects.find(p=>p.id===currentProjId);
-      if (sub) sub.textContent = _isAdminReviewer
-        ? (proj?.name||currentProjId)+' — Approve or reject work packages'
-        : (proj?.name||currentProjId)+' — Work package submissions';
+      if (sub) sub.textContent = (proj?.name||currentProjId)+' — View and bulk-edit work packages';
     } else {
       // Admin consolidated view — all WPs; non-admin multi-project — their assigned projects
       allWPs = _isAdminReviewer
@@ -344,36 +330,61 @@
   window.applyFilters = function() {
     const trade = (document.getElementById('trade-filter')?.value || 'ALL');
     const q = (document.getElementById('review-search')?.value || '').toLowerCase().trim();
-    function filter(wps) {
-      return wps.filter(w => {
-        if (trade !== 'ALL' && w.trade !== trade) return false;
-        if (q && !((w.wp_no||'').toLowerCase().includes(q) || (w.description||'').toLowerCase().includes(q))) return false;
-        return true;
-      });
+    const rows = allWPs.filter(w => {
+      if (trade !== 'ALL' && w.trade !== trade) return false;
+      if (q && !((w.wp_no||'').toString().toLowerCase().includes(q) || (w.description||'').toLowerCase().includes(q))) return false;
+      return true;
+    }).sort((a, b) =>
+      (a.project_id||'').localeCompare(b.project_id||'') ||
+      (a.wp_no||'').toString().localeCompare((b.wp_no||'').toString(), undefined, { numeric: true, sensitivity: 'base' })
+    );
+    renderPanel('panel-cards', rows);
+    renderLegacyStrip();
+  };
+
+  /* Legacy review states — no write path can create them any more (every role except
+     `viewer` is auto-approve), so anything still pending/rejected is a historical row.
+     Admins get a one-click cleanup; everyone else just sees the badge on the card. */
+  function _legacyWPs(){ return allWPs.filter(w => w.review_status && w.review_status !== 'approved'); }
+  function renderLegacyStrip(){
+    const strip = document.getElementById('legacy-strip');
+    if (!strip) return;
+    const legacy = _legacyWPs();
+    const dismissed = sessionStorage.getItem('wpm_legacy_dismissed') === '1';
+    if (!legacy.length || !_isAdminReviewer || dismissed){ strip.style.display = 'none'; return; }
+    document.getElementById('legacy-title').textContent =
+      legacy.length + ' work package' + (legacy.length===1?'':'s') + ' still sit' + (legacy.length===1?'s':'') + ' in an old review state';
+    document.getElementById('legacy-fix').textContent = 'Approve all ' + legacy.length;
+    strip.style.display = 'flex';
+  }
+  window.dismissLegacyStrip = function(){
+    sessionStorage.setItem('wpm_legacy_dismissed','1');
+    renderLegacyStrip();
+  };
+  window.approveLegacy = async function(){
+    const legacy = _legacyWPs();
+    if (!legacy.length) return;
+    if (!confirm('Approve ' + legacy.length + ' work package(s) left over from the old review workflow?\n\nThey will become visible on the dashboards.')) return;
+    const btn = document.getElementById('legacy-fix');
+    btn.disabled = true; btn.textContent = 'Approving…';
+    const errs = [];
+    for (const w of legacy){
+      try { await WPDb.approveWP(w.id); } catch(e){ errs.push((w.wp_no||w.id) + ': ' + e.message); }
     }
-    function sortByWpNo(arr) {
-      return arr.slice().sort((a, b) =>
-        (a.wp_no||'').toString().localeCompare((b.wp_no||'').toString(), undefined, { numeric: true, sensitivity: 'base' })
-      );
-    }
-    const pending  = sortByWpNo(filter(allWPs.filter(w => w.review_status === 'pending_review')));
-    const approved = sortByWpNo(filter(allWPs.filter(w => w.review_status === 'approved')));
-    const rejected = sortByWpNo(filter(allWPs.filter(w => w.review_status === 'rejected')));
-    document.getElementById('ct-pending').textContent  = pending.length;
-    document.getElementById('ct-approved').textContent = approved.length;
-    document.getElementById('ct-rejected').textContent = rejected.length;
-    renderPanel('panel-pending', pending, 'pending');
-    renderPanel('panel-approved', approved, 'approved');
-    renderPanel('panel-rejected', rejected, 'rejected');
+    _bustWPCache();
+    if (errs.length) alert('Some could not be approved:\n\n' + errs.join('\n'));
+    btn.disabled = false;
+    await loadAll();
   };
 
   function fmtM(v) { if(v==null)return'—'; return'₱'+(v/1e6).toFixed(2)+'M'; }
   function fmtDate(d) { if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'});}catch{return d;} }
 
-  function renderPanel(panelId, wps, type) {
+  function renderPanel(panelId, wps) {
     const el = document.getElementById(panelId);
+    if (!el) return;
     if (!wps.length) {
-      el.innerHTML = `<div class="empty"><i class="ti ti-${type==='pending'?'clock':type==='approved'?'circle-check':'x-circle'}"></i>No ${type} submissions</div>`;
+      el.innerHTML = `<div class="empty"><i class="ti ti-package-off"></i>No work packages match the current filters</div>`;
       return;
     }
     el.innerHTML = wps.map(w => {
@@ -381,27 +392,25 @@
       const awarded = w.total_awarded;
       const v = (budget != null && awarded != null) ? budget - awarded : null;
       const vHtml = v==null?'—':v>=0?`<span style="color:#1D9E75">+${fmtM(v)}</span>`:`<span style="color:#E24B4A">-${fmtM(Math.abs(v))}</span>`;
-      const viewBtn = `<a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-edit" style="font-size:13px"></i> Edit</a>`;
-      let actionBtns;
-      if (_isAdminReviewer) {
-        actionBtns = type === 'pending'
-          ? `<button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve</button>
-             <button class="btn-reject" onclick="openReject('${w.id}')"><i class="ti ti-x" style="font-size:13px"></i> Reject</button>
-             ${viewBtn}`
-          : type === 'approved'
-            ? viewBtn
-            : `<button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve</button>${viewBtn}`;
-      } else {
-        // Non-admin: only the Edit button (no approve/reject)
-        actionBtns = viewBtn;
-      }
+      const canEdit = AppAuth.canEditProject(adminProfile, w.project_id);
+      const editBtn = canEdit
+        ? `<a class="btn-view" href="wp-form.html?id=${w.id}"><i class="ti ti-edit" style="font-size:13px"></i> Edit</a>`
+        : `<span class="btn-view" style="opacity:.5;cursor:default" title="This project isn't assigned to you"><i class="ti ti-lock" style="font-size:13px"></i> View only</span>`;
+      // Only a legacy (non-approved) row still shows a review chip — new WPs are always approved.
+      const legacyChip = (w.review_status && w.review_status !== 'approved')
+        ? `<span class="xl-badge" style="background:${w.review_status==='rejected'?'#888':'#D97706'};margin-right:6px">${w.review_status==='rejected'?'REJECTED (legacy)':'PENDING (legacy)'}</span>` : '';
+      const approveBtn = (_isAdminReviewer && w.review_status && w.review_status !== 'approved')
+        ? `<button class="btn-approve" onclick="approveWP('${w.id}')"><i class="ti ti-check" style="font-size:13px"></i> Approve</button>` : '';
       return `<div class="review-card">
         <div class="review-card-header">
           <div>
             <div class="rc-title">${esc(w.description)}</div>
             <div class="rc-sub">${esc(w.cost_code)||''} &nbsp;·&nbsp; ${esc(w.wp_no)||''} &nbsp;·&nbsp; ${esc(w.project_id)||''} &nbsp;·&nbsp; ${esc(w.zone)||''}</div>
           </div>
-          <span style="font-size:10px;font-weight:600;color:${w.award_status==='Awarded'?'#2D9B6F':'#EE3124'}">${w.award_status||'—'}</span>
+          <div style="display:flex;align-items:center;gap:6px;white-space:nowrap">
+            ${legacyChip}
+            <span style="font-size:10px;font-weight:600;color:${w.award_status==='Awarded'?'#2D9B6F':'#EE3124'}">${esc(w.award_status)||'—'}</span>
+          </div>
         </div>
         <div class="rc-fields">
           <div class="rc-field"><div class="rc-field-label">Trade</div><div class="rc-field-val">${esc(w.trade)||'—'}</div></div>
@@ -409,20 +418,12 @@
           <div class="rc-field"><div class="rc-field-label">Total Awarded</div><div class="rc-field-val">${fmtM(w.total_awarded)}</div></div>
           <div class="rc-field"><div class="rc-field-label">Variance</div><div class="rc-field-val">${vHtml}</div></div>
           <div class="rc-field"><div class="rc-field-label">Planned Award</div><div class="rc-field-val">${fmtDate(w.awarding_date)}</div></div>
-          <div class="rc-field"><div class="rc-field-label">Submitted</div><div class="rc-field-val">${w.created_at?new Date(w.created_at).toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'}):'—'}</div></div>
-          ${w.review_notes?`<div class="rc-field" style="grid-column:1/-1"><div class="rc-field-label">Review Notes</div><div class="rc-field-val" style="color:#E24B4A">${w.review_notes}</div></div>`:''}
+          <div class="rc-field"><div class="rc-field-label">Procurement Status</div><div class="rc-field-val">${esc(w.procurement_status)||'—'}</div></div>
+          ${w.review_notes?`<div class="rc-field" style="grid-column:1/-1"><div class="rc-field-label">Review Notes (legacy)</div><div class="rc-field-val" style="color:#E24B4A">${esc(w.review_notes)}</div></div>`:''}
         </div>
-        <div class="rc-actions">${actionBtns}</div>
+        <div class="rc-actions">${approveBtn}${editBtn}</div>
       </div>`;
     }).join('');
-  }
-
-  function switchTab(tab) {
-    currentTab = tab;
-    ['pending','approved','rejected'].forEach(t => {
-      document.getElementById('tab-'+t).classList.toggle('active', t===tab);
-      document.getElementById('panel-'+t).style.display = t===tab?'':'none';
-    });
   }
 
   function _bustWPCache() {
@@ -434,27 +435,7 @@
       await WPDb.approveWP(id);
       _bustWPCache();
       await loadAll();
-    } catch(e) { alert('Error: ' + e.message); }
-  }
-
-  function openReject(id) {
-    rejectingId = id;
-    document.getElementById('rejection-reason').value = '';
-    document.getElementById('modal-reject').classList.remove('hidden');
-  }
-  function closeRejectModal() {
-    document.getElementById('modal-reject').classList.add('hidden');
-    rejectingId = null;
-  }
-  async function confirmReject() {
-    if (!rejectingId) return;
-    const reason = document.getElementById('rejection-reason').value.trim();
-    if (!reason) { alert('Please provide a rejection reason.'); return; }
-    try {
-      await WPDb.rejectWP(rejectingId, null, reason);
-      _bustWPCache();
-      closeRejectModal();
-      await loadAll();
+      setReviewView(_reviewView);
     } catch(e) { alert('Error: ' + e.message); }
   }
 
@@ -515,7 +496,7 @@
   // must be contiguous from the left, so offsets accumulate gutter + each frozen width.
   function _xlLeft(i){ let l = XL_GUTTER; for (let j=0;j<i;j++) l += XL_COLS[j].w; return l; }
 
-  let _reviewView = 'cards';
+  let _reviewView = 'grid';        // the grid is the primary surface — this is a bulk-edit page
   let _gridRows   = [];                // WPs currently displayed, in row order
   let _gridEdits  = {};                // { wpId: { field: newValue } }  — staged, unsaved
   let _xlSel      = { r:0, c:0 };      // active cell
@@ -543,12 +524,8 @@
     _reviewView = v;
     document.getElementById('rv-btn-cards').classList.toggle('primary', v==='cards');
     document.getElementById('rv-btn-grid').classList.toggle('primary', v==='grid');
-    const tabRow = document.querySelector('.tab-row');
-    if (tabRow) tabRow.style.display = v==='cards' ? '' : 'none';
-    ['pending','approved','rejected'].forEach(t=>{
-      const el=document.getElementById('panel-'+t);
-      if(el) el.style.display = (v==='cards' && t===currentTab) ? '' : 'none';
-    });
+    const cards = document.getElementById('panel-cards');
+    if (cards) cards.style.display = v==='cards' ? '' : 'none';
     document.getElementById('grid-view').style.display = v==='grid' ? '' : 'none';
     if(v==='grid') renderGrid();
   };

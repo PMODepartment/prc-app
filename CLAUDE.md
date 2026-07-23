@@ -42,7 +42,7 @@ No build step â€” edit files directly, push to GitHub, GitHub Pages auto-de
 | `index.html` | user | Portfolio Overview â€” consolidated dashboard, 6 tabs (Dashboard tab merged into Overview) |
 | `project.html` | user | Single project dashboard â€” 3 tabs |
 | `wp-form.html` | user | Add / edit work package |
-| `review.html` | user+ | View WP submissions for assigned projects; admins can approve/reject |
+| `review.html` | user+ | **All Work Packages** — bulk view/edit surface (Grid + Cards). No approval tabs: every writing role auto-approves. Admin-only legacy-cleanup strip. |
 | `admin.html` | admin + manager | User management + project management (admin/super_admin); Performance tab (all three roles) |
 | `claim-form.html` | user | Add / edit claim or CO â€” **hidden feature, not yet active** |
 | `my-wps.html` | user | Officer's WP list |
@@ -237,6 +237,17 @@ Admin â†’ User Management (active) | Portfolio Overview
 - `SidebarPrefs`: pins in `localStorage` key `wpm_sidebar_{userId}`; `window.__sidebarRefresh` callback re-renders after pin toggle
 
 ---
+
+## All Work Packages Page (`review.html`) — approval workflow retired
+
+**The approval workflow is gone (2026-07-23).** Every writing role is auto-approve (`AppAuth.isAutoApprove` = `super_admin, admin, specialist, manager, user`; only `viewer` is excluded, and viewers are redirected off this page), so **no write path can create a `pending_review` WP any more** — `wp-form.html`, the quick-add modal, CSV/Excel import and the Status Tracker all save straight to `approved`. The Pending / Approved / Rejected tabs and the Approve/Reject buttons were therefore dead controls and were **removed**, along with the reject-reason modal, `switchTab`, `currentTab` and `rejectingId`.
+
+The page is now the **bulk view-and-edit surface for all work packages**:
+- Retitled **"Work Packages"** (sub: "View and bulk-edit all work packages"); the sidebar link on `review.html`, `project.html`, `wp-form.html` and `claim-form.html` reads **"All Work Packages"** (`ti-table` icon, was "Review WPs" / `ti-clipboard-check`).
+- **Grid (Excel) is the default view** (`_reviewView` starts `'grid'`; the Grid button leads the switcher, Cards is the alternate). One card list (`#panel-cards`) shows every filtered WP — no status tabs — sorted by project then WP No., with an **Edit** button that degrades to a disabled **"View only"** when `canEditProject` is false.
+- **Legacy cleanup strip** (`#legacy-strip`, admins only, dismissible per session via `sessionStorage.wpm_legacy_dismissed`): if any rows still carry a non-`approved` `review_status` — only possible for WPs predating the auto-approve change — it reports the count and offers **Approve all N** (`approveLegacy()` loops `WPDb.approveWP`, busts the WP cache, reloads). Those rows also show a `PENDING (legacy)` / `REJECTED (legacy)` chip and a per-card Approve button. Once cleared, the strip never appears again.
+- The grid's status dropdown labels the states honestly: **All work packages / Approved (live) / Pending review (legacy) / Rejected (legacy)**.
+- `WPDb.getPendingWPs()` and the sidebar pending badges (`project.html`, `wp-form.html`) are retained — they now surface exactly these legacy leftovers and read 0 once cleaned up. `updateWP` (which resets `review_status='pending_review'`) is still called on the non-auto-approve branch of the Status Tracker and the grid save; that branch is currently unreachable but is kept so re-introducing a review-required role is a one-line change to `isAutoApprove`.
 
 ## Review Page — Excel-like Grid View (`review.html`)
 
@@ -525,7 +536,7 @@ Public pages (login, register, pending, forgot-password) load UMD bundle inline 
 
 Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net, cdnjs.cloudflare.com; `dns-prefetch` for Supabase URL; `preload as="script"` for all body scripts.
 
-**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260723c`. (`onboarding.js` independent version: `20260708b`.) **The shared `auth.js`/`db.js`/`ui.js`/`dashboard.css` includes now ALSO carry `?v=` on the other app pages (`admin.html`, `review.html`, `wp-form.html`, `my-wps.html`, `claim-form.html`, `project-selector.html`)** — previously they were unversioned and served stale `db.js` for ~10 min after a deploy (a real bug: e.g. admin.html not getting a new `db.js` write-path). When you bump the version, update it on ALL these pages too (a repo-wide `sed 's/?v=OLD/?v=NEW/g'` over the `*.html` set is simplest). `charts.js` is still only on index/project.
+**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260723d`. (`onboarding.js` independent version: `20260708b`.) **The shared `auth.js`/`db.js`/`ui.js`/`dashboard.css` includes now ALSO carry `?v=` on the other app pages (`admin.html`, `review.html`, `wp-form.html`, `my-wps.html`, `claim-form.html`, `project-selector.html`)** — previously they were unversioned and served stale `db.js` for ~10 min after a deploy (a real bug: e.g. admin.html not getting a new `db.js` write-path). When you bump the version, update it on ALL these pages too (a repo-wide `sed 's/?v=OLD/?v=NEW/g'` over the `*.html` set is simplest). `charts.js` is still only on index/project.
 
 ---
 
