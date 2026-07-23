@@ -229,7 +229,19 @@ function detectLayout(rows){
     awarding_status:      findCol(band,/awarding status/),
     remarks:              findCol(band,/^remarks$/) ?? findCol(band,/procurement remarks/) ?? findCol(band,/remark/),
   };
-  return { hdrRow:hdr, col, descCol: (col.wp_name!=null ? col.wp_name : col.wp_no) };
+  const descCol = (col.wp_name!=null ? col.wp_name : col.wp_no);
+  // Columns to scan for the hierarchical TRADE group-header text. The discipline header
+  // sits in a DIFFERENT column per template: usually the Work-Package-Description column,
+  // but e.g. QHL706 writes it in the "WORK PACKAGE NAME" column (one left of Description,
+  // right of WP No.). Scanning the WHOLE band between WP No. and Description covers both,
+  // while deliberately EXCLUDING col 0 (a per-row helper column in some sheets, e.g. CCM302,
+  // that can carry a stray/wrong trade on a header row). Falls back to the description column.
+  let tradeCols = [descCol].filter(c=>c!=null);
+  if(col.wp_no!=null && col.wp_name!=null){
+    const lo=Math.min(col.wp_no+1,col.wp_name), hi=Math.max(col.wp_no+1,col.wp_name);
+    tradeCols=[]; for(let c=lo;c<=hi;c++) tradeCols.push(c);
+  }
+  return { hdrRow:hdr, col, descCol, tradeCols };
 }
 
 // Canonicalise a trade string to one of the 10 official trades (mirrors normTrade() in
@@ -381,12 +393,12 @@ function parse(){
   for(let i=L.hdrRow+1;i<rows.length;i++){
     const r=rows[i]||[];
     if(cn(r[L.col.wp_no])==null){
-      // group-header row → update the current trade if the description column names a discipline
-      const dv = (L.descCol!=null) ? r[L.descCol] : null;
+      // group-header row → update the current trade if any of the trade-scan columns names a discipline
+      const dvs = (L.tradeCols||[]).map(c=>r[c]).filter(v=>v!=null).map(String);
       // Stop at the "NON-PO/JO" section — those rows (design/consultancy, bonds, permits,
       // insurances, project details, etc.) are NOT work packages and must never be imported.
-      if(dv && /non[\s\-]?(po|jo)/i.test(String(dv))) break;
-      if(dv && TRADE_RE.test(String(dv)) && !/subtotal|grand ?total|^\s*total/i.test(String(dv))) curTrade=String(dv).trim();
+      if(dvs.some(v=>/non[\s\-]?(po|jo)/i.test(v))) break;
+      for(const dv of dvs){ if(TRADE_RE.test(dv) && !/subtotal|grand ?total|^\s*total/i.test(dv)){ curTrade=dv.trim(); break; } }
       continue;
     }
     const wp=rowToWP(r,pid,today,L.col,curTrade); if(wp) out.push(wp);
@@ -397,7 +409,8 @@ function parse(){
 function showDetected(L){
   const c=L.col, nm=n=>n==null?'<span class="muted">not found</span>':('col '+n);
   $('detected').style.display='block';
-  $('detected').innerHTML='<b>Auto-detected layout</b> — header row <code>'+(L.hdrRow+1)+'</code>, trade from '+nm(L.descCol)+
+  const tradeFrom = (L.tradeCols&&L.tradeCols.length) ? ('col '+L.tradeCols.join('/')) : nm(L.descCol);
+  $('detected').innerHTML='<b>Auto-detected layout</b> — header row <code>'+(L.hdrRow+1)+'</code>, trade from <code>'+tradeFrom+'</code>'+
     '. Key columns: WP No <code>'+nm(c.wp_no)+'</code>, Budget <code>'+nm(c.budget_bcb)+'</code>, Awarded Cost <code>'+nm(c.awarded_cost)+
     '</code>, Awarding Date <code>'+nm(c.awarding_date)+'</code>, Actual Award <code>'+nm(c.actual_award_date)+'</code>, Completion <code>'+nm(c.target_completion)+'</code>, Remarks <code>'+nm(c.remarks)+'</code>.';
 }
