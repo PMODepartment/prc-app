@@ -51,6 +51,10 @@
   .num{text-align:right}
   .badge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px}
   .b-aw{background:#EAF3DE;color:#3B6D11}.b-no{background:#FEE2E2;color:#991B1B}
+  .shrink{background:#FEE2E2;border:1.5px solid #F87171;color:#7F1D1D;border-radius:8px;padding:12px 15px;font-size:12.5px;margin:12px 0;line-height:1.65}
+  .shrink b{color:#7F1D1D}
+  .shrink ul{margin:6px 0 0;padding-left:18px}
+  .shrink li{margin:2px 0}
   .warn{background:#FFF3CD;border:1px solid #FFC107;color:#856404;border-radius:8px;padding:11px 14px;font-size:12.5px;margin:12px 0;display:flex;gap:9px;align-items:flex-start}
   #log{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;line-height:1.6;max-height:260px;overflow-y:auto;background:#1a1a1a;color:#ccc;border-radius:8px;padding:12px;margin-top:12px;display:none}
   .ok{color:#4ade80}.err{color:#f87171}.info{color:#60a5fa}.muted{color:#9ca3af}.warnt{color:#fbbf24}
@@ -97,6 +101,7 @@
       <h2>2 · Preview</h2>
       <div class="kpis" id="kpis"></div>
       <div class="tbl-wrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+      <div class="shrink" id="shrink-warn" style="display:none"></div>
       <div class="warn"><i class="ti ti-alert-triangle" style="font-size:16px"></i>
         <span><b>Replace</b> will <b>delete ALL current work packages</b> for <b id="wp-proj"></b> and insert the <b id="wp-count"></b> rows above. This cannot be undone. Review the preview first.</span></div>
       <button class="btn btn-red" id="btn-import" disabled><i class="ti ti-database-import"></i> Replace &amp; Import</button>
@@ -488,6 +493,92 @@ function renderPreview(wps){
   $('preview-card').style.display='block';
   $('btn-import').disabled = wps.length===0;
   $('preview-card').scrollIntoView({behavior:'smooth'});
+  // Compare against what is already stored for this project and warn if this sheet is narrower
+  checkScope($('project').value, wps).then(renderScopeWarning).catch(()=>{});
+}
+
+
+/* ---- scope-shrink guard -------------------------------------------------
+ * "Replace" deletes the whole project and inserts whatever is in the chosen
+ * sheet, so importing a narrower or older working file silently shrinks the
+ * project. This happened for real on CCM302: a file named with a LATER date
+ * held only WP 1-68 (31 awarded) while the stored data came from an earlier
+ * file with WP 1-78 (40 awarded) — the import dropped 10 work packages and
+ * un-awarded eleven ₱-bearing packages.
+ * Before importing we compare the parsed sheet against what is already
+ * stored and, if the sheet has FEWER work packages or FEWER awarded ones,
+ * show exactly what would be lost and demand an extra confirmation.
+ */
+let _scopeCheck = null;   // {existing, incoming, existingAwarded, incomingAwarded, lostNos, unawardedNos}
+
+function esc(v){ return v==null?'':String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function _wpKeyNorm(v){ return String(v==null?'':v).trim().replace(/^wp[-\s]*/i,'').replace(/\.0+$/,'').toLowerCase(); }
+
+async function checkScope(pid, wps){
+  _scopeCheck = null;
+  if(!pid || !wps || !wps.length) return null;
+  const {data,error} = await sb.from('work_packages')
+    .select('wp_no,award_status,total_awarded,description').eq('project_id',pid);
+  if(error || !data || !data.length) return null;          // new/empty project — nothing to lose
+  const isAwd = w => w.award_status==='Awarded';
+  const incomingByKey = {};
+  wps.forEach(w => { incomingByKey[_wpKeyNorm(w.wp_no)] = w; });
+  const lost = [], unawarded = [];
+  data.forEach(w => {
+    const inc = incomingByKey[_wpKeyNorm(w.wp_no)];
+    if(!inc) lost.push(w);
+    else if(isAwd(w) && inc.award_status!=='Awarded') unawarded.push({stored:w, inc:inc});
+  });
+  _scopeCheck = {
+    existing: data.length, incoming: wps.length,
+    existingAwarded: data.filter(isAwd).length,
+    incomingAwarded: wps.filter(w=>w.award_status==='Awarded').length,
+    lost: lost, unawarded: unawarded
+  };
+  return _scopeCheck;
+}
+
+function renderScopeWarning(){
+  const el = $('shrink-warn');
+  if(!el) return;
+  const c = _scopeCheck;
+  if(!c || (c.incoming >= c.existing && c.incomingAwarded >= c.existingAwarded && !c.lost.length && !c.unawarded.length)){
+    el.style.display='none'; el.innerHTML=''; return;
+  }
+  const fmtList = (arr, f, max=12) => {
+    const items = arr.slice(0,max).map(f);
+    if(arr.length>max) items.push('…and '+(arr.length-max)+' more');
+    return '<ul>'+items.map(t=>'<li>'+t+'</li>').join('')+'</ul>';
+  };
+  let h = '<b><i class="ti ti-alert-octagon"></i> This sheet is NARROWER than the data already stored for '+esc($('project').value)+'.</b><br>'
+    + 'Work packages: <b>'+c.existing+'</b> stored → <b>'+c.incoming+'</b> in this sheet'
+    + (c.incoming<c.existing ? ' <b>(−'+(c.existing-c.incoming)+')</b>' : '')
+    + ' &nbsp;·&nbsp; Awarded: <b>'+c.existingAwarded+'</b> → <b>'+c.incomingAwarded+'</b>'
+    + (c.incomingAwarded<c.existingAwarded ? ' <b>(−'+(c.existingAwarded-c.incomingAwarded)+')</b>' : '');
+  if(c.lost.length){
+    h += '<br><br><b>'+c.lost.length+' stored work package(s) are NOT in this sheet and would be deleted:</b>'
+      + fmtList(c.lost, w => 'WP '+esc(w.wp_no)+(w.award_status==='Awarded'?' <b>(Awarded)</b>':'')+' — '+esc(String(w.description||'').slice(0,50)));
+  }
+  if(c.unawarded.length){
+    h += '<br><b>'+c.unawarded.length+' stored work package(s) are Awarded now but Not Yet Awarded in this sheet:</b>'
+      + fmtList(c.unawarded, x => 'WP '+esc(x.stored.wp_no)+' — '+esc(String(x.stored.description||'').slice(0,44))
+          + (x.stored.total_awarded ? ' (₱'+Number(x.stored.total_awarded).toLocaleString()+' would be cleared)' : ''));
+  }
+  h += '<br><br>If this sheet is not the current, full-scope file for this project, <b>cancel</b> and import the right one.';
+  el.innerHTML = h;
+  el.style.display='block';
+}
+
+// Extra confirmation text when the scope shrinks; '' when nothing is being lost.
+function scopeConfirmText(){
+  const c = _scopeCheck;
+  if(!c) return '';
+  const bits = [];
+  if(c.incoming < c.existing)               bits.push('• '+(c.existing-c.incoming)+' fewer work packages ('+c.existing+' → '+c.incoming+')');
+  if(c.incomingAwarded < c.existingAwarded) bits.push('• '+(c.existingAwarded-c.incomingAwarded)+' fewer AWARDED work packages ('+c.existingAwarded+' → '+c.incomingAwarded+')');
+  if(c.lost.length)                         bits.push('• '+c.lost.length+' stored WP(s) would be deleted outright: WP '+c.lost.slice(0,10).map(w=>w.wp_no).join(', ')+(c.lost.length>10?'…':''));
+  if(c.unawarded.length)                    bits.push('• '+c.unawarded.length+' awarded WP(s) would revert to Not Yet Awarded: WP '+c.unawarded.slice(0,10).map(x=>x.stored.wp_no).join(', ')+(c.unawarded.length>10?'…':''));
+  return bits.length ? bits.join('\n') : '';
 }
 
 async function doImport(){
@@ -503,6 +594,18 @@ async function doImport(){
     log('  Fix the source .xlsx so every work package has a distinct WP No., then re-parse and import.','err');
     alert(`This sheet has duplicate WP No.: ${dupNos.map(n=>`"${n}"`).join(', ')}.\n\nEach work package must have a unique WP No. Fix the Excel file and re-import — nothing was changed.`);
     return;
+  }
+  // Re-check against the stored data (the target project may have changed since the preview)
+  await checkScope(pid,_parsed).catch(()=>{}); renderScopeWarning();
+  const shrink = scopeConfirmText();
+  if(shrink){
+    log('Scope check — this sheet holds LESS than what is stored for '+pid+':','warnt');
+    shrink.split('\n').forEach(l=>log('  '+l,'warnt'));
+    if(!confirm('WARNING — this sheet has LESS data than what is already stored for '+pid+':\n\n'+shrink
+      + '\n\nThis usually means the wrong workbook was picked (an older or partial-scope file).\n\nImport it anyway?')){
+      log('Import cancelled — nothing was changed.','muted');
+      return;
+    }
   }
   if(!confirm(`Delete ALL work packages for ${pid} and import ${_parsed.length} rows from the sheet?\n\nThis cannot be undone.`)) return;
   $('btn-import').disabled=true; $('btn-cancel').disabled=true;
