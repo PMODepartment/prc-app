@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723f"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723f"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723f"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723g"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723g"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723g"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723f"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723g"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -49,7 +49,11 @@
     .mactions .mx{background:transparent;color:var(--text-secondary)}
     /* ── Excel-like grid view ───────────────────────────────────────────── */
     .xl-wrap{border:1px solid var(--border-md);border-radius:var(--radius-md);overflow:auto;max-height:calc(100vh - 250px);background:var(--surface);position:relative}
-    table.xl{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:11px;width:max-content}
+    /* table-layout:fixed is IGNORED when the width resolves via the auto algorithm —
+       `width:max-content` did exactly that, so <col> widths were discarded and one long
+       description stretched its column to thousands of px. renderGrid() sets an explicit
+       pixel width (sum of the visible columns) on every render instead. */
+    table.xl{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:11px}
     table.xl th,table.xl td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:0;height:26px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:var(--surface)}
     table.xl thead tr.xl-grp th{position:sticky;top:0;z-index:8;height:26px;background:#F3F3F3;color:var(--text-primary);
       font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;text-align:left;padding:4px 8px;
@@ -59,7 +63,13 @@
     table.xl thead tr.xl-grp .xl-grp-n{font-size:9px;font-weight:700;background:#EE3124;color:#fff;border-radius:8px;padding:0 5px;margin-left:2px}
     body.dark-mode table.xl thead tr.xl-grp th{background:#3a3a3a}
     body.dark-mode table.xl thead tr.xl-grp th:hover{background:#454545}
-    table.xl thead th.xl-colh{top:26px}
+    /* Header cells stay clipped (long labels must not bleed into the next column), so the
+       resize grip sits INSIDE the cell at its right edge. */
+    table.xl thead th.xl-colh{top:26px;padding-right:10px}
+    .xl-rz{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;z-index:9;
+      background:transparent}
+    .xl-rz:hover,.xl-rz:active{background:#EE3124}
+    #xl-rz-ghost{display:none;position:fixed;inset:0;z-index:999;cursor:col-resize}
     table.xl td.xl-ph{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,transparent 4px,transparent 8px);cursor:default}
     table.xl thead th{position:sticky;top:0;z-index:6;background:var(--surface-2);font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em;padding:5px 6px;text-align:left;white-space:normal;line-height:1.2;height:34px;vertical-align:middle}
     table.xl td{padding:4px 6px;color:var(--text-primary);cursor:cell}
@@ -203,6 +213,7 @@
             <span class="xl-hint">Sections:</span>
             <button class="xl-btn" style="padding:4px 9px" onclick="xlGroupsAll(false)" title="Show every WP-form section">Expand all</button>
             <button class="xl-btn" style="padding:4px 9px" onclick="xlGroupsAll(true)" title="Collapse every section to the key columns">Collapse all</button>
+            <button class="xl-btn" style="padding:4px 9px" onclick="xlResetWidths()" title="Restore every column to its default width">Reset widths</button>
             <span style="flex:1"></span>
             <span id="xl-missing-count" class="xl-hint" style="color:#EE3124;font-weight:700;display:none"></span>
             <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
@@ -212,9 +223,10 @@
           <div class="xl-hint" style="margin-bottom:8px">
             Click a cell to select · type or <b>Enter</b>/<b>F2</b> to edit · <b>Tab</b>/<b>arrows</b> to move ·
             <b>Ctrl+C</b>/<b>Ctrl+V</b> copy &amp; paste (multi-cell, works with Excel) · <b>Ctrl+D</b> fill down ·
-            <b>Del</b> clear · <b>Ctrl+Z</b> undo · <b>Esc</b> cancel. Edits are staged until you press Save.
+            <b>Del</b> clear · <b>Ctrl+Z</b> undo · <b>Esc</b> cancel. <b>Drag a column border</b> to resize (double-click it to reset). Edits are staged until you press Save.
           </div>
           <div class="xl-wrap" id="xl-wrap" tabindex="0"><table class="xl" id="xl-table"></table></div>
+          <div id="xl-rz-ghost"></div>
         </div>
       </div>
     </div>
@@ -224,9 +236,9 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723f"></script>
-<script src="assets/js/ui.js?v=20260723f"></script>
-<script src="assets/js/db.js?v=20260723f"></script>
+<script src="assets/js/auth.js?v=20260723g"></script>
+<script src="assets/js/ui.js?v=20260723g"></script>
+<script src="assets/js/db.js?v=20260723g"></script>
 <script>
   let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';
@@ -246,7 +258,6 @@
       const assigned = profile.projects || [];
       if (assigned.length === 1) currentProjId = assigned[0];
     }
-    _xlLoadGroups();          // per-user collapsed-section memory for the grid
     // Track navigation context
     sessionStorage.setItem('wpm_nav_ctx', currentProjId !== 'ALL' ? currentProjId : 'consolidated');
     await loadAll(profile);
@@ -575,6 +586,14 @@
   let VC = [];
   let _xlCollapsed = new Set(XL_GROUPS_DEFAULT_COLLAPSED);
   function _xlGroupKey(){ return 'wpm_grid_groups_' + ((adminProfile&&adminProfile.id)||'anon'); }
+  // Loaded lazily on the first render (NOT from the requireLogin callback — that would
+  // depend on the callback firing after these `let`s initialise).
+  let _xlPrefsLoaded = false;
+  function _xlLoadPrefs(){
+    if (_xlPrefsLoaded || !adminProfile) return;
+    _xlPrefsLoaded = true;
+    _xlLoadGroups(); _xlLoadWidths();
+  }
   function _xlLoadGroups(){
     try {
       const raw = localStorage.getItem(_xlGroupKey());
@@ -605,7 +624,60 @@
     _xlCollapsed = collapse ? new Set(XL_GROUPS.map(function(G){ return G.g; })) : new Set();
     _xlSaveGroups(); _xlSel = {r:_xlSel.r, c:0}; _xlAnchor = null; renderGrid();
   };
-  function _xlLeft(i){ let l = XL_GUTTER; for (let j=0;j<i;j++) l += VC[j].w; return l; }
+  /* Column widths: `col.w` is the default, `_xlWidths[k]` the user's dragged override
+     (persisted per user). Everything that needs a width goes through _xlW(). */
+  let _xlWidths = {};
+  function _xlWidthKey(){ return 'wpm_grid_widths_' + ((adminProfile&&adminProfile.id)||'anon'); }
+  function _xlLoadWidths(){
+    try { const raw = localStorage.getItem(_xlWidthKey()); if (raw) _xlWidths = JSON.parse(raw) || {}; } catch(_){}
+  }
+  function _xlSaveWidths(){
+    try { localStorage.setItem(_xlWidthKey(), JSON.stringify(_xlWidths)); } catch(_){}
+  }
+  function _xlW(col){ const v = _xlWidths[col.k]; return (typeof v === 'number' && v > 0) ? v : col.w; }
+  function _xlTotalW(){ return VC.reduce(function(t,c){ return t + _xlW(c); }, XL_GUTTER); }
+  function _xlLeft(i){ let l = XL_GUTTER; for (let j=0;j<i;j++) l += _xlW(VC[j]); return l; }
+  window.xlResetWidths = function(){
+    _xlWidths = {}; _xlSaveWidths(); renderGrid();
+  };
+
+  /* Drag-to-resize. Live-updates the <col> + table width during the drag (cheap — no
+     re-render), then re-renders on release so the sticky left offsets of the frozen
+     columns are recomputed. Double-click a handle to restore that column's default. */
+  const XL_MIN_W = 44, XL_MAX_W = 900;
+  function _xlStartResize(e, key){
+    e.preventDefault(); e.stopPropagation();
+    const col = VC.find(function(c){ return c.k===key; });
+    if (!col) return;
+    const idx = VC.indexOf(col);
+    const startX = e.clientX, startW = _xlW(col);
+    const tbl = document.getElementById('xl-table');
+    const colEl = tbl.querySelectorAll('colgroup col')[idx + 1];   // +1 = the row gutter
+    const ghost = document.getElementById('xl-rz-ghost');
+    document.body.style.cursor = 'col-resize';
+    if (ghost) ghost.style.display = 'block';
+    function move(ev){
+      const w = Math.max(XL_MIN_W, Math.min(XL_MAX_W, startW + (ev.clientX - startX)));
+      _xlWidths[key] = w;
+      if (colEl){ colEl.style.width = w + 'px'; colEl.style.minWidth = w + 'px'; }
+      tbl.style.width = _xlTotalW() + 'px';
+    }
+    function up(){
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      document.body.style.cursor = '';
+      if (ghost) ghost.style.display = 'none';
+      _xlSaveWidths();
+      renderGrid();               // rebuild so frozen-column left offsets follow the new width
+    }
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+  window._xlResizeDown = function(e, key){ _xlStartResize(e, key); };
+  window._xlResizeReset = function(e, key){
+    e.preventDefault(); e.stopPropagation();
+    delete _xlWidths[key]; _xlSaveWidths(); renderGrid();
+  };
 
   let _reviewView = 'grid';        // the grid is the primary surface — this is a bulk-edit page
   let _gridRows   = [];                // WPs currently displayed, in row order
@@ -747,6 +819,7 @@
     if (cnt) cnt.textContent = _gridRows.length + ' work package' + (_gridRows.length===1?'':'s')
       + (_gridRows.length!==total ? ' (of '+total+')' : '');
 
+    _xlLoadPrefs();
     _xlBuildVC();
     const tbl = document.getElementById('xl-table');
     if (!_gridRows.length){
@@ -755,7 +828,7 @@
       return;
     }
     const cg = '<colgroup><col style="width:'+XL_GUTTER+'px">' +
-      VC.map(function(c){ return '<col style="width:'+c.w+'px">'; }).join('') + '</colgroup>';
+      VC.map(function(c){ const w=_xlW(c); return '<col style="width:'+w+'px;min-width:'+w+'px">'; }).join('') + '</colgroup>';
 
     // Row 1 = WP-form section headers (click to collapse/expand); row 2 = the columns.
     let grpRow = '<tr class="xl-grp"><th class="xl-freeze" rowspan="2" style="left:0;top:0"></th>';
@@ -774,7 +847,9 @@
     const colRow = '<tr>' + VC.map(function(c,i){
         const fz = i < XL_FREEZE;
         const rq = (c.req || c.reqIfAwarded) ? ' xl-req' : '';
-        return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+'</th>';
+        const rz = c.ph ? '' :
+          '<span class="xl-rz" onmousedown="_xlResizeDown(event,\'' + c.k + '\')" ondblclick="_xlResizeReset(event,\'' + c.k + '\')" title="Drag to resize · double-click to reset"></span>';
+        return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+rz+'</th>';
       }).join('') + '</tr>';
     const thead = '<thead>' + grpRow + colRow + '</thead>';
     const tbody = '<tbody>' + _gridRows.map(function(w,r){
@@ -793,6 +868,7 @@
         }).join('') + '</tr>';
     }).join('') + '</tbody>';
     tbl.innerHTML = cg + thead + tbody;
+    tbl.style.width = _xlTotalW() + 'px';   // explicit width — see the table-layout note in the CSS
     _xlPaintEdits();
     _xlSelect(Math.min(_xlSel.r, _gridRows.length-1), _xlSel.c, false);
     _xlUpdateBar();
