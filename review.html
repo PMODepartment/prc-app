@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723d"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723d"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723d"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723e"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723e"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723e"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723d"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723e"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -72,6 +72,12 @@
     .xl-btn:disabled{opacity:.45;cursor:default}
     .xl-hint{font-size:10px;color:var(--text-hint)}
     .xl-badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;color:#fff}
+    /* Required-but-empty cells (mirrors the WP form's own required fields) */
+    table.xl td.xl-missing{background:#FDECEA;box-shadow:inset 3px 0 0 #EE3124}
+    body.dark-mode table.xl td.xl-missing{background:#4a1f1b}
+    table.xl th.xl-req::after{content:' *';color:#EE3124}
+    .xl-legend{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--text-hint)}
+    .xl-swatch{width:11px;height:11px;border-radius:2px;display:inline-block;border:1px solid rgba(0,0,0,.12)}
   </style>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
@@ -179,7 +185,13 @@
               <option value="rejected">Rejected (legacy)</option>
             </select>
             <span id="xl-count" class="xl-hint"></span>
+            <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer">
+              <input type="checkbox" id="xl-only-missing" onchange="renderGrid()" style="cursor:pointer"> Only incomplete
+            </label>
+            <span class="xl-legend"><span class="xl-swatch" style="background:#FDECEA;box-shadow:inset 3px 0 0 #EE3124"></span>required, empty</span>
+            <span class="xl-legend"><span class="xl-swatch" style="background:#FFF6DA"></span>unsaved</span>
             <span style="flex:1"></span>
+            <span id="xl-missing-count" class="xl-hint" style="color:#EE3124;font-weight:700;display:none"></span>
             <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
             <button id="xl-discard" class="xl-btn" onclick="gridDiscard()" disabled>Discard</button>
             <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled>Save changes</button>
@@ -199,9 +211,9 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723d"></script>
-<script src="assets/js/ui.js?v=20260723d"></script>
-<script src="assets/js/db.js?v=20260723d"></script>
+<script src="assets/js/auth.js?v=20260723e"></script>
+<script src="assets/js/ui.js?v=20260723e"></script>
+<script src="assets/js/db.js?v=20260723e"></script>
 <script>
   let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';
@@ -457,30 +469,30 @@
   // ro:true = read-only (generated/derived columns). type drives the editor + formatting.
   const XL_COLS = [
     { k:'project_id',          label:'Project',            w:80,  type:'text',   ro:true },
-    { k:'wp_no',               label:'WP No.',             w:70,  type:'text'  },
+    { k:'wp_no',               label:'WP No.',             w:70,  type:'text', req:true  },
     { k:'cost_code',           label:'Cost Code',          w:90,  type:'text'  },
-    { k:'description',         label:'Description',        w:240, type:'text'  },
-    { k:'trade',               label:'Trade',              w:150, type:'select', opts:XL_TRADES },
+    { k:'description',         label:'Description',        w:240, type:'text', req:true  },
+    { k:'trade',               label:'Trade',              w:150, type:'select', opts:XL_TRADES, req:true },
     { k:'works',               label:'Works',              w:140, type:'text'  },
     { k:'type_of_works',       label:'Type',               w:90,  type:'text'  },
     { k:'zone',                label:'Zone',               w:80,  type:'text'  },
     { k:'osm',                 label:'OSM',                w:60,  type:'select', opts:XL_YN },
-    { k:'charging_type',       label:'Charging',           w:110, type:'select', opts:['Main Contract','Change Order'] },
+    { k:'charging_type',       label:'Charging',           w:110, type:'select', opts:['Main Contract','Change Order'], req:true },
     { k:'procurement_status',  label:'Procurement Status', w:130, type:'select', opts:XL_PROC },
     { k:'award_status',        label:'Award Status',       w:110, type:'text',   ro:true },
     { k:'submittal_type',      label:'Submittal Status',   w:130, type:'select', opts:XL_SUBM },
     { k:'delivery_status',     label:'Delivery Status',    w:150, type:'select', opts:XL_DELIV },
-    { k:'awarding_date',       label:'Planned Award',      w:105, type:'date'  },
+    { k:'awarding_date',       label:'Planned Award',      w:105, type:'date', req:true  },
     { k:'actual_awarding_date',label:'Actual Award',       w:105, type:'date'  },
-    { k:'target_delivery',     label:'Target Delivery',    w:105, type:'date'  },
+    { k:'target_delivery',     label:'Target Delivery',    w:105, type:'date', req:true  },
     { k:'actual_delivery',     label:'Actual Delivery',    w:105, type:'date'  },
-    { k:'target_completion',   label:'Target Completion',  w:110, type:'date'  },
+    { k:'target_completion',   label:'Target Completion',  w:110, type:'date', req:true  },
     { k:'lead_time',           label:'Lead Time (d)',      w:80,  type:'num'   },
-    { k:'approved_budget_bcb', label:'Budget (BCB)',       w:120, type:'money' },
-    { k:'awarded_cost',        label:'Awarded Cost',       w:120, type:'money' },
+    { k:'approved_budget_bcb', label:'Budget (BCB)',       w:120, type:'money', req:true },
+    { k:'awarded_cost',        label:'Awarded Cost',       w:120, type:'money', reqIfAwarded:true },
     { k:'total_awarded',       label:'Total Awarded',      w:120, type:'money', ro:true },
     { k:'_variance',           label:'Variance',           w:120, type:'money', ro:true },
-    { k:'contractor',          label:'Awarded Vendor',     w:150, type:'text'  },
+    { k:'contractor',          label:'Awarded Vendor',     w:150, type:'text', reqIfAwarded:true  },
     { k:'proposed_vendors',    label:'Proposed Vendors',   w:160, type:'text'  },
     { k:'po_jo_count',         label:'No. PO/JO',          w:80,  type:'num'   },
     { k:'po_jo_numbers',       label:'PO/JO Numbers',      w:140, type:'text'  },
@@ -576,6 +588,32 @@
     return s;
   }
 
+  /* Required fields — the SAME set wp-form.html save() enforces:
+     WP No., Description, Trade, Planned Award, Target Delivery, Target Completion,
+     Budget (BCB), Charging; plus Awarded Cost + Awarded Vendor once a WP is Awarded
+     (`reqIfAwarded`). Project is implicit (a row always has one). */
+  function _xlRequired(w, col){
+    if (col.req) return true;
+    if (col.reqIfAwarded) return xlVal(w,'award_status')==='Awarded';
+    return false;
+  }
+  function _xlMissing(w, col){
+    if (!_xlRequired(w, col)) return false;
+    const v = xlVal(w, col.k);
+    return v==null || String(v).trim()==='';
+  }
+  // Every required-but-empty cell in the currently displayed rows.
+  function _xlMissingCells(){
+    const out = [];
+    _gridRows.forEach(function(w,r){
+      XL_COLS.forEach(function(col,c){ if(_xlMissing(w,col)) out.push({r:r,c:c,w:w,col:col}); });
+    });
+    return out;
+  }
+  function _xlRowMissing(w){
+    return XL_COLS.filter(function(col){ return _xlMissing(w,col); }).map(function(col){ return col.label; });
+  }
+
   window.renderGrid = function(){
     const statusF = document.getElementById('xl-status-filter') ? document.getElementById('xl-status-filter').value : 'all';
     const tradeEl = document.getElementById('trade-filter');
@@ -592,8 +630,14 @@
         (a.wp_no||'').toString().localeCompare((b.wp_no||'').toString(), undefined, {numeric:true, sensitivity:'base'});
     });
 
+    const onlyMissEl = document.getElementById('xl-only-missing');
+    const total = _gridRows.length;
+    if (onlyMissEl && onlyMissEl.checked)
+      _gridRows = _gridRows.filter(function(w){ return _xlRowMissing(w).length > 0; });
+
     const cnt = document.getElementById('xl-count');
-    if (cnt) cnt.textContent = _gridRows.length + ' work package' + (_gridRows.length===1?'':'s');
+    if (cnt) cnt.textContent = _gridRows.length + ' work package' + (_gridRows.length===1?'':'s')
+      + (_gridRows.length!==total ? ' (of '+total+')' : '');
 
     const tbl = document.getElementById('xl-table');
     if (!_gridRows.length){
@@ -606,7 +650,8 @@
     const thead = '<thead><tr><th class="xl-freeze" style="left:0"></th>' +
       XL_COLS.map(function(c,i){
         const fz = i < XL_FREEZE;
-        return '<th'+(fz?' class="xl-freeze" style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+'</th>';
+        const rq = (c.req || c.reqIfAwarded) ? ' xl-req' : '';
+        return '<th class="'+(fz?'xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+'</th>';
       }).join('') + '</tr></thead>';
     const tbody = '<tbody>' + _gridRows.map(function(w,r){
       const locked = !AppAuth.canEditProject(adminProfile, w.project_id);
@@ -616,7 +661,8 @@
           const fz  = i < XL_FREEZE;
           const ro  = c.ro || locked;
           const cls = ['xl-cell', fz?'xl-freeze':'', ro?'xl-ro':'',
-                       (c.type==='money'||c.type==='num')?'xl-num':''].filter(Boolean).join(' ');
+                       (c.type==='money'||c.type==='num')?'xl-num':'',
+                       _xlMissing(w,c)?'xl-missing':''].filter(Boolean).join(' ');
           const st  = fz ? ' style="left:'+_xlLeft(i)+'px"' : '';
           return '<td class="'+cls+'" data-r="'+r+'" data-c="'+i+'"'+st+'>'+esc(xlFmt(xlVal(w,c.k), c))+'</td>';
         }).join('') + '</tr>';
@@ -646,6 +692,18 @@
     const save = document.getElementById('xl-save'), disc = document.getElementById('xl-discard');
     if (save) { save.disabled = !n; save.textContent = n ? ('Save '+n+' change'+(n===1?'':'s')) : 'Save changes'; }
     if (disc) disc.disabled = !n;
+    // Required-but-empty tally for the visible rows
+    const miss = _xlMissingCells();
+    const ml = document.getElementById('xl-missing-count');
+    if (ml){
+      const rowsMissing = new Set(miss.map(function(m){ return m.w.id; })).size;
+      ml.textContent = miss.length
+        ? (miss.length + ' required field' + (miss.length===1?'':'s') + ' empty in ' + rowsMissing + ' WP' + (rowsMissing===1?'':'s'))
+        : '';
+      ml.style.display = miss.length ? '' : 'none';
+    }
+    const only = document.getElementById('xl-only-missing');
+    if (only) only.parentElement.style.display = '';
   }
 
   function _xlSelect(r, c, scroll){
@@ -682,10 +740,13 @@
     // Award Status is DERIVED from Procurement Status (Known Issues #18) — keep them in step.
     if (col.k === 'procurement_status'){
       const aw = (val === 'Awarded') ? 'Awarded' : 'Not Yet Awarded';
-      if ((w.award_status||'') !== aw){
+      // Compare against the CURRENT effective value, not the stored one — otherwise
+      // flipping Awarded → back again leaves a stale staged award_status behind.
+      if (xlVal(w,'award_status') !== aw){
         const had2 = Object.prototype.hasOwnProperty.call(_gridEdits[w.id], 'award_status');
         if (undoBatch) undoBatch.push({ id:w.id, k:'award_status', had:had2, prev:had2?_gridEdits[w.id].award_status:undefined });
-        _gridEdits[w.id].award_status = aw;
+        if ((w.award_status||'') === aw) delete _gridEdits[w.id].award_status;   // back to stored — drop the override
+        else _gridEdits[w.id].award_status = aw;
       }
     }
     _xlRefreshRow(r);
@@ -698,6 +759,7 @@
       td.textContent = xlFmt(xlVal(w,col.k), col);
       const edited = !!(_gridEdits[w.id] && Object.prototype.hasOwnProperty.call(_gridEdits[w.id], col.k));
       td.classList.toggle('xl-dirty', edited);
+      td.classList.toggle('xl-missing', _xlMissing(w,col));   // award status can flip what's required
     });
     _xlUpdateBar();
   }
@@ -870,18 +932,21 @@
   window.gridSave = async function(){
     const ids = Object.keys(_gridEdits);
     if (!ids.length) return;
-    // Same safeguard as the WP form: an Awarded WP needs an Awarded Cost and a Vendor.
+    // A row you edited must satisfy the same required fields as the WP form (incl. the
+    // Awarded ⇒ cost + vendor rule). Rows you did NOT touch are only highlighted, never
+    // blocking — many arrived incomplete from the monitoring-sheet imports.
     const bad = [];
     ids.forEach(function(id){
       const w = _gridRows.find(function(x){ return x.id===id; }) || allWPs.find(function(x){ return x.id===id; });
       if (!w) return;
-      if (xlVal(w,'award_status')==='Awarded'){
-        if (xlNum(xlVal(w,'awarded_cost'))==null || !String(xlVal(w,'contractor')||'').trim()) bad.push(w.wp_no||id);
-      }
+      const missing = _xlRowMissing(w);
+      if (missing.length) bad.push('  WP ' + (w.wp_no||id) + ' (' + w.project_id + ') — ' + missing.join(', '));
     });
     if (bad.length){
-      alert('These WPs are marked Awarded but are missing an Awarded Cost and/or Awarded Vendor:\n\n  '
-        + bad.join(', ') + '\n\nFill those in (or set Procurement Status back below Awarded) and save again.');
+      alert('These work packages are missing required fields (highlighted in red):\n\n'
+        + bad.join('\n')
+        + '\n\nFill them in and save again. Awarded Cost and Awarded Vendor are required only while a WP is Awarded — '
+        + 'setting Procurement Status back below Awarded clears that requirement.');
       return;
     }
     const btn = document.getElementById('xl-save');
