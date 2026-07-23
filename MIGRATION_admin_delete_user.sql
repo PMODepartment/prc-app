@@ -47,3 +47,23 @@ $$;
 -- (the function itself re-checks the caller is an admin).
 revoke all on function public.admin_delete_user(uuid) from public, anon;
 grant execute on function public.admin_delete_user(uuid) to authenticated;
+
+-- The Supabase advisor flags this as a SECURITY DEFINER function callable by the
+-- `authenticated` role — that is INTENTIONAL and safe, not a defect:
+--   • It MUST be SECURITY DEFINER: it deletes from auth.users, owned by postgres;
+--     a static front-end has no service-role key, so a signed-in admin can only
+--     purge the auth account through a definer RPC.
+--   • It MUST be callable by `authenticated` and live in the exposed `public`
+--     schema, or PostgREST could not expose it at /rest/v1/rpc for the admin UI.
+--   • It self-authorizes: auth.uid() returns the CALLER's id even inside a definer
+--     function (it reads the request JWT), so the role check above rejects any
+--     non-admin with 42501 BEFORE touching a row — no escalation, no enumeration.
+--   • Self-deletion is blocked and search_path is pinned to public.
+-- Do NOT switch to SECURITY INVOKER (the client can't write auth.users) or revoke
+-- EXECUTE (the admin Remove button would break). Dismiss the advisory.
+comment on function public.admin_delete_user(uuid) is
+  'INTENTIONAL SECURITY DEFINER RPC. Purges a user (public.users + auth.users). '
+  'Self-authorizes via auth.uid(): rejects non-admin callers with 42501 before any '
+  'delete, and refuses self-deletion. Must stay DEFINER + EXECUTE-to-authenticated + '
+  'in public schema so the admin UI can call it (no service-role key in the client). '
+  'The Supabase security_definer/RPC advisory on this function is an accepted exception.';
