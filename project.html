@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723k"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723k"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723k"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723l"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723l"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723l"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708b"/>
   <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723k"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723l"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723k"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723l"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -561,14 +561,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723k"></script>
-<script src="assets/js/ui.js?v=20260723k"></script>
-<script src="assets/js/db.js?v=20260723k"></script>
+<script src="assets/js/auth.js?v=20260723l"></script>
+<script src="assets/js/ui.js?v=20260723l"></script>
+<script src="assets/js/db.js?v=20260723l"></script>
 <script src="assets/js/onboarding.js?v=20260708b"></script>
 <script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260723k"></script>
+<script src="assets/js/charts.js?v=20260723l"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -1204,13 +1204,13 @@ function _syncBcbSwitcher(){
   const present = bcbLevelsPresent(_rawWPs);
   const levels  = BCB_LEVELS.filter(l => present[l]);
   if (levels.length < 2){ bar.style.display='none'; return; }   // nothing to switch between
-  const cur = BcbBaseline.get();
+  const cur = BcbBaseline.resolve(_rawWPs);
   btns.innerHTML = levels.map(l =>
     '<button class="ov-ch-btn'+(l===cur?' active':'')+'" onclick="setBcbBaseline(\'' + l + '\')">'+BCB_LABELS[l]+'</button>').join('');
   const n = _rawWPs.filter(w => w['budget_'+cur] != null).length;
   const note = document.getElementById('ov-bcb-note');
-  if (note) note.textContent = cur==='bcb0'
-    ? 'Original budget'
+  if (note) note.textContent = (cur===levels[0])
+    ? (BCB_LABELS[cur] + ' — this project's original baseline')
     : n + ' WP' + (n===1?'':'s') + ' re-baselined at ' + BCB_LABELS[cur] + ' — the rest carry their previous figure';
   bar.style.display='flex';
 }
@@ -2514,7 +2514,7 @@ AppAuth.requireLogin(async (user, profile) => {
   // Load data in parallel (WPs + Claims)
   const [meta, wps] = await Promise.all([WPDb.getProject(projId), WPDb.getAllWPs(projId)]);
   _rawWPs = (wps||[]).map(w => ({...w, wp_no: normWpNo(w.wp_no)}));
-  allWPs = applyBcbBaseline(_rawWPs, BcbBaseline.get());
+  allWPs = applyBcbBaseline(_rawWPs, BcbBaseline.resolve(_rawWPs));
   _syncBcbSwitcher();
   window._wpById = Object.fromEntries(allWPs.map(w => [w.id, w]));
   loadClaims(); // async — loads in background
@@ -2606,7 +2606,7 @@ AppAuth.requireLogin(async (user, profile) => {
   // Re-fetch WPs and refresh view after quick-add modal saves
   window.__wpmReloadFn = async () => {
     _rawWPs = (await WPDb.getAllWPs(projId)).map(w => ({...w, trade: normTrade(w.trade), wp_no: normWpNo(w.wp_no)}));
-    allWPs = applyBcbBaseline(_rawWPs, BcbBaseline.get());
+    allWPs = applyBcbBaseline(_rawWPs, BcbBaseline.resolve(_rawWPs));
     _syncBcbSwitcher();
     window._wpById = Object.fromEntries(allWPs.map(w => [w.id, w]));
     _syncOvCharging();

@@ -204,11 +204,22 @@ function bcbEffective(w, level) {
   for (let j = i; j >= 0; j--) { const v = bcbValue(w, BCB_LEVELS[j]); if (v != null) return v; }
   return w?.approved_budget_bcb ?? null;
 }
-// Which baselines actually carry data — drives the switcher (BCB0 is always offered).
+// Which baselines actually carry data — drives the switcher. A project may have NO BCB0:
+// QHL706's monitoring sheet heads its budget "BUDGET 1 - BCB1 (VAT EX)", so every WP lands
+// in budget_bcb1 and there is no original baseline to show. Offering an empty BCB0 tab
+// there would display BCB1's own figures under a BCB0 label — so only populated levels
+// are offered. Rows imported before baselines existed have none populated; BCB0 then
+// stands for the single stored budget.
 function bcbLevelsPresent(wps) {
-  const out = { bcb0: true };
-  BCB_LEVELS.slice(1).forEach(l => { out[l] = (wps||[]).some(w => w['budget_'+l] != null); });
+  const out = {};
+  BCB_LEVELS.forEach(l => { out[l] = (wps||[]).some(w => w['budget_'+l] != null); });
+  if (!BCB_LEVELS.some(l => out[l])) out.bcb0 = true;
   return out;
+}
+// Lowest baseline that actually has data — the sensible default for this data set.
+function bcbDefaultLevel(wps) {
+  const p = bcbLevelsPresent(wps);
+  return BCB_LEVELS.find(l => p[l]) || 'bcb0';
 }
 // Return a copy of the WP list with approved_budget_bcb set to the chosen baseline.
 function applyBcbBaseline(wps, level) {
@@ -227,11 +238,18 @@ const BcbBaseline = (() => {
   }
   function set(v) { try { if (BCB_LEVELS.includes(v)) localStorage.setItem(key(), v); } catch (_) {} }
   function label(v) { return BCB_LABELS[v || get()] || 'BCB0'; }
-  return { get, set, label, LEVELS: BCB_LEVELS, LABELS: BCB_LABELS };
+  // The level to actually render for THIS data: the user's pick if that baseline has
+  // data here, otherwise the lowest one that does (never an empty baseline).
+  function resolve(wps) {
+    const p = bcbLevelsPresent(wps), pref = get();
+    return p[pref] ? pref : bcbDefaultLevel(wps);
+  }
+  return { get, set, label, resolve, LEVELS: BCB_LEVELS, LABELS: BCB_LABELS };
 })();
 window.BCB_LEVELS = BCB_LEVELS; window.BCB_LABELS = BCB_LABELS;
 window.bcbValue = bcbValue; window.bcbEffective = bcbEffective;
-window.bcbLevelsPresent = bcbLevelsPresent; window.applyBcbBaseline = applyBcbBaseline;
+window.bcbLevelsPresent = bcbLevelsPresent; window.bcbDefaultLevel = bcbDefaultLevel;
+window.applyBcbBaseline = applyBcbBaseline;
 window.BcbBaseline = BcbBaseline;
 
 /* ── Formatting ─────────────────────────────────────────────────────── */
