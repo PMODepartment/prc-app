@@ -268,6 +268,38 @@ function detectLayout(rows){
       if(col.detailed_description==null && cands.length>1) col.detailed_description = cands[1];
     }
   }
+  /* ── BCB baselines ───────────────────────────────────────────────────────
+     Two things to find:
+     (1) WHICH baseline the main budget column represents — QHL706 heads it
+         "BUDGET 1 - BCB1 (VAT EX)", i.e. its budget is already BCB1; sheets with a
+         plain "BUDGET (BCB) (NET)" are BCB0.
+     (2) Any SEPARATE per-baseline MONEY column. Careful: every template has a
+         "BCB (0)" / "BCB (1)" pair inside the AVE. QTY / UoM block — those are
+         QUANTITIES, not budgets (CCM302's totals 2.6M vs a real budget of 886M),
+         so a candidate is only accepted when its magnitude is within reach of the
+         budget column (median >= 1% of the budget median). Without that guard the
+         importer would overwrite every budget with a quantity. */
+  const _bcbHdr = (col.budget_bcb!=null) ? band.map(b=>norm(b[col.budget_bcb])).filter(Boolean).join(' ') : '';
+  const _bl = _bcbHdr.match(/bcb ?\(?([0-2])\)?/);
+  col.budget_level = _bl ? +_bl[1] : 0;
+  const _colMedian = c => {
+    if(c==null) return 0;
+    const v=[]; for(let i=hdr+1;i<rows.length && v.length<200;i++){ const x=cn((rows[i]||[])[c]); if(x) v.push(Math.abs(x)); }
+    if(!v.length) return 0; v.sort((a,b)=>a-b); return v[Math.floor(v.length/2)];
+  };
+  const _budMed = _colMedian(col.budget_bcb);
+  col.bcb_cols = {};
+  for(const cells of band){
+    for(let c=0;c<cells.length;c++){
+      const stack = band.map(b=>norm(b[c])).filter(Boolean).join(' ');
+      const m = norm(cells[c]).match(/^bcb ?\(?([0-2])\)?$/);
+      if(!m) continue;
+      if(/qty|quantity|average|per tower|uom|%/.test(stack)) continue;   // the quantity block
+      if(c===col.budget_bcb) continue;
+      if(!_budMed || _colMedian(c) < _budMed*0.01) continue;             // magnitude guard
+      col.bcb_cols[m[1]] = c;
+    }
+  }
   const descCol = (col.wp_name!=null ? col.wp_name : col.wp_no);
   // Columns to scan for the hierarchical TRADE group-header text. The discipline header
   // sits in a DIFFERENT column per template: usually the Work-Package-Description column,
@@ -388,6 +420,12 @@ function rowToWP(r, projectId, today, C, curTrade){
   // 10 official trades; fall back to type-of-service.
   const trade = normTrade(curTrade ? mepfSplit(curTrade, desc) : cs(g('type_service')));
 
+  // Per-baseline budgets (see the BCB block in detectLayout)
+  const bcbLv = n => {
+    const c = C.bcb_cols && C.bcb_cols[String(n)];
+    if (c != null) { const v = cn(r[c]); if (v != null) return Math.round(v*100)/100; }
+    return (n === (C.budget_level||0)) ? budget : null;
+  };
   const remarks = cs(g('remarks'));
   const dpPct = cn(g('dp_percent')), retPct = cn(g('retention_percent'));
   let sdt = cs(g('submittal_document_type')); if(sdt && sdt.toLowerCase()==='mock up') sdt='Mock-up';
@@ -414,6 +452,9 @@ function rowToWP(r, projectId, today, C, curTrade){
     warranty_bond: yn(g('warranty_bond')),
     approved_budget_bcb: budget!=null ? Math.round(budget*100)/100 : null,
     _heldByFlag: heldByFlag,                      // preview-only, stripped before insert
+    // Budget at each baseline: the main budget column belongs to C.budget_level
+    // (BCB0 unless the sheet says otherwise), plus any separate money BCB columns.
+    budget_bcb0: bcbLv(0), budget_bcb1: bcbLv(1), budget_bcb2: bcbLv(2),
     awarded_cost: (awarded!=null && !isFutureAward) ? Math.round(awarded*100)/100 : null,
     additionals: Math.round((cn(g('additionals'))||0)*100)/100,
     payment_terms_days: si(g('payment_terms_days')),
@@ -481,7 +522,9 @@ function showDetected(L){
   const tradeFrom = (L.tradeCols&&L.tradeCols.length) ? ('col '+L.tradeCols.join('/')) : nm(L.descCol);
   $('detected').innerHTML='<b>Auto-detected layout</b> — header row <code>'+(L.hdrRow+1)+'</code>, trade from <code>'+tradeFrom+'</code>'+
     '. Key columns: WP No <code>'+nm(c.wp_no)+'</code>, Budget <code>'+nm(c.budget_bcb)+'</code>, Awarded Cost <code>'+nm(c.awarded_cost)+
-    '</code>, Awarding Date <code>'+nm(c.awarding_date)+'</code>, Actual Award <code>'+nm(c.actual_award_date)+'</code>, Completion <code>'+nm(c.target_completion)+'</code>, Remarks <code>'+nm(c.remarks)+'</code>.';
+    '</code>, Budget baseline <code>BCB'+(c.budget_level||0)+'</code>'+
+    (Object.keys(c.bcb_cols||{}).length ? ' (+ BCB cols '+Object.entries(c.bcb_cols).map(([k,v])=>'BCB'+k+'→'+v).join(', ')+')' : '')+
+    ', Awarding Date <code>'+nm(c.awarding_date)+'</code>, Actual Award <code>'+nm(c.actual_award_date)+'</code>, Completion <code>'+nm(c.target_completion)+'</code>, Remarks <code>'+nm(c.remarks)+'</code>.';
 }
 
 function renderPreview(wps){
@@ -688,6 +731,9 @@ $('btn-cancel').addEventListener('click',()=>{ $('preview-card').style.display='
   _projs=projs||[];
   initProjCombo();
   renderProjOptions('');
+  // Pre-select the project when arrived from a project page (?project=ID)
+  const _qp = new URLSearchParams(location.search).get('project');
+  if (_qp && _projs.some(p=>p.id===_qp)) selectProj(_qp);
   $('app').style.display='block';
 })();
 </script>

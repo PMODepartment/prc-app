@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723j"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723j"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723j"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260723j"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723k"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723k"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723k"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260723k"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723j"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723k"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -156,6 +156,7 @@
     <div class="sidebar-section">
       <div class="sidebar-section-label">Tools</div>
       <button class="nav-item" onclick="openTemplatePickerModal()"><i class="ti ti-download"></i>Download Template</button>
+      <a class="nav-item" id="nav-excel-import" href="import-monitoring.html"><i class="ti ti-file-spreadsheet"></i>Import Excel Sheet</a>
     </div>
     <div id="sidebar-admin" style="display:none">
       <div class="sidebar-section">
@@ -199,12 +200,14 @@
         <div id="import-banner" class="bulk-import-card" style="display:none;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <i class="ti ti-table-import" style="font-size:20px;color:#2563EB;flex-shrink:0"></i>
           <div style="flex:1;min-width:180px">
-            <div style="font-size:12px;font-weight:700;color:#1e40af">Bulk Import via CSV</div>
-            <div style="font-size:11px;color:#3b82f6;margin-top:1px">Upload a CSV file to import multiple work packages at once.</div>
+            <div style="font-size:12px;font-weight:700;color:#1e40af">Bulk Import</div>
+            <div style="font-size:11px;color:#3b82f6;margin-top:1px">Import many work packages at once — straight from a monitoring <b>.xlsx</b>, or via CSV.</div>
           </div>
-          <div style="display:flex;gap:8px;flex-shrink:0">
+          <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap">
             <button onclick="downloadCSVTemplate()" style="font-size:11px;font-weight:600;padding:6px 12px;border:1.5px solid #BFDBFE;border-radius:7px;background:#fff;color:#1e40af;cursor:pointer;font-family:inherit"><i class="ti ti-download" style="font-size:11px"></i> Template</button>
-            <button onclick="openWPImportModal()" style="font-size:11px;font-weight:600;padding:6px 12px;border:none;border-radius:7px;background:#2563EB;color:#fff;cursor:pointer;font-family:inherit"><i class="ti ti-upload" style="font-size:11px"></i> Import CSV</button>
+            <button onclick="openWPImportModal()" style="font-size:11px;font-weight:600;padding:6px 12px;border:1.5px solid #BFDBFE;border-radius:7px;background:#fff;color:#1e40af;cursor:pointer;font-family:inherit"><i class="ti ti-upload" style="font-size:11px"></i> Import CSV</button>
+            <!-- Excel importer as a first-class action, not buried inside the CSV modal -->
+            <a id="excel-import-btn" href="import-monitoring.html" style="font-size:11px;font-weight:600;padding:6px 12px;border:none;border-radius:7px;background:#16A34A;color:#fff;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:5px"><i class="ti ti-file-spreadsheet" style="font-size:12px"></i> Import Excel Sheet</a>
           </div>
         </div>
 
@@ -487,11 +490,7 @@
                 <input type="text" inputmode="numeric" id="f-bcb2" placeholder="Blank = same as BCB1"/>
                 <span class="hint" id="bcb2-delta"></span>
               </div>
-              <div class="form-group">
-                <label>Revised BCB3 (Net) <span style="cursor:help;color:#bbb;font-weight:400;font-size:11px" title="Budget at baseline 3. Leave blank if unchanged from the previous baseline.">&#9432;</span></label>
-                <input type="text" inputmode="numeric" id="f-bcb3" placeholder="Blank = same as BCB2"/>
-                <span class="hint" id="bcb3-delta"></span>
-              </div>
+
               <div class="form-group">
                 <label>Awarded Cost (Net) <span style="cursor:help;color:#bbb;font-weight:400;font-size:11px" title="The actual contract amount (net) the WP was awarded for. Required once Award Status is Awarded.">&#9432;</span></label>
                 <input type="number" id="f-contract" placeholder="Leave blank if not yet awarded" min="0"/>
@@ -655,10 +654,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723j"></script>
-<script src="assets/js/ui.js?v=20260723j"></script>
-<script src="assets/js/db.js?v=20260723j"></script>
-<script src="assets/js/coachmarks.js?v=20260723j"></script>
+<script src="assets/js/auth.js?v=20260723k"></script>
+<script src="assets/js/ui.js?v=20260723k"></script>
+<script src="assets/js/db.js?v=20260723k"></script>
+<script src="assets/js/coachmarks.js?v=20260723k"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -903,7 +902,7 @@
     const raw = parseFloat(el.value.replace(/,/g, ''));
     if (!isNaN(raw)) el.value = raw.toLocaleString('en-US');
   }
-  ['f-budget','f-bcb1','f-bcb2','f-bcb3','f-contract'].forEach(id => {
+  ['f-budget','f-bcb1','f-bcb2','f-contract'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('input', updateVariance);
     el.addEventListener('blur',  () => fmtComma(el));
@@ -1090,7 +1089,7 @@ function _updateBcbDeltas(){
     const v=parseFloat(String(el.value||'').replace(/,/g,'')); return isNaN(v)?null:v; };
   const awarded = num('f-contract');
   let prev = num('f-budget');
-  ['bcb1','bcb2','bcb3'].forEach(k => {
+  ['bcb1','bcb2'].forEach(k => {
     const el = document.getElementById(k+'-delta'); if(!el) return;
     const v = num('f-'+k);
     if (v == null){ el.textContent=''; el.style.color=''; return; }
@@ -1107,7 +1106,7 @@ function _updateBcbDeltas(){
     prev = v;
   });
 }
-['f-budget','f-bcb1','f-bcb2','f-bcb3','f-contract'].forEach(id => {
+['f-budget','f-bcb1','f-bcb2','f-contract'].forEach(id => {
   document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', _updateBcbDeltas);
@@ -1157,6 +1156,10 @@ AppAuth.requireLogin(async (user, profile) => {
       const reviewLink = document.getElementById('review-link-form');
       if (reviewLink) {
         reviewLink.href = projId ? 'review.html?project=' + projId : 'review.html';
+        const _xl = document.getElementById('nav-excel-import'), _xl2 = document.getElementById('excel-import-btn');
+        const _xlHref = projId ? 'import-monitoring.html?project=' + projId : 'import-monitoring.html';
+        if (_xl) _xl.href = _xlHref;
+        if (_xl2) _xl2.href = _xlHref;
         reviewLink.style.display = 'flex';
       }
     }
@@ -1281,7 +1284,7 @@ AppAuth.requireLogin(async (user, profile) => {
       // BCB0 falls back to the legacy single budget column for rows imported before baselines existed
       const _bv = existingWP.budget_bcb0 ?? existingWP.approved_budget_bcb;
       document.getElementById('f-budget').value = _bv ? parseFloat(_bv).toLocaleString('en-US') : '';
-      ['bcb1','bcb2','bcb3'].forEach(k => {
+      ['bcb1','bcb2'].forEach(k => {
         const el = document.getElementById('f-'+k), v = existingWP['budget_'+k];
         if (el) el.value = (v==null||v==='') ? '' : parseFloat(v).toLocaleString('en-US');
       });
@@ -1454,8 +1457,7 @@ AppAuth.requireLogin(async (user, profile) => {
       budget_bcb0:              getNum('f-budget'),
       budget_bcb1:              getNum('f-bcb1'),
       budget_bcb2:              getNum('f-bcb2'),
-      budget_bcb3:              getNum('f-bcb3'),
-      approved_budget_bcb:      (getNum('f-bcb3') ?? getNum('f-bcb2') ?? getNum('f-bcb1') ?? getNum('f-budget')),
+      approved_budget_bcb:      (getNum('f-bcb2') ?? getNum('f-bcb1') ?? getNum('f-budget')),
       awarded_cost:             getNum('f-contract'),
       award_status:             getVal('f-award-status'),
       payment_terms_days:       getNum('f-payment-terms-days'),

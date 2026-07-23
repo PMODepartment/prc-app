@@ -177,16 +177,16 @@ function helpingMetrics(wps) {
   return {awarded, totalBudget, awardedCost, budgetAwarded, hsCovered};
 }
 
-/* ── BCB baselines (BCB0 … BCB3) ──────────────────────────────────────────
+/* ── BCB baselines (BCB0 … BCB2) ──────────────────────────────────────────
    A project's budget is re-baselined over time, so the SAME work package can
    show savings against BCB0 and a loss against BCB1. Each baseline is stored in
-   its own column (`budget_bcb0…3`); `approved_budget_bcb` holds the CURRENT
+   its own column (`budget_bcb0…2`); `approved_budget_bcb` holds the CURRENT
    one, which is what every chart/KPI/table/export already reads.
    Rather than thread a baseline argument through ~110 read sites, the switcher
    re-maps `approved_budget_bcb` on the loaded array (`applyBcbBaseline`) and the
    whole dashboard re-renders against it unchanged. */
-const BCB_LEVELS = ['bcb0','bcb1','bcb2','bcb3'];
-const BCB_LABELS = { bcb0:'BCB0', bcb1:'BCB1', bcb2:'BCB2', bcb3:'BCB3' };
+const BCB_LEVELS = ['bcb0','bcb1','bcb2'];
+const BCB_LABELS = { bcb0:'BCB0', bcb1:'BCB1', bcb2:'BCB2' };
 
 // The figure explicitly recorded AT this baseline (BCB0 falls back to the single
 // legacy budget column, so data imported before baselines existed still reads).
