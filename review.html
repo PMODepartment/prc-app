@@ -95,6 +95,21 @@
     table.xl td.xl-freeze{background:var(--surface-2);font-weight:600}
     table.xl tbody tr:hover td:not(.xl-dirty){background:var(--surface-2)}
     .xl-ed{position:absolute;z-index:20;font-family:inherit;font-size:11px;padding:3px 5px;border:2px solid #EE3124;border-radius:0;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box}
+    /* fill handle (corner drag to copy down) + its live preview */
+    table.xl td.xl-fillprev{background:rgba(238,49,36,.16);outline:1px dashed rgba(238,49,36,.6);outline-offset:-1px}
+    #xl-fill-handle{position:absolute;width:8px;height:8px;background:#EE3124;border:1px solid #fff;z-index:19;cursor:crosshair;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+    /* per-column "set all" caret in the header */
+    .xl-colset{margin-left:4px;padding:0 2px;border:none;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:11px;line-height:1;opacity:.55;vertical-align:middle}
+    .xl-colset:hover{opacity:1;color:#EE3124}
+    #xl-colmenu{position:fixed;z-index:50;background:var(--surface);border:1.5px solid var(--border-md);border-radius:9px;box-shadow:0 10px 30px rgba(0,0,0,.22);padding:8px;min-width:210px;max-width:240px;font-size:12px}
+    #xl-colmenu .xl-cm-h{font-size:11px;color:var(--text-secondary);margin-bottom:7px;line-height:1.35}
+    #xl-colmenu .xl-cm-opts{display:flex;flex-direction:column;gap:3px;max-height:260px;overflow-y:auto}
+    #xl-colmenu .xl-cm-opt{text-align:left;padding:6px 9px;border:1px solid var(--border-md);border-radius:6px;background:var(--surface);color:var(--text-primary);cursor:pointer;font-family:inherit;font-size:12px}
+    #xl-colmenu .xl-cm-opt:hover{border-color:#EE3124;background:rgba(238,49,36,.08)}
+    #xl-colmenu .xl-cm-clear{color:#EE3124;margin-top:4px}
+    #xl-colmenu .xl-cm-row{display:flex;gap:6px;margin-bottom:4px}
+    #xl-colmenu .xl-cm-in{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border-md);border-radius:6px;background:var(--surface);color:var(--text-primary);font-family:inherit;font-size:12px;outline:none}
+    #xl-colmenu .xl-cm-apply{padding:6px 12px;border:none;border-radius:6px;background:#EE3124;color:#fff;font-weight:600;cursor:pointer;font-family:inherit;font-size:12px}
     .xl-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
     .xl-btn{font-size:11px;padding:6px 13px;border-radius:7px;border:1.5px solid var(--border-md);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;font-weight:600}
     .xl-btn.primary{background:#EE3124;border-color:#EE3124;color:#fff}
@@ -232,8 +247,9 @@
             <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled>Save changes</button>
           </div>
           <div class="xl-hint" style="margin-bottom:8px">
-            Click a cell to select · type or <b>Enter</b>/<b>F2</b> to edit · <b>Tab</b>/<b>arrows</b> to move ·
-            <b>Ctrl+C</b>/<b>Ctrl+V</b> copy &amp; paste (multi-cell, works with Excel) · <b>Ctrl+D</b> fill down ·
+            Click a cell to select · <b>drag to select a range</b> · type or <b>Enter</b>/<b>F2</b> to edit · <b>Tab</b>/<b>arrows</b> to move ·
+            <b>Ctrl+C</b>/<b>Ctrl+V</b> copy &amp; paste (multi-cell, works with Excel) · <b>Ctrl+D</b> or <b>drag the corner handle</b> to fill down ·
+            the header <b>▾</b> sets a whole column at once (handy for the dropdowns) ·
             <b>Del</b> clear · <b>Ctrl+Z</b> undo · <b>Esc</b> cancel. <b>Drag a column border</b> to resize (double-click it to reset). Edits are staged until you press Save.
           </div>
           <div class="xl-wrap" id="xl-wrap" tabindex="0"><table class="xl" id="xl-table"></table></div>
@@ -513,6 +529,7 @@
     { g:'budget',     label:'Budget & Contract' },
     { g:'payment',    label:'Payment Terms' },
     { g:'status',     label:'Procurement Status' },
+    { g:'audit',      label:'Last Change' },
   ];
   // Groups collapsed on a first visit — the wide, less-reviewed sections. The user's own
   // choice is remembered per user in localStorage.
@@ -588,7 +605,12 @@
     { g:'status',   k:'co_description',      label:'CO Description',       w:160, type:'text'  },
     { g:'status',   k:'remarks',             label:'Remarks',              w:180, type:'text'  },
     { g:'status',   k:'purchase_request',    label:'Purchase Request',     w:130, type:'text'  },
-    { g:'status',   k:'review_status',       label:'Review',               w:95,  type:'text',  ro:true },
+    // (The old read-only "Review" / review_status column was removed — the approval
+    //  workflow is retired, so it always read "approved" and was pure clutter. The SHOW
+    //  dropdown still filters on the underlying review_status field for legacy cleanup.)
+    /* ── Last Change (audit trail — read-only) ─────────────────────────── */
+    { g:'audit',    k:'updated_by_name',     label:'Last Edited By',       w:150, type:'text', ro:true },
+    { g:'audit',    k:'updated_at',          label:'Last Edited On',       w:150, type:'datetime', ro:true },
   ];
 
   const XL_FREEZE = 2;                 // Project + WP No. stay pinned left (after the row gutter)
@@ -700,6 +722,10 @@
   let _xlAnchor   = null;              // range anchor (shift-select)
   let _xlUndo     = [];                // [[{id,k,prev}, …], …]
   let _xlEditing  = false;
+  let _xlDragMode = null;              // 'select' | 'fill' while a mouse drag is in progress
+  let _xlDragOrigin = null;            // {r,c} where a select-drag began
+  let _xlFillSrc  = null;              // {r1,r2,c1,c2} source range of a fill-handle drag
+  let _xlFillTo   = null;              // current target row of a fill drag
 
   // Small transient message (no global toast helper on this page)
   function xlToast(msg){
@@ -745,6 +771,10 @@
       const a = xlNum(xlVal(w,'awarded_cost'));
       return a==null ? (w.total_awarded==null?null:w.total_awarded) : a + (w.additionals||0);
     }
+    // BCB0 is the CURRENT baseline for rows imported before per-baseline columns existed
+    // (their single budget lives in approved_budget_bcb). Mirror the dashboard's bcbValue()
+    // carry-forward so the BCB0 cell shows the current value instead of a confusing blank.
+    if (k === 'budget_bcb0' && (w.budget_bcb0==null || w.budget_bcb0==='')) return w.approved_budget_bcb;
     return w[k];
   }
   function xlNum(v){ if(v===''||v==null) return null; const n=parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?null:n; }
@@ -756,6 +786,7 @@
     if (col.type==='pct'){ const n=xlNum(v); return n==null?'':String(+(n*100).toFixed(4)); }
     if (col.type==='money'){ const n=xlNum(v); return n==null?'':n.toLocaleString('en-US',{maximumFractionDigits:2}); }
     if (col.type==='date'){ const d=String(v).match(/\d{4}-\d{2}-\d{2}/); return d?d[0]:String(v); }
+    if (col.type==='datetime'){ try{ return new Date(v).toLocaleString('en-US',{month:'short',day:'2-digit',year:'numeric',hour:'numeric',minute:'2-digit'}); }catch(_){ return String(v); } }
     return String(v);
   }
   // Editors give back strings; store the right JS type so the DB patch is clean.
@@ -953,7 +984,13 @@
         const rq = (c.req || c.reqIfAwarded) ? ' xl-req' : '';
         const rz = c.ph ? '' :
           '<span class="xl-rz" onmousedown="_xlResizeDown(event,\'' + c.k + '\')" ondblclick="_xlResizeReset(event,\'' + c.k + '\')" title="Drag to resize · double-click to reset"></span>';
-        return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+rz+'</th>';
+        // "Set all" caret — bulk-set a whole column (great for the dropdowns). Not for
+        // read-only/placeholder cols or the unique WP No./Project keys.
+        const canSet = !c.ph && !c.ro && c.k!=='wp_no' && c.k!=='project_id';
+        const setBtn = canSet
+          ? '<button class="xl-colset" title="Set this column for every row" onclick="_xlColMenu(event,\'' + c.k + '\')"><i class="ti ti-chevron-down"></i></button>'
+          : '';
+        return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+setBtn+rz+'</th>';
       }).join('') + '</tr>';
     const thead = '<thead>' + grpRow + colRow + '</thead>';
     const tbody = '<tbody>' + _gridRows.map(function(w,r){
@@ -976,6 +1013,10 @@
     }).join('') + '</tbody>';
     tbl.innerHTML = cg + thead + tbody;
     tbl.style.width = _xlTotalW() + 'px';   // explicit width — see the table-layout note in the CSS
+    // Keep the fill handle glued to the selection as the grid scrolls (bind once).
+    const _wrap = document.getElementById('xl-wrap');
+    if (_wrap && !_wrap._xlScrollBound){ _wrap._xlScrollBound = true;
+      _wrap.addEventListener('scroll', function(){ _xlSyncFill(); _xlCloseColMenu(); }); }
     _xlPaintEdits();
     _xlSelect(Math.min(_xlSel.r, _gridRows.length-1), _xlSel.c, false);
     _xlUpdateBar();
@@ -1030,12 +1071,15 @@
     _xlSel = {r:r,c:c};
     const td = _xlTd(r,c);
     if (td){ td.classList.add('xl-sel'); if(scroll) td.scrollIntoView({block:'nearest',inline:'nearest'}); }
+    _xlSyncFill();
   }
   function _xlPaintRange(){
     document.querySelectorAll('#xl-table td.xl-range').forEach(function(td){ td.classList.remove('xl-range'); });
-    if (!_xlAnchor) return;
-    const R = _xlRange();
-    for (let r=R.r1;r<=R.r2;r++) for (let c=R.c1;c<=R.c2;c++){ const td=_xlTd(r,c); if(td) td.classList.add('xl-range'); }
+    if (_xlAnchor){
+      const R = _xlRange();
+      for (let r=R.r1;r<=R.r2;r++) for (let c=R.c1;c<=R.c2;c++){ const td=_xlTd(r,c); if(td) td.classList.add('xl-range'); }
+    }
+    _xlSyncFill();
   }
   function _xlRange(){
     const a = _xlAnchor || _xlSel;
@@ -1066,6 +1110,22 @@
         else _gridEdits[w.id].award_status = aw;
       }
     }
+    // BCB0 is the CURRENT baseline when no higher baseline (BCB1/BCB2) is set — so editing
+    // it must also move approved_budget_bcb ("current"), which every dashboard read uses;
+    // otherwise the KPIs wouldn't budge. Mirrors the read-side fallback in xlVal().
+    if (col.k === 'budget_bcb0'){
+      const hasHigher = (xlVal(w,'budget_bcb1')!=null && xlVal(w,'budget_bcb1')!=='')
+                     || (xlVal(w,'budget_bcb2')!=null && xlVal(w,'budget_bcb2')!=='');
+      if (!hasHigher){
+        const cur = (val==null||val==='') ? null : val;
+        if (String(xlVal(w,'approved_budget_bcb')??'') !== String(cur??'')){
+          const had3 = !!(_gridEdits[w.id] && Object.prototype.hasOwnProperty.call(_gridEdits[w.id],'approved_budget_bcb'));
+          if (undoBatch) undoBatch.push({ id:w.id, k:'approved_budget_bcb', had:had3, prev:had3?_gridEdits[w.id].approved_budget_bcb:undefined });
+          if (String(w.approved_budget_bcb??'')===String(cur??'')) delete _gridEdits[w.id].approved_budget_bcb;
+          else _gridEdits[w.id].approved_budget_bcb = cur;
+        }
+      }
+    }
     _xlRefreshRow(r);
     return true;
   }
@@ -1088,6 +1148,7 @@
     if (!w || !col || !_xlEditable(w, col)) return;
     const td = _xlTd(r,c); if(!td) return;
     _xlEditing = true;
+    _xlSyncFill();                       // hide the fill handle while the editor is open
     const cur = xlVal(w, col.k);
     let ed;
     if (col.type === 'select' || col.type === 'bool'){
@@ -1122,6 +1183,7 @@
       if (commit){ const b=[]; _xlSet(r,c,v,b); if(b.length) _xlUndo.push(b); }
       if (move==='down')  _xlSelect(r+1, c);
       if (move==='right') _xlSelect(r, c+1);
+      _xlSyncFill();                     // restore the fill handle after the editor closes
       const wr2 = document.getElementById('xl-wrap'); if(wr2) wr2.focus();
     };
     ed.addEventListener('keydown', function(e){
@@ -1135,7 +1197,19 @@
   }
 
   /* ── Mouse + keyboard ───────────────────────────────────────────────────── */
-  document.addEventListener('click', function(e){
+  // mousedown starts either a range-select drag (on a cell) or a fill-down drag (on the
+  // little corner handle). Excel-style: click = single cell, drag = range, corner-drag = fill.
+  document.addEventListener('mousedown', function(e){
+    if (_reviewView !== 'grid' || _xlEditing) return;
+    if (e.button !== 0) return;                                   // left button only
+    // Corner fill handle → start a fill drag from the current range/cell.
+    if (e.target.id === 'xl-fill-handle'){
+      e.preventDefault();
+      _xlFillSrc = _xlRange();
+      _xlFillTo  = _xlFillSrc.r2;
+      _xlDragMode = 'fill';
+      return;
+    }
     const td = e.target.closest && e.target.closest('#xl-table td.xl-cell');
     if (!td) return;
     const r = +td.dataset.r, c = +td.dataset.c;
@@ -1143,13 +1217,145 @@
       if (!_xlAnchor) _xlAnchor = { r:_xlSel.r, c:_xlSel.c };
       _xlSel = {r:r,c:c}; _xlSelect(r,c,false); _xlPaintRange();
     } else {
-      _xlAnchor = null; _xlPaintRange(); _xlSelect(r,c);
+      _xlAnchor = null; _xlSel = {r:r,c:c}; _xlSelect(r,c,false); _xlPaintRange();
+      _xlDragMode = 'select'; _xlDragOrigin = {r:r,c:c};
     }
+    e.preventDefault();                                           // no native text selection
     const wrap = document.getElementById('xl-wrap'); if(wrap) wrap.focus();
+  });
+  document.addEventListener('mousemove', function(e){
+    if (!_xlDragMode) return;
+    const td = e.target.closest && e.target.closest('#xl-table td.xl-cell');
+    if (!td) return;
+    const r = +td.dataset.r, c = +td.dataset.c;
+    if (_xlDragMode === 'fill'){
+      if (r === _xlFillTo) return;
+      _xlFillTo = r; _xlPaintFillPreview();
+      return;
+    }
+    // select drag — extend the range to the hovered cell
+    if (r === _xlSel.r && c === _xlSel.c) return;
+    if (!_xlAnchor) _xlAnchor = { r:_xlDragOrigin.r, c:_xlDragOrigin.c };
+    _xlSel = {r:r,c:c}; _xlSelect(r,c,false); _xlPaintRange();
+  });
+  document.addEventListener('mouseup', function(){
+    if (_xlDragMode === 'fill') _xlCommitFill();
+    _xlDragMode = null; _xlDragOrigin = null;
   });
   document.addEventListener('dblclick', function(e){
     const td = e.target.closest && e.target.closest('#xl-table td.xl-cell');
     if (td){ _xlSelect(+td.dataset.r, +td.dataset.c); _xlBeginEdit(); }
+  });
+
+  /* ── Fill handle (corner drag to copy down, like Excel) ───────────────────── */
+  // A single floating square pinned to the bottom-right of the current selection.
+  function _xlSyncFill(){
+    const wrap = document.getElementById('xl-wrap'); if(!wrap) return;
+    let h = document.getElementById('xl-fill-handle');
+    if (_xlEditing || _xlDragMode==='fill' || !_gridRows.length){ if(h) h.style.display='none'; return; }
+    const R = _xlRange();
+    const td = _xlTd(R.r2, R.c2);
+    if (!td){ if(h) h.style.display='none'; return; }
+    if (!h){ h = document.createElement('div'); h.id = 'xl-fill-handle'; wrap.appendChild(h); }
+    const tr = td.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+    h.style.display = 'block';
+    h.style.left = (tr.right  - wr.left + wrap.scrollLeft - 4) + 'px';
+    h.style.top  = (tr.bottom - wr.top  + wrap.scrollTop  - 4) + 'px';
+  }
+  function _xlPaintFillPreview(){
+    document.querySelectorAll('#xl-table td.xl-fillprev').forEach(function(td){ td.classList.remove('xl-fillprev'); });
+    if (_xlFillTo==null || !_xlFillSrc) return;
+    const S = _xlFillSrc;
+    const lo = Math.min(S.r1, _xlFillTo), hi = Math.max(S.r2, _xlFillTo);
+    for (let r=lo; r<=hi; r++){
+      if (r>=S.r1 && r<=S.r2) continue;                          // source rows aren't preview
+      for (let c=S.c1; c<=S.c2; c++){ const td=_xlTd(r,c); if(td) td.classList.add('xl-fillprev'); }
+    }
+  }
+  // value that target row rr / column cc receives — repeats the source block (Excel behaviour)
+  function _xlFillValue(cc, rr, S){
+    const span = S.r2 - S.r1 + 1;
+    const off  = ((rr - S.r1) % span + span) % span;
+    return xlVal(_gridRows[S.r1 + off], VC[cc].k);
+  }
+  function _xlCommitFill(){
+    document.querySelectorAll('#xl-table td.xl-fillprev').forEach(function(td){ td.classList.remove('xl-fillprev'); });
+    const S = _xlFillSrc; const to = _xlFillTo;
+    _xlFillSrc = null; _xlFillTo = null;
+    if (!S || to==null) { _xlSyncFill(); return; }
+    const lo = Math.min(S.r1, to), hi = Math.max(S.r2, to);
+    if (lo===S.r1 && hi===S.r2){ _xlSyncFill(); return; }        // no extension
+    const b = []; let blocked = 0;
+    for (let r=lo; r<=hi; r++){
+      if (r>=S.r1 && r<=S.r2) continue;
+      for (let c=S.c1; c<=S.c2; c++){
+        const v = _xlFillValue(c, r, S);
+        if (!_xlSet(r, c, v==null?'':v, b)) blocked++;
+      }
+    }
+    if (b.length) _xlUndo.push(b);
+    if (blocked) xlToast(blocked+' cell'+(blocked===1?'':'s')+" skipped (read-only, or a project you can't edit).");
+    // grow the selection over the filled block
+    _xlAnchor = { r:lo, c:S.c1 }; _xlSel = { r:hi, c:S.c2 };
+    _xlSelect(hi, S.c2, false); _xlPaintRange();
+  }
+
+  /* ── Set a whole column at once (from the header ▾) ───────────────────────── */
+  function _xlSetColumn(k, value){
+    const ci = VC.findIndex(function(x){ return x.k===k; });
+    if (ci < 0) return;
+    const col = VC[ci];
+    const b = []; let changed = 0, blocked = 0;
+    for (let r=0; r<_gridRows.length; r++){
+      if (!_xlEditable(_gridRows[r], col)){ blocked++; continue; }
+      const before = xlVal(_gridRows[r], k);
+      _xlSet(r, ci, value==null?'':value, b);
+      const after = xlVal(_gridRows[r], k);
+      if (String(before??'') !== String(after??'')) changed++;
+    }
+    if (b.length) _xlUndo.push(b);
+    _xlPaintRange();
+    xlToast('Set “'+col.label+'” on '+changed+' row'+(changed===1?'':'s')
+      + (blocked?(' · '+blocked+" skipped (a project you can't edit)"):''));
+  }
+  window._xlCloseColMenu = function(){ const m=document.getElementById('xl-colmenu'); if(m) m.remove(); };
+  window._xlColMenu = function(e, k){
+    e.preventDefault(); e.stopPropagation();
+    _xlCloseColMenu();
+    const col = VC.find(function(x){ return x.k===k; }); if(!col) return;
+    const m = document.createElement('div'); m.id = 'xl-colmenu';
+    let inner = '<div class="xl-cm-h">Set <b>'+esc(col.label)+'</b> for all '+_gridRows.length+' row'+(_gridRows.length===1?'':'s')+'</div>';
+    if (col.type==='select' || col.type==='bool'){
+      const opts = col.type==='bool' ? ['Yes','No'] : col.opts.slice();
+      inner += '<div class="xl-cm-opts">' + opts.map(function(o){
+        return '<button class="xl-cm-opt" data-v="'+esc(o)+'" onclick="_xlColApply(\''+esc(k)+'\',this.getAttribute(\'data-v\'))">'+esc(o)+'</button>'; }).join('')
+        + '<button class="xl-cm-opt xl-cm-clear" data-v="" onclick="_xlColApply(\''+esc(k)+'\',\'\')">— Clear —</button></div>';
+    } else {
+      inner += '<div class="xl-cm-row"><input id="xl-cm-in" class="xl-cm-in" placeholder="Value for every row" '
+        + 'onkeydown="if(event.key===\'Enter\')_xlColApplyInput(\''+esc(k)+'\')">'
+        + '<button class="xl-cm-apply" onclick="_xlColApplyInput(\''+esc(k)+'\')">Apply</button></div>'
+        + '<button class="xl-cm-opt xl-cm-clear" onclick="_xlColApply(\''+esc(k)+'\',\'\')">— Clear all —</button>';
+    }
+    m.innerHTML = inner;
+    document.body.appendChild(m);
+    const b = e.target.closest('button').getBoundingClientRect();
+    m.style.left = Math.min(b.left, window.innerWidth - 250) + 'px';
+    m.style.top  = (b.bottom + 4) + 'px';
+    const inp = document.getElementById('xl-cm-in'); if(inp) inp.focus();
+  };
+  window._xlColApply = function(k, v){
+    _xlCloseColMenu();
+    if (!confirm('Set this value on all '+_gridRows.length+' rows in view? (You can Ctrl+Z to undo, and nothing saves until you press Save changes.)')) return;
+    _xlSetColumn(k, v);
+  };
+  window._xlColApplyInput = function(k){
+    const inp = document.getElementById('xl-cm-in'); const v = inp ? inp.value : '';
+    _xlColApply(k, v);
+  };
+  // Dismiss the column menu on any outside click.
+  document.addEventListener('mousedown', function(e){
+    const m = document.getElementById('xl-colmenu');
+    if (m && !m.contains(e.target) && !(e.target.closest && e.target.closest('.xl-colset'))) _xlCloseColMenu();
   });
 
   document.addEventListener('keydown', function(e){
