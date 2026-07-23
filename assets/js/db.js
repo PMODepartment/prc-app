@@ -157,8 +157,18 @@ function helpingMetrics(wps) {
       // both failure modes seen in the data: provisional costs sitting on "Not yet Awarded" WPs
       // (GRP/SLN/SLT over-count) and the Helping Sheet's date/row leaks (AVR under-count).
       hsCovered = false;
-      const awd = arr.filter(w => w.award_status==='Awarded' && (w.total_awarded||0) > 0);
-      awarded += awd.length;
+      // COUNT basis: every WP whose award_status is 'Awarded'. A WP that has genuinely been
+      // awarded but whose cost hasn't been encoded yet is still an awarded WP — excluding it
+      // made the Overview disagree with the WP List (CCM302 read 39 against a list of 40,
+      // OPW101 64 against 62). Provisional costs on Not-Yet-Awarded rows are still excluded,
+      // because that is decided by award_status, which the importer takes from the sheet's
+      // own Remarks flag rather than from the presence of a cost.
+      const awdAll = arr.filter(w => w.award_status==='Awarded');
+      // MONEY basis: only awarded WPs that actually carry a cost. Awarded Cost and
+      // Budget-for-Awarded must move together — counting a costless WP's budget here would
+      // book its entire BCB as "savings".
+      const awd = awdAll.filter(w => (w.total_awarded||0) > 0);
+      awarded += awdAll.length;
       totalBudget += arr.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
       awardedCost += awd.reduce((s,w)=>s+(w.total_awarded||0),0);
       budgetAwarded += awd.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
