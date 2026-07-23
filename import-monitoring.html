@@ -84,6 +84,7 @@
       </div>
       <div class="lookouts">
         <b>Import rules applied:</b><br>
+        • <b>Award status</b> — taken from the sheet's own <b>Remarks / Status</b> column ("Awarded" / "Not yet Awarded"). A work package that carries a <b>provisional cost</b> but is flagged Not yet Awarded stays <b>Not Yet Awarded</b> (the cost is still imported, but it can't inflate the awarded total or the savings).<br>
         • <b>Advance award dates</b> — a WP whose actual award date is in the <b>future</b> is imported as <b>Not Yet Awarded</b> (the advance date is ignored until it arrives).<br>
         • <b>OSM</b> — every WP is <b>No</b> unless its Remarks mention "OSM".<br>
         • <b>Charging</b> — every WP is set to <b>Main Contract</b>.
@@ -294,6 +295,18 @@ function mepfSplit(trade, desc){
   return trade;
 }
 
+/* Award flag written in the sheet's Remarks/Status column ("Awarded" / "Not yet Awarded").
+   Mirrors pAward() in db.js, which the CSV import path has always used. Returns null when
+   the text says nothing about award state, so the caller can fall back to inference. */
+function pAwardText(v){
+  const t = (v==null ? '' : String(v)).trim().toLowerCase();
+  if(!t) return null;
+  if(t.includes('partial')) return 'Not Yet Awarded';   // no partial state — see Known Issues #18
+  if(t.includes('not'))     return 'Not Yet Awarded';   // "Not yet Awarded"
+  if(t.includes('award'))   return 'Awarded';
+  return null;
+}
+
 /* ---- build one WP from a sheet row using the detected column map ---- */
 function rowToWP(r, projectId, today, C, curTrade){
   const g = k => { const c=C[k]; return (c==null) ? null : r[c]; };
@@ -313,8 +326,25 @@ function rowToWP(r, projectId, today, C, curTrade){
   else if(truthyC(g('rfq'))) proc='Solicited';
   else if(truthyC(g('sourcing'))) proc='Sourced';
 
-  let award = isFutureAward ? 'Not Yet Awarded' : ((awarded && awarded>0) ? 'Awarded' : 'Not Yet Awarded');
-  if(proc==='Awarded') award='Awarded'; else if(award==='Awarded') proc='Awarded';
+  /* Award status, strongest signal first:
+       1. an actual award date in the FUTURE  → not awarded yet (advance-date rule)
+       2. an actual award date in the past    → awarded
+       3. the sheet's own Remarks/Status flag → whatever it says
+       4. otherwise infer from the awarded cost
+     Step 3 is why this can't just read `awarded_cost > 0`: the monitoring sheets carry a
+     PROVISIONAL cost on work packages that are still "Not yet Awarded" (OPW101 has 6 —
+     e.g. WP 19 Vertical Equipment Consumables at ₱6.8M — which made the importer report
+     70 awarded against the sheet's own 64). Those costs are kept, but the WP stays Not
+     Yet Awarded so it can't inflate the awarded totals or the savings (Known Issues #17). */
+  const awardFlag = pAwardText(g('remarks'));
+  let award;
+  if(isFutureAward)            award = 'Not Yet Awarded';
+  else if(actualAward)         award = 'Awarded';
+  else if(awardFlag)           award = awardFlag;
+  else                         award = (awarded && awarded>0) ? 'Awarded' : 'Not Yet Awarded';
+  const heldByFlag = (award==='Not Yet Awarded' && awarded>0 && awardFlag==='Not Yet Awarded');
+  if(award==='Awarded') proc='Awarded';
+  else if(proc==='Awarded') proc='Evaluated';   // keep proc⇄award consistent (Known Issues #18)
 
   // Trade: hierarchical (from the group header), MEPF split, then canonicalised to one of the
   // 10 official trades; fall back to type-of-service.
@@ -345,6 +375,7 @@ function rowToWP(r, projectId, today, C, curTrade){
     performance_bond: yn(g('performance_bond')),
     warranty_bond: yn(g('warranty_bond')),
     approved_budget_bcb: budget!=null ? Math.round(budget*100)/100 : null,
+    _heldByFlag: heldByFlag,                      // preview-only, stripped before insert
     awarded_cost: (awarded!=null && !isFutureAward) ? Math.round(awarded*100)/100 : null,
     additionals: Math.round((cn(g('additionals'))||0)*100)/100,
     payment_terms_days: si(g('payment_terms_days')),
@@ -422,10 +453,12 @@ function renderPreview(wps){
   const future=wps.filter(w=>w._future).length;
   const osm=wps.filter(w=>w.osm==='Yes').length;
   const noTrade=wps.filter(w=>!w.trade).length;
+  // Rows carrying a cost that the sheet's own Remarks flag says are NOT awarded yet
+  const held=wps.filter(w=>w._heldByFlag).length;
   const bud=wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   $('kpis').innerHTML=[
     ['Work packages',wps.length],['Awarded',awarded],['Not Yet Awarded',wps.length-awarded],
-    ['Advance-dated → held',future],['OSM = Yes',osm],['No trade',noTrade],['Total Budget (₱M)',(bud/1e6).toFixed(1)]
+    ['Advance-dated → held',future],['Provisional cost, not awarded',held],['OSM = Yes',osm],['No trade',noTrade],['Total Budget (₱M)',(bud/1e6).toFixed(1)]
   ].map(k=>`<div class="kpi"><div class="v">${k[1]}</div><div class="l">${k[0]}</div></div>`).join('');
   const cols=['wp_no','description','trade','procurement_status','award_status','approved_budget_bcb','awarded_cost','awarding_date','actual_awarding_date','target_completion','osm'];
   $('tbl').querySelector('thead').innerHTML='<tr>'+cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')+'</tr>';
@@ -463,7 +496,8 @@ async function doImport(){
   const {count:remaining}=await sb.from('work_packages').select('id',{count:'exact',head:true}).eq('project_id',pid);
   if(remaining>0){ log(`Delete removed nothing (${remaining} WPs remain) — you likely lack delete permission for ${pid} (you can Replace only projects you're assigned to; admins any). Aborting to avoid duplicates.`,'err'); $('btn-import').disabled=false; $('btn-cancel').disabled=false; return; }
   log('Deleted existing WPs.','ok');
-  const rows=_parsed.map(w=>{ const c={...w}; delete c._future; return c; });
+  // strip preview-only keys (any _ prefix) — they are not DB columns
+  const rows=_parsed.map(w=>{ const c={...w}; Object.keys(c).forEach(k=>{ if(k.charAt(0)==='_') delete c[k]; }); return c; });
   const BATCH=20; let inserted=0;
   for(let i=0;i<rows.length;i+=BATCH){
     const batch=rows.slice(i,i+BATCH);
