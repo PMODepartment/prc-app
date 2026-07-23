@@ -197,7 +197,12 @@ function detectLayout(rows){
     performance_bond:     findCol(band,/performance/),
     warranty_bond:        findCol(band,/warranty/),
     budget_bcb:           findCol(band,/budget.*(bcb|vat ?ex|net)/) ?? findCol(band,/^budget/),
-    awarded_cost:         findCol(band,/awarded cost/),
+    // "AWARDED COST (NET|VAT EX)" on most sheets, but the LCR templates head the column
+    // just "AWARDED (VAT EX)". Match that too — while NOT matching a bare "AWARDED"
+    // column (some sheets use that as a flag/quantity helper, e.g. SLT101 col U).
+    awarded_cost:         findCol(band,/awarded cost/)
+                          ?? findCol(band,/^awarded\s*\((vat|net)/)
+                          ?? findCol(band,/awarded amount|contract amount/),
     additionals:          findCol(band,/^additional/),
     payment_terms_days:   findCol(band,/terms.*\(?days|^terms$/),
     dp_percent:           findCol(band,/% ?of ?dp|down payment ?%|dp ?%/),
