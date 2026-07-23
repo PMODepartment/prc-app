@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723h"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723h"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723h"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723h"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -68,6 +68,15 @@
     table.xl thead th.xl-colh{top:26px;padding-right:10px}
     .xl-rz{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;z-index:9;
       background:transparent}
+    /* Draft (unsaved, not-yet-inserted) rows */
+    table.xl tr.xl-newrow td{background:#EAF7EF;box-shadow:inset 0 -1px 0 #B8DDC7}
+    table.xl tr.xl-newrow td.xl-missing{background:#FDECEA}
+    table.xl tr.xl-newrow td.xl-dirty{background:#FFF6DA}
+    body.dark-mode table.xl tr.xl-newrow td{background:#1e3a2b}
+    body.dark-mode table.xl tr.xl-newrow td.xl-missing{background:#4a1f1b}
+    .xl-rm{border:none;background:transparent;color:#EE3124;font-size:15px;line-height:1;cursor:pointer;
+      width:100%;height:100%;font-family:inherit}
+    .xl-rm:hover{background:#FDECEA}
     .xl-rz:hover,.xl-rz:active{background:#EE3124}
     #xl-rz-ghost{display:none;position:fixed;inset:0;z-index:999;cursor:col-resize}
     table.xl td.xl-ph{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,transparent 4px,transparent 8px);cursor:default}
@@ -204,6 +213,8 @@
               <option value="pending_review">Pending review (legacy)</option>
               <option value="rejected">Rejected (legacy)</option>
             </select>
+            <button class="xl-btn primary" onclick="xlAddRow()" title="Add a work package directly in the grid"><i class="ti ti-plus"></i> Add WP</button>
+            <select id="xl-new-proj" style="display:none;font-size:11px;padding:5px 8px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);cursor:pointer" title="Project the new work package belongs to"></select>
             <span id="xl-count" class="xl-hint"></span>
             <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer">
               <input type="checkbox" id="xl-only-missing" onchange="renderGrid()" style="cursor:pointer"> Only incomplete
@@ -236,9 +247,9 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723g"></script>
-<script src="assets/js/ui.js?v=20260723g"></script>
-<script src="assets/js/db.js?v=20260723g"></script>
+<script src="assets/js/auth.js?v=20260723h"></script>
+<script src="assets/js/ui.js?v=20260723h"></script>
+<script src="assets/js/db.js?v=20260723h"></script>
 <script>
   let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';
@@ -768,6 +779,80 @@
     return s;
   }
 
+
+  /* ── Add a work package straight from the grid ─────────────────────────────
+     A new row is a client-side draft (`__new`, id `new_N`) pinned to the top of
+     the grid. It behaves like any other row — same editors, same required-field
+     highlighting — and is only INSERTED when you press Save, through the same
+     WPDb.submitWP + approveWP path the WP form and quick-add modal use. */
+  let _newRows = [], _newSeq = 0;
+
+  // Projects this user may add to (admins: all; others: their assigned ones).
+  function _xlAddableProjects(){
+    return (allProjects||[])
+      .filter(function(p){ return p.status !== 'archived' && p.id !== 'DEMO'; })
+      .filter(function(p){ return AppAuth.canEditProject(adminProfile, p.id); });
+  }
+  // Next WP No. for a project: highest whole number + 1 across saved AND draft rows.
+  function _xlNextWpNo(pid){
+    const nums = allWPs.concat(_newRows)
+      .filter(function(w){ return w.project_id === pid; })
+      .map(function(w){
+        const m = String(w.id && _gridEdits[w.id] && _gridEdits[w.id].wp_no != null ? _gridEdits[w.id].wp_no : (w.wp_no==null?'':w.wp_no))
+          .replace(/^wp[-\s]*/i,'').match(/\d+(?:\.\d+)?/);
+        return m ? parseFloat(m[0]) : NaN;
+      })
+      .filter(function(n){ return !isNaN(n); });
+    return nums.length ? String(Math.floor(Math.max.apply(null, nums)) + 1) : '1';
+  }
+
+  window.xlAddRow = function(){
+    const opts = _xlAddableProjects();
+    if (!opts.length){ alert('You have no projects you can add work packages to. Ask an admin to assign you a project.'); return; }
+    // Single-project context uses it directly; the consolidated grid asks which project.
+    let pid = (currentProjId !== 'ALL') ? currentProjId : (document.getElementById('xl-new-proj')||{}).value;
+    if (!pid) pid = opts[0].id;
+    if (!AppAuth.canEditProject(adminProfile, pid)){ alert("You can't add work packages to " + pid + '.'); return; }
+    const draft = {
+      id: 'new_' + (++_newSeq), __new: true, project_id: pid,
+      wp_no: _xlNextWpNo(pid),
+      // Sensible defaults so only the genuinely required fields light up red.
+      osm: 'No', charging_type: 'Main Contract',
+      procurement_status: 'Not Started', award_status: 'Not Yet Awarded',
+      submittal_type: 'Not Required', delivery_status: null,
+      surety_bond: 'No', performance_bond: 'No', warranty_bond: 'No',
+      requires_approval: false, review_status: 'draft', additionals: 0,
+    };
+    _newRows.push(draft);
+    if (document.getElementById('xl-only-missing')) document.getElementById('xl-only-missing').checked = false;
+    renderGrid();
+    // Land the cursor on Description — the first thing that actually needs typing.
+    const r = _gridRows.findIndex(function(w){ return w.id === draft.id; });
+    const c = VC.findIndex(function(col){ return col.k === 'description'; });
+    if (r >= 0 && c >= 0){ _xlSelect(r, c); _xlBeginEdit(); }
+  };
+
+  window.xlRemoveNewRow = function(id, ev){
+    if (ev) ev.stopPropagation();
+    _newRows = _newRows.filter(function(w){ return w.id !== id; });
+    delete _gridEdits[id];
+    _xlUndo = _xlUndo.map(function(b){ return b.filter(function(u){ return u.id !== id; }); }).filter(function(b){ return b.length; });
+    renderGrid();
+  };
+
+  // Turn a draft row + its staged edits into a DB payload.
+  function _xlDraftPayload(w){
+    const out = {};
+    XL_COLS.forEach(function(col){
+      if (col.ro || col.ph || col.k.charAt(0) === '_') return;      // never write generated/derived
+      const v = xlVal(w, col.k);
+      if (v !== undefined) out[col.k] = v;
+    });
+    out.project_id  = w.project_id;
+    out.award_status = xlVal(w, 'award_status') || 'Not Yet Awarded';
+    return out;
+  }
+
   /* Required fields — the SAME set wp-form.html save() enforces:
      WP No., Description, Trade, Planned Award, Target Delivery, Target Completion,
      Budget (BCB), Charging; plus Awarded Cost + Awarded Vendor once a WP is Awarded
@@ -810,10 +895,26 @@
         (a.wp_no||'').toString().localeCompare((b.wp_no||'').toString(), undefined, {numeric:true, sensitivity:'base'});
     });
 
+    // Draft rows always ride at the top and ignore the filters — you must be able to
+    // see (and finish) what you just added.
+    _gridRows = _newRows.concat(_gridRows);
+
     const onlyMissEl = document.getElementById('xl-only-missing');
     const total = _gridRows.length;
     if (onlyMissEl && onlyMissEl.checked)
-      _gridRows = _gridRows.filter(function(w){ return _xlRowMissing(w).length > 0; });
+      _gridRows = _gridRows.filter(function(w){ return w.__new || _xlRowMissing(w).length > 0; });
+
+    // Consolidated grid: pick which project a new WP goes to.
+    const npSel = document.getElementById('xl-new-proj');
+    if (npSel){
+      const addable = _xlAddableProjects();
+      if (currentProjId === 'ALL' && addable.length){
+        const keep = npSel.value;
+        npSel.innerHTML = addable.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.id)+'</option>'; }).join('');
+        if (keep) npSel.value = keep;
+        npSel.style.display = '';
+      } else npSel.style.display = 'none';
+    }
 
     const cnt = document.getElementById('xl-count');
     if (cnt) cnt.textContent = _gridRows.length + ' work package' + (_gridRows.length===1?'':'s')
@@ -854,8 +955,11 @@
     const thead = '<thead>' + grpRow + colRow + '</thead>';
     const tbody = '<tbody>' + _gridRows.map(function(w,r){
       const locked = !AppAuth.canEditProject(adminProfile, w.project_id);
-      return '<tr data-id="'+w.id+'">' +
-        '<td class="xl-freeze xl-ro" style="left:0;text-align:center;font-size:9px;color:#bbb">'+(r+1)+'</td>' +
+      return '<tr data-id="'+w.id+'"'+(w.__new?' class="xl-newrow"':'')+'>' +
+        (w.__new
+          ? '<td class="xl-freeze xl-ro" style="left:0;text-align:center;padding:0">'
+            + '<button class="xl-rm" onclick="xlRemoveNewRow(\'' + w.id + '\',event)" title="Discard this new row">&times;</button></td>'
+          : '<td class="xl-freeze xl-ro" style="left:0;text-align:center;font-size:9px;color:#bbb">'+(r+1)+'</td>') +
         VC.map(function(c,i){
           const fz  = i < XL_FREEZE;
           const ro  = c.ro || locked;
@@ -888,11 +992,20 @@
   function _xlUpdateBar(){
     const n = Object.keys(_gridEdits).reduce(function(s,id){ return s+Object.keys(_gridEdits[id]).length; },0);
     const rows = Object.keys(_gridEdits).length;
+    const nNew = _newRows.length;
     const lbl = document.getElementById('xl-dirty-count');
-    if (lbl) lbl.textContent = n ? (n+' unsaved change'+(n===1?'':'s')+' in '+rows+' WP'+(rows===1?'':'s')) : '';
+    if (lbl) lbl.textContent = [
+      nNew ? (nNew+' new WP'+(nNew===1?'':'s')) : '',
+      n    ? (n+' unsaved change'+(n===1?'':'s')+' in '+rows+' WP'+(rows===1?'':'s')) : ''
+    ].filter(Boolean).join(' · ');
     const save = document.getElementById('xl-save'), disc = document.getElementById('xl-discard');
-    if (save) { save.disabled = !n; save.textContent = n ? ('Save '+n+' change'+(n===1?'':'s')) : 'Save changes'; }
-    if (disc) disc.disabled = !n;
+    const pending = n || nNew;
+    if (save) {
+      save.disabled = !pending;
+      save.textContent = !pending ? 'Save changes'
+        : nNew ? ('Save · add '+nNew+' WP'+(nNew===1?'':'s')) : ('Save '+n+' change'+(n===1?'':'s'));
+    }
+    if (disc) disc.disabled = !pending;
     // Required-but-empty tally for the visible rows
     const miss = _xlMissingCells();
     const ml = document.getElementById('xl-missing-count');
@@ -1124,24 +1237,25 @@
   };
 
   window.gridDiscard = function(){
-    if (!Object.keys(_gridEdits).length) return;
-    if (!confirm('Discard all unsaved grid changes?')) return;
-    _gridEdits = {}; _xlUndo = [];
+    if (!Object.keys(_gridEdits).length && !_newRows.length) return;
+    if (!confirm('Discard all unsaved grid changes' + (_newRows.length ? ', including '+_newRows.length+' new work package(s)' : '') + '?')) return;
+    _gridEdits = {}; _xlUndo = []; _newRows = [];
     renderGrid();
   };
 
   window.gridSave = async function(){
-    const ids = Object.keys(_gridEdits);
-    if (!ids.length) return;
+    const ids = Object.keys(_gridEdits).filter(function(id){ return id.indexOf('new_') !== 0; });
+    if (!ids.length && !_newRows.length) return;
     // A row you edited must satisfy the same required fields as the WP form (incl. the
     // Awarded ⇒ cost + vendor rule). Rows you did NOT touch are only highlighted, never
     // blocking — many arrived incomplete from the monitoring-sheet imports.
     const bad = [];
-    ids.forEach(function(id){
+    ids.concat(_newRows.map(function(w){ return w.id; })).forEach(function(id){
       const w = _gridRows.find(function(x){ return x.id===id; }) || allWPs.find(function(x){ return x.id===id; });
       if (!w) return;
       const missing = _xlRowMissing(w);
-      if (missing.length) bad.push('  WP ' + (w.wp_no||id) + ' (' + w.project_id + ') — ' + missing.join(', '));
+      const label = w.__new ? 'New WP ' + (xlVal(w,'wp_no')||'?') : 'WP ' + (w.wp_no||id);
+      if (missing.length) bad.push('  ' + label + ' (' + w.project_id + ') — ' + missing.join(', '));
     });
     if (bad.length){
       alert('These work packages are missing required fields (highlighted in red):\n\n'
@@ -1150,11 +1264,41 @@
         + 'setting Procurement Status back below Awarded clears that requirement.');
       return;
     }
+    // (project_id, wp_no) is unique in the DB — catch a clash here rather than as a raw
+    // Postgres error halfway through the batch.
+    const _nk = function(v){ return String(v==null?'':v).trim().replace(/^wp[-\s]*/i,'').replace(/\.0+$/,'').toLowerCase(); };
+    const clash = [];
+    _newRows.forEach(function(w){
+      const key = _nk(xlVal(w,'wp_no')), pid = w.project_id;
+      const takenSaved = allWPs.some(function(x){ return x.project_id===pid && _nk(x.wp_no)===key; });
+      const takenDraft = _newRows.filter(function(x){ return x!==w && x.project_id===pid; })
+                                 .some(function(x){ return _nk(xlVal(x,'wp_no'))===key; });
+      if (takenSaved || takenDraft) clash.push('  WP ' + xlVal(w,'wp_no') + ' in ' + pid);
+    });
+    if (clash.length){
+      alert('These new work packages reuse a WP No. that already exists:\n\n' + clash.join('\n')
+        + '\n\nGive each one a different number and save again.');
+      return;
+    }
+
     const btn = document.getElementById('xl-save');
     btn.disabled = true; btn.textContent = 'Saving…';
     // Non-auto-approve roles send edits back through review, exactly like the WP form.
     const direct = AppAuth.isAutoApprove(adminProfile);
-    let ok=0; const errs=[];
+    let ok=0, added=0; const errs=[];
+    // New rows go in through the SAME path as the WP form / quick-add modal: submitWP
+    // (which lands as pending_review) then approveWP for auto-approve roles.
+    for (const w of _newRows.slice()){
+      try {
+        const row = await WPDb.submitWP(_xlDraftPayload(w), adminProfile);
+        if (direct && row && row.id) await WPDb.approveWP(row.id);
+        _newRows = _newRows.filter(function(x){ return x.id !== w.id; });
+        delete _gridEdits[w.id];
+        added++;
+      } catch(err){
+        errs.push('New WP ' + (xlVal(w,'wp_no')||'?') + ': ' + err.message);
+      }
+    }
     for (const id of ids){
       const patch = Object.assign({}, _gridEdits[id]);
       delete patch.total_awarded; delete patch._variance;      // generated columns — never write
@@ -1167,10 +1311,16 @@
         errs.push(((w&&w.wp_no)||id) + ': ' + err.message);
       }
     }
-    _gridEdits = {}; _xlUndo = [];
+    if (!_newRows.length) { _gridEdits = {}; _xlUndo = []; }
+    else ids.forEach(function(id){ delete _gridEdits[id]; });   // keep failed drafts staged
     _bustWPCache();
-    if (errs.length) alert('Saved ' + ok + ' WP(s). ' + errs.length + ' failed:\n\n' + errs.join('\n'));
-    else xlToast(ok + ' work package' + (ok===1?'':'s') + (direct ? ' saved.' : ' submitted for review.'));
+    if (errs.length) alert('Saved ' + (ok+added) + ' WP(s). ' + errs.length + ' failed:\n\n' + errs.join('\n'));
+    else {
+      const parts = [];
+      if (added) parts.push(added + ' work package' + (added===1?'':'s') + (direct ? ' added.' : ' added for review.'));
+      if (ok)    parts.push(ok + ' updated' + (direct ? '.' : ' and sent for review.'));
+      xlToast(parts.join(' ') || 'Saved.');
+    }
     await loadAll();
     setReviewView('grid');
   };
@@ -1182,7 +1332,7 @@
     if (_reviewView === 'grid') renderGrid();
   };
   window.addEventListener('beforeunload', function(e){
-    if (Object.keys(_gridEdits).length){ e.preventDefault(); e.returnValue='You have unsaved grid changes.'; return e.returnValue; }
+    if (Object.keys(_gridEdits).length || _newRows.length){ e.preventDefault(); e.returnValue='You have unsaved grid changes.'; return e.returnValue; }
   });
 
 </script>
