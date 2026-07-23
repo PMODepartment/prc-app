@@ -177,6 +177,63 @@ function helpingMetrics(wps) {
   return {awarded, totalBudget, awardedCost, budgetAwarded, hsCovered};
 }
 
+/* ── BCB baselines (BCB0 … BCB3) ──────────────────────────────────────────
+   A project's budget is re-baselined over time, so the SAME work package can
+   show savings against BCB0 and a loss against BCB1. Each baseline is stored in
+   its own column (`budget_bcb0…3`); `approved_budget_bcb` holds the CURRENT
+   one, which is what every chart/KPI/table/export already reads.
+   Rather than thread a baseline argument through ~110 read sites, the switcher
+   re-maps `approved_budget_bcb` on the loaded array (`applyBcbBaseline`) and the
+   whole dashboard re-renders against it unchanged. */
+const BCB_LEVELS = ['bcb0','bcb1','bcb2','bcb3'];
+const BCB_LABELS = { bcb0:'BCB0', bcb1:'BCB1', bcb2:'BCB2', bcb3:'BCB3' };
+
+// The figure explicitly recorded AT this baseline (BCB0 falls back to the single
+// legacy budget column, so data imported before baselines existed still reads).
+function bcbValue(w, level) {
+  if (!w) return null;
+  const v = w['budget_' + level];
+  if (v != null) return v;
+  return (level === 'bcb0') ? (w.approved_budget_bcb ?? null) : null;
+}
+// The budget IN FORCE at a baseline: that baseline's figure, else carry forward the
+// newest earlier one — a WP whose budget didn't change at BCB2 still has its BCB1 value.
+function bcbEffective(w, level) {
+  const i = BCB_LEVELS.indexOf(level);
+  if (i < 0) return w?.approved_budget_bcb ?? null;
+  for (let j = i; j >= 0; j--) { const v = bcbValue(w, BCB_LEVELS[j]); if (v != null) return v; }
+  return w?.approved_budget_bcb ?? null;
+}
+// Which baselines actually carry data — drives the switcher (BCB0 is always offered).
+function bcbLevelsPresent(wps) {
+  const out = { bcb0: true };
+  BCB_LEVELS.slice(1).forEach(l => { out[l] = (wps||[]).some(w => w['budget_'+l] != null); });
+  return out;
+}
+// Return a copy of the WP list with approved_budget_bcb set to the chosen baseline.
+function applyBcbBaseline(wps, level) {
+  if (!level || !BCB_LEVELS.includes(level)) return wps || [];
+  return (wps||[]).map(w => {
+    const v = bcbEffective(w, level);
+    return (v === w.approved_budget_bcb) ? w : { ...w, approved_budget_bcb: v };
+  });
+}
+// Selected baseline, persisted per user. Defaults to BCB0 (the original budget).
+const BcbBaseline = (() => {
+  const key = () => 'wpm_bcb_' + ((window.__profile && window.__profile.id) || 'anon');
+  function get() {
+    try { const v = localStorage.getItem(key()); if (v && BCB_LEVELS.includes(v)) return v; } catch (_) {}
+    return 'bcb0';
+  }
+  function set(v) { try { if (BCB_LEVELS.includes(v)) localStorage.setItem(key(), v); } catch (_) {} }
+  function label(v) { return BCB_LABELS[v || get()] || 'BCB0'; }
+  return { get, set, label, LEVELS: BCB_LEVELS, LABELS: BCB_LABELS };
+})();
+window.BCB_LEVELS = BCB_LEVELS; window.BCB_LABELS = BCB_LABELS;
+window.bcbValue = bcbValue; window.bcbEffective = bcbEffective;
+window.bcbLevelsPresent = bcbLevelsPresent; window.applyBcbBaseline = applyBcbBaseline;
+window.BcbBaseline = BcbBaseline;
+
 /* ── Formatting ─────────────────────────────────────────────────────── */
 // HTML-escape user-entered text before it goes into innerHTML. WP fields (description,
 // remarks, vendor, wp_no…) and self-registered user name/email are attacker-controllable

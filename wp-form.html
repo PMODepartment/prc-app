@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723i"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723i"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723i"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260723i"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723j"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723j"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723j"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260723j"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723i"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723j"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -471,9 +471,26 @@
             <div class="form-section-title"><i class="ti ti-coins" style="font-size:13px;vertical-align:middle;margin-right:6px"></i>Budget & Contract</div>
             <div class="form-grid">
               <div class="form-group">
-                <label>Budget (BCB) (Net) * <span style="cursor:help;color:#bbb;font-weight:400;font-size:11px" title="The approved procurement budget for this WP (Base Cost Budget, net of VAT). Drives Balance to Award and Savings.">&#9432;</span></label>
+                <label>Budget BCB0 (Net) * <span style="cursor:help;color:#bbb;font-weight:400;font-size:11px" title="The ORIGINAL approved procurement budget for this WP (Base Cost Budget, net of VAT). Dashboards show BCB0 by default.">&#9432;</span></label>
                 <input type="text" inputmode="numeric" id="f-budget" placeholder="e.g. 185,000,000"/>
                 <span class="hint" id="budget-display"></span>
+              </div>
+              <!-- Re-baselines. Leave blank when the budget didn't change at that baseline —
+                   the dashboards carry the previous figure forward. -->
+              <div class="form-group">
+                <label>Revised BCB1 (Net) <span style="cursor:help;color:#bbb;font-weight:400;font-size:11px" title="Budget at baseline 1. Leave blank if unchanged from BCB0.">&#9432;</span></label>
+                <input type="text" inputmode="numeric" id="f-bcb1" placeholder="Blank = same as BCB0"/>
+                <span class="hint" id="bcb1-delta"></span>
+              </div>
+              <div class="form-group">
+                <label>Revised BCB2 (Net) <span style="cursor:help;color:#bbb;font-weight:400;font-size:11px" title="Budget at baseline 2. Leave blank if unchanged from the previous baseline.">&#9432;</span></label>
+                <input type="text" inputmode="numeric" id="f-bcb2" placeholder="Blank = same as BCB1"/>
+                <span class="hint" id="bcb2-delta"></span>
+              </div>
+              <div class="form-group">
+                <label>Revised BCB3 (Net) <span style="cursor:help;color:#bbb;font-weight:400;font-size:11px" title="Budget at baseline 3. Leave blank if unchanged from the previous baseline.">&#9432;</span></label>
+                <input type="text" inputmode="numeric" id="f-bcb3" placeholder="Blank = same as BCB2"/>
+                <span class="hint" id="bcb3-delta"></span>
               </div>
               <div class="form-group">
                 <label>Awarded Cost (Net) <span style="cursor:help;color:#bbb;font-weight:400;font-size:11px" title="The actual contract amount (net) the WP was awarded for. Required once Award Status is Awarded.">&#9432;</span></label>
@@ -638,10 +655,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723i"></script>
-<script src="assets/js/ui.js?v=20260723i"></script>
-<script src="assets/js/db.js?v=20260723i"></script>
-<script src="assets/js/coachmarks.js?v=20260723i"></script>
+<script src="assets/js/auth.js?v=20260723j"></script>
+<script src="assets/js/ui.js?v=20260723j"></script>
+<script src="assets/js/db.js?v=20260723j"></script>
+<script src="assets/js/coachmarks.js?v=20260723j"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -886,7 +903,7 @@
     const raw = parseFloat(el.value.replace(/,/g, ''));
     if (!isNaN(raw)) el.value = raw.toLocaleString('en-US');
   }
-  ['f-budget','f-contract'].forEach(id => {
+  ['f-budget','f-bcb1','f-bcb2','f-bcb3','f-contract'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('input', updateVariance);
     el.addEventListener('blur',  () => fmtComma(el));
@@ -1066,6 +1083,37 @@ function onWpNoInput(){
   if (!_wpNoTouched) suggestWpNo();
 }
 
+/* Show what each re-baseline does to the budget, and whether it turns an existing
+   award from a saving into a loss — the whole point of tracking BCB0…BCB3. */
+function _updateBcbDeltas(){
+  const num = id => { const el=document.getElementById(id); if(!el) return null;
+    const v=parseFloat(String(el.value||'').replace(/,/g,'')); return isNaN(v)?null:v; };
+  const awarded = num('f-contract');
+  let prev = num('f-budget');
+  ['bcb1','bcb2','bcb3'].forEach(k => {
+    const el = document.getElementById(k+'-delta'); if(!el) return;
+    const v = num('f-'+k);
+    if (v == null){ el.textContent=''; el.style.color=''; return; }
+    const d = v - (prev==null?0:prev);
+    const sign = d>=0?'+':'-';
+    let txt = (prev==null?'':(sign+'₱'+Math.abs(d).toLocaleString('en-US',{maximumFractionDigits:0})+' vs previous baseline'));
+    let color = d>=0 ? '#2D9B6F' : '#EE3124';
+    if (awarded != null && awarded > 0){
+      const varr = v - awarded;                      // budget − awarded at THIS baseline
+      txt += (txt?' · ':'') + (varr>=0 ? 'saving ' : 'OVER ') + '₱'+Math.abs(varr).toLocaleString('en-US',{maximumFractionDigits:0});
+      color = varr>=0 ? '#2D9B6F' : '#EE3124';
+    }
+    el.textContent = txt; el.style.color = color;
+    prev = v;
+  });
+}
+['f-budget','f-bcb1','f-bcb2','f-bcb3','f-contract'].forEach(id => {
+  document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', _updateBcbDeltas);
+  });
+});
+
 function markDirty() { formDirty = true; }
 function markClean() { formDirty = false; }
 // First-run checklist marker (mirrors GettingStarted.markStep; onboarding.js isn't loaded here).
@@ -1230,7 +1278,14 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-actual-delivery', existingWP.actual_delivery || '');
       fill('f-target-installation', existingWP.target_installation);
       fill('f-target-completion', existingWP.target_completion);
-      const _bv = existingWP.approved_budget_bcb; document.getElementById('f-budget').value = _bv ? parseFloat(_bv).toLocaleString('en-US') : '';
+      // BCB0 falls back to the legacy single budget column for rows imported before baselines existed
+      const _bv = existingWP.budget_bcb0 ?? existingWP.approved_budget_bcb;
+      document.getElementById('f-budget').value = _bv ? parseFloat(_bv).toLocaleString('en-US') : '';
+      ['bcb1','bcb2','bcb3'].forEach(k => {
+        const el = document.getElementById('f-'+k), v = existingWP['budget_'+k];
+        if (el) el.value = (v==null||v==='') ? '' : parseFloat(v).toLocaleString('en-US');
+      });
+      _updateBcbDeltas();
       fill('f-contract', existingWP.total_awarded);
       fill('f-award-status', existingWP.award_status);
       fill('f-payment-terms-days', existingWP.payment_terms_days);
@@ -1394,7 +1449,13 @@ AppAuth.requireLogin(async (user, profile) => {
       actual_delivery:     getVal('f-actual-delivery') || null,
       target_installation: getVal('f-target-installation') || null,
       target_completion:   getVal('f-target-completion') || null,
-      approved_budget_bcb:      getNum('f-budget'),
+      // Each baseline is stored separately; approved_budget_bcb carries the CURRENT
+      // (newest non-blank) one so every existing chart/KPI/export keeps working.
+      budget_bcb0:              getNum('f-budget'),
+      budget_bcb1:              getNum('f-bcb1'),
+      budget_bcb2:              getNum('f-bcb2'),
+      budget_bcb3:              getNum('f-bcb3'),
+      approved_budget_bcb:      (getNum('f-bcb3') ?? getNum('f-bcb2') ?? getNum('f-bcb1') ?? getNum('f-budget')),
       awarded_cost:             getNum('f-contract'),
       award_status:             getVal('f-award-status'),
       payment_terms_days:       getNum('f-payment-terms-days'),

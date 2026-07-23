@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723i"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723i"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723i"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723j"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723j"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723j"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708b"/>
   <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723i"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723j"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723i"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723j"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -111,6 +111,11 @@
 
         <!-- Filter + Tabs bar: same row on desktop, stacked on mobile -->
         <div id="filter-tabs-bar">
+          <!-- Budget baseline (BCB0…BCB3) — hidden unless some WP carries a revision -->
+          <div id="idx-bcb-switch" style="display:none;align-items:center;gap:6px;flex-shrink:0;margin-right:4px">
+            <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888">BCB</span>
+            <div id="idx-bcb-btns" style="display:flex;gap:4px"></div>
+          </div>
           <div id="proj-filter-wrap" style="position:relative;user-select:none;flex-shrink:0">
             <button id="proj-filter-btn" onclick="toggleProjFilter()" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid #e5e5e5;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;font-size:13px;color:#444;box-shadow:0 1px 3px rgba(0,0,0,.06);white-space:nowrap">
               <i class="ti ti-filter" style="font-size:14px;color:#888"></i>
@@ -599,14 +604,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723i"></script>
-<script src="assets/js/db.js?v=20260723i"></script>
-<script src="assets/js/ui.js?v=20260723i"></script>
+<script src="assets/js/auth.js?v=20260723j"></script>
+<script src="assets/js/db.js?v=20260723j"></script>
+<script src="assets/js/ui.js?v=20260723j"></script>
 <script src="assets/js/onboarding.js?v=20260708b"></script>
 <script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260723i"></script>
+<script src="assets/js/charts.js?v=20260723j"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -772,7 +777,10 @@
     // Normalize WP No. display: some projects (e.g. SLN101) store numbers as "2.0" — show "2".
     // Only strips a trailing .0/.00 from a pure-numeric value; preserves real decimals like "2.1".
     const _normWpNo = v => { if (v==null) return v; let s=String(v).trim().replace(/^WP[-\s]?(?=\d)/i,''); return /^\d+\.0+$/.test(s) ? s.replace(/\.0+$/,'') : s; };
-    const _allWPs = rawWPs.map(w => ({...w, trade: normTrade(w.trade), wp_no: _normWpNo(w.wp_no)}));
+    // Rows as loaded; _allWPs is this list re-mapped to the selected BCB baseline
+    // (approved_budget_bcb swapped) so every downstream chart/KPI reads it unchanged.
+    const _rawAll = rawWPs.map(w => ({...w, trade: normTrade(w.trade), wp_no: _normWpNo(w.wp_no)}));
+    let _allWPs = applyBcbBaseline(_rawAll, BcbBaseline.get());
     // ID-keyed lookup for WP detail modal (avoids JSON.stringify in every table cell)
     window._wpById = Object.fromEntries(_allWPs.map(w => [w.id, w]));
     let _allClaims = []; // Claims register hidden — skip fetch
@@ -2390,7 +2398,29 @@
       }
     }
 
+    /* Budget-baseline switcher (BCB0…BCB3). Re-maps every WP's approved_budget_bcb from
+       the raw rows, then re-renders — the whole portfolio (KPIs, batteries, charts,
+       backlog, WP List) moves to that baseline together. Defaults to BCB0. */
+    function _syncIdxBcb(){
+      const bar=document.getElementById('idx-bcb-switch'), btns=document.getElementById('idx-bcb-btns');
+      if(!bar||!btns) return;
+      const present=bcbLevelsPresent(_rawAll), levels=BCB_LEVELS.filter(l=>present[l]);
+      if(levels.length<2){ bar.style.display='none'; return; }
+      const cur=BcbBaseline.get();
+      btns.innerHTML=levels.map(l=>'<button onclick="setIdxBcb(\'' + l + '\')" style="font-size:10px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;border:1.5px solid '
+        +(l===cur?'#EE3124;background:#EE3124;color:#fff':'#e5e5e5;background:#fff;color:#888')+'">'+BCB_LABELS[l]+'</button>').join('');
+      bar.style.display='flex';
+    }
+    window.setIdxBcb = function(level){
+      BcbBaseline.set(level);
+      _allWPs = applyBcbBaseline(_rawAll, level);
+      window._wpById = Object.fromEntries(_allWPs.map(w => [w.id, w]));
+      _syncIdxBcb();
+      renderAll();
+    };
+
     function renderAll() {
+      _syncIdxBcb();
       const sel = [..._activeIds];
       const filt = permitted.filter(p => sel.includes(p.id));
       const filtWPs = _allWPs.filter(w => sel.includes(w.project_id));

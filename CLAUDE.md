@@ -152,6 +152,20 @@ ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin',
 
 ---
 
+## BCB Baselines (BCB0 … BCB3)
+
+A project's procurement budget is **re-baselined** over time, so the same work package can show a **saving against BCB0 and a loss against BCB1** (the re-baseline ate the savings). Run **`MIGRATION_bcb_baselines.sql`** once — it adds `budget_bcb0..budget_bcb3 numeric(18,2)` and backfills `budget_bcb0` from `approved_budget_bcb`.
+
+- **`approved_budget_bcb` still holds the CURRENT baseline** (newest non-blank), so all ~110 existing read sites — charts, KPIs, tables, PDF, CSV, importer — keep working untouched. **Do not repoint them at a baseline column.**
+- **The switcher re-maps the data, not the readers** (`applyBcbBaseline(wps, level)` in `db.js` returns a copy with `approved_budget_bcb` set to that baseline). `project.html` keeps the loaded rows in **`_rawWPs`** and `index.html` in **`_rawAll`**; `allWPs` / `_allWPs` are the mapped views. When you add a load path, map it the same way or the switcher will silently stop applying.
+- **Carry-forward:** `bcbEffective(w, level)` returns that baseline's figure, else the newest EARLIER one — a WP not re-baselined at BCB2 keeps its BCB1 value. `bcbValue()` is the raw per-baseline figure (BCB0 falls back to the legacy single column so pre-migration rows still read).
+- **Default is BCB0**, persisted per user in `localStorage['wpm_bcb_<uid>']` via `BcbBaseline.get()/set()`. The switcher **hides itself when a project has no revisions** (`bcbLevelsPresent()` — fewer than 2 levels with data), so single-baseline projects see no new control.
+- **UI:** per-project switcher `#ov-bcb-switch` on the Overview (beside Charging Scope, with a note counting re-baselined WPs); portfolio switcher `#idx-bcb-switch` in the filter bar. Both re-render everything — KPIs, batteries, period charts, backlog, WP List.
+- **WP form:** Budget & Contract now has **Budget BCB0 (Net) \*** (the original, required) plus optional **Revised BCB1/2/3**; blank means "unchanged at that baseline". Each field shows a live delta vs the previous baseline and, once an Awarded Cost is entered, whether that baseline turns the award into a **saving** or **OVER**. Save writes all four columns and sets `approved_budget_bcb` to the newest non-blank.
+- **Review grid:** the Budget & Contract section carries `Budget (BCB) — current` (read/write as before) plus **BCB0/BCB1/BCB2/BCB3** columns for bulk entry.
+
+---
+
 ## Role-Based Access Control
 
 | Role | Projects Visible | Edit WPs | Auto-Approve | Admin Rights | Cost Data |

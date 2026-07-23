@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723i"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723i"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723i"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723j"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723j"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723j"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708b"/>
   <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723i"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723j"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723i"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723j"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -233,6 +233,12 @@
               <button id="ov-ch-co" onclick="setOvCharging('co')" class="ov-ch-btn">Change Order</button>
             </div>
             <span id="ov-ch-count" style="font-size:10px;color:#999"></span>
+          </div>
+          <!-- Budget baseline (BCB0…BCB3). Hidden unless the project actually has revisions. -->
+          <div id="ov-bcb-switch" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+            <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888">Budget Baseline</span>
+            <div id="ov-bcb-btns" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+            <span id="ov-bcb-note" style="font-size:10px;color:#999"></span>
           </div>
           <div class="ov-top-row" style="margin-bottom:16px">
             <!-- Left: Cost Overview — 6 KPIs -->
@@ -554,17 +560,20 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723i"></script>
-<script src="assets/js/ui.js?v=20260723i"></script>
-<script src="assets/js/db.js?v=20260723i"></script>
+<script src="assets/js/auth.js?v=20260723j"></script>
+<script src="assets/js/ui.js?v=20260723j"></script>
+<script src="assets/js/db.js?v=20260723j"></script>
 <script src="assets/js/onboarding.js?v=20260708b"></script>
 <script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260723i"></script>
+<script src="assets/js/charts.js?v=20260723j"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
+// Rows exactly as loaded. `allWPs` is this list re-mapped to the selected BCB baseline
+// (approved_budget_bcb swapped), so every chart/KPI/table below reads it unchanged.
+let _rawWPs=[];
 let userProfile=null;
 let currentView='overview';
 
@@ -1182,6 +1191,37 @@ function getFiltered(){
 function submittalLabel(w){
   return w.submittal_type || 'Not Required';
 }
+
+// ── Budget-baseline switcher (BCB0 … BCB3) ────────────────────────────────
+// The budget gets re-baselined during a project, so a WP awarded under BCB0 with a
+// saving can be OVER budget once BCB1 lands. Switching baseline re-maps every WP's
+// approved_budget_bcb from the raw rows and re-renders — KPIs, batteries, charts,
+// backlog and the WP List all move together. Defaults to BCB0.
+function _syncBcbSwitcher(){
+  const bar = document.getElementById('ov-bcb-switch'), btns = document.getElementById('ov-bcb-btns');
+  if(!bar || !btns) return;
+  const present = bcbLevelsPresent(_rawWPs);
+  const levels  = BCB_LEVELS.filter(l => present[l]);
+  if (levels.length < 2){ bar.style.display='none'; return; }   // nothing to switch between
+  const cur = BcbBaseline.get();
+  btns.innerHTML = levels.map(l =>
+    '<button class="ov-ch-btn'+(l===cur?' active':'')+'" onclick="setBcbBaseline(\'' + l + '\')">'+BCB_LABELS[l]+'</button>').join('');
+  const n = _rawWPs.filter(w => w['budget_'+cur] != null).length;
+  const note = document.getElementById('ov-bcb-note');
+  if (note) note.textContent = cur==='bcb0'
+    ? 'Original budget'
+    : n + ' WP' + (n===1?'':'s') + ' re-baselined at ' + BCB_LABELS[cur] + ' — the rest carry their previous figure';
+  bar.style.display='flex';
+}
+window.setBcbBaseline = function(level){
+  BcbBaseline.set(level);
+  allWPs = applyBcbBaseline(_rawWPs, level);
+  window._wpById = Object.fromEntries(allWPs.map(w => [w.id, w]));
+  _syncBcbSwitcher();
+  _syncOvCharging();                       // re-computes the Overview from the new budgets
+  Object.keys(_rendered).forEach(k => _rendered[k] = false);
+  switchView(currentView);
+};
 
 // ── Overview charging-scope switcher (Combined / Main Contract / Change Order) ──
 // Scoped to the Overview tab ONLY — Backlog / WP List / Status Tracker are unaffected.
@@ -2470,7 +2510,9 @@ AppAuth.requireLogin(async (user, profile) => {
 
   // Load data in parallel (WPs + Claims)
   const [meta, wps] = await Promise.all([WPDb.getProject(projId), WPDb.getAllWPs(projId)]);
-  allWPs = (wps||[]).map(w => ({...w, wp_no: normWpNo(w.wp_no)}));
+  _rawWPs = (wps||[]).map(w => ({...w, wp_no: normWpNo(w.wp_no)}));
+  allWPs = applyBcbBaseline(_rawWPs, BcbBaseline.get());
+  _syncBcbSwitcher();
   window._wpById = Object.fromEntries(allWPs.map(w => [w.id, w]));
   loadClaims(); // async — loads in background
 
@@ -2560,7 +2602,9 @@ AppAuth.requireLogin(async (user, profile) => {
 
   // Re-fetch WPs and refresh view after quick-add modal saves
   window.__wpmReloadFn = async () => {
-    allWPs = (await WPDb.getAllWPs(projId)).map(w => ({...w, trade: normTrade(w.trade), wp_no: normWpNo(w.wp_no)}));
+    _rawWPs = (await WPDb.getAllWPs(projId)).map(w => ({...w, trade: normTrade(w.trade), wp_no: normWpNo(w.wp_no)}));
+    allWPs = applyBcbBaseline(_rawWPs, BcbBaseline.get());
+    _syncBcbSwitcher();
     window._wpById = Object.fromEntries(allWPs.map(w => [w.id, w]));
     _syncOvCharging();
     Object.keys(_rendered).forEach(k=>_rendered[k]=false);
