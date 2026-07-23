@@ -26,7 +26,21 @@ update public.work_packages set updated_at = coalesce(updated_at, created_at) wh
 -- Extend the viewer-facing cost-free view so read-only viewers also see the
 -- last-change info (all three are non-cost columns — safe to expose).
 drop view if exists public.wp_view_public;
-create view public.wp_view_public as
+-- security_barrier: this view is INTENTIONALLY a definer-style view (owned by a
+-- privileged role, NOT security_invoker) — that is exactly what the Supabase
+-- "security_definer_view" advisor flags, and here it is BY DESIGN, not a defect:
+--   • Viewers are denied SELECT on work_packages entirely (wp_select has
+--     get_my_role() <> 'viewer'), so the view must bypass the base-table RLS.
+--   • It re-derives the CALLER'S OWN scope from their JWT via the
+--     internal.get_my_* helpers (auth.uid()-based) in the WHERE clause below, so
+--     it never returns another user's rows.
+--   • It OMITS every cost column (budget/awarded/additionals/variance/dp/retention).
+-- security_invoker=on is not an option: all logged-in users share the single
+-- `authenticated` Postgres role (roles are distinguished via JWT claims, not DB
+-- roles) and RLS cannot hide COLUMNS — so only a separate definer relation can keep
+-- cost data from viewers. security_barrier=true stops the planner from pushing a
+-- user-supplied (possibly leaky) predicate ahead of the scope conditions.
+create view public.wp_view_public with (security_barrier = true) as
   select
     id, project_id, wp_no, cost_code, description, detailed_description,
     zone, trade, works, type_of_works, scope,
@@ -52,5 +66,13 @@ create view public.wp_view_public as
     );
 
 grant select on public.wp_view_public to authenticated;
+
+comment on view public.wp_view_public is
+  'INTENTIONAL definer-style view. Cost-free, per-caller-scoped read surface for '
+  'viewers, who are denied SELECT on work_packages by RLS. Scope is enforced in the '
+  'WHERE clause via internal.get_my_*() (auth.uid()-based); all cost columns are '
+  'omitted. The Supabase security_definer_view advisory on this object is an accepted '
+  'exception — security_invoker=on cannot hide columns per-viewer (single authenticated '
+  'role). Do NOT add any money column here.';
 
 -- Done.
