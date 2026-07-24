@@ -642,6 +642,8 @@
     if (!filteredUsers.length) {
       tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:24px">No users found</td></tr>';
       document.getElementById('selected-count').textContent = '';
+      const _bb = document.getElementById('bulk-bar');
+      if (_bb && !selectedUserIds.size) _bb.style.display = 'none';
       return;
     }
     const selCount = selectedUserIds.size;
@@ -653,6 +655,7 @@
       const appBtn = document.getElementById('bulk-approve-btn');
       if (appBtn) {
         appBtn.style.display = pendingSel > 0 ? 'inline-block' : 'none';
+        appBtn.disabled = false;          // belt-and-braces: never render it latched
         appBtn.textContent = `✓ Approve${pendingSel>0 ? ' ('+pendingSel+')' : ''}`;
       }
     }
@@ -795,8 +798,12 @@
       await loadData();
     } catch (err) {
       alert('Error approving users: ' + (err.message || err));
-      if (btn) btn.disabled = false;
       await loadData();
+    } finally {
+      // Same rule as the modals: restore in `finally`. Restoring only in `catch` left the
+      // button disabled after the first SUCCESSFUL bulk approve, so every later click was
+      // a no-op until the page was refreshed.
+      if (btn) { btn.disabled = false; btn.textContent = '✓ Approve'; }
     }
   };
 
@@ -923,6 +930,9 @@
       await loadData();
     } catch(err) {
       alert('Error: ' + err.message);
+    } finally {
+      // Restore in `finally`, not just `catch` \u2014 the modal is reused, so leaving the
+      // button disabled after a SUCCESS bricks every later approval until a refresh.
       btn.textContent = '\u2713 Approve & Assign'; btn.disabled = false;
     }
   };
@@ -965,6 +975,7 @@
       await loadData();
     } catch(err) {
       alert('Error: ' + err.message);
+    } finally {
       btn.textContent = 'Save Changes'; btn.disabled = false;
     }
   }
@@ -1143,6 +1154,7 @@
       await loadData();
     } catch(err) {
       alert('Error: ' + err.message);
+    } finally {
       btn.textContent = 'Save Role'; btn.disabled = false;
     }
   };

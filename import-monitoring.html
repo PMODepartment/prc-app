@@ -652,6 +652,23 @@ function scopeConfirmText(){
   return bits.length ? bits.join('\n') : '';
 }
 
+// The BCB baseline columns only exist after MIGRATION_bcb_baselines.sql has been run.
+// Detect that specific failure so the import can fall back instead of dying mid-way.
+function _bcbColMissing(error){
+  if(!error) return false;
+  const m=(error.message||'')+(error.details||'');
+  return /budget_bcb[0-9]/.test(m) && /column|does not exist|schema cache/i.test(m);
+}
+function _stripBcbCols(r){ const c={...r}; delete c.budget_bcb0; delete c.budget_bcb1; delete c.budget_bcb2; return c; }
+
+// Insert one throwaway row to check the DB accepts our column set, then delete it again.
+async function probeColumns(pid, sampleRow){
+  const probe={...sampleRow, project_id:pid, wp_no:'__probe__'+Date.now()};
+  const {data,error}=await sb.from('work_packages').insert(probe).select('id').single();
+  if(!error && data){ await sb.from('work_packages').delete().eq('id',data.id); return {ok:true}; }
+  return {ok:false, error:error};
+}
+
 async function doImport(){
   const pid=$('project').value;
   if(!pid){ alert('Pick a target project first (search and select one from the dropdown).'); return; }
@@ -680,6 +697,39 @@ async function doImport(){
   }
   if(!confirm(`Delete ALL work packages for ${pid} and import ${_parsed.length} rows from the sheet?\n\nThis cannot be undone.`)) return;
   $('btn-import').disabled=true; $('btn-cancel').disabled=true;
+
+  /* ── Schema probe BEFORE the destructive delete ──────────────────────────────
+     Replace deletes the project's WPs first, so a column the database doesn't have
+     used to wipe the project and then fail every insert, leaving it EMPTY (MSJ101:
+     "Could not find the 'budget_bcb0' column"). Insert one throwaway row first; if it
+     is rejected we either drop the optional columns or abort with nothing changed. */
+  {
+    const _stampP={ updated_at:new Date().toISOString(), updated_by:(_auditUser&&_auditUser.id)||null, updated_by_name:(_auditUser&&_auditUser.name)||null };
+    const _clean = o => { const c={...o}; Object.keys(c).forEach(k=>{ if(k.charAt(0)==='_') delete c[k]; }); return c; };
+    let sample=_clean({..._parsed[0], ..._stampP});
+    let pr=await probeColumns(pid, sample);
+    if(!pr.ok && _bcbColMissing(pr.error)){
+      log('BCB baseline columns not in the database yet — importing budgets without the per-baseline split.','warnt');
+      log('  Run MIGRATION_bcb_baselines.sql in Supabase to enable the BCB0/BCB1/BCB2 switcher.','warnt');
+      _parsed=_parsed.map(_stripBcbCols);
+      sample=_stripBcbCols(sample);
+      pr=await probeColumns(pid, sample);
+    }
+    if(!pr.ok && (pr.error && (pr.error.code==='42703' || /updated_(at|by)/.test(pr.error.message||'')))){
+      log('Audit columns not present yet — importing without the last-change stamp.','info');
+      sample={...sample}; delete sample.updated_at; delete sample.updated_by; delete sample.updated_by_name;
+      pr=await probeColumns(pid, sample);
+    }
+    if(!pr.ok){
+      const msg=(pr.error && pr.error.message)||'unknown error';
+      log('Aborted BEFORE deleting anything — the database rejected a test row: '+msg,'err');
+      log('  Nothing was changed. Run the pending migration, then import again.','err');
+      alert('Import aborted — the database rejected a test row:\n\n'+msg+
+            '\n\nNOTHING was deleted or changed. Run the pending migration, then import again.');
+      $('btn-import').disabled=false; $('btn-cancel').disabled=false; return;
+    }
+  }
+
   log(`\nReplacing ${pid} — deleting existing work packages…`,'info');
   const {error:delErr}=await sb.from('work_packages').delete().eq('project_id',pid);
   if(delErr){ log('Delete failed: '+delErr.message,'err'); $('btn-import').disabled=false; $('btn-cancel').disabled=false; return; }
@@ -700,7 +750,18 @@ async function doImport(){
       rows=rows.map(r=>{ const c={...r}; delete c.updated_at; delete c.updated_by; delete c.updated_by_name; return c; });
       ({error}=await sb.from('work_packages').insert(rows.slice(i,i+BATCH)));
     }
-    if(error){ log(`Batch ${Math.floor(i/BATCH)+1} error: ${error.message}`,'err'); log('  first WP: '+batch[0].wp_no,'err'); $('btn-cancel').disabled=false; return; }
+    // BCB baseline columns not migrated yet → same treatment. The budget still imports
+    // via approved_budget_bcb, so only the per-baseline split is lost.
+    if(error && _bcbColMissing(error)){
+      log('BCB baseline columns not present yet — importing budgets without the per-baseline split.','warnt');
+      rows=rows.map(_stripBcbCols);
+      ({error}=await sb.from('work_packages').insert(rows.slice(i,i+BATCH)));
+    }
+    if(error){
+      log(`Batch ${Math.floor(i/BATCH)+1} error: ${error.message}`,'err'); log('  first WP: '+batch[0].wp_no,'err');
+      log(`  WARNING: ${pid} now holds only the ${inserted} row(s) inserted so far — re-run the import once the error above is fixed.`,'err');
+      $('btn-cancel').disabled=false; return;
+    }
     inserted+=batch.length; log(`Inserted ${inserted}/${rows.length}`,'ok');
   }
   log(`\n✓ COMPLETE — ${inserted} work packages imported into ${pid}.`,'ok');

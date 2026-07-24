@@ -37,6 +37,19 @@ const WPDb = (() => {
     return error.code === '42703' || /updated_by_name|updated_by|updated_at/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
   function _stripAudit(obj) { const d = {...obj}; delete d.updated_at; delete d.updated_by; delete d.updated_by_name; return d; }
+  // Same deploy-order guard for the BCB baseline columns: they only exist once
+  // MIGRATION_bcb_baselines.sql has been run, so every write retries without them.
+  function _isMissingBcbCol(error) {
+    if (!error) return false;
+    const m = (error.message || '') + (error.details || '');
+    return /budget_bcb[0-9]/.test(m) && /column|does not exist|schema cache/i.test(m);
+  }
+  function _stripBcb(obj) { const d = {...obj}; delete d.budget_bcb0; delete d.budget_bcb1; delete d.budget_bcb2; return d; }
+  // Retry helper: strip whichever optional column set the DB is missing, then try again.
+  function _stripOptional(obj, error) {
+    if (_isMissingBcbCol(error)) return _stripBcb(_stripAudit(obj));
+    return _stripAudit(obj);
+  }
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
   async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
   async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
@@ -65,19 +78,28 @@ const WPDb = (() => {
   async function submitWP(d,p) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null};
     let {data,error}=await sb.from('work_packages').insert({...base,..._auditStamp()}).select().single();
-    if(error && _isMissingAuditCol(error)) ({data,error}=await sb.from('work_packages').insert(_stripAudit(base)).select().single());
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error)))
+      ({data,error}=await sb.from('work_packages').insert(_stripOptional(base,error)).select().single());
+    if(error && _isMissingBcbCol(error))
+      ({data,error}=await sb.from('work_packages').insert(_stripBcb(_stripAudit(base))).select().single());
     if(error) throw error; return data;
   }
   async function updateWP(id,d) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review'};
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && _isMissingAuditCol(error)) ({data,error}=await sb.from('work_packages').update(_stripAudit(base)).eq('id',id).select().single());
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error)))
+      ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
+    if(error && _isMissingBcbCol(error))
+      ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
     if(error) throw error; return data;
   }
   async function updateWPDirect(id,d) {
     const sb=await getSB(); const base=unmap(d);
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && _isMissingAuditCol(error)) ({data,error}=await sb.from('work_packages').update(_stripAudit(base)).eq('id',id).select().single());
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error)))
+      ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
+    if(error && _isMissingBcbCol(error))
+      ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
     if(error) throw error; return data;
   }
   async function createProject(d) { const sb=await getSB(); const {data,error}=await sb.from('projects').insert(d).select().single(); if(error) throw error; return data; }
