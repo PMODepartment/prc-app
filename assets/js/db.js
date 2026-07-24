@@ -231,6 +231,39 @@ function helpingMetrics(wps) {
   return {awarded, totalBudget, awardedCost, budgetAwarded, hsCovered};
 }
 
+/* ── Status glyphs — never encode meaning in colour alone ──────────────────
+   Award/procurement/submittal/delivery states were distinguished ONLY by red vs
+   green, which ~8% of men cannot reliably tell apart (and which disappears in a
+   greyscale print of the PDF export). Every status label now carries a leading
+   glyph, so the state is readable without perceiving colour at all.
+   `window.statusGlyph(text)` returns the marker for a status string. */
+const _STATUS_GLYPHS = [
+  [/^awarded$/i,                         '✔'],   // ✔ done
+  [/not yet awarded|not awarded/i,       '○'],   // ○ open
+  [/^delivered$|^approved$/i,            '✔'],
+  [/approved w\/ comments/i,             '✓'],   // ✓ done, with caveats
+  [/^submitted$|manufactured|produced/i, '◐'],   // ◐ in progress
+  [/detailed drawings|dp paid/i,         '◐'],
+  [/evaluated|solicited|sourced/i,       '◐'],
+  [/not started|not required/i,          '○'],
+  [/overdue|due not awarded|rejected/i,  '⚠'],   // ⚠ needs attention
+  [/pending/i,                           '⏱'],   // ⏱ waiting
+];
+function statusGlyph(text) {
+  const t = String(text == null ? '' : text).trim();
+  if (!t) return '';
+  for (const [re, g] of _STATUS_GLYPHS) if (re.test(t)) return g;
+  return '';
+}
+// Convenience: "✔ Awarded" — the glyph is aria-hidden so screen readers, which
+// already read the status word, don't announce a meaningless symbol.
+function statusLabel(text) {
+  const g = statusGlyph(text);
+  const t = (text == null || text === '') ? '—' : String(text);
+  return g ? '<span aria-hidden="true" style="opacity:.85">' + g + '</span> ' + t : t;
+}
+window.statusGlyph = statusGlyph; window.statusLabel = statusLabel;
+
 /* ── BCB baselines (BCB0 … BCB2) ──────────────────────────────────────────
    A project's budget is re-baselined over time, so the SAME work package can
    show savings against BCB0 and a loss against BCB1. Each baseline is stored in
@@ -456,7 +489,18 @@ window.KPI_HELP = {
   'Variance':'Total Budget − Estimate at Completion. Positive = under budget, negative = over budget.'
 };
 // Returns the ` title="…" style="cursor:help"` attributes for a KPI label (empty if no help defined).
-window.kpiLabelAttrs = function(lbl){ const h=(window.KPI_HELP||{})[lbl]; return h ? (' title="'+String(h).replace(/"/g,'&quot;')+'" style="cursor:help"') : ''; };
+// KPI label help. A bare `title` is invisible on touch (no hover) and is never
+// announced reliably, so the label also gets: an aria-label (screen readers),
+// tabindex (keyboard reachable) and a `data-tip` the Tooltip helper in ui.js shows
+// on tap/focus. The dotted underline signals that help exists at all.
+window.kpiLabelAttrs = function(lbl){
+  const h=(window.KPI_HELP||{})[lbl];
+  if(!h) return '';
+  const esc=String(h).replace(/"/g,'&quot;');
+  return ' title="'+esc+'" data-tip="'+esc+'" tabindex="0" role="button"'
+       + ' aria-label="'+String(lbl).replace(/"/g,'&quot;')+' — what is this? '+esc+'"'
+       + ' class="has-tip"';
+};
 
 /* ── User bar — avatar only, role in dropdown ───────────────────────── */
 function renderUserBar(id, profile) {

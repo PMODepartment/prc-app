@@ -294,3 +294,59 @@ const AppTheme = (() => {
   return { init, toggle, isDark, apply };
 })();
 window.AppTheme = AppTheme;
+
+/* ── Tooltip helper (audit item: title-only affordances) ───────────────────
+   The app leaned on the native `title` attribute in ~44 places. That is a poor
+   affordance: it never appears on touch devices, is not keyboard reachable, and
+   screen readers announce it inconsistently. Any element carrying `data-tip`
+   now opens a real popover on click/tap or keyboard focus, and closes on Esc,
+   blur or an outside click. The native `title` is left in place as a desktop
+   hover fallback. */
+(function(){
+  let _tipEl = null, _tipFor = null;
+  function ensure(){
+    if (_tipEl) return _tipEl;
+    _tipEl = document.createElement('div');
+    _tipEl.className = 'app-tip';
+    _tipEl.setAttribute('role','tooltip');
+    _tipEl.style.display = 'none';
+    document.body.appendChild(_tipEl);
+    return _tipEl;
+  }
+  function hide(){ if(_tipEl){ _tipEl.style.display='none'; } _tipFor=null; }
+  function show(target){
+    const text = target.getAttribute('data-tip');
+    if (!text) return;
+    const t = ensure();
+    t.textContent = text;
+    t.style.display = 'block';
+    // Position under the trigger, clamped to the viewport.
+    const r = target.getBoundingClientRect();
+    const tw = Math.min(280, Math.max(160, t.offsetWidth));
+    t.style.width = tw + 'px';
+    let left = r.left + window.scrollX;
+    left = Math.min(left, window.scrollX + document.documentElement.clientWidth - tw - 10);
+    t.style.left = Math.max(window.scrollX + 8, left) + 'px';
+    t.style.top  = (r.bottom + window.scrollY + 6) + 'px';
+    _tipFor = target;
+  }
+  function toggle(target){ (_tipFor === target) ? hide() : show(target); }
+
+  document.addEventListener('click', function(e){
+    const trg = e.target.closest && e.target.closest('[data-tip]');
+    if (trg) { e.preventDefault(); toggle(trg); return; }
+    if (_tipFor) hide();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') { hide(); return; }
+    const trg = document.activeElement;
+    if ((e.key === 'Enter' || e.key === ' ') && trg && trg.hasAttribute && trg.hasAttribute('data-tip')) {
+      e.preventDefault(); toggle(trg);
+    }
+  });
+  document.addEventListener('focusout', function(e){
+    if (_tipFor && e.target === _tipFor) hide();
+  });
+  window.addEventListener('resize', hide);
+  window.addEventListener('scroll', hide, true);
+})();

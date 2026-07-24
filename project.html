@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723q"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723q"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723q"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723r"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723r"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723r"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708b"/>
   <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723q"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723r"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723q"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723r"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -199,8 +199,21 @@
     </div>
 
     <div class="content" id="main-content-region" role="main" tabindex="-1">
-      <div id="loading" class="loading-overlay">
-        <div class="spinner"></div><span>Loading project…</span>
+      <!-- Skeleton of the real layout: 4 cost KPIs + status panel, then a chart and
+           table rows. Shows the SHAPE of what is loading instead of a bare spinner —
+           the Supabase free tier cold-starts for 5-30s and looked broken. -->
+      <div id="loading" class="loading-overlay" role="status" aria-live="polite" aria-busy="true">
+        <div class="skel-wrap" style="width:100%">
+          <div class="skel-grid" style="margin-bottom:14px">
+            <div class="skel skel-card"></div><div class="skel skel-card"></div>
+            <div class="skel skel-card"></div><div class="skel skel-card"></div>
+          </div>
+          <div class="skel" style="height:230px;border-radius:12px;margin-bottom:14px"></div>
+          <div class="skel-line skel" style="width:38%"></div>
+          <div class="skel-line skel"></div><div class="skel-line skel" style="width:88%"></div>
+          <div class="skel-line skel" style="width:94%"></div><div class="skel-line skel" style="width:72%"></div>
+          <div class="skel-label"><span class="spinner" style="width:14px;height:14px;border-width:2px"></span>Loading project…</div>
+        </div>
       </div>
 
       <div id="main-content" style="display:none">
@@ -563,14 +576,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723q"></script>
-<script src="assets/js/ui.js?v=20260723q"></script>
-<script src="assets/js/db.js?v=20260723q"></script>
+<script src="assets/js/auth.js?v=20260723r"></script>
+<script src="assets/js/ui.js?v=20260723r"></script>
+<script src="assets/js/db.js?v=20260723r"></script>
 <script src="assets/js/onboarding.js?v=20260708b"></script>
 <script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260723q"></script>
+<script src="assets/js/charts.js?v=20260723r"></script>
 <script>
 const PAGE=15;
 let allWPs=[], projId='', sortCol='wp_no', sortDir=1, curPage=1;
@@ -882,7 +895,8 @@ function procStatusBadge(s){
     'Awarded':     {bg:'#F0FDF4',c:'#15803D'},
   };
   const {bg,c}=map[s]||{bg:'#F3F4F6',c:'#9CA3AF'};
-  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+(s||'—')+'</span>';
+  // statusLabel() prefixes a glyph so the state doesn't rely on colour alone
+  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+statusLabel(s)+'</span>';
 }
 function submittalBadge(s){
   const map={
@@ -892,7 +906,8 @@ function submittalBadge(s){
     'Approved':              {bg:'#F0FDF4',c:'#15803D'},
   };
   const {bg,c}=map[s]||{bg:'#F3F4F6',c:'#9CA3AF'};
-  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+(s||'—')+'</span>';
+  // statusLabel() prefixes a glyph so the state doesn't rely on colour alone
+  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+statusLabel(s)+'</span>';
 }
 function deliveryBadge(s){
   const map={
@@ -902,7 +917,8 @@ function deliveryBadge(s){
     'Delivered':                      {bg:'#F0FDF4',c:'#15803D'},
   };
   const {bg,c}=map[s]||{bg:'#F3F4F6',c:'#9CA3AF'};
-  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+(s||'—')+'</span>';
+  // statusLabel() prefixes a glyph so the state doesn't rely on colour alone
+  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+statusLabel(s)+'</span>';
 }
 
 const _rendered = { overview: false, dashboard: false, backlog: false, table: false };
@@ -1080,7 +1096,7 @@ async function _stSaveFields(id, fields, sel, onErrRevert){
 // Read-only Award Status badge (derived from Procurement Status; not directly editable in the tracker).
 function _stAwardBadge(id, status){
   const awd = status==='Awarded';
-  return `<span id="st-aw-${id}" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:${awd?'#D1FAE5':'#FEF3C7'};color:${awd?'#065F46':'#92400E'};white-space:nowrap">${awd?'Awarded':'Not Yet Awarded'}</span>`;
+  return `<span id="st-aw-${id}" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:${awd?'#D1FAE5':'#FEF3C7'};color:${awd?'#065F46':'#92400E'};white-space:nowrap">${statusLabel(awd?'Awarded':'Not Yet Awarded')}</span>`;
 }
 function _stRefreshAwardBadge(id){
   const el = document.getElementById('st-aw-'+id), w = allWPs.find(x=>x.id===id);
@@ -1424,9 +1440,9 @@ function renderOvBattery(wps) {
   const valDuePct = bcb   ? Math.round(dueBcb/bcb*100) : 0;
 
   const LEGEND = `<div style="display:flex;flex-direction:column;gap:3px;margin-top:10px;align-self:flex-start">
-    <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:#2D9B6F"></div><span style="font-size:9px;color:#777;white-space:nowrap">Awarded</span></div>
-    <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:#EE3124"></div><span style="font-size:9px;color:#777;white-space:nowrap">Due Not Awarded</span></div>
-    <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:#D1D5DB"></div><span style="font-size:9px;color:#777;white-space:nowrap">Not Due Yet</span></div>
+    <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:#2D9B6F"></div><span style="font-size:9px;color:#777;white-space:nowrap"><span aria-hidden="true">✔</span> Awarded</span></div>
+    <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:repeating-linear-gradient(135deg,#EE3124,#EE3124 3px,#C42127 3px,#C42127 6px)"></div><span style="font-size:9px;color:#777;white-space:nowrap"><span aria-hidden="true">⚠</span> Due Not Awarded</span></div>
+    <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:#D1D5DB"></div><span style="font-size:9px;color:#777;white-space:nowrap"><span aria-hidden="true">○</span> Not Due Yet</span></div>
   </div>`;
 
   function batteryCard(elId, pctAwd, pctDue, title, line1, line2) {
@@ -1441,7 +1457,7 @@ function renderOvBattery(wps) {
       <div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.08em;text-align:center;margin-bottom:10px">${title}</div>
       <div style="position:relative;width:72px;height:160px;border:2px solid #ccc;border-radius:12px;overflow:hidden;background:#ebebeb;flex-shrink:0">
         <div style="position:absolute;top:0;left:0;right:0;height:${pctND}%;background:#D1D5DB;min-height:${pctND>0?2:0}px"></div>
-        <div style="position:absolute;top:${pctND}%;left:0;right:0;height:${pctDue}%;background:#EE3124;opacity:.85;min-height:${pctDue>0?2:0}px"></div>
+        <div style="position:absolute;top:${pctND}%;left:0;right:0;height:${pctDue}%;background:repeating-linear-gradient(135deg,#EE3124,#EE3124 5px,#C42127 5px,#C42127 10px);opacity:.9;min-height:${pctDue>0?2:0}px"></div>
         <div style="position:absolute;bottom:0;left:0;right:0;height:${pctAwd}%;background:linear-gradient(to top,#1a7a50,#2D9B6F,#4ac98a);min-height:${pctAwd>0?2:0}px"></div>
         <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px;font-weight:800;color:${textColor};text-shadow:0 1px 4px rgba(0,0,0,.3);white-space:nowrap;pointer-events:none;letter-spacing:-.5px">${pctAwd}%</div>
       </div>
@@ -2193,7 +2209,7 @@ function buildTable(){
       case 'approval_date': return `<td>${fmtDate(wp.approval_date)}</td>`;
       case 'submittal_doc_type': return `<td>${wp.submittal_doc_type||'—'}</td>`;
       case 'procurement_status': return `<td style="font-size:11px;color:#555">${esc(wp.procurement_status)||'—'}</td>`;
-      case 'award_status': return `<td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${sc}22;color:${sc}">${wp.award_status||'—'}</span></td>`;
+      case 'award_status': return `<td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${sc}22;color:${sc}">${statusLabel(wp.award_status)}</span></td>`;
       case 'remarks': return `<td style="font-size:10px;color:#888;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(wp.remarks)}">${esc(wp.remarks)||'—'}</td>`;
       default: return '<td>—</td>';
     }
@@ -2276,7 +2292,7 @@ function buildTable(){
         ch+=`<div class="wpc" style="border-left-color:${bc}">
           <div class="wpc-top">
             <span class="wpc-wpno" onclick='openWPDetail("${wp.id}")'>${esc(wp.wp_no)||'—'}</span>
-            <span class="wpc-badge" style="background:${sc}22;color:${sc}">${wp.award_status||'—'}</span>
+            <span class="wpc-badge" style="background:${sc}22;color:${sc}">${statusLabel(wp.award_status)}</span>
           </div>
           <div class="wpc-desc">${esc(wp.description)||'—'}</div>
           <div class="wpc-meta">${[wp.trade,wp.works].filter(Boolean).join(' › ')||'—'}</div>

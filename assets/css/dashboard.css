@@ -1549,3 +1549,42 @@ button:disabled, .btn:disabled, a[aria-disabled="true"] {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
+
+/* ── Tooltip + help affordance (audit item: title-only affordances) ───────── */
+.app-tip {
+  position: absolute; z-index: 400; max-width: 280px;
+  background: var(--mw-black); color: #fff;
+  font-size: 11.5px; line-height: 1.45; font-weight: 500;
+  padding: 9px 11px; border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.22);
+  pointer-events: none;
+}
+body.dark-mode .app-tip { background: #4A4A4A; }
+/* Signals that help is available — a bare `title` gives no visual cue at all. */
+.has-tip {
+  cursor: help;
+  text-decoration: underline dotted currentColor 1px;
+  text-underline-offset: 3px;
+}
+.has-tip:focus-visible { outline: 2px solid var(--mw-red) !important; outline-offset: 2px; }
+
+/* ── Skeleton loading (audit item: all-or-nothing loading) ────────────────
+   Supabase free tier cold-starts take 5-30s, during which the app showed only a
+   spinner and read as broken. Skeletons show the SHAPE of what is coming. */
+.skel { position: relative; overflow: hidden; background: var(--surface-2); border-radius: 6px; }
+.skel::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,.055), transparent);
+  animation: skel-shimmer 1.3s infinite;
+}
+body.dark-mode .skel::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent); }
+@keyframes skel-shimmer { 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skel::after { animation: none; } }
+.skel-line { height: 11px; margin: 7px 0; }
+.skel-card { height: 104px; border-radius: var(--radius-lg); border: 1px solid var(--border); }
+.skel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.skel-wrap { padding: 4px 0 8px; }
+.skel-label {
+  font-size: 12px; color: var(--text-secondary); text-align: center;
+  padding: 10px 0 2px; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
