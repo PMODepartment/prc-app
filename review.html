@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723n"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723n"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723n"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723o"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723o"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723o"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723n"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723o"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -263,9 +263,9 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723n"></script>
-<script src="assets/js/ui.js?v=20260723n"></script>
-<script src="assets/js/db.js?v=20260723n"></script>
+<script src="assets/js/auth.js?v=20260723o"></script>
+<script src="assets/js/ui.js?v=20260723o"></script>
+<script src="assets/js/db.js?v=20260723o"></script>
 <script>
   let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';
@@ -577,8 +577,10 @@
     { g:'schedule', k:'target_installation',  label:'Target Installation', w:110, type:'date' },
     { g:'schedule', k:'target_completion',    label:'Target Completion',   w:110, type:'date', req:true },
     /* ── Budget & Contract ─────────────────────────────────────────────── */
-    { g:'budget',   k:'approved_budget_bcb', label:'Budget (BCB) — current', w:130, type:'money', req:true },
-    { g:'budget',   k:'budget_bcb0',        label:'BCB0',                 w:110, type:'money' },
+    // No 'current' column: approved_budget_bcb is DERIVED (the newest non-blank baseline).
+    // Showing it beside BCB0/1/2 duplicated the same number and invited the two to drift.
+    // It is still written on every edit below, because all dashboard reads use it.
+    { g:'budget',   k:'budget_bcb0',        label:'Budget BCB0',          w:120, type:'money', req:true },
     { g:'budget',   k:'budget_bcb1',        label:'BCB1',                 w:110, type:'money' },
     { g:'budget',   k:'budget_bcb2',        label:'BCB2',                 w:110, type:'money' },
     { g:'budget',   k:'awarded_cost',        label:'Awarded Cost',         w:120, type:'money', reqIfAwarded:true },
@@ -1110,20 +1112,18 @@
         else _gridEdits[w.id].award_status = aw;
       }
     }
-    // BCB0 is the CURRENT baseline when no higher baseline (BCB1/BCB2) is set — so editing
-    // it must also move approved_budget_bcb ("current"), which every dashboard read uses;
-    // otherwise the KPIs wouldn't budge. Mirrors the read-side fallback in xlVal().
-    if (col.k === 'budget_bcb0'){
-      const hasHigher = (xlVal(w,'budget_bcb1')!=null && xlVal(w,'budget_bcb1')!=='')
-                     || (xlVal(w,'budget_bcb2')!=null && xlVal(w,'budget_bcb2')!=='');
-      if (!hasHigher){
-        const cur = (val==null||val==='') ? null : val;
-        if (String(xlVal(w,'approved_budget_bcb')??'') !== String(cur??'')){
-          const had3 = !!(_gridEdits[w.id] && Object.prototype.hasOwnProperty.call(_gridEdits[w.id],'approved_budget_bcb'));
-          if (undoBatch) undoBatch.push({ id:w.id, k:'approved_budget_bcb', had:had3, prev:had3?_gridEdits[w.id].approved_budget_bcb:undefined });
-          if (String(w.approved_budget_bcb??'')===String(cur??'')) delete _gridEdits[w.id].approved_budget_bcb;
-          else _gridEdits[w.id].approved_budget_bcb = cur;
-        }
+    // `approved_budget_bcb` is the CURRENT baseline = the newest non-blank of BCB0/1/2.
+    // It has no column of its own (it's derived), but every dashboard/chart/export reads
+    // it, so recompute and stage it whenever any baseline changes — same rule as the WP
+    // form's save(). Without this the KPIs wouldn't move when a baseline is edited.
+    if (col.k === 'budget_bcb0' || col.k === 'budget_bcb1' || col.k === 'budget_bcb2'){
+      const _n = k => { const v = xlVal(w,k); return (v==null||v==='') ? null : v; };
+      const cur = _n('budget_bcb2') ?? _n('budget_bcb1') ?? _n('budget_bcb0');
+      if (String(xlVal(w,'approved_budget_bcb')??'') !== String(cur??'')){
+        const had3 = !!(_gridEdits[w.id] && Object.prototype.hasOwnProperty.call(_gridEdits[w.id],'approved_budget_bcb'));
+        if (undoBatch) undoBatch.push({ id:w.id, k:'approved_budget_bcb', had:had3, prev:had3?_gridEdits[w.id].approved_budget_bcb:undefined });
+        if (String(w.approved_budget_bcb??'')===String(cur??'')) delete _gridEdits[w.id].approved_budget_bcb;
+        else _gridEdits[w.id].approved_budget_bcb = cur;
       }
     }
     _xlRefreshRow(r);
