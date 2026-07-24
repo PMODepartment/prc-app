@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723o"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723o"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723o"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723p"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723p"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723p"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708b"/>
   <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723o"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723p"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723o"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723p"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -608,14 +608,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723o"></script>
-<script src="assets/js/db.js?v=20260723o"></script>
-<script src="assets/js/ui.js?v=20260723o"></script>
+<script src="assets/js/auth.js?v=20260723p"></script>
+<script src="assets/js/db.js?v=20260723p"></script>
+<script src="assets/js/ui.js?v=20260723p"></script>
 <script src="assets/js/onboarding.js?v=20260708b"></script>
 <script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260723o"></script>
+<script src="assets/js/charts.js?v=20260723p"></script>
 <script>
   initMobileMenu();
   initExpandableCharts();
@@ -752,12 +752,17 @@
     const userId = profile.id;
     // Search box appears only when there are enough projects to be worth filtering
     const _navSearchWrap = document.getElementById('nav-proj-search-wrap');
-    if (_navSearchWrap && permitted.length > 5) _navSearchWrap.style.display = 'block';
+    if (_navSearchWrap && permitted.filter(p => p.status !== 'archived').length > 5) _navSearchWrap.style.display = 'block';
+    // Sidebar lists ACTIVE projects only — an archived project (e.g. TES101) is not
+    // something you jump into to manage work packages. Mirrors project.html's sidebar.
+    // Archived projects stay reachable via the login picker, a direct URL, and the
+    // portfolio project cards/table (where their pill starts unselected).
+    const navProjects = permitted.filter(p => p.status !== 'archived');
     const renderIndexNav = () => {
       const term = (document.getElementById('nav-proj-search')?.value || '').toLowerCase().trim();
       const list = term
-        ? permitted.filter(p => p.id.toLowerCase().includes(term) || (p.name||'').toLowerCase().includes(term))
-        : permitted;
+        ? navProjects.filter(p => p.id.toLowerCase().includes(term) || (p.name||'').toLowerCase().includes(term))
+        : navProjects;
       if (!list.length) { navEl.innerHTML = '<div style="padding:8px 14px;font-size:11px;color:rgba(255,255,255,.35)">No matching projects</div>'; return; }
       if (typeof SidebarPrefs !== 'undefined') {
         const { pinned, rest } = SidebarPrefs.sortProjects(userId, list);
@@ -1199,7 +1204,10 @@
         const el = document.getElementById(elId);
         if(!el) return;
         const pctND = Math.max(0, 100 - pctAwd - pctDue);
-        const textColor = pctAwd > 55 ? '#fff' : '#231F20';
+        // The % label sits at the vertical CENTRE of the battery, so it's over the green fill
+        // as soon as the awarded share reaches 50 — not 55. At 55% exactly the old threshold
+        // left dark text on dark green (unreadable, per the portfolio screenshot).
+        const textColor = pctAwd >= 50 ? '#fff' : '#231F20';
         el.innerHTML = `
           <div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.08em;text-align:center;margin-bottom:10px">${title}</div>
           <div style="position:relative;width:72px;height:160px;border:2px solid #ccc;border-radius:12px;overflow:hidden;background:#ebebeb;flex-shrink:0">
