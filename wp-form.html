@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723r"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723r"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723r"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260723r"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723s"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723s"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723s"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260723s"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723r"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723s"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -36,7 +36,7 @@
     .form-actions{display:flex;gap:10px;flex-wrap:wrap;padding-top:16px;border-top:1px solid var(--border)}
     .status-info{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--radius-md);padding:12px 14px;font-size:12px;color:#1e40af;margin-bottom:20px;display:flex;gap:10px;align-items:flex-start}
     .rejection-box{background:#FFF0F0;border:1px solid #FFD0D0;border-radius:var(--radius-md);padding:12px 14px;font-size:12px;color:#EE3124;margin-bottom:20px}
-    .tbadge{font-size:9px;background:#EE3124;color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
+    .tbadge{font-size:10px;background:#EE3124;color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
     /* Multi-select user picker */
     .ms-wrap{position:relative}
     .ms-trigger{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1.5px solid var(--border-md);border-radius:var(--radius-md);background:var(--surface-2);cursor:pointer;font-size:12px;min-height:38px;gap:6px;user-select:none;transition:border-color .15s}
@@ -664,10 +664,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723r"></script>
-<script src="assets/js/ui.js?v=20260723r"></script>
-<script src="assets/js/db.js?v=20260723r"></script>
-<script src="assets/js/coachmarks.js?v=20260723r"></script>
+<script src="assets/js/auth.js?v=20260723s"></script>
+<script src="assets/js/ui.js?v=20260723s"></script>
+<script src="assets/js/db.js?v=20260723s"></script>
+<script src="assets/js/coachmarks.js?v=20260723s"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -835,7 +835,7 @@
   window.deleteCurrentWP = async function() {
     if (!editId) return;
     const _p = (allProjects||[]).find(p => p.id === (existingWP && existingWP.project_id));
-    if (_p && _p.status === 'archived') { alert('This project is archived and read-only.'); return; }
+    if (_p && _p.status === 'archived') { AppNotify.warn('This project is archived and read-only.'); return; }
     const label = (existingWP && existingWP.wp_no) ? existingWP.wp_no : 'this work package';
     if (!confirm(`Delete ${label}?\n\nThis permanently removes it and cannot be undone.`)) return;
     const btn = document.getElementById('btn-delete');
@@ -846,7 +846,7 @@
       markClean();
       location.href = 'project.html?id=' + (existingWP ? existingWP.project_id : (projId||''));
     } catch(e) {
-      alert('Delete failed: ' + (e.message || e));
+      AppNotify.fromError(e, 'Could not delete this work package.');
       if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     }
   };
@@ -1212,12 +1212,12 @@ AppAuth.requireLogin(async (user, profile) => {
     /* Load existing WP if editing */
     if (editId) {
       existingWP = await WPDb.getWP(editId);
-      if (!existingWP) { alert('Work package not found.'); markClean(); history.back(); return; }
+      if (!existingWP) { AppNotify.error('That work package no longer exists.'); markClean(); history.back(); return; }
 
       /* Check EDIT permission — specialists can view all projects but only edit assigned ones (P1).
          The WP form is an edit surface, so gate on canEditProject, not canAccessProject. */
       if (!AppAuth.canEditProject(profile, existingWP.project_id)) {
-        alert('This project isn\'t assigned to you, so you can only view it (not edit its work packages). Ask an admin to assign it.');
+        AppNotify.warn('This project isn\'t assigned to you, so you can only view it. Ask an admin to assign it.');
         markClean(); history.back(); return;
       }
 

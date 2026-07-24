@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723r"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723r"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723r"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723s"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723s"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723s"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723r"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723s"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -37,7 +37,7 @@
     .tab-row{display:flex;gap:2px;background:var(--surface-2);border-radius:10px;padding:3px;width:fit-content;margin-bottom:20px}
     .tab{font-size:12px;padding:6px 16px;border-radius:8px;border:none;cursor:pointer;font-weight:500;color:var(--text-secondary);background:transparent;transition:all .15s}
     .tab.active{background:var(--surface);color:var(--text-primary);box-shadow:0 1px 4px rgba(0,0,0,.08)}
-    .tbadge{font-size:9px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
+    .tbadge{font-size:10px;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
     .modal-bg.hidden{display:none}
     .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:440px}
@@ -60,7 +60,7 @@
       cursor:pointer;user-select:none;border-right:2px solid var(--border-md);white-space:nowrap}
     table.xl thead tr.xl-grp th:hover{background:#E8E8E8}
     table.xl thead tr.xl-grp th.collapsed{color:var(--text-hint)}
-    table.xl thead tr.xl-grp .xl-grp-n{font-size:9px;font-weight:700;background:#EE3124;color:#fff;border-radius:8px;padding:0 5px;margin-left:2px}
+    table.xl thead tr.xl-grp .xl-grp-n{font-size:10px;font-weight:700;background:#EE3124;color:#fff;border-radius:8px;padding:0 5px;margin-left:2px}
     body.dark-mode table.xl thead tr.xl-grp th{background:#3a3a3a}
     body.dark-mode table.xl thead tr.xl-grp th:hover{background:#454545}
     /* Header cells stay clipped (long labels must not bleed into the next column), so the
@@ -115,7 +115,7 @@
     .xl-btn.primary{background:#EE3124;border-color:#EE3124;color:#fff}
     .xl-btn:disabled{opacity:.45;cursor:default}
     .xl-hint{font-size:10px;color:var(--text-hint)}
-    .xl-badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;color:#fff}
+    .xl-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:9px;color:#fff}
     /* Required-but-empty cells (mirrors the WP form's own required fields) */
     table.xl td.xl-missing{background:#FDECEA;box-shadow:inset 3px 0 0 #EE3124}
     body.dark-mode table.xl td.xl-missing{background:#4a1f1b}
@@ -270,9 +270,9 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723r"></script>
-<script src="assets/js/ui.js?v=20260723r"></script>
-<script src="assets/js/db.js?v=20260723r"></script>
+<script src="assets/js/auth.js?v=20260723s"></script>
+<script src="assets/js/ui.js?v=20260723s"></script>
+<script src="assets/js/db.js?v=20260723s"></script>
 <script>
   let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';
@@ -443,7 +443,7 @@
       try { await WPDb.approveWP(w.id); } catch(e){ errs.push((w.wp_no||w.id) + ': ' + e.message); }
     }
     _bustWPCache();
-    if (errs.length) alert('Some could not be approved:\n\n' + errs.join('\n'));
+    if (errs.length) AppNotify.error('Some work packages could not be approved.', {detail: errs.join('\n')});
     btn.disabled = false;
     await loadAll();
   };
@@ -507,7 +507,7 @@
       _bustWPCache();
       await loadAll();
       setReviewView(_reviewView);
-    } catch(e) { alert('Error: ' + e.message); }
+    } catch(e) { AppNotify.fromError(e, 'Could not approve that work package.'); }
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════
@@ -851,11 +851,11 @@
 
   window.xlAddRow = function(){
     const opts = _xlAddableProjects();
-    if (!opts.length){ alert('You have no projects you can add work packages to. Ask an admin to assign you a project.'); return; }
+    if (!opts.length){ AppNotify.warn('You have no projects you can add work packages to. Ask an admin to assign you a project.'); return; }
     // Single-project context uses it directly; the consolidated grid asks which project.
     let pid = (currentProjId !== 'ALL') ? currentProjId : (document.getElementById('xl-new-proj')||{}).value;
     if (!pid) pid = opts[0].id;
-    if (!AppAuth.canEditProject(adminProfile, pid)){ alert("You can't add work packages to " + pid + '.'); return; }
+    if (!AppAuth.canEditProject(adminProfile, pid)){ AppNotify.warn("You can't add work packages to " + pid + '.'); return; }
     const draft = {
       id: 'new_' + (++_newSeq), __new: true, project_id: pid,
       wp_no: _xlNextWpNo(pid),
@@ -1008,7 +1008,7 @@
         (w.__new
           ? '<td class="xl-freeze xl-ro" style="left:0;text-align:center;padding:0">'
             + '<button class="xl-rm" onclick="xlRemoveNewRow(\'' + w.id + '\',event)" title="Discard this new row">&times;</button></td>'
-          : '<td class="xl-freeze xl-ro" style="left:0;text-align:center;font-size:9px;color:#bbb">'+(r+1)+'</td>') +
+          : '<td class="xl-freeze xl-ro" style="left:0;text-align:center;font-size:10px;color:#bbb">'+(r+1)+'</td>') +
         VC.map(function(c,i){
           const fz  = i < XL_FREEZE;
           const ro  = c.ro || locked;
@@ -1474,10 +1474,12 @@
       if (missing.length) bad.push('  ' + label + ' (' + w.project_id + ') — ' + missing.join(', '));
     });
     if (bad.length){
-      alert('These work packages are missing required fields (highlighted in red):\n\n'
-        + bad.join('\n')
-        + '\n\nFill them in and save again. Awarded Cost and Awarded Vendor are required only while a WP is Awarded — '
-        + 'setting Procurement Status back below Awarded clears that requirement.');
+      AppNotify.error('Fill in the required fields highlighted in red before saving.', {
+        title: bad.length + ' work package' + (bad.length===1?'':'s') + ' incomplete',
+        detail: bad.join('\n')
+          + '\n\nAwarded Cost and Awarded Vendor are required only while a WP is Awarded — '
+          + 'setting Procurement Status back below Awarded clears that requirement.'
+      });
       return;
     }
     // (project_id, wp_no) is unique in the DB — catch a clash here rather than as a raw
@@ -1492,8 +1494,8 @@
       if (takenSaved || takenDraft) clash.push('  WP ' + xlVal(w,'wp_no') + ' in ' + pid);
     });
     if (clash.length){
-      alert('These new work packages reuse a WP No. that already exists:\n\n' + clash.join('\n')
-        + '\n\nGive each one a different number and save again.');
+      AppNotify.error('Give each new work package a WP No. that is not already used.', {
+        title: 'Duplicate WP No.', detail: clash.join('\n') });
       return;
     }
 
@@ -1530,7 +1532,7 @@
     if (!_newRows.length) { _gridEdits = {}; _xlUndo = []; }
     else ids.forEach(function(id){ delete _gridEdits[id]; });   // keep failed drafts staged
     _bustWPCache();
-    if (errs.length) alert('Saved ' + (ok+added) + ' WP(s). ' + errs.length + ' failed:\n\n' + errs.join('\n'));
+    if (errs.length) AppNotify.error('Saved ' + (ok+added) + ', but ' + errs.length + ' failed.', {detail: errs.join('\n')});
     else {
       const parts = [];
       if (added) parts.push(added + ' work package' + (added===1?'':'s') + (direct ? ' added.' : ' added for review.'));

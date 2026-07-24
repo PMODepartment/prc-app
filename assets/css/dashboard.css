@@ -1588,3 +1588,91 @@ body.dark-mode .skel::after { background: linear-gradient(90deg, transparent, rg
   font-size: 12px; color: var(--text-secondary); text-align: center;
   padding: 10px 0 2px; display: flex; align-items: center; justify-content: center; gap: 8px;
 }
+
+/* ── AppNotify toasts (audit item: alert() everywhere) ───────────────────── */
+#app-notify {
+  position: fixed; top: 64px; right: 16px; z-index: 500;
+  display: flex; flex-direction: column; gap: 10px;
+  width: min(380px, calc(100vw - 32px)); pointer-events: none;
+}
+.ntf {
+  pointer-events: auto; display: flex; gap: 10px; align-items: flex-start;
+  background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--border-md); border-left-width: 4px;
+  border-radius: var(--radius-md); padding: 12px 12px 12px 13px;
+  box-shadow: var(--shadow-lg); font-size: 12.5px; line-height: 1.5;
+  transition: opacity .16s ease, transform .16s ease;
+  animation: ntf-in .18s ease;
+}
+@keyframes ntf-in { from { opacity: 0; transform: translateX(12px); } }
+@media (prefers-reduced-motion: reduce) { .ntf { animation: none; } }
+.ntf-ico { font-size: 17px; flex-shrink: 0; margin-top: 1px; }
+.ntf-body { flex: 1; min-width: 0; }
+.ntf-title { font-weight: 700; margin-bottom: 2px; }
+.ntf-msg { word-break: break-word; }
+.ntf-detail { margin-top: 7px; }
+.ntf-detail summary { cursor: pointer; font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+.ntf-detail code {
+  display: block; margin-top: 5px; padding: 7px 8px; border-radius: 5px;
+  background: var(--surface-2); color: var(--text-secondary);
+  font-size: 11px; white-space: pre-wrap; word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.ntf-x {
+  border: none; background: transparent; color: var(--text-hint);
+  font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; flex-shrink: 0;
+}
+.ntf-x:hover { color: var(--text-primary); }
+.ntf-error   { border-left-color: var(--mw-red); }
+.ntf-error   .ntf-ico { color: var(--mw-red); }
+.ntf-warn    { border-left-color: var(--amber); }
+.ntf-warn    .ntf-ico { color: var(--amber); }
+.ntf-success { border-left-color: var(--green); }
+.ntf-success .ntf-ico { color: var(--green); }
+.ntf-info    { border-left-color: #2563EB; }
+.ntf-info    .ntf-ico { color: #2563EB; }
+@media (max-width: 767px) {
+  #app-notify { top: 58px; right: 8px; left: 8px; width: auto; }
+}
+
+/* ── Extracted components (audit item: 1,119 inline style attributes) ──────
+   These six patterns accounted for ~90 duplicated inline declarations. Pulling
+   them into classes removes the need for `[style*="background:#fff"]`-style
+   dark-mode hacks, and — for .seg-btn — removes the JS that rewrote a full
+   cssText string on every toggle (the source of the "reserialised style
+   escapes the dark-mode selector" class of bug). */
+
+/* Segmented toggle: Monthly|Quarterly, Budget|# WPs, Chart|Table, … */
+.seg-btn {
+  font-size: 10px; padding: 3px 10px; border-radius: 5px;
+  border: 1.5px solid var(--border-md); background: var(--surface);
+  color: var(--text-secondary); cursor: pointer; font-family: inherit; font-weight: 600;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+.seg-btn:hover { border-color: var(--mw-red); color: var(--mw-red); }
+.seg-btn.active, .seg-btn[aria-pressed="true"] {
+  background: var(--mw-red); border-color: var(--mw-red); color: #fff;
+}
+.seg-btn.active:hover { color: #fff; }
+
+/* Uppercase micro-label above a control or panel */
+.field-label {
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: .04em; display: block; margin-bottom: 5px;
+}
+.sec-label {
+  font-size: 10px; font-weight: 700; color: var(--text-hint);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px;
+}
+.hint-sm { font-size: 11px; color: var(--text-secondary); }
+
+/* Standard text input / select inside filter bars and modals */
+.input-std {
+  width: 100%; padding: 9px 11px; border: 1.5px solid var(--border-md);
+  border-radius: var(--radius-md); font-size: 13px; font-family: inherit;
+  background: var(--surface); color: var(--text-primary); outline: none;
+}
+.input-std:focus { border-color: var(--mw-red); }
+
+/* "Nothing here" cell inside a table body */
+.empty-cell { text-align: center; color: var(--text-hint); padding: 20px; }

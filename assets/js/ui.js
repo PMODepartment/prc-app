@@ -350,3 +350,77 @@ window.AppTheme = AppTheme;
   window.addEventListener('resize', hide);
   window.addEventListener('scroll', hide, true);
 })();
+
+/* ── AppNotify — consistent, non-blocking feedback ─────────────────────────
+   The app raised 32 native alert()s, 7 of which dumped a raw Postgres message
+   at the user ("Error: duplicate key value violates unique constraint …").
+   alert() blocks the page, can't be styled, is easy to miss on mobile, and
+   loses the detail behind an OK button.
+   AppNotify renders a toast in the top-right instead:
+     AppNotify.error(msg, {detail, title})   red, stays until dismissed
+     AppNotify.warn(msg)   .success(msg)   .info(msg)   auto-dismiss
+   `detail` (a raw DB message) is tucked behind a "Show details" disclosure so
+   the headline stays readable but nothing is lost when reporting a bug. */
+window.AppNotify = (function(){
+  const KINDS = {
+    error:   { icon:'ti-alert-circle',   cls:'ntf-error',   ttl:0     },
+    warn:    { icon:'ti-alert-triangle', cls:'ntf-warn',    ttl:8000  },
+    success: { icon:'ti-circle-check',   cls:'ntf-success', ttl:4000  },
+    info:    { icon:'ti-info-circle',    cls:'ntf-info',    ttl:5000  },
+  };
+  function host(){
+    let h = document.getElementById('app-notify');
+    if (!h) {
+      h = document.createElement('div');
+      h.id = 'app-notify';
+      // assertive: errors must interrupt; the container itself is the live region
+      h.setAttribute('role','status');
+      h.setAttribute('aria-live','polite');
+      document.body.appendChild(h);
+    }
+    return h;
+  }
+  function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function show(kind, msg, opts){
+    opts = opts || {};
+    const k = KINDS[kind] || KINDS.info;
+    const n = document.createElement('div');
+    n.className = 'ntf ' + k.cls;
+    if (kind === 'error') n.setAttribute('role','alert');
+    n.innerHTML =
+      '<i class="ti ' + k.icon + ' ntf-ico" aria-hidden="true"></i>' +
+      '<div class="ntf-body">' +
+        (opts.title ? '<div class="ntf-title">' + esc(opts.title) + '</div>' : '') +
+        '<div class="ntf-msg">' + esc(msg) + '</div>' +
+        (opts.detail ? '<details class="ntf-detail"><summary>Show details</summary><code>' + esc(opts.detail) + '</code></details>' : '') +
+      '</div>' +
+      '<button class="ntf-x" aria-label="Dismiss">&times;</button>';
+    n.querySelector('.ntf-x').addEventListener('click', () => close(n));
+    host().appendChild(n);
+    if (k.ttl) setTimeout(() => close(n), k.ttl);
+    return n;
+  }
+  function close(n){
+    if (!n || !n.parentNode) return;
+    n.style.opacity = '0'; n.style.transform = 'translateX(8px)';
+    setTimeout(() => n.remove(), 160);
+  }
+  return {
+    error:   (m,o) => show('error',   m, o),
+    warn:    (m,o) => show('warn',    m, o),
+    success: (m,o) => show('success', m, o),
+    info:    (m,o) => show('info',    m, o),
+    /* Turn a thrown error into a readable headline + the raw text behind a
+       disclosure. Postgres/PostgREST messages are unreadable to an officer. */
+    fromError: function(err, headline){
+      const raw = (err && (err.message || err.details)) || String(err || '');
+      let msg = headline || 'Something went wrong.';
+      if (/duplicate key|unique constraint/i.test(raw))      msg = headline || 'That value already exists — pick a different one.';
+      else if (/permission denied|row-level security|42501/i.test(raw)) msg = headline || "You don't have permission to do that.";
+      else if (/column .* does not exist|schema cache/i.test(raw))      msg = headline || 'The database is missing a column this app expects — a migration is pending.';
+      else if (/network|fetch|timeout/i.test(raw))           msg = headline || 'Network problem — check your connection and try again.';
+      return show('error', msg, { detail: raw });
+    },
+    clear: function(){ const h=document.getElementById('app-notify'); if(h) h.innerHTML=''; }
+  };
+})();

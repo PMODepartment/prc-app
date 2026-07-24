@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723r"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723r"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723r"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723s"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723s"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723s"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723r">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723s">
   <style>
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
     .modal{background:#fff;border-radius:12px;width:100%;max-width:420px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden}
@@ -368,9 +368,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723r"></script>
-<script src="assets/js/db.js?v=20260723r"></script>
-<script src="assets/js/ui.js?v=20260723r"></script>
+<script src="assets/js/auth.js?v=20260723s"></script>
+<script src="assets/js/db.js?v=20260723s"></script>
+<script src="assets/js/ui.js?v=20260723s"></script>
 <script>
   let currentTab = 'all';
   let allUsers = [], allProjects = [], allAdmins = [];
@@ -580,7 +580,7 @@
       const uEmailL = (d.user.email || '').toLowerCase().trim();
       const _roleChip = roles => roles.map(r => {
         const c = r==='Responsible'?'#1D4ED8':r==='Approver'?'#7C3AED':'#059669';
-        return `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:6px;background:${c}18;color:${c};white-space:nowrap">${r}</span>`;
+        return `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:6px;background:${c}18;color:${c};white-space:nowrap">${r}</span>`;
       }).join(' ');
 
       const subRows = d.wps.map(w => {
@@ -669,7 +669,7 @@
       const assignedAdminName = isSuperAdmin
         ? (allAdmins.find(a=>a.id===u.assigned_admin)?.name || allAdmins.find(a=>a.id===u.assigned_admin)?.email || '<span style="color:#bbb">\u2014</span>')
         : '';
-      const adminCell = isSuperAdmin ? `<td style="font-size:11px;color:#888">${assignedAdminName}</td>` : '';
+      const adminCell = isSuperAdmin ? `<td class="hint-sm">${assignedAdminName}</td>` : '';
 
       if (u.status === 'pending') {
         return `<tr style="${rowStyle}" data-idx="${visIdx}" onclick="handleRowClick(event,${visIdx},'${u.id}')">
@@ -753,10 +753,10 @@
   };
 
   window.applyBulkActions = async function() {
-    if (!selectedUserIds.size) { alert('Select at least one user first.'); return; }
+    if (!selectedUserIds.size) { AppNotify.warn('Select at least one user first.'); return; }
     const projId = document.getElementById('bulk-project-select').value;
     const role = document.getElementById('bulk-role-select').value;
-    if (!projId && !role) { alert('Choose a project or role to bulk-assign.'); return; }
+    if (!projId && !role) { AppNotify.warn('Choose a project or role to bulk-assign.'); return; }
     const count = selectedUserIds.size;
     if (!confirm(`Apply to ${count} user(s)?`)) return;
     for (const uid of [...selectedUserIds]) {
@@ -780,9 +780,9 @@
   // projects; applies the chosen role/project from the bulk bar if set (role defaults
   // to 'user'). Admins auto-assign approved users to themselves so they stay visible.
   window.bulkApprove = async function() {
-    if (!selectedUserIds.size) { alert('Select at least one user first.'); return; }
+    if (!selectedUserIds.size) { AppNotify.warn('Select at least one user first.'); return; }
     const pending = allUsers.filter(u => selectedUserIds.has(u.id) && u.status === 'pending');
-    if (!pending.length) { alert('None of the selected users are pending approval.'); return; }
+    if (!pending.length) { AppNotify.warn('None of the selected users are pending approval.'); return; }
     const projId = document.getElementById('bulk-project-select').value;
     const role = document.getElementById('bulk-role-select').value;
     if (!confirm(`Approve ${pending.length} pending user(s)?`)) return;
@@ -798,7 +798,7 @@
       selectedUserIds.clear();
       await loadData();
     } catch (err) {
-      alert('Error approving users: ' + (err.message || err));
+      AppNotify.fromError(err, 'Could not approve those users.');
       await loadData();
     } finally {
       // Same rule as the modals: restore in `finally`. Restoring only in `catch` left the
@@ -930,7 +930,7 @@
       closeModal();
       await loadData();
     } catch(err) {
-      alert('Error: ' + err.message);
+      AppNotify.fromError(err, 'Could not save those changes.');
     } finally {
       // Restore in `finally`, not just `catch` \u2014 the modal is reused, so leaving the
       // button disabled after a SUCCESS bricks every later approval until a refresh.
@@ -975,7 +975,7 @@
       closeModal();
       await loadData();
     } catch(err) {
-      alert('Error: ' + err.message);
+      AppNotify.fromError(err, 'Could not save those changes.');
     } finally {
       btn.textContent = 'Save Changes'; btn.disabled = false;
     }
@@ -1025,7 +1025,7 @@
     try {
       await WPDb.deleteUser(userId);
     } catch (e) {
-      alert('Could not remove user: ' + (e.message || e));
+      AppNotify.fromError(e, 'Could not remove that user.');
       return;
     }
     await loadData();
@@ -1101,7 +1101,7 @@
     const label = d.toLocaleDateString('en-PH', {day:'2-digit', month:'short', year:'numeric'});
     const days = workingDaysSince(u.last_login);
     const ago = days === 0 ? 'today' : days === 1 ? '1 working day ago' : `${days} working days ago`;
-    return `<div style="font-size:9px;color:#aaa;margin-top:2px">Last login: ${label} · ${ago}</div>`;
+    return `<div style="font-size:10px;color:#aaa;margin-top:2px">Last login: ${label} · ${ago}</div>`;
   }
 
   // ── Project pills with truncation ────────────────────────────
@@ -1154,7 +1154,7 @@
       closeRoleModal();
       await loadData();
     } catch(err) {
-      alert('Error: ' + err.message);
+      AppNotify.fromError(err, 'Could not save those changes.');
     } finally {
       btn.textContent = 'Save Role'; btn.disabled = false;
     }
