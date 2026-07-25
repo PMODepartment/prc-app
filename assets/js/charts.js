@@ -739,7 +739,7 @@ const Charts = (() => {
       destroy(id);
       if (wrap) {
         let msg = wrap.querySelector('.scurve-nodata');
-        if (!msg) { msg = document.createElement('div'); msg.className='scurve-nodata'; msg.style.cssText='display:flex;align-items:center;justify-content:center;height:100%;color:#bbb;font-size:12px;font-style:italic;text-align:center;padding:0 16px'; wrap.appendChild(msg); }
+        if (!msg) { msg = document.createElement('div'); msg.className='scurve-nodata'; msg.style.cssText='display:flex;align-items:center;justify-content:center;height:100%;color:#bbb;font-size:0.8571rem;font-style:italic;text-align:center;padding:0 16px'; wrap.appendChild(msg); }
         msg.textContent = 'No planned award dates found. Set Planned Award Dates on work packages to display the S-Curve.';
         if (canvasEl) canvasEl.style.display = 'none';
       }

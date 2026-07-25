@@ -513,30 +513,30 @@ function renderUserBar(id, profile) {
       <button id="theme-toggle-btn" class="theme-toggle"
         onclick="AppTheme.toggle('${profile.id}')"
         title="${dark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}">
-        <i class="ti ${dark ? 'ti-sun' : 'ti-moon-stars'}" style="font-size:17px;line-height:1"></i>
+        <i class="ti ${dark ? 'ti-sun' : 'ti-moon-stars'}" style="font-size:1.2143rem;line-height:1"></i>
       </button>
       <div style="position:relative">
         <button id="avatar-btn" onclick="toggleUserMenu()" title="${esc(profile.name||profile.email)}" style="
           width:36px;height:36px;border-radius:50%;background:#EE3124;color:#fff;
-          border:none;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;
+          border:none;cursor:pointer;font-size:0.9286rem;font-weight:700;font-family:inherit;
           display:flex;align-items:center;justify-content:center;flex-shrink:0;">${initials}</button>
         <div id="user-menu" style="
           display:none;position:absolute;right:0;top:44px;
           background:#fff;border:1px solid #f0f0f0;border-radius:12px;
           box-shadow:0 8px 32px rgba(0,0,0,.12);width:220px;z-index:9999;overflow:hidden;">
           <div style="padding:14px 16px;border-bottom:1px solid #f5f5f5;">
-            <div style="font-size:13px;font-weight:600;color:#231F20">${esc(profile.name||profile.email)}</div>
-            <div style="font-size:11px;color:#888;margin-top:2px;text-transform:capitalize">${(profile.role||'').replace(/_/g,' ')}</div>
+            <div style="font-size:0.9286rem;font-weight:600;color:#231F20">${esc(profile.name||profile.email)}</div>
+            <div style="font-size:0.7857rem;color:#888;margin-top:2px;text-transform:capitalize">${(profile.role||'').replace(/_/g,' ')}</div>
           </div>
           <a onclick="event.preventDefault();(function(){var m=document.getElementById('user-menu');if(m)m.style.display='none';if(window.CoachTour&&CoachTour.available()){CoachTour.start(true);}else if(window.Onboarding&&Onboarding.open){Onboarding.open();}else{window.location.href='onboarding.html';}})()" style="
             display:flex;align-items:center;gap:8px;padding:12px 16px;
-            font-size:13px;color:#231F20;font-weight:600;text-decoration:none;
+            font-size:0.9286rem;color:#231F20;font-weight:600;text-decoration:none;
             font-family:inherit;cursor:pointer;border-bottom:1px solid #f5f5f5;">
-            <i class="ti ti-route" style="font-size:16px;color:#888"></i>Restart tour
+            <i class="ti ti-route" style="font-size:1.1429rem;color:#888"></i>Restart tour
           </a>
           <a href="login.html" onclick="event.preventDefault();AppAuth.logout()" style="
             display:flex;align-items:center;gap:8px;padding:12px 16px;
-            font-size:13px;color:#EE3124;font-weight:600;text-decoration:none;
+            font-size:0.9286rem;color:#EE3124;font-weight:600;text-decoration:none;
             font-family:inherit;cursor:pointer;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/>
@@ -573,7 +573,7 @@ function buildMetrics(containerId, items) {
 function buildRankTable(id, items, type) {
   const el = document.getElementById(id);
   if (!el) return;
-  if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:12px;padding:10px 0">No data</div>'; return; }
+  if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:0.8571rem;padding:10px 0">No data</div>'; return; }
 
   if (!document.getElementById('_rankTblStyle')) {
     const s = document.createElement('style');
@@ -595,7 +595,7 @@ function buildRankTable(id, items, type) {
   const valSign  = type === 'savings' ? '+' : type === 'loss' ? '-' : '';
   // Right-aligned headers use the SAME 8px horizontal padding as their value cells so they line up.
   const th = (txt, right, color) =>
-    `<th style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${color||'#777'};padding:7px 8px 7px ${right?'8px':'0'};text-align:${right?'right':'left'};border-bottom:2px solid #ebebeb;white-space:nowrap">${txt}</th>`;
+    `<th style="font-size:0.5714rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${color||'#777'};padding:7px 8px 7px ${right?'8px':'0'};text-align:${right?'right':'left'};border-bottom:2px solid #ebebeb;white-space:nowrap">${txt}</th>`;
   const thead = isValue
     ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true)}</tr>`
     : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Award',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)} ${th('%WT',true,accent)}</tr>`;
@@ -606,24 +606,24 @@ function buildRankTable(id, items, type) {
     const cursor = item.id ? 'cursor:pointer;' : '';
     const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:top">
       <div style="display:flex;align-items:flex-start;gap:6px">
-        <span style="font-size:10px;color:#999;font-weight:700;flex-shrink:0;min-width:14px;padding-top:1px">${i+1}</span>
+        <span style="font-size:0.7143rem;color:#999;font-weight:700;flex-shrink:0;min-width:14px;padding-top:1px">${i+1}</span>
         <div>
-          <div class="rank-short" style="font-size:11px;font-weight:600;color:#231F20;line-height:1.35;white-space:nowrap">${esc(item.name)}</div>
-          <div class="rank-sub" style="font-size:9px;color:#888;margin-top:1px;white-space:nowrap">${esc(item.sub)||''}</div>
+          <div class="rank-short" style="font-size:0.7857rem;font-weight:600;color:#231F20;line-height:1.35;white-space:nowrap">${esc(item.name)}</div>
+          <div class="rank-sub" style="font-size:0.6429rem;color:#888;margin-top:1px;white-space:nowrap">${esc(item.sub)||''}</div>
         </div>
       </div>
     </td>`;
     if (isValue) {
       return `<tr class="rank-row" data-rn="${safe}"${click} style="${cursor}border-bottom:1px solid #f5f5f5">${wpCell}
-        <td class="rank-side" style="font-size:12px;font-weight:700;color:#231F20;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.val)}</td>
+        <td class="rank-side" style="font-size:0.8571rem;font-weight:700;color:#231F20;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.val)}</td>
       </tr>`;
     }
     return `<tr class="rank-row" data-rn="${safe}"${click} style="${cursor}border-bottom:1px solid #f5f5f5">${wpCell}
-      <td class="rank-side" style="font-size:10px;color:#888;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.bcb)}</td>
-      <td class="rank-side" style="font-size:10px;color:#777;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
-      <td class="rank-side" style="font-size:12px;font-weight:700;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${valSign}${Fmt.money(item.val)}</td>
-      <td class="rank-side" style="font-size:11px;font-weight:600;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${item.pct}</td>
-      <td class="rank-side" style="font-size:11px;font-weight:600;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Savings ÷ Total BCB">${item.wt!=null?item.wt:'—'}</td>
+      <td class="rank-side" style="font-size:0.7143rem;color:#888;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.bcb)}</td>
+      <td class="rank-side" style="font-size:0.7143rem;color:#777;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
+      <td class="rank-side" style="font-size:0.8571rem;font-weight:700;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${valSign}${Fmt.money(item.val)}</td>
+      <td class="rank-side" style="font-size:0.7857rem;font-weight:600;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${item.pct}</td>
+      <td class="rank-side" style="font-size:0.7857rem;font-weight:600;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Savings ÷ Total BCB">${item.wt!=null?item.wt:'—'}</td>
     </tr>`;
   }).join('');
   el.innerHTML = `<div class="rank-table-scroll"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead>${thead}</thead><tbody>${rows}</tbody></table></div>`;
@@ -632,19 +632,19 @@ function buildRankTable(id, items, type) {
 function buildRankList(id, items, colorClass, fmtVal) {
   const el = document.getElementById(id);
   if (!el) return;
-  if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:12px;padding:8px 0">No data</div>'; return; }
+  if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:0.8571rem;padding:8px 0">No data</div>'; return; }
   el.innerHTML = items.map((item,i) => {
     const hasBcbAwd = item.bcb!=null && item.awarded!=null;
     return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f5f5f5">
-      <span style="font-size:11px;color:#aaa;font-weight:600;width:16px;flex-shrink:0;padding-top:2px">${i+1}</span>
+      <span style="font-size:0.7857rem;color:#aaa;font-weight:600;width:16px;flex-shrink:0;padding-top:2px">${i+1}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600;color:#231F20;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(item.name)}</div>
-        <div style="font-size:10px;color:#999;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub}</div>
-        ${hasBcbAwd?`<div style="font-size:10px;color:#bbb;margin-top:1px;white-space:nowrap">BCB ${Fmt.money(item.bcb)} <span style="color:#ddd">→</span> Awd ${Fmt.money(item.awarded)}</div>`:''}
+        <div style="font-size:0.8571rem;font-weight:600;color:#231F20;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(item.name)}</div>
+        <div style="font-size:0.7143rem;color:#999;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub}</div>
+        ${hasBcbAwd?`<div style="font-size:0.7143rem;color:#bbb;margin-top:1px;white-space:nowrap">BCB ${Fmt.money(item.bcb)} <span style="color:#ddd">→</span> Awd ${Fmt.money(item.awarded)}</div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0;padding-top:2px">
-        <div style="font-size:13px;font-weight:700;color:${item.color};white-space:nowrap">${fmtVal(item.val)}</div>
-        ${item.pct!=null?`<div style="font-size:10px;font-weight:600;color:${item.color};white-space:nowrap">${item.pct}</div>`:''}
+        <div style="font-size:0.9286rem;font-weight:700;color:${item.color};white-space:nowrap">${fmtVal(item.val)}</div>
+        ${item.pct!=null?`<div style="font-size:0.7143rem;font-weight:600;color:${item.color};white-space:nowrap">${item.pct}</div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -837,43 +837,43 @@ function updatePendingBadge() {
     m.innerHTML = `
       <div style="background:#fff;border-radius:12px;width:100%;max-width:460px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.2)">
         <div style="padding:20px 20px 0;flex-shrink:0">
-          <div style="font-size:16px;font-weight:700;color:#231F20;margin-bottom:4px">New Project</div>
-          <div style="font-size:13px;color:#888;margin-bottom:16px">Create a new EPC project and assign users</div>
+          <div style="font-size:1.1429rem;font-weight:700;color:#231F20;margin-bottom:4px">New Project</div>
+          <div style="font-size:0.9286rem;color:#888;margin-bottom:16px">Create a new EPC project and assign users</div>
         </div>
         <div style="padding:0 20px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px">
           <div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Project Code * <span style="font-size:9px;font-weight:400;text-transform:none">(letters/numbers only, e.g. AVR102)</span></div>
+            <div style="font-size:0.7857rem;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Project Code * <span style="font-size:0.6429rem;font-weight:400;text-transform:none">(letters/numbers only, e.g. AVR102)</span></div>
             <input id="gnp-id" type="text" placeholder="e.g. AVR102" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
-              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Project Name *</div>
+            <div style="font-size:0.7857rem;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Project Name *</div>
             <input id="gnp-name" type="text" placeholder="e.g. Avesta Residences Tower 2"
-              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Location</div>
+            <div style="font-size:0.7857rem;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Location</div>
             <input id="gnp-location" type="text" placeholder="e.g. Quezon City"
-              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Description</div>
+            <div style="font-size:0.7857rem;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Description</div>
             <input id="gnp-description" type="text" placeholder="Optional project description"
-              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Assign Users (optional)</div>
-            <div id="gnp-user-list"><div style="color:#aaa;font-size:12px">Loading…</div></div>
+            <div style="font-size:0.7857rem;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Assign Users (optional)</div>
+            <div id="gnp-user-list"><div style="color:#aaa;font-size:0.8571rem">Loading…</div></div>
           </div>
-          <div id="gnp-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 12px;font-size:13px"></div>
+          <div id="gnp-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:8px;padding:10px 12px;font-size:0.9286rem"></div>
         </div>
         <div style="padding:12px 20px 20px;flex-shrink:0;border-top:1px solid #f0f0f0;display:flex;gap:10px">
           <button onclick="window._gnpConfirm()" id="gnp-create-btn"
-            style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">
-            <i class="ti ti-plus" style="font-size:14px;margin-right:4px;vertical-align:middle"></i> Create Project
+            style="flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;font-family:inherit;cursor:pointer">
+            <i class="ti ti-plus" style="font-size:1rem;margin-right:4px;vertical-align:middle"></i> Create Project
           </button>
           <button onclick="window._gnpClose()"
-            style="padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:14px;font-family:inherit;cursor:pointer">Cancel</button>
+            style="padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:inherit;cursor:pointer">Cancel</button>
         </div>
       </div>`;
     m.addEventListener('click', e => { if(e.target===m) window._gnpClose(); });
@@ -908,7 +908,7 @@ function updatePendingBadge() {
       }
       window._gnpClose();
       const toast = document.createElement('div');
-      toast.innerHTML=`<div style="position:fixed;bottom:24px;right:24px;background:#2D9B6F;color:#fff;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:9999">✓ Project ${id} created</div>`;
+      toast.innerHTML=`<div style="position:fixed;bottom:24px;right:24px;background:#2D9B6F;color:#fff;padding:14px 20px;border-radius:12px;font-size:1rem;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:9999">✓ Project ${id} created</div>`;
       document.body.appendChild(toast); setTimeout(()=>toast.remove(),3000);
       if (typeof loadData==='function') setTimeout(loadData,500);
       if (typeof loadAll==='function') setTimeout(loadAll,500);
@@ -917,7 +917,7 @@ function updatePendingBadge() {
       errEl.textContent=(err.message.includes('duplicate')||err.message.includes('unique'))
         ?`Project Code "${id}" already exists.`:'Error: '+err.message;
       errEl.style.display='block';
-      const b=document.getElementById('gnp-create-btn'); b.innerHTML='<i class="ti ti-plus" style="font-size:14px;margin-right:4px;vertical-align:middle"></i> Create Project'; b.disabled=false;
+      const b=document.getElementById('gnp-create-btn'); b.innerHTML='<i class="ti ti-plus" style="font-size:1rem;margin-right:4px;vertical-align:middle"></i> Create Project'; b.disabled=false;
     }
   };
 
@@ -925,27 +925,27 @@ function updatePendingBadge() {
     const modal = _gnpGetOrCreate();
     modal.style.display = 'flex';
     const list = document.getElementById('gnp-user-list');
-    if (list) list.innerHTML = '<div style="color:#aaa;font-size:12px">Loading…</div>';
+    if (list) list.innerHTML = '<div style="color:#aaa;font-size:0.8571rem">Loading…</div>';
     try {
       _gnpUsers = await WPDb.getAllUsers();
       const approved = _gnpUsers.filter(u=>u.status==='approved');
       if (list) {
         list.innerHTML = `
           <div style="position:relative;margin-bottom:8px">
-            <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:13px"></i>
+            <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:0.9286rem"></i>
             <input type="text" placeholder="Search users…" oninput="document.querySelectorAll('.gnpu-row').forEach(r=>r.style.display=r.textContent.toLowerCase().includes(this.value.toLowerCase())?'':'none')"
-              style="width:100%;padding:6px 10px 6px 28px;border:1px solid #e5e5e5;border-radius:7px;font-size:12px;font-family:inherit;outline:none;box-sizing:border-box">
+              style="width:100%;padding:6px 10px 6px 28px;border:1px solid #e5e5e5;border-radius:7px;font-size:0.8571rem;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div id="gnp-user-rows" style="display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto">
             ${approved.length?approved.map(u=>`
               <div class="gnpu-row" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e5e5e5;border-radius:8px;cursor:pointer" onclick="this.querySelector('input').click()">
                 <input type="checkbox" value="${u.id}" onclick="event.stopPropagation()" style="width:16px;height:16px;accent-color:#EE3124;cursor:pointer">
-                <label onclick="event.preventDefault()" style="cursor:pointer;font-size:13px;pointer-events:none">${esc(u.name||u.email)} <span style="font-size:10px;color:#aaa">(${(u.role||'user').replace(/_/g,' ')})</span></label>
-              </div>`).join(''):'<div style="color:#aaa;font-size:12px">No approved users</div>'}
+                <label onclick="event.preventDefault()" style="cursor:pointer;font-size:0.9286rem;pointer-events:none">${esc(u.name||u.email)} <span style="font-size:0.7143rem;color:#aaa">(${(u.role||'user').replace(/_/g,' ')})</span></label>
+              </div>`).join(''):'<div style="color:#aaa;font-size:0.8571rem">No approved users</div>'}
           </div>`;
       }
     } catch(e) {
-      if (list) list.innerHTML = '<div style="color:#c00;font-size:12px">Could not load users.</div>';
+      if (list) list.innerHTML = '<div style="color:#c00;font-size:0.8571rem">Could not load users.</div>';
     }
     document.getElementById('gnp-id')?.focus();
   };

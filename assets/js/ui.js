@@ -154,11 +154,11 @@ const SidebarPrefs = (() => {
         <div class="sidebar-proj-row" style="display:flex;align-items:center;gap:2px">
           <a class="nav-item" style="flex:1;min-width:0" href="${linkHref}">
             <i class="ti ti-building-skyscraper"></i>${p.id}
-            ${label ? `<span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400;flex-shrink:0">${label}</span>` : ''}
+            ${label ? `<span style="font-size:0.7143rem;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400;flex-shrink:0">${label}</span>` : ''}
           </a>
           <button onclick="event.stopPropagation();SidebarPrefs.togglePinAndRefresh('${userId}','${p.id}')"
             title="${pinned?'Unpin':'Pin to sidebar'}"
-            style="flex-shrink:0;background:none;border:none;cursor:pointer;padding:4px 6px;color:${pinned?'#EE3124':'rgba(255,255,255,0.25)'};font-size:13px;line-height:1;border-radius:4px"
+            style="flex-shrink:0;background:none;border:none;cursor:pointer;padding:4px 6px;color:${pinned?'#EE3124':'rgba(255,255,255,0.25)'};font-size:0.9286rem;line-height:1;border-radius:4px"
             onmouseover="this.style.color='${pinned?'#C42127':'rgba(255,255,255,0.6)'}'"
             onmouseout="this.style.color='${pinned?'#EE3124':'rgba(255,255,255,0.25)'}'">
             <i class="ti ti-${pinned?'star-filled':'star'}"></i>
@@ -207,7 +207,7 @@ function initExpandableCharts() {
     if (!hasAutoMarginChild) btn.style.marginLeft = 'auto';
     btn.style.cssText += ';cursor:pointer;display:inline-flex;align-items:center;opacity:0.4;transition:opacity .15s;flex-shrink:0;padding:2px 4px;border-radius:4px';
     btn.title = 'Expand chart';
-    btn.innerHTML = '<i class="ti ti-arrows-diagonal" style="font-size:12px"></i>';
+    btn.innerHTML = '<i class="ti ti-arrows-diagonal" style="font-size:0.8571rem"></i>';
     btn.addEventListener('mouseenter', () => { btn.style.opacity = '1'; btn.style.background = 'rgba(238,49,36,.07)'; });
     btn.addEventListener('mouseleave', () => { btn.style.opacity = expanded ? '1' : '0.4'; btn.style.background = ''; });
     titleEl.appendChild(btn);
@@ -265,8 +265,8 @@ const AppTheme = (() => {
     if (!btn) return;
     // sun = switch to light; moon = switch to dark
     btn.innerHTML = dark
-      ? '<i class="ti ti-sun"    style="font-size:17px;line-height:1"></i>'
-      : '<i class="ti ti-moon-stars" style="font-size:17px;line-height:1"></i>';
+      ? '<i class="ti ti-sun"    style="font-size:1.2143rem;line-height:1"></i>'
+      : '<i class="ti ti-moon-stars" style="font-size:1.2143rem;line-height:1"></i>';
     btn.title = dark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
   }
 
