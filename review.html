@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723u"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723u"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723u"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723v"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723v"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723v"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723u"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723v"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -93,7 +93,10 @@
     table.xl th.xl-freeze,table.xl td.xl-freeze{position:sticky;z-index:4;background:var(--surface)}
     table.xl thead th.xl-freeze{z-index:7;background:var(--surface-2)}
     table.xl td.xl-freeze{background:var(--surface-2);font-weight:600}
-    table.xl tbody tr:hover td:not(.xl-dirty){background:var(--surface-2)}
+    table.xl tbody tr:nth-child(even) td:not(.xl-dirty):not(.xl-freeze):not(.xl-missing){background:var(--surface-2)}
+    table.xl tbody tr:hover td:not(.xl-dirty):not(.xl-missing){background:var(--mw-red-light)}
+    body.dark-mode table.xl tbody tr:hover td:not(.xl-dirty):not(.xl-missing){background:#3a2422}
+    table.xl tbody tr:hover .xl-rownum{color:var(--mw-red);font-weight:700}
     .xl-ed{position:absolute;z-index:20;font-family:inherit;font-size:0.7857rem;padding:3px 5px;border:2px solid #EE3124;border-radius:0;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box}
     /* fill handle (corner drag to copy down) + its live preview */
     table.xl td.xl-fillprev{background:rgba(238,49,36,.16);outline:1px dashed rgba(238,49,36,.6);outline-offset:-1px}
@@ -116,6 +119,14 @@
     .xl-btn:disabled{opacity:.45;cursor:default}
     .xl-hint{font-size:0.7143rem;color:var(--text-hint)}
     .xl-badge{font-size:0.7143rem;font-weight:700;padding:1px 6px;border-radius:9px;color:#fff}
+    .xl-help{margin-bottom:8px;font-size:0.7857rem}
+    .xl-help summary{cursor:pointer;color:var(--text-secondary);font-weight:600;display:inline-flex;align-items:center;gap:5px;list-style:none;user-select:none}
+    .xl-help summary::-webkit-details-marker{display:none}
+    .xl-help summary::before{content:'B8';display:inline-block;transition:transform .15s;color:var(--text-hint)}
+    .xl-help[open] summary::before{transform:rotate(90deg)}
+    .xl-help-hint{color:var(--text-hint);font-weight:400}
+    .xl-help-grid{margin:8px 0 0 18px;display:flex;flex-direction:column;gap:5px;color:var(--text-secondary);line-height:1.6}
+    .xl-help kbd{display:inline-block;font-family:inherit;font-size:0.7143rem;font-weight:700;line-height:1;padding:2px 5px;border:1px solid var(--border-md);border-bottom-width:2px;border-radius:4px;background:var(--surface-2);color:var(--text-primary)}
     /* Required-but-empty cells (mirrors the WP form's own required fields) */
     table.xl td.xl-missing{background:#FDECEA;box-shadow:inset 3px 0 0 #EE3124}
     body.dark-mode table.xl td.xl-missing{background:#4a1f1b}
@@ -248,17 +259,21 @@
             <button class="xl-btn" style="padding:4px 9px" onclick="xlGroupsAll(true)" title="Collapse every section to the key columns">Collapse all</button>
             <button class="xl-btn" style="padding:4px 9px" onclick="xlResetWidths()" title="Restore every column to its default width">Reset widths</button>
             <span style="flex:1"></span>
-            <span id="xl-missing-count" class="xl-hint" style="color:#EE3124;font-weight:700;display:none"></span>
+            <span id="xl-missing-count" class="xl-hint" style="color:#B45309;font-weight:700;display:none"></span>
             <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
             <button id="xl-discard" class="xl-btn" onclick="gridDiscard()" disabled>Discard</button>
             <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled>Save changes</button>
           </div>
-          <div class="xl-hint" style="margin-bottom:8px">
-            Click a cell to select · <b>drag to select a range</b> · type or <b>Enter</b>/<b>F2</b> to edit · <b>Tab</b>/<b>arrows</b> to move ·
-            <b>Ctrl+C</b>/<b>Ctrl+V</b> copy &amp; paste (multi-cell, works with Excel) · <b>Ctrl+D</b> or <b>drag the corner handle</b> to fill down ·
-            the header <b>▾</b> sets a whole column at once (handy for the dropdowns) ·
-            <b>Del</b> clear · <b>Ctrl+Z</b> undo · <b>Esc</b> cancel. <b>Drag a column border</b> to resize (double-click it to reset). Edits are staged until you press Save.
-          </div>
+          <details class="xl-help">
+            <summary><i class="ti ti-keyboard" aria-hidden="true"></i> How to use this grid <span class="xl-help-hint">— works like Excel</span></summary>
+            <div class="xl-help-grid">
+              <div><kbd>Click</kbd> select · <kbd>drag</kbd> select a range · <kbd>Enter</kbd>/<kbd>F2</kbd> or just type to edit</div>
+              <div><kbd>Tab</kbd>/<kbd>arrows</kbd> move · <kbd>Del</kbd> clear · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>Esc</kbd> cancel</div>
+              <div><kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copy &amp; paste — multi-cell, round-trips with Excel</div>
+              <div><kbd>Ctrl</kbd>+<kbd>D</kbd> or drag the corner handle to fill down · header <b>▾</b> sets a whole column at once</div>
+              <div>Drag a column border to resize (double-click to reset). Edits are staged until you press <b>Save</b>.</div>
+            </div>
+          </details>
           <div class="xl-wrap" id="xl-wrap" tabindex="0"><table class="xl" id="xl-table"></table></div>
           <div id="xl-rz-ghost"></div>
         </div>
@@ -270,9 +285,9 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723u"></script>
-<script src="assets/js/ui.js?v=20260723u"></script>
-<script src="assets/js/db.js?v=20260723u"></script>
+<script src="assets/js/auth.js?v=20260723v"></script>
+<script src="assets/js/ui.js?v=20260723v"></script>
+<script src="assets/js/db.js?v=20260723v"></script>
 <script>
   let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';
@@ -1008,7 +1023,7 @@
         (w.__new
           ? '<td class="xl-freeze xl-ro" style="left:0;text-align:center;padding:0">'
             + '<button class="xl-rm" onclick="xlRemoveNewRow(\'' + w.id + '\',event)" title="Discard this new row">&times;</button></td>'
-          : '<td class="xl-freeze xl-ro" style="left:0;text-align:center;font-size:0.7143rem;color:#bbb">'+(r+1)+'</td>') +
+          : '<td class="xl-freeze xl-ro xl-rownum" style="left:0;text-align:center;font-size:0.7143rem;color:#bbb">'+(r+1)+'</td>') +
         VC.map(function(c,i){
           const fz  = i < XL_FREEZE;
           const ro  = c.ro || locked;
