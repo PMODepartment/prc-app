@@ -118,9 +118,16 @@
     #xl-colmenu .xl-cm-in{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border-md);border-radius:6px;background:var(--surface);color:var(--text-primary);font-family:inherit;font-size:0.8571rem;outline:none}
     #xl-colmenu .xl-cm-apply{padding:6px 12px;border:none;border-radius:6px;background:#EE3124;color:#fff;font-weight:600;cursor:pointer;font-family:inherit;font-size:0.8571rem}
     .xl-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-    .xl-btn{font-size:0.7857rem;padding:6px 13px;border-radius:7px;border:1.5px solid var(--border-md);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;font-weight:600}
+    .xl-btn{font-size:0.7857rem;padding:6px 13px;border-radius:7px;border:1.5px solid var(--border-md);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+    .xl-btn .ti{font-size:0.9286rem}
     .xl-btn.primary{background:#EE3124;border-color:#EE3124;color:#fff}
     .xl-btn:disabled{opacity:.45;cursor:default}
+    /* Save/Discard pair: Save pops (shadow) only when there's something to save; Discard is a quiet ghost */
+    .xl-btn.primary:not(:disabled){box-shadow:0 1px 6px rgba(238,49,36,.35)}
+    .xl-btn.primary:not(:disabled):hover{background:#d42a1e;border-color:#d42a1e}
+    .xl-btn.ghost{border-color:transparent;background:transparent}
+    .xl-btn.ghost:not(:disabled):hover{background:var(--surface-2);color:var(--text-primary)}
+    .xl-actions{display:inline-flex;align-items:center;gap:6px;padding-left:8px;border-left:1px solid var(--border-md)}
     .xl-hint{font-size:0.7143rem;color:var(--text-hint)}
     .xl-badge{font-size:0.7143rem;font-weight:700;padding:1px 6px;border-radius:9px;color:#fff}
     .xl-help{margin-bottom:8px;font-size:0.7857rem}
@@ -134,7 +141,9 @@
     /* Required-but-empty cells (mirrors the WP form's own required fields) */
     table.xl td.xl-missing{background:#FDECEA;box-shadow:inset 3px 0 0 #EE3124}
     body.dark-mode table.xl td.xl-missing{background:#4a1f1b}
-    table.xl th.xl-req::after{content:' *';color:#EE3124}
+    /* Required marker sits INLINE right after the label text (not ::after the whole th, which
+       pushed it past the pin/caret icons and wrapped it onto a second line). */
+    .xl-req-star{color:#EE3124;font-weight:700;margin-left:1px}
     .xl-legend{display:inline-flex;align-items:center;gap:5px;font-size:0.7143rem;color:var(--text-secondary);white-space:nowrap}
     .xl-swatch{width:11px;height:11px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.12);flex-shrink:0}
     /* Grouped legend chip + thin separators keep the busy toolbar legible */
@@ -272,8 +281,10 @@
             <span style="flex:1"></span>
             <span id="xl-missing-count" class="xl-hint" style="color:#B45309;font-weight:700;display:none"></span>
             <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
-            <button id="xl-discard" class="xl-btn" onclick="gridDiscard()" disabled>Discard</button>
-            <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled>Save changes</button>
+            <span class="xl-actions">
+              <button id="xl-discard" class="xl-btn ghost" onclick="gridDiscard()" disabled title="Throw away all unsaved grid edits"><i class="ti ti-arrow-back-up"></i> Discard</button>
+              <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled title="Save all staged edits to the database"><i class="ti ti-device-floppy"></i> <span id="xl-save-lbl">Save changes</span></button>
+            </span>
           </div>
           <details class="xl-help">
             <summary><i class="ti ti-keyboard" aria-hidden="true"></i> How to use this grid <span class="xl-help-hint">— works like Excel</span></summary>
@@ -1083,7 +1094,9 @@
         const pin = c.ph ? '' :
           '<button class="xl-pin'+(isBoundary?' on':'')+'" title="'+(isBoundary?'Frozen up to here — click to unfreeze':'Freeze columns up to here')+'" '
           + 'onclick="xlSetFreeze(\'' + c.k + '\')"><i class="ti ti-'+(isBoundary?'pinned-filled':'pin')+'"></i></button>';
-        return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+pin+setBtn+rz+'</th>';
+        const star = (c.req || c.reqIfAwarded) ? '<span class="xl-req-star" title="Required">*</span>' : '';
+        const lblHtml = '<span class="xl-hlbl">'+esc(c.label)+star+'</span>';
+        return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+lblHtml+pin+setBtn+rz+'</th>';
       }).join('') + '</tr>';
     const thead = '<thead>' + grpRow + colRow + '</thead>';
     const tbody = '<tbody>' + _gridRows.map(function(w,r){
@@ -1136,12 +1149,11 @@
       n    ? (n+' unsaved change'+(n===1?'':'s')+' in '+rows+' WP'+(rows===1?'':'s')) : ''
     ].filter(Boolean).join(' · ');
     const save = document.getElementById('xl-save'), disc = document.getElementById('xl-discard');
+    const saveLbl = document.getElementById('xl-save-lbl');
     const pending = n || nNew;
-    if (save) {
-      save.disabled = !pending;
-      save.textContent = !pending ? 'Save changes'
-        : nNew ? ('Save · add '+nNew+' WP'+(nNew===1?'':'s')) : ('Save '+n+' change'+(n===1?'':'s'));
-    }
+    if (save) save.disabled = !pending;
+    if (saveLbl) saveLbl.textContent = !pending ? 'Save changes'
+      : nNew ? ('Save · add '+nNew+' WP'+(nNew===1?'':'s')) : ('Save '+n+' change'+(n===1?'':'s'));
     if (disc) disc.disabled = !pending;
     // Required-but-empty tally for the visible rows
     const miss = _xlMissingCells();
@@ -1595,7 +1607,8 @@
     }
 
     const btn = document.getElementById('xl-save');
-    btn.disabled = true; btn.textContent = 'Saving…';
+    const btnLbl = document.getElementById('xl-save-lbl');
+    btn.disabled = true; if (btnLbl) btnLbl.textContent = 'Saving…';
     // Non-auto-approve roles send edits back through review, exactly like the WP form.
     const direct = AppAuth.isAutoApprove(adminProfile);
     let ok=0, added=0; const errs=[];
