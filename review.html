@@ -104,6 +104,10 @@
     /* per-column "set all" caret in the header */
     .xl-colset{margin-left:4px;padding:0 2px;border:none;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:0.7857rem;line-height:1;opacity:.55;vertical-align:middle}
     .xl-colset:hover{opacity:1;color:#EE3124}
+    .xl-pin{margin-left:3px;padding:0 2px;border:none;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:0.7857rem;line-height:1;opacity:0;vertical-align:middle;transition:opacity .1s}
+    table.xl thead th.xl-colh:hover .xl-pin{opacity:.5}
+    .xl-pin:hover{opacity:1 !important;color:#EE3124}
+    .xl-pin.on{opacity:.9;color:#EE3124}
     #xl-colmenu{position:fixed;z-index:50;background:var(--surface);border:1.5px solid var(--border-md);border-radius:9px;box-shadow:0 10px 30px rgba(0,0,0,.22);padding:8px;min-width:210px;max-width:240px;font-size:0.8571rem}
     #xl-colmenu .xl-cm-h{font-size:0.7857rem;color:var(--text-secondary);margin-bottom:7px;line-height:1.35}
     #xl-colmenu .xl-cm-opts{display:flex;flex-direction:column;gap:3px;max-height:260px;overflow-y:auto}
@@ -271,6 +275,7 @@
               <div><kbd>Tab</kbd>/<kbd>arrows</kbd> move · <kbd>Del</kbd> clear · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>Esc</kbd> cancel</div>
               <div><kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copy &amp; paste — multi-cell, round-trips with Excel</div>
               <div><kbd>Ctrl</kbd>+<kbd>D</kbd> or drag the corner handle to fill down · header <b>▾</b> sets a whole column at once</div>
+              <div>Header <b>📌</b> freezes columns up to that point (click it again to unfreeze) · your choice is remembered</div>
               <div>Drag a column border to resize (double-click to reset). Edits are staged until you press <b>Save</b>.</div>
             </div>
           </details>
@@ -537,7 +542,7 @@
     'Allied Services','Site Development Works'];
   const XL_PROC   = ['Not Started','Sourced','Solicited','Evaluated','Awarded'];
   const XL_SUBM   = ['Not Required','Submitted','Approved w/ Comments','Approved'];
-  const XL_DELIV  = ['','DP Paid','Accomplished Detailed Drawings','Manufactured/Produced','Delivered'];
+  const XL_DELIV  = ['','N/A','DP Paid','Accomplished Detailed Drawings','Manufactured/Produced','Delivered'];
   const XL_YN     = ['No','Yes'];
 
   // Column groups mirror the 8 sections of wp-form.html, in the same order.
@@ -637,7 +642,9 @@
     { g:'audit',    k:'updated_at',          label:'Last Edited On',       w:150, type:'datetime', ro:true },
   ];
 
-  const XL_FREEZE = 2;                 // Project + WP No. stay pinned left (after the row gutter)
+  let XL_FREEZE = 2;                   // # of left columns frozen; recomputed each render from _xlFreezeKey
+  const XL_FREEZE_DEFAULT = 2;         // Project + WP No. — the default pin boundary
+  let _xlFreezeKey = null;             // key of the LAST frozen column (null = default); persisted per user
   const XL_GUTTER = 42;
   // Sticky columns need explicit pixel left offsets (Known Issues #11/#12): the chain
   // must be contiguous from the left, so offsets accumulate gutter + each frozen width.
@@ -652,8 +659,26 @@
   function _xlLoadPrefs(){
     if (_xlPrefsLoaded || !adminProfile) return;
     _xlPrefsLoaded = true;
-    _xlLoadGroups(); _xlLoadWidths();
+    _xlLoadGroups(); _xlLoadWidths(); _xlLoadFreeze();
   }
+  /* Column freeze — the user picks how many left columns stay pinned (default Project + WP No.).
+     Stored as the KEY of the last frozen column so it survives group collapse/expand; the count
+     is recomputed from the current VC each render (_xlComputeFreeze). */
+  function _xlFreezeKeyLS(){ return 'wpm_grid_freeze_' + ((adminProfile&&adminProfile.id)||'anon'); }
+  function _xlLoadFreeze(){ try { const v = localStorage.getItem(_xlFreezeKeyLS()); _xlFreezeKey = v || null; } catch(_){} }
+  function _xlSaveFreeze(){ try { if (_xlFreezeKey) localStorage.setItem(_xlFreezeKeyLS(), _xlFreezeKey); else localStorage.removeItem(_xlFreezeKeyLS()); } catch(_){} }
+  function _xlComputeFreeze(){
+    if (!_xlFreezeKey){ XL_FREEZE = XL_FREEZE_DEFAULT; return; }
+    const i = VC.findIndex(function(c){ return c.k === _xlFreezeKey; });
+    XL_FREEZE = i < 0 ? XL_FREEZE_DEFAULT : Math.max(1, Math.min(i + 1, VC.length));
+  }
+  window.xlSetFreeze = function(key){
+    // clicking the current boundary clears back to the default; otherwise freeze through this column
+    _xlFreezeKey = (_xlFreezeKey === key) ? null : key;
+    _xlSaveFreeze();
+    _xlSel = { r:_xlSel.r, c:0 }; _xlAnchor = null;
+    renderGrid();
+  };
   function _xlLoadGroups(){
     try {
       const raw = localStorage.getItem(_xlGroupKey());
@@ -980,6 +1005,7 @@
 
     _xlLoadPrefs();
     _xlBuildVC();
+    _xlComputeFreeze();
     const tbl = document.getElementById('xl-table');
     if (!_gridRows.length){
       tbl.innerHTML = '<tbody><tr><td style="padding:40px;text-align:center;color:#aaa;border:none">No work packages match the current filters.</td></tr></tbody>';
@@ -1014,7 +1040,12 @@
         const setBtn = canSet
           ? '<button class="xl-colset" title="Set this column for every row" onclick="_xlColMenu(event,\'' + c.k + '\')"><i class="ti ti-chevron-down"></i></button>'
           : '';
-        return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+setBtn+rz+'</th>';
+        // Freeze pin — click to freeze/unfreeze columns up to and including this one.
+        const isBoundary = (i === XL_FREEZE - 1);
+        const pin = c.ph ? '' :
+          '<button class="xl-pin'+(fz?' on':'')+'" title="'+(fz?(isBoundary?'Frozen up to here — click to unfreeze':'Frozen — click to freeze up to here'):'Freeze columns up to here')+'" '
+          + 'onclick="xlSetFreeze(\'' + c.k + '\')"><i class="ti ti-'+(fz?'pinned-filled':'pin')+'"></i></button>';
+        return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+esc(c.label)+pin+setBtn+rz+'</th>';
       }).join('') + '</tr>';
     const thead = '<thead>' + grpRow + colRow + '</thead>';
     const tbody = '<tbody>' + _gridRows.map(function(w,r){

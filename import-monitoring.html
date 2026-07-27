@@ -161,6 +161,14 @@ function pDate(v){
 function cs(v){ if(v==null) return null; const s=String(v).trim(); return s?s:null; }
 function cn(v){ if(v==null||v==='') return null; const f=parseFloat(String(v).replace(/,/g,'')); return isNaN(f)?null:f; }
 function si(v){ const f=cn(v); return f==null?null:Math.round(f); }
+// Percent → decimal, tolerant of sheets that store whole percents (60 → 0.6). Anything that
+// still can't fit the DB's numeric(5,4) column (|v|>9.9999) is garbage in the % cell — e.g. an
+// AMOUNT mis-entered as the retention % (LCR352 WP 45 had 17,258,238 there) — so it's dropped to
+// null rather than allowed to overflow and abort the whole batch (which, after a Replace delete,
+// left the project half-imported). Mirrors the CSV path's >1⇒/100 rule, plus the clamp.
+function pPct(v){ let n=cn(v); if(n==null) return 0; if(Math.abs(n)>1) n=n/100; if(!isFinite(n)||Math.abs(n)>9.9999) return null; return Math.round(n*10000)/10000; }
+// Money → numeric(18,2)-safe; drop absurd values (garbage) instead of overflowing.
+function pMoney(v){ const n=cn(v); if(n==null) return null; if(!isFinite(n)||Math.abs(n)>1e15) return null; return Math.round(n*100)/100; }
 function yn(v){ const s=String(v==null?'':v).trim().toLowerCase(); return (s==='yes'||s==='true'||s==='1'||s==='y')?'Yes':'No'; }
 function norm(s){ return String(s==null?'':s).replace(/\s+/g,' ').trim().toLowerCase(); }
 
@@ -427,7 +435,6 @@ function rowToWP(r, projectId, today, C, curTrade){
     return (n === (C.budget_level||0)) ? budget : null;
   };
   const remarks = cs(g('remarks'));
-  const dpPct = cn(g('dp_percent')), retPct = cn(g('retention_percent'));
   let sdt = cs(g('submittal_document_type')); if(sdt && sdt.toLowerCase()==='mock up') sdt='Mock-up';
 
   return {
@@ -450,21 +457,21 @@ function rowToWP(r, projectId, today, C, curTrade){
     surety_bond: yn(g('surety_bond')),
     performance_bond: yn(g('performance_bond')),
     warranty_bond: yn(g('warranty_bond')),
-    approved_budget_bcb: budget!=null ? Math.round(budget*100)/100 : null,
+    approved_budget_bcb: pMoney(budget),
     _heldByFlag: heldByFlag,                      // preview-only, stripped before insert
     // Budget at each baseline: the main budget column belongs to C.budget_level
     // (BCB0 unless the sheet says otherwise), plus any separate money BCB columns.
-    budget_bcb0: bcbLv(0), budget_bcb1: bcbLv(1), budget_bcb2: bcbLv(2),
-    awarded_cost: (awarded!=null && !isFutureAward) ? Math.round(awarded*100)/100 : null,
-    additionals: Math.round((cn(g('additionals'))||0)*100)/100,
+    budget_bcb0: pMoney(bcbLv(0)), budget_bcb1: pMoney(bcbLv(1)), budget_bcb2: pMoney(bcbLv(2)),
+    awarded_cost: isFutureAward ? null : pMoney(awarded),
+    additionals: pMoney(g('additionals')) || 0,
     payment_terms_days: si(g('payment_terms_days')),
-    dp_percent: dpPct!=null ? Math.round(dpPct*10000)/10000 : 0,
+    dp_percent: pPct(g('dp_percent')),
     dp_terms: cs(g('dp_terms')),
     dp_notes: cs(g('dp_notes')),
     dp_release_date: pDate(g('dp_release_date')),
-    dp_amount: Math.round((cn(g('dp_amount'))||0)*100)/100,
-    retention_percent: retPct!=null ? Math.round(retPct*10000)/10000 : 0,
-    retention_amount: Math.round((cn(g('retention_amount'))||0)*100)/100,
+    dp_amount: pMoney(g('dp_amount')) || 0,
+    retention_percent: pPct(g('retention_percent')),
+    retention_amount: pMoney(g('retention_amount')) || 0,
     retention_period: cs(g('retention_period')),
     requires_approval: cs(g('requires_approval'))==='Yes',
     approver_name: cs(g('approver_name')),
