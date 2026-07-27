@@ -314,6 +314,7 @@
     }
     // Track navigation context
     sessionStorage.setItem('wpm_nav_ctx', currentProjId !== 'ALL' ? currentProjId : 'consolidated');
+    _xlLoadUsers();   // populate the Responsible/Approver/Support autocomplete (non-blocking)
     await loadAll(profile);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
@@ -545,6 +546,32 @@
   const XL_DELIV  = ['','N/A','DP Paid','Accomplished Detailed Drawings','Manufactured/Produced','Delivered'];
   const XL_YN     = ['No','Yes'];
 
+  // Trade → [ [works, baseType], … ] — same ladder as the WP form (keep in sync). Drives the
+  // cascading Works + Type dropdowns in the grid (dynOpts). baseType decides Type's options.
+  const XL_TRADE_WORKS = {
+    'General Requirements': [['Mobilization/Demobilization','Service'],['Temporary Facilities','Service'],['Office Equipment & Supplies','Service'],['Support Crew','Service'],['Security Services','Service'],['Housekeeping & Sanitation','Service'],['Heavy Equipment','Service'],['Light Equipment and Tools','Service'],['Service Vehicle','Service'],['Fuel & Oil','Service'],['Falseworks','Service'],['Personal Protective Equipment & Safety Provisions','Service'],['Drawing Services','Service'],['Bonds, Insurances & Permits','Service'],['Material Testing','Service']],
+    'Site Works': [['Bulk Excavation & Backfilling','Service'],['Structural Excavation','Service'],['Piling Works','Service'],['Soil Protection','Service'],['Chemical Treatment','Service'],['Vapor Barrier','Materials & Labor'],['Dewatering','Service']],
+    'Structural Works': [['Rebar','Materials & Labor'],['Formworks','Materials & Labor'],['Concrete','Materials & Labor'],['Precast','Materials & Labor'],['Structural Steel','Service'],['Post Tensioning','Service']],
+    'Architectural Works': [['Block Works & Masonry Concrete','Materials & Labor'],['Precast','Materials & Labor'],['Sealant','Materials & Labor'],['Roof & Wall Sheeting','Materials & Labor'],['Stone & Tiles','Materials & Labor'],['Drywall & Ceiling','Materials & Labor'],['Waterproofing','Materials & Labor'],['Metal Doors','Materials & Labor'],['Wood Doors','Materials & Labor'],['PVC Doors','Materials & Labor'],['Door Hardware','Materials & Labor'],['Metal Works','Materials & Labor'],['Aluminum & Glazing','Materials & Labor'],['Paint','Materials & Labor'],['Cabinetry & Mill Works','Materials & Labor'],['Landscape & Amenities','Service'],['Specialties','Service']],
+    'Mechanical Works': [['Air Conditioning Equipment','Materials & Labor'],['Fans & Blowers','Materials & Labor'],['Airconditioning Pipes','Materials & Labor'],['Insulation & Fittings','Materials & Labor'],['Air Conditioning Valves & Accessories','Materials & Labor'],['Ducting Works','Materials & Labor'],['Specialties','Service']],
+    'Electrical and Auxiliary Works': [['Distribution Equipment','Materials & Labor'],['Lightning & Ground Protection','Materials & Labor'],['Panel Boards & Breakers','Materials & Labor'],['Raceways','Materials & Labor'],['Conduits & Boxes','Materials & Labor'],['Bus Ducts','Materials & Labor'],['Wires & Cables','Materials & Labor'],['Wiring Devices','Materials & Labor'],['Lighting Fixtures','Materials & Labor'],['Structured Cabling System','Service'],['Closed Circuit Television','Service'],['Public Address & Background Music','Service'],['Fire Detection & Alarm System','Service'],['Access Control System','Service'],['Building Management System','Service'],['Specialties','Service']],
+    'Plumbing Works': [['Plumbing Fixtures','Materials & Labor'],['Tanks, Pumps & Equipment','Materials & Labor'],['Valves & Accessories','Materials & Labor'],['Waterline Distribution Pipes & Fittings','Materials & Labor'],['Sanitary Pipes & Fittings','Materials & Labor'],['Sewer Treatment Plant','Service'],['Specialties','Service']],
+    'Fire Protection Works': [['Tanks','Materials & Labor'],['Pumps & Equipment','Materials & Labor'],['Pipes & Fittings','Materials & Labor'],['Valves & Accessories','Materials & Labor'],['Cabinets, Sprinkler & Extinguishers','Materials & Labor'],['Specialties','Service']],
+    'Allied Services': [['Elevators','Service'],['Escalators','Service'],['Transformers','Service'],['Building Management Units','Service'],['Generator Sets','Service']],
+    'Site Development Works': [['Site Development','Service']],
+  };
+  // Cascading option builders (mirror onTradeChange/_setTypeOptions/onWorksChange in wp-form.html).
+  function _xlWorksOpts(w){ const t = xlVal(w,'trade'); return (XL_TRADE_WORKS[t]||[]).map(function(e){ return e[0]; }); }
+  function _xlTypeOpts(w){
+    const t = xlVal(w,'trade'), works = xlVal(w,'works');
+    const entry = (XL_TRADE_WORKS[t]||[]).find(function(e){ return e[0]===works; });
+    const base = entry ? entry[1] : '';
+    return base==='Service' ? ['Service'] : base ? ['Materials','Labor'] : ['Materials','Labor','Service'];
+  }
+  // User directory for the Responsible / Approver / Support fields (loaded once from the DB).
+  let _xlUsers = [];
+  async function _xlLoadUsers(){ try { _xlUsers = (await WPDb.getAllUsers()) || []; } catch(_){ _xlUsers = []; } }
+
   // Column groups mirror the 8 sections of wp-form.html, in the same order.
   // `keep:true` columns survive their group being collapsed (they're the frozen keys).
   const XL_GROUPS = [
@@ -567,13 +594,16 @@
     /* ── Identity & Classification ─────────────────────────────────────── */
     { g:'identity', k:'project_id',          label:'Project',              w:80,  type:'text',  ro:true, keep:true },
     { g:'identity', k:'wp_no',               label:'WP No.',               w:70,  type:'text',  req:true, keep:true },
-    { g:'identity', k:'cost_code',           label:'Cost Code',            w:90,  type:'text'  },
+    // Description before Cost Code so "freeze up to Description" doesn't drag the (often-empty)
+    // Cost Code column into the frozen set — a contiguous left-freeze includes everything to
+    // the pin's left, so column ORDER is what decides what a Description-freeze captures.
     { g:'identity', k:'description',         label:'Description',          w:240, type:'text',  req:true },
+    { g:'identity', k:'cost_code',           label:'Cost Code',            w:90,  type:'text'  },
     { g:'identity', k:'detailed_description',label:'Detailed Description', w:200, type:'text'  },
     { g:'identity', k:'scope',               label:'Scope of Work',        w:180, type:'text'  },
     { g:'identity', k:'trade',               label:'Trade',                w:150, type:'select', opts:XL_TRADES, req:true },
-    { g:'identity', k:'works',               label:'Works',                w:140, type:'text'  },
-    { g:'identity', k:'type_of_works',       label:'Type',                 w:90,  type:'text'  },
+    { g:'identity', k:'works',               label:'Works',                w:140, type:'select', dynOpts:'works' },
+    { g:'identity', k:'type_of_works',       label:'Type',                 w:90,  type:'select', dynOpts:'type' },
     { g:'identity', k:'zone',                label:'Zone',                 w:80,  type:'text'  },
     { g:'identity', k:'osm',                 label:'OSM',                  w:60,  type:'select', opts:XL_YN },
     { g:'identity', k:'type_of_service',     label:'Type of Service',      w:120, type:'text'  },
@@ -583,9 +613,9 @@
     { g:'identity', k:'po_jo_count',         label:'No. PO/JO',            w:80,  type:'num'   },
     { g:'identity', k:'po_jo_numbers',       label:'PO/JO Numbers',        w:140, type:'text'  },
     /* ── Approval Matrix ───────────────────────────────────────────────── */
-    { g:'approval', k:'responsible_team',    label:'Responsible',          w:150, type:'text'  },
-    { g:'approval', k:'approver',            label:'Approver',             w:130, type:'text'  },
-    { g:'approval', k:'support_team',        label:'Support',              w:150, type:'text'  },
+    { g:'approval', k:'responsible_team',    label:'Responsible',          w:150, type:'text', users:true },
+    { g:'approval', k:'approver',            label:'Approver',             w:130, type:'text', users:true },
+    { g:'approval', k:'support_team',        label:'Support',              w:150, type:'text', users:true },
     /* ── Insurance Bonds ───────────────────────────────────────────────── */
     { g:'bonds',    k:'surety_bond',         label:'Surety Bond',          w:90,  type:'select', opts:XL_YN },
     { g:'bonds',    k:'performance_bond',    label:'Perf. Bond',           w:90,  type:'select', opts:XL_YN },
@@ -1207,14 +1237,27 @@
     let ed;
     if (col.type === 'select' || col.type === 'bool'){
       ed = document.createElement('select');
-      const opts = col.type==='bool' ? ['','Yes','No'] : col.opts.slice();
-      if (cur!=null && cur!=='' && opts.indexOf(String(cur))<0) opts.unshift(String(cur));   // keep legacy values
+      // Works/Type cascade off the row's Trade (dynOpts), like the WP form; others use col.opts.
+      let opts = col.dynOpts==='works' ? _xlWorksOpts(w).slice()
+               : col.dynOpts==='type'  ? _xlTypeOpts(w).slice()
+               : col.type==='bool'     ? ['','Yes','No']
+               : col.opts.slice();
+      if (col.dynOpts) opts.unshift('');                                          // allow blank
+      if (cur!=null && cur!=='' && opts.indexOf(String(cur))<0) opts.unshift(String(cur));   // keep legacy/off-list values
       ed.innerHTML = opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o||'— none —')+'</option>'; }).join('');
       ed.value = col.type==='bool' ? (cur===true?'Yes':cur===false?'No':'') : (cur==null ? '' : String(cur));
     } else {
       ed = document.createElement('input');
       ed.type = col.type==='date' ? 'date' : 'text';
       if (col.type==='money'||col.type==='num'||col.type==='pct') ed.inputMode = 'decimal';
+      // Responsible / Approver / Support: autocomplete from the user directory (still free text
+      // so multiple, comma-separated names are allowed — matches the WP form's multi-select intent).
+      if (col.users && _xlUsers.length){
+        let dl = document.getElementById('xl-users-dl');
+        if (!dl){ dl = document.createElement('datalist'); dl.id = 'xl-users-dl'; document.body.appendChild(dl); }
+        dl.innerHTML = _xlUsers.map(function(u){ return '<option value="'+esc(u.name||u.email||'')+'">'; }).join('');
+        ed.setAttribute('list','xl-users-dl');
+      }
       ed.value = seed != null ? seed
                : (col.type==='date'||col.type==='pct' ? (xlFmt(cur,col)||'') : (cur==null?'':String(cur)));
     }
@@ -1379,7 +1422,7 @@
     const col = VC.find(function(x){ return x.k===k; }); if(!col) return;
     const m = document.createElement('div'); m.id = 'xl-colmenu';
     let inner = '<div class="xl-cm-h">Set <b>'+esc(col.label)+'</b> for all '+_gridRows.length+' row'+(_gridRows.length===1?'':'s')+'</div>';
-    if (col.type==='select' || col.type==='bool'){
+    if ((col.type==='select' || col.type==='bool') && !col.dynOpts){   // dynOpts (Works/Type) vary per row → use the free-input branch
       const opts = col.type==='bool' ? ['Yes','No'] : col.opts.slice();
       inner += '<div class="xl-cm-opts">' + opts.map(function(o){
         return '<button class="xl-cm-opt" data-v="'+esc(o)+'" onclick="_xlColApply(\''+esc(k)+'\',this.getAttribute(\'data-v\'))">'+esc(o)+'</button>'; }).join('')
