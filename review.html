@@ -1235,14 +1235,20 @@
     _xlSyncFill();                       // hide the fill handle while the editor is open
     const cur = xlVal(w, col.k);
     let ed;
-    if (col.type === 'select' || col.type === 'bool'){
+    // Responsible/Approver/Support (users:true) become a SELECT of the DB user directory so the
+    // whole list is visible on click (a datalist only shows matches for the current text, which
+    // hid everything when the stored value was an abbreviation like "JVI"). Falls back to a plain
+    // text input if the user list hasn't loaded yet.
+    const asUserSelect = col.users && _xlUsers.length;
+    if (col.type === 'select' || col.type === 'bool' || asUserSelect){
       ed = document.createElement('select');
-      // Works/Type cascade off the row's Trade (dynOpts), like the WP form; others use col.opts.
+      // Works/Type cascade off the row's Trade (dynOpts); user fields list the directory; others use col.opts.
       let opts = col.dynOpts==='works' ? _xlWorksOpts(w).slice()
                : col.dynOpts==='type'  ? _xlTypeOpts(w).slice()
+               : asUserSelect          ? _xlUsers.map(function(u){ return u.name||u.email||''; }).filter(Boolean)
                : col.type==='bool'     ? ['','Yes','No']
                : col.opts.slice();
-      if (col.dynOpts) opts.unshift('');                                          // allow blank
+      if (col.dynOpts || asUserSelect) opts.unshift('');                          // allow blank
       if (cur!=null && cur!=='' && opts.indexOf(String(cur))<0) opts.unshift(String(cur));   // keep legacy/off-list values
       ed.innerHTML = opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o||'— none —')+'</option>'; }).join('');
       ed.value = col.type==='bool' ? (cur===true?'Yes':cur===false?'No':'') : (cur==null ? '' : String(cur));
@@ -1250,14 +1256,6 @@
       ed = document.createElement('input');
       ed.type = col.type==='date' ? 'date' : 'text';
       if (col.type==='money'||col.type==='num'||col.type==='pct') ed.inputMode = 'decimal';
-      // Responsible / Approver / Support: autocomplete from the user directory (still free text
-      // so multiple, comma-separated names are allowed — matches the WP form's multi-select intent).
-      if (col.users && _xlUsers.length){
-        let dl = document.getElementById('xl-users-dl');
-        if (!dl){ dl = document.createElement('datalist'); dl.id = 'xl-users-dl'; document.body.appendChild(dl); }
-        dl.innerHTML = _xlUsers.map(function(u){ return '<option value="'+esc(u.name||u.email||'')+'">'; }).join('');
-        ed.setAttribute('list','xl-users-dl');
-      }
       ed.value = seed != null ? seed
                : (col.type==='date'||col.type==='pct' ? (xlFmt(cur,col)||'') : (cur==null?'':String(cur)));
     }
@@ -1290,7 +1288,7 @@
       e.stopPropagation();
     });
     ed.addEventListener('blur', function(){ finish(true); });
-    if (col.type==='select'||col.type==='bool') ed.addEventListener('change', function(){ finish(true,'down'); });
+    if (ed.tagName==='SELECT') ed.addEventListener('change', function(){ finish(true,'down'); });
   }
 
   /* ── Mouse + keyboard ───────────────────────────────────────────────────── */
