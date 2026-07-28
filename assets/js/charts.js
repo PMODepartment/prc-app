@@ -350,6 +350,19 @@ const Charts = (() => {
   // Budget (BCB) and Awarded by Period — MONTHLY combo chart
   // opts.hideAwarded: backlog instances pass only not-awarded WPs, whose awarded cost is ₱0 by
   // definition — drop the two always-zero Awarded series instead of drawing a flat line at 0M.
+  // "Budget %" mode for the period bar charts — each period's Budget (BCB) and Awarded shown as a
+  // SHARE of the project's total budget (bars; no cumulative lines). budgetData/awardedData come in
+  // already ÷1e6, so the ₱M cancels in the ratio.
+  function _periodSharePct(id, labels, budgetData, awardedData){
+    const totB = budgetData.reduce((s,v)=>s+v,0) || 1;
+    const bPct = budgetData.map(v=>+(v/totB*100).toFixed(2));
+    const aPct = awardedData.map(v=>+(v/totB*100).toFixed(2));
+    const mob=_mob();
+    make(id,{type:'bar',data:{labels,datasets:[
+      {label:'Budget (BCB) %',data:bPct,backgroundColor:'#282C28',borderRadius:3},
+      {label:'Awarded %',data:aPct,backgroundColor:'#EE3124',borderRadius:3},
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:mob?{display:false}:_dlBar(v=>v>0?v.toFixed(1)+'%':'','v'),tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.raw==null?'—':ctx.raw+'%'}`}}},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{beginAtZero:true,ticks:{font:{size:mob?8:9},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'% of total budget',font:{size:9}}}}}});
+  }
   function budgetAwardedByPeriodMonthly(id, wps, opts){
     // Awarded amount is placed by its actual award date, falling back to the PLANNED award date when
     // actual_awarding_date isn't captured (WP-Monitoring imports record award_status + total_awarded but
@@ -366,6 +379,7 @@ const Charts = (() => {
     const getMKey=d=>d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
     const budgetData=months.map(mk=>wps.filter(w=>w.awarding_date&&getMKey(new Date(w.awarding_date))===mk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
     const awardedData=months.map(mk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getMKey(awDate(w))===mk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
+    if(opts&&opts.sharePct){ _periodSharePct(id, months.map(mLabel), budgetData, awardedData); return; }
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
@@ -400,6 +414,7 @@ const Charts = (() => {
     const labels=quarters.map(qLabel);
     const budgetData=quarters.map(qk=>wps.filter(w=>w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
     const awardedData=quarters.map(qk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getQKey(awDate(w))===qk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
+    if(opts&&opts.sharePct){ _periodSharePct(id, labels, budgetData, awardedData); return; }
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));

@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723w"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260723w"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723w"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260723x"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260723x"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260723x"/>
   <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260708b"/>
   <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260708b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723w"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260723x"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723w"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260723x"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -200,6 +200,7 @@
                 <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
                 <button id="idx-dash-btn-count" onclick="setIdxDashDataMode('count')" class="seg-btn active"># WPs</button>
                 <button id="idx-dash-btn-budget" onclick="setIdxDashDataMode('budget')" class="seg-btn">Budget</button>
+                <button id="idx-dash-btn-budgetpct" onclick="setIdxDashDataMode('budgetpct')" class="seg-btn">Budget %</button>
               </div>
             </div>
             <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-idx-dash-period"></canvas></div>
@@ -621,14 +622,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260723w"></script>
-<script src="assets/js/db.js?v=20260723w"></script>
-<script src="assets/js/ui.js?v=20260723w"></script>
+<script src="assets/js/auth.js?v=20260723x"></script>
+<script src="assets/js/db.js?v=20260723x"></script>
+<script src="assets/js/ui.js?v=20260723x"></script>
 <script src="assets/js/onboarding.js?v=20260708b"></script>
 <script src="assets/js/coachmarks.js?v=20260708b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260723w"></script>
+<script src="assets/js/charts.js?v=20260723x"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -1259,6 +1260,10 @@
         if(titleEl) titleEl.textContent = 'Work Packages by Period — Planned vs Actual';
         if(_idxDashPeriodMode==='monthly') Charts.wpCountByPeriodMonthly('c-idx-dash-period', wps);
         else Charts.wpCountByPeriod('c-idx-dash-period', wps);
+      } else if(_idxDashDataMode === 'budgetpct') {
+        if(titleEl) titleEl.textContent = 'Budget & Awarded by Period — % of Total Budget';
+        if(_idxDashPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-dash-period', wps, {sharePct:true});
+        else Charts.budgetAwardedByPeriod('c-idx-dash-period', wps, {sharePct:true});
       } else {
         if(titleEl) titleEl.textContent = 'Procurement Budget (BCB) and Awarded Cost by Period';
         if(_idxDashPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-dash-period', wps, {tidyLabels:true});
@@ -1281,9 +1286,10 @@
 
     window.setIdxDashDataMode = function(mode) {
       _idxDashDataMode = mode;
-      const bBud = document.getElementById('idx-dash-btn-budget'), bCnt = document.getElementById('idx-dash-btn-count');
+      const bBud = document.getElementById('idx-dash-btn-budget'), bCnt = document.getElementById('idx-dash-btn-count'), bPct = document.getElementById('idx-dash-btn-budgetpct');
       if(bBud) _segBtn(bBud, mode==='budget');
       if(bCnt) _segBtn(bCnt, mode==='count');
+      if(bPct) _segBtn(bPct, mode==='budgetpct');
       if(_lastWPs) _idxDashRenderPeriod(_lastWPs);
     };
 
