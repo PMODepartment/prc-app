@@ -84,7 +84,12 @@
       </div>
       <div class="row" style="margin-top:12px">
         <div><label>Sheet</label><select id="sheet"><option>— pick a file first —</option></select></div>
-        <div></div>
+        <div><label>Import budget into</label><select id="bcb-level">
+          <option value="auto">Auto-detect from the sheet header</option>
+          <option value="0">BCB0 (original)</option>
+          <option value="1">BCB1 (1st re-baseline)</option>
+          <option value="2">BCB2 (2nd re-baseline)</option>
+        </select></div>
       </div>
       <div class="lookouts">
         <b>Import rules applied:</b><br>
@@ -502,6 +507,10 @@ function parse(){
   const L=detectLayout(rows);
   if(!L || L.col.wp_no==null) throw new Error('Could not find a "Work Package No." column header on this sheet — is it the monitoring sheet?');
   if(L.col.budget_bcb==null) throw new Error('Could not find a Budget (BCB / VAT-EX / Net) column header on this sheet.');
+  // User override: force the main budget column into a chosen baseline (BCB0/1/2) instead of
+  // the one auto-detected from the header. 'auto' keeps detectLayout's guess.
+  const _bl = ($('bcb-level')||{}).value;
+  if(_bl && _bl!=='auto') L.col.budget_level = +_bl;
   _detected=L;
   const today=new Date(); today.setHours(0,0,0,0);
   const pid=$('project').value;
@@ -791,6 +800,8 @@ $('file').addEventListener('change', e=>{
   rd.readAsArrayBuffer(f);
 });
 $('btn-parse').addEventListener('click',()=>{ try{ renderPreview(parse()); }catch(err){ log('Parse error: '+err.message,'err'); } });
+// Changing the budget-baseline target re-previews so the choice is reflected before import.
+$('bcb-level').addEventListener('change',()=>{ if(_wb && _parsed){ try{ renderPreview(parse()); log('Budget baseline set to '+($('bcb-level').value==='auto'?'auto-detect':'BCB'+$('bcb-level').value)+'.','info'); }catch(err){ log('Parse error: '+err.message,'err'); } } });
 $('btn-import').addEventListener('click',doImport);
 $('btn-cancel').addEventListener('click',()=>{ $('preview-card').style.display='none'; _parsed=null; });
 
