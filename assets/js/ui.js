@@ -248,67 +248,6 @@ function initExpandableCharts() {
   });
 }
 
-/* ── Top 5 KPI accordion ──────────────────────────────────────────────
-   The three Top-5 cards sit side-by-side, so a long WP name pushes the value
-   columns off the edge. Clicking a card's title EXPANDS it to the full row width
-   (all columns visible); the other two collapse to slim clickable spines. Click the
-   expanded card again to return to the 3-up view. Desktop only (mobile already stacks
-   the cards full-width — see the media guard in dashboard.css). Idempotent. ── */
-function initTop5Accordion() {
-  const mq = window.matchMedia('(min-width: 768px)');
-  document.querySelectorAll('.top5-row').forEach(row => {
-    if (row.dataset.t5Init) return;
-    row.dataset.t5Init = '1';
-    const cards = Array.from(row.children).filter(c => c.classList.contains('panel'));
-    if (cards.length < 2) return;
-    // Remember each card's ORIGINAL inline flex/min-width so we can restore the 3-up view. The
-    // widths are driven with inline styles (not CSS classes) because the cards already carry an
-    // inline `flex:` that a stylesheet rule — even !important — doesn't reliably beat while a
-    // `transition:flex` is running; inline !important always wins.
-    cards.forEach(c => { c.dataset.t5Flex = c.style.flex || ''; c.dataset.t5MinW = c.style.minWidth || ''; });
-    const reset = () => {
-      row.classList.remove('t5-active');
-      cards.forEach(c => {
-        c.classList.remove('t5-expanded', 't5-collapsed');
-        c.style.flex = c.dataset.t5Flex;
-        c.style.minWidth = c.dataset.t5MinW;
-        const ic = c.querySelector('.t5-caret');
-        if (ic) ic.className = 'ti ti-arrows-diagonal t5-caret';
-      });
-    };
-    cards.forEach(card => {
-      const title = card.querySelector('.panel-title');
-      if (!title) return;
-      title.classList.add('t5-title');
-      title.setAttribute('title', 'Click to expand this Top 5 to full width');
-      if (!title.querySelector('.t5-caret')) {
-        const ic = document.createElement('i');
-        ic.className = 'ti ti-arrows-diagonal t5-caret';
-        title.appendChild(ic);
-      }
-      title.addEventListener('click', () => {
-        if (!mq.matches) return;                       // mobile already stacks cards full-width
-        const wasExpanded = card.classList.contains('t5-expanded');
-        reset();
-        if (!wasExpanded) {
-          row.classList.add('t5-active');
-          card.classList.add('t5-expanded');
-          card.style.setProperty('flex', '1 1 100%', 'important');
-          card.style.setProperty('min-width', '0', 'important');
-          cards.forEach(c => {
-            if (c === card) return;
-            c.classList.add('t5-collapsed');
-            c.style.setProperty('flex', '0 0 44px', 'important');
-            c.style.setProperty('min-width', '44px', 'important');
-          });
-          const ic = card.querySelector('.t5-caret');
-          if (ic) ic.className = 'ti ti-arrows-diagonal-minimize-2 t5-caret';
-        }
-      });
-    });
-  });
-}
-
 /* ── AppTheme — dark / light mode ──────────────────────────────────────
    Stores preference in localStorage:
      wpm_theme_{userId}  — per-user authoritative preference

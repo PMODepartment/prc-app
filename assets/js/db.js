@@ -579,12 +579,19 @@ function buildRankTable(id, items, type) {
     const s = document.createElement('style');
     s.id = '_rankTblStyle';
     s.textContent = [
-      // All 5 rows are always visible (no vertical scroll). If a long WP name + columns spill past the
-      // card width, the card scrolls LEFT↔RIGHT instead. Names/cells stay on one line (nowrap).
+      // All 5 rows always visible. The value columns (BCB/Award/…) keep their width (nowrap); the
+      // WP-NAME column TRUNCATES with an ellipsis so long names can never push the value columns off
+      // the card (the classic max-width:0 + overflow:hidden trick in a width:100% table). Full name
+      // is in the cell's title tooltip and one click away in the detail panel. Mobile-safe: no scroll.
       '.rank-row{cursor:default}',
+      // Name truncates so it never dominates; if the value columns still exceed a narrow card
+      // (tablet / split screen) the card scrolls left↔right as a graceful fallback. On normal
+      // desktop widths the whole table fits with no scroll.
       '.rank-table-scroll{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch}',
-      '.rank-table-scroll table{min-width:100%}',
-      '.rank-short,.rank-sub{white-space:nowrap}',
+      '.rank-table-scroll table{width:100%}',
+      '.rank-name-cell{max-width:0}',
+      '.rank-name-inner{min-width:0;overflow:hidden}',
+      '.rank-short,.rank-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     ].join('');
     document.head.appendChild(s);
   }
@@ -604,12 +611,12 @@ function buildRankTable(id, items, type) {
     // Clicking a row opens the WP detail slide-in panel (full details + Edit/Delete)
     const click = item.id ? ` onclick="if(window.openWPDetail)openWPDetail('${item.id}')"` : '';
     const cursor = item.id ? 'cursor:pointer;' : '';
-    const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:top">
+    const wpCell = `<td class="rank-name-cell" style="padding:9px 8px 9px 0;vertical-align:top">
       <div style="display:flex;align-items:flex-start;gap:6px">
         <span style="font-size:0.7143rem;color:#999;font-weight:700;flex-shrink:0;min-width:14px;padding-top:1px">${i+1}</span>
-        <div>
-          <div class="rank-short" style="font-size:0.7857rem;font-weight:600;color:#231F20;line-height:1.35;white-space:nowrap">${esc(item.name)}</div>
-          <div class="rank-sub" style="font-size:0.6429rem;color:#888;margin-top:1px;white-space:nowrap">${esc(item.sub)||''}</div>
+        <div class="rank-name-inner">
+          <div class="rank-short" title="${esc(item.name)}" style="font-size:0.7857rem;font-weight:600;color:#231F20;line-height:1.35">${esc(item.name)}</div>
+          <div class="rank-sub" title="${esc(item.sub)}" style="font-size:0.6429rem;color:#888;margin-top:1px">${esc(item.sub)||''}</div>
         </div>
       </div>
     </td>`;
