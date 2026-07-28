@@ -584,14 +584,17 @@ function buildRankTable(id, items, type) {
       // the card (the classic max-width:0 + overflow:hidden trick in a width:100% table). Full name
       // is in the cell's title tooltip and one click away in the detail panel. Mobile-safe: no scroll.
       '.rank-row{cursor:default}',
-      // Name truncates so it never dominates; if the value columns still exceed a narrow card
-      // (tablet / split screen) the card scrolls left↔right as a graceful fallback. On normal
-      // desktop widths the whole table fits with no scroll.
-      '.rank-table-scroll{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch}',
-      '.rank-table-scroll table{width:100%}',
-      '.rank-name-cell{max-width:0}',
-      '.rank-name-inner{min-width:0;overflow:hidden}',
-      '.rank-short,.rank-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      // Full names on one line; the card scrolls left↔right to reveal the value columns. A pair of
+      // ◂ ▸ "slide" buttons (shown only when it overflows) nudge the scroll so it is discoverable.
+      '.rank-table-scroll{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}',
+      '.rank-table-scroll table{min-width:100%}',
+      '.rank-short,.rank-sub{white-space:nowrap}',
+      '.rank-slidewrap{position:relative}',
+      '.rank-slide{position:absolute;top:0;bottom:0;width:30px;border:none;padding:0;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:3;font-size:1.15rem;font-weight:700;color:var(--mw-red,#EE3124)}',
+      '.rank-slide-l{left:0;background:linear-gradient(90deg,var(--surface,#fff) 55%,transparent)}',
+      '.rank-slide-r{right:0;background:linear-gradient(270deg,var(--surface,#fff) 55%,transparent)}',
+      '.rank-slidewrap.can-l .rank-slide-l{display:flex}',
+      '.rank-slidewrap.can-r .rank-slide-r{display:flex}',
     ].join('');
     document.head.appendChild(s);
   }
@@ -611,12 +614,12 @@ function buildRankTable(id, items, type) {
     // Clicking a row opens the WP detail slide-in panel (full details + Edit/Delete)
     const click = item.id ? ` onclick="if(window.openWPDetail)openWPDetail('${item.id}')"` : '';
     const cursor = item.id ? 'cursor:pointer;' : '';
-    const wpCell = `<td class="rank-name-cell" style="padding:9px 8px 9px 0;vertical-align:top">
+    const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:top">
       <div style="display:flex;align-items:flex-start;gap:6px">
         <span style="font-size:0.7143rem;color:#999;font-weight:700;flex-shrink:0;min-width:14px;padding-top:1px">${i+1}</span>
-        <div class="rank-name-inner">
-          <div class="rank-short" title="${esc(item.name)}" style="font-size:0.7857rem;font-weight:600;color:#231F20;line-height:1.35">${esc(item.name)}</div>
-          <div class="rank-sub" title="${esc(item.sub)}" style="font-size:0.6429rem;color:#888;margin-top:1px">${esc(item.sub)||''}</div>
+        <div>
+          <div class="rank-short" title="${esc(item.name)}" style="font-size:0.7857rem;font-weight:600;color:#231F20;line-height:1.35;white-space:nowrap">${esc(item.name)}</div>
+          <div class="rank-sub" style="font-size:0.6429rem;color:#888;margin-top:1px;white-space:nowrap">${esc(item.sub)||''}</div>
         </div>
       </div>
     </td>`;
@@ -633,8 +636,32 @@ function buildRankTable(id, items, type) {
       <td class="rank-side" style="font-size:0.7857rem;font-weight:600;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Savings ÷ Total BCB">${item.wt!=null?item.wt:'—'}</td>
     </tr>`;
   }).join('');
-  el.innerHTML = `<div class="rank-table-scroll"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead>${thead}</thead><tbody>${rows}</tbody></table></div>`;
+  el.innerHTML = `<div class="rank-slidewrap">`
+    + `<button type="button" class="rank-slide rank-slide-l" aria-label="Slide left" onclick="_rankSlide(this,-1)">‹</button>`
+    + `<div class="rank-table-scroll"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead>${thead}</thead><tbody>${rows}</tbody></table></div>`
+    + `<button type="button" class="rank-slide rank-slide-r" aria-label="Slide right" onclick="_rankSlide(this,1)">›</button>`
+    + `</div>`;
+  const sc = el.querySelector('.rank-table-scroll');
+  if (sc) {
+    sc.addEventListener('scroll', () => _rankUpdSlide(sc));
+    // wait for layout so scrollWidth/clientWidth are real
+    requestAnimationFrame(() => _rankUpdSlide(sc));
+  }
 }
+// Toggle the ◂ ▸ slide buttons on a rank card by its current scroll position/overflow.
+function _rankUpdSlide(sc) {
+  const wrap = sc.closest('.rank-slidewrap'); if (!wrap) return;
+  const max = sc.scrollWidth - sc.clientWidth;
+  wrap.classList.toggle('can-l', sc.scrollLeft > 2);
+  wrap.classList.toggle('can-r', max > 2 && sc.scrollLeft < max - 2);
+}
+// Slide a rank card's columns left/right (dir = -1 | 1). ~70% of the visible width per click.
+window._rankSlide = function(btn, dir) {
+  const wrap = btn.closest('.rank-slidewrap'); if (!wrap) return;
+  const sc = wrap.querySelector('.rank-table-scroll'); if (!sc) return;
+  sc.scrollBy({ left: dir * Math.max(120, sc.clientWidth * 0.7) });   // CSS scroll-behavior:smooth animates it
+  setTimeout(() => _rankUpdSlide(sc), 400);
+};
 
 function buildRankList(id, items, colorClass, fmtVal) {
   const el = document.getElementById(id);
