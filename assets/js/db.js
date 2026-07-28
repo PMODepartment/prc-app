@@ -585,6 +585,11 @@ function buildRankTable(id, items, type) {
       '.rank-table-scroll{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch}',
       '.rank-table-scroll table{min-width:100%}',
       '.rank-short,.rank-sub{white-space:nowrap}',
+      // Freeze the "# Work Package" column so the name stays visible while the value
+      // columns scroll left↔right (opaque bg = the card surface so rows pass under it).
+      '.rank-freeze{position:sticky;left:0;z-index:2;background:var(--surface,#fff)}',
+      '.rank-freeze-h{z-index:3}',
+      '.rank-freeze::after{content:"";position:absolute;top:0;right:0;bottom:0;width:7px;transform:translateX(100%);background:linear-gradient(90deg,rgba(0,0,0,.07),transparent);pointer-events:none}',
     ].join('');
     document.head.appendChild(s);
   }
@@ -595,7 +600,7 @@ function buildRankTable(id, items, type) {
   const valSign  = type === 'savings' ? '+' : type === 'loss' ? '-' : '';
   // Right-aligned headers use the SAME 8px horizontal padding as their value cells so they line up.
   const th = (txt, right, color) =>
-    `<th style="font-size:0.5714rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${color||'#777'};padding:7px 8px 7px ${right?'8px':'0'};text-align:${right?'right':'left'};border-bottom:2px solid #ebebeb;white-space:nowrap">${txt}</th>`;
+    `<th class="${right?'':'rank-freeze rank-freeze-h'}" style="font-size:0.5714rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${color||'#777'};padding:7px 8px 7px ${right?'8px':'0'};text-align:${right?'right':'left'};border-bottom:2px solid #ebebeb;white-space:nowrap">${txt}</th>`;
   const thead = isValue
     ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true)}</tr>`
     : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Award',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)} ${th('%WT',true,accent)}</tr>`;
@@ -604,7 +609,7 @@ function buildRankTable(id, items, type) {
     // Clicking a row opens the WP detail slide-in panel (full details + Edit/Delete)
     const click = item.id ? ` onclick="if(window.openWPDetail)openWPDetail('${item.id}')"` : '';
     const cursor = item.id ? 'cursor:pointer;' : '';
-    const wpCell = `<td style="padding:9px 8px 9px 0;vertical-align:top">
+    const wpCell = `<td class="rank-freeze" style="padding:9px 8px 9px 0;vertical-align:top">
       <div style="display:flex;align-items:flex-start;gap:6px">
         <span style="font-size:0.7143rem;color:#999;font-weight:700;flex-shrink:0;min-width:14px;padding-top:1px">${i+1}</span>
         <div>

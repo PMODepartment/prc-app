@@ -206,31 +206,45 @@ function initExpandableCharts() {
     btn.className = 'chart-expand-btn';
     if (!hasAutoMarginChild) btn.style.marginLeft = 'auto';
     btn.style.cssText += ';cursor:pointer;display:inline-flex;align-items:center;opacity:0.4;transition:opacity .15s;flex-shrink:0;padding:2px 4px;border-radius:4px';
-    btn.title = 'Expand chart';
-    btn.innerHTML = '<i class="ti ti-arrows-diagonal" style="font-size:0.8571rem"></i>';
+    btn.title = 'Fullscreen chart';
+    btn.innerHTML = '<i class="ti ti-arrows-maximize" style="font-size:0.8571rem"></i>';
     btn.addEventListener('mouseenter', () => { btn.style.opacity = '1'; btn.style.background = 'rgba(238,49,36,.07)'; });
     btn.addEventListener('mouseleave', () => { btn.style.opacity = expanded ? '1' : '0.4'; btn.style.background = ''; });
     titleEl.appendChild(btn);
 
+    // Fullscreen (real Fullscreen API) instead of a taller in-page panel — so the whole
+    // graph fills the screen, which the old 2.2× height couldn't on large displays / smart TVs.
+    const _fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      expanded = !expanded;
-      // Expanded height is set inline-!important so it beats the mobile `.chart-mob-h{height:300px!important}`
-      // rule; on collapse a plain inline height restores the default (mobile rule re-applies its 300px).
-      if (expanded) wrap.style.setProperty('height', (origH * 2.2) + 'px', 'important');
-      else wrap.style.height = origH + 'px';
-      btn.querySelector('i').className = expanded ? 'ti ti-arrows-diagonal-minimize-2' : 'ti ti-arrows-diagonal';
-      btn.style.opacity = '1';
-      btn.title = expanded ? 'Collapse chart' : 'Expand chart';
-      if (!expanded) btn.style.opacity = '0.4';
+      if (_fsEl() === panel) {
+        (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+      } else {
+        (panel.requestFullscreen || panel.webkitRequestFullscreen || function(){}).call(panel);
+      }
+    });
 
-      // Toggle data labels after Chart.js resizes (next animation frame)
+    // React to entering/leaving fullscreen (also fires on Esc / TV back button)
+    const onFsChange = () => {
+      expanded = (_fsEl() === panel);
+      panel.classList.toggle('panel-fullscreen', expanded);
+      // Fill the screen when fullscreen; restore the default height otherwise. !important beats
+      // the mobile `.chart-mob-h{height:300px!important}` rule.
+      if (expanded) wrap.style.setProperty('height', 'calc(100vh - 96px)', 'important');
+      else wrap.style.height = origH + 'px';
+      btn.querySelector('i').className = expanded ? 'ti ti-arrows-minimize' : 'ti ti-arrows-maximize';
+      btn.title = expanded ? 'Exit fullscreen' : 'Fullscreen chart';
+      btn.style.opacity = expanded ? '1' : '0.4';
+      // Resize the canvas to the new box, then toggle data labels, after layout settles.
       requestAnimationFrame(() => {
         if (typeof Charts !== 'undefined') {
+          if (Charts.resize) Charts.resize(canvas.id);
           expanded ? Charts.expand(canvas.id) : Charts.collapse(canvas.id);
         }
       });
-    });
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
   });
 }
 

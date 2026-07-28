@@ -51,6 +51,9 @@ const Charts = (() => {
   // Called by initExpandableCharts() after resize — ensures chart redraws cleanly at new height
   function expand(id) { const c=reg[id]; if(c) c.update('none'); }
   function collapse(id) { const c=reg[id]; if(c) c.update('none'); }
+  // Force the canvas to re-fit its container (used when a chart enters/exits fullscreen —
+  // the box jumps and Chart.js's own observer may not have fired yet).
+  function resize(id) { const c=reg[id]; if(c){ c.resize(); c.update('none'); } }
 
   // Near-black brand hues (#282C28 etc. + its translucent bar variant) vanish on a dark canvas → remap to a
   // visible MID gray. #9B9999 (~4.5:1 on the panel) is deliberately 65 levels below #DCDBDB — which is
@@ -716,7 +719,8 @@ const Charts = (() => {
   // Actual  = Awarded WPs whose Actual Award Date is on/before each month-end; the actual
   // line stops at the current month (no future projection). Mirrors the Excel S-Curve sheet —
   // updates automatically as WPs are marked Awarded with an actual award date.
-  function sCurve(id, wps) {
+  function sCurve(id, wps, mode) {
+    mode = mode || 'wp';                       // 'wp' | 'budget' | 'budgetpct'
     // Parse a date value as LOCAL midnight, robust to every format the DB may return:
     // date-only 'YYYY-MM-DD', full ISO timestamps ('...T00:00:00+00:00' / '...Z'),
     // space-separated timestamps, and Date objects. We extract just the YYYY-MM-DD prefix
@@ -757,38 +761,50 @@ const Charts = (() => {
       d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
     }
     const now = new Date();
-    const total = wps.length;
+    const totalWP = wps.length;
+    // Per-WP weight for the cumulative curve: 1 for the #WP mode, the WP's BCB for the
+    // Budget / Budget-% modes. So all three modes share the SAME planned/actual/forecast
+    // logic (differing only by DATE), just weighted differently.
+    const valFn = mode==='wp' ? (()=>1) : (w=>(w.approved_budget_bcb||0));
+    const totalRaw = wps.reduce((s,w)=>s+valFn(w),0);
     // Actual award date falls back to the PLANNED award date when actual_awarding_date is not
     // captured (the WP-Monitoring imports populate award_status + total_awarded from the Remarks
-    // column but never an actual award date — so without this fallback the Actual line is flat/empty
-    // for every imported project).
-    // Award date for the Actual line is CLAMPED to today — an awarded WP can never be awarded in the
-    // future, so a planned-date fallback beyond today is pulled back to now (it then shows at the
-    // current month instead of vanishing past the now-cutoff).
+    // column but never an actual award date). CLAMPED to today — an awarded WP can't be awarded
+    // in the future, so a planned-date fallback beyond today is pulled back to now.
     const awd = w => { let dd=pd(w.actual_awarding_date)||pd(w.awarding_date); if(dd && dd>now) dd=new Date(now.getFullYear(),now.getMonth(),now.getDate()); return dd; };
-    const planned = months.map(me => wps.filter(w => { const dd=pd(w.awarding_date); return dd && dd<=me; }).length);
-    const actual  = months.map(me => { if(me>now) return null; return wps.filter(w => { const dd=awd(w); return w.award_status==='Awarded' && dd && dd<=me; }).length; });
+    const sum = pred => wps.reduce((s,w)=> pred(w) ? s+valFn(w) : s, 0);
+    const plannedRaw = months.map(me => sum(w => { const dd=pd(w.awarding_date); return dd && dd<=me; }));
+    const actualRaw  = months.map(me => { if(me>now) return null; return sum(w => { const dd=awd(w); return w.award_status==='Awarded' && dd && dd<=me; }); });
     // Forecast (dashed, same red): continue the Actual line by projecting the not-yet-awarded WPs.
-    // Forecast award/completion date per not-awarded WP: PLANNED award date if still in the future
-    // (on-schedule); the NEXT month if OVERDUE (planned date already past) or no planned date —
-    // i.e. the backlog is assumed to be cleared starting next period. Anchored to the last Actual
-    // point so the dashed line joins the solid one and climbs toward 100% of WPs.
-    let lastActualIdx = -1; for (let i=0;i<actual.length;i++){ if(actual[i]!=null) lastActualIdx=i; }
-    const forecast = months.map(()=>null);
+    // PLANNED award date if still in the future (on-schedule); the NEXT month if OVERDUE or no
+    // planned date. Anchored to the last Actual point so the dashed line joins the solid one.
+    let lastActualIdx = -1; for (let i=0;i<actualRaw.length;i++){ if(actualRaw[i]!=null) lastActualIdx=i; }
+    const forecastRaw = months.map(()=>null);
     if (lastActualIdx >= 0) {
-      const anchor = actual[lastActualIdx];
+      const anchor = actualRaw[lastActualIdx];
       const nextME = months[Math.min(lastActualIdx+1, months.length-1)];
       const fdate = w => { const pa=pd(w.awarding_date); return (pa && pa>now) ? pa : nextME; };
-      for (let i=lastActualIdx;i<months.length;i++){ const me=months[i]; forecast[i]=anchor + wps.filter(w=>w.award_status!=='Awarded' && fdate(w)<=me).length; }
+      for (let i=lastActualIdx;i<months.length;i++){ const me=months[i]; forecastRaw[i]=anchor + sum(w=>w.award_status!=='Awarded' && fdate(w)<=me); }
     }
+    // Scale raw cumulative → display units: counts as-is; Budget → ₱M; Budget % → % of total.
+    const disp = mode==='budgetpct' ? (arr=>arr.map(v=>v==null?null:(totalRaw?+(v/totalRaw*100).toFixed(2):0)))
+               : mode==='budget'    ? (arr=>arr.map(v=>v==null?null:+(v/1e6).toFixed(3)))
+               : (arr=>arr);
+    const planned = disp(plannedRaw), actual = disp(actualRaw), forecast = disp(forecastRaw);
+    const yTitle  = mode==='budget' ? 'Cumulative Budget (₱M)' : mode==='budgetpct' ? 'Cumulative Budget %' : 'Cumulative WPs';
+    const suggMax = mode==='budgetpct' ? 100 : mode==='budget' ? +(totalRaw/1e6) : totalWP;
+    const yTick   = mode==='budget' ? (v=>_axM(v)) : mode==='budgetpct' ? (v=>v+'%') : undefined;
+    const tipVal  = mode==='budget' ? (v=>v==null?'—':_mAbbr(v))
+                  : mode==='budgetpct' ? (v=>v==null?'—':v+'%')
+                  : (v=>v==null?'—':v+' / '+totalWP+' WP');
     const labels = months.map(me => me.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
     const mob = _mob();
     make(id, { type:'line', data:{ labels, datasets:[
       { label:'Cumulative Planned', data:planned, borderColor:'#282C28', backgroundColor:'rgba(40,44,40,0.06)', fill:true, tension:.3, pointRadius:mob?0:2, borderWidth:2, order:2 },
       { label:'Cumulative Actual (Awarded)', data:actual, borderColor:'#EE3124', backgroundColor:'rgba(238,49,36,0.07)', fill:true, tension:.3, pointRadius:mob?0:2, borderWidth:2, spanGaps:false, order:1 },
       { label:'Forecast', data:forecast, borderColor:'#EE3124', borderDash:[6,4], fill:false, tension:.3, pointRadius:0, borderWidth:2, spanGaps:false, order:1 },
-    ]}, options:{ responsive:true, maintainAspectRatio:false, interaction:{ intersect:false, mode:'index' }, plugins:{ legend:{ position:'bottom', labels:{ font:{ size:mob?8:10 }, boxWidth:mob?10:12 } }, datalabels:{ display:false }, tooltip:{ callbacks:{ label:ctx=>` ${ctx.dataset.label}: ${ctx.raw==null?'—':ctx.raw} / ${total} WP` } } }, scales:{ x:{ grid:{ display:false }, ticks:{ font:{ size:mob?7:9 }, maxRotation:45, autoSkip:true, maxTicksLimit:mob?8:18 } }, y:{ beginAtZero:true, suggestedMax:total, ticks:{ font:{ size:mob?8:9 }, stepSize:1, precision:0 }, grid:{ color:'rgba(0,0,0,.05)' }, title:{ display:!mob, text:'Cumulative WPs', font:{ size:9 } } } } } });
+    ]}, options:{ responsive:true, maintainAspectRatio:false, interaction:{ intersect:false, mode:'index' }, plugins:{ legend:{ position:'bottom', labels:{ font:{ size:mob?8:10 }, boxWidth:mob?10:12 } }, datalabels:{ display:false }, tooltip:{ callbacks:{ label:ctx=>` ${ctx.dataset.label}: ${tipVal(ctx.raw)}` } } }, scales:{ x:{ grid:{ display:false }, ticks:{ font:{ size:mob?7:9 }, maxRotation:45, autoSkip:true, maxTicksLimit:mob?8:18 } }, y:{ beginAtZero:true, suggestedMax:suggMax, ticks:{ font:{ size:mob?8:9 }, stepSize: mode==='wp'?1:undefined, precision: mode==='wp'?0:undefined, callback: yTick }, grid:{ color:'rgba(0,0,0,.05)' }, title:{ display:!mob, text:yTitle, font:{ size:9 } } } } } });
   }
 
-  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpStatusDonutValue,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject,wpCountByPeriodMonthly,wpCountByPeriod,sCurve,expand,collapse,updateTheme};
+  return {statusByZone,awardingLeadTime,budgetVsContract,varianceTrend,scheduleTimeline,awardDonut,consolidatedBudget,budgetByTrade,awardRateByTrade,budgetAwardedByPeriod,budgetAwardedByPeriodMonthly,wpByTrade,wpStatusDonut,wpStatusDonutValue,wpSubmittalDonut,wpByPeriodQuarterly,wpAgingBuckets,budgetByTradeHBar,budgetByPeriodPerTrade,budgetByTradeDonut,awardedByTradeDonut,budgetAwardedByProject,wpCountByPeriodMonthly,wpCountByPeriod,sCurve,expand,collapse,resize,updateTheme};
 })();
