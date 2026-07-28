@@ -354,6 +354,11 @@ const Charts = (() => {
   // SHARE of the project's total budget (bars; no cumulative lines). budgetData/awardedData come in
   // already ÷1e6, so the ₱M cancels in the ratio.
   function _periodSharePct(id, labels, budgetData, awardedData){
+    // Drop trailing empty periods (the forecast-axis extension appends the current + next
+    // period, which have no budget in this mode — they'd show as stray 0% bars on the right).
+    let end = budgetData.length;
+    while (end > 1 && !(budgetData[end-1] > 0) && !(awardedData[end-1] > 0)) end--;
+    if (end < budgetData.length) { labels = labels.slice(0,end); budgetData = budgetData.slice(0,end); awardedData = awardedData.slice(0,end); }
     const totB = budgetData.reduce((s,v)=>s+v,0) || 1;
     const bPct = budgetData.map(v=>+(v/totB*100).toFixed(2));
     const aPct = awardedData.map(v=>+(v/totB*100).toFixed(2));
