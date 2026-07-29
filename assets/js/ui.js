@@ -248,6 +248,65 @@ function initExpandableCharts() {
   });
 }
 
+/* ── Top 5 KPI card expander ──────────────────────────────────────────
+   The three Top-5 cards sit side-by-side, so a card's table is cramped. Clicking a
+   card's title EXPANDS that whole card to (almost) the full row width so the whole
+   table reads at a glance; the other two shrink to slim ~128px cards (title only,
+   table hidden). Click the expanded card again to return to 3-up. Collapsed titles
+   stay HORIZONTAL (an earlier version rotated them vertically — a long title then
+   forced a huge row height). Widths set inline (!important) so they beat the cards'
+   own inline `flex:`. Desktop only; mobile already stacks the cards full-width. ── */
+function initTop5Accordion() {
+  const mq = window.matchMedia('(min-width: 768px)');
+  document.querySelectorAll('.top5-row').forEach(row => {
+    if (row.dataset.t5Init) return;
+    row.dataset.t5Init = '1';
+    const cards = Array.from(row.children).filter(c => c.classList.contains('panel'));
+    if (cards.length < 2) return;
+    cards.forEach(c => { c.dataset.t5Flex = c.style.flex || ''; c.dataset.t5MinW = c.style.minWidth || ''; });
+    const reset = () => {
+      row.classList.remove('t5-active');
+      cards.forEach(c => {
+        c.classList.remove('t5-expanded', 't5-collapsed');
+        c.style.flex = c.dataset.t5Flex;
+        c.style.minWidth = c.dataset.t5MinW;
+        const ic = c.querySelector('.t5-caret');
+        if (ic) ic.className = 'ti ti-arrows-diagonal t5-caret';
+      });
+    };
+    cards.forEach(card => {
+      const title = card.querySelector('.panel-title');
+      if (!title) return;
+      title.classList.add('t5-title');
+      title.setAttribute('title', 'Click to expand this card and read the full table');
+      if (!title.querySelector('.t5-caret')) {
+        const ic = document.createElement('i');
+        ic.className = 'ti ti-arrows-diagonal t5-caret';
+        title.appendChild(ic);
+      }
+      title.addEventListener('click', () => {
+        if (!mq.matches) return;                       // mobile already stacks cards full-width
+        const wasExpanded = card.classList.contains('t5-expanded');
+        reset();
+        if (!wasExpanded) {
+          row.classList.add('t5-active');
+          card.classList.add('t5-expanded');
+          card.style.setProperty('flex', '1 1 100%', 'important');
+          card.style.setProperty('min-width', '0', 'important');
+          cards.forEach(c => {
+            if (c === card) return;
+            c.classList.add('t5-collapsed');
+            c.style.setProperty('flex', '0 0 128px', 'important');
+            c.style.setProperty('min-width', '128px', 'important');
+          });
+          const ic = card.querySelector('.t5-caret');
+          if (ic) ic.className = 'ti ti-arrows-diagonal-minimize-2 t5-caret';
+        }
+      });
+    });
+  });
+}
+
 /* ── AppTheme — dark / light mode ──────────────────────────────────────
    Stores preference in localStorage:
      wpm_theme_{userId}  — per-user authoritative preference

@@ -366,7 +366,7 @@ const Charts = (() => {
     make(id,{type:'bar',data:{labels,datasets:[
       {label:'Budget (BCB) %',data:bPct,backgroundColor:'#282C28',borderRadius:3},
       {label:'Awarded %',data:aPct,backgroundColor:'#EE3124',borderRadius:3},
-    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:mob?{display:false}:_dlBar(v=>v>0?v.toFixed(1)+'%':'','v'),tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.raw==null?'—':ctx.raw+'%'}`}}},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{beginAtZero:true,ticks:{font:{size:mob?8:9},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'% of total budget',font:{size:9}}}}}});
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:mob?{display:false}:_dlTidy(v=>v>0?v.toFixed(1)+'%':'',{'Budget (BCB) %':'#231F20','Awarded %':'#EE3124'}),tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.raw==null?'—':ctx.raw+'%'}`}}},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{beginAtZero:true,ticks:{font:{size:mob?8:9},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'% of total budget',font:{size:9}}}}}});
   }
   function budgetAwardedByPeriodMonthly(id, wps, opts){
     // Awarded amount is placed by its actual award date, falling back to the PLANNED award date when
