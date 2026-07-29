@@ -270,6 +270,7 @@ function initTop5Accordion() {
         c.classList.remove('t5-expanded', 't5-collapsed');
         c.style.flex = c.dataset.t5Flex;
         c.style.minWidth = c.dataset.t5MinW;
+        c.style.width = '';
         c.style.order = '';
         const ic = c.querySelector('.t5-caret');
         if (ic) ic.className = 'ti ti-arrows-diagonal t5-caret';
@@ -306,8 +307,9 @@ function initTop5Accordion() {
             c.classList.add('t5-collapsed');
             // Compact fixed-width chips (sized to fit the title, not the whole row) sitting at the
             // top-left; the expanded card (basis 100%) wraps to its own full-width row below.
-            c.style.setProperty('flex', '0 0 210px', 'important');
-            c.style.setProperty('min-width', '210px', 'important');
+            c.style.setProperty('flex', '0 0 auto', 'important');
+            c.style.setProperty('min-width', 'auto', 'important');
+            c.style.setProperty('width', 'auto', 'important');
             c.style.order = '1';
           });
           const ic = card.querySelector('.t5-caret');
