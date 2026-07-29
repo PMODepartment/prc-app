@@ -283,6 +283,7 @@
                 <button id="dash-btn-count" onclick="setDashDataMode('count')" class="seg-btn active"># WPs</button>
                 <button id="dash-btn-budget" onclick="setDashDataMode('budget')" class="seg-btn">Budget</button>
                 <button id="dash-btn-budgetpct" onclick="setDashDataMode('budgetpct')" class="seg-btn">Budget %</button>
+                <button id="dash-btn-countpct" onclick="setDashDataMode('countpct')" class="seg-btn"># WPs %</button>
               </div>
             </div>
             <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-dash-period"></canvas></div>
@@ -309,12 +310,12 @@
           <!-- Charts first -->
           <div class="grid-2" style="margin-bottom:14px">
             <div class="panel">
-              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Aging</div>
-              <div style="position:relative;height:200px"><canvas id="c-backlog-aging"></canvas></div>
-            </div>
-            <div class="panel">
               <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
               <div style="position:relative;height:200px"><canvas id="c-wp-status-bl"></canvas></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><i class="ti ti-chart-bar"></i>Work Package by Aging</div>
+              <div style="position:relative;height:200px"><canvas id="c-backlog-aging"></canvas></div>
             </div>
           </div>
           <div class="grid-2">
@@ -1485,6 +1486,7 @@ function renderOverview(){
 let _dashPeriodMode = 'monthly';
 let _dashDataMode = 'count';   // default to # WPs (user preference); Budget is the alternate
 let _blPeriodMode = 'quarterly';
+let _blDataMode = 'count';   // default # WPs
 
 function setDashPeriodMode(mode) {
   _dashPeriodMode = mode;
@@ -1493,13 +1495,29 @@ function setDashPeriodMode(mode) {
   renderDashPeriod(allWPs);
 }
 
+// Backlog period chart: mode (Quarterly/Monthly) × data (# WPs / Budget / Budget % / # WPs %).
+function _blRenderPeriod(wps){
+  const monthly = _blPeriodMode==='monthly';
+  if(_blDataMode==='count'){
+    monthly ? Charts.wpCountByPeriodMonthly('c-backlog-period', wps) : Charts.wpCountByPeriod('c-backlog-period', wps);
+  } else if(_blDataMode==='countpct'){
+    monthly ? Charts.wpCountByPeriodMonthly('c-backlog-period', wps, {countPct:true}) : Charts.wpCountByPeriod('c-backlog-period', wps, {countPct:true});
+  } else if(_blDataMode==='budgetpct'){
+    monthly ? Charts.budgetAwardedByPeriodMonthly('c-backlog-period', wps, {sharePct:true,hideAwarded:true}) : Charts.budgetAwardedByPeriod('c-backlog-period', wps, {sharePct:true,hideAwarded:true});
+  } else {
+    monthly ? Charts.budgetAwardedByPeriodMonthly('c-backlog-period', wps, {hideAwarded:true}) : Charts.budgetAwardedByPeriod('c-backlog-period', wps, {hideAwarded:true});
+  }
+}
+window.setBlDataMode = function(mode){
+  _blDataMode = mode;
+  ['count','budget','budgetpct','countpct'].forEach(m => _segBtn(document.getElementById('bl-dm-'+m), m===mode));
+  _blRenderPeriod(allWPs.filter(w=>w.award_status!=='Awarded'));
+};
 function setBlPeriodMode(mode) {
   _blPeriodMode = mode;
-  (function(_e){ _e.className='seg-btn'; _e.classList.toggle('active', mode==='quarterly'); _e.setAttribute('aria-pressed', String(!!(mode==='quarterly'))); })(document.getElementById('bl-btn-quarterly'));
-  (function(_e){ _e.className='seg-btn'; _e.classList.toggle('active', mode==='monthly'); _e.setAttribute('aria-pressed', String(!!(mode==='monthly'))); })(document.getElementById('bl-btn-monthly'));
-  const notAwarded = allWPs.filter(w=>w.award_status!=='Awarded');
-  if(mode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-backlog-period', notAwarded, {hideAwarded:true});
-  else Charts.budgetAwardedByPeriod('c-backlog-period', notAwarded, {hideAwarded:true});
+  _segBtn(document.getElementById('bl-btn-quarterly'), mode==='quarterly');
+  _segBtn(document.getElementById('bl-btn-monthly'), mode==='monthly');
+  _blRenderPeriod(allWPs.filter(w=>w.award_status!=='Awarded'));
 }
 
 function renderDashPeriod(wps) {
@@ -1508,6 +1526,10 @@ function renderDashPeriod(wps) {
     if(titleEl) titleEl.textContent = 'Work Packages by Period — Planned vs Actual';
     if(_dashPeriodMode==='monthly') Charts.wpCountByPeriodMonthly('c-dash-period', wps);
     else Charts.wpCountByPeriod('c-dash-period', wps);
+  } else if(_dashDataMode === 'countpct') {
+    if(titleEl) titleEl.textContent = 'Work Packages by Period — % of Total WPs';
+    if(_dashPeriodMode==='monthly') Charts.wpCountByPeriodMonthly('c-dash-period', wps, {countPct:true});
+    else Charts.wpCountByPeriod('c-dash-period', wps, {countPct:true});
   } else if(_dashDataMode === 'budgetpct') {
     if(titleEl) titleEl.textContent = 'Budget & Awarded by Period — % of Total Budget';
     if(_dashPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-dash-period', wps, {sharePct:true});
@@ -1525,10 +1547,11 @@ const _dashBtnStyle = (active) => active
 
 window.setDashDataMode = function(mode) {
   _dashDataMode = mode;
-  const bBud = document.getElementById('dash-btn-budget'), bCnt = document.getElementById('dash-btn-count'), bPct = document.getElementById('dash-btn-budgetpct');
+  const bBud = document.getElementById('dash-btn-budget'), bCnt = document.getElementById('dash-btn-count'), bPct = document.getElementById('dash-btn-budgetpct'), bCPct = document.getElementById('dash-btn-countpct');
   if(bBud) _segBtn(bBud, mode==='budget');
   if(bCnt) _segBtn(bCnt, mode==='count');
   if(bPct) _segBtn(bPct, mode==='budgetpct');
+  if(bCPct) _segBtn(bCPct, mode==='countpct');
   renderDashPeriod(allWPs);
 };
 
@@ -1726,8 +1749,7 @@ function renderBacklog(){
   // Charts (use all not-awarded before search filter for accuracy)
   Charts.wpAgingBuckets('c-backlog-aging', notAwarded, projId||'Project');
   Charts.wpStatusDonut('c-wp-status-bl', notAwarded);
-  if(_blPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-backlog-period', notAwarded, {hideAwarded:true});
-  else Charts.budgetAwardedByPeriod('c-backlog-period', notAwarded, {hideAwarded:true});
+  _blRenderPeriod(notAwarded);
   Charts.wpSubmittalDonut('c-backlog-submittal', allWPs);
 
   // Group by trade first, then sort within each group by selected option

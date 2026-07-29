@@ -201,6 +201,7 @@
                 <button id="idx-dash-btn-count" onclick="setIdxDashDataMode('count')" class="seg-btn active"># WPs</button>
                 <button id="idx-dash-btn-budget" onclick="setIdxDashDataMode('budget')" class="seg-btn">Budget</button>
                 <button id="idx-dash-btn-budgetpct" onclick="setIdxDashDataMode('budgetpct')" class="seg-btn">Budget %</button>
+                <button id="idx-dash-btn-countpct" onclick="setIdxDashDataMode('countpct')" class="seg-btn"># WPs %</button>
               </div>
             </div>
             <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-idx-dash-period"></canvas></div>
@@ -1261,6 +1262,10 @@
         if(titleEl) titleEl.textContent = 'Work Packages by Period — Planned vs Actual';
         if(_idxDashPeriodMode==='monthly') Charts.wpCountByPeriodMonthly('c-idx-dash-period', wps);
         else Charts.wpCountByPeriod('c-idx-dash-period', wps);
+      } else if(_idxDashDataMode === 'countpct') {
+        if(titleEl) titleEl.textContent = 'Work Packages by Period — % of Total WPs';
+        if(_idxDashPeriodMode==='monthly') Charts.wpCountByPeriodMonthly('c-idx-dash-period', wps, {countPct:true});
+        else Charts.wpCountByPeriod('c-idx-dash-period', wps, {countPct:true});
       } else if(_idxDashDataMode === 'budgetpct') {
         if(titleEl) titleEl.textContent = 'Budget & Awarded by Period — % of Total Budget';
         if(_idxDashPeriodMode==='monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-dash-period', wps, {sharePct:true});
@@ -1287,10 +1292,11 @@
 
     window.setIdxDashDataMode = function(mode) {
       _idxDashDataMode = mode;
-      const bBud = document.getElementById('idx-dash-btn-budget'), bCnt = document.getElementById('idx-dash-btn-count'), bPct = document.getElementById('idx-dash-btn-budgetpct');
+      const bBud = document.getElementById('idx-dash-btn-budget'), bCnt = document.getElementById('idx-dash-btn-count'), bPct = document.getElementById('idx-dash-btn-budgetpct'), bCPct = document.getElementById('idx-dash-btn-countpct');
       if(bBud) _segBtn(bBud, mode==='budget');
       if(bCnt) _segBtn(bCnt, mode==='count');
       if(bPct) _segBtn(bPct, mode==='budgetpct');
+      if(bCPct) _segBtn(bCPct, mode==='countpct');
       if(_lastWPs) _idxDashRenderPeriod(_lastWPs);
     };
 
