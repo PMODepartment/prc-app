@@ -292,10 +292,10 @@ function initTop5Accordion() {
         if (!wasExpanded) {
           row.classList.add('t5-active');
           card.classList.add('t5-expanded');
-          // Master–detail: collapsed cards grouped at the top-left (order 1, fixed 128px),
-          // expanded card FILLS the remaining width on the right (flex-grow, basis 0 so it
-          // doesn't force a wrap the way basis:100% did). order 2 keeps it last / on the right.
-          card.style.setProperty('flex', '1 1 0%', 'important');
+          // Collapsed cards group on TOP (order 1, uniform chips); the expanded card takes its
+          // own FULL-WIDTH row below them (basis 100% forces the wrap) so there's no dead space
+          // beside it. order 2 keeps it after the collapsed chips.
+          card.style.setProperty('flex', '1 1 100%', 'important');
           card.style.setProperty('min-width', '0', 'important');
           card.style.order = '2';
           cards.forEach(c => {
