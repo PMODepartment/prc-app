@@ -285,8 +285,11 @@ function initTop5Accordion() {
         ic.className = 'ti ti-arrows-diagonal t5-caret';
         title.appendChild(ic);
       }
-      title.addEventListener('click', () => {
+      // The WHOLE card is clickable (not just the title) so a collapsed chip toggles wherever you
+      // click it. Guard: clicking a WP row inside the EXPANDED table opens its detail panel instead.
+      card.addEventListener('click', (e) => {
         if (!mq.matches) return;                       // mobile already stacks cards full-width
+        if (card.classList.contains('t5-expanded') && e.target.closest && e.target.closest('.rank-list')) return;
         const wasExpanded = card.classList.contains('t5-expanded');
         reset();
         if (!wasExpanded) {
@@ -301,11 +304,10 @@ function initTop5Accordion() {
           cards.forEach(c => {
             if (c === card) return;
             c.classList.add('t5-collapsed');
-            // Collapsed chips GROW to share the top row equally (flex:1, basis 0) so they fill the
-            // full width — no dead space beside them. The expanded card's basis:100% wraps it to
-            // the next row, leaving the collapsed chips alone on the top row to split it.
-            c.style.setProperty('flex', '1 1 0%', 'important');
-            c.style.setProperty('min-width', '0', 'important');
+            // Compact fixed-width chips (sized to fit the title, not the whole row) sitting at the
+            // top-left; the expanded card (basis 100%) wraps to its own full-width row below.
+            c.style.setProperty('flex', '0 0 210px', 'important');
+            c.style.setProperty('min-width', '210px', 'important');
             c.style.order = '1';
           });
           const ic = card.querySelector('.t5-caret');
