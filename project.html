@@ -379,11 +379,6 @@
               <option value="Awarded">Awarded</option>
               <option value="Not Yet Awarded">Not Yet Awarded</option>
             </select>
-            <select id="f-osm" style="flex-shrink:0" onchange="applyWpListFilters()">
-              <option value="all">OSM: All</option>
-              <option value="Yes">OSM: Yes</option>
-              <option value="No">OSM: No</option>
-            </select>
             <select id="f-trade" style="flex-shrink:0"><option value="all">All trades</option></select>
             <div class="msf" id="msf-works" style="flex-shrink:0">
               <button type="button" class="msf-btn" onclick="msfToggle('works')"><span id="msf-works-label">All Works</span><i class="ti ti-chevron-down"></i></button>
@@ -399,78 +394,11 @@
             </div>
           </div>
 
-          <!-- Filtered analysis: totals + budget/awarded over a monthly/quarterly timeline (cumulative incl.) -->
-          <div class="panel cost-only" id="pwa-analysis" style="margin-bottom:12px">
-            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <span><i class="ti ti-chart-bar"></i>Filtered Analysis — Budget &amp; Awarded by Period</span>
-              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-                <div style="display:flex;gap:4px;align-items:center">
-                  <span style="font-size:0.7143rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em">From</span>
-                  <select id="pwa-from" onchange="onPwaFilterChange()" style="font-size:0.7143rem;padding:3px 8px;border-radius:5px;border:1.5px solid var(--border-md);background:var(--surface-2);color:var(--text-primary);font-family:inherit;font-weight:600;cursor:pointer"><option value="all">Earliest</option></select>
-                  <span style="font-size:0.7143rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em">To</span>
-                  <select id="pwa-to" onchange="onPwaFilterChange()" style="font-size:0.7143rem;padding:3px 8px;border-radius:5px;border:1.5px solid var(--border-md);background:var(--surface-2);color:var(--text-primary);font-family:inherit;font-weight:600;cursor:pointer"><option value="all">Latest</option></select>
-                </div>
-                <div style="width:1px;height:18px;background:var(--border-md)"></div>
-                <div style="display:flex;gap:4px">
-                  <button id="pwa-btn-monthly" onclick="setPwaPeriodMode('monthly')" class="seg-btn active">Monthly</button>
-                  <button id="pwa-btn-quarterly" onclick="setPwaPeriodMode('quarterly')" class="seg-btn">Quarterly</button>
-                </div>
-                <div style="width:1px;height:18px;background:var(--border-md)"></div>
-                <div style="display:flex;gap:4px">
-                  <button id="pwa-btn-budget" onclick="setPwaDataMode('budget')" class="seg-btn active">Budget</button>
-                  <button id="pwa-btn-count" onclick="setPwaDataMode('count')" class="seg-btn"># WPs</button>
-                </div>
-                <div style="width:1px;height:18px;background:var(--border-md)"></div>
-                <div style="display:flex;gap:4px">
-                  <button id="pwa-btn-chart" onclick="setPwaViewMode('chart')" class="seg-btn active"><i class="ti ti-chart-bar" style="font-size:0.7857rem"></i> Chart</button>
-                  <button id="pwa-btn-table" onclick="setPwaViewMode('table')" class="seg-btn"><i class="ti ti-table" style="font-size:0.7857rem"></i> Table</button>
-                </div>
-              </div>
-            </div>
-            <div id="pwa-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-              <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border-md);border-radius:8px;padding:9px 12px">
-                <div style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888">Work Packages</div>
-                <div id="pwa-sum-count" style="font-size:1.2857rem;font-weight:800;color:#231F20;margin-top:2px">0</div>
-              </div>
-              <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border-md);border-radius:8px;padding:9px 12px">
-                <div style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888">Total Budget (BCB)</div>
-                <div id="pwa-sum-budget" style="font-size:1.2857rem;font-weight:800;color:#231F20;margin-top:2px">—</div>
-              </div>
-              <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border-md);border-radius:8px;padding:9px 12px">
-                <div style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888">Total Awarded</div>
-                <div id="pwa-sum-awarded" style="font-size:1.2857rem;font-weight:800;color:#2D9B6F;margin-top:2px">—</div>
-              </div>
-              <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border-md);border-radius:8px;padding:9px 12px">
-                <div style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888">Total to be Awarded</div>
-                <div id="pwa-sum-tba" style="font-size:1.2857rem;font-weight:800;color:#D97706;margin-top:2px">—</div>
-              </div>
-            </div>
-            <div id="pwa-chart-wrap" class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-pwa-period"></canvas></div>
-            <div id="pwa-table-wrap" style="display:none;overflow-x:auto;max-height:340px;overflow-y:auto">
-              <table class="data-table" id="pwa-period-table" style="font-size:0.7857rem;width:100%">
-                <thead id="pwa-period-thead"></thead>
-                <tbody id="pwa-period-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Quick Status Tracker — inline-edit Award / Procurement / Delivery status per WP -->
-          <div class="panel" id="status-tracker" style="margin-bottom:14px">
-            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <span><i class="ti ti-list-check"></i> Work Package Status Tracker <span id="st-new-badge" style="display:none;background:#EE3124;color:#fff;font-size:0.7143rem;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:10px;vertical-align:middle;margin-left:4px">NEW</span></span>
-              <span id="status-tracker-hint" style="font-size:0.7857rem;font-weight:400;color:#888">Update Award, Procurement &amp; Delivery status inline. Reflects current filters.</span>
-            </div>
-            <div id="st-new-callout" style="display:none;background:var(--mw-red-light,#FDECEA);border:1px solid var(--mw-red-mid,#F9C8C5);border-radius:8px;padding:9px 12px;margin:2px 0 10px;font-size:0.8571rem;color:var(--mw-red-dark,#C42127);display:none;align-items:center;gap:9px">
-              <i class="ti ti-sparkles" style="font-size:1.1429rem;flex-shrink:0"></i>
-              <span style="flex:1"><strong>Tip:</strong> change Award, Procurement or Delivery status right here — no need to open the full form. Setting Procurement to <strong>Awarded</strong> prompts for the cost &amp; vendor.</span>
-              <button onclick="dismissStNew()" style="background:none;border:none;color:var(--mw-red-dark,#C42127);cursor:pointer;font-weight:700;font-size:0.7857rem;white-space:nowrap">Got it</button>
-            </div>
-            <div style="overflow-x:auto;max-height:360px;overflow-y:auto">
-              <table class="data-table" id="status-tracker-table" style="font-size:0.7857rem;width:100%;min-width:640px">
-                <thead id="status-tracker-thead"></thead>
-                <tbody id="status-tracker-tbody"></tbody>
-              </table>
-            </div>
+          <!-- Filtered Analysis lives on the Overview + Portfolio; Status is edited inline
+               in the table below (Procurement & Delivery are dropdowns). -->
+          <div class="hint-sm" id="wplist-edit-hint" style="margin:2px 2px 10px;display:flex;align-items:center;gap:6px">
+            <i class="ti ti-list-check" style="color:#EE3124"></i>
+            <span>Set <b>Procurement</b> &amp; <b>Delivery</b> status inline in the Overview columns — Award Status follows Procurement.</span>
           </div>
 
           <div class="panel" style="padding:0">
@@ -637,6 +565,7 @@ const COLS=[
   {key:'submittal_doc_type', label:'Type of Submittal', w:'120px'},
   {key:'procurement_status', label:'Procurement Status', w:'120px'},
   {key:'award_status',     label:'Award Status',       w:'110px'},
+  {key:'delivery_status',  label:'Delivery Status',    w:'150px'},
   {key:'remarks',          label:'Remarks',            w:'150px'},
 ];
 
@@ -714,11 +643,11 @@ async function exportProjectExcel(){
 
 let _wpTableView = 'overview';
 const WP_TABLE_VIEWS = {
-  overview:   {keys:new Set(['cost_code','wp_no','works','description','scope','proposed_vendors','procurement_status','award_status','remarks'])},
+  overview:   {keys:new Set(['cost_code','wp_no','works','description','scope','proposed_vendors','procurement_status','delivery_status','award_status','remarks'])},
   financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount']), cost:true},
   schedule:   {keys:new Set(['cost_code','wp_no','description','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion'])},
   submittals: {keys:new Set(['cost_code','wp_no','description','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
-  all:        {keys:new Set(['cost_code','wp_no','description','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion','approver_name','approval_date','submittal_doc_type','procurement_status','award_status','remarks']), cost:true},
+  all:        {keys:new Set(['cost_code','wp_no','description','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion','approver_name','approval_date','submittal_doc_type','procurement_status','delivery_status','award_status','remarks']), cost:true},
 };
 function getActiveCols() {
   const v = WP_TABLE_VIEWS[_wpTableView] || WP_TABLE_VIEWS.overview;
@@ -944,7 +873,7 @@ function switchView(v) {
   }
   if(v==='overview') { if(!_rendered.overview){renderOverview();_rendered.overview=true;} }
   else if(v==='backlog') { if(!_rendered.backlog){renderBacklog();_rendered.backlog=true;} }
-  else if(v==='table') { buildTable(); renderPwaAnalysis(); renderStatusTracker(); }
+  else if(v==='table') { buildTable(); }
   else if(v==='claims-register' || v==='claims' || v==='change-orders') { renderClaimsRegisterKPIs(); renderClaimsRegister(); }
 }
 
@@ -1004,7 +933,7 @@ window.dbnc = function(key, fn, ms){ clearTimeout(_dbT[key]); _dbT[key] = setTim
 function applyWpListFilters(){
   curPage=1;
   Object.keys(_rendered).forEach(k=>_rendered[k]=false);
-  if(currentView==='table'){ buildTable(); renderPwaAnalysis(); renderStatusTracker(); }
+  if(currentView==='table'){ buildTable(); }
   else switchView(currentView);
 }
 
@@ -1042,7 +971,7 @@ window.dismissStNew=function(){
   if(badge) badge.style.display='none';
   if(co) co.style.display='none';
 };
-function renderStatusTracker(){
+function renderStatusTracker(){ if(!document.getElementById('status-tracker-thead')) return;
   if(window.__isViewer) return;
   const thead=document.getElementById('status-tracker-thead'), tbody=document.getElementById('status-tracker-tbody');
   if(!thead||!tbody) return;
@@ -1092,7 +1021,12 @@ async function _stSaveFields(id, fields, sel, onErrRevert){
     try{ Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx')).forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
     _stToast(autoApprove ? 'Saved' : 'Submitted for approval');
     Object.keys(_rendered).forEach(k=>_rendered[k]=false);
+    // Preserve the table's scroll position — the edit happens inline in this same table now.
+    const _tw = document.querySelector('#view-table .wp-table-wrap');
+    const _sl = _tw ? _tw.scrollLeft : 0, _st = _tw ? _tw.scrollTop : 0;
     renderPwaAnalysis(); buildTable();
+    const _tw2 = document.querySelector('#view-table .wp-table-wrap');
+    if(_tw2){ _tw2.scrollLeft = _sl; _tw2.scrollTop = _st; }
     return true;
   }catch(e){
     if(onErrRevert) onErrRevert();
@@ -1274,8 +1208,10 @@ window.msfOnToggle=function(field,cb){ const val=cb.closest('.msf-opt').getAttri
 window.msfToggle=function(field){ const box=document.getElementById('msf-'+field); const wasOpen=box.classList.contains('open'); document.querySelectorAll('.msf.open').forEach(b=>b.classList.remove('open')); if(!wasOpen) box.classList.add('open'); };
 document.addEventListener('click', e=>{ if(!e.target.closest('.msf')) document.querySelectorAll('.msf.open').forEach(b=>b.classList.remove('open')); });
 
-// OSM filter (Yes/No). Legacy rows without an osm value are treated as "No".
-function _osmMatch(w){ const o=document.getElementById('f-osm')?.value||'all'; if(o==='all')return true; const isY=(w.osm==='Yes'); return o==='Yes'?isY:!isY; }
+// OSM removed from the dashboard (2026-07-23). Kept as a no-op so existing call sites and
+// the DB column / WP form are undisturbed.
+function _osmMatch(w){ return true; }
+function _osmMatchDead(w){ const o='all'; if(o==='all')return true; const isY=(w.osm==='Yes'); return o==='Yes'?isY:!isY; }
 function getFiltered(){
   const st=document.getElementById('f-status').value;
   const tr=document.getElementById('f-trade').value;
@@ -2059,7 +1995,7 @@ window.setPwaViewMode = function(v){
   if(tw) tw.style.display=v==='table'?'':'none';
   renderPwaAnalysis();
 };
-function renderPwaAnalysis(){
+function renderPwaAnalysis(){ if(!document.getElementById('pwa-summary')) return;
   if(window.__isViewer) return;
   const all=_pwaFilteredWPs();
   _populatePwaFilters(all);
@@ -2233,8 +2169,13 @@ function buildTable(){
       case 'approver_name': return `<td>${esc(wp.approver_name)||'—'}</td>`;
       case 'approval_date': return `<td>${fmtDate(wp.approval_date)}</td>`;
       case 'submittal_doc_type': return `<td>${wp.submittal_doc_type||'—'}</td>`;
-      case 'procurement_status': return `<td style="font-size:0.7857rem;color:#555">${esc(wp.procurement_status)||'—'}</td>`;
-      case 'award_status': return `<td><span style="font-size:0.7143rem;font-weight:700;padding:2px 7px;border-radius:10px;background:${sc}22;color:${sc}">${statusLabel(wp.award_status)}</span></td>`;
+      case 'procurement_status': return (!window.__isViewer && !window.__archived)
+        ? `<td style="min-width:120px">${_stSelect(wp.id,'procurement_status',ST_PROC_OPTS,wp.procurement_status)}</td>`
+        : `<td style="font-size:0.7857rem;color:#555">${esc(wp.procurement_status)||'—'}</td>`;
+      case 'delivery_status': return (!window.__isViewer && !window.__archived)
+        ? `<td style="min-width:150px">${_stSelect(wp.id,'delivery_status',ST_DELIV_OPTS,wp.delivery_status)}</td>`
+        : `<td style="font-size:0.7857rem;color:#555">${esc(wp.delivery_status)||'—'}</td>`;
+      case 'award_status': return `<td>${_stAwardBadge(wp.id, wp.award_status)}</td>`;
       case 'remarks': return `<td style="font-size:0.7143rem;color:#888;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(wp.remarks)}">${esc(wp.remarks)||'—'}</td>`;
       default: return '<td>—</td>';
     }
@@ -2560,7 +2501,7 @@ AppAuth.requireLogin(async (user, profile) => {
     ];
     if (!_cv) _cs.push({ sel:'#metrics-cost', title:'Cost overview', body:'Headline cost figures — <b>hover any label</b> for its definition.', before:_ov });
     if (!_cv) _cs.push({ sel:'#add-wp-link', title:'Add a work package', body:'Add a single WP here, or use <b>Import from CSV</b> (in Tools) to add many at once.' });
-    _cs.push({ sel:'#f-status', title:'Filter the WP List', body:'Filter by status, <b>OSM</b>, trade, works, vendor or search to find work packages fast.', before:_tb });
+    _cs.push({ sel:'#f-status', title:'Filter the WP List', body:'Filter by status, trade, works, vendor or search to find work packages fast.', before:_tb });
     if (!_cv) _cs.push({ sel:'#status-tracker', title:'Work Package Status Tracker', body:'Update <b>Award, Procurement &amp; Delivery</b> status inline. Setting Procurement to <b>Awarded</b> prompts for the awarded cost &amp; vendor.', before:_tb });
     CoachTour.configure({ key:'coach_project', steps:_cs });
     CoachTour.maybeAutoStart();
