@@ -301,8 +301,8 @@ function initTop5Accordion() {
           cards.forEach(c => {
             if (c === card) return;
             c.classList.add('t5-collapsed');
-            c.style.setProperty('flex', '0 0 128px', 'important');
-            c.style.setProperty('min-width', '128px', 'important');
+            c.style.setProperty('flex', '0 0 150px', 'important');
+            c.style.setProperty('min-width', '150px', 'important');
             c.style.order = '1';
           });
           const ic = card.querySelector('.t5-caret');
