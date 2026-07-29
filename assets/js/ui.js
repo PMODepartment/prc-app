@@ -301,8 +301,11 @@ function initTop5Accordion() {
           cards.forEach(c => {
             if (c === card) return;
             c.classList.add('t5-collapsed');
-            c.style.setProperty('flex', '0 0 150px', 'important');
-            c.style.setProperty('min-width', '150px', 'important');
+            // Collapsed chips GROW to share the top row equally (flex:1, basis 0) so they fill the
+            // full width — no dead space beside them. The expanded card's basis:100% wraps it to
+            // the next row, leaving the collapsed chips alone on the top row to split it.
+            c.style.setProperty('flex', '1 1 0%', 'important');
+            c.style.setProperty('min-width', '0', 'important');
             c.style.order = '1';
           });
           const ic = card.querySelector('.t5-caret');
