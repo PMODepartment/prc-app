@@ -270,6 +270,7 @@ function initTop5Accordion() {
         c.classList.remove('t5-expanded', 't5-collapsed');
         c.style.flex = c.dataset.t5Flex;
         c.style.minWidth = c.dataset.t5MinW;
+        c.style.order = '';
         const ic = c.querySelector('.t5-caret');
         if (ic) ic.className = 'ti ti-arrows-diagonal t5-caret';
       });
@@ -291,13 +292,18 @@ function initTop5Accordion() {
         if (!wasExpanded) {
           row.classList.add('t5-active');
           card.classList.add('t5-expanded');
-          card.style.setProperty('flex', '1 1 100%', 'important');
+          // Master–detail: collapsed cards grouped at the top-left (order 1, fixed 128px),
+          // expanded card FILLS the remaining width on the right (flex-grow, basis 0 so it
+          // doesn't force a wrap the way basis:100% did). order 2 keeps it last / on the right.
+          card.style.setProperty('flex', '1 1 0%', 'important');
           card.style.setProperty('min-width', '0', 'important');
+          card.style.order = '2';
           cards.forEach(c => {
             if (c === card) return;
             c.classList.add('t5-collapsed');
             c.style.setProperty('flex', '0 0 128px', 'important');
             c.style.setProperty('min-width', '128px', 'important');
+            c.style.order = '1';
           });
           const ic = card.querySelector('.t5-caret');
           if (ic) ic.className = 'ti ti-arrows-diagonal-minimize-2 t5-caret';
