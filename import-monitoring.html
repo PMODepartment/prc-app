@@ -95,7 +95,6 @@
         <b>Import rules applied:</b><br>
         • <b>Award status</b> — taken from the sheet's own <b>Remarks / Status</b> column ("Awarded" / "Not yet Awarded"). A work package that carries a <b>provisional cost</b> but is flagged Not yet Awarded stays <b>Not Yet Awarded</b> (the cost is still imported, but it can't inflate the awarded total or the savings).<br>
         • <b>Advance award dates</b> — a WP whose actual award date is in the <b>future</b> is imported as <b>Not Yet Awarded</b> (the advance date is ignored until it arrives).<br>
-        • <b>OSM</b> — every WP is <b>No</b> unless its Remarks mention "OSM".<br>
         • <b>Charging</b> — every WP is set to <b>Main Contract</b>.
       </div>
       <div class="detected" id="detected"></div>
@@ -548,7 +547,6 @@ function renderPreview(wps){
   if(_detected) showDetected(_detected);
   const awarded=wps.filter(w=>w.award_status==='Awarded').length;
   const future=wps.filter(w=>w._future).length;
-  const osm=wps.filter(w=>w.osm==='Yes').length;
   const noTrade=wps.filter(w=>!w.trade).length;
   // Rows carrying a cost that the sheet's own Remarks flag says are NOT awarded yet
   const held=wps.filter(w=>w._heldByFlag).length;
@@ -561,14 +559,14 @@ function renderPreview(wps){
   $('kpis').innerHTML=[
     ['Work packages',wps.length],['Awarded',awarded],['Not Yet Awarded',wps.length-awarded],
     ['Advance-dated → held',future],['Provisional cost, not awarded',held],
-    ['Awarded, no cost',awNoCost.length],['OSM = Yes',osm],['No trade',noTrade],['Total Budget (₱M)',(bud/1e6).toFixed(1)]
+    ['Awarded, no cost',awNoCost.length],['No trade',noTrade],['Total Budget (₱M)',(bud/1e6).toFixed(1)]
   ].map(k=>`<div class="kpi"><div class="v">${k[1]}</div><div class="l">${k[0]}</div></div>`).join('');
   if(awNoCost.length){
     log('Note: '+awNoCost.length+' work package(s) are flagged Awarded in the sheet but have no awarded cost (WP '
       + awNoCost.map(w=>w.wp_no).join(', ') + '). They import as Awarded, but the dashboard\'s awarded count and '
       + 'value exclude WPs without a cost — enter the awarded cost in the sheet (or in the app) to have them counted.','warnt');
   }
-  const cols=['wp_no','description','trade','procurement_status','award_status','approved_budget_bcb','awarded_cost','awarding_date','actual_awarding_date','target_completion','osm'];
+  const cols=['wp_no','description','trade','procurement_status','award_status','approved_budget_bcb','awarded_cost','awarding_date','actual_awarding_date','target_completion'];
   $('tbl').querySelector('thead').innerHTML='<tr>'+cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')+'</tr>';
   $('tbl').querySelector('tbody').innerHTML=wps.map(w=>'<tr>'+cols.map(c=>{
     let v=w[c]; if(c==='award_status') return `<td><span class="badge ${v==='Awarded'?'b-aw':'b-no'}">${v}</span></td>`;

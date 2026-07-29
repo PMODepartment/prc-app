@@ -138,7 +138,7 @@ ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS dp_notes text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS retention_period text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS awarding_status text DEFAULT NULL;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS purchase_request text DEFAULT NULL;
-ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS osm text DEFAULT 'No';   -- OSM flag (Yes/No). Column + WP-form field + importer RETAINED; the OSM FILTER was removed from both dashboard WP Lists (2026-07-23).
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS osm text DEFAULT 'No';   -- OSM flag (Yes/No). Column + WP-form field + importer RETAINED; the OSM FILTER was removed from both dashboard WP Lists (2026-07-23), and the OSM TAG was removed GLOBALLY from the UI (2026-07-24): the WP-form field (`f-osm`), the review-grid column, the importer's OSM rule bullet + KPI tile + preview column, and project.html's `_osmMatch` dead code. The DB column is UNTOUCHED — `wp-form` still saves `osm:'No'` and the importer still writes `osm` from Remarks, so existing rows and the column keep working; only the visible tag is gone.
 -- Per-WP audit trail ("last change" log) — see MIGRATION_wp_audit_trail.sql (also recreates wp_view_public)
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS updated_at timestamptz;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS updated_by uuid;
