@@ -1368,8 +1368,33 @@
       _renderIdxSchPeriodChart();
     };
 
+    // Viewers get no main tab bar — Overview/Backlog/Schedule/WP List (the non-money tabs)
+    // are shown stacked as labeled sections on one scrolling page instead of switched between.
+    const _VIEWER_TABS = ['overview','backlog','schedule','wplist'];
+    const _VIEWER_TAB_HEADS = { overview:['Overview','ti-layout-dashboard'], backlog:['Backlog','ti-clock'], schedule:['Schedule','ti-calendar'], wplist:['Work Packages','ti-table'] };
+    function _viewerSinglePage() {
+      ALL_TABS.forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        if (el) el.style.display = _VIEWER_TABS.includes(t) ? '' : 'none';
+      });
+      _VIEWER_TABS.forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        if (!el) return;
+        if (!el.dataset.vhead) {
+          const [label, icon] = _VIEWER_TAB_HEADS[t];
+          const h = document.createElement('div');
+          h.className = 'viewer-page-head';
+          h.innerHTML = `<i class="ti ${icon}"></i>${label}`;
+          el.insertBefore(h, el.firstChild);
+          el.dataset.vhead = '1';
+        }
+        if (!_rendered[t] && _lastWPs) { _renderTab(t, _lastWPs, _lastFilt, _lastStats); _rendered[t] = true; }
+      });
+    }
+
     window.switchTab = function(tab) {
-      if (window.__isViewer && (tab === 'budget' || tab === 'works')) tab = 'overview';   // money-only tabs hidden from viewers
+      // Viewers: no tab switching — everything is already stacked on one page.
+      if (window.__isViewer) { _viewerSinglePage(); return; }
       _activeTab = tab;
       ALL_TABS.forEach(t => {
         const el = document.getElementById('tab-' + t);
@@ -2640,9 +2665,9 @@
       filtWPs.filter(w=>!w.trade).sort((a,b)=>wpNumSort(a.wp_no,b.wp_no)).forEach(w=>_wpMonData.push(w));
       populateWPMonTradeFilter();
 
-      // Render the currently active tab immediately
-      _renderTab(_activeTab, filtWPs, filt, allStats);
-      _rendered[_activeTab] = true;
+      // Render the currently active tab immediately (viewers: render all stacked sections)
+      if (window.__isViewer) { _viewerSinglePage(); }
+      else { _renderTab(_activeTab, filtWPs, filt, allStats); _rendered[_activeTab] = true; }
     }
 
     // ══ CLAIMS TAB ═══════════════════════════════════════════════════
@@ -3041,6 +3066,16 @@
     .ov-wp-split { flex-direction:column; align-items:stretch; }
   }
 
+  /* Viewer single-page layout — drop the main Overview/Backlog/Budget/Schedule/Works/WP List
+     tab bar; the (viewer-relevant) tabs render stacked as sections on one page instead
+     (see _viewerSinglePage). Budget/Works stay hidden entirely for viewers (money-only). */
+  body.viewer-mode #view-tabs { display:none !important; }
+  .viewer-page-head { display:flex; align-items:center; gap:8px; font-size:1.0714rem; font-weight:800;
+    color:var(--text-primary,#231F20); text-transform:uppercase; letter-spacing:.03em;
+    margin:0 2px 14px; padding-bottom:8px; border-bottom:2px solid var(--mw-red); }
+  .viewer-page-head .ti { color:var(--mw-red); font-size:1.2857rem; }
+  #tab-backlog .viewer-page-head, #tab-schedule .viewer-page-head, #tab-wplist .viewer-page-head { margin-top:30px; }
+  body:not(.viewer-mode) .viewer-page-head { display:none; }
   /* Viewer mode — hide all cost data */
   body.viewer-mode #btn-export { display:none !important; }   /* cost data — viewers can't export */
   body.viewer-mode #metrics-cost-group { display:none !important; }
