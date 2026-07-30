@@ -855,6 +855,9 @@ function deliveryBadge(s){
 const _rendered = { overview: false, dashboard: false, backlog: false, table: false };
 
 function switchView(v) {
+  // Viewers get a single scrolling page (no main tabs) — Overview + Backlog + WP List
+  // are all shown stacked as sections. Ignore the requested tab and render everything.
+  if (window.__isViewer) { _viewerSinglePage(); return; }
   currentView = v;
   document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
   ['overview','backlog','table','claims-register'].forEach(id => {
@@ -870,6 +873,30 @@ function switchView(v) {
   else if(v==='backlog') { if(!_rendered.backlog){renderBacklog();_rendered.backlog=true;} }
   else if(v==='table') { buildTable(); }
   else if(v==='claims-register' || v==='claims' || v==='change-orders') { renderClaimsRegisterKPIs(); renderClaimsRegister(); }
+}
+
+// Viewer single-page mode — no main tabs. Overview, Backlog and WP List are shown stacked
+// on one page, each under a red section header. Renders all three (idempotent).
+const _VIEWER_PAGE_HEADS = { overview:['Overview','ti-layout-dashboard'], backlog:['Backlog','ti-clock-hour-4'], table:['Work Packages','ti-table'] };
+function _viewerSinglePage(){
+  currentView = 'table';   // keep the WP-List filter/search handlers (they gate on this) live
+  ['overview','backlog','table'].forEach(id=>{
+    const el=document.getElementById('view-'+id);
+    if(!el) return;
+    el.style.display='';
+    if(!el.dataset.vhead){
+      const [label,icon]=_VIEWER_PAGE_HEADS[id];
+      const h=document.createElement('div');
+      h.className='viewer-page-head';
+      h.innerHTML=`<i class="ti ${icon}"></i>${label}`;
+      el.insertBefore(h, el.firstChild);
+      el.dataset.vhead='1';
+    }
+  });
+  const cl=document.getElementById('view-claims-register'); if(cl) cl.style.display='none';
+  if(!_rendered.overview){ renderOverview(); _rendered.overview=true; }
+  if(!_rendered.backlog){ renderBacklog(); _rendered.backlog=true; }
+  buildTable();
 }
 
 // Sidebar project switcher list (filtered by the search box; current project highlighted)
@@ -3340,6 +3367,15 @@ AppAuth.requireLogin(async (user, profile) => {
   /* ── Viewer simplification — lighter, read-only-focused UI ── */
   /* The "set status inline" hint is meaningless to viewers (they can't edit) */
   body.viewer-mode #wplist-edit-hint { display:none !important; }
+  /* Single-page layout: drop the main Overview/Backlog/WP List tab bar — all three views
+     are shown stacked as sections (see _viewerSinglePage) under a red section header */
+  body.viewer-mode #view-tabs { display:none !important; }
+  .viewer-page-head { display:flex; align-items:center; gap:8px; font-size:1.0714rem; font-weight:800;
+    color:var(--text-primary,#231F20); text-transform:uppercase; letter-spacing:.03em;
+    margin:0 2px 14px; padding-bottom:8px; border-bottom:2px solid var(--mw-red); }
+  .viewer-page-head .ti { color:var(--mw-red); font-size:1.2857rem; }
+  #view-backlog .viewer-page-head, #view-table .viewer-page-head { margin-top:30px; }
+  body:not(.viewer-mode) .viewer-page-head { display:none; }
   /* WP List: replace the Overview/Schedule/Submittals tab switcher (and its paged single
      table / mobile cards / collapse-expand) with the three views stacked as read-only
      sections on one page (#viewer-wp-sections, rendered by renderViewerWpSections) */
