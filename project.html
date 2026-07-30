@@ -199,6 +199,9 @@
     </div>
 
     <div class="content" id="main-content-region" role="main" tabindex="-1">
+      <!-- Viewer single-page mode only: sticky section-jump nav, built by _viewerBuildNav.
+           Hidden by default; non-viewers never populate/see it. -->
+      <nav class="viewer-side-nav" id="viewer-side-nav" aria-label="Page sections"></nav>
       <!-- Skeleton of the real layout: 4 cost KPIs + status panel, then a chart and
            table rows. Shows the SHAPE of what is loading instead of a bare spinner —
            the Supabase free tier cold-starts for 5-30s and looked broken. -->
@@ -878,28 +881,90 @@ function switchView(v) {
   else if(v==='claims-register' || v==='claims' || v==='change-orders') { renderClaimsRegisterKPIs(); renderClaimsRegister(); }
 }
 
-// Viewer single-page mode — no main tabs. Overview, Backlog and WP List are shown stacked
-// on one page, each under a red section header. Renders all three (idempotent).
+// Viewer single-page mode — no main tabs. Overview, Backlog and WP List are shown stacked as
+// collapsible sections on one page, each under a red section header (click to collapse/expand;
+// default expanded). Renders all three (idempotent).
 const _VIEWER_PAGE_HEADS = { overview:['Overview','ti-layout-dashboard'], backlog:['Backlog','ti-clock-hour-4'], table:['Work Packages','ti-table'] };
+function _mkCollapsibleHead(container, label, icon) {
+  if (!container || container.dataset.vhead) return;
+  const body = document.createElement('div');
+  body.className = 'viewer-section-body';
+  while (container.firstChild) body.appendChild(container.firstChild);
+  const head = document.createElement('div');
+  head.className = 'viewer-page-head';
+  head.innerHTML = `<i class="ti ${icon}"></i><span class="vph-label">${label}</span><i class="ti ti-chevron-down vph-caret" aria-hidden="true"></i>`;
+  head.setAttribute('role', 'button');
+  head.setAttribute('tabindex', '0');
+  head.onclick = () => {
+    const collapsed = body.style.display === 'none';
+    body.style.display = collapsed ? '' : 'none';
+    head.classList.toggle('collapsed', !collapsed);
+  };
+  head.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); head.onclick(); } };
+  container.appendChild(head);
+  container.appendChild(body);
+  container.dataset.vhead = '1';
+}
 function _viewerSinglePage(){
   currentView = 'table';   // keep the WP-List filter/search handlers (they gate on this) live
   ['overview','backlog','table'].forEach(id=>{
     const el=document.getElementById('view-'+id);
     if(!el) return;
     el.style.display='';
-    if(!el.dataset.vhead){
-      const [label,icon]=_VIEWER_PAGE_HEADS[id];
-      const h=document.createElement('div');
-      h.className='viewer-page-head';
-      h.innerHTML=`<i class="ti ${icon}"></i>${label}`;
-      el.insertBefore(h, el.firstChild);
-      el.dataset.vhead='1';
-    }
+    const [label,icon]=_VIEWER_PAGE_HEADS[id];
+    _mkCollapsibleHead(el, label, icon);
   });
   const cl=document.getElementById('view-claims-register'); if(cl) cl.style.display='none';
   if(!_rendered.overview){ renderOverview(); _rendered.overview=true; }
   if(!_rendered.backlog){ renderBacklog(); _rendered.backlog=true; }
   buildTable();
+  if (window._viewerBuildNav) window._viewerBuildNav();
+}
+
+// Sticky section-jump nav (mirrors wp-form.html's #form-nav scroll-spy pattern).
+let _viewerNavObs = null, _viewerNavClickLock = 0;
+window._viewerBuildNav = function() {
+  const nav = document.getElementById('viewer-side-nav');
+  if (!nav) return;
+  const candidates = [
+    { id:'view-overview', label:'Overview', icon:'ti-layout-dashboard' },
+    { id:'view-backlog', label:'Backlog', icon:'ti-clock-hour-4' },
+    { id:'view-table', label:'Work Packages', icon:'ti-table' },
+  ];
+  const sections = candidates.filter(s => { const el = document.getElementById(s.id); return el && el.style.display !== 'none'; });
+  if (!sections.length) { nav.style.display = 'none'; return; }
+  nav.innerHTML = '<div class="viewer-side-nav-title">Sections</div>' +
+    sections.map(s => `<a href="#" data-target="${s.id}"><i class="ti ${s.icon}"></i>${s.label}</a>`).join('');
+  nav.style.display = 'flex';
+  _viewerWireNavSpy(nav);
+};
+function _viewerWireNavSpy(nav) {
+  const links = [...nav.querySelectorAll('a[data-target]')];
+  const byId = {}; links.forEach(a => byId[a.dataset.target] = a);
+  const sections = links.map(a => document.getElementById(a.dataset.target)).filter(Boolean);
+  function setActive(id) {
+    links.forEach(a => a.classList.toggle('active', a.dataset.target === id));
+    const a = byId[id];
+    if (a && window.matchMedia('(max-width:900px)').matches) a.scrollIntoView({block:'nearest', inline:'center', behavior:'smooth'});
+  }
+  links.forEach(a => { a.onclick = (e) => {
+    e.preventDefault();
+    const el = document.getElementById(a.dataset.target);
+    if (!el) return;
+    const head = el.querySelector(':scope > .viewer-page-head');
+    if (head && head.classList.contains('collapsed')) head.click();   // auto-expand before scrolling
+    _viewerNavClickLock = Date.now() + 700;                            // suppress spy flicker during the animated scroll
+    setActive(a.dataset.target);
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+  }; });
+  if (_viewerNavObs) _viewerNavObs.disconnect();
+  _viewerNavObs = new IntersectionObserver(entries => {
+    if (Date.now() < _viewerNavClickLock) return;
+    const vis = entries.filter(en => en.isIntersecting).sort((a,b) => a.boundingClientRect.top - b.boundingClientRect.top);
+    if (vis.length) setActive(vis[0].target.id);
+  }, { rootMargin:'-80px 0px -55% 0px', threshold:0 });
+  sections.forEach(s => _viewerNavObs.observe(s));
+  if (sections.length) setActive(sections[0].id);
 }
 
 // Sidebar project switcher list (filtered by the search box; current project highlighted)
@@ -3329,14 +3394,49 @@ AppAuth.requireLogin(async (user, profile) => {
   /* The "set status inline" hint is meaningless to viewers (they can't edit) */
   body.viewer-mode #wplist-edit-hint { display:none !important; }
   /* Single-page layout: drop the main Overview/Backlog/WP List tab bar — all three views
-     are shown stacked as sections (see _viewerSinglePage) under a red section header */
+     are shown stacked as collapsible sections (see _viewerSinglePage) under a red section
+     header (click to collapse/expand; default expanded) */
   body.viewer-mode #view-tabs { display:none !important; }
   .viewer-page-head { display:flex; align-items:center; gap:8px; font-size:1.0714rem; font-weight:800;
     color:var(--text-primary,#231F20); text-transform:uppercase; letter-spacing:.03em;
-    margin:0 2px 14px; padding-bottom:8px; border-bottom:2px solid var(--mw-red); }
+    margin:0 2px 14px; padding-bottom:8px; border-bottom:2px solid var(--mw-red);
+    cursor:pointer; user-select:none; }
   .viewer-page-head .ti { color:var(--mw-red); font-size:1.2857rem; }
+  .viewer-page-head .vph-label { flex:1; }
+  .viewer-page-head .vph-caret { font-size:1.1429rem; transition:transform .18s; }
+  .viewer-page-head.collapsed .vph-caret { transform:rotate(-90deg); }
+  .viewer-page-head:hover { color:var(--mw-red); }
+  .viewer-page-head:focus-visible { outline:2px solid var(--mw-red); outline-offset:3px; }
   #view-backlog .viewer-page-head, #view-table .viewer-page-head { margin-top:30px; }
   body:not(.viewer-mode) .viewer-page-head { display:none; }
+  /* Sticky section nav rail (mirrors wp-form.html's #form-nav) — jumps between the stacked
+     sections. Desktop: 200px left rail sticky under the topbar. Mobile: horizontal scroll-spy
+     strip. Built by _viewerBuildNav / wired by _viewerWireNavSpy. */
+  body.viewer-mode #main-content-region { display:flex; gap:20px; align-items:flex-start; }
+  body.viewer-mode #main-content, body.viewer-mode #loading { flex:1; min-width:0; }
+  .viewer-side-nav { position:sticky; top:76px; flex:0 0 200px; display:none; flex-direction:column; gap:2px;
+    background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px;
+    max-height:calc(100vh - 92px); overflow-y:auto; box-shadow:var(--shadow-sm); }
+  .viewer-side-nav-title { font-size:0.7143rem; font-weight:700; color:var(--text-hint); text-transform:uppercase; letter-spacing:.06em; padding:4px 10px 6px; }
+  .viewer-side-nav a { display:flex; align-items:center; gap:9px; font-size:0.8571rem; font-weight:600; color:var(--text-secondary);
+    padding:8px 10px; border-radius:8px; text-decoration:none; cursor:pointer; white-space:nowrap;
+    transition:background .15s,color .15s; border-left:2.5px solid transparent; }
+  .viewer-side-nav a:hover { background:var(--surface-2); color:var(--text-primary); }
+  .viewer-side-nav a.active { background:#FDECEA; color:#C42127; border-left-color:#C42127; }
+  .viewer-side-nav a i { font-size:1.0714rem; flex-shrink:0; width:16px; text-align:center; }
+  body.dark-mode .viewer-side-nav a.active { background:rgba(91,157,234,.16); color:#9DBDF0; border-color:#9DBDF0; }
+  body.viewer-mode #view-overview, body.viewer-mode #view-backlog, body.viewer-mode #view-table { scroll-margin-top:76px; }
+  @media (max-width:900px) {
+    body.viewer-mode #main-content-region { flex-direction:column; gap:12px; }
+    .viewer-side-nav { position:sticky; top:52px; z-index:30; flex:none; width:100%; flex-direction:row; gap:4px;
+      overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; max-height:none; padding:6px 8px;
+      scrollbar-width:none; }
+    .viewer-side-nav::-webkit-scrollbar { display:none; }
+    .viewer-side-nav-title { display:none; }
+    .viewer-side-nav a { flex:0 0 auto; border-left:none; border-bottom:2.5px solid transparent; border-radius:8px 8px 0 0; padding:7px 11px; }
+    .viewer-side-nav a.active { border-left:none; border-bottom-color:#C42127; }
+    body.viewer-mode #view-overview, body.viewer-mode #view-backlog, body.viewer-mode #view-table { scroll-margin-top:112px; }
+  }
   /* Compact Overview: with the cost KPIs, period chart and Top 5 all hidden, the lone
      WP-status summary was left stranded at half width. Center it as a deliberate summary. */
   body.viewer-mode .ov-top-row { max-width:860px; margin-left:auto; margin-right:auto; }

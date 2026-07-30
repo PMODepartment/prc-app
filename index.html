@@ -98,6 +98,8 @@
         <div class="topbar-badge-readonly" style="align-items:center;gap:4px;padding:3px 10px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:20px;font-size:0.7143rem;font-weight:700;color:#92400E;letter-spacing:.04em;flex-shrink:0">
           <i class="ti ti-eye" style="font-size:0.7857rem"></i> READ-ONLY
         </div>
+        <!-- Viewer single-page mode relocates #proj-filter-wrap here (see _viewerSinglePage) -->
+        <div id="topbar-proj-filter-slot"></div>
       </div>
       <div class="topbar-right">
         <button class="btn-refresh" id="btn-refresh" title="Refresh data" aria-label="Refresh data" onclick="(function(){var b=document.getElementById('btn-refresh');b.disabled=true;b.querySelector('i').classList.add('spin');try{Object.keys(sessionStorage).filter(function(k){return k.startsWith('wpm_wps_idx_');}).forEach(function(k){sessionStorage.removeItem(k);});}catch(_){}location.reload();})()"><i class="ti ti-refresh"></i></button>
@@ -107,6 +109,9 @@
     </div>
 
     <div class="content" id="main-content-region" role="main" tabindex="-1">
+      <!-- Viewer single-page mode only: sticky section-jump nav, built by _viewerBuildNav.
+           Hidden by default; non-viewers never populate/see it. -->
+      <nav class="viewer-side-nav" id="viewer-side-nav" aria-label="Page sections"></nav>
       <!-- Skeleton of the real layout: 4 cost KPIs + status panel, then a chart and
            table rows. Shows the SHAPE of what is loading instead of a bare spinner —
            the Supabase free tier cold-starts for 5-30s and looked broken. -->
@@ -151,6 +156,10 @@
               <div id="proj-filter-list" style="max-height:280px;overflow-y:auto"></div>
             </div>
           </div>
+          <!-- Restore anchor: viewer single-page mode relocates #proj-filter-wrap into the
+               topbar on desktop (see _viewerSinglePage); on mobile it's moved back here, right
+               before this marker, so it never gets lost off-screen at narrow widths. -->
+          <span id="proj-filter-anchor" style="display:none"></span>
 
           <div class="view-tabs" id="view-tabs" style="flex:1;margin-bottom:0">
             <button class="view-tab active" onclick="switchTab('overview')"><i class="ti ti-layout-dashboard"></i>Overview</button>
@@ -221,7 +230,11 @@
               <div class="rank-list" id="idx-rank-losses"></div>
             </div>
           </div>
-          <!-- Project cards below the Top 5 (Portfolio-specific: clickable project cards) -->
+          <!-- Project cards below the Top 5 (Portfolio-specific: clickable project cards).
+               Wrapped in #idx-viewer-projects so viewer single-page mode can relocate this whole
+               block to the very top of the page (see _viewerSinglePage) without affecting the
+               normal tabbed position for non-viewers. -->
+          <div id="idx-viewer-projects">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;margin-top:4px;flex-wrap:wrap">
             <button id="btn-view-cards" onclick="setProjectView('cards')" class="btn" style="background:#231F20;color:#fff;border-color:#231F20"><i class="ti ti-layout-grid"></i><span class="hide-mobile"> Cards</span></button>
             <button id="btn-view-table" onclick="setProjectView('table')" class="btn"><i class="ti ti-table"></i><span class="hide-mobile"> Table</span></button>
@@ -252,6 +265,7 @@
                 </table>
               </div>
             </div>
+          </div>
           </div>
         </div>
 
@@ -367,6 +381,7 @@
                 <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
                 <button id="sch-btn-count" onclick="setIdxSchDataMode('count')" class="seg-btn active"># WPs</button>
                 <button id="sch-btn-budget" onclick="setIdxSchDataMode('budget')" class="seg-btn">Budget</button>
+                <button id="sch-btn-wppct" onclick="setIdxSchDataMode('wppct')" class="seg-btn">WP %</button>
               </div>
             </div>
             <div class="chart-mob-h" style="position:relative;height:260px"><canvas id="c-idx-sch-period"></canvas></div>
@@ -1338,6 +1353,13 @@
         if(titleEl) titleEl.textContent = 'Work Package by Period (Planned vs Actual)';
         if(_idxSchPeriodMode === 'monthly') Charts.wpCountByPeriodMonthly('c-idx-sch-period', _lastWPs);
         else Charts.wpCountByPeriod('c-idx-sch-period', _lastWPs);
+      } else if(_idxSchDataMode === 'wppct') {
+        // Planned/Actual WP counts as a share of the portfolio's total WP count — same
+        // cumulative Planned %/Actual %/Forecast % treatment as Budget %, but counts, not ₱.
+        // Not money — visible to viewers too (only Budget mode is viewer-hidden).
+        if(titleEl) titleEl.textContent = 'Work Package by Period — % of Total WPs';
+        if(_idxSchPeriodMode === 'monthly') Charts.wpCountByPeriodMonthly('c-idx-sch-period', _lastWPs, {countPct:true});
+        else Charts.wpCountByPeriod('c-idx-sch-period', _lastWPs, {countPct:true});
       } else {
         if(titleEl) titleEl.textContent = 'Procurement Budget (BCB) and Awarded Cost by Period';
         if(_idxSchPeriodMode === 'monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-sch-period', _lastWPs, {tidyLabels:true});
@@ -1361,18 +1383,63 @@
 
     window.setIdxSchDataMode = function(mode) {
       _idxSchDataMode = mode;
-      const bC = document.getElementById('sch-btn-count'), bB = document.getElementById('sch-btn-budget');
+      const bC = document.getElementById('sch-btn-count'), bB = document.getElementById('sch-btn-budget'), bP = document.getElementById('sch-btn-wppct');
       if(bC) _segBtn(bC, mode==='count');
       if(bB) _segBtn(bB, mode==='budget');
+      if(bP) _segBtn(bP, mode==='wppct');
       _destroyCharts(['c-idx-sch-period']);
       _renderIdxSchPeriodChart();
     };
 
-    // Viewers get no main tab bar — Overview/Backlog/Schedule/WP List (the non-money tabs)
-    // are shown stacked as labeled sections on one scrolling page instead of switched between.
+    // Viewers get no main tab bar — Projects/Overview/Backlog/Schedule/WP List (the non-money
+    // tabs) are shown stacked as collapsible sections on one scrolling page instead of switched
+    // between. Each section's original children are wrapped into a .viewer-section-body so the
+    // header can toggle just that body; the header itself is inserted once (el.dataset.vhead guard).
     const _VIEWER_TABS = ['overview','backlog','schedule','wplist'];
     const _VIEWER_TAB_HEADS = { overview:['Overview','ti-layout-dashboard'], backlog:['Backlog','ti-clock'], schedule:['Schedule','ti-calendar'], wplist:['Work Packages','ti-table'] };
+    function _mkCollapsibleHead(container, label, icon) {
+      if (!container || container.dataset.vhead) return;
+      const body = document.createElement('div');
+      body.className = 'viewer-section-body';
+      while (container.firstChild) body.appendChild(container.firstChild);
+      const head = document.createElement('div');
+      head.className = 'viewer-page-head';
+      head.innerHTML = `<i class="ti ${icon}"></i><span class="vph-label">${label}</span><i class="ti ti-chevron-down vph-caret" aria-hidden="true"></i>`;
+      head.setAttribute('role', 'button');
+      head.setAttribute('tabindex', '0');
+      head.onclick = () => {
+        const collapsed = body.style.display === 'none';
+        body.style.display = collapsed ? '' : 'none';
+        head.classList.toggle('collapsed', !collapsed);
+      };
+      head.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); head.onclick(); } };
+      container.appendChild(head);
+      container.appendChild(body);
+      container.dataset.vhead = '1';
+    }
+    // Relocate the project filter into the topbar on desktop (seamless header placement); on
+    // narrow viewports move it back next to #proj-filter-anchor so it isn't lost off-screen.
+    function _viewerRelocateProjFilter() {
+      const pfw = document.getElementById('proj-filter-wrap');
+      const slot = document.getElementById('topbar-proj-filter-slot');
+      const anchor = document.getElementById('proj-filter-anchor');
+      if (!pfw || !slot || !anchor) return;
+      const isDesktop = window.matchMedia('(min-width:768px)').matches;
+      if (isDesktop && pfw.parentElement !== slot) slot.appendChild(pfw);
+      else if (!isDesktop && pfw.parentElement !== anchor.parentElement) anchor.parentElement.insertBefore(pfw, anchor);
+    }
     function _viewerSinglePage() {
+      _viewerRelocateProjFilter();
+      // Project cards/table: relocated to the very top of the page, ahead of the Overview
+      // section, as its own collapsible "Projects" section (viewer-only; non-viewers never
+      // call this function, so the block stays in its normal end-of-Overview-tab position).
+      const projSec = document.getElementById('idx-viewer-projects');
+      const mainContent = document.getElementById('main-content');
+      if (projSec && mainContent && mainContent.firstElementChild !== projSec) {
+        mainContent.insertBefore(projSec, mainContent.firstElementChild);
+      }
+      _mkCollapsibleHead(projSec, 'Projects', 'ti-building-skyscraper');
+
       ALL_TABS.forEach(t => {
         const el = document.getElementById('tab-' + t);
         if (el) el.style.display = _VIEWER_TABS.includes(t) ? '' : 'none';
@@ -1380,16 +1447,61 @@
       _VIEWER_TABS.forEach(t => {
         const el = document.getElementById('tab-' + t);
         if (!el) return;
-        if (!el.dataset.vhead) {
-          const [label, icon] = _VIEWER_TAB_HEADS[t];
-          const h = document.createElement('div');
-          h.className = 'viewer-page-head';
-          h.innerHTML = `<i class="ti ${icon}"></i>${label}`;
-          el.insertBefore(h, el.firstChild);
-          el.dataset.vhead = '1';
-        }
+        const [label, icon] = _VIEWER_TAB_HEADS[t];
+        _mkCollapsibleHead(el, label, icon);
         if (!_rendered[t] && _lastWPs) { _renderTab(t, _lastWPs, _lastFilt, _lastStats); _rendered[t] = true; }
       });
+      if (window._viewerBuildNav) window._viewerBuildNav();
+    }
+
+    // Sticky section-jump nav (mirrors wp-form.html's #form-nav scroll-spy pattern).
+    // Rebuilt every _viewerSinglePage() call so it only lists currently-visible sections
+    // (Budget/Works never appear; Projects/Overview/Backlog/Schedule/WP List do).
+    let _viewerNavObs = null, _viewerNavClickLock = 0;
+    window._viewerBuildNav = function() {
+      const nav = document.getElementById('viewer-side-nav');
+      if (!nav) return;
+      const candidates = [
+        { id:'idx-viewer-projects', label:'Projects', icon:'ti-building-skyscraper' },
+        { id:'tab-overview', label:'Overview', icon:'ti-layout-dashboard' },
+        { id:'tab-backlog', label:'Backlog', icon:'ti-clock' },
+        { id:'tab-schedule', label:'Schedule', icon:'ti-calendar' },
+        { id:'tab-wplist', label:'Work Packages', icon:'ti-table' },
+      ];
+      const sections = candidates.filter(s => { const el = document.getElementById(s.id); return el && el.style.display !== 'none'; });
+      if (!sections.length) { nav.style.display = 'none'; return; }
+      nav.innerHTML = '<div class="viewer-side-nav-title">Sections</div>' +
+        sections.map(s => `<a href="#" data-target="${s.id}"><i class="ti ${s.icon}"></i>${s.label}</a>`).join('');
+      nav.style.display = 'flex';
+      _viewerWireNavSpy(nav);
+    };
+    function _viewerWireNavSpy(nav) {
+      const links = [...nav.querySelectorAll('a[data-target]')];
+      const byId = {}; links.forEach(a => byId[a.dataset.target] = a);
+      const sections = links.map(a => document.getElementById(a.dataset.target)).filter(Boolean);
+      function setActive(id) {
+        links.forEach(a => a.classList.toggle('active', a.dataset.target === id));
+        const a = byId[id];
+        if (a && window.matchMedia('(max-width:900px)').matches) a.scrollIntoView({block:'nearest', inline:'center', behavior:'smooth'});
+      }
+      links.forEach(a => { a.onclick = (e) => {
+        e.preventDefault();
+        const el = document.getElementById(a.dataset.target);
+        if (!el) return;
+        const head = el.querySelector(':scope > .viewer-page-head');
+        if (head && head.classList.contains('collapsed')) head.click();   // auto-expand before scrolling
+        _viewerNavClickLock = Date.now() + 700;                            // suppress spy flicker during the animated scroll
+        setActive(a.dataset.target);
+        el.scrollIntoView({behavior:'smooth', block:'start'});
+      }; });
+      if (_viewerNavObs) _viewerNavObs.disconnect();
+      _viewerNavObs = new IntersectionObserver(entries => {
+        if (Date.now() < _viewerNavClickLock) return;
+        const vis = entries.filter(en => en.isIntersecting).sort((a,b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (vis.length) setActive(vis[0].target.id);
+      }, { rootMargin:'-80px 0px -55% 0px', threshold:0 });
+      sections.forEach(s => _viewerNavObs.observe(s));
+      if (sections.length) setActive(sections[0].id);
     }
 
     window.switchTab = function(tab) {
@@ -1668,6 +1780,9 @@
             projSeq.forEach(pid => {
               const pWps = projGroups.get(pid);
               const pKey = '__P__'+pid;
+              // Viewers: project groups start collapsed (seed once — Map.has guards against
+              // re-collapsing a group the viewer already opened).
+              if (window.__isViewer && !_blCollapseState.has(pKey)) _blCollapseState.set(pKey, true);
               const pCollapsed = !!_blCollapseState.get(pKey);
               const pBudget = pWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
               const pInd = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:rgba(255,255,255,.25);color:#fff;font-size:0.9286rem;font-weight:700;float:right;margin-left:4px">${pCollapsed?'+':'−'}</span>`;
@@ -1804,13 +1919,15 @@
             const s = allStats[pi];
             const projRowId = 'sch-proj-' + p.id;
 
-            // ── Project header row (collapsible — hides/shows all trade rows) ──
+            // ── Project header row (collapsible — hides/shows all trade rows). Viewers start
+            // with the trade rows collapsed (only the project header shows on first render). ──
+            const pStartCollapsed = !!window.__isViewer;
             schHtml += `<tr style="background:#f0f0f0;cursor:pointer;font-weight:600" onclick="toggleSchProj('${projRowId}')">
               <td colspan="6" style="padding:8px 12px">
                 <span style="font-size:0.7143rem;font-weight:700;background:#EE3124;color:#fff;padding:2px 7px;border-radius:4px;margin-right:8px">${p.id}</span>
                 ${p.name||p.id}
                 <span style="float:right;font-size:0.7857rem;color:#888">${pWps.length} WPs · ${s.awardRate}% awarded</span>
-                <span id="${projRowId}-ind" style="float:right;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:0.9286rem;font-weight:700;margin-right:6px">−</span>
+                <span id="${projRowId}-ind" style="float:right;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:0.9286rem;font-weight:700;margin-right:6px">${pStartCollapsed?'+':'−'}</span>
               </td>
             </tr>`;
 
@@ -1827,7 +1944,7 @@
               const tRate = tw.length ? Math.round(tAwd/tw.length*100) : 0;
 
               // Trade header row — clicking expands individual WP rows below
-              schHtml += `<tr data-proj="${projRowId}" data-trade-hdr="${tradeKey}" style="background:#fafafa;cursor:pointer" onclick="toggleSchTrade('${tradeKey}')">
+              schHtml += `<tr data-proj="${projRowId}" data-trade-hdr="${tradeKey}" style="background:#fafafa;cursor:pointer${pStartCollapsed?';display:none':''}" onclick="toggleSchTrade('${tradeKey}')">
                 <td style="padding-left:24px;font-size:0.7857rem;color:#333;font-weight:600">
                   <span id="sch-ti-${tId}" style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:2px;background:#ddd;color:#555;font-size:0.7857rem;font-weight:700;margin-right:6px;vertical-align:middle;flex-shrink:0">+</span>${t}
                 </td>
@@ -2397,6 +2514,9 @@
         const tg = projGroups.get(pid);
         const tradeOrder = [...tg.keys()].sort((a,b)=>{const oa=TRADE_ORDER.indexOf(a),ob=TRADE_ORDER.indexOf(b);return(oa<0?999:oa)-(ob<0?999:ob);});
         const projCount = [...tg.values()].reduce((s,arr)=>s+arr.length,0);
+        // Viewers: project groups start collapsed (seed once — Map.has guards against
+        // re-collapsing a group the viewer already opened).
+        if (window.__isViewer && !_projCollapseState.has(pid)) _projCollapseState.set(pid, true);
         const projCollapsed = !!_projCollapseState.get(pid);
         items.push({type:'projheader', project:pid, projLabel:_projLabel(pid), count:projCount, collapsed:projCollapsed});
         if (projCollapsed) return;
@@ -3067,15 +3187,60 @@
   }
 
   /* Viewer single-page layout — drop the main Overview/Backlog/Budget/Schedule/Works/WP List
-     tab bar; the (viewer-relevant) tabs render stacked as sections on one page instead
-     (see _viewerSinglePage). Budget/Works stay hidden entirely for viewers (money-only). */
+     tab bar; the (viewer-relevant) tabs render stacked as collapsible sections on one page
+     instead (see _viewerSinglePage). Budget/Works stay hidden entirely for viewers (money-only).
+     #idx-viewer-projects (Projects) is relocated to be the very first section, ahead of Overview. */
   body.viewer-mode #view-tabs { display:none !important; }
   .viewer-page-head { display:flex; align-items:center; gap:8px; font-size:1.0714rem; font-weight:800;
     color:var(--text-primary,#231F20); text-transform:uppercase; letter-spacing:.03em;
-    margin:0 2px 14px; padding-bottom:8px; border-bottom:2px solid var(--mw-red); }
+    margin:0 2px 14px; padding-bottom:8px; border-bottom:2px solid var(--mw-red);
+    cursor:pointer; user-select:none; }
   .viewer-page-head .ti { color:var(--mw-red); font-size:1.2857rem; }
-  #tab-backlog .viewer-page-head, #tab-schedule .viewer-page-head, #tab-wplist .viewer-page-head { margin-top:30px; }
+  .viewer-page-head .vph-label { flex:1; }
+  .viewer-page-head .vph-caret { font-size:1.1429rem; transition:transform .18s; }
+  .viewer-page-head.collapsed .vph-caret { transform:rotate(-90deg); }
+  .viewer-page-head:hover { color:var(--mw-red); }
+  .viewer-page-head:focus-visible { outline:2px solid var(--mw-red); outline-offset:3px; }
+  #tab-overview .viewer-page-head, #tab-backlog .viewer-page-head,
+  #tab-schedule .viewer-page-head, #tab-wplist .viewer-page-head { margin-top:30px; }
   body:not(.viewer-mode) .viewer-page-head { display:none; }
+  /* Relocated project filter chip — compact styling for its topbar home (desktop, viewer-mode) */
+  #topbar-proj-filter-slot { min-width:0; flex-shrink:1; }
+  body.viewer-mode .topbar-left #proj-filter-wrap { flex-shrink:1; min-width:0; }
+  body.viewer-mode .topbar-left #proj-filter-wrap #proj-filter-btn {
+    padding:6px 12px; font-size:0.8571rem; box-shadow:none; background:var(--surface-2,#f5f5f5); }
+  body.viewer-mode .topbar-left #proj-filter-wrap #proj-filter-label {
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:160px; }
+  /* Sticky section nav rail (mirrors wp-form.html's #form-nav) — jumps between the stacked
+     sections. Desktop: 200px left rail sticky under the topbar. Mobile: horizontal scroll-spy
+     strip. Built by _viewerBuildNav / wired by _viewerWireNavSpy. */
+  body.viewer-mode #main-content-region { display:flex; gap:20px; align-items:flex-start; }
+  body.viewer-mode #main-content, body.viewer-mode #loading { flex:1; min-width:0; }
+  .viewer-side-nav { position:sticky; top:76px; flex:0 0 200px; display:none; flex-direction:column; gap:2px;
+    background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px;
+    max-height:calc(100vh - 92px); overflow-y:auto; box-shadow:var(--shadow-sm); }
+  .viewer-side-nav-title { font-size:0.7143rem; font-weight:700; color:var(--text-hint); text-transform:uppercase; letter-spacing:.06em; padding:4px 10px 6px; }
+  .viewer-side-nav a { display:flex; align-items:center; gap:9px; font-size:0.8571rem; font-weight:600; color:var(--text-secondary);
+    padding:8px 10px; border-radius:8px; text-decoration:none; cursor:pointer; white-space:nowrap;
+    transition:background .15s,color .15s; border-left:2.5px solid transparent; }
+  .viewer-side-nav a:hover { background:var(--surface-2); color:var(--text-primary); }
+  .viewer-side-nav a.active { background:#FDECEA; color:#C42127; border-left-color:#C42127; }
+  .viewer-side-nav a i { font-size:1.0714rem; flex-shrink:0; width:16px; text-align:center; }
+  body.dark-mode .viewer-side-nav a.active { background:rgba(91,157,234,.16); color:#9DBDF0; border-color:#9DBDF0; }
+  body.viewer-mode #idx-viewer-projects, body.viewer-mode #tab-overview, body.viewer-mode #tab-backlog,
+  body.viewer-mode #tab-schedule, body.viewer-mode #tab-wplist { scroll-margin-top:76px; }
+  @media (max-width:900px) {
+    body.viewer-mode #main-content-region { flex-direction:column; gap:12px; }
+    .viewer-side-nav { position:sticky; top:52px; z-index:30; flex:none; width:100%; flex-direction:row; gap:4px;
+      overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; max-height:none; padding:6px 8px;
+      scrollbar-width:none; }
+    .viewer-side-nav::-webkit-scrollbar { display:none; }
+    .viewer-side-nav-title { display:none; }
+    .viewer-side-nav a { flex:0 0 auto; border-left:none; border-bottom:2.5px solid transparent; border-radius:8px 8px 0 0; padding:7px 11px; }
+    .viewer-side-nav a.active { border-left:none; border-bottom-color:#C42127; }
+    body.viewer-mode #idx-viewer-projects, body.viewer-mode #tab-overview, body.viewer-mode #tab-backlog,
+    body.viewer-mode #tab-schedule, body.viewer-mode #tab-wplist { scroll-margin-top:112px; }
+  }
   /* Viewer mode — hide all cost data */
   body.viewer-mode #btn-export { display:none !important; }   /* cost data — viewers can't export */
   body.viewer-mode #metrics-cost-group { display:none !important; }
