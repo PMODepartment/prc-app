@@ -111,13 +111,22 @@
     var h = r.height + pad * 2;
     _spot.style.top = top + 'px'; _spot.style.left = left + 'px';
     _spot.style.width = w + 'px'; _spot.style.height = h + 'px';
-    // Place the card below the spot if it fits, else above.
-    var ch = _card.offsetHeight || 160, cw = _card.offsetWidth || 300, gap = 12;
-    var cTop = (top + h + gap + ch < window.innerHeight) ? (top + h + gap)
-             : (top - gap - ch > 6 ? top - gap - ch : Math.max(6, window.innerHeight - ch - 6));
-    var cLeft = Math.min(Math.max(6, left), window.innerWidth - cw - 6);
-    _card.style.top = cTop + 'px'; _card.style.left = cLeft + 'px';
+    // The card (and its Back/Next buttons) is PINNED to a fixed corner so the
+    // buttons stay put across steps — the user shouldn't have to chase a moving
+    // "Next". Horizontal position is constant (bottom-right); vertically it sits
+    // at the bottom, flipping to the top ONLY when the spotlight would cover it,
+    // so Next never travels sideways and rarely moves at all.
+    var ch = _card.offsetHeight || 160, cw = _card.offsetWidth || 300, m = 16;
+    var cLeft = Math.max(6, window.innerWidth - cw - m);
+    var botTop = window.innerHeight - ch - m;
+    var spotBottom = top + h, spotRight = left + w;
+    // Does the spotlight intersect the bottom-right card slot? If so, go to top.
+    var overlapsBottom = (spotBottom > botTop - gap()) && (spotRight > cLeft - gap());
+    var cTop = overlapsBottom ? m : botTop;
+    _card.style.top = Math.max(6, cTop) + 'px';
+    _card.style.left = cLeft + 'px';
   }
+  function gap() { return 12; }
 
   function go(dir) {
     _dir = dir;
