@@ -329,7 +329,7 @@
               </div>
               <div class="chart-mob-h" style="position:relative;height:220px"><canvas id="c-backlog-period"></canvas></div>
             </div>
-            <div class="panel">
+            <div class="panel" id="bl-submittal-panel">
               <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Submittal Status</div>
               <div style="position:relative;height:220px"><canvas id="c-backlog-submittal"></canvas></div>
             </div>
@@ -3285,6 +3285,19 @@ AppAuth.requireLogin(async (user, profile) => {
   body.viewer-mode #backlog-period-panel { display:none !important; }
   body.viewer-mode #backlog-table th:nth-child(6),
   body.viewer-mode #backlog-table td:nth-child(6) { display:none !important; }
+  /* ── Viewer simplification — lighter, read-only-focused UI ── */
+  /* The "set status inline" hint is meaningless to viewers (they can't edit) */
+  body.viewer-mode #wplist-edit-hint { display:none !important; }
+  /* WP List: drop the Overview/Schedule/Submittals view-tab switcher — viewers get a
+     single clean read-only list (default Overview view); full per-WP detail is one click
+     away via the WP No. → detail panel */
+  body.viewer-mode #proj-view-tabs { display:none !important; }
+  /* Trim the Submittal-status donut — it renders as one solid 100% ring whenever a
+     project has no submittal spread, which is uninformative to a read-only viewer */
+  body.viewer-mode #bl-submittal-panel { display:none !important; }
+  /* Compact Overview: with the cost KPIs, period chart and Top 5 all hidden, the lone
+     WP-status summary was left stranded at half width. Center it as a deliberate summary. */
+  body.viewer-mode .ov-top-row { max-width:860px; margin-left:auto; margin-right:auto; }
   /* Archived project — read-only for everyone: hide all editing entry points */
   body.archived-readonly #add-wp-link,
   body.archived-readonly #sidebar-tools,
