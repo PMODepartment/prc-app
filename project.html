@@ -3414,27 +3414,34 @@ AppAuth.requireLogin(async (user, profile) => {
      strip. Built by _viewerBuildNav / wired by _viewerWireNavSpy. */
   body.viewer-mode #main-content-region { display:flex; gap:20px; align-items:flex-start; }
   body.viewer-mode #main-content, body.viewer-mode #loading { flex:1; min-width:0; }
-  .viewer-side-nav { position:sticky; top:76px; flex:0 0 200px; display:none; flex-direction:column; gap:2px;
-    background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:8px;
-    max-height:calc(100vh - 92px); overflow-y:auto; box-shadow:var(--shadow-sm); }
-  .viewer-side-nav-title { font-size:0.7143rem; font-weight:700; color:var(--text-hint); text-transform:uppercase; letter-spacing:.06em; padding:4px 10px 6px; }
-  .viewer-side-nav a { display:flex; align-items:center; gap:9px; font-size:0.8571rem; font-weight:600; color:var(--text-secondary);
-    padding:8px 10px; border-radius:8px; text-decoration:none; cursor:pointer; white-space:nowrap;
-    transition:background .15s,color .15s; border-left:2.5px solid transparent; }
+  /* Desktop: a slim 40px rail — each link's label is rotated 90° (CSS writing-mode, no icon)
+     so the whole rail reads top-to-bottom without eating horizontal content width. */
+  .viewer-side-nav { position:sticky; top:76px; flex:0 0 40px; display:none; flex-direction:column; gap:14px;
+    background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 4px;
+    max-height:calc(100vh - 92px); overflow-y:auto; overflow-x:hidden; box-shadow:var(--shadow-sm); align-items:stretch; }
+  .viewer-side-nav-title { display:none; }
+  .viewer-side-nav a { display:block; text-align:center; font-size:0.7857rem; font-weight:700; color:var(--text-secondary);
+    padding:10px 4px; border-radius:6px; text-decoration:none; cursor:pointer; white-space:nowrap;
+    transition:background .15s,color .15s; border-left:2.5px solid transparent;
+    writing-mode:vertical-rl; transform:rotate(180deg); letter-spacing:.02em; }
   .viewer-side-nav a:hover { background:var(--surface-2); color:var(--text-primary); }
   .viewer-side-nav a.active { background:#FDECEA; color:#C42127; border-left-color:#C42127; }
-  .viewer-side-nav a i { font-size:1.0714rem; flex-shrink:0; width:16px; text-align:center; }
+  .viewer-side-nav a i { display:none; }
   body.dark-mode .viewer-side-nav a.active { background:rgba(91,157,234,.16); color:#9DBDF0; border-color:#9DBDF0; }
   body.viewer-mode #view-overview, body.viewer-mode #view-backlog, body.viewer-mode #view-table { scroll-margin-top:76px; }
   @media (max-width:900px) {
+    /* Mobile: back to a normal horizontal scroll-spy strip (icon + upright label) — a rotated
+       rail only saves space in a vertical (sidebar) layout, not a horizontal (top strip) one. */
     body.viewer-mode #main-content-region { flex-direction:column; gap:12px; }
     .viewer-side-nav { position:sticky; top:52px; z-index:30; flex:none; width:100%; flex-direction:row; gap:4px;
       overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; max-height:none; padding:6px 8px;
       scrollbar-width:none; }
     .viewer-side-nav::-webkit-scrollbar { display:none; }
-    .viewer-side-nav-title { display:none; }
-    .viewer-side-nav a { flex:0 0 auto; border-left:none; border-bottom:2.5px solid transparent; border-radius:8px 8px 0 0; padding:7px 11px; }
+    .viewer-side-nav a { display:flex; align-items:center; text-align:left; flex:0 0 auto; gap:9px;
+      border-left:none; border-bottom:2.5px solid transparent; border-radius:8px 8px 0 0; padding:7px 11px;
+      writing-mode:horizontal-tb; transform:none; }
     .viewer-side-nav a.active { border-left:none; border-bottom-color:#C42127; }
+    .viewer-side-nav a i { display:inline-flex; font-size:1.0714rem; flex-shrink:0; width:16px; text-align:center; }
     body.viewer-mode #view-overview, body.viewer-mode #view-backlog, body.viewer-mode #view-table { scroll-margin-top:112px; }
   }
   /* Compact Overview: with the cost KPIs, period chart and Top 5 all hidden, the lone
