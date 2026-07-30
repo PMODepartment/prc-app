@@ -1043,15 +1043,17 @@
       tbody.innerHTML = html || '<tr><td class="empty-cell" colspan="6">No backlog items</td></tr>';
     };
     const _blCollapseState = new Map();
-    let _idxBlGroupMode = 'flat';   // 'flat' | 'trade' | 'project'
+    let _idxBlGroupMode = 'flat';   // 'flat' | 'trade' | 'project' | 'project-trade'
     window.toggleBlGroup = function(key) {
       _blCollapseState.set(key, !(_blCollapseState.get(key)||false));
       if (window.renderBlTable) window.renderBlTable();
     };
     window.toggleIdxBlGroupMode = function() {
-      // cycle Flat → By Trade → By Project → Flat
-      _idxBlGroupMode = _idxBlGroupMode==='flat' ? 'trade' : _idxBlGroupMode==='trade' ? 'project' : 'flat';
-      _blCollapseState.clear();   // group keys differ between trade/project modes
+      // cycle Flat → By Trade → By Project → By Project & Trade → Flat
+      _idxBlGroupMode = _idxBlGroupMode==='flat' ? 'trade'
+        : _idxBlGroupMode==='trade' ? 'project'
+        : _idxBlGroupMode==='project' ? 'project-trade' : 'flat';
+      _blCollapseState.clear();   // group keys differ between modes
       const btn = document.getElementById('idx-bl-group-toggle');
       if (btn) {
         const active = _idxBlGroupMode!=='flat';
@@ -1059,7 +1061,7 @@
         btn.style.color = active ? '#fff' : '#888';
         btn.style.borderColor = active ? '#EE3124' : '#e5e5e5';
         const lbl = btn.querySelector('span');
-        if (lbl) lbl.textContent = _idxBlGroupMode==='flat' ? 'Flat' : _idxBlGroupMode==='trade' ? 'By Trade' : 'By Project';
+        if (lbl) lbl.textContent = _idxBlGroupMode==='flat' ? 'Flat' : _idxBlGroupMode==='trade' ? 'By Trade' : _idxBlGroupMode==='project' ? 'By Project' : 'By Project & Trade';
       }
       if (window.renderBlTable) window.renderBlTable();
     };
@@ -1595,6 +1597,7 @@
             return cmp!==0?cmp:wpNoSort(a,b);
           };
           const byProject = _idxBlGroupMode==='project';
+          const twoLevel = _idxBlGroupMode==='project-trade';   // Project → Trade, mirrors the WP List
           const keyOf = byProject ? (w=>w.project_id||'(No Project)') : (w=>normTrade(w.trade)||'(No Trade)');
           const groups = new Map(); const groupSeq = [];
           rows.forEach(w => { const k=keyOf(w); if(!groups.has(k)){groups.set(k,[]);groupSeq.push(k);} groups.get(k).push(w); });
@@ -1604,19 +1607,22 @@
           const _blProjLabel = id => { const p=permitted.find(x=>x.id===id); return (p&&p.name&&p.name!==p.id) ? (id+' — '+p.name.split('—')[0].trim()) : id; };
 
           // Cols: [Project], WP No., Desc, [Trade], Planned Award, Aging, Budget, Status, Submittal.
-          // The grouped-by column is hidden (it's the group header): trade mode hides Trade,
-          // project mode hides Project; flat shows both.
+          // A grouped-by column is hidden (it becomes the group header): Trade mode hides Trade,
+          // Project mode hides Project, Project & Trade hides BOTH; flat shows both.
+          const showProj  = _idxBlGroupMode==='flat' || _idxBlGroupMode==='trade';
+          const showTrade = _idxBlGroupMode==='flat' || _idxBlGroupMode==='project';
           const grouped = _idxBlGroupMode !== 'flat';
-          const nCols = grouped ? 8 : 9;
+          const nCols = 7 + (showProj?1:0) + (showTrade?1:0);
           const preBudgetCols = nCols - 3; // cols before Budget (excl. Budget, Status, Submittal)
           // Rebuild thead per mode (CSS display:none unreliable in tables)
           const blThead = document.getElementById('bl-thead');
           if (blThead) {
-            blThead.innerHTML = byProject
-              ? '<tr><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>'
-              : (_idxBlGroupMode==='trade'
-                ? '<tr><th>Project</th><th>WP No.</th><th>Description</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>'
-                : '<tr><th>Project</th><th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th></tr>');
+            let ths = '';
+            if (showProj)  ths += '<th>Project</th>';
+            ths += '<th>WP No.</th><th>Description</th>';
+            if (showTrade) ths += '<th>Trade</th>';
+            ths += '<th>Planned Award</th><th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th>';
+            blThead.innerHTML = '<tr>'+ths+'</tr>';
           }
 
           const _renderBlRow = w => {
@@ -1624,10 +1630,10 @@
             const agStyle = aging > 60 ? 'color:#EE3124;font-weight:700' : aging > 30 ? 'color:#D97706;font-weight:600' : '';
             const slbl = w.submittal_type||(w.review_status==='approved'?'Approved':w.review_status==='pending_review'?'Submitted':'Not Required');
             return `<tr>
-              ${byProject ? '' : `<td style="font-weight:600;font-size:0.7857rem">${esc(w.project_id)||'—'}</td>`}
+              ${showProj ? `<td style="font-weight:600;font-size:0.7857rem">${esc(w.project_id)||'—'}</td>` : ''}
               <td>${esc(w.wp_no)||'—'}</td>
               <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.description)||'—'}</td>
-              ${_idxBlGroupMode==='trade' ? '' : `<td class="hint-sm">${esc(w.trade)||'—'}</td>`}
+              ${showTrade ? `<td class="hint-sm">${esc(w.trade)||'—'}</td>` : ''}
               <td>${w.awarding_date?Fmt.date(w.awarding_date):'—'}</td>
               <td style="${agStyle}">${aging!=null?(aging>0?'+'+aging+'d':aging===0?'today':aging+'d'):'—'}</td>
               <td style="white-space:nowrap">${w.approved_budget_bcb?Fmt.moneyFull(w.approved_budget_bcb):'—'}</td>
@@ -1640,7 +1646,53 @@
             <td style="font-size:0.7857rem;padding:8px 10px">${window.__isViewer?'—':Fmt.money(budget)}</td>
             <td colspan="2"></td>
           </tr>` : '';
-          if (grouped) {
+          if (twoLevel) {
+            // Two-level Project → Trade (mirrors the WP List): a prominent red Project header,
+            // then Trade subheaders under it, both collapsible. Project and Trade columns are
+            // hidden from the rows (they're the headers). Collapse keys: project = `__P__<pid>`,
+            // trade = `<pid>||<trade>` (independent per project).
+            const escKey = k => String(k).replace(/"/g,'&quot;');
+            const projGroups = new Map(); const projSeq = [];
+            rows.forEach(w => { const p=w.project_id||'(No Project)'; if(!projGroups.has(p)){projGroups.set(p,[]);projSeq.push(p);} projGroups.get(p).push(w); });
+            projSeq.sort((a,b)=>{const ia=permitted.findIndex(p=>p.id===a),ib=permitted.findIndex(p=>p.id===b);return (ia<0?999:ia)-(ib<0?999:ib);});
+            let html = '';
+            projSeq.forEach(pid => {
+              const pWps = projGroups.get(pid);
+              const pKey = '__P__'+pid;
+              const pCollapsed = !!_blCollapseState.get(pKey);
+              const pBudget = pWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+              const pInd = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:rgba(255,255,255,.25);color:#fff;font-size:0.9286rem;font-weight:700;float:right;margin-left:4px">${pCollapsed?'+':'−'}</span>`;
+              const pBudgetLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:0.7143rem;color:rgba(255,255,255,.85);font-weight:400">${Fmt.money(pBudget)}</span>`;
+              html += `<tr onclick="toggleBlGroup(this.dataset.group)" data-group="${escKey(pKey)}" style="cursor:pointer;background:#EE3124;border-top:2px solid #c42127">
+                <td colspan="${nCols}" style="position:sticky;left:0;z-index:2;background:#EE3124;padding:8px 12px;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#fff">
+                  ${esc(_blProjLabel(pid))}${pInd}
+                  <span style="float:right;margin-right:6px;font-size:0.7143rem;color:rgba(255,255,255,.75);font-weight:400">${pWps.length} WPs</span>
+                  ${pBudgetLabel}
+                </td></tr>`;
+              if (pCollapsed) return;
+              // Trade subgroups within this project.
+              const tG = new Map(); const tSeq = [];
+              pWps.forEach(w => { const t=normTrade(w.trade)||'(No Trade)'; if(!tG.has(t)){tG.set(t,[]);tSeq.push(t);} tG.get(t).push(w); });
+              tSeq.sort((a,b)=>{const oa=TRADE_ORDER.indexOf(a),ob=TRADE_ORDER.indexOf(b);return(oa<0?999:oa)-(ob<0?999:ob);});
+              tSeq.forEach(t => {
+                const tWps = tG.get(t).slice().sort(withinSort);
+                const tKey = pid+'||'+t;
+                const tCollapsed = !!_blCollapseState.get(tKey);
+                const tBudget = tWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+                const tInd = `<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:0.8571rem;font-weight:700;float:right;margin-left:4px">${tCollapsed?'+':'−'}</span>`;
+                const tBudgetLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:0.7143rem;color:#888;font-weight:400">${Fmt.money(tBudget)}</span>`;
+                html += `<tr onclick="toggleBlGroup(this.dataset.group)" data-group="${escKey(tKey)}" style="cursor:pointer;background:#fafafa;border-top:1px solid #eee">
+                  <td colspan="${nCols}" style="position:sticky;left:0;z-index:2;background:#fafafa;padding:6px 12px 6px 26px;font-size:0.7143rem;font-weight:700;color:#555">
+                    ${esc(t)}${tInd}
+                    <span style="float:right;margin-right:6px;font-size:0.7143rem;color:#aaa;font-weight:400">${tWps.length} WPs</span>
+                    ${tBudgetLabel}
+                  </td></tr>`;
+                if (!tCollapsed) tWps.forEach(w => { html += _renderBlRow(w); });
+              });
+            });
+            html += _totalRow(rows.length, totalBudget);
+            tbody.innerHTML = html || `<tr><td class="empty-cell" colspan="${nCols}">No backlog items</td></tr>`;
+          } else if (grouped) {
             // Grouped by Trade OR Project — collapsible group headers (WP count + budget).
             let html = '';
             groupSeq.forEach(gk => {
