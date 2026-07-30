@@ -286,11 +286,13 @@ function initTop5Accordion() {
         ic.className = 'ti ti-arrows-diagonal t5-caret';
         title.appendChild(ic);
       }
-      // The WHOLE card is clickable (not just the title) so a collapsed chip toggles wherever you
-      // click it. Guard: clicking a WP row inside the EXPANDED table opens its detail panel instead.
+      // The card chrome (title/caret/empty space) toggles expand-collapse; a collapsed chip hides
+      // its table so the whole chip toggles. Clicking a WP ROW is a SEPARATE interaction — it always
+      // opens that WP's detail panel and never expands/collapses the card (the two were conflated:
+      // in the default 3-up state a row click both opened the panel AND enlarged the card).
       card.addEventListener('click', (e) => {
         if (!mq.matches) return;                       // mobile already stacks cards full-width
-        if (card.classList.contains('t5-expanded') && e.target.closest && e.target.closest('.rank-list')) return;
+        if (e.target.closest && e.target.closest('.rank-list')) return;  // rows → detail panel only
         const wasExpanded = card.classList.contains('t5-expanded');
         reset();
         if (!wasExpanded) {
