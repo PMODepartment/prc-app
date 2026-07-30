@@ -241,7 +241,7 @@
       lead: 'Contributors manage work packages on their projects, with full cost visibility. No user or project administration.',
       body:
         '<ul class="ob-list">' +
-        '<li><i class="ti ti-pencil-plus"></i><span><b>Add, edit and delete</b> work packages on your projects — changes save immediately (auto-approved).</span></li>' +
+        '<li><i class="ti ti-pencil-plus"></i><span><b>Add, edit and delete</b> work packages on your projects — changes save immediately.</span></li>' +
         '<li><i class="ti ti-file-import"></i><span><b>Import from CSV</b> in bulk — re-importing updates existing WPs by WP No. (no duplicates).</span></li>' +
         '<li><i class="ti ti-adjustments-check"></i><span><b>Status Tracker</b> — update Award / Procurement / Delivery status inline, no form needed.</span></li>' +
         '<li><i class="ti ti-cash"></i><span>Full <b>cost &amp; budget</b> visibility on the dashboards.</span></li>' +
