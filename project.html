@@ -404,7 +404,7 @@
                 <button class="proj-vtab" data-view="submittals" onclick="setWPTableView('submittals')" style="padding:5px 12px;font-size:0.7857rem;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">Submittals</button>
                 <button class="proj-vtab" data-view="all" onclick="setWPTableView('all')" style="padding:5px 12px;font-size:0.7857rem;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:#555">All</button>
               </div>
-              <div style="display:flex;gap:4px;flex-shrink:0">
+              <div id="wp-bulk-btns" style="display:flex;gap:4px;flex-shrink:0">
                 <button onclick="collapseAllTrades()" title="Collapse all" style="padding:5px 10px;font-size:0.7857rem;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:0.8571rem;font-weight:700">−</span> Collapse</button>
                 <button onclick="expandAllTrades()" title="Expand all" style="padding:5px 10px;font-size:0.7857rem;font-weight:600;font-family:inherit;border:1.5px solid #e5e5e5;border-radius:7px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:0.8571rem;font-weight:700">+</span> Expand</button>
               </div>
@@ -417,7 +417,9 @@
                 <tbody id="tbl-body"></tbody>
               </table>
             </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid #f0f0f0">
+            <!-- Viewer-only: the three read-only views stacked as sections (replaces the tab switcher) -->
+            <div id="viewer-wp-sections" style="display:none;padding:14px 14px 4px"></div>
+            <div id="wp-pagination" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid #f0f0f0">
               <button class="btn" id="btn-prev" onclick="changePage(-1)">← Prev</button>
               <span id="pg-info" style="font-size:0.8571rem;color:#888"></span>
               <button class="btn" id="btn-next" onclick="changePage(1)">Next →</button>
@@ -2082,6 +2084,101 @@ function _wpEmptyState(){
     <div style="font-size:0.9286rem;color:#888">No work packages match the current filters. Try clearing or widening them.</div></div>`;
 }
 
+// Module-scope cell renderer (extracted from buildTable) so both the tabbed single table
+// and the viewer stacked-section view format cells identically. Pass _stickyLeft={} for a
+// plain (non-frozen) cell.
+function _fmtPct(v){ return v!=null?(parseFloat(v)*100).toFixed(0)+'%':'—'; }
+function _wpRenderCell(key,wp,_stickyLeft){
+  _stickyLeft = _stickyLeft || {};
+  const fmtPct=_fmtPct;
+  const bud=wp.approved_budget_bcb||0,awd=wp.total_awarded||0,v=bud-awd;
+  const sc=wp.award_status==='Awarded'?'#2D9B6F':'#EE3124';
+  const sl=key in _stickyLeft?`position:sticky;left:${_stickyLeft[key]}px;background:#fff;z-index:1;`:'';
+  switch(key){
+    case 'cost_code':   return `<td style="${sl}"><span class="td-code">${esc(wp.cost_code)||'—'}</span></td>`;
+    case 'wp_no':       return `<td style="${sl}"><span class="td-code" style="cursor:pointer;color:#EE3124" onclick='openWPDetail("${wp.id}")'>${esc(wp.wp_no)||'—'}</span></td>`;
+    case 'works':       return `<td style="${sl}overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(wp.works)}">${esc(wp.works)||'—'}</td>`;
+    case 'description': return `<td style="${sl}max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(wp.description)}"><span class="td-name">${esc(wp.description)||'—'}</span></td>`;
+    case 'trade':       return `<td>${esc(wp.trade)||'—'}</td>`;
+    case 'type_of_works': return `<td>${esc(wp.type_of_works)||'—'}</td>`;
+    case 'scope':{const s=wp.scope||'';const sh=s.length>55?s.slice(0,55)+'…':s;return `<td style="font-size:0.7143rem;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${sh||'—'}${s.length>55?`<button onclick='openWPDetail("${wp.id}")' style="margin-left:4px;font-size:0.7143rem;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:''}${!s?`<button onclick='openWPDetail("${wp.id}")' title="View details" style="font-size:0.7143rem;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`:''}</td>`;}
+    case 'proposed_vendors': return `<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px" title="${esc(wp.proposed_vendors)}">${esc(wp.proposed_vendors)||'—'}</td>`;
+    case 'po_jo_count': return `<td style="text-align:center">${wp.po_jo_count!=null?wp.po_jo_count:'—'}</td>`;
+    case 'po_jo_numbers': return `<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">${esc(wp.po_jo_numbers)||'—'}</td>`;
+    case 'approved_budget_bcb': return `<td style="text-align:right">${fmt(bud)}</td>`;
+    case 'total_awarded': return `<td style="text-align:right">${fmt(awd)}</td>`;
+    case 'variance':    return `<td style="text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}">${(bud||awd)?(v>=0?'+':'')+fmt(v):'—'}</td>`;
+    case 'pct_wt': { const tb=window._projTotalBCB||0; const pw=tb?(v/tb*100):0; return `<td style="text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}" title="Savings ÷ Total BCB">${(bud||awd)?(v>=0?'+':'')+pw.toFixed(2)+'%':'—'}</td>`; }
+    case 'surety_bond': return `<td style="text-align:center">${wp.surety_bond||'—'}</td>`;
+    case 'performance_bond': return `<td style="text-align:center">${wp.performance_bond||'—'}</td>`;
+    case 'warranty_bond': return `<td style="text-align:center">${wp.warranty_bond||'—'}</td>`;
+    case 'payment_terms_days': return `<td style="text-align:center">${wp.payment_terms_days?wp.payment_terms_days+'d':'—'}</td>`;
+    case 'dp_percent':  return `<td style="text-align:center">${fmtPct(wp.dp_percent)}</td>`;
+    case 'dp_terms':    return `<td>${esc(wp.dp_terms)||'—'}</td>`;
+    case 'dp_amount':   return `<td style="text-align:right">${fmt(wp.dp_amount)}</td>`;
+    case 'dp_release_date': return `<td>${fmtDate(wp.dp_release_date)}</td>`;
+    case 'retention_percent': return `<td style="text-align:center">${fmtPct(wp.retention_percent)}</td>`;
+    case 'retention_amount': return `<td style="text-align:right">${fmt(wp.retention_amount)}</td>`;
+    case 'awarding_lead_time': return `<td style="text-align:center">${wp.awarding_lead_time!=null?wp.awarding_lead_time+'d':'—'}</td>`;
+    case 'awarding_date': return `<td>${fmtDate(wp.awarding_date)}</td>`;
+    case 'actual_awarding_date': return `<td>${fmtDate(wp.actual_awarding_date)}</td>`;
+    case 'target_delivery': return `<td>${fmtDate(wp.target_delivery||wp.target_completion)}</td>`;
+    case 'actual_delivery': return `<td>${fmtDate(wp.actual_delivery)}</td>`;
+    case 'target_installation': return `<td>${fmtDate(wp.target_installation)}</td>`;
+    case 'target_completion': return `<td>${fmtDate(wp.target_completion)}</td>`;
+    case 'approver_name': return `<td>${esc(wp.approver_name)||'—'}</td>`;
+    case 'approval_date': return `<td>${fmtDate(wp.approval_date)}</td>`;
+    case 'submittal_doc_type': return `<td>${wp.submittal_doc_type||'—'}</td>`;
+    case 'procurement_status': return (!window.__isViewer && !window.__archived)
+      ? `<td style="min-width:120px">${_stSelect(wp.id,'procurement_status',ST_PROC_OPTS,wp.procurement_status)}</td>`
+      : `<td style="font-size:0.7857rem;color:#555">${esc(wp.procurement_status)||'—'}</td>`;
+    case 'delivery_status': return (!window.__isViewer && !window.__archived)
+      ? `<td style="min-width:150px">${_stSelect(wp.id,'delivery_status',ST_DELIV_OPTS,wp.delivery_status)}</td>`
+      : `<td style="font-size:0.7857rem;color:#555">${esc(wp.delivery_status)||'—'}</td>`;
+    case 'award_status': return `<td>${_stAwardBadge(wp.id, wp.award_status)}</td>`;
+    case 'remarks': return `<td style="font-size:0.7143rem;color:#888;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(wp.remarks)}">${esc(wp.remarks)||'—'}</td>`;
+    default: return '<td>—</td>';
+  }
+}
+
+// Viewer WP List — the tab switcher is replaced by the three read-only views stacked as
+// labeled sections on one page (Overview → Schedule → Submittals). Cost columns are excluded
+// (COST_KEYS) exactly as getActiveCols() does for viewers. Rows are grouped by trade and
+// mirror the current Trade/Works/Vendor/Search/Status filters via getFilteredSorted().
+const VIEWER_WP_SECTIONS = [
+  ['overview','Overview','ti-eye'],
+  ['schedule','Schedule','ti-calendar-event'],
+  ['submittals','Submittals','ti-file-check'],
+];
+function renderViewerWpSections(groups){
+  const host=document.getElementById('viewer-wp-sections');
+  if(!host) return;
+  const totalWPs=groups.reduce((s,g)=>s+g.wps.length,0);
+  if(!totalWPs){ host.innerHTML=`<div class="panel" style="padding:0">${_wpEmptyState()}</div>`; return; }
+  let out='';
+  VIEWER_WP_SECTIONS.forEach(([view,label,icon])=>{
+    const v=WP_TABLE_VIEWS[view]||WP_TABLE_VIEWS.overview;
+    const cols=COLS.filter(c=>v.keys.has(c.key)&&!COST_KEYS.has(c.key));
+    const nCols=cols.length;
+    const head='<tr>'+cols.map(c=>`<th style="text-align:left;white-space:normal;vertical-align:bottom;line-height:1.3">${c.label}</th>`).join('')+'</tr>';
+    let body='';
+    groups.forEach(({trade,wps})=>{
+      body+=`<tr><td colspan="${nCols}" style="background:#f8f8f8;padding:7px 12px;font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#555">${esc(trade)||'—'} · ${wps.length}</td></tr>`;
+      wps.forEach(w=>{ body+='<tr data-trade-row="'+String(trade).replace(/"/g,'&quot;')+'">'+cols.map(c=>_wpRenderCell(c.key,w,{})).join('')+'</tr>'; });
+    });
+    out+=`<div class="panel viewer-wp-section" style="padding:0;margin-bottom:16px">
+      <div class="panel-title" style="padding:12px 16px;border-bottom:1px solid #f0f0f0;margin:0"><i class="ti ${icon}"></i>${label}</div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <table class="data-table" style="width:100%">
+          <thead>${head}</thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+  host.innerHTML=out;
+}
+
 function buildTable(){
   const groups=getFilteredSorted(), cols=getActiveCols();
   const nCols=cols.length;
@@ -2123,57 +2220,8 @@ function buildTable(){
     return `<th onclick="if(sortCol==='${c.key}')sortDir*=-1;else{sortCol='${c.key}';sortDir=1;}curPage=1;buildTable()" style="${ss}cursor:pointer;user-select:none;overflow:hidden;vertical-align:bottom;white-space:normal;line-height:1.3" title="Sort by ${c.label}">${c.label}${ind}</th>`;
   }).join('')+'<th></th></tr>';
 
-  // Cell renderer — sl applied per-cell so sticky style is clean and isolated
-  function renderCell(key,wp){
-    const bud=wp.approved_budget_bcb||0,awd=wp.total_awarded||0,v=bud-awd;
-    const sc=wp.award_status==='Awarded'?'#2D9B6F':'#EE3124';
-    const sl=key in _stickyLeft?`position:sticky;left:${_stickyLeft[key]}px;background:#fff;z-index:1;`:'';
-    switch(key){
-      case 'cost_code':   return `<td style="${sl}"><span class="td-code">${esc(wp.cost_code)||'—'}</span></td>`;
-      case 'wp_no':       return `<td style="${sl}"><span class="td-code" style="cursor:pointer;color:#EE3124" onclick='openWPDetail("${wp.id}")'>${esc(wp.wp_no)||'—'}</span></td>`;
-      case 'works':       return `<td style="${sl}overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(wp.works)}">${esc(wp.works)||'—'}</td>`;
-      case 'description': return `<td style="${sl}max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(wp.description)}"><span class="td-name">${esc(wp.description)||'—'}</span></td>`;
-      case 'trade':       return `<td>${esc(wp.trade)||'—'}</td>`;
-      case 'type_of_works': return `<td>${esc(wp.type_of_works)||'—'}</td>`;
-      case 'scope':{const s=wp.scope||'';const sh=s.length>55?s.slice(0,55)+'…':s;return `<td style="font-size:0.7143rem;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${sh||'—'}${s.length>55?`<button onclick='openWPDetail("${wp.id}")' style="margin-left:4px;font-size:0.7143rem;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:''}${!s?`<button onclick='openWPDetail("${wp.id}")' title="View details" style="font-size:0.7143rem;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`:''}</td>`;}
-      case 'proposed_vendors': return `<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px" title="${esc(wp.proposed_vendors)}">${esc(wp.proposed_vendors)||'—'}</td>`;
-      case 'po_jo_count': return `<td style="text-align:center">${wp.po_jo_count!=null?wp.po_jo_count:'—'}</td>`;
-      case 'po_jo_numbers': return `<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">${esc(wp.po_jo_numbers)||'—'}</td>`;
-      case 'approved_budget_bcb': return `<td style="text-align:right">${fmt(bud)}</td>`;
-      case 'total_awarded': return `<td style="text-align:right">${fmt(awd)}</td>`;
-      case 'variance':    return `<td style="text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}">${(bud||awd)?(v>=0?'+':'')+fmt(v):'—'}</td>`;
-      case 'pct_wt': { const tb=window._projTotalBCB||0; const pw=tb?(v/tb*100):0; return `<td style="text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}" title="Savings ÷ Total BCB">${(bud||awd)?(v>=0?'+':'')+pw.toFixed(2)+'%':'—'}</td>`; }
-      case 'surety_bond': return `<td style="text-align:center">${wp.surety_bond||'—'}</td>`;
-      case 'performance_bond': return `<td style="text-align:center">${wp.performance_bond||'—'}</td>`;
-      case 'warranty_bond': return `<td style="text-align:center">${wp.warranty_bond||'—'}</td>`;
-      case 'payment_terms_days': return `<td style="text-align:center">${wp.payment_terms_days?wp.payment_terms_days+'d':'—'}</td>`;
-      case 'dp_percent':  return `<td style="text-align:center">${fmtPct(wp.dp_percent)}</td>`;
-      case 'dp_terms':    return `<td>${esc(wp.dp_terms)||'—'}</td>`;
-      case 'dp_amount':   return `<td style="text-align:right">${fmt(wp.dp_amount)}</td>`;
-      case 'dp_release_date': return `<td>${fmtDate(wp.dp_release_date)}</td>`;
-      case 'retention_percent': return `<td style="text-align:center">${fmtPct(wp.retention_percent)}</td>`;
-      case 'retention_amount': return `<td style="text-align:right">${fmt(wp.retention_amount)}</td>`;
-      case 'awarding_lead_time': return `<td style="text-align:center">${wp.awarding_lead_time!=null?wp.awarding_lead_time+'d':'—'}</td>`;
-      case 'awarding_date': return `<td>${fmtDate(wp.awarding_date)}</td>`;
-      case 'actual_awarding_date': return `<td>${fmtDate(wp.actual_awarding_date)}</td>`;
-      case 'target_delivery': return `<td>${fmtDate(wp.target_delivery||wp.target_completion)}</td>`;
-      case 'actual_delivery': return `<td>${fmtDate(wp.actual_delivery)}</td>`;
-      case 'target_installation': return `<td>${fmtDate(wp.target_installation)}</td>`;
-      case 'target_completion': return `<td>${fmtDate(wp.target_completion)}</td>`;
-      case 'approver_name': return `<td>${esc(wp.approver_name)||'—'}</td>`;
-      case 'approval_date': return `<td>${fmtDate(wp.approval_date)}</td>`;
-      case 'submittal_doc_type': return `<td>${wp.submittal_doc_type||'—'}</td>`;
-      case 'procurement_status': return (!window.__isViewer && !window.__archived)
-        ? `<td style="min-width:120px">${_stSelect(wp.id,'procurement_status',ST_PROC_OPTS,wp.procurement_status)}</td>`
-        : `<td style="font-size:0.7857rem;color:#555">${esc(wp.procurement_status)||'—'}</td>`;
-      case 'delivery_status': return (!window.__isViewer && !window.__archived)
-        ? `<td style="min-width:150px">${_stSelect(wp.id,'delivery_status',ST_DELIV_OPTS,wp.delivery_status)}</td>`
-        : `<td style="font-size:0.7857rem;color:#555">${esc(wp.delivery_status)||'—'}</td>`;
-      case 'award_status': return `<td>${_stAwardBadge(wp.id, wp.award_status)}</td>`;
-      case 'remarks': return `<td style="font-size:0.7143rem;color:#888;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(wp.remarks)}">${esc(wp.remarks)||'—'}</td>`;
-      default: return '<td>—</td>';
-    }
-  }
+  // Cell renderer moved to module scope (_wpRenderCell) so the viewer stacked-section
+  // view can reuse the exact same cell formatting. _stickyLeft is passed in.
 
   // Tbody — innerHTML for performance; trade header split into sticky + rest cells
   const nSticky=cols.filter(c=>c.sticky).length;
@@ -2189,7 +2237,7 @@ function buildTable(){
       html+=`<tr class="trade-group-header" data-trade="${item.trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5">${tdS}${tdR}</tr>`;
     } else {
       const editLink=(window.__isViewer||window.__archived)?'':`<a href="wp-form.html?id=${item.wp.id}&project=${item.wp.project_id}" style="font-size:0.7857rem;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
-      html+=`<tr data-trade-row="${item.trade.replace(/"/g,'&quot;')}">${cols.map(c=>renderCell(c.key,item.wp)).join('')}<td>${editLink}</td></tr>`;
+      html+=`<tr data-trade-row="${item.trade.replace(/"/g,'&quot;')}">${cols.map(c=>_wpRenderCell(c.key,item.wp,_stickyLeft)).join('')}<td>${editLink}</td></tr>`;
     }
   });
   const tbody=document.getElementById('tbl-body');
@@ -2266,6 +2314,10 @@ function buildTable(){
     });
     cardEl.innerHTML=ch||_wpEmptyState();
   }
+
+  // Viewers: the tab switcher + single paged table/cards are hidden (CSS); render the three
+  // read-only views stacked as sections instead. Uses the same filtered/grouped set.
+  if(window.__isViewer){ try{ renderViewerWpSections(groups); }catch(e){ console.error(e); } }
 }
 
 function changePage(d){curPage+=d;buildTable();}
@@ -3288,13 +3340,15 @@ AppAuth.requireLogin(async (user, profile) => {
   /* ── Viewer simplification — lighter, read-only-focused UI ── */
   /* The "set status inline" hint is meaningless to viewers (they can't edit) */
   body.viewer-mode #wplist-edit-hint { display:none !important; }
-  /* WP List: drop the Overview/Schedule/Submittals view-tab switcher — viewers get a
-     single clean read-only list (default Overview view); full per-WP detail is one click
-     away via the WP No. → detail panel */
-  body.viewer-mode #proj-view-tabs { display:none !important; }
-  /* Trim the Submittal-status donut — it renders as one solid 100% ring whenever a
-     project has no submittal spread, which is uninformative to a read-only viewer */
-  body.viewer-mode #bl-submittal-panel { display:none !important; }
+  /* WP List: replace the Overview/Schedule/Submittals tab switcher (and its paged single
+     table / mobile cards / collapse-expand) with the three views stacked as read-only
+     sections on one page (#viewer-wp-sections, rendered by renderViewerWpSections) */
+  body.viewer-mode #proj-view-tabs,
+  body.viewer-mode #wp-bulk-btns,
+  body.viewer-mode .wp-table-wrap,
+  body.viewer-mode #proj-wp-cards,
+  body.viewer-mode #wp-pagination { display:none !important; }
+  body.viewer-mode #viewer-wp-sections { display:block !important; }
   /* Compact Overview: with the cost KPIs, period chart and Top 5 all hidden, the lone
      WP-status summary was left stranded at half width. Center it as a deliberate summary. */
   body.viewer-mode .ov-top-row { max-width:860px; margin-left:auto; margin-right:auto; }
