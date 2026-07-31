@@ -684,6 +684,9 @@ const Charts = (() => {
   // with cumulative planned/actual/forecast % lines. Mirrors _periodSharePct but for counts.
   // opts.hideAwarded: backlog instances pass only not-awarded WPs, whose actual/cumulative-actual
   // series are 0% by definition — drop those (and Forecast) instead of drawing a flat line at 0%.
+  // `total` (8th arg, forwarded from opts.totalCount by the callers below): denominator to weight
+  // against — the Backlog chart passes the WHOLE project's WP count so bars/cumulative line show
+  // what SHARE of total project WPs the backlog carries, not always climbing to 100% of just itself.
   function _periodCountPct(id, labels, planned, actual, cumP, cumADisp, forecast, total, hideAwd){
     const t = total || planned.reduce((s,v)=>s+v,0) || 1;
     const pct = arr => (arr||[]).map(v => v==null ? null : +(v/t*100).toFixed(2));
@@ -722,7 +725,7 @@ const Charts = (() => {
     const _nowMK=getMKey(new Date());
     const cumADisp=months.map((mk,i)=> mk>_nowMK ? null : cumA[i]);
     if(opts&&opts.countPct){ _periodCountPct(id, months.map(mLabel), planned, actual, cumP, cumADisp,
-      _wpForecastLine(months,getMKey,wps,cumA,()=>1,w=>!!_actAwDate(w)), wps.length, hideAwd); return; }
+      _wpForecastLine(months,getMKey,wps,cumA,()=>1,w=>!!_actAwDate(w)), (opts&&opts.totalCount)||wps.length, hideAwd); return; }
     const mob=_mob();
     const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
     make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
@@ -754,7 +757,7 @@ const Charts = (() => {
     const _nowQK=getQKey(new Date());
     const cumADisp=quarters.map((qk,i)=> qk>_nowQK ? null : cumA[i]);
     if(opts&&opts.countPct){ _periodCountPct(id, quarters.map(qLabel), planned, actual, cumP, cumADisp,
-      _wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)), wps.length, hideAwd); return; }
+      _wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)), (opts&&opts.totalCount)||wps.length, hideAwd); return; }
     const mob=_mob();
     const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
     make(id,{type:'bar',data:{labels:quarters.map(qLabel),datasets:[
