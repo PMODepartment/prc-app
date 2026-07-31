@@ -283,10 +283,11 @@
                 <button id="dash-btn-monthly" onclick="setDashPeriodMode('monthly')" class="seg-btn active">Monthly</button>
                 <button id="dash-btn-quarterly" onclick="setDashPeriodMode('quarterly')" class="seg-btn">Quarterly</button>
                 <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
-                <button id="dash-btn-count" onclick="setDashDataMode('count')" class="seg-btn active"># WPs</button>
-                <button id="dash-btn-budget" onclick="setDashDataMode('budget')" class="seg-btn">Budget</button>
-                <button id="dash-btn-budgetpct" onclick="setDashDataMode('budgetpct')" class="seg-btn">Budget %</button>
-                <button id="dash-btn-countpct" onclick="setDashDataMode('countpct')" class="seg-btn"># WPs %</button>
+                <button id="dash-btn-wp" onclick="setDashMetric('wp')" class="seg-btn active">WP</button>
+                <button id="dash-btn-budget" onclick="setDashMetric('budget')" class="seg-btn">Budget</button>
+                <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
+                <button id="dash-btn-num" onclick="setDashView('num')" class="seg-btn active">#</button>
+                <button id="dash-btn-pct" onclick="setDashView('pct')" class="seg-btn">%</button>
               </div>
             </div>
             <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-dash-period"></canvas></div>
@@ -329,10 +330,11 @@
                   <button id="bl-btn-quarterly" onclick="setBlPeriodMode('quarterly')" class="seg-btn active">Quarterly</button>
                   <button id="bl-btn-monthly" onclick="setBlPeriodMode('monthly')" class="seg-btn">Monthly</button>
                   <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
-                  <button id="bl-dm-count" onclick="setBlDataMode('count')" class="seg-btn active"># WPs</button>
-                  <button id="bl-dm-budget" onclick="setBlDataMode('budget')" class="seg-btn">Budget</button>
-                  <button id="bl-dm-countpct" onclick="setBlDataMode('countpct')" class="seg-btn">WP %</button>
-                  <button id="bl-dm-budgetpct" onclick="setBlDataMode('budgetpct')" class="seg-btn">Budget %</button>
+                  <button id="bl-dm-wp" onclick="setBlMetric('wp')" class="seg-btn active">WP</button>
+                  <button id="bl-dm-budget" onclick="setBlMetric('budget')" class="seg-btn">Budget</button>
+                  <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
+                  <button id="bl-dm-num" onclick="setBlView('num')" class="seg-btn active">#</button>
+                  <button id="bl-dm-pct" onclick="setBlView('pct')" class="seg-btn">%</button>
                 </div>
               </div>
               <div class="chart-mob-h" style="position:relative;height:220px"><canvas id="c-backlog-period"></canvas></div>
@@ -1537,8 +1539,14 @@ function renderOverview(){
 
 let _dashPeriodMode = 'monthly';
 let _dashDataMode = 'count';   // default to # WPs (user preference); Budget is the alternate
+// The 4 modes (count/countpct/budget/budgetpct) are exposed as two independent 2-way toggles —
+// WP|Budget (metric) and #|% (view) — instead of 4 flat buttons; _dashMetric/_dashView combine
+// into _dashDataMode via _dashComboMode() below. Mirrored on the Backlog panel (_bl*) and the
+// Portfolio Overview panel (index.html's _idxDash*).
+let _dashMetric = 'wp', _dashView = 'num';
 let _blPeriodMode = 'quarterly';
 let _blDataMode = 'count';   // default # WPs
+let _blMetric = 'wp', _blView = 'num';
 
 function setDashPeriodMode(mode) {
   _dashPeriodMode = mode;
@@ -1570,8 +1578,20 @@ function _blRenderPeriod(wps){
 }
 window.setBlDataMode = function(mode){
   _blDataMode = mode;
-  ['count','budget','budgetpct','countpct'].forEach(m => _segBtn(document.getElementById('bl-dm-'+m), m===mode));
   _blRenderPeriod(allWPs.filter(w=>w.award_status!=='Awarded'));
+};
+function _blComboMode(){ return _blMetric==='wp' ? (_blView==='pct'?'countpct':'count') : (_blView==='pct'?'budgetpct':'budget'); }
+window.setBlMetric = function(m){
+  _blMetric = m;
+  _segBtn(document.getElementById('bl-dm-wp'), m==='wp');
+  _segBtn(document.getElementById('bl-dm-budget'), m==='budget');
+  setBlDataMode(_blComboMode());
+};
+window.setBlView = function(v){
+  _blView = v;
+  _segBtn(document.getElementById('bl-dm-num'), v==='num');
+  _segBtn(document.getElementById('bl-dm-pct'), v==='pct');
+  setBlDataMode(_blComboMode());
 };
 function setBlPeriodMode(mode) {
   _blPeriodMode = mode;
@@ -1607,12 +1627,20 @@ const _dashBtnStyle = (active) => active
 
 window.setDashDataMode = function(mode) {
   _dashDataMode = mode;
-  const bBud = document.getElementById('dash-btn-budget'), bCnt = document.getElementById('dash-btn-count'), bPct = document.getElementById('dash-btn-budgetpct'), bCPct = document.getElementById('dash-btn-countpct');
-  if(bBud) _segBtn(bBud, mode==='budget');
-  if(bCnt) _segBtn(bCnt, mode==='count');
-  if(bPct) _segBtn(bPct, mode==='budgetpct');
-  if(bCPct) _segBtn(bCPct, mode==='countpct');
   renderDashPeriod(allWPs);
+};
+function _dashComboMode(){ return _dashMetric==='wp' ? (_dashView==='pct'?'countpct':'count') : (_dashView==='pct'?'budgetpct':'budget'); }
+window.setDashMetric = function(m){
+  _dashMetric = m;
+  _segBtn(document.getElementById('dash-btn-wp'), m==='wp');
+  _segBtn(document.getElementById('dash-btn-budget'), m==='budget');
+  setDashDataMode(_dashComboMode());
+};
+window.setDashView = function(v){
+  _dashView = v;
+  _segBtn(document.getElementById('dash-btn-num'), v==='num');
+  _segBtn(document.getElementById('dash-btn-pct'), v==='pct');
+  setDashDataMode(_dashComboMode());
 };
 
 function renderStatusTable(wps, tableId) {

@@ -207,10 +207,11 @@
                 <button id="idx-dash-btn-monthly" onclick="setIdxDashPeriodMode('monthly')" class="seg-btn active">Monthly</button>
                 <button id="idx-dash-btn-quarterly" onclick="setIdxDashPeriodMode('quarterly')" class="seg-btn">Quarterly</button>
                 <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
-                <button id="idx-dash-btn-count" onclick="setIdxDashDataMode('count')" class="seg-btn active"># WPs</button>
-                <button id="idx-dash-btn-budget" onclick="setIdxDashDataMode('budget')" class="seg-btn">Budget</button>
-                <button id="idx-dash-btn-budgetpct" onclick="setIdxDashDataMode('budgetpct')" class="seg-btn">Budget %</button>
-                <button id="idx-dash-btn-countpct" onclick="setIdxDashDataMode('countpct')" class="seg-btn"># WPs %</button>
+                <button id="idx-dash-btn-wp" onclick="setIdxDashMetric('wp')" class="seg-btn active">WP</button>
+                <button id="idx-dash-btn-budget" onclick="setIdxDashMetric('budget')" class="seg-btn">Budget</button>
+                <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
+                <button id="idx-dash-btn-num" onclick="setIdxDashView('num')" class="seg-btn active">#</button>
+                <button id="idx-dash-btn-pct" onclick="setIdxDashView('pct')" class="seg-btn">%</button>
               </div>
             </div>
             <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-idx-dash-period"></canvas></div>
@@ -1203,6 +1204,9 @@
     let _activeTab = 'overview';
     let _idxDashPeriodMode = 'monthly';
     let _idxDashDataMode = 'count';   // default to # WPs (user preference); Budget is the alternate
+    // Exposed as two 2-way toggles (WP|Budget metric, #|% view) instead of 4 flat buttons — see
+    // project.html's matching _dashMetric/_dashView for the same pattern on the per-project page.
+    let _idxDashMetric = 'wp', _idxDashView = 'num';
     let _idxBlPeriodMode = 'quarterly';
     let _idxBudPeriodMode = 'monthly';
     let _idxBudDataMode = 'budget';
@@ -1291,12 +1295,20 @@
 
     window.setIdxDashDataMode = function(mode) {
       _idxDashDataMode = mode;
-      const bBud = document.getElementById('idx-dash-btn-budget'), bCnt = document.getElementById('idx-dash-btn-count'), bPct = document.getElementById('idx-dash-btn-budgetpct'), bCPct = document.getElementById('idx-dash-btn-countpct');
-      if(bBud) _segBtn(bBud, mode==='budget');
-      if(bCnt) _segBtn(bCnt, mode==='count');
-      if(bPct) _segBtn(bPct, mode==='budgetpct');
-      if(bCPct) _segBtn(bCPct, mode==='countpct');
       if(_lastWPs) _idxDashRenderPeriod(_lastWPs);
+    };
+    function _idxDashComboMode(){ return _idxDashMetric==='wp' ? (_idxDashView==='pct'?'countpct':'count') : (_idxDashView==='pct'?'budgetpct':'budget'); }
+    window.setIdxDashMetric = function(m){
+      _idxDashMetric = m;
+      _segBtn(document.getElementById('idx-dash-btn-wp'), m==='wp');
+      _segBtn(document.getElementById('idx-dash-btn-budget'), m==='budget');
+      setIdxDashDataMode(_idxDashComboMode());
+    };
+    window.setIdxDashView = function(v){
+      _idxDashView = v;
+      _segBtn(document.getElementById('idx-dash-btn-num'), v==='num');
+      _segBtn(document.getElementById('idx-dash-btn-pct'), v==='pct');
+      setIdxDashDataMode(_idxDashComboMode());
     };
 
 
