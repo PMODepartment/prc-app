@@ -688,12 +688,30 @@ function getActiveCols() {
       cols.splice(wpNoIdx + 1, 0, desc);
     }
   }
-  // User-configurable freeze override — if the user has pinned a column, freeze everything up to
-  // and including it (contiguous from the left, per the sticky-chain requirement); falls back to
-  // the view's default sticky set above when the pinned key isn't in this view's columns.
+  // User-configurable freeze override, mirroring review.html's Excel-grid pin BEHAVIOR (not its
+  // literal index-freeze mechanism — that grid mostly only ever has 1-2 visible columns ahead of
+  // whatever's pinned, since most sections start collapsed; the WP List always shows every column
+  // in the view, so blanket-freezing everything before a distant pin froze most of the table and
+  // read as "clashing"). Two cases:
+  //  - Pinning one of the DEFAULT sticky columns (cost_code/wp_no/works or .../description) just
+  //    truncates the default frozen run to that column — normal "freeze fewer columns".
+  //  - Pinning any OTHER column REORDERS it to sit immediately after the default frozen run (moving
+  //    past whatever was between them, which stays unfrozen) and freezes only default+that column —
+  //    it never drags along the columns in between.
+  // Falls back to the view's default sticky set above when the pinned key isn't in this view.
   if (_wpFreezeKey) {
-    const i = cols.findIndex(c => c.key === _wpFreezeKey);
-    if (i !== -1) cols = cols.map((c, idx) => ({...c, sticky: idx <= i}));
+    const defaultKeys = new Set(cols.filter(c => c.sticky).map(c => c.key));
+    if (defaultKeys.has(_wpFreezeKey)) {
+      const i = cols.findIndex(c => c.key === _wpFreezeKey);
+      if (i !== -1) cols = cols.map((c, idx) => ({...c, sticky: idx <= i}));
+    } else {
+      const idx = cols.findIndex(c => c.key === _wpFreezeKey);
+      if (idx !== -1) {
+        const [pinned] = cols.splice(idx, 1);
+        const insertAt = cols.filter(c => c.sticky).length;
+        cols.splice(insertAt, 0, {...pinned, sticky: true});
+      }
+    }
   }
   return cols;
 }
