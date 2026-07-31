@@ -1235,17 +1235,18 @@
         const el = document.getElementById(elId);
         if(!el) return;
         const pctND = Math.max(0, 100 - pctAwd - pctDue);
-        // The % label sits at the vertical CENTRE of the battery, so it's over the green fill
-        // as soon as the awarded share reaches 50 — not 55. At 55% exactly the old threshold
-        // left dark text on dark green (unreadable, per the portfolio screenshot).
-        const textColor = pctAwd >= 50 ? '#fff' : '#231F20';
+        // The % label sits at the vertical CENTRE of the battery, which can land on any of the
+        // three fill colors (green/red-stripe/light-gray) depending on the split — switching text
+        // color per card made the two KPI cards look inconsistent with each other. Fixed color
+        // (white) + a solid dark outline (multi-directional text-shadow, not just a soft blur)
+        // instead, so it reads the same on every background including the light-gray fill.
         el.innerHTML = `
           <div style="font-size:0.7143rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.08em;text-align:center;margin-bottom:10px">${title}</div>
           <div style="position:relative;width:72px;height:160px;border:2px solid #ccc;border-radius:12px;overflow:hidden;background:#ebebeb;flex-shrink:0">
             <div style="position:absolute;top:0;left:0;right:0;height:${pctND}%;background:#D1D5DB;min-height:${pctND>0?2:0}px"></div>
             <div style="position:absolute;top:${pctND}%;left:0;right:0;height:${pctDue}%;background:repeating-linear-gradient(135deg,#EE3124,#EE3124 5px,#C42127 5px,#C42127 10px);opacity:.9;min-height:${pctDue>0?2:0}px"></div>
             <div style="position:absolute;bottom:0;left:0;right:0;height:${pctAwd}%;background:linear-gradient(to top,#1a7a50,#2D9B6F,#4ac98a);min-height:${pctAwd>0?2:0}px"></div>
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5714rem;font-weight:800;color:${textColor};text-shadow:0 1px 4px rgba(0,0,0,.3);white-space:nowrap;pointer-events:none;letter-spacing:-.5px">${pctAwd}%</div>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5714rem;font-weight:800;color:#fff;text-shadow:-1px -1px 1px rgba(0,0,0,.75),1px -1px 1px rgba(0,0,0,.75),-1px 1px 1px rgba(0,0,0,.75),1px 1px 1px rgba(0,0,0,.75),0 1px 5px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none;letter-spacing:-.5px">${pctAwd}%</div>
           </div>
           <div style="margin-top:10px;text-align:center">
             <div style="font-size:0.8571rem;font-weight:700;color:#231F20;line-height:1.2">${line1}</div>
