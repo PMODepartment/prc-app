@@ -353,17 +353,22 @@ const Charts = (() => {
   // "Budget %" mode for the period charts — each period's Budget (BCB) and Awarded as a SHARE of the
   // project's total budget (bars), PLUS the cumulative % lines + forecast (the same S-curve treatment
   // as the # WPs and Budget charts, just expressed in %). All arrays come in ₱M; ÷totB×100 → %.
-  function _periodSharePct(id, labels, budgetData, awardedData, cumB, cumADisp, forecast){
-    const totB = budgetData.reduce((s,v)=>s+v,0) || 1;
+  // opts.hideAwarded: backlog instances pass only not-awarded WPs, whose Awarded/Cumulative-Awarded %
+  // are 0% by definition — drop those (and Forecast %) instead of drawing a flat line at 0%.
+  // totalOverride (₱M): denominator to weight against instead of Σbudget of the passed-in WPs — e.g.
+  // the Backlog chart passes the WHOLE project's budget so the bars/cumulative line show what SHARE of
+  // total project budget the backlog carries, rather than always climbing to 100% of just itself.
+  function _periodSharePct(id, labels, budgetData, awardedData, cumB, cumADisp, forecast, hideAwd, totalOverride){
+    const totB = totalOverride || budgetData.reduce((s,v)=>s+v,0) || 1;
     const pct = arr => (arr||[]).map(v => v==null ? null : +(v/totB*100).toFixed(2));
     const bPct=pct(budgetData), aPct=pct(awardedData), cumBP=pct(cumB), cumAP=pct(cumADisp), fP=pct(forecast);
     const mob=_mob();
     make(id,{type:'bar',data:{labels,datasets:[
       {label:'Budget (BCB) %',data:bPct,backgroundColor:'#282C28',borderRadius:3,order:2},
-      {label:'Awarded %',data:aPct,backgroundColor:'#EE3124',borderRadius:3,order:2},
+      ...(hideAwd?[]:[{label:'Awarded %',data:aPct,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Budget %',data:cumBP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Awarded %',data:cumAP,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false},
-      {label:'Forecast %',data:fP,type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
+      ...(hideAwd?[]:[{label:'Cumulative Awarded %',data:cumAP,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast %',data:fP,type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:mob?{display:false}:_dlTidy(v=>v>0?v.toFixed(1)+'%':'',{'Budget (BCB) %':'#231F20','Awarded %':'#EE3124'}),tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.raw==null?'—':ctx.raw+'%'}`}}},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{beginAtZero:true,suggestedMax:100,ticks:{font:{size:mob?8:9},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'% of total budget',font:{size:9}}}}}});
   }
   function budgetAwardedByPeriodMonthly(id, wps, opts){
@@ -391,7 +396,7 @@ const Charts = (() => {
     const cumADisp=months.map((mk,i)=> mk>_nowMK ? null : cumA[i]);
     const forecast=_wpForecastLine(months,getMKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6,w=>w.award_status==='Awarded'&&(w.total_awarded||0)>0);
     // Budget % mode: same cumulative + forecast S-curve, expressed as % of total budget.
-    if(opts&&opts.sharePct){ _periodSharePct(id, months.map(mLabel), budgetData, awardedData, cumB, cumADisp, forecast); return; }
+    if(opts&&opts.sharePct){ _periodSharePct(id, months.map(mLabel), budgetData, awardedData, cumB, cumADisp, forecast, !!(opts&&opts.hideAwarded), opts&&opts.totalBudget); return; }
     const mob=_mob();
     const tidy=!!(opts&&opts.tidyLabels);
     const dl=mob?{display:false}:(tidy?_dlTidy(v=>v>0?_mAbbr(v):'',{'Budget (BCB)':'#231F20','Awarded':'#EE3124'}):_dlBar(v=>v>0?_mAbbr(v):'','v'));
@@ -427,7 +432,7 @@ const Charts = (() => {
     const _nowQK=getQKey(new Date());
     const cumADisp=quarters.map((qk,i)=> qk>_nowQK ? null : cumA[i]);
     const forecast=_wpForecastLine(quarters,getQKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6,w=>w.award_status==='Awarded'&&(w.total_awarded||0)>0);
-    if(opts&&opts.sharePct){ _periodSharePct(id, labels, budgetData, awardedData, cumB, cumADisp, forecast); return; }
+    if(opts&&opts.sharePct){ _periodSharePct(id, labels, budgetData, awardedData, cumB, cumADisp, forecast, !!(opts&&opts.hideAwarded), opts&&opts.totalBudget); return; }
     const mob=_mob();
     const tidy=!!(opts&&opts.tidyLabels);
     const dl=mob?{display:false}:(tidy?_dlTidy(v=>v>0?_mAbbr(v):'',{'Budget (BCB)':'#231F20','Awarded':'#EE3124'}):_dlBar(v=>v>0?_mAbbr(v):'','v'));
