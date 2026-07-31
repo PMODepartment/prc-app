@@ -688,29 +688,19 @@ function getActiveCols() {
       cols.splice(wpNoIdx + 1, 0, desc);
     }
   }
-  // User-configurable freeze override, mirroring review.html's Excel-grid pin BEHAVIOR (not its
-  // literal index-freeze mechanism — that grid mostly only ever has 1-2 visible columns ahead of
-  // whatever's pinned, since most sections start collapsed; the WP List always shows every column
-  // in the view, so blanket-freezing everything before a distant pin froze most of the table and
-  // read as "clashing"). Two cases:
-  //  - Pinning one of the DEFAULT sticky columns (cost_code/wp_no/works or .../description) just
-  //    truncates the default frozen run to that column — normal "freeze fewer columns".
-  //  - Pinning any OTHER column REORDERS it to sit immediately after the default frozen run (moving
-  //    past whatever was between them, which stays unfrozen) and freezes only default+that column —
-  //    it never drags along the columns in between.
-  // Falls back to the view's default sticky set above when the pinned key isn't in this view.
+  // User-configurable freeze override — pinning a column makes it the ONE AND ONLY frozen column
+  // (per explicit user feedback: picking Description must not leave Cost Code/WP No. still frozen
+  // too). It's moved to the far left (index 0) since a sticky column has to be the leftmost of a
+  // contiguous run to render correctly — a single sticky column NOT at index 0 would sit at
+  // left:0 while unfrozen columns before it scroll normally underneath it, i.e. the exact clash
+  // this feature exists to avoid. Clicking the same column's pin again clears _wpFreezeKey and
+  // restores the view's default sticky set above. Falls back to that default when the pinned key
+  // isn't part of the current view's columns.
   if (_wpFreezeKey) {
-    const defaultKeys = new Set(cols.filter(c => c.sticky).map(c => c.key));
-    if (defaultKeys.has(_wpFreezeKey)) {
-      const i = cols.findIndex(c => c.key === _wpFreezeKey);
-      if (i !== -1) cols = cols.map((c, idx) => ({...c, sticky: idx <= i}));
-    } else {
-      const idx = cols.findIndex(c => c.key === _wpFreezeKey);
-      if (idx !== -1) {
-        const [pinned] = cols.splice(idx, 1);
-        const insertAt = cols.filter(c => c.sticky).length;
-        cols.splice(insertAt, 0, {...pinned, sticky: true});
-      }
+    const idx = cols.findIndex(c => c.key === _wpFreezeKey);
+    if (idx !== -1) {
+      const [pinned] = cols.splice(idx, 1);
+      cols = [{...pinned, sticky: true}, ...cols.map(c => ({...c, sticky: false}))];
     }
   }
   return cols;
