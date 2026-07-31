@@ -677,27 +677,32 @@ const Charts = (() => {
 
   // "# WPs %" — planned/actual WP COUNTS as a share of the project's total work packages,
   // with cumulative planned/actual/forecast % lines. Mirrors _periodSharePct but for counts.
-  function _periodCountPct(id, labels, planned, actual, cumP, cumADisp, forecast, total){
+  // opts.hideAwarded: backlog instances pass only not-awarded WPs, whose actual/cumulative-actual
+  // series are 0% by definition — drop those (and Forecast) instead of drawing a flat line at 0%.
+  function _periodCountPct(id, labels, planned, actual, cumP, cumADisp, forecast, total, hideAwd){
     const t = total || planned.reduce((s,v)=>s+v,0) || 1;
     const pct = arr => (arr||[]).map(v => v==null ? null : +(v/t*100).toFixed(2));
     const pP=pct(planned), aP=pct(actual), cP=pct(cumP), cA=pct(cumADisp), fP=pct(forecast);
     const mob=_mob();
     make(id,{type:'bar',data:{labels,datasets:[
       {label:'Planned WPs %',data:pP,backgroundColor:'#282C28',borderRadius:3,order:2},
-      {label:'Actual WPs %',data:aP,backgroundColor:'#EE3124',borderRadius:3,order:2},
+      ...(hideAwd?[]:[{label:'Actual WPs %',data:aP,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Planned %',data:cP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Actual %',data:cA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false},
-      {label:'Forecast %',data:fP,type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
+      ...(hideAwd?[]:[{label:'Cumulative Actual %',data:cA,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast %',data:fP,type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:mob?{display:false}:_dlTidy(v=>v>0?v.toFixed(1)+'%':'',{'Planned WPs %':'#231F20','Actual WPs %':'#EE3124'}),tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.raw==null?'—':ctx.raw+'%'}`}}},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{beginAtZero:true,suggestedMax:100,ticks:{font:{size:mob?8:9},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'% of total WPs',font:{size:9}}}}}});
   }
 
+  // opts.hideAwarded: backlog instances pass only not-awarded WPs, whose actual/cumulative-actual
+  // counts are 0 by definition — drop those series (and Forecast) instead of a flat line at 0.
   function wpCountByPeriodMonthly(id, wps, opts) {
+    const hideAwd=!!(opts&&opts.hideAwarded);
     const mSet=new Set();
     wps.forEach(w=>{
       if(w.awarding_date){const d=new Date(w.awarding_date);mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0'));}
       const ad=_actAwDate(w); if(ad){mSet.add(ad.getFullYear()+'-'+(ad.getMonth()+1).toString().padStart(2,'0'));}
     });
-    _extendForecastAxis(mSet, wps, 'm', false);
+    _extendForecastAxis(mSet, wps, 'm', hideAwd);
     if(!mSet.size){destroy(id);return;}
     const months=[...mSet].sort();
     const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -712,26 +717,27 @@ const Charts = (() => {
     const _nowMK=getMKey(new Date());
     const cumADisp=months.map((mk,i)=> mk>_nowMK ? null : cumA[i]);
     if(opts&&opts.countPct){ _periodCountPct(id, months.map(mLabel), planned, actual, cumP, cumADisp,
-      _wpForecastLine(months,getMKey,wps,cumA,()=>1,w=>!!_actAwDate(w)), wps.length); return; }
+      _wpForecastLine(months,getMKey,wps,cumA,()=>1,w=>!!_actAwDate(w)), wps.length, hideAwd); return; }
     const mob=_mob();
     const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
     make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
       {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
-      {label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
+      ...(hideAwd?[]:[{label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Actual',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false},
-      {label:'Forecast',data:_wpForecastLine(months,getMKey,wps,cumA,()=>1,w=>!!_actAwDate(w)),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
+      ...(hideAwd?[]:[{label:'Cumulative Actual',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(months,getMKey,wps,cumA,()=>1,w=>!!_actAwDate(w)),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
 
   // WP Count by Period — Quarterly (Planned vs Actual)
   function wpCountByPeriod(id, wps, opts) {
+    const hideAwd=!!(opts&&opts.hideAwarded);
     const qSet=new Set();
     wps.forEach(w=>{
       if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date)));
       const ad=_actAwDate(w); if(ad) qSet.add(getQKey(ad));
     });
-    _extendForecastAxis(qSet, wps, 'q', false);
+    _extendForecastAxis(qSet, wps, 'q', hideAwd);
     if(!qSet.size){destroy(id);return;}
     const quarters=[...qSet].sort();
     const planned=quarters.map(qk=>wps.filter(w=>w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).length);
@@ -743,15 +749,15 @@ const Charts = (() => {
     const _nowQK=getQKey(new Date());
     const cumADisp=quarters.map((qk,i)=> qk>_nowQK ? null : cumA[i]);
     if(opts&&opts.countPct){ _periodCountPct(id, quarters.map(qLabel), planned, actual, cumP, cumADisp,
-      _wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)), wps.length); return; }
+      _wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)), wps.length, hideAwd); return; }
     const mob=_mob();
     const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
     make(id,{type:'bar',data:{labels:quarters.map(qLabel),datasets:[
       {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
-      {label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
+      ...(hideAwd?[]:[{label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
-      {label:'Cumulative Actual',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false},
-      {label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
+      ...(hideAwd?[]:[{label:'Cumulative Actual',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
 
