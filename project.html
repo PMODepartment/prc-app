@@ -642,6 +642,21 @@ async function exportProjectExcel(){
   XLSX.writeFile(wb, (projId||'project') + '_WorkPackages_' + stamp + '.xlsx');
 }
 
+// User-configurable frozen columns for the WP List (mirrors review.html's Excel-grid pin):
+// null = each view's default sticky set (see getActiveCols); a column key = frozen up to and
+// including that column, persisted per user. Falls back to the view's default when the pinned
+// key isn't part of the currently active view's columns (e.g. pinned in Overview, then switched
+// to Schedule where that column doesn't exist).
+let _wpFreezeKey = null;
+function _wpFreezeKeyLS(){ return 'wpm_wplist_freeze_' + ((window.__profile&&window.__profile.id)||'anon'); }
+function _wpLoadFreeze(){ try{ const v = localStorage.getItem(_wpFreezeKeyLS()); _wpFreezeKey = v || null; }catch(_){} }
+function _wpSaveFreeze(){ try{ if(_wpFreezeKey) localStorage.setItem(_wpFreezeKeyLS(), _wpFreezeKey); else localStorage.removeItem(_wpFreezeKeyLS()); }catch(_){} }
+window.wpSetFreeze = function(key){
+  _wpFreezeKey = (_wpFreezeKey === key) ? null : key;
+  _wpSaveFreeze();
+  buildTable();
+};
+
 let _wpTableView = 'overview';
 const WP_TABLE_VIEWS = {
   overview:   {keys:new Set(['cost_code','wp_no','works','description','scope','proposed_vendors','procurement_status','delivery_status','award_status','remarks'])},
@@ -672,6 +687,13 @@ function getActiveCols() {
       const [desc] = cols.splice(descIdx, 1);
       cols.splice(wpNoIdx + 1, 0, desc);
     }
+  }
+  // User-configurable freeze override — if the user has pinned a column, freeze everything up to
+  // and including it (contiguous from the left, per the sticky-chain requirement); falls back to
+  // the view's default sticky set above when the pinned key isn't in this view's columns.
+  if (_wpFreezeKey) {
+    const i = cols.findIndex(c => c.key === _wpFreezeKey);
+    if (i !== -1) cols = cols.map((c, idx) => ({...c, sticky: idx <= i}));
   }
   return cols;
 }
@@ -2271,18 +2293,25 @@ function buildTable(){
   let _sl=0;
   const _stickyLeft={};
   cols.forEach(c=>{ if(c.sticky){_stickyLeft[c.key]=_sl;_sl+=parseInt(c.w);} });
+  const _stickyCount=cols.filter(c=>c.sticky).length;
 
   // Colgroup — fixed column widths so sticky offsets match rendered widths
   const cg=document.getElementById('proj-wp-colgroup');
   if(cg) cg.innerHTML=cols.map(c=>`<col style="width:${parseInt(c.w)}px;min-width:${parseInt(c.w)}px">`).join('')+'<col style="width:50px;min-width:50px">';
 
-  // Thead — white-space:normal so headers wrap to 2 lines instead of overflowing
+  // Thead — white-space:normal so headers wrap to 2 lines instead of overflowing.
+  // Each header also carries a freeze pin (hover to reveal) so the user can pick their own
+  // frozen-column boundary, like review.html's Excel grid — sticky columns are always the
+  // contiguous run from the left (idx <= boundary), so the pin only ever appears "on" for the
+  // LAST sticky column; clicking it toggles back to the view's default.
   const thead=document.getElementById('tbl-head');
-  if(thead) thead.innerHTML='<tr>'+cols.map(c=>{
+  if(thead) thead.innerHTML='<tr>'+cols.map((c,i)=>{
     const isSorted=sortCol===c.key;
     const ind=isSorted?`<span style="margin-left:3px;color:#EE3124">${sortDir===1?'↑':'↓'}</span>`:'';
     const ss=c.sticky?`position:sticky;left:${_stickyLeft[c.key]}px;background:#f8f8f8;z-index:3;`:'';
-    return `<th onclick="if(sortCol==='${c.key}')sortDir*=-1;else{sortCol='${c.key}';sortDir=1;}curPage=1;buildTable()" style="${ss}cursor:pointer;user-select:none;overflow:hidden;vertical-align:bottom;white-space:normal;line-height:1.3" title="Sort by ${c.label}">${c.label}${ind}</th>`;
+    const isBoundary=c.sticky&&i===_stickyCount-1;
+    const pin=`<button class="wp-pin${isBoundary?' on':''}" title="${isBoundary?'Frozen up to here — click to unfreeze':'Freeze columns up to here'}" onclick="event.stopPropagation();wpSetFreeze('${c.key}')"><i class="ti ti-${isBoundary?'pinned-filled':'pin'}"></i></button>`;
+    return `<th onclick="if(sortCol==='${c.key}')sortDir*=-1;else{sortCol='${c.key}';sortDir=1;}curPage=1;buildTable()" style="${ss}cursor:pointer;user-select:none;overflow:hidden;vertical-align:bottom;white-space:normal;line-height:1.3" title="Sort by ${c.label}">${c.label}${ind}${pin}</th>`;
   }).join('')+'<th></th></tr>';
 
   // Cell renderer moved to module scope (_wpRenderCell) so the viewer stacked-section
@@ -2588,6 +2617,7 @@ window.addEventListener('pageshow', e => {
 
 AppAuth.requireLogin(async (user, profile) => {
   userProfile = profile;
+  _wpLoadFreeze();
   window.__wpmRole = profile.role;
   window.__isViewer = profile.role === 'viewer';
   if (window.__isViewer) {
@@ -3341,6 +3371,11 @@ AppAuth.requireLogin(async (user, profile) => {
     background: var(--mw-red-light) !important;
     color: var(--mw-red);
   }
+  /* WP List — user-configurable freeze pin (mirrors review.html's Excel grid ".xl-pin") */
+  .wp-pin{margin-left:3px;padding:0 2px;border:none;background:transparent;color:var(--text-secondary,#888);cursor:pointer;font-size:0.7857rem;line-height:1;opacity:0;vertical-align:middle;transition:opacity .1s}
+  #proj-wp-table thead th:hover .wp-pin{opacity:.5}
+  .wp-pin:hover{opacity:1 !important;color:#EE3124}
+  .wp-pin.on{opacity:.9;color:#EE3124}
   .wp-card-list { display:none; padding:0 0 8px; }
   @media (max-width:767px) {
     .wp-table-wrap { display:none !important; }
