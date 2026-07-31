@@ -2218,51 +2218,62 @@ function _wpRenderCell(key,wp,_stickyLeft){
   const fmtPct=_fmtPct;
   const bud=wp.approved_budget_bcb||0,awd=wp.total_awarded||0,v=bud-awd;
   const sc=wp.award_status==='Awarded'?'#2D9B6F':'#EE3124';
-  const sl=key in _stickyLeft?`position:sticky;left:${_stickyLeft[key]}px;background:#fff;z-index:1;`:'';
+  // Sticky positioning is applied GENERICALLY here for every column, not opted into per-case —
+  // previously only cost_code/wp_no/works/description carried the sticky style inline, so freezing
+  // ANY other column (via the pin — see buildTable) marked it sticky in the header/offset math but
+  // left its body cell as a normal, non-positioned <td>, desyncing header and body ("clashing").
+  // position/background/z-index now live in the ".wp-freeze" CSS class (dark-mode aware); only the
+  // per-column "left" offset is still inline, since that's genuinely per-render data.
+  const isSticky = key in _stickyLeft;
+  const stickyStyle = isSticky ? `left:${_stickyLeft[key]}px;` : '';
+  const td = (inner, extraStyle, extraAttrs) => {
+    const style = stickyStyle + (extraStyle||'');
+    return `<td${isSticky?' class="wp-freeze"':''}${style?` style="${style}"`:''}${extraAttrs||''}>${inner}</td>`;
+  };
   switch(key){
-    case 'cost_code':   return `<td style="${sl}"><span class="td-code">${esc(wp.cost_code)||'—'}</span></td>`;
-    case 'wp_no':       return `<td style="${sl}"><span class="td-code" style="cursor:pointer;color:#EE3124" onclick='openWPDetail("${wp.id}")'>${esc(wp.wp_no)||'—'}</span></td>`;
-    case 'works':       return `<td style="${sl}overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(wp.works)}">${esc(wp.works)||'—'}</td>`;
-    case 'description': return `<td style="${sl}max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(wp.description)}"><span class="td-name">${esc(wp.description)||'—'}</span></td>`;
-    case 'trade':       return `<td>${esc(wp.trade)||'—'}</td>`;
-    case 'type_of_works': return `<td>${esc(wp.type_of_works)||'—'}</td>`;
-    case 'scope':{const s=wp.scope||'';const sh=s.length>55?s.slice(0,55)+'…':s;return `<td style="font-size:0.7143rem;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${sh||'—'}${s.length>55?`<button onclick='openWPDetail("${wp.id}")' style="margin-left:4px;font-size:0.7143rem;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:''}${!s?`<button onclick='openWPDetail("${wp.id}")' title="View details" style="font-size:0.7143rem;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`:''}</td>`;}
-    case 'proposed_vendors': return `<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px" title="${esc(wp.proposed_vendors)}">${esc(wp.proposed_vendors)||'—'}</td>`;
-    case 'po_jo_count': return `<td style="text-align:center">${wp.po_jo_count!=null?wp.po_jo_count:'—'}</td>`;
-    case 'po_jo_numbers': return `<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">${esc(wp.po_jo_numbers)||'—'}</td>`;
-    case 'approved_budget_bcb': return `<td style="text-align:right">${fmt(bud)}</td>`;
-    case 'total_awarded': return `<td style="text-align:right">${fmt(awd)}</td>`;
-    case 'variance':    return `<td style="text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}">${(bud||awd)?(v>=0?'+':'')+fmt(v):'—'}</td>`;
-    case 'pct_wt': { const tb=window._projTotalBCB||0; const pw=tb?(v/tb*100):0; return `<td style="text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}" title="Savings ÷ Total BCB">${(bud||awd)?(v>=0?'+':'')+pw.toFixed(2)+'%':'—'}</td>`; }
-    case 'surety_bond': return `<td style="text-align:center">${wp.surety_bond||'—'}</td>`;
-    case 'performance_bond': return `<td style="text-align:center">${wp.performance_bond||'—'}</td>`;
-    case 'warranty_bond': return `<td style="text-align:center">${wp.warranty_bond||'—'}</td>`;
-    case 'payment_terms_days': return `<td style="text-align:center">${wp.payment_terms_days?wp.payment_terms_days+'d':'—'}</td>`;
-    case 'dp_percent':  return `<td style="text-align:center">${fmtPct(wp.dp_percent)}</td>`;
-    case 'dp_terms':    return `<td>${esc(wp.dp_terms)||'—'}</td>`;
-    case 'dp_amount':   return `<td style="text-align:right">${fmt(wp.dp_amount)}</td>`;
-    case 'dp_release_date': return `<td>${fmtDate(wp.dp_release_date)}</td>`;
-    case 'retention_percent': return `<td style="text-align:center">${fmtPct(wp.retention_percent)}</td>`;
-    case 'retention_amount': return `<td style="text-align:right">${fmt(wp.retention_amount)}</td>`;
-    case 'awarding_lead_time': return `<td style="text-align:center">${wp.awarding_lead_time!=null?wp.awarding_lead_time+'d':'—'}</td>`;
-    case 'awarding_date': return `<td>${fmtDate(wp.awarding_date)}</td>`;
-    case 'actual_awarding_date': return `<td>${fmtDate(wp.actual_awarding_date)}</td>`;
-    case 'target_delivery': return `<td>${fmtDate(wp.target_delivery||wp.target_completion)}</td>`;
-    case 'actual_delivery': return `<td>${fmtDate(wp.actual_delivery)}</td>`;
-    case 'target_installation': return `<td>${fmtDate(wp.target_installation)}</td>`;
-    case 'target_completion': return `<td>${fmtDate(wp.target_completion)}</td>`;
-    case 'approver_name': return `<td>${esc(wp.approver_name)||'—'}</td>`;
-    case 'approval_date': return `<td>${fmtDate(wp.approval_date)}</td>`;
-    case 'submittal_doc_type': return `<td>${wp.submittal_doc_type||'—'}</td>`;
+    case 'cost_code':   return td(`<span class="td-code">${esc(wp.cost_code)||'—'}</span>`);
+    case 'wp_no':       return td(`<span class="td-code" style="cursor:pointer;color:#EE3124" onclick='openWPDetail("${wp.id}")'>${esc(wp.wp_no)||'—'}</span>`);
+    case 'works':       return td(esc(wp.works)||'—', 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap', ` title="${esc(wp.works)}"`);
+    case 'description': return td(`<span class="td-name">${esc(wp.description)||'—'}</span>`, 'max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', ` title="${esc(wp.description)}"`);
+    case 'trade':       return td(esc(wp.trade)||'—');
+    case 'type_of_works': return td(esc(wp.type_of_works)||'—');
+    case 'scope':{const s=wp.scope||'';const sh=s.length>55?s.slice(0,55)+'…':s;return td(`${sh||'—'}${s.length>55?`<button onclick='openWPDetail("${wp.id}")' style="margin-left:4px;font-size:0.7143rem;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:''}${!s?`<button onclick='openWPDetail("${wp.id}")' title="View details" style="font-size:0.7143rem;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`:''}`, 'font-size:0.7143rem;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px');}
+    case 'proposed_vendors': return td(esc(wp.proposed_vendors)||'—', 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px', ` title="${esc(wp.proposed_vendors)}"`);
+    case 'po_jo_count': return td(wp.po_jo_count!=null?wp.po_jo_count:'—', 'text-align:center');
+    case 'po_jo_numbers': return td(esc(wp.po_jo_numbers)||'—', 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px');
+    case 'approved_budget_bcb': return td(fmt(bud), 'text-align:right');
+    case 'total_awarded': return td(fmt(awd), 'text-align:right');
+    case 'variance':    return td((bud||awd)?(v>=0?'+':'')+fmt(v):'—', `text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}`);
+    case 'pct_wt': { const tb=window._projTotalBCB||0; const pw=tb?(v/tb*100):0; return td((bud||awd)?(v>=0?'+':'')+pw.toFixed(2)+'%':'—', `text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}`, ` title="Savings ÷ Total BCB"`); }
+    case 'surety_bond': return td(wp.surety_bond||'—', 'text-align:center');
+    case 'performance_bond': return td(wp.performance_bond||'—', 'text-align:center');
+    case 'warranty_bond': return td(wp.warranty_bond||'—', 'text-align:center');
+    case 'payment_terms_days': return td(wp.payment_terms_days?wp.payment_terms_days+'d':'—', 'text-align:center');
+    case 'dp_percent':  return td(fmtPct(wp.dp_percent), 'text-align:center');
+    case 'dp_terms':    return td(esc(wp.dp_terms)||'—');
+    case 'dp_amount':   return td(fmt(wp.dp_amount), 'text-align:right');
+    case 'dp_release_date': return td(fmtDate(wp.dp_release_date));
+    case 'retention_percent': return td(fmtPct(wp.retention_percent), 'text-align:center');
+    case 'retention_amount': return td(fmt(wp.retention_amount), 'text-align:right');
+    case 'awarding_lead_time': return td(wp.awarding_lead_time!=null?wp.awarding_lead_time+'d':'—', 'text-align:center');
+    case 'awarding_date': return td(fmtDate(wp.awarding_date));
+    case 'actual_awarding_date': return td(fmtDate(wp.actual_awarding_date));
+    case 'target_delivery': return td(fmtDate(wp.target_delivery||wp.target_completion));
+    case 'actual_delivery': return td(fmtDate(wp.actual_delivery));
+    case 'target_installation': return td(fmtDate(wp.target_installation));
+    case 'target_completion': return td(fmtDate(wp.target_completion));
+    case 'approver_name': return td(esc(wp.approver_name)||'—');
+    case 'approval_date': return td(fmtDate(wp.approval_date));
+    case 'submittal_doc_type': return td(wp.submittal_doc_type||'—');
     case 'procurement_status': return (!window.__isViewer && !window.__archived)
-      ? `<td style="min-width:120px">${_stSelect(wp.id,'procurement_status',ST_PROC_OPTS,wp.procurement_status)}</td>`
-      : `<td style="font-size:0.7857rem;color:#555">${esc(wp.procurement_status)||'—'}</td>`;
+      ? td(_stSelect(wp.id,'procurement_status',ST_PROC_OPTS,wp.procurement_status), 'min-width:120px')
+      : td(esc(wp.procurement_status)||'—', 'font-size:0.7857rem;color:#555');
     case 'delivery_status': return (!window.__isViewer && !window.__archived)
-      ? `<td style="min-width:150px">${_stSelect(wp.id,'delivery_status',ST_DELIV_OPTS,wp.delivery_status)}</td>`
-      : `<td style="font-size:0.7857rem;color:#555">${esc(wp.delivery_status)||'—'}</td>`;
-    case 'award_status': return `<td style="overflow:hidden">${_stAwardBadge(wp.id, wp.award_status)}</td>`;
-    case 'remarks': return `<td style="font-size:0.7143rem;color:#888;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(wp.remarks)}">${esc(wp.remarks)||'—'}</td>`;
-    default: return '<td>—</td>';
+      ? td(_stSelect(wp.id,'delivery_status',ST_DELIV_OPTS,wp.delivery_status), 'min-width:150px')
+      : td(esc(wp.delivery_status)||'—', 'font-size:0.7857rem;color:#555');
+    case 'award_status': return td(_stAwardBadge(wp.id, wp.award_status), 'overflow:hidden');
+    case 'remarks': return td(esc(wp.remarks)||'—', 'font-size:0.7143rem;color:#888;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', ` title="${esc(wp.remarks)}"`);
+    default: return td('—');
   }
 }
 
@@ -2308,10 +2319,10 @@ function buildTable(){
   if(thead) thead.innerHTML='<tr>'+cols.map((c,i)=>{
     const isSorted=sortCol===c.key;
     const ind=isSorted?`<span style="margin-left:3px;color:#EE3124">${sortDir===1?'↑':'↓'}</span>`:'';
-    const ss=c.sticky?`position:sticky;left:${_stickyLeft[c.key]}px;background:#f8f8f8;z-index:3;`:'';
+    const ss=c.sticky?`left:${_stickyLeft[c.key]}px;`:'';
     const isBoundary=c.sticky&&i===_stickyCount-1;
     const pin=`<button class="wp-pin${isBoundary?' on':''}" title="${isBoundary?'Frozen up to here — click to unfreeze':'Freeze columns up to here'}" onclick="event.stopPropagation();wpSetFreeze('${c.key}')"><i class="ti ti-${isBoundary?'pinned-filled':'pin'}"></i></button>`;
-    return `<th onclick="if(sortCol==='${c.key}')sortDir*=-1;else{sortCol='${c.key}';sortDir=1;}curPage=1;buildTable()" style="${ss}cursor:pointer;user-select:none;overflow:hidden;vertical-align:bottom;white-space:normal;line-height:1.3" title="Sort by ${c.label}">${c.label}${ind}${pin}</th>`;
+    return `<th${c.sticky?' class="wp-freeze"':''} onclick="if(sortCol==='${c.key}')sortDir*=-1;else{sortCol='${c.key}';sortDir=1;}curPage=1;buildTable()" style="${ss}cursor:pointer;user-select:none;overflow:hidden;vertical-align:bottom;white-space:normal;line-height:1.3" title="Sort by ${c.label}">${c.label}${ind}${pin}</th>`;
   }).join('')+'<th></th></tr>';
 
   // Cell renderer moved to module scope (_wpRenderCell) so the viewer stacked-section
@@ -3376,6 +3387,15 @@ AppAuth.requireLogin(async (user, profile) => {
   #proj-wp-table thead th:hover .wp-pin{opacity:.5}
   .wp-pin:hover{opacity:1 !important;color:#EE3124}
   .wp-pin.on{opacity:.9;color:#EE3124}
+  /* Frozen (sticky) WP List columns — CSS class instead of inline style, mirroring review.html's
+     ".xl-freeze": position/background come from the theme-aware CSS var, not a hardcoded #fff, so
+     dark mode and the row-hover tint both apply cleanly instead of a JS-computed inline color that
+     can visually "seam"/clash against the row next to it once the frozen boundary changes. */
+  #proj-wp-table th.wp-freeze, #proj-wp-table td.wp-freeze { position:sticky; overflow:hidden; background:var(--surface,#fff); }
+  #proj-wp-table thead th.wp-freeze { z-index:4; background:var(--surface-2,#f8f8f8); }
+  #proj-wp-table tbody td.wp-freeze { z-index:1; }
+  /* the existing tr[data-trade-row]:hover td rule (above) already !important-overrides this for
+     row hover, since it targets plain "td" with higher-priority !important, not ".wp-freeze" */
   .wp-card-list { display:none; padding:0 0 8px; }
   @media (max-width:767px) {
     .wp-table-wrap { display:none !important; }
