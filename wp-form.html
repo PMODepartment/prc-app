@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260731c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260731c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260731c"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260731c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260803a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260803a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260731c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803a"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -658,10 +658,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260731c"></script>
-<script src="assets/js/ui.js?v=20260731c"></script>
-<script src="assets/js/db.js?v=20260731c"></script>
-<script src="assets/js/coachmarks.js?v=20260731c"></script>
+<script src="assets/js/auth.js?v=20260803a"></script>
+<script src="assets/js/ui.js?v=20260803a"></script>
+<script src="assets/js/db.js?v=20260803a"></script>
+<script src="assets/js/coachmarks.js?v=20260803a"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -1130,7 +1130,7 @@ document.addEventListener('input', function(e) { if (e.target.closest && e.targe
 AppAuth.requireLogin(async (user, profile) => {
     userProfile = profile;
     window.__wpmRole = profile.role;
-    if (profile.role === 'viewer') { window.location.href = 'project.html' + (projId ? '?id=' + projId : ''); return; }
+    if (profile.role === 'viewer' || profile.role === 'viewer_budget') { window.location.href = 'project.html' + (projId ? '?id=' + projId : ''); return; }
     // Guard: wp-form requires a project context
     if (!editId && !projId) {
       // No project selected — redirect to login to pick one
@@ -1156,7 +1156,7 @@ AppAuth.requireLogin(async (user, profile) => {
       if (pn) pn.textContent = projId;
     }
     // Review WPs link visible to all non-viewer roles
-    if (profile.role !== 'viewer') {
+    if (profile.role !== 'viewer' && profile.role !== 'viewer_budget') {
       const reviewLink = document.getElementById('review-link-form');
       if (reviewLink) {
         reviewLink.href = projId ? 'review.html?project=' + projId : 'review.html';
@@ -1218,7 +1218,7 @@ AppAuth.requireLogin(async (user, profile) => {
       document.getElementById('page-title').textContent = 'Edit Work Package';
       document.getElementById('page-sub').textContent = existingWP.wp_no + ' — ' + existingWP.description;
       const delBtn = document.getElementById('btn-delete');
-      if (delBtn && profile.role !== 'viewer') delBtn.style.display = '';
+      if (delBtn && profile.role !== 'viewer' && profile.role !== 'viewer_budget') delBtn.style.display = '';
       document.getElementById('btn-submit-text').textContent =
         AppAuth.isAutoApprove(profile) ? 'Save Changes' : 'Submit Update for Review';
 

@@ -26,7 +26,7 @@
   /* ---- role → capability tier -------------------------------------------- */
   function tierOf(role) {
     if (role === 'super_admin' || role === 'admin') return 'admin';
-    if (role === 'viewer') return 'viewer';
+    if (role === 'viewer' || role === 'viewer_budget') return 'viewer';
     return 'contributor';                    // specialist / manager / user
   }
   var TIER_META = {

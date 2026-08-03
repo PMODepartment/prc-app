@@ -59,7 +59,7 @@ const WPDb = (() => {
   // back to the table so nothing hard-breaks (viewers just still see cost until the DB is migrated).
   let _wpRelCache=null;
   async function _wpRel() {
-    if (!(typeof window!=='undefined' && window.__isViewer)) return 'work_packages';
+    if (!(typeof window!=='undefined' && window.__wpmRole==='viewer')) return 'work_packages';
     if (_wpRelCache) return _wpRelCache;
     try { const sb=await getSB(); const {error}=await sb.from('wp_view_public').select('id').limit(1); _wpRelCache = error ? 'work_packages' : 'wp_view_public'; }
     catch(_) { _wpRelCache='work_packages'; }

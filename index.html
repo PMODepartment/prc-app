@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260731c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260731c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260731c"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260731c"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260731c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260803a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803a"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260803a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260803a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260731c"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260803a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260731c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803a"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -635,14 +635,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260731c"></script>
-<script src="assets/js/db.js?v=20260731c"></script>
-<script src="assets/js/ui.js?v=20260731c"></script>
-<script src="assets/js/onboarding.js?v=20260731c"></script>
-<script src="assets/js/coachmarks.js?v=20260731c"></script>
+<script src="assets/js/auth.js?v=20260803a"></script>
+<script src="assets/js/db.js?v=20260803a"></script>
+<script src="assets/js/ui.js?v=20260803a"></script>
+<script src="assets/js/onboarding.js?v=20260803a"></script>
+<script src="assets/js/coachmarks.js?v=20260803a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260731c"></script>
+<script src="assets/js/charts.js?v=20260803a"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -721,9 +721,13 @@
 
   AppAuth.requireLogin(async (user, profile) => {
     window.__wpmRole = profile.role;
-    window.__isViewer = profile.role === 'viewer';
+    window.__isViewer = (profile.role === 'viewer' || profile.role === 'viewer_budget');
+    window.__hideBudget = profile.role === 'viewer';
     if (window.__isViewer) {
       document.body.classList.add('viewer-mode');
+    }
+    if (window.__hideBudget) {
+      document.body.classList.add('budget-hidden');
       // Hide Financial view tab — contains cost data
       document.querySelectorAll('.wp-vtab[data-view="financial"],.wp-vtab[data-view="all"]').forEach(b=>b.style.display='none');
     }
@@ -731,7 +735,7 @@
     // Interactive coach-mark tour (spotlights real UI). Auto-runs once per user; re-runnable from the
     // profile menu. The slide-deck guide (Onboarding) stays available via the topbar ? button.
     if (window.CoachTour) {
-      const _cv = window.__isViewer;
+      const _cv = window.__hideBudget;
       const _cs = [
         { sel:'#view-tabs', title:'Your dashboard tabs', body:'Switch between <b>Overview</b>, Backlog, Budget, Schedule, Works and the <b>WP List</b> — each is a different view of your work packages.' },
         { sel:'#proj-filter-btn', title:'Filter projects', body:'Choose which projects feed the charts. <b>Archived</b> projects start unselected — toggle them on if you need them.' },
@@ -861,7 +865,7 @@
           <div><div class="pc-stat-val" style="color:var(--mw-red)">${s.late}</div><div class="pc-stat-lbl">Due Not Awarded</div></div>
           <div><div class="pc-stat-val" style="color:#aaa">${s.total-s.awarded-s.late}</div><div class="pc-stat-lbl">Not Due Yet</div></div>
         </div>
-        ${window.__isViewer ? '' : `<div style="display:flex;gap:10px;margin:8px 0 4px;font-size:0.7857rem;flex-wrap:wrap">
+        ${window.__hideBudget ? '' : `<div style="display:flex;gap:10px;margin:8px 0 4px;font-size:0.7857rem;flex-wrap:wrap">
           <span style="color:#888">Budget: <strong style="color:#231F20">${budgetM}</strong></span>
           <span style="color:#888">Awarded: <strong style="color:#2D9B6F">${contractM}</strong></span>
         </div>`}
@@ -958,7 +962,7 @@
       const nonOverview = _wpListView !== 'overview';
       const isAll = _wpListView === 'all';
       return v.keys
-        .filter(k => !(window.__isViewer && _WPC[k]?.cost))
+        .filter(k => !(window.__hideBudget && _WPC[k]?.cost))
         .map(k => {
           const col = {key:k, ..._WPC[k]};
           if (isAll) {
@@ -983,7 +987,7 @@
       });
       // Hide Award and All tabs for viewers (cost data)
       document.querySelectorAll('.wp-vtab[data-view="financial"],.wp-vtab[data-view="all"]').forEach(b => {
-        b.style.display = window.__isViewer ? 'none' : '';
+        b.style.display = window.__hideBudget ? 'none' : '';
       });
       _wpMonPage = 1;
       renderWPMonTable(_wpMonFiltered);
@@ -999,7 +1003,7 @@
       const tbody = document.getElementById('idx-dash-backlog-tbody');
       if (!tbody) return;
       const now = new Date();
-      const isViewer = window.__isViewer;
+      const isViewer = window.__hideBudget;
       // Populate Trade filter once
       const trSel = document.getElementById('idx-dbl-trade');
       if (trSel && trSel.options.length <= 1) {
@@ -1085,7 +1089,7 @@
     window.openWPDetail = function(idOrObj) {
       const w = typeof idOrObj === 'string' ? (window._wpById||{})[idOrObj] : idOrObj;
       if (!w) return;
-      const isViewer = window.__isViewer;
+      const isViewer = window.__hideBudget;
       const fmtM = v => v ? Fmt.money(v) : '—';
       const fmtD = d => d ? Fmt.date(d) : '—';
       const fmtPct = v => v != null ? (parseFloat(v)*100).toFixed(0)+'%' : '—';
@@ -1246,7 +1250,7 @@
             <div style="position:absolute;top:0;left:0;right:0;height:${pctND}%;background:#D1D5DB;min-height:${pctND>0?2:0}px"></div>
             <div style="position:absolute;top:${pctND}%;left:0;right:0;height:${pctDue}%;background:repeating-linear-gradient(135deg,#EE3124,#EE3124 5px,#C42127 5px,#C42127 10px);opacity:.9;min-height:${pctDue>0?2:0}px"></div>
             <div style="position:absolute;bottom:0;left:0;right:0;height:${pctAwd}%;background:linear-gradient(to top,#1a7a50,#2D9B6F,#4ac98a);min-height:${pctAwd>0?2:0}px"></div>
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5714rem;font-weight:800;color:#fff;text-shadow:-1px -1px 1px rgba(0,0,0,.75),1px -1px 1px rgba(0,0,0,.75),-1px 1px 1px rgba(0,0,0,.75),1px 1px 1px rgba(0,0,0,.75),0 1px 5px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none;letter-spacing:-.5px">${pctAwd}%</div>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Montserrat',sans-serif;font-size:1.4286rem;font-weight:700;color:#fff;-webkit-font-smoothing:antialiased;text-shadow:0 0 3px rgba(0,0,0,.85),0 0 6px rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.9);white-space:nowrap;pointer-events:none;letter-spacing:0">${pctAwd}%</div>
           </div>
           <div style="margin-top:10px;text-align:center">
             <div style="font-size:0.8571rem;font-weight:700;color:#231F20;line-height:1.2">${line1}</div>
@@ -1776,7 +1780,7 @@
           };
           const _totalRow = (cnt, budget) => cnt ? `<tr style="background:#fafafa;font-weight:700;border-top:2px solid #e5e5e5">
             <td colspan="${preBudgetCols}" style="font-size:0.7857rem;padding:8px 10px">TOTAL (${cnt} WPs)</td>
-            <td style="font-size:0.7857rem;padding:8px 10px">${window.__isViewer?'—':Fmt.money(budget)}</td>
+            <td style="font-size:0.7857rem;padding:8px 10px">${window.__hideBudget?'—':Fmt.money(budget)}</td>
             <td colspan="2"></td>
           </tr>` : '';
           if (twoLevel) {
@@ -1802,7 +1806,7 @@
               const pInfo = permitted.find(x=>x.id===pid);
               const pName = pInfo && pInfo.name ? pInfo.name : pid;
               const pInd = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:0.9286rem;font-weight:700;float:right;margin-left:4px">${pCollapsed?'+':'−'}</span>`;
-              const pBudgetLabel = window.__isViewer ? '' : ` · ${Fmt.money(pBudget)}`;
+              const pBudgetLabel = window.__hideBudget ? '' : ` · ${Fmt.money(pBudget)}`;
               html += `<tr onclick="toggleBlGroup(this.dataset.group)" data-group="${escKey(pKey)}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
                 <td colspan="${nCols}" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:8px 12px;font-weight:600">
                   <span style="font-size:0.7143rem;font-weight:700;background:#EE3124;color:#fff;padding:2px 7px;border-radius:4px;margin-right:8px">${esc(pid)}</span>
@@ -1821,7 +1825,7 @@
                 const tCollapsed = !!_blCollapseState.get(tKey);
                 const tBudget = tWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
                 const tInd = `<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background:#e0e0e0;color:#555;font-size:0.8571rem;font-weight:700;float:right;margin-left:4px">${tCollapsed?'+':'−'}</span>`;
-                const tBudgetLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:0.7143rem;color:#888;font-weight:400">${Fmt.money(tBudget)}</span>`;
+                const tBudgetLabel = window.__hideBudget ? '' : `<span style="float:right;margin-right:6px;font-size:0.7143rem;color:#888;font-weight:400">${Fmt.money(tBudget)}</span>`;
                 html += `<tr onclick="toggleBlGroup(this.dataset.group)" data-group="${escKey(tKey)}" style="cursor:pointer;background:#fafafa;border-top:1px solid #eee">
                   <td colspan="${nCols}" style="position:sticky;left:0;z-index:2;background:#fafafa;padding:6px 12px 6px 26px;font-size:0.7143rem;font-weight:700;color:#555">
                     ${esc(t)}${tInd}
@@ -1841,7 +1845,7 @@
               const collapsed = !!_blCollapseState.get(gk);
               const gBudget = gWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
               const ind = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:0.9286rem;font-weight:700;float:right;margin-left:4px">${collapsed?'+':'−'}</span>`;
-              const budgeLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:0.7143rem;color:#888;font-weight:400">${Fmt.money(gBudget)}</span>`;
+              const budgeLabel = window.__hideBudget ? '' : `<span style="float:right;margin-right:6px;font-size:0.7143rem;color:#888;font-weight:400">${Fmt.money(gBudget)}</span>`;
               const label = byProject ? _blProjLabel(gk) : gk;
               html += `<tr onclick="toggleBlGroup(this.dataset.group)" data-group="${String(gk).replace(/"/g,'&quot;')}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
                 <td colspan="${nCols}" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:7px 12px;font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
@@ -2597,7 +2601,7 @@
       // ── Mobile card view (tab-aware) ─────────────────────────────────
       const cardEl = document.getElementById('wp-mon-cards');
       if (cardEl) {
-        const isViewer = window.__isViewer;
+        const isViewer = window.__hideBudget;
         const view = _wpListView;
         const _sc = s => s==='Awarded'?'#2D9B6F':'#EE3124';
         const _bc = s => s==='Awarded'?'#2D9B6F':'#e5e5e5';
@@ -3132,7 +3136,7 @@
     renderAll();
 
     document.getElementById('btn-export').addEventListener('click', async () => {
-      if (window.__isViewer) return;   // viewers must not export cost data (PDF emits BCB/Awarded/Variance)
+      if (window.__hideBudget) return;   // viewers must not export cost data (PDF emits BCB/Awarded/Variance)
       const btn = document.getElementById('btn-export');
       btn.disabled = true;
       btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i><span class="hide-mobile"> Generating…</span>';
@@ -3267,38 +3271,38 @@
     body.viewer-mode #idx-viewer-projects, body.viewer-mode #tab-overview, body.viewer-mode #tab-backlog,
     body.viewer-mode #tab-schedule, body.viewer-mode #tab-wplist { scroll-margin-top:112px; }
   }
-  /* Viewer mode — hide all cost data */
-  body.viewer-mode #btn-export { display:none !important; }   /* cost data — viewers can't export */
-  body.viewer-mode #metrics-cost-group { display:none !important; }
-  body.viewer-mode #tab-budget { display:none !important; }
-  body.viewer-mode #tab-budget-btn { display:none !important; }
-  body.viewer-mode #idx-wk-scope-budget-panel { display:none !important; }
-  body.viewer-mode #idx-wk-scope-budget-panel + div { display:none !important; }
-  /* Viewers: hide all budget/cost/award-amount charts, graphs & money panels */
-  body.viewer-mode #idx-ov-battery-val,
-  body.viewer-mode .top5-row,
-  body.viewer-mode #idx-dash-period-panel,
-  body.viewer-mode #idx-bl-period-panel,
-  body.viewer-mode #tab-works,
-  body.viewer-mode #tab-works-btn,
-  body.viewer-mode #wp-mon-analysis,
-  body.viewer-mode #sch-btn-budget { display:none !important; }
+  /* Budget-hidden mode (role='viewer' only) — hide all cost data */
+  body.budget-hidden #btn-export { display:none !important; }   /* cost data — plain viewers can't export */
+  body.budget-hidden #metrics-cost-group { display:none !important; }
+  body.budget-hidden #tab-budget { display:none !important; }
+  body.budget-hidden #tab-budget-btn { display:none !important; }
+  body.budget-hidden #idx-wk-scope-budget-panel { display:none !important; }
+  body.budget-hidden #idx-wk-scope-budget-panel + div { display:none !important; }
+  /* Plain viewers: hide all budget/cost/award-amount charts, graphs & money panels */
+  body.budget-hidden #idx-ov-battery-val,
+  body.budget-hidden .top5-row,
+  body.budget-hidden #idx-dash-period-panel,
+  body.budget-hidden #idx-bl-period-panel,
+  body.budget-hidden #tab-works,
+  body.budget-hidden #tab-works-btn,
+  body.budget-hidden #wp-mon-analysis,
+  body.budget-hidden #sch-btn-budget { display:none !important; }
   /* Project table — hide the Budget (₱M) column */
-  body.viewer-mode #proj-data-table th:nth-child(7),
-  body.viewer-mode #proj-data-table td:nth-child(7) { display:none !important; }
+  body.budget-hidden #proj-data-table th:nth-child(7),
+  body.budget-hidden #proj-data-table td:nth-child(7) { display:none !important; }
   /* Hide cost columns in consolidated WP list (Budget, Awarded, Variance, DP Amt, Retention%, Retention Amt) */
-  body.viewer-mode #wp-mon-table th:nth-child(12),
-  body.viewer-mode #wp-mon-table td:nth-child(12),
-  body.viewer-mode #wp-mon-table th:nth-child(13),
-  body.viewer-mode #wp-mon-table td:nth-child(13),
-  body.viewer-mode #wp-mon-table th:nth-child(14),
-  body.viewer-mode #wp-mon-table td:nth-child(14),
-  body.viewer-mode #wp-mon-table th:nth-child(21),
-  body.viewer-mode #wp-mon-table td:nth-child(21),
-  body.viewer-mode #wp-mon-table th:nth-child(23),
-  body.viewer-mode #wp-mon-table td:nth-child(23),
-  body.viewer-mode #wp-mon-table th:nth-child(24),
-  body.viewer-mode #wp-mon-table td:nth-child(24) { display:none !important; }
+  body.budget-hidden #wp-mon-table th:nth-child(12),
+  body.budget-hidden #wp-mon-table td:nth-child(12),
+  body.budget-hidden #wp-mon-table th:nth-child(13),
+  body.budget-hidden #wp-mon-table td:nth-child(13),
+  body.budget-hidden #wp-mon-table th:nth-child(14),
+  body.budget-hidden #wp-mon-table td:nth-child(14),
+  body.budget-hidden #wp-mon-table th:nth-child(21),
+  body.budget-hidden #wp-mon-table td:nth-child(21),
+  body.budget-hidden #wp-mon-table th:nth-child(23),
+  body.budget-hidden #wp-mon-table td:nth-child(23),
+  body.budget-hidden #wp-mon-table th:nth-child(24),
+  body.budget-hidden #wp-mon-table td:nth-child(24) { display:none !important; }
   /* ── WP List: table on desktop, card view on mobile ── */
   .wp-card-list { display:none; padding:0 0 8px; }
   @media (max-width:767px) {
@@ -3338,13 +3342,13 @@
   .wpc-actions button { flex:1;font-size:0.7857rem;font-weight:600;color:#555;background:#f5f5f5;border:none;border-radius:6px;padding:7px 6px;cursor:pointer;font-family:inherit; }
   .wpc-actions a { font-size:0.7857rem;font-weight:600;color:#EE3124;border:1.5px solid #EE3124;border-radius:6px;padding:6px 12px;text-decoration:none;white-space:nowrap; }
   /* Hide Budget column in backlog tables and dashboard backlog */
-  body.viewer-mode #bl-table th:nth-child(7),
-  body.viewer-mode #bl-table td:nth-child(7),
-  body.viewer-mode #idx-dash-backlog-table th:nth-child(5),
-  body.viewer-mode #idx-dash-backlog-table td:nth-child(5) { display:none !important; }
-  /* Hide budget (₱M) filter inputs from viewers */
-  body.viewer-mode #idx-dbl-bmin, body.viewer-mode #idx-dbl-bmax,
-  body.viewer-mode #bl-bmin, body.viewer-mode #bl-bmax { display:none !important; }
+  body.budget-hidden #bl-table th:nth-child(7),
+  body.budget-hidden #bl-table td:nth-child(7),
+  body.budget-hidden #idx-dash-backlog-table th:nth-child(5),
+  body.budget-hidden #idx-dash-backlog-table td:nth-child(5) { display:none !important; }
+  /* Hide budget (₱M) filter inputs from plain viewers */
+  body.budget-hidden #idx-dbl-bmin, body.budget-hidden #idx-dbl-bmax,
+  body.budget-hidden #bl-bmin, body.budget-hidden #bl-bmax { display:none !important; }
 </style>
 
 <!-- WP Detail Modal -->

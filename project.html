@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260731c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260731c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260731c"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260731c"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260731c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260803a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803a"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260803a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260803a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260731c"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260803a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260731c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803a"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -504,14 +504,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260731c"></script>
-<script src="assets/js/ui.js?v=20260731c"></script>
-<script src="assets/js/db.js?v=20260731c"></script>
-<script src="assets/js/onboarding.js?v=20260731c"></script>
-<script src="assets/js/coachmarks.js?v=20260731c"></script>
+<script src="assets/js/auth.js?v=20260803a"></script>
+<script src="assets/js/ui.js?v=20260803a"></script>
+<script src="assets/js/db.js?v=20260803a"></script>
+<script src="assets/js/onboarding.js?v=20260803a"></script>
+<script src="assets/js/coachmarks.js?v=20260803a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260731c"></script>
+<script src="assets/js/charts.js?v=20260803a"></script>
 <script>
 
   // Segmented toggle state — swaps a class instead of rewriting cssText.
@@ -612,10 +612,10 @@ function _xlsxCellVal(w, key){
   }
 }
 async function exportProjectExcel(){
-  if (window.__isViewer) return;                       // viewers never export cost data
+  if (window.__hideBudget) return;                       // viewers never export cost data
   const XLSX = await _loadSheetJS();
   // All columns (cost-aware), full project WP set, sorted by trade then numeric WP No.
-  const cols = window.__isViewer ? COLS.filter(c=>!COST_KEYS.has(c.key)) : COLS;
+  const cols = window.__hideBudget ? COLS.filter(c=>!COST_KEYS.has(c.key)) : COLS;
   const order = (typeof TRADE_ORDER!=='undefined' && TRADE_ORDER) ? TRADE_ORDER : [];
   const rows = (allWPs||[]).slice().sort((a,b)=>{
     const ta = order.indexOf(a.trade), tb = order.indexOf(b.trade);
@@ -665,7 +665,7 @@ const WP_TABLE_VIEWS = {
 };
 function getActiveCols() {
   const v = WP_TABLE_VIEWS[_wpTableView] || WP_TABLE_VIEWS.overview;
-  const base = window.__isViewer ? COLS.filter(c=>!COST_KEYS.has(c.key)) : COLS;
+  const base = window.__hideBudget ? COLS.filter(c=>!COST_KEYS.has(c.key)) : COLS;
   const freezeDesc = _wpTableView !== 'overview';
   const isAll = _wpTableView === 'all';
   let cols = base.filter(c => v.keys.has(c.key)).map(c => {
@@ -712,7 +712,7 @@ function setWPTableView(view) {
   });
   // Hide Award and All tabs for viewers
   document.querySelectorAll('.proj-vtab[data-view="financial"],.proj-vtab[data-view="all"]').forEach(b => {
-    b.style.display = window.__isViewer ? 'none' : '';
+    b.style.display = window.__hideBudget ? 'none' : '';
   });
   curPage = 1; buildTable();
 }
@@ -720,7 +720,7 @@ function setWPTableView(view) {
 function openWPDetail(idOrObj) {
   const w = typeof idOrObj === 'string' ? (window._wpById||{})[idOrObj] : idOrObj;
   if (!w) return;
-  const isViewer = window.__isViewer;
+  const isViewer = window.__hideBudget;
   const fmtM = v => v ? '₱'+(Math.abs(v)/1e6).toFixed(1)+'M' : '—';
   const fmtD = d => { if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'});}catch{return d;} };
   const fmtPct = v => v != null ? (parseFloat(v)*100).toFixed(0)+'%' : '—';
@@ -1234,7 +1234,7 @@ window.stAwardConfirm = async function(){
 // WPs awarded over their own BCB and cost-bearing rows still flagged "Not Awarded", and reconciles the
 // row totals against the Helping Sheet. Non-viewers only; renders a dismissible panel + console.table.
 window.runForecastDiag = function(){
-  if(window.__isViewer) return;
+  if(window.__hideBudget) return;
   const rows = allWPs||[];
   const n = v => Number(v)||0;
   const bcbAll = rows.reduce((s,w)=>s+n(w.approved_budget_bcb),0);
@@ -1512,7 +1512,7 @@ function renderOvBattery(wps) {
         <div style="position:absolute;top:0;left:0;right:0;height:${pctND}%;background:#D1D5DB;min-height:${pctND>0?2:0}px"></div>
         <div style="position:absolute;top:${pctND}%;left:0;right:0;height:${pctDue}%;background:repeating-linear-gradient(135deg,#EE3124,#EE3124 5px,#C42127 5px,#C42127 10px);opacity:.9;min-height:${pctDue>0?2:0}px"></div>
         <div style="position:absolute;bottom:0;left:0;right:0;height:${pctAwd}%;background:linear-gradient(to top,#1a7a50,#2D9B6F,#4ac98a);min-height:${pctAwd>0?2:0}px"></div>
-        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5714rem;font-weight:800;color:#fff;text-shadow:-1px -1px 1px rgba(0,0,0,.75),1px -1px 1px rgba(0,0,0,.75),-1px 1px 1px rgba(0,0,0,.75),1px 1px 1px rgba(0,0,0,.75),0 1px 5px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none;letter-spacing:-.5px">${pctAwd}%</div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Montserrat',sans-serif;font-size:1.4286rem;font-weight:700;color:#fff;-webkit-font-smoothing:antialiased;text-shadow:0 0 3px rgba(0,0,0,.85),0 0 6px rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.9);white-space:nowrap;pointer-events:none;letter-spacing:0">${pctAwd}%</div>
       </div>
       <div style="margin-top:10px;text-align:center">
         <div style="font-size:0.8571rem;font-weight:700;color:#231F20;line-height:1.2">${line1}</div>
@@ -1906,7 +1906,7 @@ function renderBacklog(){
       const collapsed = !!_blCollapseState.get(trade);
       const tBudget = tWps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
       const ind = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:0.9286rem;font-weight:700;float:right;margin-left:4px">${collapsed?'+':'−'}</span>`;
-      const budgeLabel = window.__isViewer ? '' : `<span style="float:right;margin-right:6px;font-size:0.7143rem;color:#888;font-weight:400">${((tBudget)/1e6).toFixed(1)} M</span>`;
+      const budgeLabel = window.__hideBudget ? '' : `<span style="float:right;margin-right:6px;font-size:0.7143rem;color:#888;font-weight:400">${((tBudget)/1e6).toFixed(1)} M</span>`;
       html += `<tr onclick="toggleBlGroup(this.dataset.trade)" data-trade="${trade.replace(/"/g,'&quot;')}" style="cursor:pointer;background:#f0f0f0;border-top:2px solid #e5e5e5">
         <td colspan="${nCols}" style="position:sticky;left:0;z-index:2;background:#f0f0f0;padding:7px 12px;font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555">
           ${trade}${ind}
@@ -2145,7 +2145,7 @@ window.setPwaViewMode = function(v){
   renderPwaAnalysis();
 };
 function renderPwaAnalysis(){ if(!document.getElementById('pwa-summary')) return;
-  if(window.__isViewer) return;
+  if(window.__hideBudget) return;
   const all=_pwaFilteredWPs();
   _populatePwaFilters(all);
   const rows=(_pwaFrom==='all'&&_pwaTo==='all')?all:all.filter(w=>_pwaPeriodMatch(_pwaPdate(w.awarding_date)));
@@ -2381,7 +2381,7 @@ function buildTable(){
   // ── Mobile card view (tab-aware) ────────────────────────────────────
   const cardEl=document.getElementById('proj-wp-cards');
   if(cardEl){
-    const isViewer=window.__isViewer;
+    const isViewer=window.__hideBudget;
     const view=_wpTableView;
     const _sc=s=>s==='Awarded'?'#2D9B6F':'#EE3124';
     const _bc=s=>s==='Awarded'?'#2D9B6F':'#e5e5e5';
@@ -2659,24 +2659,29 @@ AppAuth.requireLogin(async (user, profile) => {
   userProfile = profile;
   _wpLoadFreeze();
   window.__wpmRole = profile.role;
-  window.__isViewer = profile.role === 'viewer';
+  window.__isViewer = (profile.role === 'viewer' || profile.role === 'viewer_budget');
+  window.__hideBudget = profile.role === 'viewer';
   if (window.__isViewer) {
     document.body.classList.add('viewer-mode');
-    document.querySelectorAll('.proj-vtab[data-view="financial"],.proj-vtab[data-view="all"]').forEach(b=>b.style.display='none');
-    const pwa=document.getElementById('pwa-analysis'); if(pwa) pwa.style.display='none';   // cost panel hidden for viewers
     const st=document.getElementById('status-tracker'); if(st) st.style.display='none';    // viewers can't edit
+  }
+  if (window.__hideBudget) {
+    document.body.classList.add('budget-hidden');
+    document.querySelectorAll('.proj-vtab[data-view="financial"],.proj-vtab[data-view="all"]').forEach(b=>b.style.display='none');
+    const pwa=document.getElementById('pwa-analysis'); if(pwa) pwa.style.display='none';   // cost panel hidden for plain viewers
   }
   // Interactive coach-mark tour (spotlights real UI, role-aware). Auto-runs once; re-runnable from the
   // profile menu. Steps for hidden elements (viewer/archived) are skipped automatically.
   if (window.CoachTour) {
     const _cv = window.__isViewer;
+    const _hb = window.__hideBudget;
     const _ov = function(){ try{ if(window.switchView) switchView('overview'); }catch(e){} };
     const _tb = function(){ try{ if(window.switchView) switchView('table'); }catch(e){} };
     const _cs = [
       { sel:'.view-tabs', title:'Project views', body:'<b>Overview</b> for the summary, <b>Backlog</b> for not-yet-awarded WPs, and <b>WP List</b> to filter, edit and track work packages.', before:_ov },
       { sel:'#ov-battery-wp', title:'Award progress', body:'How much of this project is awarded, by work-package count.', before:_ov },
     ];
-    if (!_cv) _cs.push({ sel:'#metrics-cost', title:'Cost overview', body:'Headline cost figures — <b>hover any label</b> for its definition.', before:_ov });
+    if (!_hb) _cs.push({ sel:'#metrics-cost', title:'Cost overview', body:'Headline cost figures — <b>hover any label</b> for its definition.', before:_ov });
     if (!_cv) _cs.push({ sel:'#add-wp-link', title:'Add a work package', body:'Add a single WP here, or use <b>Import from CSV</b> (in Tools) to add many at once.' });
     _cs.push({ sel:'#f-status', title:'Filter the WP List', body:'Filter by status, trade, works, vendor or search to find work packages fast.', before:_tb });
     if (!_cv) _cs.push({ sel:'#status-tracker', title:'Work Package Status Tracker', body:'Update <b>Award, Procurement &amp; Delivery</b> status inline. Setting Procurement to <b>Awarded</b> prompts for the awarded cost &amp; vendor.', before:_tb });
@@ -2832,7 +2837,7 @@ AppAuth.requireLogin(async (user, profile) => {
   if(srch) srch.addEventListener('input',()=>dbnc('fsearch',()=>{curPage=1; if(currentView==='table'){buildTable(); renderPwaAnalysis();}}));
 
   document.getElementById('btn-export').addEventListener('click', async () => {
-    if (window.__isViewer) return;   // viewers must not export cost data (PDF emits BCB/Awarded/Variance)
+    if (window.__hideBudget) return;   // viewers must not export cost data (PDF emits BCB/Awarded/Variance)
     const btn = document.getElementById('btn-export');
     btn.disabled = true;
     btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i><span class="hide-mobile"> Generating…</span>';
@@ -2847,7 +2852,7 @@ AppAuth.requireLogin(async (user, profile) => {
   });
 
   document.getElementById('btn-export-xlsx').addEventListener('click', async () => {
-    if (window.__isViewer) return;   // viewers must not export cost data
+    if (window.__hideBudget) return;   // viewers must not export cost data
     const btn = document.getElementById('btn-export-xlsx');
     btn.disabled = true;
     btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i><span class="hide-mobile"> Generating…</span>';
@@ -3463,25 +3468,26 @@ AppAuth.requireLogin(async (user, profile) => {
   .wpc-actions { display:flex;gap:7px;margin-top:9px; }
   .wpc-actions button { flex:1;font-size:0.7857rem;font-weight:600;color:#555;background:#f5f5f5;border:none;border-radius:6px;padding:7px 6px;cursor:pointer;font-family:inherit; }
   .wpc-actions a { font-size:0.7857rem;font-weight:600;color:#EE3124;border:1.5px solid #EE3124;border-radius:6px;padding:6px 12px;text-decoration:none;white-space:nowrap; }
-  /* Viewer mode — hide all cost data and editing tools */
-  body.viewer-mode #metrics-cost-group { display:none !important; }
-  body.viewer-mode #btn-export,
-  body.viewer-mode #btn-export-xlsx { display:none !important; }   /* cost data — viewers can't export */
+  /* Viewer mode — hide editing tools (read-only for both viewer & viewer_budget) */
   body.viewer-mode #sidebar-tools { display:none !important; }
-  body.viewer-mode #dash-backlog-table th:nth-child(5),
-  body.viewer-mode #dash-backlog-table td:nth-child(5),
-  body.viewer-mode #dash-bl-bmin,
-  body.viewer-mode #dash-bl-bmax,
-  body.viewer-mode #backlog-min-budget,
-  body.viewer-mode #backlog-max-budget,
-  body.viewer-mode label[for="backlog-min-budget"] { display:none !important; }
-  /* Viewers: hide all budget/cost/award-amount charts, graphs & money panels */
-  body.viewer-mode #ov-battery-val,
-  body.viewer-mode .top5-row,
-  body.viewer-mode #dash-period-panel,
-  body.viewer-mode #backlog-period-panel { display:none !important; }
-  body.viewer-mode #backlog-table th:nth-child(6),
-  body.viewer-mode #backlog-table td:nth-child(6) { display:none !important; }
+  /* Budget-hidden mode (role='viewer' only) — hide all cost data */
+  body.budget-hidden #metrics-cost-group { display:none !important; }
+  body.budget-hidden #btn-export,
+  body.budget-hidden #btn-export-xlsx { display:none !important; }   /* cost data — plain viewers can't export */
+  body.budget-hidden #dash-backlog-table th:nth-child(5),
+  body.budget-hidden #dash-backlog-table td:nth-child(5),
+  body.budget-hidden #dash-bl-bmin,
+  body.budget-hidden #dash-bl-bmax,
+  body.budget-hidden #backlog-min-budget,
+  body.budget-hidden #backlog-max-budget,
+  body.budget-hidden label[for="backlog-min-budget"] { display:none !important; }
+  /* Plain viewers: hide all budget/cost/award-amount charts, graphs & money panels */
+  body.budget-hidden #ov-battery-val,
+  body.budget-hidden .top5-row,
+  body.budget-hidden #dash-period-panel,
+  body.budget-hidden #backlog-period-panel { display:none !important; }
+  body.budget-hidden #backlog-table th:nth-child(6),
+  body.budget-hidden #backlog-table td:nth-child(6) { display:none !important; }
   /* ── Viewer simplification — lighter, read-only-focused UI ── */
   /* The "set status inline" hint is meaningless to viewers (they can't edit) */
   body.viewer-mode #wplist-edit-hint { display:none !important; }
@@ -3537,8 +3543,9 @@ AppAuth.requireLogin(async (user, profile) => {
     body.viewer-mode #view-overview, body.viewer-mode #view-backlog, body.viewer-mode #view-table { scroll-margin-top:112px; }
   }
   /* Compact Overview: with the cost KPIs, period chart and Top 5 all hidden, the lone
-     WP-status summary was left stranded at half width. Center it as a deliberate summary. */
-  body.viewer-mode .ov-top-row { max-width:860px; margin-left:auto; margin-right:auto; }
+     WP-status summary was left stranded at half width. Center it as a deliberate summary.
+     (Only when cost is actually hidden — viewer_budget still has the full-width KPI row.) */
+  body.budget-hidden .ov-top-row { max-width:860px; margin-left:auto; margin-right:auto; }
   /* Archived project — read-only for everyone: hide all editing entry points */
   body.archived-readonly #add-wp-link,
   body.archived-readonly #sidebar-tools,

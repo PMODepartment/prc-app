@@ -25,8 +25,8 @@ create table if not exists users (
   id          uuid primary key references auth.users(id) on delete cascade,
   name        text,
   email       text unique not null,
-  role        text not null default 'user'   -- super_admin | admin | specialist | manager | user | viewer
-                check (role in ('super_admin','admin','specialist','manager','user','viewer')),
+  role        text not null default 'user'   -- super_admin | admin | specialist | manager | user | viewer | viewer_budget
+                check (role in ('super_admin','admin','specialist','manager','user','viewer','viewer_budget')),
   status      text not null default 'pending'  -- pending | approved | rejected
                 check (status in ('pending','approved','rejected')),
   projects    text[] default '{}',            -- array of project IDs assigned to user
@@ -304,7 +304,7 @@ create policy "wp_insert" on work_packages
   for insert to authenticated
   with check (
     internal.get_my_status() = 'approved'
-    and internal.get_my_role() <> 'viewer'
+    and internal.get_my_role() not in ('viewer','viewer_budget')
     and (
       internal.get_my_role() in ('super_admin','admin')
       or project_id = any(internal.get_my_projects())
@@ -316,7 +316,7 @@ create policy "wp_update" on work_packages
   for update to authenticated
   using (
     internal.get_my_status() = 'approved'
-    and internal.get_my_role() <> 'viewer'
+    and internal.get_my_role() not in ('viewer','viewer_budget')
     and (
       internal.get_my_role() in ('super_admin','admin')
       or project_id = any(internal.get_my_projects())
@@ -330,7 +330,7 @@ create policy "wp_delete" on work_packages
   for delete to authenticated
   using (
     internal.get_my_status() = 'approved'
-    and internal.get_my_role() <> 'viewer'
+    and internal.get_my_role() not in ('viewer','viewer_budget')
     and (
       internal.get_my_role() in ('super_admin','admin')
       or project_id = any(internal.get_my_projects())
@@ -386,7 +386,7 @@ create policy "claims_insert" on claims
   for insert to authenticated
   with check (
     internal.get_my_status() = 'approved'
-    and internal.get_my_role() <> 'viewer'
+    and internal.get_my_role() not in ('viewer','viewer_budget')
     and (
       internal.get_my_role() in ('super_admin','admin')
       or project_id = any(internal.get_my_projects())
@@ -397,7 +397,7 @@ create policy "claims_update" on claims
   for update to authenticated
   using (
     internal.get_my_status() = 'approved'
-    and internal.get_my_role() <> 'viewer'
+    and internal.get_my_role() not in ('viewer','viewer_budget')
     and (
       internal.get_my_role() in ('super_admin','admin')
       or project_id = any(internal.get_my_projects())
