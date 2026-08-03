@@ -206,8 +206,12 @@ function initExpandableCharts() {
     // clipped past the panel's edge (nowrap), or — once the row was allowed to wrap — landed alone
     // on an orphaned second line with nothing else around it, reading as randomly placed. A fixed
     // corner position is unambiguous regardless of how crowded the title row gets, on any panel,
-    // on any screen size.
-    if (getComputedStyle(panel).position === 'static') panel.style.position = 'relative';
+    // on any screen size. `.panel` supplies `position:relative` itself (dashboard.css) — do NOT set
+    // it here as an inline style: an inline `panel.style.position` would beat
+    // `.panel.panel-fake-fullscreen{position:fixed}` regardless of that rule's specificity (inline
+    // always wins over a stylesheet rule short of `!important`), silently trapping the "fullscreen"
+    // panel in normal document flow — just enormously tall, with no scrollable way out except the
+    // shrink button itself (a real regression this caused, caught from a user report).
     // Reserve a little right-padding so the title's OWN text (row 1, which shrinks) never runs
     // under the icon. That alone isn't enough for a `flex-shrink:0` toggle-button group though —
     // it ignores the reduced space and overflows straight into the reserved corner. `flexWrap` lets

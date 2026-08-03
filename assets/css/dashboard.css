@@ -550,6 +550,14 @@ body {
   border-radius: var(--radius-lg);
   padding: 18px;
   box-shadow: var(--shadow-sm);
+  /* Positioning context for the corner-anchored chart-expand button (initExpandableCharts, ui.js)
+     AND for .panel-fake-fullscreen's position:fixed to actually take effect below — this must be a
+     class rule, not a JS inline style: an inline `style.position` on the element would beat
+     .panel.panel-fake-fullscreen{position:fixed} regardless of that rule's higher specificity
+     (inline always wins over stylesheet rules short of !important), silently trapping the panel in
+     static/relative flow — enormously tall instead of a real fullscreen overlay — with no scrollable
+     way out except the shrink button (see Known Issues). */
+  position: relative;
 }
 /* A chart panel promoted to real fullscreen (initExpandableCharts). The Fullscreen API
    defaults to a black backdrop, so paint our surface and give the chart room to fill. */
@@ -569,7 +577,11 @@ body {
   position: fixed;
   inset: 0;
   z-index: 500;
-  margin: 0;
+  /* !important: several panels (e.g. #dash-period-panel) carry an inline `margin-top`/`margin-bottom`
+     — same inline-beats-class gotcha as `position` above. Without it, `top/right/bottom/left:0`
+     resolve correctly but the element's own inline margin still offsets the border box away from
+     those edges, leaving thin gaps at the top/bottom instead of a true edge-to-edge overlay. */
+  margin: 0 !important;
   border-radius: 0;
   background: var(--surface);
   padding: 22px 26px;
