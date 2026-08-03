@@ -345,8 +345,10 @@
                 <button id="bud-btn-monthly" onclick="setIdxBudPeriodMode('monthly')" class="seg-btn active">Monthly</button>
                 <button id="bud-btn-quarterly" onclick="setIdxBudPeriodMode('quarterly')" class="seg-btn">Quarterly</button>
                 <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
-                <button id="bud-btn-budget" onclick="setIdxBudDataMode('budget')" class="seg-btn active">Budget</button>
-                <button id="bud-btn-count" onclick="setIdxBudDataMode('count')" class="seg-btn"># WPs</button>
+                <button id="bud-btn-wp" onclick="setIdxBudMetric('wp')" class="seg-btn">WP</button>
+                <button id="bud-btn-budget" onclick="setIdxBudMetric('budget')" class="seg-btn active">Budget</button>
+                <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
+                <button id="bud-btn-view" onclick="setIdxBudView(_idxBudView==='num'?'pct':'num')" class="seg-btn active">#</button>
               </div>
             </div>
             <div style="position:relative;height:300px"><canvas id="c-idx-bud-period"></canvas></div>
@@ -381,9 +383,10 @@
                 <button id="sch-btn-monthly" onclick="setIdxSchPeriodMode('monthly')" class="seg-btn active">Monthly</button>
                 <button id="sch-btn-quarterly" onclick="setIdxSchPeriodMode('quarterly')" class="seg-btn">Quarterly</button>
                 <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
-                <button id="sch-btn-count" onclick="setIdxSchDataMode('count')" class="seg-btn active"># WPs</button>
-                <button id="sch-btn-budget" onclick="setIdxSchDataMode('budget')" class="seg-btn">Budget</button>
-                <button id="sch-btn-wppct" onclick="setIdxSchDataMode('wppct')" class="seg-btn">WP %</button>
+                <button id="sch-btn-wp" onclick="setIdxSchMetric('wp')" class="seg-btn active">WP</button>
+                <button id="sch-btn-budget" onclick="setIdxSchMetric('budget')" class="seg-btn">Budget</button>
+                <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
+                <button id="sch-btn-view" onclick="setIdxSchView(_idxSchView==='num'?'pct':'num')" class="seg-btn active">#</button>
               </div>
             </div>
             <div class="chart-mob-h" style="position:relative;height:260px"><canvas id="c-idx-sch-period"></canvas></div>
@@ -1220,7 +1223,11 @@
     let _idxBlPeriodMode = 'quarterly';
     let _idxBudPeriodMode = 'monthly';
     let _idxBudDataMode = 'budget';
+    // Exposed as two 2-way toggles (WP|Budget metric, #|% view), same pattern as _idxDashMetric/_idxDashView.
+    let _idxBudMetric = 'budget', _idxBudView = 'num';
     let _idxSchPeriodMode = 'monthly';
+    // Same split-toggle pattern for the Schedule tab (was 3 flat buttons: # WPs/Budget/WP %).
+    let _idxSchMetric = 'wp', _idxSchView = 'num';
     function renderIdxOvBattery(wps) {
       const today = new Date();
       const total = wps.length;
@@ -1340,20 +1347,25 @@
 
     function _renderIdxBudPeriodChart() {
       if (!_lastWPs) return;
-      const on  = 'font-size:0.7143rem;padding:3px 10px;border-radius:5px;border:1.5px solid #EE3124;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit;font-weight:600';
-      const off = 'font-size:0.7143rem;padding:3px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600';
       const titleEl = document.getElementById('idx-bud-period-title');
       if (_idxBudDataMode === 'count') {
         if (titleEl) titleEl.textContent = 'Work Packages by Period — Planned vs Actual';
         if (_idxBudPeriodMode === 'monthly') Charts.wpCountByPeriodMonthly('c-idx-bud-period', _lastWPs);
         else Charts.wpCountByPeriod('c-idx-bud-period', _lastWPs);
+      } else if (_idxBudDataMode === 'countpct') {
+        if (titleEl) titleEl.textContent = 'Work Packages by Period — % of Total WPs';
+        if (_idxBudPeriodMode === 'monthly') Charts.wpCountByPeriodMonthly('c-idx-bud-period', _lastWPs, {countPct:true});
+        else Charts.wpCountByPeriod('c-idx-bud-period', _lastWPs, {countPct:true});
+      } else if (_idxBudDataMode === 'budgetpct') {
+        if (titleEl) titleEl.textContent = 'Budget & Awarded by Period — % of Total Budget';
+        if (_idxBudPeriodMode === 'monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-bud-period', _lastWPs, {sharePct:true});
+        else Charts.budgetAwardedByPeriod('c-idx-bud-period', _lastWPs, {sharePct:true});
       } else {
         if (titleEl) titleEl.textContent = 'Procurement Budget (BCB) and Awarded by Period';
         if (_idxBudPeriodMode === 'monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-bud-period', _lastWPs, {tidyLabels:true});
         else Charts.budgetAwardedByPeriod('c-idx-bud-period', _lastWPs, {tidyLabels:true});
       }
       ['monthly','quarterly'].forEach(m => { const b=document.getElementById('bud-btn-'+m); if(b) _segBtn(b, m===_idxBudPeriodMode); });
-      ['budget','count'].forEach(m => { const b=document.getElementById('bud-btn-'+m); if(b) _segBtn(b, m===_idxBudDataMode); });
     }
 
     window.setIdxBudPeriodMode = function(mode) {
@@ -1365,6 +1377,19 @@
       _idxBudDataMode = mode;
       _destroyCharts(['c-idx-bud-period']);
       _renderIdxBudPeriodChart();
+    };
+    function _idxBudComboMode(){ return _idxBudMetric==='wp' ? (_idxBudView==='pct'?'countpct':'count') : (_idxBudView==='pct'?'budgetpct':'budget'); }
+    window.setIdxBudMetric = function(m){
+      _idxBudMetric = m;
+      _segBtn(document.getElementById('bud-btn-wp'), m==='wp');
+      _segBtn(document.getElementById('bud-btn-budget'), m==='budget');
+      setIdxBudDataMode(_idxBudComboMode());
+    };
+    window.setIdxBudView = function(v){
+      _idxBudView = v;
+      const btn = document.getElementById('bud-btn-view');
+      if(btn) btn.textContent = v==='num' ? '#' : '%';
+      setIdxBudDataMode(_idxBudComboMode());
     };
 
     let _idxSchDataMode = 'count';
@@ -1383,6 +1408,10 @@
         if(titleEl) titleEl.textContent = 'Work Package by Period — % of Total WPs';
         if(_idxSchPeriodMode === 'monthly') Charts.wpCountByPeriodMonthly('c-idx-sch-period', _lastWPs, {countPct:true});
         else Charts.wpCountByPeriod('c-idx-sch-period', _lastWPs, {countPct:true});
+      } else if(_idxSchDataMode === 'budgetpct') {
+        if(titleEl) titleEl.textContent = 'Budget & Awarded by Period — % of Total Budget';
+        if(_idxSchPeriodMode === 'monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-sch-period', _lastWPs, {sharePct:true});
+        else Charts.budgetAwardedByPeriod('c-idx-sch-period', _lastWPs, {sharePct:true});
       } else {
         if(titleEl) titleEl.textContent = 'Procurement Budget (BCB) and Awarded Cost by Period';
         if(_idxSchPeriodMode === 'monthly') Charts.budgetAwardedByPeriodMonthly('c-idx-sch-period', _lastWPs, {tidyLabels:true});
@@ -1406,12 +1435,21 @@
 
     window.setIdxSchDataMode = function(mode) {
       _idxSchDataMode = mode;
-      const bC = document.getElementById('sch-btn-count'), bB = document.getElementById('sch-btn-budget'), bP = document.getElementById('sch-btn-wppct');
-      if(bC) _segBtn(bC, mode==='count');
-      if(bB) _segBtn(bB, mode==='budget');
-      if(bP) _segBtn(bP, mode==='wppct');
       _destroyCharts(['c-idx-sch-period']);
       _renderIdxSchPeriodChart();
+    };
+    function _idxSchComboMode(){ return _idxSchMetric==='wp' ? (_idxSchView==='pct'?'wppct':'count') : (_idxSchView==='pct'?'budgetpct':'budget'); }
+    window.setIdxSchMetric = function(m){
+      _idxSchMetric = m;
+      _segBtn(document.getElementById('sch-btn-wp'), m==='wp');
+      _segBtn(document.getElementById('sch-btn-budget'), m==='budget');
+      setIdxSchDataMode(_idxSchComboMode());
+    };
+    window.setIdxSchView = function(v){
+      _idxSchView = v;
+      const btn = document.getElementById('sch-btn-view');
+      if(btn) btn.textContent = v==='num' ? '#' : '%';
+      setIdxSchDataMode(_idxSchComboMode());
     };
 
     // Viewers get no main tab bar — Projects/Overview/Backlog/Schedule/WP List (the non-money
