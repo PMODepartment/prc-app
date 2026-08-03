@@ -322,7 +322,7 @@ const Charts = (() => {
   function awardRateByTrade(id,wps,trades){
     const rates=trades.map(t=>{
       const tw=wps.filter(w=>w.trade===t);
-      return tw.length?Math.round(tw.filter(w=>w.award_status==='Awarded').length/tw.length*100):0;
+      return tw.length?Math.round(tw.filter(w=>window.isResolved(w)).length/tw.length*100):0;
     });
     const dl = _dlBar(v => v > 0 ? v+'%' : '', 'h');
     make(id,{type:'bar',data:{labels:trades,datasets:[{label:'Award Rate %',data:rates,backgroundColor:rates.map(r=>r>=80?'#2D9B6F':r>=50?'#D97706':'#EE3124'),borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:_pad('h')},plugins:{legend:{display:false},datalabels:dl},scales:{x:{min:0,max:100,ticks:{font:{size:9},callback:v=>v+'%'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
@@ -449,7 +449,7 @@ const Charts = (() => {
   // Work Package by Trade — horizontal grouped bar
   function wpByTrade(id, wps){
     const trades=[...new Set(wps.map(w=>w.trade).filter(Boolean))];
-    const data=trades.map(t=>({t,total:wps.filter(w=>w.trade===t).length,awarded:wps.filter(w=>w.trade===t&&w.award_status==='Awarded').length})).sort((a,b)=>b.total-a.total);
+    const data=trades.map(t=>({t,total:wps.filter(w=>w.trade===t).length,awarded:wps.filter(w=>w.trade===t&&window.isResolved(w)).length})).sort((a,b)=>b.total-a.total);
     const dl = _dlBar(v => v > 0 ? v : '', 'h');
     make(id,{type:'bar',data:{labels:data.map(d=>d.t),datasets:[
       {label:'Total WP',data:data.map(d=>d.total),backgroundColor:'#282C28',borderRadius:3},
@@ -460,8 +460,8 @@ const Charts = (() => {
   // Work Package by Status — donut
   function wpStatusDonut(id, wps){
     const today=new Date();
-    const awarded=wps.filter(w=>w.award_status==='Awarded').length;
-    const na=wps.filter(w=>w.award_status!=='Awarded');
+    const awarded=wps.filter(w=>window.isResolved(w)).length;
+    const na=wps.filter(w=>!window.isResolved(w));
     const due=na.filter(w=>w.awarding_date&&new Date(w.awarding_date)<today).length;
     const notDue=na.filter(w=>!w.awarding_date||new Date(w.awarding_date)>=today).length;
     const total=wps.length;
@@ -478,8 +478,8 @@ const Charts = (() => {
   // Work Package by Status — donut by BCB value
   function wpStatusDonutValue(id, wps){
     const today=new Date();
-    const awardedBCB=wps.filter(w=>w.award_status==='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-    const na=wps.filter(w=>w.award_status!=='Awarded');
+    const awardedBCB=wps.filter(w=>window.isResolved(w)).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    const na=wps.filter(w=>!window.isResolved(w));
     const dueBCB=na.filter(w=>w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
     const notDueBCB=na.filter(w=>!w.awarding_date||new Date(w.awarding_date)>=today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
     const totalBCB=awardedBCB+dueBCB+notDueBCB;
@@ -526,7 +526,7 @@ const Charts = (() => {
       {label:'Actual',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2},
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1},
       {label:'Cumulative Actual',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:2,fill:false,tension:.1,order:1,spanGaps:false},
-      {label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
+      {label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)||!!w.not_to_be_awarded),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false},
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:true,text:'Count',font:{size:9}}}}}});
   }
 
@@ -668,7 +668,7 @@ const Charts = (() => {
   // mode: 'm' monthly / 'q' quarterly. Skipped when hideAwd (backlog charts have no forecast).
   function _extendForecastAxis(set, wps, mode, hideAwd) {
     if (hideAwd) return;
-    if (!wps.some(w => w.award_status !== 'Awarded')) return;   // nothing to forecast
+    if (!wps.some(w => !window.isResolved(w))) return;   // nothing to forecast
     const now = new Date();
     if (mode === 'q') {
       set.add(getQKey(now));
@@ -725,7 +725,7 @@ const Charts = (() => {
     const _nowMK=getMKey(new Date());
     const cumADisp=months.map((mk,i)=> mk>_nowMK ? null : cumA[i]);
     if(opts&&opts.countPct){ _periodCountPct(id, months.map(mLabel), planned, actual, cumP, cumADisp,
-      _wpForecastLine(months,getMKey,wps,cumA,()=>1,w=>!!_actAwDate(w)), (opts&&opts.totalCount)||wps.length, hideAwd); return; }
+      _wpForecastLine(months,getMKey,wps,cumA,()=>1,w=>!!_actAwDate(w)||!!w.not_to_be_awarded), (opts&&opts.totalCount)||wps.length, hideAwd); return; }
     const mob=_mob();
     const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
     make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
@@ -733,7 +733,7 @@ const Charts = (() => {
       ...(hideAwd?[]:[{label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
       ...(hideAwd?[]:[{label:'Cumulative Actual',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
-      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(months,getMKey,wps,cumA,()=>1,w=>!!_actAwDate(w)),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(months,getMKey,wps,cumA,()=>1,w=>!!_actAwDate(w)||!!w.not_to_be_awarded),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true,maxTicksLimit:mob?8:24}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
 
@@ -757,7 +757,7 @@ const Charts = (() => {
     const _nowQK=getQKey(new Date());
     const cumADisp=quarters.map((qk,i)=> qk>_nowQK ? null : cumA[i]);
     if(opts&&opts.countPct){ _periodCountPct(id, quarters.map(qLabel), planned, actual, cumP, cumADisp,
-      _wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)), (opts&&opts.totalCount)||wps.length, hideAwd); return; }
+      _wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)||!!w.not_to_be_awarded), (opts&&opts.totalCount)||wps.length, hideAwd); return; }
     const mob=_mob();
     const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
     make(id,{type:'bar',data:{labels:quarters.map(qLabel),datasets:[
@@ -765,7 +765,7 @@ const Charts = (() => {
       ...(hideAwd?[]:[{label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
       {label:'Cumulative Planned',data:cumP,type:'line',borderColor:'#282C28',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1},
       ...(hideAwd?[]:[{label:'Cumulative Actual',data:cumADisp,type:'line',borderColor:'#EE3124',borderWidth:2,pointRadius:mob?1:2,fill:false,tension:.1,order:1,spanGaps:false}]),
-      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
+      ...(hideAwd?[]:[{label:'Forecast',data:_wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)||!!w.not_to_be_awarded),type:'line',borderColor:'#EE3124',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:.1,order:1,spanGaps:false}]),
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:mob?0:_pad('v')},plugins:{legend:{position:'bottom',labels:{font:{size:mob?8:10},boxWidth:mob?10:12,padding:mob?5:8}},datalabels:dl},scales:{x:{grid:{display:false},ticks:{font:{size:mob?7:9},maxRotation:45,autoSkip:true}},y:{ticks:{font:{size:mob?8:9},stepSize:1},grid:{color:'rgba(0,0,0,.05)'},title:{display:!mob,text:'No. of Work Packages',font:{size:9}}}}}});
   }
 
@@ -839,7 +839,7 @@ const Charts = (() => {
       const anchor = actualRaw[lastActualIdx];
       const nextME = months[Math.min(lastActualIdx+1, months.length-1)];
       const fdate = w => { const pa=pd(w.awarding_date); return (pa && pa>now) ? pa : nextME; };
-      for (let i=lastActualIdx;i<months.length;i++){ const me=months[i]; forecastRaw[i]=anchor + sum(w=>w.award_status!=='Awarded' && fdate(w)<=me); }
+      for (let i=lastActualIdx;i<months.length;i++){ const me=months[i]; forecastRaw[i]=anchor + sum(w=>!window.isResolved(w) && fdate(w)<=me); }
     }
     // Scale raw cumulative → display units: counts as-is; Budget → ₱M; Budget % → % of total.
     const disp = mode==='budgetpct' ? (arr=>arr.map(v=>v==null?null:(totalRaw?+(v/totalRaw*100).toFixed(2):0)))

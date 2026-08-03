@@ -179,7 +179,7 @@ function computeStats(wps) {
   const totalContract=hm.awardedCost;
   const variance=totalBudget-totalContract;
   const today=new Date();
-  const late=wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+  const late=wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).length;
   return {total,awarded,notAwarded,totalBudget,totalContract,variance,late,awardRate:total?Math.round(awarded/total*100):0};
 }
 
@@ -193,18 +193,33 @@ function computeStats(wps) {
    data is ever found to be unusable; prefer fixing the rows instead. Use project.html?id=<PID>&diag=1
    to inspect a project's awarded reconciliation. */
 const HELPING_FIGURES = {};
+// A WP is "resolved" — done, no longer sitting in the active backlog — when it's
+// genuinely Awarded, OR flagged `not_to_be_awarded` (Ops decided it will NEVER go
+// through a formal award: handled outside PRC entirely — petty cash, direct
+// arrangement, scope removed). Requiring Procurement Status to be set to "Awarded"
+// before the flag "counted" was a contradiction in the UI (the WP form would say
+// "Award Status: Awarded" right next to "Not to be Awarded: Yes") — so this check
+// is deliberately independent of award_status. Use it everywhere a WP's "is this
+// done / not backlog" state matters — awarded counts, Due-Not-Awarded / Not-Due
+// splits, Backlog tables — never re-inline `award_status==='Awarded'` (or its
+// negation) for that purpose, or a not_to_be_awarded WP with Procurement Status
+// left honest (not set to "Awarded") will still show stuck in the backlog forever
+// while the KPI cards already treat it as closed.
+window.isResolved = function (w) {
+  return !!w && (w.award_status === 'Awarded' || !!w.not_to_be_awarded);
+};
 // A WP is "money awarded" when it's genuinely Awarded with a real cost, OR it's
-// flagged `not_to_be_awarded` — Ops decided it will NEVER go through a formal
-// award (handled outside PRC entirely), so its budget is realized savings at an
-// effective ₱0 cost rather than data pending entry. Without this flag a WP like
-// that is indistinguishable from "Awarded, cost not encoded yet" and gets
-// dropped from BOTH sides of the ledger (Known Issue #17) instead of counting
-// as real savings. Use these two helpers everywhere the app decides whether a
-// WP's money counts and what its effective awarded cost is — never re-inline
-// `award_status==='Awarded' && total_awarded>0`, or a not_to_be_awarded WP will
-// disagree between tabs/charts again.
+// flagged `not_to_be_awarded` (see isResolved above) — its budget is realized
+// savings at an effective ₱0 cost rather than data pending entry. Without this
+// flag a WP like that is indistinguishable from "Awarded, cost not encoded yet"
+// and gets dropped from BOTH sides of the ledger (Known Issue #17) instead of
+// counting as real savings. Deliberately does NOT require award_status==='Awarded'
+// (see isResolved) — the flag alone is sufficient. Use these two helpers
+// everywhere the app decides whether a WP's money counts and what its effective
+// awarded cost is — never re-inline `award_status==='Awarded' && total_awarded>0`,
+// or a not_to_be_awarded WP will disagree between tabs/charts again.
 window.isMoneyAwarded = function (w) {
-  return !!w && w.award_status === 'Awarded' && ((w.total_awarded || 0) > 0 || !!w.not_to_be_awarded);
+  return !!w && (!!w.not_to_be_awarded || (w.award_status === 'Awarded' && (w.total_awarded || 0) > 0));
 };
 window.effectiveAwardedCost = function (w) {
   return (w && w.not_to_be_awarded) ? 0 : ((w && w.total_awarded) || 0);
@@ -227,13 +242,14 @@ function helpingMetrics(wps) {
       // both failure modes seen in the data: provisional costs sitting on "Not yet Awarded" WPs
       // (GRP/SLN/SLT over-count) and the Helping Sheet's date/row leaks (AVR under-count).
       hsCovered = false;
-      // COUNT basis: every WP whose award_status is 'Awarded'. A WP that has genuinely been
-      // awarded but whose cost hasn't been encoded yet is still an awarded WP — excluding it
-      // made the Overview disagree with the WP List (CCM302 read 39 against a list of 40,
+      // COUNT basis: every WP that's "resolved" (award_status==='Awarded', OR flagged
+      // not_to_be_awarded — see isResolved). A WP that has genuinely been awarded but
+      // whose cost hasn't been encoded yet is still an awarded WP — excluding it made
+      // the Overview disagree with the WP List (CCM302 read 39 against a list of 40,
       // OPW101 64 against 62). Provisional costs on Not-Yet-Awarded rows are still excluded,
       // because that is decided by award_status, which the importer takes from the sheet's
       // own Remarks flag rather than from the presence of a cost.
-      const awdAll = arr.filter(w => w.award_status==='Awarded');
+      const awdAll = arr.filter(w => window.isResolved(w));
       // MONEY basis: only awarded WPs that actually carry a cost, OR are flagged
       // not_to_be_awarded (their budget is realized savings at an effective ₱0
       // cost — see isMoneyAwarded). Awarded Cost and Budget-for-Awarded must move
@@ -702,7 +718,7 @@ async function exportPDF(wps, label, titleStr) {
   const multiProject = new Set((wps||[]).map(w=>w.project_id).filter(Boolean)).size > 1;
 
   // ── Computed stats ──
-  const awarded    = wps.filter(w=>w.award_status==='Awarded').length;
+  const awarded    = wps.filter(w=>window.isResolved(w)).length;
   const totalBCB   = wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   const totalAwd   = wps.reduce((s,w)=>s+(w.total_awarded||0),0);
   const variance   = totalBCB - totalAwd;

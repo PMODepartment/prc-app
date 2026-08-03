@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803e"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260803e"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803e"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260803e"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260803e"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803f"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260803f"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803f"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260803f"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260803f"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260803e"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260803f"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803e"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803f"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -504,14 +504,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260803e"></script>
-<script src="assets/js/ui.js?v=20260803e"></script>
-<script src="assets/js/db.js?v=20260803e"></script>
-<script src="assets/js/onboarding.js?v=20260803e"></script>
-<script src="assets/js/coachmarks.js?v=20260803e"></script>
+<script src="assets/js/auth.js?v=20260803f"></script>
+<script src="assets/js/ui.js?v=20260803f"></script>
+<script src="assets/js/db.js?v=20260803f"></script>
+<script src="assets/js/onboarding.js?v=20260803f"></script>
+<script src="assets/js/coachmarks.js?v=20260803f"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260803e"></script>
+<script src="assets/js/charts.js?v=20260803f"></script>
 <script>
 
   // Segmented toggle state — swaps a class instead of rewriting cssText.
@@ -726,7 +726,8 @@ function openWPDetail(idOrObj) {
   const fmtPct = v => v != null ? (parseFloat(v)*100).toFixed(0)+'%' : '—';
   const row = (label, val, isHtml) => val && val !== '—' ? `<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f5f5f5"><span style="font-size:0.7143rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;min-width:140px;flex-shrink:0">${label}</span><span style="font-size:0.8571rem;color:#231F20;word-break:break-word">${isHtml?val:esc(val)}</span></div>` : '';
   const bud=w.approved_budget_bcb||0, awd=w.total_awarded||0, vari=bud-awd;
-  const sc=w.award_status==='Awarded'?'#2D9B6F':'#EE3124';
+  const sc=w.not_to_be_awarded?'#374151':(w.award_status==='Awarded'?'#2D9B6F':'#EE3124');
+  const awardLabel = w.not_to_be_awarded ? 'Not to be Awarded' : (w.award_status||'—');
   let html = `
     <div style="margin-bottom:14px">
       <div class="sec-label">Identity</div>
@@ -747,7 +748,7 @@ function openWPDetail(idOrObj) {
     </div>
     <div style="margin-bottom:14px">
       <div class="sec-label">Status</div>
-      ${row('Award Status',`<span style="font-size:0.7857rem;font-weight:700;padding:2px 8px;border-radius:10px;background:${sc}22;color:${sc}">${esc(w.award_status||'—')}</span>`,true)}
+      ${row('Award Status',`<span style="font-size:0.7857rem;font-weight:700;padding:2px 8px;border-radius:10px;background:${sc}22;color:${sc}">${esc(awardLabel)}</span>`,true)}
       ${row('Charging Type',w.charging_type||'—')}
       ${row('Contract Pkg No.',w.contract_package_no||'—')}
       ${row('CO Description',w.co_description||'—')}
@@ -1107,7 +1108,7 @@ function renderStatusTracker(){ if(!document.getElementById('status-tracker-thea
       html+=`<tr>`+
         `<td style="font-weight:600;color:#EE3124;white-space:nowrap">${_stEsc(w.wp_no)}</td>`+
         `<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_stEsc(w.description)}">${_stEsc(w.description)||'—'}</td>`+
-        `<td>${_stAwardBadge(w.id,w.award_status)}</td>`+
+        `<td>${_stAwardBadge(w.id,w.award_status,w.not_to_be_awarded)}</td>`+
         `<td>${_stSelect(w.id,'procurement_status',ST_PROC_OPTS,w.procurement_status)}</td>`+
         `<td>${_stSelect(w.id,'delivery_status',ST_DELIV_OPTS,w.delivery_status)}</td>`+
       `</tr>`;
@@ -1152,13 +1153,17 @@ async function _stSaveFields(id, fields, sel, onErrRevert){
   }finally{ if(sel) sel.disabled=false; }
 }
 // Read-only Award Status badge (derived from Procurement Status; not directly editable in the tracker).
-function _stAwardBadge(id, status){
+// notToBeAwarded overrides the label/color entirely — a WP flagged this way is resolved (Ops pulled it
+// from the award pipeline) regardless of what its Procurement/Award Status literally says, so showing
+// the raw "Not Yet Awarded" text next to that flag would read as contradictory. See isResolved (db.js).
+function _stAwardBadge(id, status, notToBeAwarded){
+  if (notToBeAwarded) return `<span id="st-aw-${id}" style="font-size:0.7143rem;font-weight:700;padding:3px 9px;border-radius:20px;background:#E5E7EB;color:#374151;white-space:nowrap">Not to be Awarded</span>`;
   const awd = status==='Awarded';
   return `<span id="st-aw-${id}" style="font-size:0.7143rem;font-weight:700;padding:3px 9px;border-radius:20px;background:${awd?'#D1FAE5':'#FEF3C7'};color:${awd?'#065F46':'#92400E'};white-space:nowrap">${statusLabel(awd?'Awarded':'Not Yet Awarded')}</span>`;
 }
 function _stRefreshAwardBadge(id){
   const el = document.getElementById('st-aw-'+id), w = allWPs.find(x=>x.id===id);
-  if(el && w) el.outerHTML = _stAwardBadge(id, w.award_status);
+  if(el && w) el.outerHTML = _stAwardBadge(id, w.award_status, w.not_to_be_awarded);
 }
 window.updateWpStatus = async function(id, field, value, sel){
   const w = allWPs.find(x=>x.id===id); if(!w) return;
@@ -1423,7 +1428,7 @@ function buildMetrics(wps){
   const eac = actualAward + ctc;
   const variance = totalBudget - eac;
   const pctVar = totalBudget ? ((variance/totalBudget)*100).toFixed(1) : '0.0';
-  const dueNotAwarded = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+  const dueNotAwarded = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).length;
   const notDue = Math.max(0, total - awarded - dueNotAwarded);
   const pctByWP = total ? Math.round(awarded/total*100) : 0;
   const pctByVal = totalBudget ? Math.round(actualAward/totalBudget*100) : 0;
@@ -1482,10 +1487,10 @@ function renderOvBattery(wps) {
   // Awarded count/value from the Helping Sheet (authoritative) so the battery matches the KPI cards
   const hm = helpingMetrics(wps);
   const awardedN = hm.awarded;
-  const dueN = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+  const dueN = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).length;
   const bcb = hm.totalBudget;
   const awd = hm.awardedCost;
-  const dueBcb = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const dueBcb = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   const wpPct     = total ? Math.round(awardedN/total*100) : 0;
   const valPct    = bcb   ? Math.round(awd/bcb*100) : 0;
   const wpDuePct  = total ? Math.round(dueN/total*100) : 0;
@@ -1570,7 +1575,7 @@ function _blRenderPeriod(wps){
 }
 window.setBlDataMode = function(mode){
   _blDataMode = mode;
-  _blRenderPeriod(allWPs.filter(w=>w.award_status!=='Awarded'));
+  _blRenderPeriod(allWPs.filter(w=>!window.isResolved(w)));
 };
 function _blComboMode(){ return _blMetric==='wp' ? (_blView==='pct'?'countpct':'count') : (_blView==='pct'?'budgetpct':'budget'); }
 window.setBlMetric = function(m){
@@ -1589,7 +1594,7 @@ function setBlPeriodMode(mode) {
   _blPeriodMode = mode;
   _segBtn(document.getElementById('bl-btn-quarterly'), mode==='quarterly');
   _segBtn(document.getElementById('bl-btn-monthly'), mode==='monthly');
-  _blRenderPeriod(allWPs.filter(w=>w.award_status!=='Awarded'));
+  _blRenderPeriod(allWPs.filter(w=>!window.isResolved(w)));
 }
 
 function renderDashPeriod(wps) {
@@ -1639,7 +1644,7 @@ function renderStatusTable(wps, tableId) {
   const today = new Date();
   const total = wps.length;
   const awarded = helpingMetrics(wps).awarded;   // authoritative (Helping Sheet)
-  const due = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+  const due = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).length;
   const notDue = Math.max(0, total - awarded - due);
   const pct = v => total ? Math.round(v/total*100) : 0;
   const el = document.getElementById(tableId);
@@ -1674,11 +1679,11 @@ function renderDashStatusBars(wps) {
   const total = wps.length;
   const hm = helpingMetrics(wps);              // authoritative (Helping Sheet)
   const awarded = hm.awarded;
-  const due = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).length;
+  const due = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).length;
   const notDue = Math.max(0, total - awarded - due);
   const bcbTotal = hm.totalBudget;
   const bcbAwd = hm.awardedCost;              // Awarded value = Helping Sheet Awarded Cost
-  const bcbDue = wps.filter(w=>w.award_status!=='Awarded'&&w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const bcbDue = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   const bcbNotDue = Math.max(0, bcbTotal - bcbAwd - bcbDue);
   const wpPct  = total    ? Math.round(awarded/total*100)    : 0;
   const valPct = bcbTotal ? Math.round(bcbAwd/bcbTotal*100)  : 0;
@@ -1733,7 +1738,7 @@ function renderDashboard(){
 window.renderDashBacklog = function() {
   const today = new Date();
   const sortBy = document.getElementById('dash-bl-sort')?.value || 'aging';
-  let wps = allWPs.filter(w => w.award_status !== 'Awarded');
+  let wps = allWPs.filter(w => !window.isResolved(w));
   // Populate the Trade filter once (from the not-awarded set)
   const trSel = document.getElementById('dash-bl-trade');
   if (trSel && trSel.options.length <= 1) {
@@ -1841,7 +1846,7 @@ function renderBacklog(){
   const tradeF = document.getElementById('bl-trade-filter')?.value||'';
   const search = (document.getElementById('bl-search')?.value||'').toLowerCase().trim();
 
-  let notAwarded = allWPs.filter(w=>w.award_status!=='Awarded');
+  let notAwarded = allWPs.filter(w=>!window.isResolved(w));
 
   // Populate trade filter dropdown
   const tradeEl = document.getElementById('bl-trade-filter');
@@ -2152,7 +2157,7 @@ function renderPwaAnalysis(){ if(!document.getElementById('pwa-summary')) return
   const rows=(_pwaFrom==='all'&&_pwaTo==='all')?all:all.filter(w=>_pwaPeriodMatch(_pwaPdate(w.awarding_date)));
   const tb=rows.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   const ta=rows.reduce((s,w)=>s+(w.total_awarded||0),0);
-  const tba=rows.filter(w=>w.award_status!=='Awarded').reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+  const tba=rows.filter(w=>!window.isResolved(w)).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   const set=(id,txt,full)=>{const e=document.getElementById(id); if(e){e.textContent=txt; if(full!=null)e.title=full;}};
   set('pwa-sum-count', rows.length);
   set('pwa-sum-budget', tb?Fmt.moneyShort(tb):'—', Fmt.moneyFull(tb));
@@ -2300,7 +2305,7 @@ function _wpRenderCell(key,wp,_stickyLeft){
     case 'delivery_status': return (!window.__isViewer && !window.__archived)
       ? td(_stSelect(wp.id,'delivery_status',ST_DELIV_OPTS,wp.delivery_status), 'min-width:150px')
       : td(esc(wp.delivery_status)||'—', 'font-size:0.7857rem;color:#555');
-    case 'award_status': return td(_stAwardBadge(wp.id, wp.award_status), 'overflow:hidden');
+    case 'award_status': return td(_stAwardBadge(wp.id, wp.award_status, wp.not_to_be_awarded), 'overflow:hidden');
     case 'remarks': return td(esc(wp.remarks)||'—', 'font-size:0.7143rem;color:#888;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', ` title="${esc(wp.remarks)}"`);
     default: return td('—');
   }
