@@ -727,7 +727,7 @@ const Charts = (() => {
     if(opts&&opts.countPct){ _periodCountPct(id, months.map(mLabel), planned, actual, cumP, cumADisp,
       _wpForecastLine(months,getMKey,wps,cumA,()=>1,w=>!!_actAwDate(w)||!!w.not_to_be_awarded), (opts&&opts.totalCount)||wps.length, hideAwd); return; }
     const mob=_mob();
-    const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
+    const dl=mob?{display:false}:_dlTidy(v=>v>0?v:'',{'Planned WPs':'#231F20','Actual WPs':'#EE3124'});
     make(id,{type:'bar',data:{labels:months.map(mLabel),datasets:[
       {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
       ...(hideAwd?[]:[{label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
@@ -759,7 +759,7 @@ const Charts = (() => {
     if(opts&&opts.countPct){ _periodCountPct(id, quarters.map(qLabel), planned, actual, cumP, cumADisp,
       _wpForecastLine(quarters,getQKey,wps,cumA,()=>1,w=>!!_actAwDate(w)||!!w.not_to_be_awarded), (opts&&opts.totalCount)||wps.length, hideAwd); return; }
     const mob=_mob();
-    const dl=mob?{display:false}:_dlBar(v=>v>0?v:'','v');
+    const dl=mob?{display:false}:_dlTidy(v=>v>0?v:'',{'Planned WPs':'#231F20','Actual WPs':'#EE3124'});
     make(id,{type:'bar',data:{labels:quarters.map(qLabel),datasets:[
       {label:'Planned WPs',data:planned,backgroundColor:'#282C28',borderRadius:3,order:2},
       ...(hideAwd?[]:[{label:'Actual WPs',data:actual,backgroundColor:'#EE3124',borderRadius:3,order:2}]),
