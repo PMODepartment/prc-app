@@ -712,6 +712,7 @@ Three deliverables share the same copy, organised by **capability tier** (not th
 1. **Generated columns**: `total_awarded`, `awarding_lead_time`, `variance` â€” never INSERT into them. Use `awarded_cost` and `lead_time`. `unmap()` strips all three automatically.
 2. **Sticky tabs + overflow**: `overflow:hidden/clip` on any ancestor of `.view-tabs` breaks `position:sticky` in Safari. See CSS section.
 3. **READ-ONLY badge**: never set `display:inline-flex` as inline style on `.topbar-badge-readonly` â€” mobile media query can't override it.
+3b. **`.topbar-left` must not have `overflow:hidden` on mobile (fixed 2026-08-03)** â€” the project-switcher popover (`#hdr-switcher` in `project.html`, `position:absolute` inside `.topbar-left`'s positioned wrapper) was being clipped by `.topbar-left{overflow:hidden}` in the `≤767px` media query in `dashboard.css`, so tapping the title on mobile showed only a sliver of the search box with the project list cut off — same bug class as the already-documented `.topbar` overflow:visible rule, just one level deeper. Removed `overflow:hidden` from `.topbar-left`; `.page-title` already has its own `overflow:hidden;text-overflow:ellipsis` so title truncation is unaffected.
 4. **N+1 query**: never use `Promise.all(projects.map(p => WPDb.getApprovedWPs(p.id)))` â€” use `getAllApprovedWPs()` or `getApprovedWPsForProjects(ids)`.
 5. **Role caching**: `window.__wpmRole` set once at login. Role/project changes require the user to log out and back in.
 6. **Chart.js leaks**: always `chartInstance.destroy()` before re-rendering.
