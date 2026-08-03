@@ -82,7 +82,22 @@
       '.btn-guide{width:34px;height:34px;border-radius:8px;border:1px solid var(--border-md,rgba(0,0,0,.14));background:var(--surface,#fff);color:var(--text-secondary,#5A5858);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:color .12s,border-color .12s}',
       '.btn-guide:hover{color:var(--mw-red,#EE3124);border-color:var(--mw-red,#EE3124)}',
       '.btn-guide i{font-size:17px}',
-      '@media(max-width:520px){.ob-head h2{font-size:15px}.ob-badge{display:none}.ob-s-title{font-size:17px}.ob-body{padding:18px 18px 6px}.ob-foot{padding:12px 16px 16px}.ob-btn{padding:8px 13px}}',
+      /* Mobile: .ob-foot crammed 4 items (progress dots, "Don\'t show on login" checkbox, Back,
+         Next) onto one nowrap row — the checkbox label wrapped to 2 lines and squeezed against
+         the buttons. Wrap it into three stacked rows instead: dots, then the checkbox, then
+         full-width Back/Next side by side. */
+      '@media(max-width:520px){'
+        + '.ob-overlay{padding:10px}'
+        + '.ob-head{padding:14px 44px 14px 16px}.ob-head h2{font-size:15px}.ob-badge{display:none}'
+        + '.ob-x{width:26px;height:26px;top:10px;right:10px}'
+        + '.ob-s-title{font-size:17px}.ob-body{padding:16px 16px 6px}'
+        + '.ob-foot{flex-wrap:wrap;row-gap:10px;padding:12px 16px 16px}'
+        + '.ob-dots{order:1;flex:0 0 100%;justify-content:center}'
+        + '.ob-chk{order:2;flex:0 0 100%;justify-content:center;margin-right:0;white-space:nowrap}'
+        + '.ob-btn-prev{order:3;flex:1}'
+        + '.ob-btn-next{order:4;flex:1}'
+        + '.ob-btn{padding:9px 13px;text-align:center}'
+      + '}',
       'body.dark-mode .btn-guide{background:var(--surface,#2B2C2B)}'
     ].join('\n');
     document.head.appendChild(s);

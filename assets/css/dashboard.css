@@ -275,6 +275,23 @@ body {
   border: 1.5px solid var(--border-md);
   background: var(--surface-2);
   transition: background .15s, border-color .15s, box-shadow .15s;
+  min-width: 0;
+}
+/* The project name itself is the part that must truncate — the caret badge stays fixed-size
+   and fully visible. Without this, .page-title's own overflow/ellipsis (meant for a plain-text
+   title) doesn't apply cleanly once it's repurposed as an inline-flex row with a caret child. */
+.proj-switcher-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+/* Export Excel/PDF entries renderUserBar (db.js) adds to the profile dropdown — mobile only,
+   since the topbar's own Export buttons remain visible and are the primary path on tablet/desktop.
+   !important is required: the entries carry an inline `display:flex` (matching the other dropdown
+   rows' inline-styled layout), which would otherwise always win over this rule regardless of width. */
+@media (min-width: 768px) {
+  .user-menu-mobile-only { display: none !important; }
 }
 .proj-switcher:hover, .proj-switcher:focus-visible {
   border-color: var(--mw-red);
@@ -545,6 +562,22 @@ body {
   flex-direction: column;
 }
 .panel:fullscreen canvas, .panel:-webkit-full-screen canvas { max-width: 100% !important; }
+/* CSS fallback for browsers where the real Fullscreen API is unavailable or silently no-ops
+   (initExpandableCharts in ui.js — notably iOS Safari, which has no Element.requestFullscreen).
+   Mimics .panel:fullscreen via fixed positioning instead of the native API. */
+.panel.panel-fake-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  margin: 0;
+  border-radius: 0;
+  background: var(--surface);
+  padding: 22px 26px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.panel.panel-fake-fullscreen canvas { max-width: 100% !important; }
 .panel-title {
   font-size: 0.7857rem;
   font-weight: 700;
@@ -563,6 +596,13 @@ body {
 .top5-row .panel-title.t5-title { cursor: pointer; user-select: none; }
 .top5-row .t5-caret { margin-left: auto; opacity: .4; font-size: 0.8571rem; flex-shrink: 0; }
 .top5-row .panel-title.t5-title:hover .t5-caret { opacity: 1; color: var(--mw-red); }
+/* initTop5Accordion() no-ops below 768px (mobile already stacks each card full-width, so
+   there's nothing to expand) — but the caret was still rendered, reading as a dead button.
+   Hide it here so mobile doesn't show an expand affordance that does nothing. */
+@media (max-width: 767px) {
+  .top5-row .panel-title.t5-title { cursor: default; }
+  .top5-row .t5-caret { display: none; }
+}
 @media (min-width: 768px) {
   /* Collapsed cards sit at the TOP-left as UNIFORM chips (same width via JS + same fixed
      height here), regardless of how many lines the title would wrap to. */
@@ -1226,6 +1266,13 @@ body {
   .page-title { font-size: 0.9286rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .page-sub { display: none; }               /* hide subtitle — saves topbar space */
   .topbar-badge-readonly { display: none; }  /* hide READ-ONLY pill — notice banner covers it */
+  /* Too many icon buttons (refresh, Export Excel, Export PDF, guide, theme, avatar) left almost
+     no room for the page title — it collapsed to a single character. Export moves into the
+     profile dropdown on mobile (renderUserBar in db.js adds "Export Excel"/"Export PDF" entries
+     there, gated the same way the buttons themselves are); the guide button is redundant with
+     the dropdown's existing "Restart tour" entry. Refresh/theme/avatar stay — those are one-tap,
+     frequently used at any screen size. */
+  #btn-export, #btn-export-xlsx, #btn-guide { display: none; }
 
   .content { padding: 12px 12px 48px; }
 

@@ -542,6 +542,24 @@ function renderUserBar(id, profile) {
   if (!el || !profile) return;
   const initials = (profile.name||profile.email||'U').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
   const dark = typeof AppTheme !== 'undefined' && AppTheme.isDark(profile.id);
+  // Export PDF / Export Excel move into this dropdown ON MOBILE ONLY (class hidden ≥768px in
+  // dashboard.css) — the topbar hides those two buttons on mobile (too many icons crowded the
+  // page title, see Known Issues), so this is the only way to reach them there. Detected by
+  // presence in the DOM, so it works on whichever page loaded (project.html has both; index.html
+  // has PDF only) with no per-page code. `.click()` on the real (hidden) button reuses its exact
+  // handler — including its own `__hideBudget` viewer guard — so nothing needs duplicating.
+  // Still gated here too so a viewer never sees a menu entry that would silently no-op.
+  const exportItems = window.__hideBudget ? '' : ['btn-export-xlsx','btn-export'].map(bid => {
+    if (!document.getElementById(bid)) return '';
+    const label = bid === 'btn-export-xlsx' ? 'Export Excel' : 'Export PDF';
+    const icon  = bid === 'btn-export-xlsx' ? 'ti-file-type-xls' : 'ti-file-type-pdf';
+    return `<a class="user-menu-mobile-only" onclick="event.preventDefault();(function(){var m=document.getElementById('user-menu');if(m)m.style.display='none';var b=document.getElementById('${bid}');if(b)b.click();})()" style="
+            display:flex;align-items:center;gap:8px;padding:12px 16px;
+            font-size:0.9286rem;color:#231F20;font-weight:600;text-decoration:none;
+            font-family:inherit;cursor:pointer;border-bottom:1px solid #f5f5f5;">
+            <i class="ti ${icon}" style="font-size:1.1429rem;color:#888"></i>${label}
+          </a>`;
+  }).join('');
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:6px">
       <button id="theme-toggle-btn" class="theme-toggle"
@@ -562,6 +580,7 @@ function renderUserBar(id, profile) {
             <div style="font-size:0.9286rem;font-weight:600;color:#231F20">${esc(profile.name||profile.email)}</div>
             <div style="font-size:0.7857rem;color:#888;margin-top:2px;text-transform:capitalize">${(profile.role||'').replace(/_/g,' ')}</div>
           </div>
+          ${exportItems}
           <a onclick="event.preventDefault();(function(){var m=document.getElementById('user-menu');if(m)m.style.display='none';if(window.CoachTour&&CoachTour.available()){CoachTour.start(true);}else if(window.Onboarding&&Onboarding.open){Onboarding.open();}else{window.location.href='onboarding.html';}})()" style="
             display:flex;align-items:center;gap:8px;padding:12px 16px;
             font-size:0.9286rem;color:#231F20;font-weight:600;text-decoration:none;

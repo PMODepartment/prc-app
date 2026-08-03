@@ -216,19 +216,50 @@ function initExpandableCharts() {
 
     // Fullscreen (real Fullscreen API) instead of a taller in-page panel — so the whole
     // graph fills the screen, which the old 2.2× height couldn't on large displays / smart TVs.
+    // MOBILE FALLBACK: iOS Safari has no Element.requestFullscreen at all (only <video> supports
+    // it), and some Android/PWA-standalone browsers silently reject the request or never fire
+    // `fullscreenchange` — on those the button looked like it did nothing. `.panel-fake-fullscreen`
+    // (fixed-position CSS, below) is used whenever the native API is missing or doesn't actually
+    // take effect shortly after being requested.
     const _fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+    const _fsSupported = !!(panel.requestFullscreen || panel.webkitRequestFullscreen);
+    const isExpanded = () => _fsEl() === panel || panel.classList.contains('panel-fake-fullscreen');
+
+    let fakeFallbackTimer = null;
+    function setFake(on) {
+      panel.classList.toggle('panel-fake-fullscreen', on);
+      document.body.style.overflow = on ? 'hidden' : '';
+      syncState();
+    }
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      if (_fsEl() === panel) {
-        (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+      if (isExpanded()) {
+        if (_fsEl() === panel) (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+        else setFake(false);
+        return;
+      }
+      if (_fsSupported) {
+        const req = (panel.requestFullscreen || panel.webkitRequestFullscreen).call(panel);
+        if (req && req.catch) req.catch(() => setFake(true));
+        // Safety net: some browsers resolve the promise (or have no promise at all) without ever
+        // actually entering fullscreen / firing fullscreenchange. If nothing happened shortly
+        // after asking, fall back to the CSS simulation instead of leaving the button inert.
+        // Cancelled below the moment a real fullscreenchange for this panel does land, so a slow
+        // (but eventually successful) native fullscreen can't get stuck double-applying the fake mode.
+        fakeFallbackTimer = setTimeout(() => { if (!isExpanded()) setFake(true); }, 350);
       } else {
-        (panel.requestFullscreen || panel.webkitRequestFullscreen || function(){}).call(panel);
+        setFake(true);
       }
     });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && panel.classList.contains('panel-fake-fullscreen')) setFake(false);
+    });
 
-    // React to entering/leaving fullscreen (also fires on Esc / TV back button)
-    const onFsChange = () => {
-      expanded = (_fsEl() === panel);
+    // React to entering/leaving fullscreen (also fires on Esc / TV back button) and to the fake mode
+    const syncState = () => {
+      // Real fullscreen landed (however slowly) — the pending fake-mode fallback must not fire later.
+      if (_fsEl() === panel && fakeFallbackTimer) { clearTimeout(fakeFallbackTimer); fakeFallbackTimer = null; }
+      expanded = isExpanded();
       panel.classList.toggle('panel-fullscreen', expanded);
       // Fill the screen when fullscreen; restore the default height otherwise. !important beats
       // the mobile `.chart-mob-h{height:300px!important}` rule.
@@ -245,8 +276,8 @@ function initExpandableCharts() {
         }
       });
     };
-    document.addEventListener('fullscreenchange', onFsChange);
-    document.addEventListener('webkitfullscreenchange', onFsChange);
+    document.addEventListener('fullscreenchange', syncState);
+    document.addEventListener('webkitfullscreenchange', syncState);
   });
 }
 
