@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260803g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803h"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260803h"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803h"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803h"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -38,6 +38,20 @@
     .tab{font-size:0.8571rem;padding:6px 16px;border-radius:8px;border:none;cursor:pointer;font-weight:500;color:var(--text-secondary);background:transparent;transition:all .15s}
     .tab.active{background:var(--surface);color:var(--text-primary);box-shadow:0 1px 4px rgba(0,0,0,.08)}
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
+    /* Filter bar: each label+control (or badge) is its own flex-wrap unit so the outer wrap can
+       never split a label from the control it names — that's what made "Trade" land next to the
+       GPR101 project badge on its own, orphaned from its <select>, on narrow screens. */
+    .rv-filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+    .rv-filter-group{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+    @media (max-width:520px){
+      .rv-filter-bar{gap:10px 0}
+      .rv-filter-group,
+      #proj-context-badge,
+      .rv-filter-search{flex:1 1 100%}
+      .rv-filter-group select{flex:1;min-width:0}
+      .rv-view-switch{margin-left:0!important;width:100%}
+      .rv-view-switch button{flex:1}
+    }
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
     .modal-bg.hidden{display:none}
     .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:440px}
@@ -214,27 +228,31 @@
       <div id="main-content" style="display:none">
 
         <!-- Filter bar: Project (consolidated only) + Trade + Search -->
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <div class="rv-filter-bar">
           <!-- Project filter — hidden when viewing a single project (would bypass dashboard selector) -->
-          <span id="proj-filter-wrap" style="display:flex;align-items:center;gap:8px">
+          <span id="proj-filter-wrap" class="rv-filter-group">
             <label style="font-size:0.7857rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Project</label>
             <select id="proj-select" onchange="changeProject(this.value)" style="font-size:0.9286rem;padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-family:inherit;background:#fff;color:#231F20;min-width:180px;cursor:pointer">
               <option value="ALL">All Projects</option>
             </select>
           </span>
           <!-- Project badge shown in per-project context instead of filter -->
-          <span id="proj-context-badge" style="display:none;font-size:0.7857rem;font-weight:700;padding:4px 12px;border-radius:20px;background:#EE3124;color:#fff"></span>
-          <label style="font-size:0.7857rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Trade</label>
-          <select id="trade-filter" onchange="applyFilters()" style="font-size:0.9286rem;padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-family:inherit;background:#fff;color:#231F20;min-width:150px;cursor:pointer">
-            <option value="ALL">All Trades</option>
-          </select>
-          <div style="position:relative;flex:1;min-width:180px">
+          <span id="proj-context-badge" style="display:none;font-size:0.7857rem;font-weight:700;padding:4px 12px;border-radius:20px;background:#EE3124;color:#fff;flex-shrink:0"></span>
+          <!-- Trade label+select grouped so the outer wrap can't strand the label next to the
+               project badge, separated from its own control (see .rv-filter-group above). -->
+          <span class="rv-filter-group">
+            <label style="font-size:0.7857rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Trade</label>
+            <select id="trade-filter" onchange="applyFilters()" style="font-size:0.9286rem;padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-family:inherit;background:#fff;color:#231F20;min-width:150px;cursor:pointer">
+              <option value="ALL">All Trades</option>
+            </select>
+          </span>
+          <div class="rv-filter-search" style="position:relative;flex:1;min-width:180px">
             <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#bbb;font-size:0.9286rem;pointer-events:none"></i>
             <input id="review-search" type="text" placeholder="Search WP No. or description…" oninput="applyFilters()"
               style="width:100%;padding:7px 12px 7px 32px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;outline:none;box-sizing:border-box"/>
           </div>
           <!-- Cards | Grid (Excel) view switcher -->
-          <div style="display:flex;gap:4px;margin-left:auto">
+          <div class="rv-view-switch" style="display:flex;gap:4px;margin-left:auto">
             <button id="rv-btn-grid" class="xl-btn primary" onclick="setReviewView('grid')"><i class="ti ti-table"></i> Grid (Excel)</button>
             <button id="rv-btn-cards" class="xl-btn" onclick="setReviewView('cards')"><i class="ti ti-layout-cards"></i> Cards</button>
           </div>
@@ -308,9 +326,9 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260803g"></script>
-<script src="assets/js/ui.js?v=20260803g"></script>
-<script src="assets/js/db.js?v=20260803g"></script>
+<script src="assets/js/auth.js?v=20260803h"></script>
+<script src="assets/js/ui.js?v=20260803h"></script>
+<script src="assets/js/db.js?v=20260803h"></script>
 <script>
   let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';

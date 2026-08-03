@@ -213,6 +213,13 @@ function initExpandableCharts() {
     btn.addEventListener('mouseenter', () => { btn.style.opacity = '1'; btn.style.background = 'rgba(238,49,36,.07)'; });
     btn.addEventListener('mouseleave', () => { btn.style.opacity = expanded ? '1' : '0.4'; btn.style.background = ''; });
     titleEl.appendChild(btn);
+    // Several panel titles (the Monthly/Quarterly/WP/Budget/# period-chart toggles) already fill
+    // the whole row on a phone — the title's own `flex-shrink:0` button-group never yields, so this
+    // button had nowhere to go and rendered clipped past the panel's right edge. Letting the row
+    // wrap (harmless on desktop, where everything already fits on one line) drops it to its own
+    // line — right-aligned via the margin-left:auto above — instead of spilling off-screen.
+    titleEl.style.flexWrap = 'wrap';
+    titleEl.style.rowGap = titleEl.style.rowGap || '4px';
 
     // Fullscreen (real Fullscreen API) instead of a taller in-page panel — so the whole
     // graph fills the screen, which the old 2.2× height couldn't on large displays / smart TVs.
