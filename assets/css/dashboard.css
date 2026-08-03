@@ -1361,10 +1361,37 @@ body {
   /* Pager buttons */
   .pager button { min-height: 44px; }
 
-  /* Filter selects */
+  /* Filter selects — 2-column grid instead of one-control-per-row stack, so a filter bar
+     with 4-6 controls (Trade/Works/Vendor/Status/etc.) takes half the vertical space and
+     content below appears sooner. Search + Clear span both columns. !important is needed
+     because these controls carry inline flex/min-width/max-width styles (sized for a wide
+     desktop row) that would otherwise keep them narrower than their grid cell. */
   .filter-bar select { min-height: 40px; font-size: 1rem; }
   .filter-bar input[type=text] { min-height: 40px; font-size: 1rem; width: 100%; }
-  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .filter-bar > * { width: 100% !important; min-width: 0 !important; max-width: none !important; flex: none !important; }
+  .filter-bar .msf-btn { width: 100%; max-width: none; min-width: 0; }
+  .filter-bar > div[style*="position:relative"],
+  .filter-bar > button { grid-column: 1 / -1; }
+
+  /* Same 2-column treatment for filter rows that aren't the shared .filter-bar component
+     (e.g. the Portfolio Backlog table's inline title+controls row) — opt in with
+     .filter-row-2col; mark any child that should span the full width with
+     .filter-row-2col-full (search boxes, standalone titles/buttons). */
+  .filter-row-2col {
+    display: grid !important;   /* beats the element's own inline display:flex */
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .filter-row-2col > * { width: 100% !important; min-width: 0 !important; max-width: none !important; flex: none !important; margin-left: 0 !important; }
+  .filter-row-2col > .panel-title,
+  .filter-row-2col > .filter-row-2col-full { grid-column: 1 / -1; }
 
   /* Period charts: taller on mobile to give bars more vertical breathing room */
   .chart-mob-h { height: 300px !important; }
