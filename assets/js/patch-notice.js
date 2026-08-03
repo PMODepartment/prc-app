@@ -2,8 +2,8 @@
  * Patch Notice — one-off "What's New" announcement, Jul 27 – Aug 3 2026 update
  * ----------------------------------------------------------------------------
  * TEMPORARY component. Auto-shows once to contributor-tier accounts
- * (specialist / manager / user — never admin/super_admin or viewer/
- * viewer_budget) to call out the "Not to be Awarded" flag and a couple of
+ * (specialist / manager / user) AND admin / super_admin — never viewer/
+ * viewer_budget — to call out the "Not to be Awarded" flag and a couple of
  * other changes from this update.
  *
  * Hard-expires 2026-08-08 00:00 — both maybeAutoOpen() and open() refuse to
@@ -26,7 +26,8 @@
   var EXPIRES = new Date('2026-08-08T00:00:00');   // hard cutoff (exclusive)
 
   function isContributor(role) {
-    return role === 'specialist' || role === 'manager' || role === 'user';
+    return role === 'specialist' || role === 'manager' || role === 'user' ||
+      role === 'admin' || role === 'super_admin';
   }
 
   function injectCss() {
