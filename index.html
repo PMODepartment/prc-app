@@ -212,7 +212,7 @@
                 <button id="idx-dash-btn-wp" onclick="setIdxDashMetric('wp')" class="seg-btn active">WP</button>
                 <button id="idx-dash-btn-budget" onclick="setIdxDashMetric('budget')" class="seg-btn">Budget</button>
                 <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
-                <button id="idx-dash-btn-view" onclick="setIdxDashView(_idxDashView==='num'?'pct':'num')" class="seg-btn active">#</button>
+                <button id="idx-dash-btn-view" onclick="toggleIdxDashView()" class="seg-btn active">#</button>
               </div>
             </div>
             <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-idx-dash-period"></canvas></div>
@@ -348,7 +348,7 @@
                 <button id="bud-btn-wp" onclick="setIdxBudMetric('wp')" class="seg-btn">WP</button>
                 <button id="bud-btn-budget" onclick="setIdxBudMetric('budget')" class="seg-btn active">Budget</button>
                 <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
-                <button id="bud-btn-view" onclick="setIdxBudView(_idxBudView==='num'?'pct':'num')" class="seg-btn active">#</button>
+                <button id="bud-btn-view" onclick="toggleIdxBudView()" class="seg-btn active">#</button>
               </div>
             </div>
             <div style="position:relative;height:300px"><canvas id="c-idx-bud-period"></canvas></div>
@@ -386,7 +386,7 @@
                 <button id="sch-btn-wp" onclick="setIdxSchMetric('wp')" class="seg-btn active">WP</button>
                 <button id="sch-btn-budget" onclick="setIdxSchMetric('budget')" class="seg-btn">Budget</button>
                 <span style="color:#e0e0e0;margin:0 2px;align-self:center">|</span>
-                <button id="sch-btn-view" onclick="setIdxSchView(_idxSchView==='num'?'pct':'num')" class="seg-btn active">#</button>
+                <button id="sch-btn-view" onclick="toggleIdxSchView()" class="seg-btn active">#</button>
               </div>
             </div>
             <div class="chart-mob-h" style="position:relative;height:260px"><canvas id="c-idx-sch-period"></canvas></div>
@@ -1328,6 +1328,12 @@
       if(btn) btn.textContent = v==='num' ? '#' : '%';
       setIdxDashDataMode(_idxDashComboMode());
     };
+    // The #/% button's onclick can't read `_idxDashView` directly — that variable is declared
+    // inside this AppAuth.requireLogin closure, but inline onclick handlers run in global scope,
+    // so a bare reference to it throws a silent ReferenceError and the click does nothing. This
+    // toggle wrapper is defined (and exposed via window.) in the SAME closure, so it can read the
+    // variable correctly; the onclick attribute just calls it with no arguments.
+    window.toggleIdxDashView = function(){ setIdxDashView(_idxDashView==='num'?'pct':'num'); };
 
 
     window.setIdxBlPeriodMode = function(mode) {
@@ -1391,6 +1397,8 @@
       if(btn) btn.textContent = v==='num' ? '#' : '%';
       setIdxBudDataMode(_idxBudComboMode());
     };
+    // See toggleIdxDashView's comment — same fix, same reason.
+    window.toggleIdxBudView = function(){ setIdxBudView(_idxBudView==='num'?'pct':'num'); };
 
     let _idxSchDataMode = 'count';
 
@@ -1451,6 +1459,8 @@
       if(btn) btn.textContent = v==='num' ? '#' : '%';
       setIdxSchDataMode(_idxSchComboMode());
     };
+    // See toggleIdxDashView's comment — same fix, same reason.
+    window.toggleIdxSchView = function(){ setIdxSchView(_idxSchView==='num'?'pct':'num'); };
 
     // Viewers get no main tab bar — Projects/Overview/Backlog/Schedule/WP List (the non-money
     // tabs) are shown stacked as collapsible sections on one scrolling page instead of switched
