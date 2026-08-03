@@ -42,8 +42,10 @@ function initMobileMenu() {
   const COLLAPSE_KEY = 'wpm_sidebar_collapsed';
   const isDesktop = () => window.innerWidth >= 768;
 
-  // Restore the collapsed state on desktop without animating the slide on first paint.
-  if (isDesktop() && localStorage.getItem(COLLAPSE_KEY) === '1') {
+  // Default to COLLAPSED on desktop — the sidebar starts tucked away and the hamburger
+  // expands it (was the reverse: open by default, hamburger to collapse). Only stays
+  // expanded if the user has explicitly expanded it before (stored '0').
+  if (isDesktop() && localStorage.getItem(COLLAPSE_KEY) !== '0') {
     document.body.classList.add('no-transition', 'sidebar-collapsed');
     requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.remove('no-transition')));
   }
