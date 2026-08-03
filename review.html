@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803d"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260803d"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803d"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803e"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260803e"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803e"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803d"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803e"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -308,9 +308,9 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260803d"></script>
-<script src="assets/js/ui.js?v=20260803d"></script>
-<script src="assets/js/db.js?v=20260803d"></script>
+<script src="assets/js/auth.js?v=20260803e"></script>
+<script src="assets/js/ui.js?v=20260803e"></script>
+<script src="assets/js/db.js?v=20260803e"></script>
 <script>
   let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';
@@ -1274,7 +1274,10 @@
                : col.type==='bool'     ? ['','Yes','No']
                : col.opts.slice();
       if (col.dynOpts || asUserSelect) opts.unshift('');                          // allow blank
-      if (cur!=null && cur!=='' && opts.indexOf(String(cur))<0) opts.unshift(String(cur));   // keep legacy/off-list values
+      // bool columns are fully covered by ['','Yes','No'] already — a raw true/false current
+      // value is NOT an off-list legacy value, it's just the un-labeled form of Yes/No, so
+      // String(cur) ("true"/"false") must never be unshifted as a spurious 4th option.
+      if (col.type!=='bool' && cur!=null && cur!=='' && opts.indexOf(String(cur))<0) opts.unshift(String(cur));   // keep legacy/off-list values
       ed.innerHTML = opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o||'— none —')+'</option>'; }).join('');
       ed.value = col.type==='bool' ? (cur===true?'Yes':cur===false?'No':'') : (cur==null ? '' : String(cur));
     } else {
