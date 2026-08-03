@@ -113,7 +113,7 @@
     <div class="sidebar-section" id="nav-projects-section">
       <div class="sidebar-section-label">Projects</div>
       <!-- Searchable project list -->
-      <div id="sidebar-proj-search-wrap" style="padding:0 4px 6px;display:none">
+      <div id="sidebar-proj-search-wrap" style="padding:0 4px 6px;display:none;position:sticky;top:0;z-index:3;background:var(--mw-black)">
         <div style="position:relative">
           <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.3);font-size:0.8571rem;pointer-events:none"></i>
           <input id="sidebar-proj-search" type="text" placeholder="Search projects…" oninput="filterSidebarProjects(this.value)"
@@ -1296,10 +1296,10 @@ window.addEventListener('beforeunload', function(e) {
       ? window._sidebarProjects.filter(p=>p.id.toLowerCase().includes(q)||((p.name||'').toLowerCase().includes(q)))
       : null;
 
-    // Show the full assigned-project list (container scrolls); the search box filters it.
+    // Show the full assigned-project list — grows naturally within the sidebar's OWN scroller
+    // (.sidebar overflow-y:auto). Don't reintroduce an inner max-height scroll box here: that
+    // renders a second scrollbar nested inside the sidebar's, see CLAUDE.md Known Issues.
     const list = all || [...window._sidebarProjects].sort((a,b)=>a.id.localeCompare(b.id));
-    navProj.style.maxHeight = '240px';
-    navProj.style.overflowY = 'auto';
     navProj.innerHTML = list.length
       ? list.map(plainProjectLink).join('')
       : '<div style="font-size:0.7857rem;color:rgba(255,255,255,.3);padding:4px 12px">No matches</div>';
