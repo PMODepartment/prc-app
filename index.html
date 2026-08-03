@@ -12,17 +12,17 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260803c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803c"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260803c"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260803c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260803d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803d"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260803d"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260803d"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260803c"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260803d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803d"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -635,14 +635,14 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260803c"></script>
-<script src="assets/js/db.js?v=20260803c"></script>
-<script src="assets/js/ui.js?v=20260803c"></script>
-<script src="assets/js/onboarding.js?v=20260803c"></script>
-<script src="assets/js/coachmarks.js?v=20260803c"></script>
+<script src="assets/js/auth.js?v=20260803d"></script>
+<script src="assets/js/db.js?v=20260803d"></script>
+<script src="assets/js/ui.js?v=20260803d"></script>
+<script src="assets/js/onboarding.js?v=20260803d"></script>
+<script src="assets/js/coachmarks.js?v=20260803d"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260803c"></script>
+<script src="assets/js/charts.js?v=20260803d"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -1670,10 +1670,12 @@
         _idxDashBlWPs = wps.filter(w => w.award_status !== 'Awarded');
         window.renderIdxDashBacklog();
 
-        // Top 5 — Savings/Overbudget only count fully Awarded WPs (closed), so an
-        // in-progress (Not Yet Awarded) WP can't show phantom savings.
-        const withBoth = wps.filter(w=>w.award_status==='Awarded'&&w.approved_budget_bcb>0&&w.total_awarded>0);
-        const variance = w => (w.approved_budget_bcb||0)-(w.total_awarded||0);
+        // Top 5 — Savings/Overbudget only count fully Awarded WPs (closed) that are
+        // "money awarded" (real cost, or explicitly not_to_be_awarded — see
+        // isMoneyAwarded in db.js), so an in-progress (Not Yet Awarded) WP can't
+        // show phantom savings.
+        const withBoth = wps.filter(w=>window.isMoneyAwarded(w)&&(w.approved_budget_bcb||0)>0);
+        const variance = w => (w.approved_budget_bcb||0)-window.effectiveAwardedCost(w);
         const totBCB = window._idxTotalBCB || 0;                          // for %WT = Savings ÷ Total BCB
         const wtPct = (v,sign) => totBCB ? (sign+(Math.abs(v)/totBCB*100).toFixed(2)+'%') : '—';
         buildRankTable('idx-rank-value',
@@ -1683,13 +1685,13 @@
         buildRankTable('idx-rank-gains',
           withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
             .map(w=>({id:w.id,name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:''),
-              val:variance(w), bcb:w.approved_budget_bcb, awarded:w.total_awarded,
+              val:variance(w), bcb:w.approved_budget_bcb, awarded:window.effectiveAwardedCost(w),
               pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%', wt:wtPct(variance(w),'+')})),
           'savings');
         buildRankTable('idx-rank-losses',
           withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
             .map(w=>({id:w.id,name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:''),
-              val:Math.abs(variance(w)), bcb:w.approved_budget_bcb, awarded:w.total_awarded,
+              val:Math.abs(variance(w)), bcb:w.approved_budget_bcb, awarded:window.effectiveAwardedCost(w),
               pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%', wt:wtPct(variance(w),'-')})),
           'loss');
 
@@ -1902,8 +1904,8 @@
           const rows = trades.map(t => {
             const tw = wps.filter(w=>w.trade===t);
             const budget = tw.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-            // Awarded uses the strict predicate so the table reconciles with the KPI cards (see CLAUDE.md #17)
-            const awarded = tw.filter(w=>w.award_status==='Awarded' && (w.total_awarded||0)>0).reduce((s,w)=>s+(w.total_awarded||0),0);
+            // Awarded uses isMoneyAwarded so the table reconciles with the KPI cards (see CLAUDE.md #17)
+            const awarded = tw.filter(w=>window.isMoneyAwarded(w)).reduce((s,w)=>s+window.effectiveAwardedCost(w),0);
             const v = budget-awarded;
             const ar = tw.length ? Math.round(tw.filter(w=>w.award_status==='Awarded').length/tw.length*100) : 0;
             return `<tr><td>${t}</td><td style="text-align:center">${tw.length}</td>
@@ -1914,7 +1916,7 @@
               <td style="text-align:center">${ar}%</td></tr>`;
           });
           const totB = trades.reduce((s,t)=>s+wps.filter(w=>w.trade===t).reduce((ss,w)=>ss+(w.approved_budget_bcb||0),0),0);
-          const totA = trades.reduce((s,t)=>s+wps.filter(w=>w.trade===t && w.award_status==='Awarded' && (w.total_awarded||0)>0).reduce((ss,w)=>ss+(w.total_awarded||0),0),0);
+          const totA = trades.reduce((s,t)=>s+wps.filter(w=>w.trade===t && window.isMoneyAwarded(w)).reduce((ss,w)=>ss+window.effectiveAwardedCost(w),0),0);
           const totV = totB - totA;
           budTbody.innerHTML = rows.join('') + `<tr style="font-weight:700;background:#fafafa;border-top:2px solid #e5e5e5">
             <td>TOTAL</td><td style="text-align:center">${wps.length}</td>

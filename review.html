@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260803c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260803d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803d"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -308,9 +308,9 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260803c"></script>
-<script src="assets/js/ui.js?v=20260803c"></script>
-<script src="assets/js/db.js?v=20260803c"></script>
+<script src="assets/js/auth.js?v=20260803d"></script>
+<script src="assets/js/ui.js?v=20260803d"></script>
+<script src="assets/js/db.js?v=20260803d"></script>
 <script>
   let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';
@@ -662,6 +662,12 @@
     { g:'budget',   k:'_variance',           label:'Variance',             w:120, type:'money', ro:true },
     { g:'budget',   k:'award_status',        label:'Award Status',         w:110, type:'text',  ro:true },
     { g:'budget',   k:'contractor',          label:'Awarded Vendor',       w:150, type:'text',  reqIfAwarded:true },
+    // Ops decided this WP will NEVER go through a formal award (handled outside PRC —
+    // petty cash, direct arrangement, scope removed). Waives the Awarded Cost/Vendor
+    // requirement below and tells the dashboard's money math to count this WP's full
+    // budget as realized savings at an effective ₱0 cost instead of excluding it. See
+    // isMoneyAwarded/effectiveAwardedCost in db.js and CLAUDE.md.
+    { g:'budget',   k:'not_to_be_awarded',   label:'Not to be Awarded',    w:130, type:'bool'  },
     /* ── Payment Terms ─────────────────────────────────────────────────── */
     { g:'payment',  k:'payment_terms_days',  label:'Terms (Days)',         w:95,  type:'num'   },
     { g:'payment',  k:'dp_percent',          label:'Down Payment %',       w:110, type:'pct'   },
@@ -989,7 +995,8 @@
      (`reqIfAwarded`). Project is implicit (a row always has one). */
   function _xlRequired(w, col){
     if (col.req) return true;
-    if (col.reqIfAwarded) return xlVal(w,'award_status')==='Awarded';
+    // Not to be Awarded WPs will never get a real Awarded Cost/Vendor — see the column note above.
+    if (col.reqIfAwarded) return xlVal(w,'award_status')==='Awarded' && !xlVal(w,'not_to_be_awarded');
     return false;
   }
   function _xlMissing(w, col){

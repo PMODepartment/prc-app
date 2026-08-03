@@ -376,7 +376,7 @@ const Charts = (() => {
     // actual_awarding_date isn't captured (WP-Monitoring imports record award_status + total_awarded but
     // no actual date — without the fallback the Awarded bars / Cumulative Awarded line are flat at 0).
     const awDate=_awDate;   // actual→planned fallback, clamped to today (no future awards)
-    const isAwd=w=>w.award_status==='Awarded'&&(w.total_awarded||0)>0;   // awarded = flagged Awarded AND has a cost
+    const isAwd=w=>window.isMoneyAwarded(w);   // awarded = flagged Awarded AND has a cost, or not_to_be_awarded
     const mSet=new Set();
     wps.forEach(w=>{ if(w.awarding_date){ const d=new Date(w.awarding_date); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } if(isAwd(w)&&awDate(w)){ const d=awDate(w); mSet.add(d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')); } });
     _extendForecastAxis(mSet, wps, 'm', !!(opts&&opts.hideAwarded));
@@ -386,7 +386,7 @@ const Charts = (() => {
     const mLabel=k=>{ const[y,m]=k.split('-'); return MONTH_NAMES[parseInt(m)-1]+' \''+y.slice(2); };
     const getMKey=d=>d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
     const budgetData=months.map(mk=>wps.filter(w=>w.awarding_date&&getMKey(new Date(w.awarding_date))===mk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
-    const awardedData=months.map(mk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getMKey(awDate(w))===mk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
+    const awardedData=months.map(mk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getMKey(awDate(w))===mk).reduce((s,w)=>s+window.effectiveAwardedCost(w),0)/1e6);
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
@@ -394,7 +394,7 @@ const Charts = (() => {
     // line past the current month so it ends at today instead of drawing flat to the last budget month.
     const _nowMK=(()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');})();
     const cumADisp=months.map((mk,i)=> mk>_nowMK ? null : cumA[i]);
-    const forecast=_wpForecastLine(months,getMKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6,w=>w.award_status==='Awarded'&&(w.total_awarded||0)>0);
+    const forecast=_wpForecastLine(months,getMKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6,w=>window.isMoneyAwarded(w));
     // Budget % mode: same cumulative + forecast S-curve, expressed as % of total budget.
     if(opts&&opts.sharePct){ _periodSharePct(id, months.map(mLabel), budgetData, awardedData, cumB, cumADisp, forecast, !!(opts&&opts.hideAwarded), opts&&opts.totalBudget); return; }
     const mob=_mob();
@@ -415,7 +415,7 @@ const Charts = (() => {
     // Awarded amount falls back to the PLANNED award date when actual_awarding_date isn't captured
     // (see budgetAwardedByPeriodMonthly for the why) so the Awarded series isn't flat at 0.
     const awDate=_awDate;   // actual→planned fallback, clamped to today (no future awards)
-    const isAwd=w=>w.award_status==='Awarded'&&(w.total_awarded||0)>0;   // awarded = flagged Awarded AND has a cost
+    const isAwd=w=>window.isMoneyAwarded(w);   // awarded = flagged Awarded AND has a cost, or not_to_be_awarded
     const qSet=new Set();
     wps.forEach(w=>{ if(w.awarding_date) qSet.add(getQKey(new Date(w.awarding_date))); if(isAwd(w)&&awDate(w)) qSet.add(getQKey(awDate(w))); });
     _extendForecastAxis(qSet, wps, 'q', !!(opts&&opts.hideAwarded));
@@ -423,7 +423,7 @@ const Charts = (() => {
     const quarters=[...qSet].sort();
     const labels=quarters.map(qLabel);
     const budgetData=quarters.map(qk=>wps.filter(w=>w.awarding_date&&getQKey(new Date(w.awarding_date))===qk).reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6);
-    const awardedData=quarters.map(qk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getQKey(awDate(w))===qk).reduce((s,w)=>s+(w.total_awarded||0),0)/1e6);
+    const awardedData=quarters.map(qk=>wps.filter(w=>isAwd(w)&&awDate(w)&&getQKey(awDate(w))===qk).reduce((s,w)=>s+window.effectiveAwardedCost(w),0)/1e6);
     let cb=0,ca=0;
     const cumB=budgetData.map(v=>(cb=+(cb+v).toFixed(1)));
     const cumA=awardedData.map(v=>(ca=+(ca+v).toFixed(1)));
@@ -431,7 +431,7 @@ const Charts = (() => {
     // ends at today instead of drawing flat to the last (future) budget quarter.
     const _nowQK=getQKey(new Date());
     const cumADisp=quarters.map((qk,i)=> qk>_nowQK ? null : cumA[i]);
-    const forecast=_wpForecastLine(quarters,getQKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6,w=>w.award_status==='Awarded'&&(w.total_awarded||0)>0);
+    const forecast=_wpForecastLine(quarters,getQKey,wps,cumA,w=>(w.approved_budget_bcb||0)/1e6,w=>window.isMoneyAwarded(w));
     if(opts&&opts.sharePct){ _periodSharePct(id, labels, budgetData, awardedData, cumB, cumADisp, forecast, !!(opts&&opts.hideAwarded), opts&&opts.totalBudget); return; }
     const mob=_mob();
     const tidy=!!(opts&&opts.tidyLabels);

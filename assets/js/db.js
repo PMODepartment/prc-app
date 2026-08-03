@@ -193,6 +193,22 @@ function computeStats(wps) {
    data is ever found to be unusable; prefer fixing the rows instead. Use project.html?id=<PID>&diag=1
    to inspect a project's awarded reconciliation. */
 const HELPING_FIGURES = {};
+// A WP is "money awarded" when it's genuinely Awarded with a real cost, OR it's
+// flagged `not_to_be_awarded` — Ops decided it will NEVER go through a formal
+// award (handled outside PRC entirely), so its budget is realized savings at an
+// effective ₱0 cost rather than data pending entry. Without this flag a WP like
+// that is indistinguishable from "Awarded, cost not encoded yet" and gets
+// dropped from BOTH sides of the ledger (Known Issue #17) instead of counting
+// as real savings. Use these two helpers everywhere the app decides whether a
+// WP's money counts and what its effective awarded cost is — never re-inline
+// `award_status==='Awarded' && total_awarded>0`, or a not_to_be_awarded WP will
+// disagree between tabs/charts again.
+window.isMoneyAwarded = function (w) {
+  return !!w && w.award_status === 'Awarded' && ((w.total_awarded || 0) > 0 || !!w.not_to_be_awarded);
+};
+window.effectiveAwardedCost = function (w) {
+  return (w && w.not_to_be_awarded) ? 0 : ((w && w.total_awarded) || 0);
+};
 // Aggregate awarded metrics over a set of WPs (grouped by project), row-derived.
 function helpingMetrics(wps) {
   const byProj = {};
@@ -218,13 +234,15 @@ function helpingMetrics(wps) {
       // because that is decided by award_status, which the importer takes from the sheet's
       // own Remarks flag rather than from the presence of a cost.
       const awdAll = arr.filter(w => w.award_status==='Awarded');
-      // MONEY basis: only awarded WPs that actually carry a cost. Awarded Cost and
-      // Budget-for-Awarded must move together — counting a costless WP's budget here would
-      // book its entire BCB as "savings".
-      const awd = awdAll.filter(w => (w.total_awarded||0) > 0);
+      // MONEY basis: only awarded WPs that actually carry a cost, OR are flagged
+      // not_to_be_awarded (their budget is realized savings at an effective ₱0
+      // cost — see isMoneyAwarded). Awarded Cost and Budget-for-Awarded must move
+      // together — counting a costless WP's budget here would otherwise book its
+      // entire BCB as "savings" while its real cost is still pending.
+      const awd = awdAll.filter(w => window.isMoneyAwarded(w));
       awarded += awdAll.length;
       totalBudget += arr.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-      awardedCost += awd.reduce((s,w)=>s+(w.total_awarded||0),0);
+      awardedCost += awd.reduce((s,w)=>s+window.effectiveAwardedCost(w),0);
       budgetAwarded += awd.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
     }
   });

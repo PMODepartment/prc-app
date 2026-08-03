@@ -1,0 +1,26 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- "Not to be Awarded" flag
+-- Run once in the Supabase SQL Editor. Safe to re-run.
+--
+-- Some work packages are marked Awarded in the source monitoring sheet (Remarks
+-- column) yet will NEVER carry a real Awarded Cost — Ops has decided the item
+-- will not go through a formal award at all (handled outside PRC, e.g. direct
+-- arrangement / petty cash / scope removed). The dashboard's money math
+-- (helpingMetrics() in db.js) normally excludes any "Awarded" WP with no cost,
+-- to avoid booking a WP's full budget as phantom savings while its real cost is
+-- simply pending data entry. That's the wrong call for a WP that will NEVER get
+-- a cost — its budget genuinely will not be spent, so it should count as real,
+-- realized savings instead of being silently dropped from both sides of the
+-- ledger. This flag lets a WP opt into that treatment explicitly.
+--
+-- When true (and award_status = 'Awarded'): the WP's full approved_budget_bcb
+-- is added to Budget-for-Awarded, and its awarded-cost contribution is treated
+-- as ₱0 (not its raw total_awarded, which is usually NULL) — so it shows up as
+-- pure savings rather than being excluded entirely. See CLAUDE.md.
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS not_to_be_awarded boolean DEFAULT false;
+
+-- Viewers read work packages through wp_view_public. This flag is not money
+-- itself (it's a status modifier), so it's safe to expose there too — add it
+-- if you want viewers to see the "not to be awarded" badge:
+-- ALTER VIEW / recreate wp_view_public to include not_to_be_awarded (optional).

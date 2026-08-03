@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260803c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803c"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260803c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260803d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803d"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260803d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803d"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -515,6 +515,13 @@
                 <label>Awarded Vendor</label>
                 <input type="text" id="f-contractor" placeholder="Leave blank if not yet awarded"/>
               </div>
+              <div class="form-group full" id="ntba-group">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">
+                  <input type="checkbox" id="f-not-to-be-awarded" onchange="onNotToBeAwardedChange()" style="width:16px;height:16px;cursor:pointer"/>
+                  <span>Not to be Awarded <span style="cursor:help;color:#bbb;font-weight:400;font-size:0.7857rem" title="Ops has decided this WP will NEVER go through a formal award — handled outside PRC entirely (e.g. petty cash, direct arrangement, or removed from scope). Check this instead of entering an Awarded Cost/Vendor: the dashboard will count this WP's full budget as realized savings at an effective ₱0 cost, instead of excluding it as if the cost were merely pending.">&#9432;</span></span>
+                </label>
+                <span class="hint">Its full budget shows as savings — it will never receive a real Awarded Cost.</span>
+              </div>
             </div>
           </div>
 
@@ -658,10 +665,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260803c"></script>
-<script src="assets/js/ui.js?v=20260803c"></script>
-<script src="assets/js/db.js?v=20260803c"></script>
-<script src="assets/js/coachmarks.js?v=20260803c"></script>
+<script src="assets/js/auth.js?v=20260803d"></script>
+<script src="assets/js/ui.js?v=20260803d"></script>
+<script src="assets/js/db.js?v=20260803d"></script>
+<script src="assets/js/coachmarks.js?v=20260803d"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -869,6 +876,24 @@
       if (dt) { dt.disabled = false; if (dt.value === 'N/A') dt.value = ''; }
       if (nm) { nm.disabled = false; if (nm.value === 'N/A') nm.value = ''; nm.placeholder = 'e.g. Project Manager'; }
       if (dd) { dd.disabled = false; }
+    }
+    markDirty();
+  }
+
+  // "Not to be Awarded" — Ops decided this WP will NEVER go through a formal award (see
+  // CLAUDE.md). Awarded Cost/Vendor don't apply — clear + disable them while checked so
+  // nothing stale gets saved; the dashboard's money math treats this WP's budget as
+  // realized savings at an effective ₱0 cost instead of excluding it as data-pending.
+  function onNotToBeAwardedChange() {
+    const ntba = document.getElementById('f-not-to-be-awarded').checked;
+    const cost = document.getElementById('f-contract');
+    const vendor = document.getElementById('f-contractor');
+    if (ntba) {
+      if (cost) { cost.value = ''; cost.disabled = true; }
+      if (vendor) { vendor.value = ''; vendor.disabled = true; vendor.placeholder = 'Not applicable — not to be awarded'; }
+    } else {
+      if (cost) { cost.disabled = false; }
+      if (vendor) { vendor.disabled = false; vendor.placeholder = 'Leave blank if not yet awarded'; }
     }
     markDirty();
   }
@@ -1315,6 +1340,8 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-submittal', existingWP.submittal_type);
       fillSelectLegacy('f-delivery-status', existingWP.delivery_status);
       fill('f-contractor', existingWP.contractor);
+      document.getElementById('f-not-to-be-awarded').checked = !!existingWP.not_to_be_awarded;
+      onNotToBeAwardedChange();   // re-apply the disabled/cleared Awarded Cost+Vendor state
       fill('f-remarks', existingWP.remarks);
       if (existingWP.charging_type) {
         document.getElementById('f-charging').value = existingWP.charging_type || '';
@@ -1397,10 +1424,12 @@ AppAuth.requireLogin(async (user, profile) => {
     if (!getNum('f-budget'))         return showErr('Enter the Budget (BCB) amount (Budget & Contract).', 'f-budget');
     if (!getVal('f-charging'))       return showErr('Choose a Charging type (Main Contract or Change Order).', 'f-charging');
 
-    /* Awarded WPs must have an Awarded Cost and an Awarded Vendor */
-    if (getVal('f-award-status') === 'Awarded') {
-      if (!getNum('f-contract'))     return showErr('This WP is marked Awarded — enter the Awarded Cost (Net), or set Award Status back to "Not Yet Awarded".', 'f-contract');
-      if (!getVal('f-contractor'))   return showErr('This WP is marked Awarded — enter the Awarded Vendor, or set Award Status back to "Not Yet Awarded".', 'f-contractor');
+    /* Awarded WPs must have an Awarded Cost and an Awarded Vendor — unless flagged
+       Not to be Awarded, which is exactly the case where no real cost will ever exist. */
+    const notToBeAwarded = document.getElementById('f-not-to-be-awarded').checked;
+    if (getVal('f-award-status') === 'Awarded' && !notToBeAwarded) {
+      if (!getNum('f-contract'))     return showErr('This WP is marked Awarded — enter the Awarded Cost (Net), set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'f-contract');
+      if (!getVal('f-contractor'))   return showErr('This WP is marked Awarded — enter the Awarded Vendor, set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'f-contractor');
     }
 
     /* No. of PO/JO must match the count of entries in PO/JO Numbers */
@@ -1462,6 +1491,7 @@ AppAuth.requireLogin(async (user, profile) => {
       approved_budget_bcb:      (getNum('f-bcb2') ?? getNum('f-bcb1') ?? getNum('f-budget')),
       awarded_cost:             getNum('f-contract'),
       award_status:             getVal('f-award-status'),
+      not_to_be_awarded:        notToBeAwarded,
       payment_terms_days:       getNum('f-payment-terms-days'),
       dp_percent:               (() => { const v = parseFloat(document.getElementById('f-dp-percent').value); return isNaN(v) ? null : v / 100; })(),
       dp_terms:                 getVal('f-dp-terms') || null,
