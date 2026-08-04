@@ -281,8 +281,13 @@
               <option value="pending_review">Pending review (legacy)</option>
               <option value="rejected">Rejected (legacy)</option>
             </select>
-            <button class="xl-btn primary" onclick="xlAddRow()" title="Add a work package directly in the grid"><i class="ti ti-plus"></i> Add WP</button>
+            <button class="xl-btn primary" onclick="xlAddRow()" title="Add blank work-package rows directly in the grid (uses the count on the right)"><i class="ti ti-plus"></i> Add WP</button>
+            <input type="number" id="xl-add-count" min="1" max="100" value="1" title="How many blank rows to add at once" style="width:52px;font-size:0.7857rem;padding:5px 6px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);text-align:center">
             <select id="xl-new-proj" style="display:none;font-size:0.7857rem;padding:5px 8px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);cursor:pointer" title="Project the new work package belongs to"></select>
+            <span class="xl-sep"></span>
+            <button class="xl-btn" onclick="xlSelectAllCells()" title="Select every cell in the grid (Ctrl+A)"><i class="ti ti-box-multiple"></i> Select all</button>
+            <button class="xl-btn" onclick="xlCopyWPs()" title="Copy the selected work packages — then open another project's grid and click Paste WPs to add them there"><i class="ti ti-copy"></i> Copy WPs</button>
+            <button class="xl-btn" id="xl-paste-wps" onclick="xlPasteWPs()" title="Add the copied work packages as new rows in this project"><i class="ti ti-clipboard-plus"></i> Paste WPs</button>
             <span id="xl-count" class="xl-hint"></span>
             <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer">
               <input type="checkbox" id="xl-only-missing" onchange="renderGrid()" style="cursor:pointer"> Only incomplete
@@ -313,6 +318,8 @@
               <div><kbd>Ctrl</kbd>+<kbd>D</kbd> or drag the corner handle to fill down · header <b>▾</b> sets a whole column at once</div>
               <div>Header <b>📌</b> freezes columns up to that point (click it again to unfreeze) · your choice is remembered</div>
               <div>Drag a column border to resize (double-click to reset). Edits are staged until you press <b>Save</b>.</div>
+              <div><b>Add WP</b> adds the number of blank rows in the box beside it (up to 100) at once.</div>
+              <div><b>Select all</b> → <b>Copy WPs</b>, then open another project's grid and <b>Paste WPs</b> to bring those work packages in as new rows.</div>
             </div>
           </details>
           <div class="xl-wrap" id="xl-wrap" tabindex="0"><table class="xl" id="xl-table"></table></div>
@@ -963,6 +970,21 @@
     return nums.length ? String(Math.floor(Math.max.apply(null, nums)) + 1) : '1';
   }
 
+  // Build a blank draft row for `pid` with sensible defaults so only the genuinely
+  // required fields light up red. `seed` (optional) pre-fills fields — used by paste.
+  function _xlNewDraft(pid, seed){
+    const d = {
+      id: 'new_' + (++_newSeq), __new: true, project_id: pid,
+      osm: 'No', charging_type: 'Main Contract',
+      procurement_status: 'Not Started', award_status: 'Not Yet Awarded',
+      submittal_type: 'Not Required', delivery_status: null,
+      surety_bond: 'No', performance_bond: 'No', warranty_bond: 'No',
+      requires_approval: false, review_status: 'draft', additionals: 0,
+    };
+    if (seed) for (const k in seed){ if (seed[k] !== undefined) d[k] = seed[k]; }
+    return d;
+  }
+
   window.xlAddRow = function(){
     const opts = _xlAddableProjects();
     if (!opts.length){ AppNotify.warn('You have no projects you can add work packages to. Ask an admin to assign you a project.'); return; }
@@ -970,23 +992,139 @@
     let pid = (currentProjId !== 'ALL') ? currentProjId : (document.getElementById('xl-new-proj')||{}).value;
     if (!pid) pid = opts[0].id;
     if (!AppAuth.canEditProject(adminProfile, pid)){ AppNotify.warn("You can't add work packages to " + pid + '.'); return; }
-    const draft = {
-      id: 'new_' + (++_newSeq), __new: true, project_id: pid,
-      wp_no: _xlNextWpNo(pid),
-      // Sensible defaults so only the genuinely required fields light up red.
-      osm: 'No', charging_type: 'Main Contract',
-      procurement_status: 'Not Started', award_status: 'Not Yet Awarded',
-      submittal_type: 'Not Required', delivery_status: null,
-      surety_bond: 'No', performance_bond: 'No', warranty_bond: 'No',
-      requires_approval: false, review_status: 'draft', additionals: 0,
-    };
-    _newRows.push(draft);
+    // How many blank rows to add at once (the box beside the Add WP button).
+    let n = parseInt((document.getElementById('xl-add-count')||{}).value, 10);
+    if (!(n >= 1)) n = 1; if (n > 100) n = 100;
+    let first = null;
+    for (let i = 0; i < n; i++){
+      // _xlNextWpNo reads _newRows, so each pushed draft bumps the next number.
+      const draft = _xlNewDraft(pid, { wp_no: _xlNextWpNo(pid) });
+      _newRows.push(draft);
+      if (i === 0) first = draft;
+    }
     if (document.getElementById('xl-only-missing')) document.getElementById('xl-only-missing').checked = false;
     renderGrid();
-    // Land the cursor on Description — the first thing that actually needs typing.
-    const r = _gridRows.findIndex(function(w){ return w.id === draft.id; });
-    const c = VC.findIndex(function(col){ return col.k === 'description'; });
-    if (r >= 0 && c >= 0){ _xlSelect(r, c); _xlBeginEdit(); }
+    // For a single add, land the cursor on Description — the first thing that needs typing.
+    if (n === 1 && first){
+      const r = _gridRows.findIndex(function(w){ return w.id === first.id; });
+      const c = VC.findIndex(function(col){ return col.k === 'description'; });
+      if (r >= 0 && c >= 0){ _xlSelect(r, c); _xlBeginEdit(); }
+    } else if (first){
+      const r = _gridRows.findIndex(function(w){ return w.id === first.id; });
+      if (r >= 0) _xlSelect(r, VC.findIndex(function(col){ return col.k === 'description'; }));
+      xlToast(n + ' blank work packages added — fill them in and press Save.');
+    }
+  };
+
+  /* ── Copy / paste whole work packages across projects ──────────────────────
+     "Select all → Copy WPs" stores the selected rows' full field data in
+     localStorage (survives navigating to another project) plus a TSV on the OS
+     clipboard for Excel. "Paste WPs" re-creates them as draft rows in whatever
+     project's grid you're viewing — WP Nos. that clash are auto-renumbered. */
+  const WP_CLIP_KEY = 'wpm_wp_clipboard';
+  // Fields worth copying: everything editable. Skip read-only/derived/placeholder
+  // columns and project_id (the target project differs).
+  function _xlCopyableCols(){
+    return XL_COLS.filter(function(c){
+      return !c.ro && !c.ph && c.k.charAt(0) !== '_' && c.k !== 'project_id';
+    });
+  }
+  function _xlReadClip(){
+    try { const p = JSON.parse(localStorage.getItem(WP_CLIP_KEY) || 'null');
+      return (p && p.rows && p.rows.length) ? p : null; } catch(e){ return null; }
+  }
+  // Reflect what's on the WP-clipboard in the Paste button's label/title.
+  function _xlSyncPasteBtn(){
+    const btn = document.getElementById('xl-paste-wps'); if (!btn) return;
+    const p = _xlReadClip();
+    if (p){
+      btn.disabled = false;
+      btn.title = 'Add the ' + p.rows.length + ' work package' + (p.rows.length===1?'':'s')
+        + ' copied from ' + (p.source||'another project') + ' as new rows in this project.';
+      btn.innerHTML = '<i class="ti ti-clipboard-plus"></i> Paste ' + p.rows.length + ' WP' + (p.rows.length===1?'':'s');
+    } else {
+      btn.disabled = true;
+      btn.title = 'Copy work packages from a project first (Select all → Copy WPs), then paste them here.';
+      btn.innerHTML = '<i class="ti ti-clipboard-plus"></i> Paste WPs';
+    }
+  }
+
+  window.xlSelectAllCells = function(){
+    if (_reviewView !== 'grid' || !_gridRows.length || !VC.length) return;
+    _xlAnchor = { r:0, c:0 };
+    _xlSel = { r:_gridRows.length-1, c:VC.length-1 };
+    _xlSelect(_xlSel.r, _xlSel.c, false);
+    _xlPaintRange();
+  };
+
+  window.xlCopyWPs = function(){
+    if (!_gridRows.length){ AppNotify.warn('There are no work packages to copy.'); return; }
+    const R = _xlRange(), cols = _xlCopyableCols(), rows = [];
+    for (let r = R.r1; r <= R.r2; r++){
+      const w = _gridRows[r]; if (!w) continue;
+      const o = {};
+      cols.forEach(function(c){ const v = xlVal(w, c.k); if (v !== undefined && v !== null && v !== '') o[c.k] = v; });
+      rows.push(o);
+    }
+    if (!rows.length){ AppNotify.warn('Select the work packages to copy first (Select all copies them all).'); return; }
+    const payload = { v:1, source:(currentProjId!=='ALL'?currentProjId:'the consolidated grid'), rows:rows };
+    try { localStorage.setItem(WP_CLIP_KEY, JSON.stringify(payload)); }
+    catch(e){ AppNotify.error('Could not copy — browser storage is full.', {detail:e.message}); return; }
+    // Also drop a TSV on the OS clipboard so the same selection can go into Excel.
+    try {
+      const tsv = [cols.map(function(c){ return c.label; }).join('\t')]
+        .concat(rows.map(function(o){ return cols.map(function(c){ return xlFmt(o[c.k], c); }).join('\t'); }))
+        .join('\n');
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv).catch(function(){});
+    } catch(e){}
+    xlToast('Copied ' + rows.length + ' work package' + (rows.length===1?'':'s')
+      + '. Open another project’s grid and click Paste WPs to add them.');
+    _xlSyncPasteBtn();
+  };
+
+  window.xlPasteWPs = function(){
+    const opts = _xlAddableProjects();
+    if (!opts.length){ AppNotify.warn('You have no projects you can add work packages to.'); return; }
+    let pid = (currentProjId !== 'ALL') ? currentProjId : (document.getElementById('xl-new-proj')||{}).value;
+    if (!pid) pid = opts[0].id;
+    if (!AppAuth.canEditProject(adminProfile, pid)){ AppNotify.warn("You can't add work packages to " + pid + '.'); return; }
+    const payload = _xlReadClip();
+    if (!payload){ AppNotify.warn('Nothing to paste. Copy work packages from a project first (Select all → Copy WPs).'); return; }
+
+    // Renumber any WP No. that already exists in the target project (saved rows,
+    // existing drafts, and rows pasted earlier in this batch). (project_id, wp_no)
+    // is unique in the DB, so a clash would otherwise fail the Save.
+    const _nk = function(v){ return String(v==null?'':v).trim().replace(/^wp[-\s]*/i,'').replace(/\.0+$/,'').toLowerCase(); };
+    const taken = new Set(); let maxNum = 0;
+    allWPs.concat(_newRows).filter(function(w){ return w.project_id===pid; }).forEach(function(w){
+      const raw = (w.id && _gridEdits[w.id] && _gridEdits[w.id].wp_no != null) ? _gridEdits[w.id].wp_no : w.wp_no;
+      const k = _nk(raw); if (k) taken.add(k);
+      const m = k.match(/^\d+/); if (m) maxNum = Math.max(maxNum, parseInt(m[0], 10));
+    });
+    const freeWpNo = function(pref){
+      const pk = _nk(pref);
+      if (pref != null && pref !== '' && pk && !taken.has(pk)){ taken.add(pk); return String(pref); }
+      do { maxNum++; } while (taken.has(_nk(maxNum)));
+      taken.add(_nk(maxNum)); return String(maxNum);
+    };
+
+    const added = [];
+    payload.rows.forEach(function(rowData){
+      const seed = {};
+      Object.keys(rowData).forEach(function(k){ if (k !== 'wp_no') seed[k] = rowData[k]; });
+      const d = _xlNewDraft(pid, seed);
+      d.wp_no = freeWpNo(rowData.wp_no);
+      // Award Status is derived from Procurement Status (Known Issues #18).
+      d.award_status = (d.procurement_status === 'Awarded') ? 'Awarded' : 'Not Yet Awarded';
+      _newRows.push(d); added.push(d);
+    });
+    if (document.getElementById('xl-only-missing')) document.getElementById('xl-only-missing').checked = false;
+    renderGrid();
+    const r0 = added.length ? _gridRows.findIndex(function(w){ return w.id === added[0].id; }) : -1;
+    if (r0 >= 0) _xlSelect(r0, VC.findIndex(function(col){ return col.k === 'description'; }), true);
+    AppNotify.success(added.length + ' work package' + (added.length===1?'':'s') + ' from ' + (payload.source||'another project')
+      + ' added as new rows in ' + pid + '. Review the fields highlighted in red, then press Save.',
+      { title: 'Pasted ' + added.length + ' work package' + (added.length===1?'':'s') });
   };
 
   window.xlRemoveNewRow = function(id, ev){
@@ -1007,6 +1145,12 @@
     });
     out.project_id  = w.project_id;
     out.award_status = xlVal(w, 'award_status') || 'Not Yet Awarded';
+    // approved_budget_bcb is DERIVED (newest non-blank baseline) and has no column of
+    // its own, but every dashboard/chart/export reads it — set it here so a grid-added
+    // or pasted WP's budget shows up in the KPIs. Same rule as _xlSet / the WP form.
+    const _bn = k => { const v = xlVal(w, k); return (v==null||v==='') ? null : v; };
+    const abcb = _bn('budget_bcb2') ?? _bn('budget_bcb1') ?? _bn('budget_bcb0');
+    if (abcb != null) out.approved_budget_bcb = abcb;
     return out;
   }
 
@@ -1194,6 +1338,7 @@
     }
     const only = document.getElementById('xl-only-missing');
     if (only) only.parentElement.style.display = '';
+    _xlSyncPasteBtn();
   }
 
   function _xlSelect(r, c, scroll){
@@ -1537,6 +1682,7 @@
       return;
     }
     if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){ e.preventDefault(); gridUndo(); return; }
+    if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='a'){ e.preventDefault(); xlSelectAllCells(); return; }
     if (e.ctrlKey||e.metaKey) return;                      // let the copy/paste handlers run
     // Any printable character starts editing with that character (Excel behaviour)
     if (e.key.length===1){ e.preventDefault(); _xlBeginEdit(e.key); }
