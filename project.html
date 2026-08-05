@@ -309,7 +309,39 @@
 
         <!-- ══ BACKLOG VIEW ══ -->
         <div id="view-backlog" style="display:none">
-          <!-- Charts first -->
+          <!-- Backlog table first, charts below (2026-08-05: reordered per user request) -->
+          <div class="bl-toolbar" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+            <div style="font-size:0.7857rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;flex:1;min-width:140px">WORK PACKAGES — NOT AWARDED ONLY</div>
+            <button id="bl-group-toggle" onclick="toggleBlGroupMode()" style="font-size:0.7143rem;padding:4px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px;flex-shrink:0"><i class="ti ti-layout-rows" style="font-size:0.8571rem"></i><span>Flat</span></button>
+            <select id="bl-trade-filter" onchange="renderBacklog()" style="font-size:0.7857rem;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff">
+              <option value="">All Trades</option>
+            </select>
+            <select id="bl-due-filter" onchange="renderBacklog()" title="Filter by whether the planned award date has passed" style="font-size:0.7857rem;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff">
+              <option value="">All (Due + Not Due)</option>
+              <option value="due">Due Only</option>
+              <option value="notdue">Not Due Yet</option>
+            </select>
+            <div style="position:relative">
+              <i class="ti ti-search" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);color:#bbb;font-size:0.7857rem;pointer-events:none"></i>
+              <input id="bl-search" type="text" placeholder="Search…" oninput="dbnc('bl',renderBacklog)" style="font-size:0.7857rem;padding:4px 8px 4px 24px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;width:140px">
+            </div>
+            <label style="font-size:0.7857rem;color:#888;font-weight:600">Budget:</label>
+            <input id="backlog-min-budget" type="number" placeholder="Min ₱M" oninput="dbnc('bl',renderBacklog)" style="width:65px;font-size:0.7857rem;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
+            <span style="font-size:0.7857rem;color:#aaa">—</span>
+            <input id="backlog-max-budget" type="number" placeholder="Max ₱M" oninput="dbnc('bl',renderBacklog)" style="width:65px;font-size:0.7857rem;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
+          </div>
+          <div class="panel" style="margin-bottom:14px">
+            <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog</div>
+            <div style="overflow-x:auto">
+              <table class="budget-table" id="backlog-table">
+                <thead id="backlog-thead"><tr>
+                  <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th>
+                  <th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th>
+                </tr></thead>
+                <tbody id="backlog-tbody"></tbody>
+              </table>
+            </div>
+          </div>
           <div class="grid-2" style="margin-bottom:14px">
             <div class="panel">
               <div class="panel-title"><i class="ti ti-chart-donut"></i>Work Package by Status</div>
@@ -341,34 +373,6 @@
               <div style="position:relative;height:220px"><canvas id="c-backlog-submittal"></canvas></div>
             </div>
           </div>
-          <!-- Backlog table last (after the charts) -->
-          <div class="bl-toolbar" style="display:flex;align-items:center;gap:8px;margin:18px 0 14px;flex-wrap:wrap">
-            <div style="font-size:0.7857rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;flex:1;min-width:140px">WORK PACKAGES — NOT AWARDED ONLY</div>
-            <button id="bl-group-toggle" onclick="toggleBlGroupMode()" style="font-size:0.7143rem;padding:4px 10px;border-radius:5px;border:1.5px solid #e5e5e5;background:#fff;color:#888;cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px;flex-shrink:0"><i class="ti ti-layout-rows" style="font-size:0.8571rem"></i><span>Flat</span></button>
-            <select id="bl-trade-filter" onchange="renderBacklog()" style="font-size:0.7857rem;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;background:#fff">
-              <option value="">All Trades</option>
-            </select>
-            <div style="position:relative">
-              <i class="ti ti-search" style="position:absolute;left:7px;top:50%;transform:translateY(-50%);color:#bbb;font-size:0.7857rem;pointer-events:none"></i>
-              <input id="bl-search" type="text" placeholder="Search…" oninput="dbnc('bl',renderBacklog)" style="font-size:0.7857rem;padding:4px 8px 4px 24px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit;width:140px">
-            </div>
-            <label style="font-size:0.7857rem;color:#888;font-weight:600">Budget:</label>
-            <input id="backlog-min-budget" type="number" placeholder="Min ₱M" oninput="dbnc('bl',renderBacklog)" style="width:65px;font-size:0.7857rem;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
-            <span style="font-size:0.7857rem;color:#aaa">—</span>
-            <input id="backlog-max-budget" type="number" placeholder="Max ₱M" oninput="dbnc('bl',renderBacklog)" style="width:65px;font-size:0.7857rem;padding:4px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-family:inherit">
-          </div>
-          <div class="panel">
-            <div class="panel-title"><i class="ti ti-list"></i>Work Package Backlog</div>
-            <div style="overflow-x:auto">
-              <table class="budget-table" id="backlog-table">
-                <thead id="backlog-thead"><tr>
-                  <th>WP No.</th><th>Description</th><th>Trade</th><th>Planned Award</th>
-                  <th>Aging (d)</th><th>Procurement Budget (BCB)</th><th>Status</th><th>Submittal</th>
-                </tr></thead>
-                <tbody id="backlog-tbody"></tbody>
-              </table>
-            </div>
-          </div>
         </div>
 
         <!-- ══ WP LIST VIEW ══ -->
@@ -380,6 +384,11 @@
               <option value="Not Yet Awarded">Not Yet Awarded</option>
             </select>
             <select id="f-trade" style="flex-shrink:0"><option value="all">All trades</option></select>
+            <select id="f-charging" style="flex-shrink:0" title="Filter by Charging Type">
+              <option value="all">Main Contract + CO</option>
+              <option value="main">Main Contract</option>
+              <option value="co">Change Order</option>
+            </select>
             <div class="msf" id="msf-works" style="flex-shrink:0">
               <button type="button" class="msf-btn" onclick="msfToggle('works')"><span id="msf-works-label">All Works</span><i class="ti ti-chevron-down"></i></button>
               <div class="msf-pop" id="msf-works-pop"></div>
@@ -1338,11 +1347,14 @@ document.addEventListener('click', e=>{ if(!e.target.closest('.msf')) document.q
 function getFiltered(){
   const st=document.getElementById('f-status').value;
   const tr=document.getElementById('f-trade').value;
+  const ch=document.getElementById('f-charging')?.value||'all';
   const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search').value||'').toLowerCase();
   return allWPs.filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
+    if(ch==='main'&&_isCO(w))return false;
+    if(ch==='co'&&!_isCO(w))return false;
     if(works.size&&!works.has(w.works||''))return false;
     if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
@@ -1848,6 +1860,7 @@ function renderBacklog(){
   const minBud = parseFloat(document.getElementById('backlog-min-budget')?.value||0)*1e6||0;
   const maxBud = parseFloat(document.getElementById('backlog-max-budget')?.value||0)*1e6||Infinity;
   const tradeF = document.getElementById('bl-trade-filter')?.value||'';
+  const dueF = document.getElementById('bl-due-filter')?.value||'';
   const search = (document.getElementById('bl-search')?.value||'').toLowerCase().trim();
 
   let notAwarded = allWPs.filter(w=>!window.isResolved(w));
@@ -1861,6 +1874,11 @@ function renderBacklog(){
 
   // Apply filters
   if (tradeF) notAwarded = notAwarded.filter(w=>w.trade===tradeF);
+  // Due = planned award date has already passed (same "due" definition as the WP-status
+  // batteries — see renderOvBattery). A WP with no planned award date can't be judged, so it's
+  // excluded from "Due Only" and included in "Not Due Yet".
+  if (dueF==='due') notAwarded = notAwarded.filter(w=>w.awarding_date && new Date(w.awarding_date)<=today);
+  else if (dueF==='notdue') notAwarded = notAwarded.filter(w=>!w.awarding_date || new Date(w.awarding_date)>today);
   if (minBud>0||maxBud<Infinity) notAwarded = notAwarded.filter(w=>(w.approved_budget_bcb||0)>=minBud&&(w.approved_budget_bcb||0)<=maxBud);
   if (search) notAwarded = notAwarded.filter(w=>(w.description||'').toLowerCase().includes(search)||(w.wp_no||'').toLowerCase().includes(search)||(w.trade||'').toLowerCase().includes(search));
 
@@ -1896,8 +1914,10 @@ function renderBacklog(){
 
   const tbody = document.getElementById('backlog-tbody');
   const _renderRow = w => {
-    const aging = w.awarding_date ? Math.round((today-new Date(w.awarding_date))/86400000) : null;
-    const agCls = aging==null?'':aging>60?'aging-critical':aging>0?'aging-warning':'aging-ok';
+    // Aging = planned award date − today (2026-08-05: sign flipped from the old today−date
+    // convention). Overdue WPs now read NEGATIVE (e.g. "-15d"); not-yet-due WPs read POSITIVE.
+    const aging = w.awarding_date ? Math.round((new Date(w.awarding_date)-today)/86400000) : null;
+    const agCls = aging==null?'':aging<-60?'aging-critical':aging<0?'aging-warning':'aging-ok';
     return `<tr>
       <td><span class="td-code">${esc(w.wp_no)||'—'}</span></td>
       <td style="font-size:0.7857rem;max-width:200px">${esc(w.description)||'—'}</td>
@@ -2042,11 +2062,14 @@ window.toggleProjWPTableMode = function() {
 function getFilteredSorted(){
   const st=document.getElementById('f-status').value;
   const tr=document.getElementById('f-trade').value;
+  const ch=document.getElementById('f-charging')?.value||'all';
   const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search').value||'').toLowerCase();
   let rows = allWPs.filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
+    if(ch==='main'&&_isCO(w))return false;
+    if(ch==='co'&&!_isCO(w))return false;
     if(works.size&&!works.has(w.works||''))return false;
     if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
@@ -2093,11 +2116,14 @@ function _pwaPeriodMatch(d){
 function _pwaFilteredWPs(){
   const st=document.getElementById('f-status')?.value||'all';
   const tr=document.getElementById('f-trade')?.value||'all';
+  const ch=document.getElementById('f-charging')?.value||'all';
   const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search')?.value||'').toLowerCase();
   return allWPs.filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
+    if(ch==='main'&&_isCO(w))return false;
+    if(ch==='co'&&!_isCO(w))return false;
     if(works.size&&!works.has(w.works||''))return false;
     if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
@@ -2841,8 +2867,8 @@ AppAuth.requireLogin(async (user, profile) => {
   document.getElementById('f-trade').innerHTML='<option value="all">All trades</option>'+trades.map(t=>'<option value="'+t+'">'+t+'</option>').join('');
   _recomputeFilterOptions();   // build the Works/Vendor multiselect options (cascades from Trade)
 
-  // Status re-filter only; Trade also recomputes the Works/Vendor cascade
-  ['f-status'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', applyWpListFilters); });
+  // Status/Charging re-filter only; Trade also recomputes the Works/Vendor cascade
+  ['f-status','f-charging'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', applyWpListFilters); });
   const trEl=document.getElementById('f-trade');
   if(trEl) trEl.addEventListener('change',()=>{ _msfSel.works.clear(); _msfSel.vendor.clear(); _recomputeFilterOptions(); applyWpListFilters(); });
   const srch = document.getElementById('f-search');
