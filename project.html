@@ -292,15 +292,15 @@
           </div>
           <!-- Top 5 panels -->
           <div class="top5-row" style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:14px">
-            <div class="panel" style="flex:0.8;min-width:170px">
+            <div class="panel" style="flex:1;min-width:250px">
               <div class="panel-title"><i class="ti ti-trophy"></i>Top 5 High Value Packages</div>
               <div class="rank-list" id="rank-value"></div>
             </div>
-            <div class="panel" style="flex:1.25;min-width:250px">
+            <div class="panel" style="flex:1;min-width:250px">
               <div class="panel-title"><i class="ti ti-trending-up"></i>Top 5 Savings</div>
               <div class="rank-list" id="rank-gains"></div>
             </div>
-            <div class="panel" style="flex:1.25;min-width:250px">
+            <div class="panel" style="flex:1;min-width:250px">
               <div class="panel-title"><i class="ti ti-trending-down"></i>Top 5 Overbudget</div>
               <div class="rank-list" id="rank-losses"></div>
             </div>
@@ -1810,10 +1810,13 @@ function renderTop5(wps){
   const wtPct = (v,sign) => totBCB ? (sign+(Math.abs(v)/totBCB*100).toFixed(2)+'%') : '—';
   buildRankTable('rank-value',
     [...wps].filter(w=>(w.approved_budget_bcb||0)>0).sort((a,b)=>(b.approved_budget_bcb||0)-(a.approved_budget_bcb||0)).slice(0,5)
-      .map(w=>({id:w.id,name:w.description,sub:w.wp_no+(w.trade?' · '+w.trade:''),
-        val:w.approved_budget_bcb, awarded:window.effectiveAwardedCost(w),
-        pct:w.approved_budget_bcb?((window.effectiveAwardedCost(w)/w.approved_budget_bcb)*100).toFixed(1)+'%':'—',
-        wt:totBCB?((w.approved_budget_bcb/totBCB)*100).toFixed(2)+'%':'—'})),
+      .map(w=>{
+        const v = variance(w), sign = v>=0?'+':'-';
+        return {id:w.id,name:w.description,sub:w.wp_no+(w.trade?' · '+w.trade:''),
+          val:w.approved_budget_bcb, awarded:window.effectiveAwardedCost(w), savings:v,
+          pct:w.approved_budget_bcb?(sign+(Math.abs(v)/w.approved_budget_bcb*100).toFixed(1)+'%'):'—',
+          wt:wtPct(v,sign)};
+      }),
     'value');
   buildRankTable('rank-gains',
     withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)

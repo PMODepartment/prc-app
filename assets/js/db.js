@@ -649,14 +649,14 @@ function buildRankTable(id, items, type) {
 
   const isValue  = type === 'value';
   const accent   = type === 'savings' ? '#2D9B6F' : '#EE3124';
-  const valLabel = type === 'savings' ? 'Savings' : type === 'loss' ? 'Overbudget' : 'Budget';
+  const valLabel = type === 'savings' ? 'Savings' : type === 'loss' ? 'Overbudget' : 'BCB';
   const valSign  = type === 'savings' ? '+' : type === 'loss' ? '-' : '';
   // Right-aligned headers use the SAME 8px horizontal padding as their value cells so they line up.
   const th = (txt, right, color) =>
     `<th style="font-size:0.5714rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${color||'#777'};padding:7px 8px 7px ${right?'8px':'0'};text-align:${right?'right':'left'};border-bottom:2px solid #ebebeb;white-space:nowrap">${txt}</th>`;
   const valueAccent = '#231F20';
   const thead = isValue
-    ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true)} ${th('Award',true)} ${th('%',true,valueAccent)} ${th('%WT',true,valueAccent)}</tr>`
+    ? `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th(valLabel,true)} ${th('Award',true)} ${th('Savings/Loss',true,valueAccent)} ${th('%',true,valueAccent)} ${th('%WT',true,valueAccent)}</tr>`
     : `<tr>${th('#&nbsp;&nbsp;Work Package',false)} ${th('BCB',true)} ${th('Award',true)} ${th(valLabel,true,accent)} ${th('%',true,accent)} ${th('%WT',true,accent)}</tr>`;
   const rows = items.map((item, i) => {
     const safe = esc(item.name);  // data-rn attribute (used by search filter)
@@ -673,11 +673,14 @@ function buildRankTable(id, items, type) {
       </div>
     </td>`;
     if (isValue) {
+      const rowColor = (item.savings!=null && item.savings<0) ? '#EE3124' : '#2D9B6F';
+      const savingsTxt = item.savings!=null ? (item.savings>=0?'+':'-')+Fmt.money(Math.abs(item.savings)) : '—';
       return `<tr class="rank-row" data-rn="${safe}"${click} style="${cursor}border-bottom:1px solid #f5f5f5">${wpCell}
         <td class="rank-side" style="font-size:0.8571rem;font-weight:700;color:#231F20;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.val)}</td>
         <td class="rank-side" style="font-size:0.7143rem;color:#777;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
-        <td class="rank-side" style="font-size:0.7857rem;font-weight:600;color:${valueAccent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Awarded Cost ÷ Budget (BCB)">${item.pct!=null?item.pct:'—'}</td>
-        <td class="rank-side" style="font-size:0.7857rem;font-weight:600;color:${valueAccent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Budget (BCB) ÷ Total BCB">${item.wt!=null?item.wt:'—'}</td>
+        <td class="rank-side" style="font-size:0.8571rem;font-weight:700;color:${rowColor};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Budget (BCB) − Awarded Cost">${savingsTxt}</td>
+        <td class="rank-side" style="font-size:0.7857rem;font-weight:600;color:${rowColor};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Savings/Loss ÷ Budget (BCB)">${item.pct!=null?item.pct:'—'}</td>
+        <td class="rank-side" style="font-size:0.7857rem;font-weight:600;color:${rowColor};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Savings/Loss ÷ Total BCB">${item.wt!=null?item.wt:'—'}</td>
       </tr>`;
     }
     return `<tr class="rank-row" data-rn="${safe}"${click} style="${cursor}border-bottom:1px solid #f5f5f5">${wpCell}
