@@ -153,6 +153,13 @@
     .xl-hint{font-size:0.7143rem;color:var(--text-hint)}
     .xl-badge{font-size:0.7143rem;font-weight:700;padding:1px 6px;border-radius:9px;color:#fff}
     .xl-help{margin-bottom:8px;font-size:0.7857rem}
+    /* Sharing a row with the missing/dirty-count + Discard/Save actions (instead of sitting on
+       its own near-empty line below them) — see the "wide empty space" fix. As a flex item it
+       naturally shrinks to its summary's width while collapsed; forcing it to the full row width
+       once opened lets the multi-line help content wrap onto its own line instead of squeezing
+       in beside the counts/actions. */
+    .xl-bar2 .xl-help{margin-bottom:0}
+    .xl-bar2 .xl-help[open]{flex-basis:100%}
     .xl-help summary{cursor:pointer;color:var(--text-secondary);font-weight:600;display:inline-flex;align-items:center;gap:5px;list-style:none;user-select:none}
     .xl-help summary::-webkit-details-marker{display:none}
     .xl-help summary::before{content:'▸';display:inline-block;transition:transform .15s;color:var(--text-hint)}
@@ -295,13 +302,6 @@
         <!-- ══ EXCEL-LIKE GRID VIEW ══ -->
         <div id="grid-view">
           <div class="xl-bar">
-            <label class="xl-hint" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888">Show</label>
-            <select id="xl-status-filter" onchange="renderGrid()" style="font-size:0.8571rem;padding:6px 10px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);cursor:pointer">
-              <option value="all">All work packages</option>
-              <option value="approved">Approved (live)</option>
-              <option value="pending_review">Pending review (legacy)</option>
-              <option value="rejected">Rejected (legacy)</option>
-            </select>
             <button class="xl-btn primary" onclick="xlAddRow()" title="Add blank work-package rows directly in the grid (uses the count on the right)"><i class="ti ti-plus"></i> Add WP</button>
             <input type="number" id="xl-add-count" min="1" max="100" value="1" title="How many blank rows to add at once" style="width:52px;font-size:0.7857rem;padding:5px 6px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);text-align:center">
             <select id="xl-new-proj" style="display:none;font-size:0.7857rem;padding:5px 8px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);cursor:pointer" title="Project the new work package belongs to"></select>
@@ -323,18 +323,11 @@
             <button class="xl-btn" style="padding:4px 9px" onclick="xlGroupsAll(false)" title="Show every WP-form section">Expand all</button>
             <button class="xl-btn" style="padding:4px 9px" onclick="xlGroupsAll(true)" title="Collapse every section to the key columns">Collapse all</button>
             <button class="xl-btn" style="padding:4px 9px" onclick="xlResetWidths()" title="Restore every column to its default width">Reset widths</button>
-            <span style="flex:1"></span>
-            <span id="xl-missing-count" class="xl-hint" style="color:#B45309;font-weight:700;display:none"></span>
-            <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
-            <span id="xl-autosave-indicator" class="xl-hint" style="display:none;color:var(--text-hint)"><i class="ti ti-device-floppy"></i> <span id="xl-autosave-indicator-text"></span></span>
-            <span class="xl-actions">
-              <button id="xl-discard" class="xl-btn ghost" onclick="gridDiscard()" disabled title="Throw away all unsaved grid edits"><i class="ti ti-arrow-back-up"></i> Discard</button>
-              <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled title="Save all staged edits to the database"><i class="ti ti-device-floppy"></i> <span id="xl-save-lbl">Save changes</span></button>
-            </span>
           </div>
-          <details class="xl-help">
-            <summary><i class="ti ti-keyboard" aria-hidden="true"></i> How to use this grid <span class="xl-help-hint">— works like Excel</span></summary>
-            <div class="xl-help-grid">
+          <div class="xl-bar xl-bar2">
+            <details class="xl-help">
+              <summary><i class="ti ti-keyboard" aria-hidden="true"></i> How to use this grid <span class="xl-help-hint">— works like Excel</span></summary>
+              <div class="xl-help-grid">
               <div><kbd>Click</kbd> select · <kbd>drag</kbd> select a range · <kbd>Enter</kbd>/<kbd>F2</kbd> or just type to edit</div>
               <div><kbd>Tab</kbd>/<kbd>arrows</kbd> move · <kbd>Shift</kbd>+<kbd>arrows</kbd> extend selection · <kbd>Ctrl</kbd>+<kbd>arrows</kbd> jump to edge of data · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>arrows</kbd> extend to edge of data · <kbd>Del</kbd> clear · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>Esc</kbd> cancel</div>
               <div><kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copy &amp; paste — multi-cell, round-trips with Excel. <kbd>Ctrl</kbd>+<kbd>A</kbd> then <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copies whole WPs and pastes them as new rows (works across projects).</div>
@@ -344,8 +337,17 @@
               <div><b>Add WP</b> adds the number of blank rows in the box beside it (up to 100) at once — then <kbd>Tab</kbd>/<kbd>Enter</kbd> walks you straight through its required fields, skipping anything already filled in.</div>
               <div>Dropdown cells (Trade, Works, Status…) let you <b>type to filter</b> instead of scrolling; pasted or typed text is matched to the real option regardless of case/spacing.</div>
               <div><b>Select all</b> → <b>Copy WPs</b>, then open another project's grid and <b>Paste WPs</b> to bring those work packages in as new rows.</div>
-            </div>
-          </details>
+              </div>
+            </details>
+            <span style="flex:1"></span>
+            <span id="xl-missing-count" class="xl-hint" style="color:#B45309;font-weight:700;display:none"></span>
+            <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
+            <span id="xl-autosave-indicator" class="xl-hint" style="display:none;color:var(--text-hint)"><i class="ti ti-device-floppy"></i> <span id="xl-autosave-indicator-text"></span></span>
+            <span class="xl-actions">
+              <button id="xl-discard" class="xl-btn ghost" onclick="gridDiscard()" disabled title="Throw away all unsaved grid edits"><i class="ti ti-arrow-back-up"></i> Discard</button>
+              <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled title="Save all staged edits to the database"><i class="ti ti-device-floppy"></i> <span id="xl-save-lbl">Save changes</span></button>
+            </span>
+          </div>
           <div class="xl-wrap" id="xl-wrap" tabindex="0"><table class="xl" id="xl-table"></table></div>
           <div id="xl-rz-ghost"></div>
         </div>
@@ -1367,7 +1369,10 @@
   }
 
   window.renderGrid = function(){
-    const statusF = document.getElementById('xl-status-filter') ? document.getElementById('xl-status-filter').value : 'all';
+    // The "Show" review_status filter (All/Approved/Pending/Rejected) was removed 2026-08-06 —
+    // the approval workflow is retired, so it was almost always "All" anyway; the legacy-strip
+    // above already surfaces + fixes any pre-auto-approve rows without a filter dropdown.
+    const statusF = 'all';
     const tradeEl = document.getElementById('trade-filter');
     const trade   = tradeEl ? tradeEl.value : 'ALL';
     const srchEl  = document.getElementById('review-search');
