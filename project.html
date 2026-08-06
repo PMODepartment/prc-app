@@ -1810,7 +1810,10 @@ function renderTop5(wps){
   const wtPct = (v,sign) => totBCB ? (sign+(Math.abs(v)/totBCB*100).toFixed(2)+'%') : '—';
   buildRankTable('rank-value',
     [...wps].filter(w=>(w.approved_budget_bcb||0)>0).sort((a,b)=>(b.approved_budget_bcb||0)-(a.approved_budget_bcb||0)).slice(0,5)
-      .map(w=>({id:w.id,name:w.description,sub:w.wp_no+(w.trade?' · '+w.trade:''),val:w.approved_budget_bcb})),
+      .map(w=>({id:w.id,name:w.description,sub:w.wp_no+(w.trade?' · '+w.trade:''),
+        val:w.approved_budget_bcb, awarded:window.effectiveAwardedCost(w),
+        pct:w.approved_budget_bcb?((window.effectiveAwardedCost(w)/w.approved_budget_bcb)*100).toFixed(1)+'%':'—',
+        wt:totBCB?((w.approved_budget_bcb/totBCB)*100).toFixed(2)+'%':'—'})),
     'value');
   buildRankTable('rank-gains',
     withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
