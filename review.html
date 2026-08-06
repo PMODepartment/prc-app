@@ -171,17 +171,15 @@
     .xl-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-bottom:8px}
     .xl-bar-left{display:flex;align-items:center;flex-wrap:wrap;gap:8px;flex:1 1 auto;min-width:0}
     .xl-bar-right{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
-    /* Row 2 pairs the (narrow) help toggle with the counts + Discard/Save actions. Two
-       previous attempts put the actions on row 1 and let flex-wrap decide — at real viewport
-       widths row 1 was already full, so the actions wrapped to a line of their own with a wide
-       dead gap to their left, and the help disclosure pushed to a 3rd line. Pairing them in a
-       DEDICATED row makes the layout deterministic (always exactly 2 toolbar rows) and the help
-       toggle fills what was the dead space. */
-    .xl-bar2{margin-bottom:8px}
-    .xl-bar2 .xl-help{margin-bottom:0;flex:0 1 auto;min-width:0}
-    /* Expanded, the multi-line help needs the whole row — force it to its own line so it can't
-       squeeze the actions off-screen. The actions then sit on the row below it. */
-    .xl-bar2 .xl-help[open]{flex-basis:100%}
+    /* Footer strip BELOW the grid: help toggle (left) + status counts (right). Everything that
+       isn't an action the user reaches for constantly lives here rather than above the table,
+       so only one toolbar row sits between the filter bar and the data. */
+    .xl-foot{margin-top:6px;margin-bottom:0}
+    .xl-foot .xl-help{margin-bottom:0;flex:0 1 auto;min-width:0}
+    /* Expanded, the multi-line help takes the whole row so it can't squeeze the counts. */
+    .xl-foot .xl-help[open]{flex-basis:100%}
+    /* Grid-only Discard/Save, hosted on the filter bar (hidden in Cards view by setReviewView). */
+    .rv-grid-actions{flex-shrink:0}
     .xl-btn{font-size:0.7857rem;padding:6px 13px;border-radius:7px;border:1.5px solid var(--border-md);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px;transition:background .12s,border-color .12s,color .12s}
     .xl-btn .ti{font-size:0.9286rem}
     .xl-btn.primary{background:#EE3124;border-color:#EE3124;color:#fff}
@@ -306,7 +304,10 @@
               <option value="ALL">All Trades</option>
             </select>
           </span>
-          <div class="rv-filter-search" style="position:relative;flex:1;min-width:180px">
+          <!-- Search is capped (max-width) rather than greedily flex:1 — the freed width is what
+               lets the grid's Discard/Save actions share this row instead of needing one of
+               their own (see .rv-grid-actions below). -->
+          <div class="rv-filter-search" style="position:relative;flex:1 1 200px;min-width:160px;max-width:420px">
             <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#bbb;font-size:0.9286rem;pointer-events:none"></i>
             <input id="review-search" type="text" placeholder="Search WP No. or description…" oninput="applyFilters()"
               style="width:100%;padding:7px 12px 7px 32px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;outline:none;box-sizing:border-box"/>
@@ -316,6 +317,13 @@
             <button id="rv-btn-grid" class="xl-btn primary" onclick="setReviewView('grid')"><i class="ti ti-table"></i> Grid (Excel)</button>
             <button id="rv-btn-cards" class="xl-btn" onclick="setReviewView('cards')"><i class="ti ti-layout-cards"></i> Cards</button>
           </div>
+          <!-- Grid-only save actions. They live on the FILTER row (not the grid toolbar) so the
+               toolbar stays a single row; setReviewView() hides them in Cards view, where
+               there's nothing staged to save. -->
+          <span class="rv-grid-actions xl-actions" id="rv-grid-actions">
+            <button id="xl-discard" class="xl-btn ghost" onclick="gridDiscard()" disabled title="Throw away all unsaved grid edits"><i class="ti ti-arrow-back-up"></i> Discard</button>
+            <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled title="Save all staged edits to the database"><i class="ti ti-device-floppy"></i> <span id="xl-save-lbl">Save changes</span></button>
+          </span>
         </div>
 
         <!-- Legacy review-state cleanup (admins only). Nothing can enter pending_review any
@@ -371,9 +379,12 @@
               <button class="xl-btn xl-btn-mini" onclick="xlResetWidths()" title="Restore every column to its default width">Reset widths</button>
             </div>
           </div>
-          <!-- Row 2 — the help toggle occupies the left (which was dead space when the
-               counts/actions sat alone on this line), counts + Discard/Save pinned right. -->
-          <div class="xl-bar xl-bar2">
+          <div class="xl-wrap" id="xl-wrap" tabindex="0"><table class="xl" id="xl-table"></table></div>
+          <!-- Footer UNDER the grid — the help toggle (left) and the status counts (right).
+               Both were previously a second toolbar row above the table, pushing the grid down;
+               below it they use space that was otherwise dead and keep the chrome above the
+               data to a single row. -->
+          <div class="xl-bar xl-foot">
           <details class="xl-help">
             <summary><i class="ti ti-keyboard" aria-hidden="true"></i> How to use this grid <span class="xl-help-hint">— works like Excel</span></summary>
             <div class="xl-help-grid">
@@ -392,13 +403,8 @@
               <span id="xl-missing-count" class="xl-hint" style="color:#B45309;font-weight:700;display:none"></span>
               <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
               <span id="xl-autosave-indicator" class="xl-hint" style="display:none;color:var(--text-hint)"><i class="ti ti-device-floppy"></i> <span id="xl-autosave-indicator-text"></span></span>
-              <span class="xl-actions">
-                <button id="xl-discard" class="xl-btn ghost" onclick="gridDiscard()" disabled title="Throw away all unsaved grid edits"><i class="ti ti-arrow-back-up"></i> Discard</button>
-                <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled title="Save all staged edits to the database"><i class="ti ti-device-floppy"></i> <span id="xl-save-lbl">Save changes</span></button>
-              </span>
             </div>
           </div>
-          <div class="xl-wrap" id="xl-wrap" tabindex="0"><table class="xl" id="xl-table"></table></div>
           <div id="xl-rz-ghost"></div>
         </div>
       </div>
@@ -1037,6 +1043,10 @@
     const cards = document.getElementById('panel-cards');
     if (cards) cards.style.display = v==='cards' ? '' : 'none';
     document.getElementById('grid-view').style.display = v==='grid' ? '' : 'none';
+    // Discard/Save live on the shared filter bar, so they must be hidden in Cards view —
+    // there are no staged grid edits to act on there.
+    const rga = document.getElementById('rv-grid-actions');
+    if (rga) rga.style.display = v==='grid' ? '' : 'none';
     if(v==='grid') renderGrid();
   };
 
@@ -1469,6 +1479,7 @@
     if (!_gridRows.length){
       tbl.innerHTML = '<tbody><tr><td style="padding:40px;text-align:center;color:#aaa;border:none">No work packages match the current filters.</td></tr></tbody>';
       _xlUpdateBar();
+      _xlFitHeight();
       return;
     }
     const cg = '<colgroup><col style="width:'+XL_GUTTER+'px">' +
@@ -1537,7 +1548,32 @@
     _xlPaintEdits();
     _xlSelect(Math.min(_xlSel.r, _gridRows.length-1), _xlSel.c, false);
     _xlUpdateBar();
+    _xlFitHeight();
   };
+
+  /* Size the grid to exactly fill the space left below it, instead of the old hard-coded
+     `max-height: calc(100vh - 205px)` guess. That constant could never be right for every
+     combination of toolbar wrapping / filter-bar height / legacy strip / draft banner, which
+     is why a dead gap kept reappearing under the table (and, when the guess was too big, the
+     page scrolled instead). Measuring removes the guess entirely. */
+  function _xlFitHeight(){
+    const wrap = document.getElementById('xl-wrap');
+    if (!wrap || _reviewView !== 'grid' || wrap.offsetParent === null) return;
+    // Document-relative top via the offsetTop chain — deliberately NOT
+    // getBoundingClientRect().top, which is viewport-relative and would feed back on itself:
+    // growing the wrap can scroll the page, which changes rect.top, which changes the height.
+    let top = 0, el = wrap;
+    while (el){ top += el.offsetTop; el = el.offsetParent; }
+    const foot = document.querySelector('.xl-foot');
+    const footH = foot ? Math.ceil(foot.getBoundingClientRect().height) : 0;
+    const avail = window.innerHeight - top - footH - 14;   // 14px breathing room
+    wrap.style.maxHeight = Math.max(240, Math.round(avail)) + 'px';
+  }
+  window.addEventListener('resize', _xlFitHeight);
+  // Opening/closing the help disclosure changes the footer height → re-fit the table.
+  document.addEventListener('toggle', function(e){
+    if (e.target && e.target.classList && e.target.classList.contains('xl-help')) _xlFitHeight();
+  }, true);
 
   function _xlTd(r,c){ return document.querySelector('#xl-table td[data-r="'+r+'"][data-c="'+c+'"]'); }
   function _xlPaintEdits(){
