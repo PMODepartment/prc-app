@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803k"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260803k"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803k"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260803k"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260803k"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260806a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260806a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260806a"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260806a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260806a"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260803a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260803k"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260806a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803k"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260806a"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -241,6 +241,29 @@
             <button id="btn-view-cards" onclick="setProjectView('cards')" class="btn" style="background:#231F20;color:#fff;border-color:#231F20"><i class="ti ti-layout-grid"></i><span class="hide-mobile"> Cards</span></button>
             <button id="btn-view-table" onclick="setProjectView('table')" class="btn"><i class="ti ti-table"></i><span class="hide-mobile"> Table</span></button>
             <span id="proj-count-label" style="font-size:0.7857rem;color:#888;margin-left:4px"></span>
+            <!-- Group Head controls (2026-08-06). Shared by BOTH the Cards and Table views —
+                 renderProjectCards() and renderProjectTable() run the same _projRows() pipeline,
+                 so a change here only needs wiring in one place. -->
+            <span style="flex:1"></span>
+            <span class="proj-gh-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <select id="proj-gh-filter" onchange="onProjGhChange()" title="Filter projects by Group Head"
+                style="padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:var(--surface,#fff)">
+                <option value="all">All Group Heads</option>
+              </select>
+              <select id="proj-sort" onchange="onProjGhChange()" title="Sort projects"
+                style="padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:var(--surface,#fff)">
+                <option value="id">Sort: Code</option>
+                <option value="name">Sort: Name</option>
+                <option value="gh">Sort: Group Head</option>
+                <option value="wps">Sort: WPs</option>
+                <option value="awarded">Sort: Awarded</option>
+                <option value="rate">Sort: Award rate</option>
+                <option value="budget" class="gh-budget-opt">Sort: Budget</option>
+              </select>
+              <label style="display:flex;align-items:center;gap:5px;font-size:0.8571rem;color:#888;cursor:pointer;white-space:nowrap">
+                <input type="checkbox" id="proj-gh-group" onchange="onProjGhChange()" style="cursor:pointer"> Group by Group Head
+              </label>
+            </span>
           </div>
           <div class="project-cards" id="project-cards"></div>
           <div id="project-table-wrap" style="display:none;margin-bottom:14px">
@@ -257,6 +280,7 @@
                     <th>Code</th>
                     <th>Name</th>
                     <th class="hide-mobile">Location</th>
+                    <th>Group Head</th>
                     <th>WPs</th>
                     <th>Awarded</th>
                     <th>Rate</th>
@@ -649,16 +673,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260803k"></script>
-<script src="assets/js/db.js?v=20260803k"></script>
-<script src="assets/js/ui.js?v=20260803k"></script>
-<script src="assets/js/onboarding.js?v=20260803k"></script>
-<script src="assets/js/coachmarks.js?v=20260803k"></script>
+<script src="assets/js/auth.js?v=20260806a"></script>
+<script src="assets/js/db.js?v=20260806a"></script>
+<script src="assets/js/ui.js?v=20260806a"></script>
+<script src="assets/js/onboarding.js?v=20260806a"></script>
+<script src="assets/js/coachmarks.js?v=20260806a"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260803a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260803k"></script>
+<script src="assets/js/charts.js?v=20260806a"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -876,7 +900,7 @@
       return `<a class="project-card" href="project.html?id=${p.id}" style="${extraStyle}">
         <div class="pc-header"><span class="pc-id">${p.id}</span><span class="pc-status-badge" style="${badge}">${label}</span></div>
         <div class="pc-name">${esc(p.name&&p.name!==p.id?p.id+' — '+p.name.split('—')[0].trim():p.id)}</div>
-        <div class="pc-meta">${p.location||''}</div>
+        <div class="pc-meta">${esc(p.location||'')}${p.group_head ? `${p.location?' · ':''}<span style="font-weight:600;color:#231F20">${esc(p.group_head)}</span>` : ''}</div>
         <div class="pc-spacer"></div>
         <div class="pc-stats">
           <div><div class="pc-stat-val" style="color:var(--green)">${s.awarded}</div><div class="pc-stat-lbl">Awarded</div></div>
@@ -2847,40 +2871,13 @@
       // Portfolio donut chart
       renderIdxOvBattery(filtWPs);
 
-      // Project Cards
-      const cardsEl = document.getElementById('project-cards');
-      cardsEl.innerHTML = '';
-      if (filt.length === 0) {
-        cardsEl.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:48px 24px;color:#aaa">
-          <i class="ti ti-filter-off" style="font-size:2.5714rem;display:block;margin-bottom:12px;opacity:.4"></i>
-          <div style="font-size:1rem;font-weight:600;color:#888;margin-bottom:6px">No projects selected</div>
-          <div style="font-size:0.8571rem">Use the project filter above to select one or more projects.</div>
-        </div>`;
-      } else {
-        filt.filter(p=>p.status!=='archived').forEach(p => {
-          cardsEl.innerHTML += renderProjectCard(p, allStats[filt.indexOf(p)]);
-        });
-      }
-      const archFilt = filt.filter(p=>p.status==='archived');
-      const existingArch = document.getElementById('archived-section');
-      if (existingArch) existingArch.remove();
-      if (archFilt.length > 0) {
-        const archSec = document.createElement('div');
-        archSec.id = 'archived-section';
-        archSec.style.marginTop = '16px';
-        archSec.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer" onclick="const c=document.getElementById('archived-cards-inner');c.style.display=c.style.display==='none'?'grid':'none'">
-          <span style="font-size:0.8571rem;font-weight:600;color:#888"><i class="ti ti-archive" style="font-size:0.9286rem;vertical-align:middle;margin-right:4px"></i>Archived (${archFilt.length})</span>
-          <span style="font-size:0.7143rem;color:#aaa">click to expand</span>
-        </div><div id="archived-cards-inner" class="project-cards" style="display:none"></div>`;
-        cardsEl.after(archSec);
-        const ac = document.getElementById('archived-cards-inner');
-        archFilt.forEach(p => { ac.innerHTML += renderProjectCard(p, allStats[filt.indexOf(p)], 'opacity:.75;border:1px dashed #ccc'); });
-      }
-
-      // Count label + project table
+      // Count label + shared row data. _tableData MUST be set before renderProjectCards()
+      // — both the cards and the table read their rows from it via _projRows().
       const countLabel = document.getElementById('proj-count-label');
       if (countLabel) countLabel.textContent = filt.filter(p=>p.status!=='archived').length + ' active project(s)';
       _tableData = filt.map((p,i)=>({p, s:allStats[i]}));
+      _syncGhFilterOptions();
+      renderProjectCards();
       if (document.getElementById('project-table-wrap')?.style.display !== 'none') renderProjectTable();
 
       // WP monitoring data (for WP List tab) — grouped by fixed trade order, sorted by WP-No numerically within each trade
@@ -3041,7 +3038,10 @@
     window.clPageNext = function() { const p = Math.ceil(_clFiltered.length/CL_PER_PAGE); if (_clPage < p) { _clPage++; renderClaimsTablePage(); } };
 
     // ── Project table view ───────────────────────────────────────────
-    let _tableData=[], _tableSortCol='id', _tableSortDir=1;
+    // Sorting is driven by the #proj-sort select (see _GH_SORTS below), which replaced the
+    // never-wired sortProjTable()/_tableSortCol click-to-sort stub (removed 2026-08-06 —
+    // no thead cell ever called it, so the table was always id-ascending).
+    let _tableData=[];
 
     window.setProjectView = function(mode) {
       const cards = document.getElementById('project-cards');
@@ -3065,37 +3065,165 @@
       }
     };
 
-    window.sortProjTable = function(col) {
-      if (_tableSortCol===col) _tableSortDir*=-1; else { _tableSortCol=col; _tableSortDir=1; }
-      renderProjectTable();
+    window.filterProjectTable = function() { renderProjectTable(); };
+
+    /* ── Group Head: shared filter / sort / group pipeline ──────────────
+       ONE row shape + ONE filter+sort pass feeds BOTH the project Cards and the
+       project Table, so the Group Head filter, the Sort select and the "Group by
+       Group Head" checkbox behave identically in either view. The table layers its
+       own search box + status dropdown on top; the cards don't have those. */
+    const _GH_SORTS = {
+      id:      (a,b)=> a.id.localeCompare(b.id),
+      name:    (a,b)=> a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+      gh:      (a,b)=> ghLabel(a.gh).localeCompare(ghLabel(b.gh)) || a.id.localeCompare(b.id),
+      wps:     (a,b)=> (b.wps-a.wps)         || a.id.localeCompare(b.id),
+      awarded: (a,b)=> (b.awarded-a.awarded) || a.id.localeCompare(b.id),
+      rate:    (a,b)=> (b.rate-a.rate)       || a.id.localeCompare(b.id),
+      budget:  (a,b)=> ((b.budget||0)-(a.budget||0)) || a.id.localeCompare(b.id),
+    };
+    const _ghVal   = () => document.getElementById('proj-gh-filter')?.value || 'all';
+    const _ghSort  = () => document.getElementById('proj-sort')?.value || 'id';
+    const _ghGroup = () => !!document.getElementById('proj-gh-group')?.checked;
+
+    // Rows for the CURRENT project selection, Group-Head-filtered and sorted.
+    function _projRows() {
+      const gh = _ghVal();
+      let rows = _tableData.map(({p,s})=>({
+        id: p.id, name: p.name||p.id, location: p.location||'', status: p.status||'active',
+        gh: p.group_head||'',
+        wps: s.total, awarded: s.awarded, rate: s.awardRate,
+        budget: s.totalBudget, p, s
+      }));
+      // 'Unassigned' is the sentinel for a blank/NULL group_head (matches ghLabel()).
+      if (gh !== 'all') rows = rows.filter(r => ghLabel(r.gh) === gh);
+      // When grouping, always order by Group Head FIRST so a group's rows stay contiguous;
+      // the chosen sort then orders within each group.
+      const cmp = _GH_SORTS[_ghSort()] || _GH_SORTS.id;
+      rows.sort(_ghGroup() ? (a,b)=> ghLabel(a.gh).localeCompare(ghLabel(b.gh)) || cmp(a,b) : cmp);
+      return rows;
+    }
+
+    // Rebuild the Group Head filter's options from the projects actually present
+    // (roster order first, then any off-roster legacy value, then Unassigned if any).
+    function _syncGhFilterOptions() {
+      const sel = document.getElementById('proj-gh-filter');
+      if (!sel) return;
+      const present = new Set(_tableData.map(({p}) => ghLabel(p.group_head)));
+      const opts = (window.GROUP_HEADS||[]).filter(g => present.has(g));
+      [...present].forEach(g => { if (g !== GH_UNASSIGNED && !opts.includes(g)) opts.push(g); });
+      if (present.has(GH_UNASSIGNED)) opts.push(GH_UNASSIGNED);
+      const cur = sel.value || 'all';
+      sel.innerHTML = '<option value="all">All Group Heads</option>' +
+        opts.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
+      // Keep the selection if it still exists, else fall back to All.
+      sel.value = opts.includes(cur) ? cur : 'all';
+    }
+
+    window.onProjGhChange = function() {
+      renderProjectCards();
+      if (document.getElementById('project-table-wrap')?.style.display !== 'none') renderProjectTable();
     };
 
-    window.filterProjectTable = function() { renderProjectTable(); };
+    // Group-header row for the project table / a divider for the cards grid.
+    function _ghHeadCells(label, count, nCols) {
+      return `<tr class="gh-group-row"><td colspan="${nCols}" style="background:#f0f0f0;padding:6px 10px">
+        <span style="font-size:0.7143rem;font-weight:700;background:#EE3124;color:#fff;padding:2px 8px;border-radius:4px">${esc(label)}</span>
+        <span style="font-size:0.7143rem;color:#888;margin-left:8px">${count} project${count===1?'':'s'}</span>
+      </td></tr>`;
+    }
+
+    /* Project CARDS. Extracted out of renderAll() (2026-08-06) so the Group Head
+       filter / sort / group controls can re-render just this block. Archived projects
+       still go into their own collapsible "Archived (N)" section below the grid. */
+    function renderProjectCards() {
+      const cardsEl = document.getElementById('project-cards');
+      if (!cardsEl) return;
+      const rows = _projRows();
+      const active = rows.filter(r=>r.status!=='archived');
+      const arch   = rows.filter(r=>r.status==='archived');
+
+      if (!_tableData.length) {
+        cardsEl.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:48px 24px;color:#aaa">
+          <i class="ti ti-filter-off" style="font-size:2.5714rem;display:block;margin-bottom:12px;opacity:.4"></i>
+          <div style="font-size:1rem;font-weight:600;color:#888;margin-bottom:6px">No projects selected</div>
+          <div style="font-size:0.8571rem">Use the project filter above to select one or more projects.</div>
+        </div>`;
+      } else if (!active.length && !arch.length) {
+        cardsEl.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:36px 24px;color:#aaa">
+          <div style="font-size:0.9286rem;font-weight:600;color:#888">No projects for this Group Head</div>
+        </div>`;
+      } else if (_ghGroup()) {
+        // Grouped: a full-width divider per Group Head, then that head's cards.
+        // .project-cards is a CSS grid, so the divider spans it with grid-column:1/-1.
+        let html = '', last = null;
+        active.forEach(r => {
+          const g = ghLabel(r.gh);
+          if (g !== last) {
+            last = g;
+            const n = active.filter(x=>ghLabel(x.gh)===g).length;
+            html += `<div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;margin:6px 0 2px">
+              <span style="font-size:0.7143rem;font-weight:700;background:#EE3124;color:#fff;padding:2px 8px;border-radius:4px">${esc(g)}</span>
+              <span style="font-size:0.7143rem;color:#888">${n} project${n===1?'':'s'}</span>
+              <span style="flex:1;height:1px;background:var(--border,#eee)"></span>
+            </div>`;
+          }
+          html += renderProjectCard(r.p, r.s);
+        });
+        cardsEl.innerHTML = html;
+      } else {
+        cardsEl.innerHTML = active.map(r => renderProjectCard(r.p, r.s)).join('');
+      }
+
+      const existingArch = document.getElementById('archived-section');
+      if (existingArch) existingArch.remove();
+      if (arch.length > 0) {
+        const archSec = document.createElement('div');
+        archSec.id = 'archived-section';
+        archSec.style.marginTop = '16px';
+        archSec.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer" onclick="const c=document.getElementById('archived-cards-inner');c.style.display=c.style.display==='none'?'grid':'none'">
+          <span style="font-size:0.8571rem;font-weight:600;color:#888"><i class="ti ti-archive" style="font-size:0.9286rem;vertical-align:middle;margin-right:4px"></i>Archived (${arch.length})</span>
+          <span style="font-size:0.7143rem;color:#aaa">click to expand</span>
+        </div><div id="archived-cards-inner" class="project-cards" style="display:none"></div>`;
+        cardsEl.after(archSec);
+        document.getElementById('archived-cards-inner').innerHTML =
+          arch.map(r => renderProjectCard(r.p, r.s, 'opacity:.75;border:1px dashed #ccc')).join('');
+        // Keep the archived block hidden while the Table view is showing (setProjectView).
+        if (document.getElementById('project-table-wrap')?.style.display !== 'none') archSec.style.display = 'none';
+      }
+    }
 
     function renderProjectTable() {
       const q = (document.getElementById('proj-table-search')?.value||'').toLowerCase();
       const statusFilter = document.getElementById('proj-table-status')?.value||'all';
-      let rows = _tableData.map(({p,s})=>({
-        id: p.id, name: p.name||p.id, location: p.location||'', status: p.status||'active',
-        wps: s.total, awarded: s.awarded, rate: s.awardRate,
-        budget: s.totalBudget, p, s
-      }));
-      if (q) rows = rows.filter(r=>r.id.toLowerCase().includes(q)||r.name.toLowerCase().includes(q)||(r.location||'').toLowerCase().includes(q));
+      let rows = _projRows();
+      if (q) rows = rows.filter(r=>r.id.toLowerCase().includes(q)||r.name.toLowerCase().includes(q)||(r.location||'').toLowerCase().includes(q)||ghLabel(r.gh).toLowerCase().includes(q));
       if (statusFilter !== 'all') rows = rows.filter(r=>r.status===statusFilter);
-      rows.sort((a,b)=>{
-        const va=a[_tableSortCol]??'', vb=b[_tableSortCol]??'';
-        return (typeof va==='number'?(va-vb):String(va).localeCompare(String(vb)))*_tableSortDir;
-      });
       const tbody = document.getElementById('proj-table-body');
       if (!tbody) return;
-      if (!rows.length) { tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px;color:#aaa">No projects match</td></tr>'; return; }
+      const N_COLS = 10;
+      if (!rows.length) { tbody.innerHTML=`<tr><td colspan="${N_COLS}" style="text-align:center;padding:24px;color:#aaa">No projects match</td></tr>`; return; }
+      const grouped = _ghGroup();
+      let lastGh = null;
       tbody.innerHTML = rows.map(r=>{
+        let head = '';
+        if (grouped && ghLabel(r.gh) !== lastGh) {
+          lastGh = ghLabel(r.gh);
+          head = _ghHeadCells(lastGh, rows.filter(x=>ghLabel(x.gh)===lastGh).length, N_COLS);
+        }
+        return head + _projTableRow(r);
+      }).join('');
+    }
+
+    function _projTableRow(r) {
         const statusStyle = r.status==='archived'?'background:#f0f0f0;color:#888':r.status==='active'?'background:#D1FAE5;color:#065F46':'background:#f0f0f0;color:#888';
         const varColor = (r.s.totalBudget-r.s.totalContract)>=0?'#2D9B6F':'#EE3124';
         return `<tr onclick="location.href='project.html?id=${r.id}'" style="cursor:pointer">
           <td><span style="font-size:0.7143rem;font-weight:700;background:#EE3124;color:#fff;padding:2px 7px;border-radius:4px">${r.id}</span></td>
           <td style="font-weight:600;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.name!==r.id?r.name:'')}</td>
-          <td style="color:#888;font-size:0.7857rem">${r.location}</td>
+          <td style="color:#888;font-size:0.7857rem">${esc(r.location)}</td>
+          <td style="font-size:0.7857rem">${r.gh
+            ? `<span style="font-weight:600;color:#231F20">${esc(r.gh)}</span>`
+            : `<span style="color:#aaa">${GH_UNASSIGNED}</span>`}</td>
           <td style="text-align:center">${r.wps}</td>
           <td style="text-align:center;color:#2D9B6F;font-weight:600">${r.awarded}</td>
           <td style="text-align:center">
@@ -3110,7 +3238,6 @@
           <td><span style="font-size:0.7143rem;font-weight:700;padding:2px 8px;border-radius:10px;${statusStyle}">${r.status.toUpperCase()}</span></td>
           <td><a href="project.html?id=${r.id}" style="font-size:0.7857rem;color:#EE3124;font-weight:600;text-decoration:none" onclick="event.stopPropagation()">Open →</a></td>
         </tr>`;
-      }).join('');
     }
 
     // ── Project filter ────────────────────────────────────────────
@@ -3374,8 +3501,10 @@
   body.budget-hidden #wp-mon-analysis,
   body.budget-hidden #sch-btn-budget { display:none !important; }
   /* Project table — hide the Budget (₱M) column */
-  body.budget-hidden #proj-data-table th:nth-child(7),
-  body.budget-hidden #proj-data-table td:nth-child(7) { display:none !important; }
+  /* Budget column is nth-child(8) since the Group Head column was inserted at 4 (2026-08-06). */
+  body.budget-hidden #proj-data-table th:nth-child(8),
+  body.budget-hidden #proj-data-table td:nth-child(8) { display:none !important; }
+  body.budget-hidden .gh-budget-opt { display:none !important; }
   /* Hide cost columns in consolidated WP list (Budget, Awarded, Variance, DP Amt, Retention%, Retention Amt) */
   body.budget-hidden #wp-mon-table th:nth-child(12),
   body.budget-hidden #wp-mon-table td:nth-child(12),

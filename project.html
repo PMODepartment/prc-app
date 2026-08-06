@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260803k"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260803k"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260803k"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260803k"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260803k"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260806a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260806a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260806a"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260806a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260806a"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260803a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260803k"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260806a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260803k"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260806a"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -515,16 +515,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260803k"></script>
-<script src="assets/js/ui.js?v=20260803k"></script>
-<script src="assets/js/db.js?v=20260803k"></script>
-<script src="assets/js/onboarding.js?v=20260803k"></script>
-<script src="assets/js/coachmarks.js?v=20260803k"></script>
+<script src="assets/js/auth.js?v=20260806a"></script>
+<script src="assets/js/ui.js?v=20260806a"></script>
+<script src="assets/js/db.js?v=20260806a"></script>
+<script src="assets/js/onboarding.js?v=20260806a"></script>
+<script src="assets/js/coachmarks.js?v=20260806a"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260803a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260803k"></script>
+<script src="assets/js/charts.js?v=20260806a"></script>
 <script>
 
   // Segmented toggle state — swaps a class instead of rewriting cssText.
@@ -2813,7 +2813,12 @@ AppAuth.requireLogin(async (user, profile) => {
     const _dispName = (meta.name && meta.name !== meta.id) ? meta.name.split('—')[0].trim() : '';
     document.title = _dispName ? meta.id+' — '+_dispName+' — WPM' : meta.id+' — WPM';
     document.getElementById('page-title-text').textContent = _dispName ? meta.id+' — '+_dispName : meta.id;
-    document.getElementById('page-sub').textContent = (meta.location||'')+(meta.description?' · '+meta.description:'');
+    // Group Head is shown as part of the project details line (blank group_head is simply omitted).
+    document.getElementById('page-sub').textContent = [
+      meta.location || '',
+      meta.group_head ? 'Group Head: ' + meta.group_head : '',
+      meta.description || ''
+    ].filter(Boolean).join(' · ');
     document.getElementById('nav-proj-name').textContent = meta.id;
     document.getElementById('nav-proj-link').href = 'project.html?id='+meta.id;
     // Archived projects are READ-ONLY for everyone (all roles). Only an admin can unarchive.
@@ -2946,6 +2951,8 @@ AppAuth.requireLogin(async (user, profile) => {
     document.getElementById('ep-name').value = meta.name !== meta.id ? (meta.name||'') : '';
     document.getElementById('ep-location').value = meta.location || '';
     document.getElementById('ep-description').value = meta.description || '';
+    // Rebuilt every open so an off-roster legacy value is preserved as an option (ghOptions).
+    document.getElementById('ep-group-head').innerHTML = window.ghOptions(meta.group_head || '');
     const _epb = meta.budget_bcb; document.getElementById('ep-budget').value = _epb ? parseFloat(_epb).toLocaleString('en-US') : '';
     document.getElementById('ep-error').style.display = 'none';
     document.getElementById('ep-modal').style.display = 'flex';
@@ -2965,6 +2972,7 @@ AppAuth.requireLogin(async (user, profile) => {
         name,
         location: document.getElementById('ep-location').value.trim()||null,
         description: document.getElementById('ep-description').value.trim()||null,
+        group_head: document.getElementById('ep-group-head').value.trim()||null,
         budget_bcb: parseFloat(document.getElementById('ep-budget').value.replace(/,/g,''))||null,
       });
       closeEditProjectModal();
@@ -3887,6 +3895,10 @@ window.saveQuickWP = async function() {
       <div>
         <div style="font-size:0.7857rem;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:6px">Location</div>
         <input id="ep-location" type="text" placeholder="e.g. Quezon City" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:0.7857rem;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:6px">Group Head</div>
+        <select id="ep-group-head" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:inherit;outline:none;box-sizing:border-box;background:var(--surface,#fff)"></select>
       </div>
       <div>
         <div style="font-size:0.7857rem;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:6px">Description</div>

@@ -50,6 +50,14 @@ const WPDb = (() => {
     if (_isMissingBcbCol(error)) return _stripBcb(_stripAudit(obj));
     return _stripAudit(obj);
   }
+  // Same deploy-order guard again for projects.group_head (MIGRATION_project_group_head.sql):
+  // every project write retries without the column if the DB hasn't been migrated yet.
+  function _isMissingGroupHeadCol(error) {
+    if (!error) return false;
+    const m = (error.message || '') + (error.details || '');
+    return /group_head/.test(m) && /column|does not exist|schema cache/i.test(m);
+  }
+  function _stripGroupHead(obj) { const d = {...obj}; delete d.group_head; return d; }
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
   async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
   async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
@@ -102,7 +110,13 @@ const WPDb = (() => {
       ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
     if(error) throw error; return data;
   }
-  async function createProject(d) { const sb=await getSB(); const {data,error}=await sb.from('projects').insert(d).select().single(); if(error) throw error; return data; }
+  async function createProject(d) {
+    const sb=await getSB();
+    let {data,error}=await sb.from('projects').insert(d).select().single();
+    if(error && _isMissingGroupHeadCol(error))
+      ({data,error}=await sb.from('projects').insert(_stripGroupHead(d)).select().single());
+    if(error) throw error; return data;
+  }
   async function approveWP(id) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({review_status:'approved'}).eq('id',id).select().single(); return data; }
   async function rejectWP(id,_,reason) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({review_status:'rejected',review_notes:reason}).eq('id',id).select().single(); return data; }
   async function assignOfficer(id,uid) { const sb=await getSB(); const {data}=await sb.from('work_packages').update({assigned_officer:uid}).eq('id',id).select().single(); return data; }
@@ -161,7 +175,13 @@ const WPDb = (() => {
   }
   async function archiveProject(id) { const sb=await getSB(); const {error}=await sb.from('projects').update({status:'archived'}).eq('id',id); if(error) throw error; }
   async function unarchiveProject(id) { const sb=await getSB(); const {error}=await sb.from('projects').update({status:'active'}).eq('id',id); if(error) throw error; }
-  async function updateProject(id,data) { const sb=await getSB(); const {data:d,error}=await sb.from('projects').update(data).eq('id',id).select().single(); if(error) throw error; return d; }
+  async function updateProject(id,data) {
+    const sb=await getSB();
+    let {data:d,error}=await sb.from('projects').update(data).eq('id',id).select().single();
+    if(error && _isMissingGroupHeadCol(error))
+      ({data:d,error}=await sb.from('projects').update(_stripGroupHead(data)).eq('id',id).select().single());
+    if(error) throw error; return d;
+  }
   async function deleteProject(id) { const sb=await getSB(); await sb.from('work_packages').delete().eq('project_id',id); const {error}=await sb.from('projects').delete().eq('id',id); if(error) throw error; }
   async function seedWP(d) { return submitWP(d,null); }
   return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getAllApprovedWPs,getApprovedWPsForProjects,getPendingWPs,getAllWPsForAdmin,getAllWPsForProjects,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,deleteWP,getAllUsers,getUsersForAdmin,getAdminUsers,getManagerUsers,updateUser,updateLastLogin,deleteUser,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
@@ -385,6 +405,29 @@ window.esc = function (v) {
   return v == null ? '' : String(v)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+};
+
+/* ── Group Heads ────────────────────────────────────────────────────
+   SINGLE SOURCE OF TRUTH for the Group Head roster. Stored per project in
+   projects.group_head (MIGRATION_project_group_head.sql) as free text, so
+   changing this list needs no DB migration — an existing project tagged with a
+   name later removed from the roster still displays, and _ghOptions() below
+   re-adds it as a "(legacy)" option so an edit doesn't silently clear it
+   (same pattern as fillSelectLegacy() in wp-form.html).
+   Consumers: the New Project modal (below), project.html's Edit Project modal,
+   admin.html's New Project modal, and index.html's Portfolio Overview
+   filter / group / sort controls. */
+window.GROUP_HEADS = ['Tan','Rodrin','Ronquillo','Calimag','Fellowes','Flores'];
+window.GH_UNASSIGNED = 'Unassigned';           // display label for a blank group_head
+window.ghLabel = function (v) { return (v && String(v).trim()) || window.GH_UNASSIGNED; };
+// <option> markup for a Group Head <select>. `cur` is pre-selected and, when it's
+// an off-roster legacy value, prepended so editing can't drop it.
+window.ghOptions = function (cur) {
+  const c = (cur == null ? '' : String(cur).trim());
+  const list = window.GROUP_HEADS.slice();
+  if (c && !list.some(g => g.toLowerCase() === c.toLowerCase())) list.unshift(c);
+  return `<option value=""${c ? '' : ' selected'}>— ${window.GH_UNASSIGNED} —</option>` +
+    list.map(g => `<option value="${esc(g)}"${g.toLowerCase() === c.toLowerCase() ? ' selected' : ''}>${esc(g)}</option>`).join('');
 };
 
 const Fmt = {
@@ -922,6 +965,11 @@ function updatePendingBadge() {
               style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
+            <div style="font-size:0.7857rem;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Group Head</div>
+            <select id="gnp-group-head"
+              style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:inherit;outline:none;box-sizing:border-box;background:var(--surface,#fff)">${window.ghOptions('')}</select>
+          </div>
+          <div>
             <div style="font-size:0.7857rem;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px">Description</div>
             <input id="gnp-description" type="text" placeholder="Optional project description"
               style="width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:inherit;outline:none;box-sizing:border-box">
@@ -949,7 +997,7 @@ function updatePendingBadge() {
   window._gnpClose = function() {
     const m = document.getElementById('gnp-global-modal');
     if (m) m.style.display = 'none';
-    ['gnp-id','gnp-name','gnp-location','gnp-description'].forEach(id=>{
+    ['gnp-id','gnp-name','gnp-location','gnp-description','gnp-group-head'].forEach(id=>{
       const el=document.getElementById(id); if(el) el.value='';
     });
     const err=document.getElementById('gnp-error'); if(err) err.style.display='none';
@@ -966,7 +1014,7 @@ function updatePendingBadge() {
     btn.textContent='Creating…'; btn.disabled=true; errEl.style.display='none';
     try {
       // budget_bcb is intentionally omitted — a project's BCB is the sum of its work packages' BCB (computed)
-      await WPDb.createProject({id, name, location:v('gnp-location'), description:v('gnp-description'), status:'active'});
+      await WPDb.createProject({id, name, location:v('gnp-location'), description:v('gnp-description'), group_head:v('gnp-group-head')||null, status:'active'});
       for (const uid of selectedUsers) {
         const user = _gnpUsers.find(u=>u.id===uid);
         if (user) await WPDb.updateUser(uid, {projects:[...new Set([...(user.projects||[]),id])]});
