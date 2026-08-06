@@ -62,7 +62,7 @@
     .mactions .mc{background:var(--red-400,#EE3124);color:#fff;border-color:var(--red-400,#EE3124)}
     .mactions .mx{background:transparent;color:var(--text-secondary)}
     /* ── Excel-like grid view ───────────────────────────────────────────── */
-    .xl-wrap{border:1px solid var(--border-md);border-radius:var(--radius-md);overflow:auto;max-height:calc(100vh - 250px);background:var(--surface);position:relative}
+    .xl-wrap{border:1px solid var(--border-md);border-radius:var(--radius-md);overflow:auto;max-height:calc(100vh - 215px);background:var(--surface);position:relative}
     /* table-layout:fixed is IGNORED when the width resolves via the auto algorithm —
        `width:max-content` did exactly that, so <col> widths were discarded and one long
        description stretched its column to thousands of px. renderGrid() sets an explicit
@@ -94,7 +94,12 @@
     .xl-rz:hover,.xl-rz:active{background:#EE3124}
     #xl-rz-ghost{display:none;position:fixed;inset:0;z-index:999;cursor:col-resize}
     table.xl td.xl-ph{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 4px,transparent 4px,transparent 8px);cursor:default}
-    table.xl thead th{position:sticky;top:0;z-index:6;background:var(--surface-2);font-size:0.7143rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em;padding:5px 6px;text-align:left;white-space:normal;line-height:1.2;height:34px;vertical-align:middle}
+    /* Column-header row background used to be the SAME var(--surface-2) as the even-row zebra
+       stripe below it — headers blended straight into the data instead of reading as a header
+       band. Now matches the group-header row's tone (#F3F3F3/#3a3a3a) so the whole header area
+       is one consistent, clearly-distinct shade, with a firmer bottom border to seal it off. */
+    table.xl thead th{position:sticky;top:0;z-index:6;background:#F3F3F3;font-size:0.7143rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em;padding:5px 6px;text-align:left;white-space:normal;line-height:1.2;height:34px;vertical-align:middle;border-bottom:2px solid var(--border-md)}
+    body.dark-mode table.xl thead th{background:#3a3a3a}
     table.xl td{padding:4px 6px;color:var(--text-primary);cursor:cell}
     table.xl td.xl-ro{background:var(--surface-2);color:var(--text-secondary)}
     table.xl td.xl-num{text-align:right;font-variant-numeric:tabular-nums}
@@ -113,9 +118,14 @@
     table.xl td.xl-dirty{position:relative}
     body.dark-mode table.xl td.xl-dirty{background:#4a3c14}
     table.xl th.xl-freeze,table.xl td.xl-freeze{position:sticky;z-index:4;background:var(--surface)}
-    table.xl thead th.xl-freeze{z-index:7;background:var(--surface-2)}
+    table.xl thead th.xl-freeze{z-index:7;background:#F3F3F3}
+    body.dark-mode table.xl thead th.xl-freeze{background:#3a3a3a}
     table.xl td.xl-freeze{background:var(--surface-2);font-weight:600}
-    table.xl tbody tr:nth-child(even) td:not(.xl-dirty):not(.xl-freeze):not(.xl-missing){background:var(--surface-2)}
+    /* Zebra stripe strengthened beyond the app's default var(--surface-2) (near-invisible at
+       ~2% contrast) — this table is wide and dense, so a row needs to read at a glance while
+       scrolling horizontally. Still clearly lighter than the header band above. */
+    table.xl tbody tr:nth-child(even) td:not(.xl-dirty):not(.xl-freeze):not(.xl-missing){background:#F1F1F1}
+    body.dark-mode table.xl tbody tr:nth-child(even) td:not(.xl-dirty):not(.xl-freeze):not(.xl-missing){background:#363736}
     table.xl tbody tr:hover td:not(.xl-dirty):not(.xl-missing){background:var(--mw-red-light)}
     body.dark-mode table.xl tbody tr:hover td:not(.xl-dirty):not(.xl-missing){background:#3a2422}
     table.xl tbody tr:hover .xl-rownum{color:var(--mw-red);font-weight:700}
@@ -140,7 +150,7 @@
     #xl-colmenu .xl-cm-in{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border-md);border-radius:6px;background:var(--surface);color:var(--text-primary);font-family:inherit;font-size:0.8571rem;outline:none}
     #xl-colmenu .xl-cm-apply{padding:6px 12px;border:none;border-radius:6px;background:#EE3124;color:#fff;font-weight:600;cursor:pointer;font-family:inherit;font-size:0.8571rem}
     .xl-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-    .xl-btn{font-size:0.7857rem;padding:6px 13px;border-radius:7px;border:1.5px solid var(--border-md);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+    .xl-btn{font-size:0.7857rem;padding:6px 13px;border-radius:7px;border:1.5px solid var(--border-md);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px;transition:background .12s,border-color .12s,color .12s}
     .xl-btn .ti{font-size:0.9286rem}
     .xl-btn.primary{background:#EE3124;border-color:#EE3124;color:#fff}
     .xl-btn:disabled{opacity:.45;cursor:default}
@@ -149,17 +159,20 @@
     .xl-btn.primary:not(:disabled):hover{background:#d42a1e;border-color:#d42a1e}
     .xl-btn.ghost{border-color:transparent;background:transparent}
     .xl-btn.ghost:not(:disabled):hover{background:var(--surface-2);color:var(--text-primary)}
+    /* Plain (secondary) buttons had NO hover state at all — every click felt static/flat with
+       no interactive feedback. A red-tinted hover (same convention as row-hover/menu-hover
+       elsewhere in the app, var(--mw-red-light)) gives them a clear "you can click this" cue
+       and visually separates them from the tertiary "Sections" mini-buttons below. */
+    .xl-btn:not(.primary):not(.ghost):not(:disabled):hover{background:var(--mw-red-light);border-color:#EE3124;color:#EE3124}
+    /* Tertiary tier — the "Sections" group (Expand/Collapse/Reset widths) are infrequent
+       layout tools, not primary content actions, so they're borderless/muted by default and
+       only pick up color on hover, instead of competing visually with Select all/Copy/Paste WPs. */
+    .xl-btn-mini{padding:4px 9px;border-color:transparent;background:transparent;color:var(--text-hint);font-weight:600}
+    .xl-btn-mini:not(:disabled):hover{background:var(--mw-red-light);border-color:transparent;color:#EE3124}
     .xl-actions{display:inline-flex;align-items:center;gap:6px;padding-left:8px;border-left:1px solid var(--border-md)}
     .xl-hint{font-size:0.7143rem;color:var(--text-hint)}
     .xl-badge{font-size:0.7143rem;font-weight:700;padding:1px 6px;border-radius:9px;color:#fff}
     .xl-help{margin-bottom:8px;font-size:0.7857rem}
-    /* Sharing a row with the missing/dirty-count + Discard/Save actions (instead of sitting on
-       its own near-empty line below them) — see the "wide empty space" fix. As a flex item it
-       naturally shrinks to its summary's width while collapsed; forcing it to the full row width
-       once opened lets the multi-line help content wrap onto its own line instead of squeezing
-       in beside the counts/actions. */
-    .xl-bar2 .xl-help{margin-bottom:0}
-    .xl-bar2 .xl-help[open]{flex-basis:100%}
     .xl-help summary{cursor:pointer;color:var(--text-secondary);font-weight:600;display:inline-flex;align-items:center;gap:5px;list-style:none;user-select:none}
     .xl-help summary::-webkit-details-marker{display:none}
     .xl-help summary::before{content:'▸';display:inline-block;transition:transform .15s;color:var(--text-hint)}
@@ -320,25 +333,9 @@
             </span>
             <span class="xl-sep"></span>
             <span class="xl-hint">Sections:</span>
-            <button class="xl-btn" style="padding:4px 9px" onclick="xlGroupsAll(false)" title="Show every WP-form section">Expand all</button>
-            <button class="xl-btn" style="padding:4px 9px" onclick="xlGroupsAll(true)" title="Collapse every section to the key columns">Collapse all</button>
-            <button class="xl-btn" style="padding:4px 9px" onclick="xlResetWidths()" title="Restore every column to its default width">Reset widths</button>
-          </div>
-          <div class="xl-bar xl-bar2">
-            <details class="xl-help">
-              <summary><i class="ti ti-keyboard" aria-hidden="true"></i> How to use this grid <span class="xl-help-hint">— works like Excel</span></summary>
-              <div class="xl-help-grid">
-              <div><kbd>Click</kbd> select · <kbd>drag</kbd> select a range · <kbd>Enter</kbd>/<kbd>F2</kbd> or just type to edit</div>
-              <div><kbd>Tab</kbd>/<kbd>arrows</kbd> move · <kbd>Shift</kbd>+<kbd>arrows</kbd> extend selection · <kbd>Ctrl</kbd>+<kbd>arrows</kbd> jump to edge of data · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>arrows</kbd> extend to edge of data · <kbd>Del</kbd> clear · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>Esc</kbd> cancel</div>
-              <div><kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copy &amp; paste — multi-cell, round-trips with Excel. <kbd>Ctrl</kbd>+<kbd>A</kbd> then <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copies whole WPs and pastes them as new rows (works across projects).</div>
-              <div><kbd>Ctrl</kbd>+<kbd>D</kbd> or drag the corner handle to fill down · header <b>▾</b> sets a whole column at once</div>
-              <div>Header <b>📌</b> freezes columns up to that point (click it again to unfreeze) · your choice is remembered</div>
-              <div>Drag a column border to resize (double-click to reset). Edits are staged until you press <b>Save</b>.</div>
-              <div><b>Add WP</b> adds the number of blank rows in the box beside it (up to 100) at once — then <kbd>Tab</kbd>/<kbd>Enter</kbd> walks you straight through its required fields, skipping anything already filled in.</div>
-              <div>Dropdown cells (Trade, Works, Status…) let you <b>type to filter</b> instead of scrolling; pasted or typed text is matched to the real option regardless of case/spacing.</div>
-              <div><b>Select all</b> → <b>Copy WPs</b>, then open another project's grid and <b>Paste WPs</b> to bring those work packages in as new rows.</div>
-              </div>
-            </details>
+            <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(false)" title="Show every WP-form section">Expand all</button>
+            <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(true)" title="Collapse every section to the key columns">Collapse all</button>
+            <button class="xl-btn xl-btn-mini" onclick="xlResetWidths()" title="Restore every column to its default width">Reset widths</button>
             <span style="flex:1"></span>
             <span id="xl-missing-count" class="xl-hint" style="color:#B45309;font-weight:700;display:none"></span>
             <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
@@ -348,6 +345,20 @@
               <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled title="Save all staged edits to the database"><i class="ti ti-device-floppy"></i> <span id="xl-save-lbl">Save changes</span></button>
             </span>
           </div>
+          <details class="xl-help">
+            <summary><i class="ti ti-keyboard" aria-hidden="true"></i> How to use this grid <span class="xl-help-hint">— works like Excel</span></summary>
+            <div class="xl-help-grid">
+              <div><kbd>Click</kbd> select · <kbd>drag</kbd> select a range · <kbd>Enter</kbd>/<kbd>F2</kbd> or just type to edit</div>
+              <div><kbd>Tab</kbd>/<kbd>arrows</kbd> move · <kbd>Shift</kbd>+<kbd>arrows</kbd> extend selection · <kbd>Ctrl</kbd>+<kbd>arrows</kbd> jump to edge of data · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>arrows</kbd> extend to edge of data · <kbd>Del</kbd> clear · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>Esc</kbd> cancel</div>
+              <div><kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copy &amp; paste — multi-cell, round-trips with Excel. <kbd>Ctrl</kbd>+<kbd>A</kbd> then <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copies whole WPs and pastes them as new rows (works across projects).</div>
+              <div><kbd>Ctrl</kbd>+<kbd>D</kbd> or drag the corner handle to fill down · header <b>▾</b> sets a whole column at once</div>
+              <div>Header <b>📌</b> freezes columns up to that point (click it again to unfreeze) · your choice is remembered</div>
+              <div>Drag a column border to resize (double-click to reset). Edits are staged until you press <b>Save</b>.</div>
+              <div><b>Add WP</b> adds the number of blank rows in the box beside it (up to 100) at once — then <kbd>Tab</kbd>/<kbd>Enter</kbd> walks you straight through its required fields, skipping anything already filled in.</div>
+              <div>Dropdown cells (Trade, Works, Status…) let you <b>type to filter</b> instead of scrolling; pasted or typed text is matched to the real option regardless of case/spacing.</div>
+              <div><b>Select all</b> → <b>Copy WPs</b>, then open another project's grid and <b>Paste WPs</b> to bring those work packages in as new rows.</div>
+            </div>
+          </details>
           <div class="xl-wrap" id="xl-wrap" tabindex="0"><table class="xl" id="xl-table"></table></div>
           <div id="xl-rz-ghost"></div>
         </div>
