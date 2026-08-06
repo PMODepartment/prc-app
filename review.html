@@ -180,6 +180,8 @@
     .xl-foot .xl-help[open]{flex-basis:100%}
     /* Grid-only Discard/Save, hosted on the filter bar (hidden in Cards view by setReviewView). */
     .rv-grid-actions{flex-shrink:0}
+    /* Sections label + its 3 buttons wrap as ONE unit, never split across rows. */
+    .xl-sections{display:inline-flex;align-items:center;gap:8px;flex-shrink:0}
     .xl-btn{font-size:0.7857rem;padding:6px 13px;border-radius:7px;border:1.5px solid var(--border-md);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px;transition:background .12s,border-color .12s,color .12s}
     .xl-btn .ti{font-size:0.9286rem}
     .xl-btn.primary{background:#EE3124;border-color:#EE3124;color:#fff}
@@ -304,10 +306,11 @@
               <option value="ALL">All Trades</option>
             </select>
           </span>
-          <!-- Search is capped (max-width) rather than greedily flex:1 — the freed width is what
-               lets the grid's Discard/Save actions share this row instead of needing one of
-               their own (see .rv-grid-actions below). -->
-          <div class="rv-filter-search" style="position:relative;flex:1 1 200px;min-width:160px;max-width:420px">
+          <!-- Grows to absorb the leftover width (no max-width cap — that left a visible dead gap
+               between the search and the view switcher on wide/sidebar-collapsed layouts). The
+               small flex-basis + min-width let it shrink instead when the row gets tight, so the
+               Discard/Save actions still fit on this row. -->
+          <div class="rv-filter-search" style="position:relative;flex:1 1 200px;min-width:160px">
             <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#bbb;font-size:0.9286rem;pointer-events:none"></i>
             <input id="review-search" type="text" placeholder="Search WP No. or description…" oninput="applyFilters()"
               style="width:100%;padding:7px 12px 7px 32px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;outline:none;box-sizing:border-box"/>
@@ -368,15 +371,17 @@
               <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer">
                 <input type="checkbox" id="xl-only-missing" onchange="renderGrid()" style="cursor:pointer"> Only incomplete
               </label>
-              <span class="xl-legend-box" title="What the cell colours mean — red: a required field left blank · amber: an edit you haven't saved yet">
-                <span class="xl-legend"><span class="xl-swatch" style="background:#FDECEA;box-shadow:inset 3px 0 0 #EE3124"></span>required, empty</span>
-                <span class="xl-legend"><span class="xl-swatch" style="background:#FFF6DA;border-color:#E0B94D"></span>unsaved</span>
-              </span>
               <span class="xl-sep"></span>
-              <span class="xl-hint">Sections:</span>
-              <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(false)" title="Show every WP-form section">Expand all</button>
-              <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(true)" title="Collapse every section to the key columns">Collapse all</button>
-              <button class="xl-btn xl-btn-mini" onclick="xlResetWidths()" title="Restore every column to its default width">Reset widths</button>
+              <!-- The Sections label + its 3 buttons are ONE inline-flex unit so a tight row can
+                   never strand "Collapse all"/"Reset widths" on a line of their own, split from
+                   the "Sections:" label they belong to (the reported 3rd-row spill). If it has
+                   to wrap it wraps as a whole group. -->
+              <span class="xl-sections">
+                <span class="xl-hint">Sections:</span>
+                <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(false)" title="Show every WP-form section">Expand all</button>
+                <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(true)" title="Collapse every section to the key columns">Collapse all</button>
+                <button class="xl-btn xl-btn-mini" onclick="xlResetWidths()" title="Restore every column to its default width">Reset widths</button>
+              </span>
             </div>
           </div>
           <div class="xl-wrap" id="xl-wrap" tabindex="0"><table class="xl" id="xl-table"></table></div>
@@ -400,6 +405,13 @@
             </div>
           </details>
             <div class="xl-bar-right">
+              <!-- Colour legend lives here rather than in the toolbar: it's explanatory (like the
+                   help text beside it), not an action, and it was ~180px of the toolbar width
+                   that pushed the Sections buttons onto a second row when the sidebar is open. -->
+              <span class="xl-legend-box" title="What the cell colours mean — red: a required field left blank · amber: an edit you haven't saved yet">
+                <span class="xl-legend"><span class="xl-swatch" style="background:#FDECEA;box-shadow:inset 3px 0 0 #EE3124"></span>required, empty</span>
+                <span class="xl-legend"><span class="xl-swatch" style="background:#FFF6DA;border-color:#E0B94D"></span>unsaved</span>
+              </span>
               <span id="xl-missing-count" class="xl-hint" style="color:#B45309;font-weight:700;display:none"></span>
               <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
               <span id="xl-autosave-indicator" class="xl-hint" style="display:none;color:var(--text-hint)"><i class="ti ti-device-floppy"></i> <span id="xl-autosave-indicator-text"></span></span>
