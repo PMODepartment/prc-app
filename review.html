@@ -99,7 +99,15 @@
     table.xl td.xl-ro{background:var(--surface-2);color:var(--text-secondary)}
     table.xl td.xl-num{text-align:right;font-variant-numeric:tabular-nums}
     table.xl td.xl-sel{outline:2px solid #EE3124;outline-offset:-2px;z-index:3;position:relative}
-    table.xl td.xl-range{background:rgba(238,49,36,.08)}
+    /* Range highlight — a box-shadow OVERLAY rather than a background-color, so it always
+       paints visibly on top regardless of the cell's own background (zebra stripe, .xl-dirty
+       amber, .xl-missing red, or the row :hover tint below) instead of losing a CSS
+       specificity fight for `background`. This was the reported bug: dragging a multi-cell
+       range only ever showed the outline on the LAST cell touched — the range fill was too
+       faint (8% opacity) and got fully masked by the row-hover rule while the mouse was
+       still over the row being dragged through. */
+    table.xl td.xl-range{box-shadow:inset 0 0 0 9999px rgba(238,49,36,.22);position:relative;z-index:2}
+    body.dark-mode table.xl td.xl-range{box-shadow:inset 0 0 0 9999px rgba(255,122,110,.28)}
     table.xl td.xl-dirty{background:#FFF6DA}
     table.xl td.xl-dirty::after{content:'';position:absolute;top:0;right:0;border:4px solid transparent;border-top-color:#D97706;border-right-color:#D97706}
     table.xl td.xl-dirty{position:relative}
@@ -302,6 +310,7 @@
             <button class="xl-btn" onclick="xlCopyWPs()" title="Copy the selected work packages — then open another project's grid and click Paste WPs to add them there"><i class="ti ti-copy"></i> Copy WPs</button>
             <button class="xl-btn" id="xl-paste-wps" onclick="xlPasteWPs()" title="Add the copied work packages as new rows in this project"><i class="ti ti-clipboard-plus"></i> Paste WPs</button>
             <span id="xl-count" class="xl-hint"></span>
+            <span id="xl-sel-info" class="xl-hint" style="display:none;font-weight:700;color:#EE3124"></span>
             <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer">
               <input type="checkbox" id="xl-only-missing" onchange="renderGrid()" style="cursor:pointer"> Only incomplete
             </label>
@@ -1491,10 +1500,21 @@
   }
   function _xlPaintRange(){
     document.querySelectorAll('#xl-table td.xl-range').forEach(function(td){ td.classList.remove('xl-range'); });
+    const info = document.getElementById('xl-sel-info');
     if (_xlAnchor){
       const R = _xlRange();
-      for (let r=R.r1;r<=R.r2;r++) for (let c=R.c1;c<=R.c2;c++){ const td=_xlTd(r,c); if(td) td.classList.add('xl-range'); }
-    }
+      let painted = 0;
+      for (let r=R.r1;r<=R.r2;r++) for (let c=R.c1;c<=R.c2;c++){ const td=_xlTd(r,c); if(td){ td.classList.add('xl-range'); painted++; } }
+      // Explicit "N cells selected" readout — the highlight alone can still be missed against
+      // a busy sheet, so this removes any doubt about whether a drag actually took.
+      if (info){
+        const nr = R.r2-R.r1+1, nc = R.c2-R.c1+1;
+        if (nr>1 || nc>1){
+          info.textContent = painted + ' cell' + (painted===1?'':'s') + ' selected (' + nr + ' row' + (nr===1?'':'s') + ' × ' + nc + ' col' + (nc===1?'':'s') + ')';
+          info.style.display = '';
+        } else info.style.display = 'none';
+      }
+    } else if (info) info.style.display = 'none';
     _xlSyncFill();
   }
   function _xlRange(){
