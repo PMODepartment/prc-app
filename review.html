@@ -182,6 +182,39 @@
     .rv-grid-actions{flex-shrink:0}
     /* Sections label + its 3 buttons wrap as ONE unit, never split across rows. */
     .xl-sections{display:inline-flex;align-items:center;gap:8px;flex-shrink:0}
+
+    /* ── Non-scrolling Grid view ──────────────────────────────────────────────
+       A spreadsheet shouldn't have two nested scrollbars: the PAGE stays fixed at
+       viewport height and `.xl-wrap` is the only thing that scrolls, so the filter bar
+       and toolbar can never scroll away from the data.
+
+       This is a flex CHAIN (app-shell → main → content → #main-content → #grid-view →
+       .xl-wrap:flex:1), NOT arithmetic. Every earlier attempt computed the grid height by
+       hand and kept leaving a gap, because a constant can't know about things like
+       `.content`'s 48px bottom padding (the real source of the last stubborn dead space).
+       Letting flex do it is self-correcting: open the help disclosure, add a banner, wrap
+       the toolbar — the grid just gives up the right amount of height on its own.
+
+       `min-height:0` on every link is load-bearing: a flex item's default min-height is
+       `auto`, which refuses to shrink below content size and would push the page taller
+       than the viewport again.
+
+       Grid view only (`body.rv-grid-fixed`, toggled in setReviewView) and desktop only —
+       Cards view is a normal document that should scroll, and mobile defaults to Cards. */
+    @media (min-width: 768px){
+      body.rv-grid-fixed .app-shell{height:100vh;min-height:0;overflow:hidden}
+      body.rv-grid-fixed .main{min-height:0;overflow:hidden}
+      body.rv-grid-fixed .content{min-height:0;overflow:hidden;display:flex;flex-direction:column;padding-bottom:14px}
+      /* display:flex needs !important — the load path sets an INLINE `display:block` on
+         #main-content (it starts inline `display:none`), and an inline style outranks a class
+         rule. Without this the flex chain silently breaks here and everything below the grid
+         gets clipped by the overflow:hidden above. */
+      body.rv-grid-fixed #main-content{flex:1;min-height:0;display:flex !important;flex-direction:column}
+      body.rv-grid-fixed #grid-view{flex:1;min-height:0;display:flex;flex-direction:column}
+      /* !important beats the inline max-height _xlFitHeight() sets on other layouts —
+         inline styles outrank class rules (see the panel-fullscreen trap in Known Issues). */
+      body.rv-grid-fixed .xl-wrap{flex:1;min-height:0;max-height:none !important}
+    }
     .xl-btn{font-size:0.7857rem;padding:6px 13px;border-radius:7px;border:1.5px solid var(--border-md);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px;transition:background .12s,border-color .12s,color .12s}
     .xl-btn .ti{font-size:0.9286rem}
     .xl-btn.primary{background:#EE3124;border-color:#EE3124;color:#fff}
@@ -1059,6 +1092,11 @@
     // there are no staged grid edits to act on there.
     const rga = document.getElementById('rv-grid-actions');
     if (rga) rga.style.display = v==='grid' ? '' : 'none';
+    // Grid view pins the page to viewport height so only the grid scrolls (see the
+    // .rv-grid-fixed CSS). Cards view is a normal scrolling document. The class is set
+    // regardless of width — the CSS itself is gated to >=768px, so one breakpoint owns it
+    // and a window resize re-evaluates with no JS listener.
+    document.body.classList.toggle('rv-grid-fixed', v==='grid');
     if(v==='grid') renderGrid();
   };
 
@@ -1571,6 +1609,14 @@
   function _xlFitHeight(){
     const wrap = document.getElementById('xl-wrap');
     if (!wrap || _reviewView !== 'grid' || wrap.offsetParent === null) return;
+    // When the non-scrolling grid layout is active the flex chain sizes the wrap for us —
+    // clear any inline max-height left over from a narrow/Cards pass and get out of the way.
+    // (Below 768px that CSS doesn't apply, so we fall through to the measured fallback.)
+    if (document.body.classList.contains('rv-grid-fixed')
+        && window.matchMedia('(min-width: 768px)').matches){
+      wrap.style.maxHeight = '';
+      return;
+    }
     // Document-relative top via the offsetTop chain — deliberately NOT
     // getBoundingClientRect().top, which is viewport-relative and would feed back on itself:
     // growing the wrap can scroll the page, which changes rect.top, which changes the height.
