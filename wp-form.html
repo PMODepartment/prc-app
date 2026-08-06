@@ -206,6 +206,17 @@
           <i class="ti ti-circle-check" style="flex-shrink:0"></i><span id="success-text"></span>
         </div>
 
+        <!-- Local draft-recovery banner (auto-save is client-side only — nothing is written to the
+             DB until Save is clicked). Shown when a saved-but-unsubmitted draft is found on load. -->
+        <div id="draft-banner" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#FDECEA;border:1.5px solid #F5B8B3;border-radius:10px;padding:10px 14px;margin-bottom:14px">
+          <i class="ti ti-device-floppy" style="font-size:1.1429rem;color:#EE3124;flex-shrink:0"></i>
+          <div style="flex:1;min-width:180px;font-size:0.8571rem;color:#C42127" id="draft-banner-text">You have an unsaved draft.</div>
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            <button type="button" onclick="restoreDraft()" style="font-size:0.7857rem;font-weight:600;padding:6px 12px;border:none;border-radius:7px;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit">Restore draft</button>
+            <button type="button" onclick="discardDraft()" style="font-size:0.7857rem;font-weight:600;padding:6px 12px;border:1.5px solid #F5B8B3;border-radius:7px;background:#fff;color:#C42127;cursor:pointer;font-family:inherit">Discard</button>
+          </div>
+        </div>
+
         <!-- Bulk Import banner -->
         <div id="import-banner" class="bulk-import-card" style="display:none;background:#FDECEA;border:1.5px solid #F5B8B3;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <i class="ti ti-table-import" style="font-size:1.4286rem;color:#EE3124;flex-shrink:0"></i>
@@ -649,6 +660,7 @@
             <button class="btn" onclick="history.back()">
               <i class="ti ti-arrow-left" style="font-size:0.9286rem"></i> Cancel
             </button>
+            <span id="autosave-indicator" style="display:none;align-items:center;gap:5px;font-size:0.7857rem;color:var(--text-hint)"><i class="ti ti-device-floppy" style="font-size:0.8571rem"></i><span id="autosave-indicator-text"></span></span>
             <button class="btn" id="btn-delete" onclick="deleteCurrentWP()" style="display:none;margin-left:auto;color:#EE3124;border-color:#EE3124">
               <i class="ti ti-trash" style="font-size:0.9286rem"></i> Delete WP
             </button>
@@ -845,6 +857,7 @@
       await WPDb.deleteWP(editId);
       try { Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx')).forEach(k=>sessionStorage.removeItem(k)); } catch(e){}
       markClean();
+      discardDraft();
       location.href = 'project.html?id=' + (existingWP ? existingWP.project_id : (projId||''));
     } catch(e) {
       AppNotify.fromError(e, 'Could not delete this work package.');
@@ -1142,7 +1155,7 @@ function _updateBcbDeltas(){
   });
 });
 
-function markDirty() { formDirty = true; }
+function markDirty() { formDirty = true; scheduleAutosave(); }
 function markClean() { formDirty = false; }
 // First-run checklist marker (mirrors GettingStarted.markStep; onboarding.js isn't loaded here).
 function _gsMark(step){ try{ const uid=(userProfile&&userProfile.id)||'anon'; const k='wpm_gs_'+uid; const p=JSON.parse(localStorage.getItem(k)||'{}'); if(!p[step]){ p[step]=true; localStorage.setItem(k,JSON.stringify(p)); } }catch(_){} }
@@ -1151,6 +1164,114 @@ window.addEventListener('beforeunload', function(e) {
 });
 document.addEventListener('change', function(e) { if (e.target.closest && e.target.closest('form,#form-container,.form-section')) markDirty(); });
 document.addEventListener('input', function(e) { if (e.target.closest && e.target.closest('form,#form-container,.form-section')) markDirty(); });
+
+/* ── Local draft auto-save (recovery only — nothing is written to the DB until Save is
+   clicked; see CLAUDE.md). Periodically snapshots every #form-container field into
+   localStorage, scoped per user + per WP (editId, or a new-WP slot per project), so a
+   crashed tab / accidental back-nav / browser close doesn't lose in-progress typing. */
+let _autosaveTimer = null;
+let _restoringDraft = false;
+let _formLoaded = false;   // true only once initial load/fill has finished — suppresses the
+                            // markDirty() calls that fire during programmatic fill (onProcStatusChange
+                            // etc. at load time), so autosave never fires on an unmodified page.
+function _draftKey(){
+  const uid = (userProfile && userProfile.id) || 'anon';
+  const scope = editId ? ('edit_' + editId) : ('new_' + (projId || 'noproj'));
+  return 'wpm_wpdraft_' + uid + '_' + scope;
+}
+function scheduleAutosave(){
+  if (_restoringDraft || !_formLoaded) return;
+  clearTimeout(_autosaveTimer);
+  _autosaveTimer = setTimeout(saveDraftNow, 1200);
+}
+function saveDraftNow(){
+  try {
+    const container = document.querySelector('.panel') || document;
+    const values = {};
+    container.querySelectorAll('[id^="f-"]').forEach(el => {
+      if (!el.id || el.disabled) return;
+      values[el.id] = (el.type === 'checkbox') ? el.checked : el.value;
+    });
+    const draft = {
+      values,
+      ms: { responsible: [..._msState.responsible], support: [..._msState.support] },
+      savedAt: Date.now()
+    };
+    localStorage.setItem(_draftKey(), JSON.stringify(draft));
+    const ind = document.getElementById('autosave-indicator');
+    const txt = document.getElementById('autosave-indicator-text');
+    if (ind && txt) {
+      txt.textContent = 'Draft saved ' + new Date(draft.savedAt).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+      ind.style.display = 'inline-flex';
+    }
+  } catch(_) { /* localStorage unavailable/full — autosave is best-effort only */ }
+}
+function _loadDraft(){
+  try { const raw = localStorage.getItem(_draftKey()); return raw ? JSON.parse(raw) : null; } catch(_) { return null; }
+}
+function discardDraft(){
+  try { localStorage.removeItem(_draftKey()); } catch(_) {}
+  const b = document.getElementById('draft-banner');
+  if (b) b.style.display = 'none';
+}
+function restoreDraft(){
+  const draft = _loadDraft();
+  const b = document.getElementById('draft-banner');
+  if (b) b.style.display = 'none';
+  if (!draft || !draft.values) return;
+  _restoringDraft = true;
+  try {
+    const v = draft.values;
+    // Trade → Works → Type must be restored in cascade order so the dependent
+    // dropdowns are populated with the right options before their value is set.
+    if (v['f-trade'] != null) { document.getElementById('f-trade').value = v['f-trade']; onTradeChange(); }
+    if (v['f-works'] != null) {
+      const el = document.getElementById('f-works');
+      if (el) { if (v['f-works'] && ![...el.options].some(o=>o.value===v['f-works'])) el.add(new Option(v['f-works'], v['f-works'])); el.value = v['f-works']; }
+      onWorksChange();
+    }
+    if (v['f-type'] != null) {
+      const el = document.getElementById('f-type');
+      if (el) { if (v['f-type'] && ![...el.options].some(o=>o.value===v['f-type'])) el.add(new Option(v['f-type'], v['f-type'])); el.value = v['f-type']; }
+    }
+    // Approval matrix multi-selects — restored directly from the saved id sets.
+    if (draft.ms) {
+      _msState.responsible = new Set(draft.ms.responsible || []);
+      _msState.support = new Set(draft.ms.support || []);
+      _updateMsPills('responsible');
+      _updateMsPills('support');
+    }
+    // Everything else — plain value/checked restore, cascade fields already handled above.
+    const skip = { 'f-trade':1, 'f-works':1, 'f-type':1 };
+    Object.keys(v).forEach(id => {
+      if (skip[id]) return;
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = !!v[id]; else el.value = v[id];
+    });
+    // Re-apply dependent UI state driven by the fields we just restored.
+    onRequiresApprovalChange();
+    onNotToBeAwardedChange();
+    onProcStatusChange();
+    onChargingChange();
+    _updateBcbDeltas();
+    updateVariance();
+    markDirty();
+    if (window.AppNotify) AppNotify.success('Draft restored.');
+  } finally {
+    _restoringDraft = false;
+  }
+}
+function _maybeOfferDraft(){
+  const draft = _loadDraft();
+  if (!draft || !draft.savedAt) return;
+  const b = document.getElementById('draft-banner');
+  const t = document.getElementById('draft-banner-text');
+  if (!b) return;
+  const when = new Date(draft.savedAt).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+  if (t) t.textContent = 'You have an unsaved draft from ' + when + ' for this ' + (editId ? 'work package' : 'new work package') + '. Restore it?';
+  b.style.display = 'flex';
+}
 
 AppAuth.requireLogin(async (user, profile) => {
     userProfile = profile;
@@ -1359,6 +1480,9 @@ AppAuth.requireLogin(async (user, profile) => {
     onRequiresApprovalChange();   // apply N/A on first load (new WP defaults to "No")
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
+    markClean();                  // discard any dirty flag set by the programmatic fill above
+    _formLoaded = true;
+    _maybeOfferDraft();
 
     // Guided tour of the Add WP form (coach-marks). Auto-runs once per user; re-openable via the
     // topbar "?" button. Steps auto-skip any field that's hidden for the current role.
@@ -1542,6 +1666,8 @@ AppAuth.requireLogin(async (user, profile) => {
       successEl.className = 'alert alert-success';
       successEl.scrollIntoView({ behavior:'smooth' });
       markClean();
+      discardDraft();
+      const ind0 = document.getElementById('autosave-indicator'); if (ind0) ind0.style.display = 'none';
       /* Bust index.html WP cache so Portfolio Overview reflects this change immediately */
       try { Object.keys(sessionStorage).filter(k=>k.startsWith('wpm_wps_idx_')).forEach(k=>sessionStorage.removeItem(k)); } catch(_){}
       /* Redirect back to project page after save/update so dashboard reflects changes */

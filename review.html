@@ -271,6 +271,19 @@
         </div>
         <div id="panel-cards" style="display:none"></div>
 
+        <!-- Local draft-recovery banner (auto-save is client-side only — the grid's staged
+             edits/new rows are periodically snapshotted to localStorage so a crashed tab or
+             accidental reload doesn't lose unsaved grid work; nothing is written to the DB
+             until Save changes is clicked). -->
+        <div id="xl-draft-banner" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#FDECEA;border:1.5px solid #F5B8B3;border-radius:10px;padding:10px 14px;margin-bottom:14px">
+          <i class="ti ti-device-floppy" style="font-size:1.1429rem;color:#EE3124;flex-shrink:0"></i>
+          <div style="flex:1;min-width:180px;font-size:0.8571rem;color:#C42127" id="xl-draft-banner-text">You have unsaved grid edits.</div>
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            <button type="button" onclick="xlRestoreDraft()" style="font-size:0.7857rem;font-weight:600;padding:6px 12px;border:none;border-radius:7px;background:#EE3124;color:#fff;cursor:pointer;font-family:inherit">Restore edits</button>
+            <button type="button" onclick="xlDiscardDraftBanner()" style="font-size:0.7857rem;font-weight:600;padding:6px 12px;border:1.5px solid #F5B8B3;border-radius:7px;background:#fff;color:#C42127;cursor:pointer;font-family:inherit">Discard</button>
+          </div>
+        </div>
+
         <!-- ══ EXCEL-LIKE GRID VIEW ══ -->
         <div id="grid-view">
           <div class="xl-bar">
@@ -304,6 +317,7 @@
             <span style="flex:1"></span>
             <span id="xl-missing-count" class="xl-hint" style="color:#B45309;font-weight:700;display:none"></span>
             <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
+            <span id="xl-autosave-indicator" class="xl-hint" style="display:none;color:var(--text-hint)"><i class="ti ti-device-floppy"></i> <span id="xl-autosave-indicator-text"></span></span>
             <span class="xl-actions">
               <button id="xl-discard" class="xl-btn ghost" onclick="gridDiscard()" disabled title="Throw away all unsaved grid edits"><i class="ti ti-arrow-back-up"></i> Discard</button>
               <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled title="Save all staged edits to the database"><i class="ti ti-device-floppy"></i> <span id="xl-save-lbl">Save changes</span></button>
@@ -364,6 +378,7 @@
     if (window.matchMedia && window.matchMedia('(max-width:767px)').matches) setReviewView('cards');
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
+    _xlMaybeOfferDraft();
   });
 
   async function loadAll(profile) {
@@ -856,6 +871,86 @@
   let _xlDragOrigin = null;            // {r,c} where a select-drag began
   let _xlFillSrc  = null;              // {r1,r2,c1,c2} source range of a fill-handle drag
   let _xlFillTo   = null;              // current target row of a fill drag
+
+  /* ── Local draft auto-save for the grid (recovery only — nothing is written to the DB
+     until Save changes is clicked; see CLAUDE.md). Periodically snapshots _gridEdits +
+     _newRows to localStorage, scoped per user + per project context, so a crashed tab /
+     accidental reload doesn't lose staged grid edits or in-progress new-WP rows. */
+  let _xlAutosaveTimer = null;
+  let _xlRestoringDraft = false;
+  let _xlDraftChecked = false;   // true once the user has restored/discarded an offered draft, or
+                                  // there was none to offer — blocks autosave from wiping an
+                                  // as-yet-unrestored draft during the initial (empty) render.
+  function _xlDraftKey(){
+    const uid = (adminProfile && adminProfile.id) || 'anon';
+    return 'wpm_griddraft_' + uid + '_' + (currentProjId || 'ALL');
+  }
+  function _xlScheduleAutosave(){
+    if (_xlRestoringDraft || !_xlDraftChecked) return;
+    clearTimeout(_xlAutosaveTimer);
+    _xlAutosaveTimer = setTimeout(_xlSaveDraftNow, 1200);
+  }
+  function _xlSaveDraftNow(){
+    try {
+      const hasEdits = Object.keys(_gridEdits).length || _newRows.length;
+      const ind = document.getElementById('xl-autosave-indicator');
+      const txt = document.getElementById('xl-autosave-indicator-text');
+      if (!hasEdits) {
+        localStorage.removeItem(_xlDraftKey());
+        if (ind) ind.style.display = 'none';
+        return;
+      }
+      const draft = { gridEdits: _gridEdits, newRows: _newRows, savedAt: Date.now() };
+      localStorage.setItem(_xlDraftKey(), JSON.stringify(draft));
+      if (ind && txt) {
+        txt.textContent = 'Draft saved ' + new Date(draft.savedAt).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+        ind.style.display = 'inline-flex';
+      }
+    } catch(_) { /* localStorage unavailable/full — autosave is best-effort only */ }
+  }
+  function _xlLoadDraft(){
+    try { const raw = localStorage.getItem(_xlDraftKey()); return raw ? JSON.parse(raw) : null; } catch(_) { return null; }
+  }
+  window.xlDiscardDraftBanner = function(){
+    try { localStorage.removeItem(_xlDraftKey()); } catch(_) {}
+    const b = document.getElementById('xl-draft-banner');
+    if (b) b.style.display = 'none';
+    _xlDraftChecked = true;
+  };
+  window.xlRestoreDraft = function(){
+    const draft = _xlLoadDraft();
+    const b = document.getElementById('xl-draft-banner');
+    if (b) b.style.display = 'none';
+    if (!draft) { _xlDraftChecked = true; return; }
+    _xlRestoringDraft = true;
+    try {
+      _gridEdits = draft.gridEdits || {};
+      _newRows = draft.newRows || [];
+      renderGrid();
+      xlToast('Grid draft restored.');
+    } finally {
+      _xlRestoringDraft = false;
+      _xlDraftChecked = true;   // now safe to let autosave manage the draft again
+      _xlUpdateBar();
+    }
+  };
+  function _xlMaybeOfferDraft(){
+    const draft = _xlLoadDraft();
+    const nEdits = draft ? Object.keys(draft.gridEdits||{}).length : 0;
+    const nNew = draft ? (draft.newRows||[]).length : 0;
+    if (!draft || !draft.savedAt || (!nEdits && !nNew)) { _xlDraftChecked = true; return; }
+    const b = document.getElementById('xl-draft-banner');
+    const t = document.getElementById('xl-draft-banner-text');
+    if (!b) { _xlDraftChecked = true; return; }
+    const when = new Date(draft.savedAt).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+    const parts = [];
+    if (nNew) parts.push(nNew + ' new WP' + (nNew===1?'':'s'));
+    if (nEdits) parts.push(nEdits + ' edited WP' + (nEdits===1?'':'s'));
+    if (t) t.textContent = 'You have unsaved grid edits from ' + when + ' (' + parts.join(', ') + '). Restore them?';
+    b.style.display = 'flex';
+    // _xlDraftChecked stays false until the user clicks Restore or Discard — autosave is
+    // paused until then, so the empty initial render can't silently wipe the offered draft.
+  }
 
   // Small transient message (no global toast helper on this page)
   function xlToast(msg){
@@ -1354,6 +1449,7 @@
     });
   }
   function _xlUpdateBar(){
+    _xlScheduleAutosave();
     const n = Object.keys(_gridEdits).reduce(function(s,id){ return s+Object.keys(_gridEdits[id]).length; },0);
     const rows = Object.keys(_gridEdits).length;
     const nNew = _newRows.length;
@@ -1793,6 +1889,8 @@
     if (!Object.keys(_gridEdits).length && !_newRows.length) return;
     if (!confirm('Discard all unsaved grid changes' + (_newRows.length ? ', including '+_newRows.length+' new work package(s)' : '') + '?')) return;
     _gridEdits = {}; _xlUndo = []; _newRows = [];
+    try { localStorage.removeItem(_xlDraftKey()); } catch(_) {}
+    const ind = document.getElementById('xl-autosave-indicator'); if (ind) ind.style.display = 'none';
     renderGrid();
   };
 
@@ -1869,6 +1967,7 @@
     }
     if (!_newRows.length) { _gridEdits = {}; _xlUndo = []; }
     else ids.forEach(function(id){ delete _gridEdits[id]; });   // keep failed drafts staged
+    _xlSaveDraftNow();   // clears the localStorage draft if everything saved, else re-saves what's left
     _bustWPCache();
     if (errs.length) AppNotify.error('Saved ' + (ok+added) + ', but ' + errs.length + ' failed.', {detail: errs.join('\n')});
     else {
