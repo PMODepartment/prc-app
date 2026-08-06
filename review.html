@@ -63,6 +63,17 @@
     .mactions .mx{background:transparent;color:var(--text-secondary)}
     /* ── Excel-like grid view ───────────────────────────────────────────── */
     .xl-wrap{border:1px solid var(--border-md);border-radius:var(--radius-md);overflow:auto;max-height:calc(100vh - 205px);background:var(--surface);position:relative}
+    /* #xl-wrap carries tabindex="0" (it's the grid's keyboard-event target) and the grid calls
+       wrap.focus() after EVERY cell click / editor commit. That matches dashboard.css's global
+       `[tabindex]:focus-visible` a11y ring, so clicking any cell drew a 2px red outline around
+       the ENTIRE scroll container — reported as "selecting a cell highlights the whole grid".
+       Chromium treats a programmatic .focus() on a tabindex container as focus-visible, so this
+       fired on plain mouse clicks, not just keyboard tabbing.
+       Suppressed ONLY while a cell is actually selected: `.xl-sel` already paints a 2px red
+       outline on the active cell, which is a more precise focus indicator than ringing the
+       whole container. The :has() guard keeps the container ring for the genuine edge case
+       (empty grid / no selected cell), so keyboard users are never left with no indicator. */
+    .xl-wrap:focus-visible:has(td.xl-sel){outline:none !important}
     /* table-layout:fixed is IGNORED when the width resolves via the auto algorithm —
        `width:max-content` did exactly that, so <col> widths were discarded and one long
        description stretched its column to thousands of px. renderGrid() sets an explicit
