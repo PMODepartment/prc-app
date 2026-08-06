@@ -341,7 +341,8 @@
               <div><kbd>Ctrl</kbd>+<kbd>D</kbd> or drag the corner handle to fill down · header <b>▾</b> sets a whole column at once</div>
               <div>Header <b>📌</b> freezes columns up to that point (click it again to unfreeze) · your choice is remembered</div>
               <div>Drag a column border to resize (double-click to reset). Edits are staged until you press <b>Save</b>.</div>
-              <div><b>Add WP</b> adds the number of blank rows in the box beside it (up to 100) at once.</div>
+              <div><b>Add WP</b> adds the number of blank rows in the box beside it (up to 100) at once — then <kbd>Tab</kbd>/<kbd>Enter</kbd> walks you straight through its required fields, skipping anything already filled in.</div>
+              <div>Dropdown cells (Trade, Works, Status…) let you <b>type to filter</b> instead of scrolling; pasted or typed text is matched to the real option regardless of case/spacing.</div>
               <div><b>Select all</b> → <b>Copy WPs</b>, then open another project's grid and <b>Paste WPs</b> to bring those work packages in as new rows.</div>
             </div>
           </details>
@@ -1024,7 +1025,9 @@
     return String(v);
   }
   // Editors give back strings; store the right JS type so the DB patch is clean.
-  function xlCoerce(raw, col){
+  // `ctx` (optional) is the row — or a partial row-shaped object with at least `.trade` —
+  // used to resolve dynOpts (Works/Type) option lists, since those vary per row.
+  function xlCoerce(raw, col, ctx){
     const s = String(raw==null?'':raw).trim();
     if (col.type==='bool'){
       if (s==='') return null;
@@ -1040,9 +1043,21 @@
       if (!isNaN(d.getTime())) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
       return null;
     }
-    if (col.type==='select' && col.opts){                      // accept any case/spacing from a paste
-      const hit = col.opts.find(o => o.toLowerCase() === s.toLowerCase());
-      return hit != null ? hit : s;
+    // Select-type columns — fixed option list OR per-row dynOpts (Works/Type, resolved off
+    // ctx.trade/ctx.works) — snap a pasted or typed value onto the real option ignoring case
+    // AND extra/collapsed whitespace, so it matches filters/reports instead of silently
+    // becoming an off-list value (this used to only handle case, and never touched dynOpts
+    // columns at all — a paste into Works/Type was never normalized).
+    if (col.type==='select'){
+      const opts = col.dynOpts==='works' ? _xlWorksOpts(ctx||{})
+                 : col.dynOpts==='type'  ? _xlTypeOpts(ctx||{})
+                 : (col.opts || null);
+      if (opts){
+        const norm = t => String(t==null?'':t).trim().toLowerCase().replace(/\s+/g,' ');
+        const target = norm(s);
+        const hit = opts.find(o => norm(o) === target);
+        return hit != null ? hit : s;
+      }
     }
     return s;
   }
@@ -1265,7 +1280,7 @@
       cells.forEach(function(v, i){
         const col = VC[i]; if (!col) return;
         if (col.ro || col.ph || col.k.charAt(0) === '_' || col.k === 'project_id') return;   // never write generated/derived
-        const cv = xlCoerce(v, col);                                    // reverse xlFmt: strip commas, %÷100, parse dates
+        const cv = xlCoerce(v, col, o);                                 // reverse xlFmt: strip commas, %÷100, parse dates; o.trade (if already pasted) resolves dynOpts
         if (cv !== null && cv !== '' && cv !== undefined) o[col.k] = cv;
       });
       return o;
@@ -1326,6 +1341,29 @@
   }
   function _xlRowMissing(w){
     return XL_COLS.filter(function(col){ return _xlMissing(w,col); }).map(function(col){ return col.label; });
+  }
+
+  /* Guided fill-in: find the next required-but-empty VISIBLE cell in row `r`, searching
+     from `fromC` in the given direction and wrapping within the row (never crosses rows —
+     "guided" is about not hunting across a wide row, not a whole-sheet jump). Only searches
+     VC (the visible columns), never XL_COLS directly — a required field hidden behind a
+     collapsed section can't be navigated to without first expanding it (see the VC coordinate
+     rule elsewhere in this file). Returns null if the row has no other missing required cell. */
+  function _xlNextRequiredEmptyInRow(r, fromC, forward){
+    const w = _gridRows[r]; if (!w) return null;
+    const m = VC.length;
+    for (let step=1; step<m; step++){
+      const cc = forward ? (fromC+step)%m : (fromC-step+m*1000)%m;
+      if (_xlMissing(w, VC[cc])) return cc;
+    }
+    return null;
+  }
+  // Tab's destination: the next required-empty cell in the row if there is one, else the
+  // plain adjacent column (normal Excel Tab) — so once a row is fully filled in, Tab goes
+  // back to ordinary one-cell-at-a-time movement.
+  function _xlTabTarget(r, c, forward){
+    const jumpC = _xlNextRequiredEmptyInRow(r, c, forward);
+    return jumpC != null ? { r:r, c:jumpC } : { r:r, c:c + (forward?1:-1) };
   }
 
   window.renderGrid = function(){
@@ -1550,7 +1588,7 @@
   function _xlSet(r, c, raw, undoBatch){
     const w = _gridRows[r], col = VC[c];
     if (!w || !col || !_xlEditable(w, col)) return false;
-    const val  = xlCoerce(raw, col);
+    const val  = xlCoerce(raw, col, w);
     const prev = xlVal(w, col.k);
     if ((prev==null?'':String(prev)) === (val==null?'':String(val))) return true;   // no-op
     const had = !!(_gridEdits[w.id] && Object.prototype.hasOwnProperty.call(_gridEdits[w.id], col.k));
@@ -1614,7 +1652,6 @@
     // text input if the user list hasn't loaded yet.
     const asUserSelect = col.users && _xlUsers.length;
     if (col.type === 'select' || col.type === 'bool' || asUserSelect){
-      ed = document.createElement('select');
       // Works/Type cascade off the row's Trade (dynOpts); user fields list the directory; others use col.opts.
       let opts = col.dynOpts==='works' ? _xlWorksOpts(w).slice()
                : col.dynOpts==='type'  ? _xlTypeOpts(w).slice()
@@ -1626,8 +1663,27 @@
       // value is NOT an off-list legacy value, it's just the un-labeled form of Yes/No, so
       // String(cur) ("true"/"false") must never be unshifted as a spurious 4th option.
       if (col.type!=='bool' && cur!=null && cur!=='' && opts.indexOf(String(cur))<0) opts.unshift(String(cur));   // keep legacy/off-list values
-      ed.innerHTML = opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o||'— none —')+'</option>'; }).join('');
-      ed.value = col.type==='bool' ? (cur===true?'Yes':cur===false?'No':'') : (cur==null ? '' : String(cur));
+      if (asUserSelect || col.type==='bool'){
+        // Native <select> — full option list visible on click. Deliberately NOT a datalist
+        // here: a datalist filters its suggestion popup to the current text, which hides
+        // everything when the stored value is an abbreviation not in the option list (e.g. a
+        // legacy "JVI" for a full name) — bool only has 2 real options anyway, no filtering to gain.
+        ed = document.createElement('select');
+        ed.innerHTML = opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o||'— none —')+'</option>'; }).join('');
+        ed.value = col.type==='bool' ? (cur===true?'Yes':cur===false?'No':'') : (cur==null ? '' : String(cur));
+      } else {
+        // Fixed-list or dynOpts (Works/Type) select column — a filterable text input backed by
+        // a <datalist> so a long option list (some trades' Works run to a dozen+ entries) can
+        // be narrowed by typing instead of scrolling a native dropdown. xlCoerce() snaps
+        // whatever's typed back onto the real option (case/whitespace-insensitive) on commit.
+        ed = document.createElement('input');
+        ed.type = 'text'; ed.autocomplete = 'off';
+        let dl = document.getElementById('xl-ed-datalist');
+        if (!dl){ dl = document.createElement('datalist'); dl.id = 'xl-ed-datalist'; document.body.appendChild(dl); }
+        dl.innerHTML = opts.filter(function(o){ return o!==''; }).map(function(o){ return '<option value="'+esc(o)+'">'; }).join('');
+        ed.setAttribute('list', 'xl-ed-datalist');
+        ed.value = cur==null ? '' : String(cur);
+      }
     } else {
       ed = document.createElement('input');
       ed.type = col.type==='date' ? 'date' : 'text';
@@ -1652,14 +1708,25 @@
       const v = ed.value;
       if (ed.parentNode) ed.parentNode.removeChild(ed);
       if (commit){ const b=[]; _xlSet(r,c,v,b); if(b.length) _xlUndo.push(b); }
-      if (move==='down')  _xlSelect(r+1, c);
-      if (move==='right') _xlSelect(r, c+1);
+      if (move==='right' || move==='left'){
+        const dest = _xlTabTarget(r, c, move==='right');
+        _xlSelect(dest.r, dest.c);
+      } else if (move==='down'){
+        // Guided fill-in, but ONLY for a freshly added draft row (w.__new) — Enter jumps to
+        // the next required-empty cell in this row until it's complete, then falls back to a
+        // plain move down. Deliberately NOT applied to ordinary (saved) rows: Enter-down a
+        // single column across many existing rows is an established bulk-edit pattern (e.g.
+        // fixing one field on 30 incomplete rows) that this would otherwise hijack sideways
+        // every time that row still has some OTHER missing required field.
+        const jumpC = w.__new ? _xlNextRequiredEmptyInRow(r, c, true) : null;
+        if (jumpC != null) _xlSelect(r, jumpC); else _xlSelect(r+1, c);
+      }
       _xlSyncFill();                     // restore the fill handle after the editor closes
       const wr2 = document.getElementById('xl-wrap'); if(wr2) wr2.focus();
     };
     ed.addEventListener('keydown', function(e){
       if (e.key==='Enter'){ e.preventDefault(); finish(true,'down'); }
-      else if (e.key==='Tab'){ e.preventDefault(); finish(true,'right'); }
+      else if (e.key==='Tab'){ e.preventDefault(); finish(true, e.shiftKey?'left':'right'); }
       else if (e.key==='Escape'){ e.preventDefault(); finish(false); }
       e.stopPropagation();
     });
@@ -1847,7 +1914,7 @@
       } else { _xlAnchor=null; _xlPaintRange(); _xlSelect(dest.r, dest.c); }
       return;
     }
-    if (e.key==='Tab'){ e.preventDefault(); _xlAnchor=null; _xlPaintRange(); _xlSelect(r, c + (e.shiftKey?-1:1)); return; }
+    if (e.key==='Tab'){ e.preventDefault(); const dest=_xlTabTarget(r,c,!e.shiftKey); _xlAnchor=null; _xlPaintRange(); _xlSelect(dest.r, dest.c); return; }
     if (e.key==='Enter'||e.key==='F2'){ e.preventDefault(); _xlBeginEdit(); return; }
     if (e.key==='Delete'||e.key==='Backspace'){
       e.preventDefault();
