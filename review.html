@@ -62,7 +62,7 @@
     .mactions .mc{background:var(--red-400,#EE3124);color:#fff;border-color:var(--red-400,#EE3124)}
     .mactions .mx{background:transparent;color:var(--text-secondary)}
     /* ── Excel-like grid view ───────────────────────────────────────────── */
-    .xl-wrap{border:1px solid var(--border-md);border-radius:var(--radius-md);overflow:auto;max-height:calc(100vh - 215px);background:var(--surface);position:relative}
+    .xl-wrap{border:1px solid var(--border-md);border-radius:var(--radius-md);overflow:auto;max-height:calc(100vh - 205px);background:var(--surface);position:relative}
     /* table-layout:fixed is IGNORED when the width resolves via the auto algorithm —
        `width:max-content` did exactly that, so <col> widths were discarded and one long
        description stretched its column to thousands of px. renderGrid() sets an explicit
@@ -149,7 +149,17 @@
     #xl-colmenu .xl-cm-row{display:flex;gap:6px;margin-bottom:4px}
     #xl-colmenu .xl-cm-in{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border-md);border-radius:6px;background:var(--surface);color:var(--text-primary);font-family:inherit;font-size:0.8571rem;outline:none}
     #xl-colmenu .xl-cm-apply{padding:6px 12px;border:none;border-radius:6px;background:#EE3124;color:#fff;font-weight:600;cursor:pointer;font-family:inherit;font-size:0.8571rem}
-    .xl-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+    /* Two explicit groups instead of one long flat flex-wrap list — a single wide row of ~20
+       items wrapped UNPREDICTABLY (sometimes splitting mid-group across 3 ragged lines
+       depending on viewport width, which read as "broken" rather than intentional). Grouping
+       into left (main tools) / right (counts + Discard/Save) means there are only ever two
+       possible outcomes: both groups share one row (right pinned via margin-left:auto, filling
+       what would otherwise be dead trailing space), or — once too narrow — the right group
+       wraps as a single unit onto its own row while the left group wraps its OWN children
+       independently. Never a 3-way ragged split. */
+    .xl-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-bottom:8px}
+    .xl-bar-left{display:flex;align-items:center;flex-wrap:wrap;gap:8px;flex:1 1 auto;min-width:0}
+    .xl-bar-right{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
     .xl-btn{font-size:0.7857rem;padding:6px 13px;border-radius:7px;border:1.5px solid var(--border-md);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px;transition:background .12s,border-color .12s,color .12s}
     .xl-btn .ti{font-size:0.9286rem}
     .xl-btn.primary{background:#EE3124;border-color:#EE3124;color:#fff}
@@ -315,35 +325,38 @@
         <!-- ══ EXCEL-LIKE GRID VIEW ══ -->
         <div id="grid-view">
           <div class="xl-bar">
-            <button class="xl-btn primary" onclick="xlAddRow()" title="Add blank work-package rows directly in the grid (uses the count on the right)"><i class="ti ti-plus"></i> Add WP</button>
-            <input type="number" id="xl-add-count" min="1" max="100" value="1" title="How many blank rows to add at once" style="width:52px;font-size:0.7857rem;padding:5px 6px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);text-align:center">
-            <select id="xl-new-proj" style="display:none;font-size:0.7857rem;padding:5px 8px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);cursor:pointer" title="Project the new work package belongs to"></select>
-            <span class="xl-sep"></span>
-            <button class="xl-btn" onclick="xlSelectAllCells()" title="Select every cell in the grid (Ctrl+A)"><i class="ti ti-box-multiple"></i> Select all</button>
-            <button class="xl-btn" onclick="xlCopyWPs()" title="Copy the selected work packages — then open another project's grid and click Paste WPs to add them there"><i class="ti ti-copy"></i> Copy WPs</button>
-            <button class="xl-btn" id="xl-paste-wps" onclick="xlPasteWPs()" title="Add the copied work packages as new rows in this project"><i class="ti ti-clipboard-plus"></i> Paste WPs</button>
-            <span id="xl-count" class="xl-hint"></span>
-            <span id="xl-sel-info" class="xl-hint" style="display:none;font-weight:700;color:#EE3124"></span>
-            <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer">
-              <input type="checkbox" id="xl-only-missing" onchange="renderGrid()" style="cursor:pointer"> Only incomplete
-            </label>
-            <span class="xl-legend-box" title="What the cell colours mean — red: a required field left blank · amber: an edit you haven't saved yet">
-              <span class="xl-legend"><span class="xl-swatch" style="background:#FDECEA;box-shadow:inset 3px 0 0 #EE3124"></span>required, empty</span>
-              <span class="xl-legend"><span class="xl-swatch" style="background:#FFF6DA;border-color:#E0B94D"></span>unsaved</span>
-            </span>
-            <span class="xl-sep"></span>
-            <span class="xl-hint">Sections:</span>
-            <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(false)" title="Show every WP-form section">Expand all</button>
-            <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(true)" title="Collapse every section to the key columns">Collapse all</button>
-            <button class="xl-btn xl-btn-mini" onclick="xlResetWidths()" title="Restore every column to its default width">Reset widths</button>
-            <span style="flex:1"></span>
-            <span id="xl-missing-count" class="xl-hint" style="color:#B45309;font-weight:700;display:none"></span>
-            <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
-            <span id="xl-autosave-indicator" class="xl-hint" style="display:none;color:var(--text-hint)"><i class="ti ti-device-floppy"></i> <span id="xl-autosave-indicator-text"></span></span>
-            <span class="xl-actions">
-              <button id="xl-discard" class="xl-btn ghost" onclick="gridDiscard()" disabled title="Throw away all unsaved grid edits"><i class="ti ti-arrow-back-up"></i> Discard</button>
-              <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled title="Save all staged edits to the database"><i class="ti ti-device-floppy"></i> <span id="xl-save-lbl">Save changes</span></button>
-            </span>
+            <div class="xl-bar-left">
+              <button class="xl-btn primary" onclick="xlAddRow()" title="Add blank work-package rows directly in the grid (uses the count on the right)"><i class="ti ti-plus"></i> Add WP</button>
+              <input type="number" id="xl-add-count" min="1" max="100" value="1" title="How many blank rows to add at once" style="width:52px;font-size:0.7857rem;padding:5px 6px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);text-align:center">
+              <select id="xl-new-proj" style="display:none;font-size:0.7857rem;padding:5px 8px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);cursor:pointer" title="Project the new work package belongs to"></select>
+              <span class="xl-sep"></span>
+              <button class="xl-btn" onclick="xlSelectAllCells()" title="Select every cell in the grid (Ctrl+A)"><i class="ti ti-box-multiple"></i> Select all</button>
+              <button class="xl-btn" onclick="xlCopyWPs()" title="Copy the selected work packages — then open another project's grid and click Paste WPs to add them there"><i class="ti ti-copy"></i> Copy WPs</button>
+              <button class="xl-btn" id="xl-paste-wps" onclick="xlPasteWPs()" title="Add the copied work packages as new rows in this project"><i class="ti ti-clipboard-plus"></i> Paste WPs</button>
+              <span id="xl-count" class="xl-hint"></span>
+              <span id="xl-sel-info" class="xl-hint" style="display:none;font-weight:700;color:#EE3124"></span>
+              <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer">
+                <input type="checkbox" id="xl-only-missing" onchange="renderGrid()" style="cursor:pointer"> Only incomplete
+              </label>
+              <span class="xl-legend-box" title="What the cell colours mean — red: a required field left blank · amber: an edit you haven't saved yet">
+                <span class="xl-legend"><span class="xl-swatch" style="background:#FDECEA;box-shadow:inset 3px 0 0 #EE3124"></span>required, empty</span>
+                <span class="xl-legend"><span class="xl-swatch" style="background:#FFF6DA;border-color:#E0B94D"></span>unsaved</span>
+              </span>
+              <span class="xl-sep"></span>
+              <span class="xl-hint">Sections:</span>
+              <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(false)" title="Show every WP-form section">Expand all</button>
+              <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(true)" title="Collapse every section to the key columns">Collapse all</button>
+              <button class="xl-btn xl-btn-mini" onclick="xlResetWidths()" title="Restore every column to its default width">Reset widths</button>
+            </div>
+            <div class="xl-bar-right">
+              <span id="xl-missing-count" class="xl-hint" style="color:#B45309;font-weight:700;display:none"></span>
+              <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
+              <span id="xl-autosave-indicator" class="xl-hint" style="display:none;color:var(--text-hint)"><i class="ti ti-device-floppy"></i> <span id="xl-autosave-indicator-text"></span></span>
+              <span class="xl-actions">
+                <button id="xl-discard" class="xl-btn ghost" onclick="gridDiscard()" disabled title="Throw away all unsaved grid edits"><i class="ti ti-arrow-back-up"></i> Discard</button>
+                <button id="xl-save" class="xl-btn primary" onclick="gridSave()" disabled title="Save all staged edits to the database"><i class="ti ti-device-floppy"></i> <span id="xl-save-lbl">Save changes</span></button>
+              </span>
+            </div>
           </div>
           <details class="xl-help">
             <summary><i class="ti ti-keyboard" aria-hidden="true"></i> How to use this grid <span class="xl-help-hint">— works like Excel</span></summary>
