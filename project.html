@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260806b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260806b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260806b"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260806b"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260806b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260807a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260807a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260807a"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260807a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260807a"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260803a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260806b"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260807a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260806b"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260807a"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -222,36 +222,43 @@
       </div>
 
       <div id="main-content" style="display:none">
-        <!-- Power BI style view tabs -->
-        <div class="view-tabs" id="view-tabs">
-          <button class="view-tab active" data-view="overview" onclick="switchView('overview')">
-            <i class="ti ti-layout-dashboard"></i>Overview
-          </button>
-          <button class="view-tab" data-view="backlog" onclick="switchView('backlog')">
-            <i class="ti ti-clock"></i>Backlog
-          </button>
-          <button class="view-tab" data-view="table" onclick="switchView('table')">
-            <i class="ti ti-table"></i>WP List
-          </button>
-          <button class="view-tab" data-view="claims-register" onclick="switchView('claims-register')" style="display:none">
-            <i class="ti ti-file-invoice"></i>Claims &amp; Change Orders
-            <span class="tbadge" id="claims-tab-badge" style="display:none;background:#D97706">0</span>
-          </button>
-        </div>
-
-        <!-- ══ OVERVIEW VIEW ══ -->
-        <div id="view-overview">
-          <div id="gs-checklist"></div>
+        <!-- Power BI style view tabs, with the Charging Scope switcher pinned to the right end
+             of the SAME row (2026-08-07, per user request — was its own row inside the Overview
+             tab, now seamless with the Overview/Backlog/WP List tabs). The switch lives here at
+             the top level (outside the per-view #view-* containers) so it can share the row;
+             its own visibility is still Overview-only + "only if this project has COs" — driven
+             by _syncOvChargingVisibility(), called from switchView() and _syncOvCharging(). -->
+        <div id="view-tabs-row" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+          <div class="view-tabs" id="view-tabs" style="flex:1;min-width:0;margin-bottom:0">
+            <button class="view-tab active" data-view="overview" onclick="switchView('overview')">
+              <i class="ti ti-layout-dashboard"></i>Overview
+            </button>
+            <button class="view-tab" data-view="backlog" onclick="switchView('backlog')">
+              <i class="ti ti-clock"></i>Backlog
+            </button>
+            <button class="view-tab" data-view="table" onclick="switchView('table')">
+              <i class="ti ti-table"></i>WP List
+            </button>
+            <button class="view-tab" data-view="claims-register" onclick="switchView('claims-register')" style="display:none">
+              <i class="ti ti-file-invoice"></i>Claims &amp; Change Orders
+              <span class="tbadge" id="claims-tab-badge" style="display:none;background:#D97706">0</span>
+            </button>
+          </div>
           <!-- Charging scope switcher — Overview tab only (Combined / Main Contract / Change Order) -->
-          <div id="ov-charging-switch" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-            <span style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888">Charging Scope</span>
+          <div id="ov-charging-switch" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0">
+            <span style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;white-space:nowrap">Charging Scope</span>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
               <button id="ov-ch-all" onclick="setOvCharging('all')" class="ov-ch-btn">Combined</button>
               <button id="ov-ch-main" onclick="setOvCharging('main')" class="ov-ch-btn">Main Contract</button>
               <button id="ov-ch-co" onclick="setOvCharging('co')" class="ov-ch-btn">Change Order</button>
             </div>
-            <span id="ov-ch-count" style="font-size:0.7143rem;color:#999"></span>
+            <span id="ov-ch-count" style="font-size:0.7143rem;color:#999;white-space:nowrap"></span>
           </div>
+        </div>
+
+        <!-- ══ OVERVIEW VIEW ══ -->
+        <div id="view-overview">
+          <div id="gs-checklist"></div>
           <!-- Budget baseline (BCB0…BCB3). Hidden unless the project actually has revisions. -->
           <div id="ov-bcb-switch" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
             <span style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888">Budget Baseline</span>
@@ -515,16 +522,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260806b"></script>
-<script src="assets/js/ui.js?v=20260806b"></script>
-<script src="assets/js/db.js?v=20260806b"></script>
-<script src="assets/js/onboarding.js?v=20260806b"></script>
-<script src="assets/js/coachmarks.js?v=20260806b"></script>
+<script src="assets/js/auth.js?v=20260807a"></script>
+<script src="assets/js/ui.js?v=20260807a"></script>
+<script src="assets/js/db.js?v=20260807a"></script>
+<script src="assets/js/onboarding.js?v=20260807a"></script>
+<script src="assets/js/coachmarks.js?v=20260807a"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260803a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260806b"></script>
+<script src="assets/js/charts.js?v=20260807a"></script>
 <script>
 
   // Segmented toggle state — swaps a class instead of rewriting cssText.
@@ -911,6 +918,7 @@ function switchView(v) {
     const el = document.getElementById('view-'+id);
     if(el) el.style.display = id === v ? '' : 'none';
   });
+  _syncOvChargingVisibility();
   // backwards compat: old ?tab=claims / ?tab=change-orders both show the combined register
   if (v === 'claims' || v === 'change-orders') {
     const el = document.getElementById('view-claims-register');
@@ -1400,7 +1408,17 @@ window.setBcbBaseline = function(level){
 // ── Overview charging-scope switcher (Combined / Main Contract / Change Order) ──
 // Scoped to the Overview tab ONLY — Backlog / WP List / Status Tracker are unaffected.
 // A blank charging_type counts as Main Contract (the Excel importer defaults every WP to it).
+// Lives in the view-tabs row (2026-08-07), outside the per-view containers, so its visibility
+// is driven manually rather than by the tab-switch show/hide loop — see _syncOvChargingVisibility.
 let _ovCharging = 'all';
+let _ovHasCO = false;
+function _syncOvChargingVisibility(){
+  // Viewers get the single-page stacked layout (no #view-tabs, currentView pinned to 'table'
+  // for the WP-List filter handlers) — the Overview section is always on-screen there, so treat
+  // that the same as "on the Overview tab" rather than hiding the switch permanently for them.
+  const bar = document.getElementById('ov-charging-switch');
+  if(bar) bar.style.display = (_ovHasCO && (currentView==='overview' || window.__isViewer)) ? 'flex' : 'none';
+}
 function _isCO(w){ return /change\s*order/i.test(w.charging_type||''); }
 function ovWPs(){
   const all = (typeof allWPs !== 'undefined' && allWPs) ? allWPs : [];
@@ -1424,10 +1442,9 @@ function setOvCharging(mode){
 // switcher entirely on projects that have no Change Orders (nothing to split).
 function _syncOvCharging(){
   const all = (typeof allWPs!=='undefined'&&allWPs)?allWPs:[];
-  const hasCO = all.some(_isCO);
-  const bar = document.getElementById('ov-charging-switch');
-  if(bar) bar.style.display = hasCO ? 'flex' : 'none';
-  if(!hasCO) _ovCharging = 'all';
+  _ovHasCO = all.some(_isCO);
+  _syncOvChargingVisibility();
+  if(!_ovHasCO) _ovCharging = 'all';
   setOvCharging(_ovCharging);
 }
 
