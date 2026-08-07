@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260806a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260806a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260806a"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260806a"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260806a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260806b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260806b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260806b"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260806b"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260806b"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260803a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260806a"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260806b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260806a"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260806b"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -147,6 +147,16 @@
               <i class="ti ti-chevron-down" id="proj-filter-chevron" style="font-size:0.8571rem;margin-left:8px;color:#aaa;transition:transform .2s"></i>
             </button>
             <div id="proj-filter-panel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.1);min-width:300px;max-width:90vw;overflow:hidden">
+              <!-- Group Head picker. Unlike a display-only filter this REPLACES the project
+                   selection (_activeIds) with that head's projects, so every chart, KPI and
+                   table on the page re-renders scoped to that Group Head. -->
+              <div style="padding:10px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px">
+                <span style="font-size:0.7857rem;font-weight:600;color:#888;white-space:nowrap"><i class="ti ti-users" style="font-size:0.9286rem;vertical-align:middle;margin-right:4px"></i>Group Head</span>
+                <select id="pf-gh" onchange="setFilterGroupHead(this.value)"
+                  style="flex:1;min-width:0;padding:6px 8px;border:1.5px solid #e5e5e5;border-radius:6px;font-size:0.8571rem;font-family:inherit;outline:none;background:var(--surface,#fff)">
+                  <option value="all">All Group Heads</option>
+                </select>
+              </div>
               <div style="padding:10px 12px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px">
                 <div style="position:relative;flex:1">
                   <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#bbb;font-size:0.8571rem;pointer-events:none"></i>
@@ -241,15 +251,13 @@
             <button id="btn-view-cards" onclick="setProjectView('cards')" class="btn" style="background:#231F20;color:#fff;border-color:#231F20"><i class="ti ti-layout-grid"></i><span class="hide-mobile"> Cards</span></button>
             <button id="btn-view-table" onclick="setProjectView('table')" class="btn"><i class="ti ti-table"></i><span class="hide-mobile"> Table</span></button>
             <span id="proj-count-label" style="font-size:0.7857rem;color:#888;margin-left:4px"></span>
-            <!-- Group Head controls (2026-08-06). Shared by BOTH the Cards and Table views —
-                 renderProjectCards() and renderProjectTable() run the same _projRows() pipeline,
-                 so a change here only needs wiring in one place. -->
+            <!-- Group Head sort/group controls (2026-08-06). The FILTER by Group Head now lives
+                 in the project-selection dropdown (#pf-gh, topbar) instead of here — picking a
+                 head there swaps _activeIds so it scopes every chart/KPI on the page, not just
+                 this cards/table block. Sort + Group-by stay local display controls, shared by
+                 BOTH the Cards and Table views via the one _projRows() pipeline below. -->
             <span style="flex:1"></span>
             <span class="proj-gh-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <select id="proj-gh-filter" onchange="onProjGhChange()" title="Filter projects by Group Head"
-                style="padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:var(--surface,#fff)">
-                <option value="all">All Group Heads</option>
-              </select>
               <select id="proj-sort" onchange="onProjGhChange()" title="Sort projects"
                 style="padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:var(--surface,#fff)">
                 <option value="id">Sort: Code</option>
@@ -673,16 +681,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260806a"></script>
-<script src="assets/js/db.js?v=20260806a"></script>
-<script src="assets/js/ui.js?v=20260806a"></script>
-<script src="assets/js/onboarding.js?v=20260806a"></script>
-<script src="assets/js/coachmarks.js?v=20260806a"></script>
+<script src="assets/js/auth.js?v=20260806b"></script>
+<script src="assets/js/db.js?v=20260806b"></script>
+<script src="assets/js/ui.js?v=20260806b"></script>
+<script src="assets/js/onboarding.js?v=20260806b"></script>
+<script src="assets/js/coachmarks.js?v=20260806b"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260803a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260806a"></script>
+<script src="assets/js/charts.js?v=20260806b"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -2876,7 +2884,6 @@
       const countLabel = document.getElementById('proj-count-label');
       if (countLabel) countLabel.textContent = filt.filter(p=>p.status!=='archived').length + ' active project(s)';
       _tableData = filt.map((p,i)=>({p, s:allStats[i]}));
-      _syncGhFilterOptions();
       renderProjectCards();
       if (document.getElementById('project-table-wrap')?.style.display !== 'none') renderProjectTable();
 
@@ -3081,21 +3088,20 @@
       rate:    (a,b)=> (b.rate-a.rate)       || a.id.localeCompare(b.id),
       budget:  (a,b)=> ((b.budget||0)-(a.budget||0)) || a.id.localeCompare(b.id),
     };
-    const _ghVal   = () => document.getElementById('proj-gh-filter')?.value || 'all';
     const _ghSort  = () => document.getElementById('proj-sort')?.value || 'id';
     const _ghGroup = () => !!document.getElementById('proj-gh-group')?.checked;
 
-    // Rows for the CURRENT project selection, Group-Head-filtered and sorted.
+    // Rows for the CURRENT project selection (_tableData, already scoped by _activeIds /
+    // the #pf-gh project-filter picker), sorted per #proj-sort / grouped per #proj-gh-group.
+    // No Group-Head filtering happens here any more — that's done upstream by picking a head
+    // in the project-selection dropdown, which changes _activeIds itself (see setFilterGroupHead).
     function _projRows() {
-      const gh = _ghVal();
       let rows = _tableData.map(({p,s})=>({
         id: p.id, name: p.name||p.id, location: p.location||'', status: p.status||'active',
         gh: p.group_head||'',
         wps: s.total, awarded: s.awarded, rate: s.awardRate,
         budget: s.totalBudget, p, s
       }));
-      // 'Unassigned' is the sentinel for a blank/NULL group_head (matches ghLabel()).
-      if (gh !== 'all') rows = rows.filter(r => ghLabel(r.gh) === gh);
       // When grouping, always order by Group Head FIRST so a group's rows stay contiguous;
       // the chosen sort then orders within each group.
       const cmp = _GH_SORTS[_ghSort()] || _GH_SORTS.id;
@@ -3103,31 +3109,19 @@
       return rows;
     }
 
-    // Rebuild the Group Head filter's options from the projects actually present
-    // (roster order first, then any off-roster legacy value, then Unassigned if any).
-    function _syncGhFilterOptions() {
-      const sel = document.getElementById('proj-gh-filter');
-      if (!sel) return;
-      const present = new Set(_tableData.map(({p}) => ghLabel(p.group_head)));
-      const opts = (window.GROUP_HEADS||[]).filter(g => present.has(g));
-      [...present].forEach(g => { if (g !== GH_UNASSIGNED && !opts.includes(g)) opts.push(g); });
-      if (present.has(GH_UNASSIGNED)) opts.push(GH_UNASSIGNED);
-      const cur = sel.value || 'all';
-      sel.innerHTML = '<option value="all">All Group Heads</option>' +
-        opts.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
-      // Keep the selection if it still exists, else fall back to All.
-      sel.value = opts.includes(cur) ? cur : 'all';
-    }
-
     window.onProjGhChange = function() {
       renderProjectCards();
       if (document.getElementById('project-table-wrap')?.style.display !== 'none') renderProjectTable();
     };
 
-    // Group-header row for the project table / a divider for the cards grid.
+    // Group-header row for the project table / a divider for the cards grid. Deliberately NOT
+    // a solid-red pill (2026-08-06, per user feedback: "no red overlay behind the Group Head
+    // tag") — red is reserved for the project-code pill elsewhere in this app; a full-red label
+    // here read as louder than intended. Uses a light tinted chip with a red LEFT BORDER accent
+    // instead — same restrained treatment as the app's other section/group headers.
     function _ghHeadCells(label, count, nCols) {
       return `<tr class="gh-group-row"><td colspan="${nCols}" style="background:#f0f0f0;padding:6px 10px">
-        <span style="font-size:0.7143rem;font-weight:700;background:#EE3124;color:#fff;padding:2px 8px;border-radius:4px">${esc(label)}</span>
+        <span style="font-size:0.7143rem;font-weight:700;color:#231F20;background:var(--mw-red-light,#FDECEA);border-left:3px solid var(--mw-red);padding:2px 8px;border-radius:4px">${esc(label)}</span>
         <span style="font-size:0.7143rem;color:#888;margin-left:8px">${count} project${count===1?'':'s'}</span>
       </td></tr>`;
     }
@@ -3162,7 +3156,7 @@
             last = g;
             const n = active.filter(x=>ghLabel(x.gh)===g).length;
             html += `<div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;margin:6px 0 2px">
-              <span style="font-size:0.7143rem;font-weight:700;background:#EE3124;color:#fff;padding:2px 8px;border-radius:4px">${esc(g)}</span>
+              <span style="font-size:0.7143rem;font-weight:700;color:#231F20;background:var(--mw-red-light,#FDECEA);border-left:3px solid var(--mw-red);padding:2px 8px;border-radius:4px">${esc(g)}</span>
               <span style="font-size:0.7143rem;color:#888">${n} project${n===1?'':'s'}</span>
               <span style="flex:1;height:1px;background:var(--border,#eee)"></span>
             </div>`;
@@ -3253,18 +3247,52 @@
         box.style.background  = on ? 'var(--mw-red)' : '#fff';
         box.innerHTML = on ? '<i class="ti ti-check" style="font-size:0.7143rem;color:#fff"></i>' : '';
       }
+      // A manual pill toggle can break the picked head's set (e.g. adding one extra project),
+      // so drop the picker back to "all" rather than have it silently misrepresent the selection.
+      const ghSel = document.getElementById('pf-gh');
+      if (ghSel) ghSel.value = 'all';
       updateFilterLabel();
       renderAll(); // immediate update — no Apply button needed
     };
 
     window.selectAllPills = function() {
       permitted.forEach(p => _activeIds.add(p.id));
+      document.getElementById('pf-gh') && (document.getElementById('pf-gh').value = 'all');
       updateFilterLabel(); renderFilterList(); renderAll();
     };
     window.clearPills = function() {
       _activeIds = new Set();
+      document.getElementById('pf-gh') && (document.getElementById('pf-gh').value = 'all');
       updateFilterLabel(); renderFilterList(); renderAll();
     };
+
+    // Group Head picker inside the project filter (2026-08-06). Picking a head REPLACES the
+    // project selection with exactly that head's (non-archived) projects — this is what makes
+    // every chart/KPI/table on the page filter by Group Head, since they all read _activeIds.
+    // 'all' restores the normal default selection (every non-archived permitted project).
+    window.setFilterGroupHead = function(gh) {
+      if (gh === 'all') {
+        _activeIds = new Set(permitted.filter(p => p.status !== 'archived').map(p => p.id));
+      } else {
+        _activeIds = new Set(permitted.filter(p => p.status !== 'archived' && ghLabel(p.group_head) === gh).map(p => p.id));
+      }
+      updateFilterLabel(); renderFilterList(); renderAll();
+    };
+
+    // Rebuild the picker's options from the heads actually present among `permitted`
+    // (roster order, then any off-roster legacy value, then Unassigned if any).
+    function _syncPfGhOptions() {
+      const sel = document.getElementById('pf-gh');
+      if (!sel) return;
+      const present = new Set(permitted.filter(p=>p.status!=='archived').map(p => ghLabel(p.group_head)));
+      const opts = (window.GROUP_HEADS||[]).filter(g => present.has(g));
+      [...present].forEach(g => { if (g !== GH_UNASSIGNED && !opts.includes(g)) opts.push(g); });
+      if (present.has(GH_UNASSIGNED)) opts.push(GH_UNASSIGNED);
+      const cur = sel.value || 'all';
+      sel.innerHTML = '<option value="all">All Group Heads</option>' +
+        opts.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
+      sel.value = opts.includes(cur) ? cur : 'all';
+    }
 
     function closeProjFilter() {
       const panel   = document.getElementById('proj-filter-panel');
@@ -3344,6 +3372,7 @@
       }).join('');
     }
 
+    _syncPfGhOptions();
     renderFilterList();
     updateFilterLabel();
     renderAll();
