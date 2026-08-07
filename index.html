@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260807b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260807b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260807b"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260807b"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260807b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260807c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260807c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260807c"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260807c"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260807c"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260803a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260807b"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260807c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260807b"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260807c"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -251,13 +251,20 @@
             <button id="btn-view-cards" onclick="setProjectView('cards')" class="btn" style="background:#231F20;color:#fff;border-color:#231F20"><i class="ti ti-layout-grid"></i><span class="hide-mobile"> Cards</span></button>
             <button id="btn-view-table" onclick="setProjectView('table')" class="btn"><i class="ti ti-table"></i><span class="hide-mobile"> Table</span></button>
             <span id="proj-count-label" style="font-size:0.7857rem;color:#888;margin-left:4px"></span>
-            <!-- Group Head sort/group controls (2026-08-06). The FILTER by Group Head now lives
-                 in the project-selection dropdown (#pf-gh, topbar) instead of here — picking a
-                 head there swaps _activeIds so it scopes every chart/KPI on the page, not just
-                 this cards/table block. Sort + Group-by stay local display controls, shared by
-                 BOTH the Cards and Table views via the one _projRows() pipeline below. -->
+            <!-- Group Head sort/group controls (2026-08-06), joined by Search + Status
+                 (2026-08-07, moved here from the Table-only panel header so they sit beside
+                 Sort and apply to BOTH the Cards and Table views via the one _projRows()
+                 pipeline below — see _projSearchVal()/_projStatusVal()). The FILTER by Group
+                 Head itself lives in the project-selection dropdown (#pf-gh, topbar) instead of
+                 here — picking a head there swaps _activeIds so it scopes every chart/KPI on
+                 the page, not just this cards/table block. -->
             <span style="flex:1"></span>
             <span class="proj-gh-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <input id="proj-table-search" type="text" placeholder="Search projects…" oninput="dbnc('pt',onProjGhChange)" style="padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;outline:none;background:var(--surface,#fff);width:180px">
+              <select id="proj-table-status" onchange="onProjGhChange()" title="Filter by status"
+                style="padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:var(--surface,#fff)">
+                <option value="all">All statuses</option><option value="active">Active</option><option value="archived">Archived</option>
+              </select>
               <select id="proj-sort" onchange="onProjGhChange()" title="Sort projects"
                 style="padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:var(--surface,#fff)">
                 <option value="id">Sort: Code</option>
@@ -269,19 +276,13 @@
                 <option value="budget" class="gh-budget-opt">Sort: Budget</option>
               </select>
               <label style="display:flex;align-items:center;gap:5px;font-size:0.8571rem;color:#888;cursor:pointer;white-space:nowrap">
-                <input type="checkbox" id="proj-gh-group" onchange="onProjGhChange()" style="cursor:pointer"> Group by Group Head
+                <input type="checkbox" id="proj-gh-group" checked onchange="onProjGhChange()" style="cursor:pointer"> Group by Group Head
               </label>
             </span>
           </div>
           <div class="project-cards" id="project-cards"></div>
           <div id="project-table-wrap" style="display:none;margin-bottom:14px">
             <div class="panel" style="padding:0;overflow:hidden">
-              <div style="padding:10px 14px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                <input id="proj-table-search" type="text" placeholder="Search projects…" oninput="dbnc('pt',filterProjectTable)" style="padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;outline:none;width:200px">
-                <select id="proj-table-status" onchange="filterProjectTable()" style="padding:7px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;background:#fff">
-                  <option value="all">All statuses</option><option value="active">Active</option><option value="archived">Archived</option>
-                </select>
-              </div>
               <div style="overflow-x:auto">
                 <table class="data-table" id="proj-data-table" style="font-size:0.8571rem">
                   <thead><tr>
@@ -681,16 +682,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260807b"></script>
-<script src="assets/js/db.js?v=20260807b"></script>
-<script src="assets/js/ui.js?v=20260807b"></script>
-<script src="assets/js/onboarding.js?v=20260807b"></script>
-<script src="assets/js/coachmarks.js?v=20260807b"></script>
+<script src="assets/js/auth.js?v=20260807c"></script>
+<script src="assets/js/db.js?v=20260807c"></script>
+<script src="assets/js/ui.js?v=20260807c"></script>
+<script src="assets/js/onboarding.js?v=20260807c"></script>
+<script src="assets/js/coachmarks.js?v=20260807c"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260803a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260807b"></script>
+<script src="assets/js/charts.js?v=20260807c"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -3072,8 +3073,6 @@
       }
     };
 
-    window.filterProjectTable = function() { renderProjectTable(); };
-
     /* ── Group Head: shared filter / sort / group pipeline ──────────────
        ONE row shape + ONE filter+sort pass feeds BOTH the project Cards and the
        project Table, so the Group Head filter, the Sort select and the "Group by
@@ -3090,11 +3089,19 @@
     };
     const _ghSort  = () => document.getElementById('proj-sort')?.value || 'id';
     const _ghGroup = () => !!document.getElementById('proj-gh-group')?.checked;
+    const _projSearchVal = () => (document.getElementById('proj-table-search')?.value||'').toLowerCase();
+    const _projStatusVal = () => document.getElementById('proj-table-status')?.value||'all';
 
     // Rows for the CURRENT project selection (_tableData, already scoped by _activeIds /
-    // the #pf-gh project-filter picker), sorted per #proj-sort / grouped per #proj-gh-group.
-    // No Group-Head filtering happens here any more — that's done upstream by picking a head
-    // in the project-selection dropdown, which changes _activeIds itself (see setFilterGroupHead).
+    // the #pf-gh project-filter picker), search/status-filtered, sorted per #proj-sort /
+    // grouped per #proj-gh-group. Search + status now live in the shared toolbar (2026-08-07,
+    // moved beside Sort) so they apply to BOTH Cards and Table — same "ONE filter+sort pass"
+    // pipeline as the rest of this block. renderProjectCards()'s own active-vs-archived split
+    // still works unchanged: filtering to status='archived' just leaves its "active" bucket
+    // empty and its "Archived (N)" section holding everything, same as picking 'archived' used
+    // to do for the table alone. No Group-Head filtering happens here — that's done upstream by
+    // picking a head in the project-selection dropdown, which changes _activeIds itself (see
+    // setFilterGroupHead).
     function _projRows() {
       let rows = _tableData.map(({p,s})=>({
         id: p.id, name: p.name||p.id, location: p.location||'', status: p.status||'active',
@@ -3102,6 +3109,10 @@
         wps: s.total, awarded: s.awarded, rate: s.awardRate,
         budget: s.totalBudget, p, s
       }));
+      const q = _projSearchVal();
+      if (q) rows = rows.filter(r=>r.id.toLowerCase().includes(q)||r.name.toLowerCase().includes(q)||(r.location||'').toLowerCase().includes(q)||ghLabel(r.gh).toLowerCase().includes(q));
+      const statusFilter = _projStatusVal();
+      if (statusFilter !== 'all') rows = rows.filter(r=>r.status===statusFilter);
       // When grouping, always order by Group Head FIRST so a group's rows stay contiguous;
       // the chosen sort then orders within each group.
       const cmp = _GH_SORTS[_ghSort()] || _GH_SORTS.id;
@@ -3187,11 +3198,8 @@
     }
 
     function renderProjectTable() {
-      const q = (document.getElementById('proj-table-search')?.value||'').toLowerCase();
-      const statusFilter = document.getElementById('proj-table-status')?.value||'all';
-      let rows = _projRows();
-      if (q) rows = rows.filter(r=>r.id.toLowerCase().includes(q)||r.name.toLowerCase().includes(q)||(r.location||'').toLowerCase().includes(q)||ghLabel(r.gh).toLowerCase().includes(q));
-      if (statusFilter !== 'all') rows = rows.filter(r=>r.status===statusFilter);
+      // Search + status are applied inside _projRows() now (shared with the Cards view).
+      const rows = _projRows();
       const tbody = document.getElementById('proj-table-body');
       if (!tbody) return;
       const N_COLS = 10;
