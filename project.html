@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260807a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260807a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260807a"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260807a"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260807a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260807b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260807b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260807b"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260807b"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260807b"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260803a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260807a"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260807b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260807a"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260807b"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -244,9 +244,11 @@
               <span class="tbadge" id="claims-tab-badge" style="display:none;background:#D97706">0</span>
             </button>
           </div>
-          <!-- Charging scope switcher — Overview tab only (Combined / Main Contract / Change Order) -->
+          <!-- Charging scope switcher — Overview / Backlog / WP List (Combined / Main Contract /
+               Change Order). On mobile the label + count are hidden (.ov-ch-label / #ov-ch-count,
+               see dashboard.css ≤767px block) so only the 3 buttons show, per user request. -->
           <div id="ov-charging-switch" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0">
-            <span style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;white-space:nowrap">Charging Scope</span>
+            <span class="ov-ch-label" style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;white-space:nowrap">Charging Scope</span>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
               <button id="ov-ch-all" onclick="setOvCharging('all')" class="ov-ch-btn">Combined</button>
               <button id="ov-ch-main" onclick="setOvCharging('main')" class="ov-ch-btn">Main Contract</button>
@@ -522,16 +524,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260807a"></script>
-<script src="assets/js/ui.js?v=20260807a"></script>
-<script src="assets/js/db.js?v=20260807a"></script>
-<script src="assets/js/onboarding.js?v=20260807a"></script>
-<script src="assets/js/coachmarks.js?v=20260807a"></script>
+<script src="assets/js/auth.js?v=20260807b"></script>
+<script src="assets/js/ui.js?v=20260807b"></script>
+<script src="assets/js/db.js?v=20260807b"></script>
+<script src="assets/js/onboarding.js?v=20260807b"></script>
+<script src="assets/js/coachmarks.js?v=20260807b"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260803a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260807a"></script>
+<script src="assets/js/charts.js?v=20260807b"></script>
 <script>
 
   // Segmented toggle state — swaps a class instead of rewriting cssText.
@@ -1322,7 +1324,7 @@ window.runForecastDiag = function(){
 // Cascade: Works options come from the selected Trade; Vendor options from Trade+Works. Drops now-invalid selections.
 function _recomputeFilterOptions(){
   const tr=document.getElementById('f-trade')?.value||'all';
-  const base=allWPs.filter(w=> tr==='all' || w.trade===tr);
+  const base=ovWPs().filter(w=> tr==='all' || w.trade===tr);
   const worksOpts=[...new Set(base.map(w=>w.works).filter(Boolean))].sort();
   _msfSel.works.forEach(v=>{ if(!worksOpts.includes(v)) _msfSel.works.delete(v); });
   const workSel=_msfSel.works;
@@ -1358,7 +1360,9 @@ function getFiltered(){
   const ch=document.getElementById('f-charging')?.value||'all';
   const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search').value||'').toLowerCase();
-  return allWPs.filter(w=>{
+  // ovWPs() applies the page-wide Charging Scope switch (2026-08-07); the local #f-charging
+  // select still narrows further within that scope (same AND-combination as Trade/Works/Vendor).
+  return ovWPs().filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
     if(ch==='main'&&_isCO(w))return false;
@@ -1405,19 +1409,24 @@ window.setBcbBaseline = function(level){
   switchView(currentView);
 };
 
-// ── Overview charging-scope switcher (Combined / Main Contract / Change Order) ──
-// Scoped to the Overview tab ONLY — Backlog / WP List / Status Tracker are unaffected.
-// A blank charging_type counts as Main Contract (the Excel importer defaults every WP to it).
-// Lives in the view-tabs row (2026-08-07), outside the per-view containers, so its visibility
-// is driven manually rather than by the tab-switch show/hide loop — see _syncOvChargingVisibility.
+// ── Charging-scope switcher (Combined / Main Contract / Change Order) ──
+// Scopes ALL THREE tabs — Overview, Backlog, and WP List (2026-08-07, per user request; was
+// Overview-only) — Status Tracker is unaffected (it edits individual WPs by id regardless of
+// scope). A blank charging_type counts as Main Contract (the Excel importer defaults every WP
+// to it). Lives in the view-tabs row, outside the per-view containers, so its visibility is
+// driven manually rather than by the tab-switch show/hide loop — see _syncOvChargingVisibility.
+// NOTE: the WP List also has its OWN local "Charging Type" filter (#f-charging, in its filter
+// bar) — that one further narrows the WP List specifically and stacks on top of this page-wide
+// scope (same AND-combination as Trade/Works/Vendor), it is not replaced by this switcher.
 let _ovCharging = 'all';
 let _ovHasCO = false;
 function _syncOvChargingVisibility(){
   // Viewers get the single-page stacked layout (no #view-tabs, currentView pinned to 'table'
-  // for the WP-List filter handlers) — the Overview section is always on-screen there, so treat
-  // that the same as "on the Overview tab" rather than hiding the switch permanently for them.
+  // for the WP-List filter handlers) — every section is always on-screen there, so treat that
+  // as "a scoped tab is visible" rather than hiding the switch permanently for them.
   const bar = document.getElementById('ov-charging-switch');
-  if(bar) bar.style.display = (_ovHasCO && (currentView==='overview' || window.__isViewer)) ? 'flex' : 'none';
+  const onScopedTab = currentView==='overview' || currentView==='backlog' || currentView==='table';
+  if(bar) bar.style.display = (_ovHasCO && (onScopedTab || window.__isViewer)) ? 'flex' : 'none';
 }
 function _isCO(w){ return /change\s*order/i.test(w.charging_type||''); }
 function ovWPs(){
@@ -1437,6 +1446,21 @@ function setOvCharging(mode){
   if(cnt) cnt.textContent = wps.length + ' WP' + (wps.length===1?'':'s')
     + (mode==='all' ? '' : ' of ' + ((typeof allWPs!=='undefined'&&allWPs)?allWPs.length:0));
   buildMetrics(wps);
+  // Backlog is lazily rendered and caches its last render across tab switches (_rendered.backlog)
+  // — reset that flag so it recomputes against the new scope next time it's opened, same pattern
+  // used elsewhere when something scope-wide changes (see setBcbBaseline). If the user is sitting
+  // ON Backlog or WP List right now, also refresh in place immediately rather than waiting for a
+  // tab switch. Guarded with typeof/currentView checks so this is a no-op before switchView() has
+  // ever run (e.g. during the initial _syncOvCharging() call at data load).
+  if (typeof _rendered !== 'undefined') _rendered.backlog = false;
+  if (currentView === 'backlog' && typeof renderBacklog === 'function') renderBacklog();
+  if (currentView === 'table') {
+    // Re-cascade Works/Vendor options against the new scope first (prunes now-invalid
+    // selections, same as the Trade-change listener) so buildTable() reflects them together.
+    if (typeof _recomputeFilterOptions === 'function') _recomputeFilterOptions();
+    if (typeof buildTable === 'function') buildTable();
+    if (typeof renderPwaAnalysis === 'function') renderPwaAnalysis();
+  }
 }
 // Called after every data load/reload: re-applies the current scope and hides the
 // switcher entirely on projects that have no Change Orders (nothing to split).
@@ -1591,16 +1615,18 @@ function _blRenderPeriod(wps){
   if(_blDataMode==='count'){
     monthly ? Charts.wpCountByPeriodMonthly('c-backlog-period', wps, {hideAwarded:true}) : Charts.wpCountByPeriod('c-backlog-period', wps, {hideAwarded:true});
   } else if(_blDataMode==='countpct'){
-    // % of the WHOLE project's WP count (not just the backlog's own total) — same weighting fix as
-    // Budget %, so the bars/cumulative line show how many of the project's TOTAL work packages are
-    // sitting in the backlog, not a self-normalized curve that always climbs to 100% of itself.
-    const totalCount = allWPs.length;
+    // % of the current Charging-Scope's WP count (not just the backlog's own total) — same
+    // weighting fix as Budget %, so the bars/cumulative line show how many of the SCOPED work
+    // packages are sitting in the backlog, not a self-normalized curve that always climbs to
+    // 100% of itself.
+    const totalCount = ovWPs().length;
     monthly ? Charts.wpCountByPeriodMonthly('c-backlog-period', wps, {countPct:true,hideAwarded:true,totalCount}) : Charts.wpCountByPeriod('c-backlog-period', wps, {countPct:true,hideAwarded:true,totalCount});
   } else if(_blDataMode==='budgetpct'){
-    // % of the WHOLE project's budget (not just the backlog's own total), so the bars/cumulative line
-    // show how much weight the backlog carries relative to the full project — not a self-normalized
-    // curve that always climbs to 100% regardless of how big the backlog actually is.
-    const totalBudget = allWPs.reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6;
+    // % of the current Charging-Scope's budget (not just the backlog's own total), so the
+    // bars/cumulative line show how much weight the backlog carries relative to the SCOPED
+    // project total — not a self-normalized curve that always climbs to 100% regardless of how
+    // big the backlog actually is.
+    const totalBudget = ovWPs().reduce((s,w)=>s+(w.approved_budget_bcb||0),0)/1e6;
     monthly ? Charts.budgetAwardedByPeriodMonthly('c-backlog-period', wps, {sharePct:true,hideAwarded:true,totalBudget}) : Charts.budgetAwardedByPeriod('c-backlog-period', wps, {sharePct:true,hideAwarded:true,totalBudget});
   } else {
     monthly ? Charts.budgetAwardedByPeriodMonthly('c-backlog-period', wps, {hideAwarded:true}) : Charts.budgetAwardedByPeriod('c-backlog-period', wps, {hideAwarded:true});
@@ -1608,7 +1634,7 @@ function _blRenderPeriod(wps){
 }
 window.setBlDataMode = function(mode){
   _blDataMode = mode;
-  _blRenderPeriod(allWPs.filter(w=>!window.isResolved(w)));
+  _blRenderPeriod(ovWPs().filter(w=>!window.isResolved(w)));
 };
 function _blComboMode(){ return _blMetric==='wp' ? (_blView==='pct'?'countpct':'count') : (_blView==='pct'?'budgetpct':'budget'); }
 window.setBlMetric = function(m){
@@ -1627,7 +1653,7 @@ function setBlPeriodMode(mode) {
   _blPeriodMode = mode;
   _segBtn(document.getElementById('bl-btn-quarterly'), mode==='quarterly');
   _segBtn(document.getElementById('bl-btn-monthly'), mode==='monthly');
-  _blRenderPeriod(allWPs.filter(w=>!window.isResolved(w)));
+  _blRenderPeriod(ovWPs().filter(w=>!window.isResolved(w)));
 }
 
 function renderDashPeriod(wps) {
@@ -1886,7 +1912,9 @@ function renderBacklog(){
   const dueF = document.getElementById('bl-due-filter')?.value||'';
   const search = (document.getElementById('bl-search')?.value||'').toLowerCase().trim();
 
-  let notAwarded = allWPs.filter(w=>!window.isResolved(w));
+  // ovWPs() applies the page-wide Charging Scope switch (2026-08-07) before the backlog's own
+  // trade/due/budget/search filters narrow further.
+  let notAwarded = ovWPs().filter(w=>!window.isResolved(w));
 
   // Populate trade filter dropdown
   const tradeEl = document.getElementById('bl-trade-filter');
@@ -1909,7 +1937,7 @@ function renderBacklog(){
   Charts.wpAgingBuckets('c-backlog-aging', notAwarded, projId||'Project');
   Charts.wpStatusDonut('c-wp-status-bl', notAwarded);
   _blRenderPeriod(notAwarded);
-  Charts.wpSubmittalDonut('c-backlog-submittal', allWPs);
+  Charts.wpSubmittalDonut('c-backlog-submittal', ovWPs());
 
   // Group by trade first, then sort within each group by selected option
   const tradeGroups = new Map();
@@ -2088,7 +2116,9 @@ function getFilteredSorted(){
   const ch=document.getElementById('f-charging')?.value||'all';
   const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search').value||'').toLowerCase();
-  let rows = allWPs.filter(w=>{
+  // ovWPs() applies the page-wide Charging Scope switch (2026-08-07); #f-charging still narrows
+  // further within that scope, same as getFiltered() / _pwaFilteredWPs() below (keep in sync).
+  let rows = ovWPs().filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
     if(ch==='main'&&_isCO(w))return false;
@@ -2142,7 +2172,7 @@ function _pwaFilteredWPs(){
   const ch=document.getElementById('f-charging')?.value||'all';
   const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search')?.value||'').toLowerCase();
-  return allWPs.filter(w=>{
+  return ovWPs().filter(w=>{
     if(st!=='all'&&w.award_status!==st)return false;
     if(tr!=='all'&&w.trade!==tr)return false;
     if(ch==='main'&&_isCO(w))return false;
