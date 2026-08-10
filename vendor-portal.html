@@ -43,9 +43,9 @@
     .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:'Montserrat',sans-serif;color:#231F20;outline:none}
     .field input:focus,.field select:focus,.field textarea:focus{border-color:#EE3124}
     .field textarea{resize:vertical;min-height:70px}
-    .chip-select{display:flex;flex-wrap:wrap;gap:6px}
-    .chip{padding:5px 12px;border:1.5px solid #e5e5e5;border-radius:20px;font-size:12px;cursor:pointer;user-select:none}
-    .chip.on{background:#EE3124;border-color:#EE3124;color:#fff}
+    .trade-checklist{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;border:1.5px solid #e5e5e5;border-radius:8px;padding:10px 12px;max-height:200px;overflow-y:auto}
+    .trade-checklist label{display:flex;align-items:center;gap:8px;font-size:13px;color:#231F20;cursor:pointer}
+    .trade-checklist input[type="checkbox"]{width:15px;height:15px;accent-color:#EE3124;cursor:pointer;flex-shrink:0}
     .btn-primary{padding:10px 20px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer}
     .btn-primary:hover{background:#C42127}
     .btn-primary:disabled{background:#e8a09b;cursor:default}
@@ -103,7 +103,7 @@
     <div class="field"><label>Company Name</label><input id="f-name" type="text" placeholder="Company Name"></div>
     <div class="field">
       <label>Trade Categories</label>
-      <div class="chip-select" id="tradeChips"></div>
+      <div class="trade-checklist" id="tradeChips"></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Contact Person</label><input id="f-contact-person" type="text"></div>
@@ -226,12 +226,11 @@ function renderOverviewForm() {
 
 function buildTradeChips() {
   const wrap = document.getElementById('tradeChips');
-  wrap.innerHTML = TRADES.map(t => `<span class="chip ${selectedTrades.has(t)?'on':''}" data-t="${esc(t)}" onclick="toggleTrade(this)">${esc(t)}</span>`).join('');
+  wrap.innerHTML = TRADES.map((t, i) => `<label><input type="checkbox" id="trade-${i}" data-t="${esc(t)}" onchange="toggleTrade(this)" ${selectedTrades.has(t)?'checked':''}> ${esc(t)}</label>`).join('');
 }
 function toggleTrade(el) {
   const t = el.dataset.t;
-  if (selectedTrades.has(t)) selectedTrades.delete(t); else selectedTrades.add(t);
-  el.classList.toggle('on');
+  if (el.checked) selectedTrades.add(t); else selectedTrades.delete(t);
 }
 function esc(v) { return window.esc ? window.esc(v) : String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
