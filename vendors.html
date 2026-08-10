@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810c">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810d">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -58,9 +58,13 @@
     .btn-primary:hover{background:#C42127}
     .btn-cancel{padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;cursor:pointer}
     .invite-link-box{background:#f5f5f5;border-radius:8px;padding:10px 12px;font-size:0.8rem;word-break:break-all;font-family:monospace;margin-top:8px}
-    .detail-tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}
-    .detail-tab{padding:6px 14px;border:1px solid #e5e5e5;border-radius:8px;background:transparent;font-size:0.8571rem;font-weight:600;font-family:inherit;cursor:pointer;color:#888}
-    .detail-tab.active{background:#231F20;border-color:#231F20;color:#fff}
+    .detail-jump{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;position:sticky;top:0;background:#fff;z-index:2;padding-bottom:8px;border-bottom:1px solid #f0f0f0}
+    .detail-jump a{padding:6px 14px;border:1px solid #e5e5e5;border-radius:8px;background:transparent;font-size:0.8571rem;font-weight:600;font-family:inherit;cursor:pointer;color:#888;text-decoration:none}
+    .detail-jump a.active{background:#231F20;border-color:#231F20;color:#fff}
+    .detail-scroll{padding-right:4px}
+    .detail-section{padding:18px 0;border-bottom:1px solid #f0f0f0;scroll-margin-top:52px}
+    .detail-section:last-child{border-bottom:none;padding-bottom:4px}
+    .detail-section-title{font-size:0.9286rem;font-weight:700;color:#231F20;margin:0 0 12px}
     .row-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f5f5f5}
     .row-item:last-child{border-bottom:none}
     .row-item-title{font-size:0.8571rem;font-weight:600}
@@ -92,8 +96,11 @@
     body.dark-mode .trade-checklist label{color:var(--text-primary)}
     body.dark-mode .btn-cancel{color:var(--text-hint);border-color:var(--border-md)}
     body.dark-mode .invite-link-box{background:var(--surface-2);color:var(--text-primary)}
-    body.dark-mode .detail-tab{color:var(--text-hint);border-color:var(--border-md)}
-    body.dark-mode .detail-tab.active{background:var(--mw-red);border-color:var(--mw-red);color:#fff}
+    body.dark-mode .detail-jump{background:var(--surface);border-bottom-color:var(--border)}
+    body.dark-mode .detail-jump a{color:var(--text-hint);border-color:var(--border-md)}
+    body.dark-mode .detail-jump a.active{background:var(--mw-red);border-color:var(--mw-red);color:#fff}
+    body.dark-mode .detail-section{border-bottom-color:var(--border)}
+    body.dark-mode .detail-section-title{color:var(--text-primary)}
     body.dark-mode .row-item{border-bottom-color:var(--border)}
     body.dark-mode .row-item-title{color:var(--text-primary)}
     body.dark-mode .row-item-sub{color:var(--text-hint)}
@@ -214,28 +221,30 @@
       <div><div class="modal-title" id="detailTitle">Vendor</div><div class="modal-subtitle" id="detailSub"></div></div>
       <button class="modal-close" onclick="closeDetailModal()">&times;</button>
     </div>
-    <div class="modal-body">
-      <div class="detail-tabs">
-        <button class="detail-tab active" data-t="overview" onclick="switchDetailTab('overview')">Overview</button>
-        <button class="detail-tab" data-t="products" onclick="switchDetailTab('products')">Products</button>
-        <button class="detail-tab" data-t="certs" onclick="switchDetailTab('certs')">Certifications</button>
-        <button class="detail-tab" data-t="personnel" onclick="switchDetailTab('personnel')">Personnel</button>
-        <button class="detail-tab" data-t="rates" onclick="switchDetailTab('rates')">Rates</button>
+    <div class="modal-body" id="detailModalBody">
+      <nav class="detail-jump" id="detailJump">
+        <a href="#dsec-overview">Overview</a>
+        <a href="#dsec-products">Products</a>
+        <a href="#dsec-certs">Certifications</a>
+        <a href="#dsec-personnel">Personnel</a>
+        <a href="#dsec-rates">Rates</a>
+      </nav>
+      <div class="detail-scroll" id="detailScroll">
+        <section class="detail-section" id="dsec-overview"><h3 class="detail-section-title">Overview</h3><div id="dtab-overview"></div></section>
+        <section class="detail-section" id="dsec-products"><h3 class="detail-section-title">Products &amp; Services</h3><div id="dtab-products"></div></section>
+        <section class="detail-section" id="dsec-certs"><h3 class="detail-section-title">Certifications</h3><div id="dtab-certs"></div></section>
+        <section class="detail-section" id="dsec-personnel"><h3 class="detail-section-title">Personnel</h3><div id="dtab-personnel"></div></section>
+        <section class="detail-section" id="dsec-rates"><h3 class="detail-section-title">Reference Rates</h3><div id="dtab-rates"></div></section>
       </div>
-      <div id="dtab-overview"></div>
-      <div id="dtab-products" style="display:none"></div>
-      <div id="dtab-certs" style="display:none"></div>
-      <div id="dtab-personnel" style="display:none"></div>
-      <div id="dtab-rates" style="display:none"></div>
     </div>
     <div class="modal-footer" id="detailFooter"></div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810c"></script>
-<script src="assets/js/db.js?v=20260810c"></script>
-<script src="assets/js/ui.js?v=20260810c"></script>
+<script src="assets/js/auth.js?v=20260810d"></script>
+<script src="assets/js/db.js?v=20260810d"></script>
+<script src="assets/js/ui.js?v=20260810d"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -355,15 +364,34 @@ async function openDetailModal(id) {
   document.getElementById('detailTitle').textContent = activeVendor.name;
   document.getElementById('detailSub').innerHTML = `<span class="badge badge-${activeVendor.status}">${esc(activeVendor.status.replace('_',' '))}</span>`;
   renderDetailFooter();
-  switchDetailTab('overview');
   document.getElementById('detailModal').style.display = 'flex';
+  document.getElementById('detailModalBody').scrollTop = 0;
   await Promise.all([renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates()]);
   renderDetailOverview();
+  _wireDetailScrollSpy();
 }
-function closeDetailModal() { document.getElementById('detailModal').style.display = 'none'; activeVendor = null; }
-function switchDetailTab(t) {
-  ['overview','products','certs','personnel','rates'].forEach(k => document.getElementById('dtab-'+k).style.display = k===t ? 'block' : 'none');
-  document.querySelectorAll('.detail-tab').forEach(b => b.classList.toggle('active', b.dataset.t === t));
+function closeDetailModal() {
+  document.getElementById('detailModal').style.display = 'none';
+  activeVendor = null;
+  if (_detailScrollSpy) { _detailScrollSpy.disconnect(); _detailScrollSpy = null; }
+}
+let _detailScrollSpy = null;
+function _wireDetailScrollSpy() {
+  const scroller = document.getElementById('detailModalBody');
+  const links = [...document.querySelectorAll('#detailJump a')];
+  if (_detailScrollSpy) _detailScrollSpy.disconnect();
+  _detailScrollSpy = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const id = e.target.id;
+      links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+    });
+  }, { root: scroller, rootMargin: '-10% 0px -70% 0px' });
+  document.querySelectorAll('.detail-section').forEach(s => _detailScrollSpy.observe(s));
+  links.forEach(a => a.onclick = (e) => {
+    e.preventDefault();
+    document.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 function renderDetailFooter() {
   const el = document.getElementById('detailFooter');
