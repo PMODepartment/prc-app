@@ -178,6 +178,7 @@
 
           <div class="view-tabs" id="view-tabs" style="flex:1;margin-bottom:0">
             <button class="view-tab active" onclick="switchTab('overview')"><i class="ti ti-layout-dashboard"></i>Overview</button>
+            <button class="view-tab" onclick="switchTab('actions')"><i class="ti ti-alert-triangle"></i>Action Center</button>
             <button class="view-tab" onclick="switchTab('backlog')"><i class="ti ti-clock"></i>Backlog</button>
             <button id="tab-budget-btn" class="view-tab" onclick="switchTab('budget')"><i class="ti ti-report-money"></i>Budget</button>
             <button class="view-tab" onclick="switchTab('schedule')"><i class="ti ti-calendar"></i>Schedule</button>
@@ -305,6 +306,12 @@
             </div>
           </div>
           </div>
+        </div>
+
+        <!-- ══ ACTION CENTER TAB ══ -->
+        <div id="tab-actions" style="display:none">
+          <div id="actions-summary" class="metrics-grid" style="margin-bottom:16px"></div>
+          <div id="actions-sections"></div>
         </div>
 
         <!-- ══ BACKLOG TAB ══ -->
@@ -1262,7 +1269,7 @@
       }
     };
     // ── Tab switching ─────────────────────────────────────────────
-    const ALL_TABS = ['overview','backlog','budget','schedule','works','wplist','claims'];
+    const ALL_TABS = ['overview','actions','backlog','budget','schedule','works','wplist','claims'];
     let _activeTab = 'overview';
     let _idxDashPeriodMode = 'monthly';
     let _idxDashDataMode = 'count';   // default to # WPs (user preference); Budget is the alternate
@@ -1676,8 +1683,113 @@
         </div>`).join('');
     }
 
+    /* ══ Risk & Action Center ══ decision-first "what needs attention now"
+       view over the selected projects' approved WPs. Tables only (no canvas),
+       every row opens the WP detail panel. Desktop non-viewer tab only. */
+    function renderActionsTab(wps) {
+      const T = new Date(); T.setHours(0,0,0,0);            // local midnight
+      const DAY = 86400000;
+      const esc2 = window.esc || (s => s);
+      const projName = pid => { const p = permitted.find(x => x.id === pid); return p ? p.name : pid; };
+      const parseD = v => { if (!v) return null; const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? new Date(+m[1], +m[2]-1, +m[3]) : null; };
+      const money = v => Fmt.moneyShort(v || 0);
+      const CAP = 50;
+
+      // 1. Overdue awards — not resolved, planned award date already passed.
+      const overdue = wps.filter(w => !window.isResolved(w) && (() => { const d = parseD(w.awarding_date); return d && d < T; })())
+        .map(w => ({ w, days: Math.round((T - parseD(w.awarding_date)) / DAY), bcb: w.approved_budget_bcb || 0 }))
+        .sort((a, b) => b.days - a.days);
+      // 2. Awarded over budget — effective awarded cost exceeds its own BCB.
+      const over = wps.filter(w => window.isMoneyAwarded(w) && (w.approved_budget_bcb || 0) > 0 && window.effectiveAwardedCost(w) > (w.approved_budget_bcb || 0))
+        .map(w => ({ w, bcb: w.approved_budget_bcb || 0, awd: window.effectiveAwardedCost(w), ovr: window.effectiveAwardedCost(w) - (w.approved_budget_bcb || 0) }))
+        .sort((a, b) => b.ovr - a.ovr);
+      // 3. Data gaps — flagged Awarded but missing cost or vendor (breaks KPI
+      //    reconciliation; deliberate "Not to be Awarded" WPs are excluded).
+      const gaps = wps.filter(w => w.award_status === 'Awarded' && !w.not_to_be_awarded && (!((w.total_awarded || 0) > 0) || !(w.contractor && String(w.contractor).trim())))
+        .map(w => ({ w, noCost: !((w.total_awarded || 0) > 0), noVendor: !(w.contractor && String(w.contractor).trim()), bcb: w.approved_budget_bcb || 0 }));
+      // 4. Upcoming award pipeline — not resolved, planned award today or later.
+      const upcoming = wps.filter(w => !window.isResolved(w) && (() => { const d = parseD(w.awarding_date); return d && d >= T; })())
+        .map(w => ({ w, days: Math.round((parseD(w.awarding_date) - T) / DAY), bcb: w.approved_budget_bcb || 0 }))
+        .sort((a, b) => a.days - b.days);
+      const sumBcb = arr => arr.reduce((s, x) => s + (x.bcb || 0), 0);
+      const inRange = (lo, hi) => upcoming.filter(u => u.days >= lo && (hi == null || u.days <= hi));
+      const b30 = inRange(0, 30), b60 = inRange(31, 60), b90 = inRange(61, 90);
+
+      // Summary tiles
+      const tile = (lbl, val, cls, sub) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls || ''}">${val}</div>${sub ? `<div class="metric-sub" style="font-size:0.85rem;font-weight:700;margin-top:4px;color:#888">${sub}</div>` : ''}</div>`;
+      document.getElementById('actions-summary').innerHTML = [
+        tile('Overdue Awards', overdue.length, overdue.length ? 'red' : 'green', money(sumBcb(overdue)) + ' BCB at risk'),
+        tile('Awarded Over Budget', over.length, over.length ? 'red' : 'green', over.length ? ('+' + money(over.reduce((s, x) => s + x.ovr, 0)) + ' overrun') : 'None'),
+        tile('Data Gaps', gaps.length, gaps.length ? 'amber' : 'green', 'Awarded, missing cost/vendor'),
+        tile('Awards Next 30 Days', b30.length, '', money(sumBcb(b30)) + ' to award'),
+      ].join('');
+
+      // Table plumbing
+      const TH = 'padding:8px 10px;border-bottom:2px solid var(--border-md,#ddd);font-size:0.72rem;text-transform:uppercase;letter-spacing:.02em;color:#888;white-space:nowrap';
+      const TDB = 'padding:7px 10px;border-bottom:1px solid var(--border,#eee);font-size:0.8rem;vertical-align:top';
+      const td = (content, extra) => `<td style="${TDB};${extra || ''}">${content}</td>`;
+      const tbl = (heads, rows, empty) => rows.length
+        ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+            <thead><tr>${heads.map(h => `<th style="${TH};text-align:${h.a || 'left'}">${h.t}</th>`).join('')}</tr></thead>
+            <tbody>${rows.join('')}</tbody></table></div>`
+        : `<div style="color:#2D9B6F;font-size:0.85rem;padding:6px 0"><i class="ti ti-circle-check" style="margin-right:4px"></i>${empty}</div>`;
+      const trunc = n => n > CAP ? `<div style="font-size:0.75rem;color:#aaa;margin-top:8px">Showing top ${CAP} of ${n}.</div>` : '';
+      const rowOpen = w => `<tr onclick="openWPDetail('${w.id}')" style="cursor:pointer" onmouseover="this.style.background='var(--mw-red-light,#FDECEA)'" onmouseout="this.style.background=''">`;
+      const R = 'text-align:right';
+      const panel = (icon, title, sub, body) => `<div class="panel" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <div class="panel-title" style="margin:0"><i class="ti ${icon}" style="margin-right:6px;color:var(--mw-red)"></i>${title}</div>
+          <div style="font-size:0.8rem;color:#888">${sub}</div></div>${body}</div>`;
+
+      // 1. Overdue
+      const s1 = tbl(
+        [{t:'WP No.'},{t:'Project'},{t:'Trade'},{t:'Planned Award'},{t:'Days Overdue',a:'right'},{t:'BCB',a:'right'}],
+        overdue.slice(0, CAP).map(x => rowOpen(x.w)
+          + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.trade||'—'))
+          + td(x.w.awarding_date?Fmt.date(x.w.awarding_date):'—') + td(x.days+'d', R+';color:#EE3124;font-weight:700') + td(money(x.bcb), R) + '</tr>'),
+        'No overdue awards — every not-yet-awarded WP is still within its planned date.') + trunc(overdue.length);
+
+      // 2. Over budget
+      const s2 = tbl(
+        [{t:'WP No.'},{t:'Project'},{t:'Vendor'},{t:'BCB',a:'right'},{t:'Awarded',a:'right'},{t:'Overrun',a:'right'}],
+        over.slice(0, CAP).map(x => rowOpen(x.w)
+          + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.contractor||'—'))
+          + td(money(x.bcb), R) + td(money(x.awd), R) + td('+'+money(x.ovr), R+';color:#EE3124;font-weight:700') + '</tr>'),
+        'No awarded WP is over its BCB.') + trunc(over.length);
+
+      // 3. Data gaps
+      const s3 = tbl(
+        [{t:'WP No.'},{t:'Project'},{t:'Trade'},{t:'Missing'},{t:'BCB',a:'right'}],
+        gaps.slice(0, CAP).map(x => { const tags = [x.noCost?'<span style="color:#B45309;font-weight:700">Cost</span>':'', x.noVendor?'<span style="color:#B45309;font-weight:700">Vendor</span>':''].filter(Boolean).join(', ');
+          return rowOpen(x.w)
+          + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.trade||'—'))
+          + td(tags) + td(money(x.bcb), R) + '</tr>'; }),
+        'No data gaps — every Awarded WP has a cost and vendor.') + trunc(gaps.length);
+
+      // 4. Upcoming pipeline (bucket summary + table)
+      const buckets = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        ${[['0–30 days',b30],['31–60 days',b60],['61–90 days',b90]].map(([lbl,arr]) =>
+          `<div style="flex:1;min-width:130px;border:1px solid var(--border,#eee);border-radius:8px;padding:9px 12px">
+            <div style="font-size:0.72rem;color:#888;text-transform:uppercase">${lbl}</div>
+            <div style="font-size:1.1rem;font-weight:800">${arr.length} <span style="font-size:0.8rem;font-weight:600;color:#888">WP${arr.length===1?'':'s'}</span></div>
+            <div style="font-size:0.8rem;color:#2563EB;font-weight:700">${money(sumBcb(arr))}</div></div>`).join('')}</div>`;
+      const s4 = buckets + tbl(
+        [{t:'WP No.'},{t:'Project'},{t:'Trade'},{t:'Planned Award'},{t:'In',a:'right'},{t:'BCB',a:'right'}],
+        upcoming.slice(0, CAP).map(x => rowOpen(x.w)
+          + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.trade||'—'))
+          + td(x.w.awarding_date?Fmt.date(x.w.awarding_date):'—') + td(x.days+'d', R) + td(money(x.bcb), R) + '</tr>'),
+        'No upcoming awards scheduled.') + trunc(upcoming.length);
+
+      document.getElementById('actions-sections').innerHTML =
+        panel('ti-alarm', 'Overdue Awards', `${overdue.length} WP${overdue.length===1?'':'s'} past planned award · ${money(sumBcb(overdue))} BCB`, s1) +
+        panel('ti-trending-up', 'Awarded Over Budget', `${over.length} WP${over.length===1?'':'s'}`, s2) +
+        panel('ti-alert-circle', 'Data Gaps (Awarded, incomplete)', `${gaps.length} WP${gaps.length===1?'':'s'} — fix so KPIs reconcile`, s3) +
+        panel('ti-calendar-due', 'Upcoming Award Pipeline', `${upcoming.length} WP${upcoming.length===1?'':'s'} ahead · ${money(sumBcb(upcoming))} BCB`, s4);
+    }
+
     function _renderTab(tab, wps, filt, allStats) {
       const now = new Date();
+      if (tab === 'actions') { renderActionsTab(wps); return; }
       if (tab === 'overview') {
         // Cost + WP Status KPI groups render in renderAll; here we render the period chart + Top 5
         // (merged in from the former Dashboard tab). The old WP-status-bars / status-summary /
