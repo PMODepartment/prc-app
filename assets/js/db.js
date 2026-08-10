@@ -1460,6 +1460,34 @@ const VendorDb = (() => {
     const { error } = await sb.from('vendor_rates').delete().eq('id', id);
     if (error) throw error;
   }
+  // Upsert a rate row tied to a source WP (MIGRATION_vendor_rates_wp_link.sql
+  // adds vendor_rates.wp_id + a partial unique index on (vendor_id,wp_id)
+  // where wp_id is not null) — re-running the backfill updates the existing
+  // row instead of duplicating it. Deploy-order-safe: if wp_id doesn't exist
+  // yet, falls back to a plain insert (loses the de-dup guarantee until the
+  // migration runs, but never fails the caller).
+  function _isMissingWpIdCol(error) {
+    return _isMissingCol(error, /wp_id/);
+  }
+  async function upsertRate(wpId, vendorId, projectId, fields, profile) {
+    const sb = await getSB();
+    const payload = {
+      ...fields,
+      wp_id: wpId,
+      vendor_id: vendorId,
+      project_id: projectId || null,
+      created_by: profile?.id || null,
+    };
+    let { data, error } = await sb.from('vendor_rates')
+      .upsert(payload, { onConflict: 'vendor_id,wp_id' })
+      .select().single();
+    if (error && _isMissingWpIdCol(error)) {
+      const d2 = { ...payload }; delete d2.wp_id;
+      ({ data, error } = await sb.from('vendor_rates').insert(d2).select().single());
+    }
+    if (error) throw error;
+    return data;
+  }
 
   // ── Certification file uploads (Supabase Storage, private bucket) ───
   async function uploadCertFile(vendorId, certId, file) {
@@ -1655,6 +1683,133 @@ const VendorDb = (() => {
     return { created, linked, distinct: names.size };
   }
 
+  // ── Backfill trade categories / products / bid history / rates for
+  //    vendors that were created via importVendorsFromWPs (identity-only —
+  //    name + placeholder email). Re-runnable: trades union (no dupes by
+  //    construction), products dedupe by normalized description per vendor
+  //    (checked against already-fetched existing products), bids/rates
+  //    upsert on (vendor_id, wp_id) so a second run updates in place rather
+  //    than duplicating. Rules (see CLAUDE.md Vendor Management section):
+  //   - Trade Categories: from BOTH awarded (`contractor`) AND proposed
+  //     (`proposed_vendors`) WPs — any non-blank `trade` on either
+  //     is unioned into that vendor's trade_categories.
+  //   - Products / Bids / Rates: ONLY from genuinely-awarded WPs
+  //     (award_status==='Awarded' && awarded_cost>0 — mirrors the
+  //     isMoneyAwarded predicate used everywhere else in the app, using
+  //     awarded_cost since total_awarded is a generated column not read
+  //     here). No original/negotiated offer data exists in work_packages,
+  //     so bids only populate final_amount.
+  async function backfillVendorDataFromWPs(profile) {
+    const sb = await getSB();
+    const { data: wps, error } = await sb.from('work_packages')
+      .select('id,project_id,wp_no,description,trade,contractor,proposed_vendors,vendor_id,award_status,awarded_cost,awarding_date,actual_awarding_date');
+    if (error) throw error;
+    const rows = wps || [];
+
+    const vendors = await getVendors();
+    const byNorm = {}; vendors.forEach(v => { byNorm[_normName(v.name)] = v; });
+    const tradeSets = {}; // vendorId -> Set of trades (seeded from existing)
+    vendors.forEach(v => { tradeSets[v.id] = new Set((v.trade_categories || [])); });
+
+    const existingProducts = await getAllVendorProducts(); // [{vendor_id,category,description}]
+    const productKeys = {}; // vendorId -> Set of normalized descriptions
+    existingProducts.forEach(p => {
+      const k = p.vendor_id;
+      (productKeys[k] = productKeys[k] || new Set()).add(_normName(p.description));
+    });
+    const newProducts = {}; // vendorId -> Map(normDesc -> {category,description})
+
+    const isAwarded = w => w.award_status === 'Awarded' && (w.awarded_cost || 0) > 0;
+
+    const bidsToUpsert = [];
+    const ratesToUpsert = [];
+    let skippedNoVendor = 0;
+
+    const resolveVendors = w => {
+      const out = new Set();
+      if (w.vendor_id) out.add(w.vendor_id);
+      else if (w.contractor) { const v = byNorm[_normName(w.contractor)]; if (v) out.add(v.id); }
+      _splitVendors(w.proposed_vendors).forEach(nm => { const v = byNorm[_normName(nm)]; if (v) out.add(v.id); });
+      return out;
+    };
+
+    rows.forEach(w => {
+      const vids = resolveVendors(w);
+      if (!vids.size) { skippedNoVendor++; return; }
+      // Trades — union from every resolved vendor on this WP (awarded or proposed).
+      if (w.trade) {
+        vids.forEach(vid => { if (tradeSets[vid]) tradeSets[vid].add(w.trade); });
+      }
+      if (!isAwarded(w)) return;
+      // Awarded-only: products / bids / rates. The "awarded vendor" for these
+      // is the one matching contractor/vendor_id specifically (not every
+      // proposed-but-not-won vendor).
+      let awardedVid = w.vendor_id || (w.contractor ? (byNorm[_normName(w.contractor)] || {}).id : null);
+      if (!awardedVid) return;
+      if (w.description) {
+        const nk = _normName(w.description);
+        const seen = productKeys[awardedVid] = productKeys[awardedVid] || new Set();
+        if (!seen.has(nk)) {
+          seen.add(nk);
+          const map = newProducts[awardedVid] = newProducts[awardedVid] || new Map();
+          if (!map.has(nk)) map.set(nk, { category: w.trade || null, description: w.description });
+        }
+      }
+      const bidDate = w.awarding_date || w.actual_awarding_date || null;
+      const awardDate = w.actual_awarding_date || w.awarding_date || null;
+      bidsToUpsert.push({
+        wpId: w.id, vendorId: awardedVid, projectId: w.project_id,
+        fields: {
+          original_offer: null, negotiated_offer: null, final_amount: w.awarded_cost,
+          status: 'awarded', bid_date: bidDate, award_date: awardDate,
+          notes: `Backfilled from WP ${w.wp_no || ''}`.trim(),
+        },
+      });
+      ratesToUpsert.push({
+        wpId: w.id, vendorId: awardedVid, projectId: w.project_id,
+        fields: {
+          item_description: w.description || null, trade: w.trade || null,
+          rate: w.awarded_cost, unit: null, date_quoted: awardDate,
+          source: 'awarded contract',
+        },
+      });
+    });
+
+    let tradesUpdated = 0;
+    for (const v of vendors) {
+      const set = tradeSets[v.id];
+      if (!set) continue;
+      const orig = new Set(v.trade_categories || []);
+      const union = [...set];
+      const changed = union.length !== orig.size || union.some(t => !orig.has(t));
+      if (!changed) continue;
+      await updateVendor(v.id, { trade_categories: union });
+      tradesUpdated++;
+    }
+
+    let productsAdded = 0;
+    for (const vendorId of Object.keys(newProducts)) {
+      for (const { category, description } of newProducts[vendorId].values()) {
+        await products.add(vendorId, { category, description, unit: null });
+        productsAdded++;
+      }
+    }
+
+    let bidsUpserted = 0;
+    for (const b of bidsToUpsert) {
+      await upsertBid(b.wpId, b.vendorId, b.projectId, b.fields, profile);
+      bidsUpserted++;
+    }
+
+    let ratesUpserted = 0;
+    for (const r of ratesToUpsert) {
+      await upsertRate(r.wpId, r.vendorId, r.projectId, r.fields, profile);
+      ratesUpserted++;
+    }
+
+    return { tradesUpdated, productsAdded, bidsUpserted, ratesUpserted, skippedNoVendor };
+  }
+
   // All product rows across vendors (id + searchable text), for the directory's
   // "search by product/service" filter. Returns [] if the table is absent.
   async function getAllVendorProducts() {
@@ -1689,11 +1844,12 @@ const VendorDb = (() => {
   return {
     getVendors, getVendor, createVendor, updateVendor, approveVendor, rejectVendor, setVendorStatus, deleteVendor,
     products, certifications, personnel,
-    getVendorRates, addVendorRate, deleteVendorRate,
+    getVendorRates, addVendorRate, deleteVendorRate, upsertRate,
     uploadCertFile, getCertFileUrl, deleteCertFile,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
     searchApprovedVendors, quickCreateVendor,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
+    backfillVendorDataFromWPs,
   };
 })();
 window.VendorDb = VendorDb;

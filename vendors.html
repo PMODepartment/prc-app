@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810f"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810f"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810f"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810g"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810g"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810g"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810f">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810g">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -226,6 +226,7 @@
               <button id="vv-table" onclick="setVendorView('table')" aria-label="Table view"><i class="ti ti-table"></i> Table</button>
             </div>
             <button class="btn-cancel" onclick="importFromWPs()" title="Scan all work packages and add any awarded/proposed vendors not already in the directory"><i class="ti ti-file-import" style="margin-right:4px"></i>Import from WPs</button>
+            <button id="btn-backfill-vendor-data" class="btn-cancel" onclick="backfillFromWPs()" title="Fill in trade categories, products, bid history and rates for vendors from their work packages"><i class="ti ti-refresh-dot" style="margin-right:4px"></i>Backfill Trade/Bid Data</button>
             <button class="btn-cancel" onclick="openMergeModal()" title="Combine duplicate vendor records (typos / different names for the same company) into one"><i class="ti ti-arrows-join" style="margin-right:4px"></i>Merge</button>
             <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Invite Vendor</button>
           </div>
@@ -328,10 +329,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810f"></script>
-<script src="assets/js/db.js?v=20260810f"></script>
-<script src="assets/js/ui.js?v=20260810f"></script>
-<script src="assets/js/onboarding.js?v=20260810f"></script>
+<script src="assets/js/auth.js?v=20260810g"></script>
+<script src="assets/js/db.js?v=20260810g"></script>
+<script src="assets/js/ui.js?v=20260810g"></script>
+<script src="assets/js/onboarding.js?v=20260810g"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -476,6 +477,21 @@ async function importFromWPs() {
     await loadAll();
     AppNotify && AppNotify.success(`Import complete: ${r.created} new vendor(s) added, ${r.linked} work package(s) linked (${r.distinct} distinct names found).`);
   } catch (e) { AppNotify ? AppNotify.fromError(e, 'Import failed') : alert(e.message); }
+}
+
+/* ── Backfill trade categories / products / bid history / rates from WPs ── */
+async function backfillFromWPs() {
+  if (!confirm('Backfill trade categories, products, bid history and rates for vendors from their work packages?\n\nThis is a one-time (but re-runnable) action — trade categories are unioned from all their WPs, while products/bids/rates are added only from AWARDED work packages. This may take a while for large portfolios.')) return;
+  const btn = document.getElementById('btn-backfill-vendor-data');
+  const orig = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin" style="margin-right:4px"></i>Backfilling…'; }
+  try {
+    AppNotify && AppNotify.info('Backfilling vendor trade/bid data from work packages…');
+    const r = await VendorDb.backfillVendorDataFromWPs(userProfile);
+    await loadAll();
+    AppNotify && AppNotify.success(`Backfill complete: ${r.tradesUpdated} vendor(s) trades updated, ${r.productsAdded} product(s) added, ${r.bidsUpserted} bid(s) synced, ${r.ratesUpserted} rate(s) synced.`);
+  } catch (e) { AppNotify ? AppNotify.fromError(e, 'Backfill failed') : alert(e.message); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = orig; } }
 }
 
 /* ── Merge vendors ── */
