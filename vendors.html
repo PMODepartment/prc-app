@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810d"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810d"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810d"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810e"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810e"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810e"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810d">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810e">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -228,6 +228,7 @@
         <a href="#dsec-certs">Certifications</a>
         <a href="#dsec-personnel">Personnel</a>
         <a href="#dsec-rates">Rates</a>
+        <a href="#dsec-bids">Bid History</a>
       </nav>
       <div class="detail-scroll" id="detailScroll">
         <section class="detail-section" id="dsec-overview"><h3 class="detail-section-title">Overview</h3><div id="dtab-overview"></div></section>
@@ -235,6 +236,7 @@
         <section class="detail-section" id="dsec-certs"><h3 class="detail-section-title">Certifications</h3><div id="dtab-certs"></div></section>
         <section class="detail-section" id="dsec-personnel"><h3 class="detail-section-title">Personnel</h3><div id="dtab-personnel"></div></section>
         <section class="detail-section" id="dsec-rates"><h3 class="detail-section-title">Reference Rates</h3><div id="dtab-rates"></div></section>
+        <section class="detail-section" id="dsec-bids"><h3 class="detail-section-title">Bid History</h3><div id="dtab-bids"></div></section>
       </div>
     </div>
     <div class="modal-footer" id="detailFooter"></div>
@@ -242,9 +244,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810d"></script>
-<script src="assets/js/db.js?v=20260810d"></script>
-<script src="assets/js/ui.js?v=20260810d"></script>
+<script src="assets/js/auth.js?v=20260810e"></script>
+<script src="assets/js/db.js?v=20260810e"></script>
+<script src="assets/js/ui.js?v=20260810e"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -366,7 +368,7 @@ async function openDetailModal(id) {
   renderDetailFooter();
   document.getElementById('detailModal').style.display = 'flex';
   document.getElementById('detailModalBody').scrollTop = 0;
-  await Promise.all([renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates()]);
+  await Promise.all([renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates(), renderDetailBids()]);
   renderDetailOverview();
   _wireDetailScrollSpy();
 }
@@ -608,6 +610,12 @@ async function removeRate(id) {
   if (!confirm('Remove this rate entry?')) return;
   await VendorDb.deleteVendorRate(id);
   await renderDetailRates();
+}
+async function renderDetailBids() {
+  // Read-only per-vendor bid history (+ staff delete). Bids are LOGGED per
+  // work package (WP detail panel), not added here. Delete hidden from plain
+  // viewer (vendor_bids RLS denies that role writes anyway).
+  await BidWidget.mountForVendor('dtab-bids', { vendorId: activeVendor.id, canEdit: userProfile && userProfile.role !== 'viewer' });
 }
 </script>
 </body>

@@ -561,3 +561,169 @@ window.AppNotify = (function(){
     clear: function(){ const h=document.getElementById('app-notify'); if(h) h.innerHTML=''; }
   };
 })();
+
+/* ── BidWidget — vendor bid logging + history (Phase 2b) ──────────────────
+   Two entry points sharing one self-contained widget:
+   • mount(container,{wpId,projectId,canEdit,onChange})  — per-WP Log Bid UI
+     (list + add/edit/delete via VendorDb.upsertBid/deleteBid, with a searchable
+     approved-vendor combobox + inline quick-create). Used by the WP detail
+     panels in index.html / project.html.
+   • mountForVendor(container,{vendorId,canEdit})         — per-vendor Bid
+     History (read-only list + delete). Used by vendors.html detail modal.
+   Bids carry money, so callers must NOT mount for the plain `viewer` role
+   (window.__hideBudget) — vendor_bids RLS also denies that role server-side.
+   Only one WP-detail / one vendor-detail is open at a time, so single module
+   state is safe. Follows the AppNotify/Tooltip self-contained convention. */
+window.BidWidget = (function(){
+  const STATUSES = ['participated','shortlisted','awarded','lost','withdrawn'];
+  const SC = { participated:'#6E6C6C', shortlisted:'#2563EB', awarded:'#2D9B6F', lost:'#EE3124', withdrawn:'#9B9999' };
+  const esc = v => (window.esc ? window.esc(v) : String(v==null?'':v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
+  const money = v => { if (v==null||v==='') return '—'; const n=Number(v); return isNaN(n)?'—':'₱'+Math.round(n).toLocaleString(); };
+  const fdate = d => { if(!d) return ''; try{ return new Date(d).toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'});}catch{return d;} };
+  const cap = s => (s||'').charAt(0).toUpperCase()+(s||'').slice(1);
+  const pill = s => `<span class="bw-pill" style="background:${(SC[s]||'#6E6C6C')}22;color:${SC[s]||'#6E6C6C'}">${esc(s||'participated')}</span>`;
+  const offersOf = b => [b.original_offer!=null?`Orig ${money(b.original_offer)}`:null, b.negotiated_offer!=null?`Neg ${money(b.negotiated_offer)}`:null, b.final_amount!=null?`Final ${money(b.final_amount)}`:null].filter(Boolean).join(' → ') || '—';
+
+  let _cssDone=false, _outsideWired=false;
+  function injectCss(){
+    if (_cssDone) return; _cssDone=true;
+    const s=document.createElement('style'); s.id='bidwidget-css';
+    s.textContent = `
+      .bw-wrap{margin-top:14px}
+      .bw-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+      .bw-title{font-size:0.7143rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em}
+      .bw-add-btn{border:1px solid #EE3124;color:#EE3124;background:#fff;border-radius:8px;padding:4px 10px;font-size:0.75rem;font-weight:600;font-family:inherit;cursor:pointer}
+      .bw-add-btn:hover{background:#FDECEA}
+      .bw-row{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid #f5f5f5}
+      .bw-row:last-child{border-bottom:none}
+      .bw-row-main{flex:1;min-width:0}
+      .bw-vname{font-size:0.8571rem;font-weight:600;color:#231F20;word-break:break-word}
+      .bw-offers{font-size:0.7857rem;color:#555;margin-top:2px}
+      .bw-meta{font-size:0.7143rem;color:#888;margin-top:2px;word-break:break-word}
+      .bw-pill{display:inline-block;font-size:0.6875rem;font-weight:700;padding:1px 7px;border-radius:9px;text-transform:capitalize;margin-left:4px}
+      .bw-icon{background:none;border:none;cursor:pointer;font-size:0.9286rem;padding:2px 4px}
+      .bw-empty{font-size:0.8rem;color:#888;padding:6px 0}
+      .bw-form{background:#f7f7f7;border-radius:8px;padding:10px;margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+      .bw-form input,.bw-form select{padding:7px 9px;border:1px solid #e0e0e0;border-radius:7px;font-size:0.8rem;font-family:inherit;width:100%;box-sizing:border-box}
+      .bw-form .bw-full{grid-column:1/-1}
+      .bw-form-actions{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end}
+      .bw-save{background:#EE3124;color:#fff;border:none;border-radius:7px;padding:8px 14px;font-size:0.8rem;font-weight:600;font-family:inherit;cursor:pointer}
+      .bw-cancel{background:transparent;color:#666;border:1px solid #e0e0e0;border-radius:7px;padding:8px 14px;font-size:0.8rem;font-family:inherit;cursor:pointer}
+      .bw-vc{position:relative}
+      .bw-vc-pop{position:absolute;top:100%;left:0;right:0;z-index:20;background:#fff;border:1px solid #e0e0e0;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.14);max-height:190px;overflow-y:auto;margin-top:2px}
+      .bw-vc-opt{padding:7px 10px;font-size:0.8rem;cursor:pointer}
+      .bw-vc-opt:hover{background:#FDECEA}
+      .bw-vc-new{color:#EE3124;font-weight:600}
+      body.dark-mode .bw-title,body.dark-mode .bw-meta,body.dark-mode .bw-empty{color:var(--text-hint)}
+      body.dark-mode .bw-vname{color:var(--text-primary)}
+      body.dark-mode .bw-offers{color:var(--text-secondary)}
+      body.dark-mode .bw-row{border-bottom-color:var(--border)}
+      body.dark-mode .bw-add-btn{background:transparent}
+      body.dark-mode .bw-form{background:var(--surface-2)}
+      body.dark-mode .bw-form input,body.dark-mode .bw-form select,body.dark-mode .bw-vc-pop{background:var(--surface);color:var(--text-primary);border-color:var(--border-md)}
+      body.dark-mode .bw-vc-opt:hover{background:rgba(238,49,36,.18)}
+      body.dark-mode .bw-cancel{color:var(--text-hint);border-color:var(--border-md)}`;
+    document.head.appendChild(s);
+    if (!_outsideWired){ _outsideWired=true; document.addEventListener('click', e => { if(!e.target.closest('.bw-vc')){ const p=document.getElementById('bw-vc-pop'); if(p) p.style.display='none'; } }); }
+  }
+
+  /* ── per-WP Log Bid ── */
+  let cur=null, _vcResults=[], _vcTimer=null;
+  async function mount(container, opts){
+    injectCss();
+    const el = typeof container==='string' ? document.getElementById(container) : container;
+    if (!el) return;
+    cur = { wpId:opts.wpId, projectId:opts.projectId||null, canEdit:!!opts.canEdit, el, bids:[], editingId:null, vendorId:'', vendorName:'', showForm:false, onChange:opts.onChange||null };
+    await refresh();
+  }
+  async function refresh(){ if(!cur) return; try{ cur.bids = await VendorDb.getBidsForWP(cur.wpId); }catch(e){ cur.bids=[]; } render(); }
+  function render(){
+    if(!cur) return;
+    const rows = cur.bids.length ? cur.bids.map(b=>{
+      const meta=[fdate(b.bid_date)?('Bid '+fdate(b.bid_date)):null, b.award_date?('Awarded '+fdate(b.award_date)):null, b.notes?esc(b.notes):null].filter(Boolean).join(' · ');
+      const act = cur.canEdit ? `<button class="bw-icon" style="color:#2563EB" title="Edit" onclick="BidWidget._edit('${b.id}')"><i class="ti ti-pencil"></i></button><button class="bw-icon" style="color:#EE3124" title="Delete" onclick="BidWidget._del('${b.id}')"><i class="ti ti-trash"></i></button>` : '';
+      return `<div class="bw-row"><div class="bw-row-main"><div class="bw-vname">${esc(b.vendor_name||'(unknown vendor)')}${pill(b.status)}</div><div class="bw-offers">${offersOf(b)}</div>${meta?`<div class="bw-meta">${meta}</div>`:''}</div>${act}</div>`;
+    }).join('') : `<div class="bw-empty">No bids logged for this work package yet.</div>`;
+    const addBtn = cur.canEdit && !cur.showForm ? `<button class="bw-add-btn" onclick="BidWidget._openForm()"><i class="ti ti-plus"></i> Log Bid</button>` : '';
+    let html = `<div class="bw-wrap"><div class="bw-head"><span class="bw-title">Bidding</span>${addBtn}</div>${rows}`;
+    if (cur.canEdit && cur.showForm) html += formHtml();
+    cur.el.innerHTML = html + `</div>`;
+    if (cur.showForm){ const i=document.getElementById('bw-vendor'); if(i && !cur.editingId) i.focus(); }
+  }
+  function formHtml(){
+    const v = cur.editingId ? (cur.bids.find(b=>b.id===cur.editingId)||{}) : {};
+    return `<div class="bw-form">
+      <div class="bw-full bw-vc">
+        <input id="bw-vendor" placeholder="Vendor name" autocomplete="off" value="${esc(cur.vendorName||'')}" ${cur.editingId?'readonly':''} oninput="BidWidget._vc(true)" onfocus="BidWidget._vc(false)">
+        <div id="bw-vc-pop" class="bw-vc-pop" style="display:none"></div>
+      </div>
+      <select id="bw-status">${STATUSES.map(s=>`<option value="${s}"${(v.status||'participated')===s?' selected':''}>${cap(s)}</option>`).join('')}</select>
+      <input id="bw-bid-date" type="date" value="${v.bid_date||''}" title="Bid date">
+      <input id="bw-orig" type="number" step="any" placeholder="Original offer (₱)" value="${v.original_offer??''}">
+      <input id="bw-neg" type="number" step="any" placeholder="Negotiated offer (₱)" value="${v.negotiated_offer??''}">
+      <input id="bw-final" type="number" step="any" placeholder="Final amount (₱)" value="${v.final_amount??''}">
+      <input id="bw-notes" class="bw-full" placeholder="Notes (optional)" value="${esc(v.notes||'')}">
+      <div class="bw-form-actions"><button class="bw-cancel" onclick="BidWidget._cancel()">Cancel</button><button class="bw-save" onclick="BidWidget._save()">${cur.editingId?'Update Bid':'Add Bid'}</button></div>
+    </div>`;
+  }
+  function _openForm(){ if(!cur) return; cur.editingId=null; cur.vendorId=''; cur.vendorName=''; cur.showForm=true; render(); }
+  function _cancel(){ if(!cur) return; cur.showForm=false; cur.editingId=null; cur.vendorId=''; cur.vendorName=''; render(); }
+  function _edit(id){ if(!cur) return; const b=cur.bids.find(x=>x.id===id); if(!b) return; cur.editingId=id; cur.vendorId=b.vendor_id; cur.vendorName=b.vendor_name||''; cur.showForm=true; render(); }
+  async function _del(id){ if(!cur||!confirm('Delete this bid entry?')) return; try{ await VendorDb.deleteBid(id); await refresh(); if(cur.onChange) cur.onChange(); }catch(e){ window.AppNotify?AppNotify.fromError(e,'Could not delete bid'):alert(e.message); } }
+  function _vc(clearId){
+    if(!cur) return;
+    const input=document.getElementById('bw-vendor'), pop=document.getElementById('bw-vc-pop');
+    if(!input||!pop) return;
+    if(cur.editingId){ pop.style.display='none'; return; }
+    if(clearId){ cur.vendorId=''; }
+    cur.vendorName=input.value;
+    const q=input.value.trim();
+    clearTimeout(_vcTimer);
+    _vcTimer=setTimeout(async ()=>{
+      try{ _vcResults = await VendorDb.searchApprovedVendors(q); }catch(e){ _vcResults=[]; }
+      let h = _vcResults.map(v=>`<div class="bw-vc-opt" onclick="BidWidget._vcPick('${v.id}')">${esc(v.name)}</div>`).join('');
+      if(q && !_vcResults.some(v=>v.name.toLowerCase()===q.toLowerCase())) h += `<div class="bw-vc-opt bw-vc-new" onclick="BidWidget._vcAddNew()"><i class="ti ti-plus"></i> Add "${esc(q)}" as a new vendor</div>`;
+      pop.innerHTML = h || `<div class="bw-vc-opt" style="color:#888;cursor:default">No approved vendors match.</div>`;
+      pop.style.display='block';
+    }, 250);
+  }
+  function _vcPick(id){ if(!cur) return; const v=_vcResults.find(x=>x.id===id); if(!v) return; cur.vendorId=v.id; cur.vendorName=v.name; const i=document.getElementById('bw-vendor'); if(i) i.value=v.name; const p=document.getElementById('bw-vc-pop'); if(p) p.style.display='none'; }
+  async function _vcAddNew(){
+    if(!cur) return;
+    const input=document.getElementById('bw-vendor'); const name=(input?input.value:'').trim(); if(!name) return;
+    try{ const v=await VendorDb.quickCreateVendor(name, window.__profile||null); cur.vendorId=v.id; cur.vendorName=v.name; if(input) input.value=v.name; const p=document.getElementById('bw-vc-pop'); if(p) p.style.display='none'; if(window.AppNotify) AppNotify.info('Vendor added as pending review — approve it in the Vendors directory.'); }
+    catch(e){ window.AppNotify?AppNotify.fromError(e,'Could not create vendor'):alert(e.message); }
+  }
+  async function _save(){
+    if(!cur) return;
+    if(!cur.vendorId){ window.AppNotify?AppNotify.warn('Pick a vendor (or add a new one) first.'):alert('Pick a vendor first.'); return; }
+    const num=id=>{ const v=document.getElementById(id).value; return v===''?null:parseFloat(v); };
+    const fields={ status:document.getElementById('bw-status').value, bid_date:document.getElementById('bw-bid-date').value||null, original_offer:num('bw-orig'), negotiated_offer:num('bw-neg'), final_amount:num('bw-final'), notes:document.getElementById('bw-notes').value.trim()||null };
+    try{ await VendorDb.upsertBid(cur.wpId, cur.vendorId, cur.projectId, fields, window.__profile||null); cur.showForm=false; cur.editingId=null; cur.vendorId=''; cur.vendorName=''; await refresh(); if(cur.onChange) cur.onChange(); if(window.AppNotify) AppNotify.success('Bid saved.'); }
+    catch(e){ window.AppNotify?AppNotify.fromError(e,'Could not save bid'):alert(e.message); }
+  }
+
+  /* ── per-vendor Bid History ── */
+  let _vm=null;
+  async function mountForVendor(container, opts){
+    injectCss();
+    const el = typeof container==='string' ? document.getElementById(container) : container;
+    if(!el) return;
+    _vm={ el, vendorId:opts.vendorId, canEdit:!!opts.canEdit };
+    let bids=[]; try{ bids=await VendorDb.getBidsForVendor(opts.vendorId); }catch(e){ bids=[]; }
+    const rows = bids.length ? bids.map(b=>{
+      const wpLabel = b.wp_no?`WP ${esc(b.wp_no)}`:'(unlinked bid)';
+      const meta=[b.wp_description?esc(b.wp_description):null, b.project_id?esc(b.project_id):null, fdate(b.bid_date)?('Bid '+fdate(b.bid_date)):null, b.award_date?('Awarded '+fdate(b.award_date)):null].filter(Boolean).join(' · ');
+      const del = _vm.canEdit ? `<button class="bw-icon" style="color:#EE3124" title="Delete" onclick="BidWidget._delVendor('${b.id}')"><i class="ti ti-trash"></i></button>` : '';
+      return `<div class="bw-row"><div class="bw-row-main"><div class="bw-vname">${wpLabel}${pill(b.status)}</div><div class="bw-offers">${offersOf(b)}</div>${meta?`<div class="bw-meta">${meta}</div>`:''}</div>${del}</div>`;
+    }).join('') : `<div class="bw-empty">No bids recorded for this vendor yet. Bids are logged from a work package's detail panel.</div>`;
+    el.innerHTML = `<div class="bw-wrap">${rows}</div>`;
+  }
+  async function _delVendor(id){
+    if(!_vm||!confirm('Delete this bid entry?')) return;
+    try{ await VendorDb.deleteBid(id); }catch(e){ window.AppNotify?AppNotify.fromError(e,'Could not delete bid'):alert(e.message); return; }
+    mountForVendor(_vm.el, { vendorId:_vm.vendorId, canEdit:_vm.canEdit });
+  }
+
+  return { mount, refresh, render, mountForVendor, _openForm, _cancel, _edit, _del, _vc, _vcPick, _vcAddNew, _save, _delVendor };
+})();

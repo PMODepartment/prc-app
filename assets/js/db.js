@@ -1509,7 +1509,15 @@ const VendorDb = (() => {
     const sb = await getSB();
     const { data, error } = await sb.from('vendor_bids').select('*').eq('vendor_id', vendorId).order('created_at', { ascending: false });
     if (error) { if (_isMissingBidsTable(error)) return []; throw error; }
-    return data || [];
+    const rows = data || [];
+    if (!rows.length) return rows;
+    // Merge in WP No. + description so the per-vendor Bid History can show
+    // WHAT each bid was for (mirrors getBidsForWP's vendor-name merge).
+    const wpIds = [...new Set(rows.map(r => r.wp_id).filter(Boolean))];
+    if (!wpIds.length) return rows;
+    const { data: wps } = await sb.from('work_packages').select('id,wp_no,description').in('id', wpIds);
+    const byId = {}; (wps || []).forEach(w => { byId[w.id] = w; });
+    return rows.map(r => ({ ...r, wp_no: byId[r.wp_id]?.wp_no || null, wp_description: byId[r.wp_id]?.description || null }));
   }
   async function upsertBid(wpId, vendorId, projectId, fields, profile) {
     const sb = await getSB();
