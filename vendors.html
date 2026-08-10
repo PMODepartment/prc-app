@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810o"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810o"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810o"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810p"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810p"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810p"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810o">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810p">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -118,6 +118,7 @@
     .seg-chip input{border:none;background:transparent;color:inherit;font:inherit;padding:0;width:auto;min-width:40px;outline:none}
     .seg-chip .seg-x{cursor:pointer;font-weight:700;opacity:.6;padding:0 2px}
     .seg-chip .seg-x:hover{opacity:1}
+    .seg-match{display:inline-flex;align-items:center;gap:3px;background:#D1FAE5;color:#065F46;padding:1px 7px;border-radius:10px;font-size:0.7143rem;font-weight:600;white-space:nowrap}
     .seg-add{display:flex;gap:6px;align-items:center;margin-bottom:8px}
     .seg-add input{padding:5px 9px;border:1px solid #e5e5e5;border-radius:8px;font-size:0.8rem;font-family:inherit;flex:1;min-width:100px}
     .split-row-actions{display:flex;gap:8px}
@@ -138,6 +139,7 @@
     body.dark-mode .split-row,body.dark-mode .mg-card{border-color:var(--border)}
     body.dark-mode .split-orig,body.dark-mode .mg-src-list label{color:var(--text-primary)}
     body.dark-mode .seg-chip{background:rgba(238,49,36,.18);color:#FF9E96}
+    body.dark-mode .seg-match{background:rgba(22,163,74,.22);color:#5FD3A3}
     body.dark-mode .btn-skip{color:var(--text-hint);border-color:var(--border-md)!important}
     body.dark-mode .split-empty,body.dark-mode .mg-card-title,body.dark-mode .mg-truncate-note,body.dark-mode .section-divider{color:var(--text-hint)}
     body.dark-mode .mg-keep-row{background:#102B1F}
@@ -392,10 +394,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810o"></script>
-<script src="assets/js/db.js?v=20260810o"></script>
-<script src="assets/js/ui.js?v=20260810o"></script>
-<script src="assets/js/onboarding.js?v=20260810o"></script>
+<script src="assets/js/auth.js?v=20260810p"></script>
+<script src="assets/js/db.js?v=20260810p"></script>
+<script src="assets/js/ui.js?v=20260810p"></script>
+<script src="assets/js/onboarding.js?v=20260810p"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -705,16 +707,37 @@ function openSplitModal() {
   document.getElementById('splitModal').style.display = 'flex';
 }
 function closeSplitModal() { document.getElementById('splitModal').style.display = 'none'; }
+// Finds an already-existing vendor whose name normalizes to the same
+// value as `name` (case/punctuation/whitespace-insensitive, same
+// normalization Merge's duplicate-suggestion uses) — excludes `excludeId`
+// so a vendor never "matches itself" while being split. Used so Split
+// LINKS a segment to an existing directory record instead of always
+// creating a new one, which would otherwise silently duplicate any
+// segment name that already has its own clean vendor row elsewhere.
+function _findExistingVendorByName(name, excludeId) {
+  const norm = _mgNormalize(name);
+  if (!norm) return null;
+  return allVendors.find(v => v.id !== excludeId && _mgNormalize(v.name) === norm) || null;
+}
 function renderSplitList() {
   const cands = _splitCandidates();
   const el = document.getElementById('splitList');
   if (!cands.length) { el.innerHTML = '<div class="split-empty">No garbled vendor names left to review.</div>'; return; }
   el.innerHTML = cands.map(v => {
     const segs = _splitSegs[v.id] || [];
-    const chips = segs.map((s, i) => `<span class="seg-chip">
+    const chips = segs.map((s, i) => {
+      const match = _findExistingVendorByName(s, v.id);
+      return `<span class="seg-chip">
         <input type="text" value="${esc(s)}" data-vid="${v.id}" data-idx="${i}" onchange="_splitSegEdit(this)" style="width:${Math.max(40, s.length * 7)}px">
         <span class="seg-x" onclick="_splitSegRemove('${v.id}',${i})" title="Remove segment">&times;</span>
-      </span>`).join('');
+        ${match ? `<span class="seg-match" title="Will LINK to the existing vendor “${esc(match.name)}” instead of creating a new one"><i class="ti ti-link"></i> links to existing</span>` : ''}
+      </span>`;
+    }).join('');
+    const linkCount = segs.filter(s => _findExistingVendorByName(s, v.id)).length;
+    const newCount = segs.length - linkCount;
+    const summary = segs.length
+      ? `${newCount ? newCount + ' new' : ''}${newCount && linkCount ? ' + ' : ''}${linkCount ? linkCount + ' linked to existing' : ''}`
+      : '';
     return `<div class="split-row" id="split-row-${v.id}">
       <div class="split-orig">${esc(v.name)}</div>
       <div class="split-segs" id="split-segs-${v.id}">${chips}</div>
@@ -723,7 +746,7 @@ function renderSplitList() {
         <button class="btn-cancel" style="padding:5px 10px" onclick="_splitSegAdd('${v.id}')">Add</button>
       </div>
       <div class="split-row-actions">
-        <button class="btn-split" onclick="doSplit('${v.id}')">Split into ${segs.length || 0} vendor${segs.length===1?'':'s'}</button>
+        <button class="btn-split" onclick="doSplit('${v.id}')">Split (${summary || (segs.length||0)+' vendors'})</button>
         <button class="btn-skip" onclick="skipSplit('${v.id}')">Skip</button>
       </div>
     </div>`;
@@ -732,6 +755,7 @@ function renderSplitList() {
 function _splitSegEdit(input) {
   const vid = input.dataset.vid, idx = +input.dataset.idx;
   if (_splitSegs[vid]) _splitSegs[vid][idx] = input.value.trim();
+  renderSplitList();
 }
 function _splitSegRemove(vid, idx) {
   if (!_splitSegs[vid]) return;
@@ -749,17 +773,26 @@ async function doSplit(vendorId) {
   const v = allVendors.find(x => x.id === vendorId);
   const segs = (_splitSegs[vendorId] || []).map(s => s.trim()).filter(Boolean);
   if (segs.length < 2) { AppNotify ? AppNotify.warn('Need at least 2 segments to split — edit or remove segments, or Skip this row.') : alert('Need at least 2 segments to split.'); return; }
-  if (!confirm(`Split "${v ? v.name : ''}" into ${segs.length} separate vendors (${segs.join(', ')})?\n\nThe original garbled record and any of its own products/certifications/personnel/rates/bids will be permanently deleted. Any work packages currently linked to it will need to be manually re-linked to the correct new vendor afterward — this tool does not attempt to redistribute those links.\n\nThis cannot be undone.`)) return;
+  const plan = segs.map(seg => ({ seg, match: _findExistingVendorByName(seg, vendorId) }));
+  const newOnes = plan.filter(p => !p.match);
+  const linked = plan.filter(p => p.match);
+  const planText = plan.map(p => p.match ? `${p.seg} (→ links to existing "${p.match.name}")` : `${p.seg} (new)`).join('\n  ');
+  if (!confirm(`Split "${v ? v.name : ''}" into ${segs.length} vendors?\n\n  ${planText}\n\n${newOnes.length} new vendor record(s) will be created; ${linked.length} segment(s) already match an existing vendor and will be linked to it (its trade categories are updated, no duplicate is created).\n\nThe original garbled record and any of its own products/certifications/personnel/rates/bids will be permanently deleted. Any work packages currently linked to it will need to be manually re-linked to the correct new/linked vendor afterward — this tool does not attempt to redistribute those links.\n\nThis cannot be undone.`)) return;
   try {
-    for (const seg of segs) {
-      await VendorDb.createVendor({ name: seg, trade_categories: v ? (v.trade_categories || []) : [], invite_email: _addVendorPlaceholderEmail() }, userProfile);
+    for (const { seg, match } of plan) {
+      if (match) {
+        const union = Array.from(new Set([...(match.trade_categories || []), ...((v && v.trade_categories) || [])]));
+        if (union.length !== (match.trade_categories || []).length) await VendorDb.updateVendor(match.id, { trade_categories: union });
+      } else {
+        await VendorDb.createVendor({ name: seg, trade_categories: v ? (v.trade_categories || []) : [], invite_email: _addVendorPlaceholderEmail() }, userProfile);
+      }
     }
     await VendorDb.deleteVendorCascade(vendorId);
     _splitSkipped.delete(vendorId);
     delete _splitSegs[vendorId];
     await loadAll();
     renderSplitList();
-    AppNotify && AppNotify.success(`Split into ${segs.length} vendors.`);
+    AppNotify && AppNotify.success(`Split complete — ${newOnes.length} new vendor(s) created, ${linked.length} linked to existing.`);
   } catch (e) { AppNotify ? AppNotify.fromError(e, 'Split failed') : alert(e.message); }
 }
 function skipSplit(vendorId) {
