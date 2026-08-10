@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810m"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810m"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810m"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810n"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810n"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810n"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810m">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810n">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -392,10 +392,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810m"></script>
-<script src="assets/js/db.js?v=20260810m"></script>
-<script src="assets/js/ui.js?v=20260810m"></script>
-<script src="assets/js/onboarding.js?v=20260810m"></script>
+<script src="assets/js/auth.js?v=20260810n"></script>
+<script src="assets/js/db.js?v=20260810n"></script>
+<script src="assets/js/ui.js?v=20260810n"></script>
+<script src="assets/js/onboarding.js?v=20260810n"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -637,16 +637,21 @@ async function doMerge() {
    own name has a comma) are expected and handled by manual review/Skip —
    this tool never auto-executes a split. */
 let _splitSkipped = new Set();
-// Garbled multi-name entries use comma AND/OR slash as the delimiter
-// (source cells like "A, B / C" or "A / B / C") — detect either. A bare
-// legal suffix fragment ("Inc.", "Corp", "Ltd", "LLC", "Co.") after a comma
-// is NOT a separate vendor — "Abenson Ventures, Inc." is one real company,
-// not two — so it's merged back onto the preceding segment rather than
-// treated as its own split candidate.
-const SPLIT_DELIM_RE = /[,/]/;
+// Garbled multi-name entries use comma, slash, semicolon, pipe, or a
+// literal newline as the delimiter — the same set _wpVendors()/proposed_vendors
+// parsing already treats as multi-vendor separators elsewhere in this app
+// (newline/semicolon/pipe), plus comma/slash (which those helpers deliberately
+// exclude, since a real company name can legitimately contain one — but a
+// bulk-imported single-value `contractor` field was never split on ANYTHING,
+// so all of these can show up ungarbled here). A bare legal suffix fragment
+// ("Inc.", "Corp", "Ltd", "LLC", "Co.") after a comma is NOT a separate
+// vendor — "Abenson Ventures, Inc." is one real company, not two — so it's
+// merged back onto the preceding segment rather than treated as its own
+// split candidate.
+const SPLIT_DELIM_RE = /[,/;|\r\n]/;
 const CORP_SUFFIX_RE = /^(inc\.?|incorporated|corp\.?|corporation|ltd\.?|limited|llc\.?|co\.?|company)$/i;
 function _splitSegments(name) {
-  const raw = (name || '').split(/[,/]+/).map(s => s.trim()).filter(Boolean);
+  const raw = (name || '').split(/[,/;|\r\n]+/).map(s => s.trim()).filter(Boolean);
   const merged = [];
   for (const seg of raw) {
     if (CORP_SUFFIX_RE.test(seg) && merged.length) merged[merged.length - 1] += ', ' + seg;
