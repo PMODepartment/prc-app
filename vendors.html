@@ -183,7 +183,10 @@
         <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
         <div class="page-title">Vendor Management</div>
       </div>
-      <div class="topbar-right"><div id="user-bar"></div></div>
+      <div class="topbar-right">
+        <button class="btn-refresh" id="btn-refresh-v" title="Refresh" aria-label="Refresh vendors" onclick="refreshVendors()"><i class="ti ti-refresh"></i></button>
+        <div id="user-bar"></div>
+      </div>
     </div>
     <div class="content" id="main-content-region" role="main" tabindex="-1">
       <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading vendors…</span></div>
@@ -316,6 +319,7 @@
 <script src="assets/js/auth.js?v=20260810f"></script>
 <script src="assets/js/db.js?v=20260810f"></script>
 <script src="assets/js/ui.js?v=20260810f"></script>
+<script src="assets/js/onboarding.js?v=20260810f"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -347,6 +351,12 @@ async function loadAll() {
   renderKpis();
   renderVendorList();
   buildInviteChips();
+}
+
+async function refreshVendors() {
+  const b = document.getElementById('btn-refresh-v'), i = b && b.querySelector('i');
+  if (b) b.disabled = true; if (i) i.classList.add('spin');
+  try { await loadAll(); } finally { if (b) b.disabled = false; if (i) i.classList.remove('spin'); }
 }
 
 let _vendorView = 'cards';
