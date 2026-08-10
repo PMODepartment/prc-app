@@ -30,6 +30,32 @@
     .v-table th{font-size:0.7143rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#999;padding:9px 10px;text-align:left;border-bottom:2px solid #f0f0f0;background:#fafafa;white-space:nowrap}
     .v-table td{padding:10px 10px;font-size:0.9286rem;color:#231F20;border-bottom:1px solid #f5f5f5;vertical-align:middle}
     .v-table tr:hover td{background:#fafafa;cursor:pointer}
+    /* View toggle (Cards | Table) */
+    .view-toggle{display:inline-flex;border:1.5px solid #e5e5e5;border-radius:8px;overflow:hidden;flex-shrink:0}
+    .view-toggle button{border:none;background:#fff;padding:8px 12px;font-size:0.8rem;font-family:inherit;cursor:pointer;color:#888;display:flex;align-items:center;gap:5px}
+    .view-toggle button.active{background:#231F20;color:#fff}
+    /* Vendor cards */
+    .vendor-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+    .vcard{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;cursor:pointer;display:flex;flex-direction:column;gap:11px;transition:box-shadow .15s,border-color .15s,transform .15s}
+    .vcard:hover{box-shadow:0 8px 22px rgba(0,0,0,.08);border-color:#EE3124;transform:translateY(-1px)}
+    .vcard:focus-visible{outline:2px solid #EE3124;outline-offset:2px}
+    .vcard-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+    .vcard-idwrap{display:flex;gap:11px;align-items:center;min-width:0}
+    .vcard-avatar{width:42px;height:42px;border-radius:10px;background:#FDECEA;color:#EE3124;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9286rem;flex-shrink:0}
+    .vcard-name{font-size:1rem;font-weight:700;color:#231F20;line-height:1.25;word-break:break-word}
+    .vcard-sub{font-size:0.7143rem;color:#999;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .vcard-trades{display:flex;flex-wrap:wrap;gap:4px;min-height:20px}
+    .vcard-chip{font-size:0.6875rem;font-weight:600;background:#FDECEA;color:#C42127;padding:2px 8px;border-radius:10px}
+    .vcard-chip.more{background:#f0f0f0;color:#666}
+    .vcard-chip.none{background:#f5f5f5;color:#aaa}
+    .vcard-contact{font-size:0.7857rem;color:#666;display:flex;flex-direction:column;gap:4px}
+    .vcard-contact div{display:flex;align-items:center;gap:7px;min-width:0}
+    .vcard-contact i{color:#bbb;font-size:0.9rem;width:15px;text-align:center;flex-shrink:0}
+    .vcard-contact span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .vcard-foot{display:flex;gap:6px;align-items:center;margin-top:auto;padding-top:11px;border-top:1px solid #f5f5f5}
+    .vcard-foot .action-btn{flex:1;text-align:center}
+    .vcard-foot .view-hint{margin-left:auto;font-size:0.75rem;color:#aaa;font-weight:600;display:flex;align-items:center;gap:4px}
+    .vcard-empty{grid-column:1/-1;text-align:center;color:#888;padding:44px 0;font-size:0.9286rem}
     .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7857rem;font-weight:600}
     .badge-pending_review{background:#FEF3C7;color:#92400E}
     .badge-approved{background:#D1FAE5;color:#065F46}
@@ -82,6 +108,17 @@
     body.dark-mode .section-card{background:var(--surface);border-color:var(--border)}
     body.dark-mode .v-table th{background:var(--surface-2);color:var(--text-hint);border-bottom-color:var(--border)}
     body.dark-mode .v-table td{color:var(--text-primary);border-bottom-color:var(--border)}
+    body.dark-mode .view-toggle{border-color:var(--border-md)}
+    body.dark-mode .view-toggle button{background:var(--surface);color:var(--text-hint)}
+    body.dark-mode .view-toggle button.active{background:var(--mw-red);color:#fff}
+    body.dark-mode .vcard{background:var(--surface);border-color:var(--border)}
+    body.dark-mode .vcard:hover{border-color:var(--mw-red)}
+    body.dark-mode .vcard-name{color:var(--text-primary)}
+    body.dark-mode .vcard-sub,body.dark-mode .vcard-contact{color:var(--text-hint)}
+    body.dark-mode .vcard-avatar{background:rgba(238,49,36,.18);color:#FF7A6E}
+    body.dark-mode .vcard-chip{background:rgba(238,49,36,.18);color:#FF9E96}
+    body.dark-mode .vcard-chip.more,body.dark-mode .vcard-chip.none{background:var(--surface-2);color:var(--text-hint)}
+    body.dark-mode .vcard-foot{border-top-color:var(--border)}
     body.dark-mode .v-table tr:hover td{background:var(--surface-2)}
     body.dark-mode #vendor-search,body.dark-mode #vendor-status-filter{background:var(--surface-2);color:var(--text-primary);border-color:var(--border-md)}
     body.dark-mode .btn-reject-row{background:var(--surface-2);color:var(--text-primary)}
@@ -158,22 +195,27 @@
             <div class="kpi-card"><div class="kpi-value" id="kpiApproved" style="color:#065F46">—</div><div class="kpi-label">Approved</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiRejected" style="color:#6B7280">—</div><div class="kpi-label">Rejected / Inactive</div></div>
           </div>
-          <div class="section-card">
-            <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
-              <div style="position:relative;flex:1;min-width:200px">
-                <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#aaa;font-size:1rem;pointer-events:none"></i>
-                <input id="vendor-search" type="text" placeholder="Search by company name…" oninput="renderTable()"
-                  style="width:100%;padding:8px 12px 8px 34px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;outline:none">
-              </div>
-              <select id="vendor-status-filter" onchange="renderTable()" style="padding:8px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:#fff;color:#231F20">
-                <option value="all">All Statuses</option>
-                <option value="pending_review">Pending Review</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="inactive">Inactive</option>
-              </select>
-              <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Invite Vendor</button>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+            <div style="position:relative;flex:1;min-width:200px">
+              <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#aaa;font-size:1rem;pointer-events:none"></i>
+              <input id="vendor-search" type="text" placeholder="Search by company name…" oninput="renderVendorList()"
+                style="width:100%;padding:8px 12px 8px 34px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;outline:none">
             </div>
+            <select id="vendor-status-filter" onchange="renderVendorList()" style="padding:8px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:#fff;color:#231F20">
+              <option value="all">All Statuses</option>
+              <option value="pending_review">Pending Review</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <div class="view-toggle" role="group" aria-label="View mode">
+              <button id="vv-cards" class="active" onclick="setVendorView('cards')" aria-label="Card view"><i class="ti ti-layout-grid"></i> Cards</button>
+              <button id="vv-table" onclick="setVendorView('table')" aria-label="Table view"><i class="ti ti-table"></i> Table</button>
+            </div>
+            <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Invite Vendor</button>
+          </div>
+          <div class="vendor-cards" id="vendorCards"></div>
+          <div class="section-card" id="vendorTableWrap" style="display:none">
             <div class="table-wrapper">
               <table class="v-table">
                 <thead><tr>
@@ -266,8 +308,65 @@ async function loadAll() {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('main-content').style.display = '';
   renderKpis();
-  renderTable();
+  renderVendorList();
   buildInviteChips();
+}
+
+let _vendorView = 'cards';
+function setVendorView(v) {
+  _vendorView = v;
+  document.getElementById('vv-cards').classList.toggle('active', v === 'cards');
+  document.getElementById('vv-table').classList.toggle('active', v === 'table');
+  document.getElementById('vendorCards').style.display = v === 'cards' ? 'grid' : 'none';
+  document.getElementById('vendorTableWrap').style.display = v === 'table' ? 'block' : 'none';
+  renderVendorList();
+}
+function _vendorFiltered() {
+  const q = (document.getElementById('vendor-search').value || '').toLowerCase();
+  const statusF = document.getElementById('vendor-status-filter').value;
+  return allVendors.filter(v =>
+    (statusF === 'all' || v.status === statusF) &&
+    (!q || (v.name || '').toLowerCase().includes(q))
+  );
+}
+function renderVendorList() { _vendorView === 'table' ? renderTable() : renderCards(); }
+function _initials(name) {
+  const p = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return '?';
+  return (p.length === 1 ? p[0].slice(0, 2) : p[0][0] + p[p.length - 1][0]).toUpperCase();
+}
+function renderCards() {
+  const rows = _vendorFiltered();
+  const el = document.getElementById('vendorCards');
+  if (!rows.length) { el.innerHTML = '<div class="vcard-empty">No vendors found.</div>'; return; }
+  el.innerHTML = rows.map(v => {
+    const trades = v.trade_categories || [];
+    const shown = trades.slice(0, 3), moreN = trades.length - shown.length;
+    const chips = trades.length
+      ? shown.map(t => `<span class="vcard-chip">${esc(t)}</span>`).join('') + (moreN > 0 ? `<span class="vcard-chip more">+${moreN}</span>` : '')
+      : '<span class="vcard-chip none">No trades listed</span>';
+    const email = v.contact_email || v.invite_email;
+    const contact = [
+      v.contact_person ? `<div><i class="ti ti-user"></i><span>${esc(v.contact_person)}</span></div>` : '',
+      email ? `<div><i class="ti ti-mail"></i><span>${esc(email)}</span></div>` : '',
+      v.contact_number ? `<div><i class="ti ti-phone"></i><span>${esc(v.contact_number)}</span></div>` : '',
+    ].filter(Boolean).join('') || '<div style="color:#bbb">No contact details yet</div>';
+    const foot = v.status === 'pending_review'
+      ? `<button class="action-btn btn-approve-row" onclick="event.stopPropagation();quickApprove('${v.id}')">Approve</button><button class="action-btn btn-reject-row" onclick="event.stopPropagation();quickReject('${v.id}')">Reject</button>`
+      : `<span class="view-hint">View profile <i class="ti ti-arrow-right"></i></span>`;
+    return `<div class="vcard" tabindex="0" role="button" onclick="openDetailModal('${v.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetailModal('${v.id}')}">
+      <div class="vcard-head">
+        <div class="vcard-idwrap">
+          <div class="vcard-avatar">${esc(_initials(v.name))}</div>
+          <div style="min-width:0"><div class="vcard-name">${esc(v.name)}</div><div class="vcard-sub">${esc(v.contact_person || email || '—')}</div></div>
+        </div>
+        <span class="badge badge-${v.status}">${esc(v.status.replace('_',' '))}</span>
+      </div>
+      <div class="vcard-trades">${chips}</div>
+      <div class="vcard-contact">${contact}</div>
+      <div class="vcard-foot">${foot}</div>
+    </div>`;
+  }).join('');
 }
 
 function renderKpis() {
@@ -278,12 +377,7 @@ function renderKpis() {
 }
 
 function renderTable() {
-  const q = (document.getElementById('vendor-search').value || '').toLowerCase();
-  const statusF = document.getElementById('vendor-status-filter').value;
-  const rows = allVendors.filter(v =>
-    (statusF === 'all' || v.status === statusF) &&
-    (!q || (v.name || '').toLowerCase().includes(q))
-  );
+  const rows = _vendorFiltered();
   const tbody = document.getElementById('vendorTableBody');
   if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888;padding:24px">No vendors found.</td></tr>'; return; }
   tbody.innerHTML = rows.map(v => `
@@ -451,7 +545,7 @@ async function saveDetailOverview() {
     document.getElementById('detailTitle').textContent = activeVendor.name;
     document.getElementById('detailSub').innerHTML = `<span class="badge badge-${activeVendor.status}">${esc(activeVendor.status.replace('_',' '))}</span>`;
     renderDetailFooter();
-    renderTable();
+    renderVendorList();
     renderKpis();
     AppNotify && AppNotify.success('Vendor info saved.');
     renderDetailOverview();
