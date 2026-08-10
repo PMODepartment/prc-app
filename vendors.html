@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810n"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810n"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810n"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810o"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810o"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810o"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810n">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810o">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -392,10 +392,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810n"></script>
-<script src="assets/js/db.js?v=20260810n"></script>
-<script src="assets/js/ui.js?v=20260810n"></script>
-<script src="assets/js/onboarding.js?v=20260810n"></script>
+<script src="assets/js/auth.js?v=20260810o"></script>
+<script src="assets/js/db.js?v=20260810o"></script>
+<script src="assets/js/ui.js?v=20260810o"></script>
+<script src="assets/js/onboarding.js?v=20260810o"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -637,21 +637,48 @@ async function doMerge() {
    own name has a comma) are expected and handled by manual review/Skip —
    this tool never auto-executes a split. */
 let _splitSkipped = new Set();
-// Garbled multi-name entries use comma, slash, semicolon, pipe, or a
+// Garbled multi-name entries use comma, slash, semicolon, colon, pipe, or a
 // literal newline as the delimiter — the same set _wpVendors()/proposed_vendors
 // parsing already treats as multi-vendor separators elsewhere in this app
-// (newline/semicolon/pipe), plus comma/slash (which those helpers deliberately
-// exclude, since a real company name can legitimately contain one — but a
-// bulk-imported single-value `contractor` field was never split on ANYTHING,
-// so all of these can show up ungarbled here). A bare legal suffix fragment
-// ("Inc.", "Corp", "Ltd", "LLC", "Co.") after a comma is NOT a separate
-// vendor — "Abenson Ventures, Inc." is one real company, not two — so it's
-// merged back onto the preceding segment rather than treated as its own
-// split candidate.
-const SPLIT_DELIM_RE = /[,/;|\r\n]/;
+// (newline/semicolon/pipe), plus comma/slash/colon (which those helpers
+// deliberately exclude, since a real company name can legitimately contain
+// one — but a bulk-imported single-value `contractor` field was never split
+// on ANYTHING, so all of these can show up ungarbled here). A bare legal
+// suffix fragment ("Inc.", "Corp", "Ltd", "LLC", "Co.") after a delimiter is
+// NOT a separate vendor — "Abenson Ventures, Inc." is one real company, not
+// two — so it's merged back onto the preceding segment rather than treated
+// as its own split candidate.
+const SPLIT_DELIM_RE = /[,/;:|\r\n]/;
 const CORP_SUFFIX_RE = /^(inc\.?|incorporated|corp\.?|corporation|ltd\.?|limited|llc\.?|co\.?|company)$/i;
+// A REAL sample of ~1,000 imported vendors (live-DB audit, 2026-08-10) showed
+// entries with NO delimiter character at all — company names just run
+// together, e.g. "Meralco Energy Inc. Maxrate Construction Inc. Top One
+// Construction..." — separated only by a recurring legal-suffix word. A
+// single genuine company name has that suffix word ONCE, at the very end
+// ("Megawide Construction Corporation - BU Formworks" is correctly left
+// alone — only 1 occurrence). TWO OR MORE occurrences anywhere in the name
+// is a strong signal of several concatenated companies, so as a fallback
+// (only tried when no delimiter character split the name into 2+ pieces) a
+// split point is inserted right after every suffix occurrence that isn't
+// the very last token in the string.
+const SUFFIX_TOKEN_RE = /\b(?:inc|incorporated|corp|corporation|ltd|limited|llc|co|company)\b\.?/gi;
+const SUFFIX_BOUNDARY_RE = /\b(inc|incorporated|corp|corporation|ltd|limited|llc|co|company)\b\.?/gi;
+function _countSuffixTokens(name) {
+  const m = (name || '').match(SUFFIX_TOKEN_RE);
+  return m ? m.length : 0;
+}
+function _splitOnSuffixRuns(name) {
+  const marker = ' ';
+  const marked = (name || '').replace(SUFFIX_BOUNDARY_RE, (m, suffix, offset, str) => {
+    const rest = str.slice(offset + m.length);
+    return /[A-Za-z0-9]/.test(rest) ? m + marker : m;
+  });
+  return marked.split(marker).map(s => s.trim()).filter(Boolean);
+}
 function _splitSegments(name) {
-  const raw = (name || '').split(/[,/;|\r\n]+/).map(s => s.trim()).filter(Boolean);
+  const n = name || '';
+  let raw = n.split(/[,/;:|\r\n]+/).map(s => s.trim()).filter(Boolean);
+  if (raw.length < 2 && _countSuffixTokens(n) >= 2) raw = _splitOnSuffixRuns(n);
   const merged = [];
   for (const seg of raw) {
     if (CORP_SUFFIX_RE.test(seg) && merged.length) merged[merged.length - 1] += ', ' + seg;
@@ -660,7 +687,7 @@ function _splitSegments(name) {
   return merged;
 }
 function _splitCandidates() {
-  return allVendors.filter(v => SPLIT_DELIM_RE.test(v.name || '') && _splitSegments(v.name).length >= 2 && !_splitSkipped.has(v.id));
+  return allVendors.filter(v => _splitSegments(v.name).length >= 2 && !_splitSkipped.has(v.id));
 }
 function updateSplitBadge() {
   const n = _splitCandidates().length;
