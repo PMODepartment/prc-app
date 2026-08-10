@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810w"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810w"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810w"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810y"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810y"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810y"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810w">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810y">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -322,6 +322,7 @@
               <div class="tools-menu" id="toolsMenu" style="display:none">
                 <button onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs</span><small>Scan work packages for vendors not yet in the directory</small></button>
                 <button onclick="closeToolsMenu();backfillFromWPs()"><i class="ti ti-refresh-dot"></i><span>Backfill Trade/Bid Data</span><small>Fill in trades, products, bid history and rates from WPs</small></button>
+                <button onclick="closeToolsMenu();normalizeVendorTrades()"><i class="ti ti-tags"></i><span>Normalize Trades</span><small>Collapse trade variants (e.g. "GENERAL REQUIREMENT" → "General Requirements") to the 10 standard trades</small></button>
                 <button onclick="closeToolsMenu();openMergeModal()"><i class="ti ti-arrows-join"></i><span>Merge Duplicates</span><small>Combine records that are the same company under different names</small></button>
                 <button id="tools-menu-split" onclick="closeToolsMenu();openSplitModal()"><i class="ti ti-cut"></i><span>Needs Splitting <span class="tools-menu-badge" id="split-count-badge" style="display:none"><span id="split-count">0</span></span></span><small>Records that look like several companies joined together</small></button>
               </div>
@@ -479,9 +480,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810w"></script>
-<script src="assets/js/db.js?v=20260810w"></script>
-<script src="assets/js/ui.js?v=20260810w"></script>
+<script src="assets/js/auth.js?v=20260810y"></script>
+<script src="assets/js/db.js?v=20260810y"></script>
+<script src="assets/js/ui.js?v=20260810y"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -519,6 +520,12 @@ let _vendorProductText = {};  // vendorId -> lowercased "category description �
 async function loadAll() {
   try { allVendors = await VendorDb.getVendors(); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not load vendors') : alert(e.message); allVendors = []; }
+  // Normalize trade_categories to the 10 canonical trades for DISPLAY (casing/
+  // label variants from the WP-derived import — "GENERAL REQUIREMENT" vs
+  // "General Requirements" — collapse). Non-destructive: the DB isn't touched
+  // until a vendor is saved or the "Normalize Trades" cleanup runs. Uses the
+  // shared window.CanonTrades from db.js.
+  if (window.CanonTrades) allVendors.forEach(v => { v.trade_categories = window.CanonTrades(v.trade_categories); });
   // Load products once so the directory search can also match a vendor's
   // products/services (one query; degrades to name+trade search if it fails).
   _vendorProductText = {};
@@ -731,6 +738,37 @@ async function backfillFromWPs() {
     }
   } catch (e) { AppNotify ? AppNotify.fromError(e, 'Backfill failed') : alert(e.message); }
   finally { _backfillRunning = false; }
+}
+
+/* ── Normalize trade categories to the 10 canonical trades (one-time, DB) ── */
+let _normTradesRunning = false;
+async function normalizeVendorTrades() {
+  if (_normTradesRunning) { AppNotify && AppNotify.info('Already running…'); return; }
+  if (!window.CanonTrades) { AppNotify && AppNotify.error('Trade normalizer unavailable (db.js not loaded).'); return; }
+  // Fetch RAW stored values (loadAll normalizes allVendors in memory, so we
+  // can't detect DB drift from that copy) and update only those that differ.
+  let raw;
+  try { raw = await VendorDb.getVendors(); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not load vendors') : alert(e.message); return; }
+  const todo = raw.map(v => ({ v, canon: window.CanonTrades(v.trade_categories) }))
+    .filter(({ v, canon }) => {
+      const orig = v.trade_categories || [];
+      return canon.length !== orig.length || canon.some((t, i) => t !== orig[i]);
+    });
+  if (!todo.length) { AppNotify && AppNotify.success('All vendor trades are already standardized.'); return; }
+  if (!confirm(`Standardize trade categories on ${todo.length} vendor(s)?\n\nVariants like "GENERAL REQUIREMENT" and "General Requirements" collapse into one canonical trade, and duplicates within a vendor are removed. This writes to the directory and cannot be auto-undone (but is safe to re-run).`)) return;
+  _normTradesRunning = true;
+  AppNotify && AppNotify.info(`Standardizing trades on ${todo.length} vendor(s)…`);
+  let ok = 0; const failed = []; let firstErr = null;
+  for (const { v, canon } of todo) {
+    try { await VendorDb.updateVendor(v.id, { trade_categories: canon }); ok++; }
+    catch (e) { failed.push(v.id); if (!firstErr) firstErr = (e && (e.message || e.hint)) || String(e); console.error('[normalizeVendorTrades] failed', v.id, e); }
+  }
+  await loadAll();
+  renderVendorList();
+  _normTradesRunning = false;
+  if (failed.length) AppNotify && AppNotify.error(`Standardized ${ok} vendor(s); ${failed.length} failed — safe to re-run.`, { title: 'Normalize Trades finished with errors', detail: firstErr });
+  else AppNotify && AppNotify.success(`Standardized trades on ${ok} vendor(s).`);
 }
 
 /* ── Modal scroll lock ── keep the background page from scrolling while any

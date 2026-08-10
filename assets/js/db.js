@@ -1373,6 +1373,58 @@ window.WPCsv = (function(){
    by the vendor_edit_guard trigger — see MIGRATION_vendor_management.sql).
    vendor_rates is staff-only. Phase 2b adds work_packages.vendor_id +
    vendor_bids on top of this — not present yet. */
+/* ── Canonical trade normalizer (shared) ────────────────────────────
+   Vendor trade_categories were seeded from RAW work-package trade strings
+   (importVendorsFromWPs / backfillVendorDataFromWPs), which are only
+   normalized at DISPLAY time on the WP dashboards (index/project inline
+   normTrade), never in the DB. That let casing/label variants pile up on
+   vendors — "GENERAL REQUIREMENT" vs "General Requirements", "ARCHITECTURAL
+   WORKS" vs "Architectural works". This mirrors that inline normTrade
+   (keep in sync with index.html/project.html/import-monitoring.html) so the
+   vendor write paths + vendors.html can collapse them to the 10 canonical
+   trades. `window.CanonTrades(arr)` maps + de-dups (case-insensitively) +
+   preserves first-seen order. */
+const _CANON_TRADE_MAP = {
+  'general requirement':'General Requirements','general requirements':'General Requirements',
+  'housekeeping & sanitation services':'General Requirements','housekeeping and sanitation services':'General Requirements',
+  'drawing services':'General Requirements','security services':'General Requirements',
+  'site works':'Site Works',
+  'site development':'Site Development Works','site development works':'Site Development Works',
+  'structural works':'Structural Works','structural labor and services':'Structural Works',
+  'architectural works':'Architectural Works','aluminum and glazing works':'Architectural Works',
+  'masonry works':'Architectural Works','drywall & ceiling works':'Architectural Works',
+  'drywall and ceiling works':'Architectural Works','tiling works':'Architectural Works',
+  'painting works':'Architectural Works','stoneworks':'Architectural Works','metal works':'Architectural Works',
+  'mechanical works':'Mechanical Works',
+  'electrical works':'Electrical and Auxiliary Works','auxiliary works':'Electrical and Auxiliary Works',
+  'electrical and auxiliary works':'Electrical and Auxiliary Works','electrical & auxiliary works':'Electrical and Auxiliary Works',
+  'plumbing works':'Plumbing Works','fire protection works':'Fire Protection Works',
+  'allied services':'Allied Services','other allied services':'Allied Services',
+};
+function CanonTrade(t){
+  if(!t) return t;
+  const k=String(t).trim().toLowerCase();
+  if(_CANON_TRADE_MAP[k]) return _CANON_TRADE_MAP[k];
+  if(/landscap|amenit/.test(k)) return 'Architectural Works';
+  if(/electr/.test(k)) return 'Electrical and Auxiliary Works';
+  if(/auxiliary/.test(k)) return 'Electrical and Auxiliary Works';
+  if(/fire/.test(k)) return 'Fire Protection Works';
+  if(/plumb/.test(k)) return 'Plumbing Works';
+  if(/mechanic|hvac|elevator|\blift\b|escalator/.test(k)) return 'Mechanical Works';
+  if(/structural/.test(k)) return 'Structural Works';
+  if(/site develop/.test(k)) return 'Site Development Works';
+  if(/masonry|tiling|tile|drywall|ceiling|glazing|aluminum|aluminium|paint|stone|metal|finish|architectural/.test(k)) return 'Architectural Works';
+  if(/general requirement|services$/.test(k)) return 'General Requirements';
+  if(/\bsite\b/.test(k)) return 'Site Works';
+  return String(t).trim();
+}
+function CanonTrades(arr){
+  const out=[], seen=new Set();
+  (arr||[]).forEach(t=>{ const c=CanonTrade(t); if(c && !seen.has(c.toLowerCase())){ seen.add(c.toLowerCase()); out.push(c); } });
+  return out;
+}
+if (typeof window !== 'undefined') { window.CanonTrade = CanonTrade; window.CanonTrades = CanonTrades; }
+
 const VendorDb = (() => {
   function _stamp() {
     const p = (typeof window !== 'undefined' && window.__profile) || {};
@@ -1793,9 +1845,12 @@ const VendorDb = (() => {
     rows.forEach(w => {
       const vids = resolveVendors(w);
       if (!vids.size) { skippedNoVendor++; return; }
-      // Trades — union from every resolved vendor on this WP (awarded or proposed).
+      // Trades — union from every resolved vendor on this WP (awarded or
+      // proposed), normalized to a canonical trade so casing/label variants
+      // don't pile up on the vendor.
       if (w.trade) {
-        vids.forEach(vid => { if (tradeSets[vid]) tradeSets[vid].add(w.trade); });
+        const ct = CanonTrade(w.trade);
+        vids.forEach(vid => { if (tradeSets[vid]) tradeSets[vid].add(ct); });
       }
       if (!isAwarded(w)) return;
       // Awarded-only: products / bids / rates. The "awarded vendor" for these
@@ -1849,9 +1904,12 @@ const VendorDb = (() => {
     for (const v of vendors) {
       const set = tradeSets[v.id];
       if (!set) continue;
-      const orig = new Set(v.trade_categories || []);
-      const union = [...set];
-      const changed = union.length !== orig.size || union.some(t => !orig.has(t));
+      // Merge the WP-derived trades with the vendor's existing ones, then
+      // canonicalize the whole set — this also collapses any raw variants
+      // already stored on the vendor.
+      const origArr = v.trade_categories || [];
+      const union = CanonTrades([...origArr, ...set]);
+      const changed = union.length !== origArr.length || union.some((t, i) => t !== origArr[i]);
       if (!changed) continue;
       try {
         await updateVendor(v.id, { trade_categories: union });
