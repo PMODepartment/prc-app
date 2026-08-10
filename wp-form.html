@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810g"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260810g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810h"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810h"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810h"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260810h"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810h"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -74,6 +74,18 @@
     body.dark-mode .vc-opt:hover,body.dark-mode .vc-opt.active{background:rgba(91,157,234,.16)}
     body.dark-mode .vc-add{border-top-color:rgba(255,255,255,.09)}
     body.dark-mode .vc-add:hover{background:rgba(91,157,234,.16)}
+    /* Proposed Vendors multi-select (chip/tag combobox) — same popover styling as the
+       single-select Awarded Vendor combobox (.vc-pop/.vc-opt/.vc-add/.vc-empty), but
+       supports adding several vendors instead of replacing the selection. */
+    .pv-wrap{position:relative}
+    .pv-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+    .pv-chips:empty{display:none}
+    .pv-chip{display:inline-flex;align-items:center;gap:6px;background:#FBD9D5;color:#9B1B1B;border-radius:8px;padding:4px 6px 4px 10px;font-size:0.7857rem;font-weight:600;white-space:nowrap}
+    .pv-chip.pv-chip-legacy{background:var(--surface-2);color:var(--text-hint);border:1px dashed var(--border-md)}
+    .pv-chip-x{cursor:pointer;opacity:.65;font-size:0.9286rem;line-height:1;font-weight:400;padding:0 2px}
+    .pv-chip-x:hover{opacity:1}
+    .pv-chip-legacy-tag{font-size:0.6429rem;text-transform:uppercase;letter-spacing:.03em;opacity:.75;margin-left:2px}
+    body.dark-mode .pv-chip{background:rgba(238,49,36,.22);color:#FF9E96}
     @media(max-width:767px){
       .ms-dd{position:fixed;left:12px;right:12px;top:auto;z-index:500;border-radius:12px}
       /* Single-column form on mobile so nothing feels "all over the place" */
@@ -348,9 +360,13 @@
                   <option value="2- Lumpsum">2 - Lump Sum</option>
                 </select>
               </div>
-              <div class="form-group full">
+              <div class="form-group full pv-wrap" id="pv-wrap">
                 <label>Proposed Vendors / Suppliers</label>
-                <textarea id="f-proposed-vendors" rows="2" placeholder="List vendors, one per line…"></textarea>
+                <div class="pv-chips" id="pv-chips"></div>
+                <input type="text" id="pv-input" placeholder="Search or type a vendor name…" autocomplete="off"/>
+                <input type="hidden" id="f-proposed-vendors"/>
+                <div id="pv-pop" class="vc-pop"></div>
+                <span class="hint">Search the vendor directory or type a new name — several vendors can be proposed per WP.</span>
               </div>
               <div class="form-group">
                 <label>No. of PO / JO <span style="cursor:help;color:#bbb;font-weight:400;font-size:0.7857rem" title="Must equal the number of PO/JO numbers you list in the next field.">&#9432;</span></label>
@@ -695,10 +711,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810g"></script>
-<script src="assets/js/ui.js?v=20260810g"></script>
-<script src="assets/js/db.js?v=20260810g"></script>
-<script src="assets/js/coachmarks.js?v=20260810g"></script>
+<script src="assets/js/auth.js?v=20260810h"></script>
+<script src="assets/js/ui.js?v=20260810h"></script>
+<script src="assets/js/db.js?v=20260810h"></script>
+<script src="assets/js/coachmarks.js?v=20260810h"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -959,6 +975,139 @@
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.vc-wrap')) pop.classList.remove('open');
     });
+  }
+
+  /* ── Proposed Vendors multi-select (chip combobox) ──────────────────
+     A NEW, separate implementation from the single-select Awarded Vendor
+     combobox above (this codebase's convention is duplicate-per-purpose,
+     not shared abstractions) — but it mirrors that one's visual style and
+     popover/debounce/quick-add behavior for consistency. Several vendors
+     can be proposed per WP, so selections accumulate as removable chips
+     instead of replacing one another.
+     _pvChips is the single ordered source of truth: {id, name} where id
+     is a real vendors.id for a linked chip, or null for a "legacy" chip
+     (a name carried over from the old free-text field with no directory
+     match — rendered in a muted style, still saved into the text column,
+     but never contributes to proposed_vendor_ids). The hidden
+     #f-proposed-vendors input is regenerated from this array on every
+     change so the existing text column keeps saving a coherent value and
+     every other reader of that column (free-text vendor filters, CSV/
+     Excel export/import) keeps working unmodified. */
+  let _pvChips = [];         // [{id: uuid|null, name: string}]
+  let _pvResults = [];
+  let _pvDebounce = null;
+
+  function _pvSyncHidden() {
+    const hid = document.getElementById('f-proposed-vendors');
+    if (hid) hid.value = _pvChips.map(c => c.name).join('\n');
+  }
+  function _pvRenderChips() {
+    const wrap = document.getElementById('pv-chips');
+    if (!wrap) return;
+    wrap.innerHTML = _pvChips.map((c, i) => {
+      const nm = esc ? esc(c.name) : c.name;
+      const legacy = !c.id;
+      return `<span class="pv-chip${legacy ? ' pv-chip-legacy' : ''}">${nm}${legacy ? '<span class="pv-chip-legacy-tag">unlinked</span>' : ''}<span class="pv-chip-x" data-pv-remove="${i}">&times;</span></span>`;
+    }).join('');
+  }
+  function _pvHasChip(nameOrId) {
+    return _pvChips.some(c => (nameOrId.id && c.id === nameOrId.id) || c.name.toLowerCase() === (nameOrId.name || '').trim().toLowerCase());
+  }
+  function _pvAdd(chip) {
+    const name = (chip.name || '').trim();
+    if (!name || _pvHasChip({ id: chip.id, name })) return;
+    _pvChips.push({ id: chip.id || null, name });
+    _pvRenderChips();
+    _pvSyncHidden();
+    markDirty();
+  }
+  function _pvRemoveAt(i) {
+    _pvChips.splice(i, 1);
+    _pvRenderChips();
+    _pvSyncHidden();
+    markDirty();
+  }
+  function _pvRenderResults(list, query) {
+    const pop = document.getElementById('pv-pop');
+    if (!pop) return;
+    _pvResults = list;
+    let html = '';
+    if (!list.length) {
+      html += '<div class="vc-empty">No matching approved vendors</div>';
+    } else {
+      html += list.map((v, i) => `<div class="vc-opt" data-i="${i}">${esc ? esc(v.name) : v.name}<span class="vc-status">approved</span></div>`).join('');
+    }
+    const q = (query || '').trim();
+    if (q && !list.some(v => v.name.toLowerCase() === q.toLowerCase()) && !_pvChips.some(c => c.name.toLowerCase() === q.toLowerCase())) {
+      html += `<div class="vc-add" id="pv-add-new">+ Add "${(esc ? esc(q) : q)}" as a new vendor</div>`;
+    }
+    pop.innerHTML = html;
+    pop.classList.add('open');
+  }
+  async function _pvAddNew(name) {
+    try {
+      const created = await VendorDb.quickCreateVendor(name, userProfile);
+      _pvAdd({ id: created.id, name: created.name });
+      const inp = document.getElementById('pv-input');
+      if (inp) inp.value = '';
+      document.getElementById('pv-pop').classList.remove('open');
+      AppNotify.success('New vendor "' + name + '" added — pending staff review.');
+    } catch (e) {
+      AppNotify.fromError(e, 'Could not create that vendor.');
+    }
+  }
+  function initProposedVendorsCombo() {
+    const inp = document.getElementById('pv-input');
+    const pop = document.getElementById('pv-pop');
+    if (!inp || !pop || typeof VendorDb === 'undefined') return;
+    const search = (q) => {
+      clearTimeout(_pvDebounce);
+      _pvDebounce = setTimeout(async () => {
+        try {
+          const results = (await VendorDb.searchApprovedVendors(q)).filter(v => !_pvChips.some(c => c.id === v.id));
+          _pvRenderResults(results, q);
+        } catch (e) { _pvRenderResults([], q); }
+      }, 250);
+    };
+    inp.addEventListener('focus', () => search(inp.value));
+    inp.addEventListener('input', () => search(inp.value));
+    pop.addEventListener('mousedown', (e) => {
+      const addEl = e.target.closest('#pv-add-new');
+      if (addEl) { e.preventDefault(); _pvAddNew(inp.value.trim()); return; }
+      const opt = e.target.closest('.vc-opt');
+      if (opt) {
+        e.preventDefault();
+        const v = _pvResults[parseInt(opt.dataset.i, 10)];
+        if (v) { _pvAdd({ id: v.id, name: v.name }); inp.value = ''; pop.classList.remove('open'); }
+      }
+    });
+    document.getElementById('pv-chips').addEventListener('click', (e) => {
+      const x = e.target.closest('[data-pv-remove]');
+      if (x) _pvRemoveAt(parseInt(x.dataset.pvRemove, 10));
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.pv-wrap')) pop.classList.remove('open');
+    });
+  }
+  // Seed the chip set from an existing WP on edit-mode load. Prefers the linked
+  // proposed_vendor_ids array (resolved to names via VendorDb.getVendorsByIds); falls back to
+  // parsing the legacy free-text column (same delimiter convention as _wpVendors() elsewhere:
+  // newline/semicolon/pipe, never comma/space) into unlinked "legacy" chips when no ids exist yet.
+  async function _pvLoadFromWP(wp) {
+    _pvChips = [];
+    const ids = Array.isArray(wp.proposed_vendor_ids) ? wp.proposed_vendor_ids.filter(Boolean) : [];
+    if (ids.length) {
+      try {
+        const rows = await VendorDb.getVendorsByIds(ids);
+        const byId = {}; rows.forEach(r => byId[r.id] = r.name);
+        ids.forEach(id => { if (byId[id]) _pvChips.push({ id, name: byId[id] }); });
+      } catch (e) { /* directory lookup failed — fall through, chips just stay empty */ }
+    } else if (wp.proposed_vendors) {
+      String(wp.proposed_vendors).split(/[\r\n;|]+/).map(s => s.trim()).filter(Boolean)
+        .forEach(name => _pvChips.push({ id: null, name }));
+    }
+    _pvRenderChips();
+    _pvSyncHidden();
   }
 
   // When "Requires Approval?" is No, the submittal fields are Not Applicable — set them to N/A and
@@ -1283,6 +1432,7 @@ function saveDraftNow(){
     const draft = {
       values,
       ms: { responsible: [..._msState.responsible], support: [..._msState.support] },
+      pv: _pvChips.slice(),
       savedAt: Date.now()
     };
     localStorage.setItem(_draftKey(), JSON.stringify(draft));
@@ -1329,8 +1479,14 @@ function restoreDraft(){
       _updateMsPills('responsible');
       _updateMsPills('support');
     }
+    // Proposed Vendors chips — restored from the saved chip array (like the Approval Matrix
+    // multi-selects above), then the hidden text field is regenerated from them, so it's never
+    // left holding stale text that disagrees with the restored chips.
+    _pvChips = Array.isArray(draft.pv) ? draft.pv.slice() : [];
+    _pvRenderChips();
+    _pvSyncHidden();
     // Everything else — plain value/checked restore, cascade fields already handled above.
-    const skip = { 'f-trade':1, 'f-works':1, 'f-type':1 };
+    const skip = { 'f-trade':1, 'f-works':1, 'f-type':1, 'f-proposed-vendors':1 };
     Object.keys(v).forEach(id => {
       if (skip[id]) return;
       const el = document.getElementById(id);
@@ -1497,7 +1653,7 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-type-service', existingWP.type_of_service);
       fill('f-type-procurement', existingWP.type_of_procurement);
       fill('f-type-contract', existingWP.type_of_contract);
-      fill('f-proposed-vendors', existingWP.proposed_vendors);
+      _pvLoadFromWP(existingWP);
       fill('f-po-jo-count', existingWP.po_jo_count);
       fill('f-po-jo-numbers', existingWP.po_jo_numbers);
       _setMsFromText('responsible', existingWP.responsible_team);
@@ -1568,6 +1724,7 @@ AppAuth.requireLogin(async (user, profile) => {
     }
 
     initVendorCombo();
+    initProposedVendorsCombo();
     onRequiresApprovalChange();   // apply N/A on first load (new WP defaults to "No")
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
@@ -1679,6 +1836,7 @@ AppAuth.requireLogin(async (user, profile) => {
       type_of_procurement:      getVal('f-type-procurement') || null,
       type_of_contract:         getVal('f-type-contract') || null,
       proposed_vendors:         getVal('f-proposed-vendors') || null,
+      proposed_vendor_ids:      _pvChips.filter(c => c.id).map(c => c.id),
       po_jo_count:              getNum('f-po-jo-count') || 0,
       po_jo_numbers:            getVal('f-po-jo-numbers') || null,
       responsible_team:         getMsValues('responsible') || null,
@@ -1779,10 +1937,13 @@ AppAuth.requireLogin(async (user, profile) => {
       /* Clear form if new */
       if (!editId) {
         ['f-cost-code','f-wp-no','f-description','f-zone','f-actual-awarding-date',
-         'f-target-installation','f-contract','f-contractor','f-remarks','f-vendor-id'].forEach(id=>{
+         'f-target-installation','f-contract','f-contractor','f-remarks','f-vendor-id',
+         'f-proposed-vendors'].forEach(id=>{
           document.getElementById(id).value='';
         });
         _selectedVendorId = null;
+        _pvChips = [];
+        _pvRenderChips();
         updateVariance();
       }
     } catch(e) {

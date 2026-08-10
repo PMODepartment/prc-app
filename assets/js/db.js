@@ -50,6 +50,7 @@ const WPDb = (() => {
     let d = _stripAudit(obj);
     if (_isMissingBcbCol(error)) d = _stripBcb(d);
     if (_isMissingVendorCol(error)) d = _stripVendor(d);
+    if (_isMissingProposedVendorIdsCol(error)) d = _stripProposedVendorIds(d);
     return d;
   }
   // Same deploy-order guard again for projects.group_head (MIGRATION_project_group_head.sql):
@@ -65,9 +66,20 @@ const WPDb = (() => {
   function _isMissingVendorCol(error) {
     if (!error) return false;
     const m = (error.message || '') + (error.details || '');
-    return /vendor_id/.test(m) && /column|does not exist|schema cache/i.test(m);
+    // \b after "vendor_id" so this does NOT also match "proposed_vendor_ids"
+    // (both are word chars — "id"→"s" has no boundary — so the two guards can't cross-trigger).
+    return /vendor_id\b/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
   function _stripVendor(obj) { const d = {...obj}; delete d.vendor_id; return d; }
+  // Same deploy-order guard for work_packages.proposed_vendor_ids (MIGRATION_wp_proposed_vendor_ids.sql):
+  // every WP write retries without it if that migration hasn't run yet. Precise match on the full
+  // column name so this can never cross-trigger with _isMissingVendorCol above (or vice versa).
+  function _isMissingProposedVendorIdsCol(error) {
+    if (!error) return false;
+    const m = (error.message || '') + (error.details || '');
+    return /proposed_vendor_ids/.test(m) && /column|does not exist|schema cache/i.test(m);
+  }
+  function _stripProposedVendorIds(obj) { const d = {...obj}; delete d.proposed_vendor_ids; return d; }
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
   async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
   async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
@@ -96,34 +108,40 @@ const WPDb = (() => {
   async function submitWP(d,p) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null};
     let {data,error}=await sb.from('work_packages').insert({...base,..._auditStamp()}).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error)))
       ({data,error}=await sb.from('work_packages').insert(_stripOptional(base,error)).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').insert(_stripBcb(_stripAudit(base))).select().single());
     if(error && _isMissingVendorCol(error))
       ({data,error}=await sb.from('work_packages').insert(_stripVendor(_stripAudit(base))).select().single());
+    if(error && _isMissingProposedVendorIdsCol(error))
+      ({data,error}=await sb.from('work_packages').insert(_stripProposedVendorIds(_stripAudit(base))).select().single());
     if(error) throw error; return data;
   }
   async function updateWP(id,d) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review'};
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error)))
       ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
     if(error && _isMissingVendorCol(error))
       ({data,error}=await sb.from('work_packages').update(_stripVendor(_stripAudit(base))).eq('id',id).select().single());
+    if(error && _isMissingProposedVendorIdsCol(error))
+      ({data,error}=await sb.from('work_packages').update(_stripProposedVendorIds(_stripAudit(base))).eq('id',id).select().single());
     if(error) throw error; return data;
   }
   async function updateWPDirect(id,d) {
     const sb=await getSB(); const base=unmap(d);
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error)))
       ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
     if(error && _isMissingVendorCol(error))
       ({data,error}=await sb.from('work_packages').update(_stripVendor(_stripAudit(base))).eq('id',id).select().single());
+    if(error && _isMissingProposedVendorIdsCol(error))
+      ({data,error}=await sb.from('work_packages').update(_stripProposedVendorIds(_stripAudit(base))).eq('id',id).select().single());
     if(error) throw error; return data;
   }
   async function createProject(d) {
@@ -1608,6 +1626,16 @@ const VendorDb = (() => {
     if (error) throw error;
     return data || [];
   }
+  // Fetch just id+name for a set of vendor ids — used by the WP-form Proposed Vendors
+  // multi-select combobox to resolve `proposed_vendor_ids` into display chips on edit-mode load
+  // without pulling the whole ~900-row directory (see VendorDb.getVendors, which is heavier).
+  async function getVendorsByIds(ids) {
+    if (!ids || !ids.length) return [];
+    const sb = await getSB();
+    const { data, error } = await sb.from('vendors').select('id,name,status').in('id', ids);
+    if (error) throw error;
+    return data || [];
+  }
   // vendors.invite_email is NOT NULL (Phase 2a schema) — a staff-side quick
   // create from the WP form has no invite email to give it (that's only
   // collected via the vendors.html "Invite Vendor" flow), so this uses a
@@ -1847,7 +1875,7 @@ const VendorDb = (() => {
     getVendorRates, addVendorRate, deleteVendorRate, upsertRate,
     uploadCertFile, getCertFileUrl, deleteCertFile,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
-    searchApprovedVendors, quickCreateVendor,
+    searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
     backfillVendorDataFromWPs,
   };
