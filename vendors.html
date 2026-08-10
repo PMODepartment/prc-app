@@ -319,6 +319,7 @@
             <div class="view-toggle" role="group" aria-label="View mode">
               <button id="vv-cards" class="active" onclick="setVendorView('cards')" aria-label="Card view"><i class="ti ti-layout-grid"></i> Cards</button>
               <button id="vv-table" onclick="setVendorView('table')" aria-label="Table view"><i class="ti ti-table"></i> Table</button>
+              <button id="vv-analytics" onclick="setVendorView('analytics')" aria-label="Analytics view"><i class="ti ti-chart-bar"></i> Analytics</button>
             </div>
             </div>
             <div class="vendor-toolbar-actions" style="display:flex;gap:10px;align-items:center;flex-shrink:0">
@@ -346,6 +347,7 @@
               <button onclick="clearVendorSel()">Clear</button>
             </div>
           </div>
+          <div id="vendorAnalytics" style="display:none"></div>
           <div class="vendor-cards" id="vendorCards"></div>
           <div class="section-card" id="vendorTableWrap" style="display:none">
             <div class="table-wrapper">
@@ -505,6 +507,7 @@ AppAuth.requireLogin((user, profile) => {
   if (profile.role === 'vendor') { window.location.href = 'vendor-portal.html'; return; }
   _canManage = !['viewer', 'viewer_budget'].includes(profile.role);   // write roles only
   _canBulkDelete = AppAuth.isAdmin(profile);                            // delete is admin-only (matches RLS)
+  if (profile.role === 'viewer') { const b = document.getElementById('vv-analytics'); if (b) b.style.display = 'none'; } // Analytics shows spend
   if (AppAuth.isAdmin(profile)) document.getElementById('nav-admin-section').style.display = '';
   renderUserBar('user-bar', profile);
   initMobileMenu();
@@ -558,12 +561,19 @@ async function refreshVendors() {
 
 let _vendorView = 'cards';
 function setVendorView(v) {
+  if (v === 'analytics' && userProfile && userProfile.role === 'viewer') return; // cost view — not for plain viewer
   _vendorView = v;
+  const isAn = v === 'analytics';
   document.getElementById('vv-cards').classList.toggle('active', v === 'cards');
   document.getElementById('vv-table').classList.toggle('active', v === 'table');
-  document.getElementById('vendorCards').style.display = v === 'cards' ? 'grid' : 'none';
-  document.getElementById('vendorTableWrap').style.display = v === 'table' ? 'block' : 'none';
-  renderVendorList();
+  const vab = document.getElementById('vv-analytics'); if (vab) vab.classList.toggle('active', isAn);
+  document.getElementById('vendorCards').style.display = (v === 'cards') ? 'grid' : 'none';
+  document.getElementById('vendorTableWrap').style.display = (v === 'table') ? 'block' : 'none';
+  document.getElementById('vendorAnalytics').style.display = isAn ? 'block' : 'none';
+  // Hide directory chrome (count/bulk bar + pager) in analytics mode.
+  const meta = document.querySelector('.vendor-meta'); if (meta) meta.style.display = isAn ? 'none' : '';
+  const pager = document.getElementById('vendorPager'); if (pager) pager.style.display = isAn ? 'none' : '';
+  if (isAn) renderVendorAnalytics(); else renderVendorList();
 }
 function _vendorFiltered() {
   const q = (document.getElementById('vendor-search').value || '').toLowerCase().trim();
@@ -596,6 +606,101 @@ function renderVendorList() {
   _vendorView === 'table' ? renderTable(pageRows) : renderCards(pageRows);
   renderPager(total, pages);
   _syncBulkUI();
+}
+
+/* ── Vendor Analytics ── portfolio-level scorecards aggregated from approved
+   WPs + the directory. Tables only; cost view (hidden for plain viewer). */
+let _vaWPs = null;
+async function renderVendorAnalytics() {
+  const el = document.getElementById('vendorAnalytics');
+  el.innerHTML = '<div style="color:#888;padding:20px">Loading analytics…</div>';
+  if (!_vaWPs) {
+    try { _vaWPs = await WPDb.getAllApprovedWPs(); }
+    catch (e) { el.innerHTML = '<div style="color:#EE3124;padding:20px">Could not load work packages for analytics.</div>'; return; }
+  }
+  const wps = _vaWPs;
+  const nm = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const splitV = s => String(s || '').split(/[\r\n;|]+/).map(x => x.trim()).filter(Boolean);
+  const money = v => Fmt.moneyShort(v || 0);
+  const byId = {}, byName = {};
+  allVendors.forEach(v => { byId[v.id] = v; byName[nm(v.name)] = v; });
+
+  // Aggregate per vendor: awarded spend/bcb/#WPs (wins) + participation
+  // (proposed or awarded). Key = directory vendor id when resolvable, else the
+  // normalized free-text name (so un-imported contractors still tally).
+  const agg = {};
+  const ensure = (key, name) => (agg[key] = agg[key] || { key, name, spend: 0, bcb: 0, wpCount: 0, wins: 0, participated: 0 });
+  wps.forEach(w => {
+    const awardedKey = (w.vendor_id && byId[w.vendor_id]) ? w.vendor_id : (w.contractor ? nm(w.contractor) : null);
+    const awardedName = (w.vendor_id && byId[w.vendor_id]) ? byId[w.vendor_id].name : (w.contractor ? w.contractor.trim() : '');
+    const parts = new Set();
+    if (Array.isArray(w.proposed_vendor_ids)) w.proposed_vendor_ids.forEach(id => { if (byId[id]) parts.add(id); });
+    splitV(w.proposed_vendors).forEach(n => { const v = byName[nm(n)]; parts.add(v ? v.id : nm(n)); });
+    if (awardedKey) parts.add(awardedKey);
+    parts.forEach(pk => { if (pk) ensure(pk, byId[pk] ? byId[pk].name : pk).participated++; });
+    if (window.isMoneyAwarded(w) && awardedKey) {
+      const a = ensure(awardedKey, awardedName || (byId[awardedKey] ? byId[awardedKey].name : awardedKey));
+      a.spend += window.effectiveAwardedCost(w); a.bcb += (w.approved_budget_bcb || 0); a.wpCount++; a.wins++;
+    }
+  });
+  const rows = Object.values(agg);
+  const awarded = rows.filter(r => r.wpCount > 0).map(r => ({ ...r, savings: r.bcb - r.spend, savPct: r.bcb ? (r.bcb - r.spend) / r.bcb * 100 : 0 }));
+  const totalSpend = awarded.reduce((s, r) => s + r.spend, 0);
+  const totalBcb = awarded.reduce((s, r) => s + r.bcb, 0);
+  const totalSav = totalBcb - totalSpend;
+  const totalSavPct = totalBcb ? totalSav / totalBcb * 100 : 0;
+  const awardedWpTotal = awarded.reduce((s, r) => s + r.wpCount, 0);
+  const approvedCount = allVendors.filter(v => v.status === 'approved').length;
+  const bySpend = [...awarded].sort((a, b) => b.spend - a.spend);
+  const top1 = totalSpend && bySpend[0] ? bySpend[0].spend / totalSpend * 100 : 0;
+  const top5 = totalSpend ? bySpend.slice(0, 5).reduce((s, r) => s + r.spend, 0) / totalSpend * 100 : 0;
+
+  const tile = (lbl, val, cls, sub) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls || ''}">${val}</div>${sub ? `<div class="metric-sub" style="font-size:0.85rem;font-weight:700;margin-top:4px;color:#888">${sub}</div>` : ''}</div>`;
+  const kpis = `<div class="metrics-grid" style="margin-bottom:16px">${[
+    tile('Total Vendors', allVendors.length.toLocaleString(), '', approvedCount + ' approved'),
+    tile('Awarded Spend', money(totalSpend), 'green', awarded.length + ' vendor' + (awarded.length === 1 ? '' : 's')),
+    tile('Awarded WPs', awardedWpTotal.toLocaleString(), '', 'across the portfolio'),
+    tile('Portfolio Savings', (totalSav >= 0 ? '+' : '-') + money(Math.abs(totalSav)), totalSav >= 0 ? 'green' : 'red', (totalSav >= 0 ? '+' : '') + totalSavPct.toFixed(1) + '%'),
+  ].join('')}</div>`;
+
+  const TH = 'padding:8px 10px;border-bottom:2px solid var(--border-md,#ddd);font-size:0.68rem;text-transform:uppercase;color:#888;white-space:nowrap;text-align:left';
+  const TD = 'padding:7px 10px;border-bottom:1px solid var(--border,#eee);font-size:0.8rem';
+  const openR = r => (byId[r.key]) ? `onclick="openDetailModal('${r.key}')" style="cursor:pointer" onmouseover="this.style.background='var(--mw-red-light,#FDECEA)'" onmouseout="this.style.background=''"` : '';
+  const savColor = v => v >= 0 ? '#2D9B6F' : '#EE3124';
+  const rank = (title, sub, list, cols) => `<div class="section-card" style="margin-bottom:14px;padding:14px 16px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px"><div style="font-weight:800;font-size:0.95rem">${title}</div><div style="font-size:0.78rem;color:#888">${sub}</div></div>
+    ${list.length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>${cols.map(c => `<th style="${TH};text-align:${c.a || 'left'}">${c.t}</th>`).join('')}</tr></thead>
+      <tbody>${list.map((r, i) => `<tr ${openR(r)}>${cols.map(c => `<td style="${TD};text-align:${c.a || 'left'}">${c.f(r, i)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '<div style="color:#888;font-size:0.85rem">No data yet.</div>'}</div>`;
+
+  const nameCell = (r, i) => `<span style="color:#888;margin-right:6px">${i + 1}</span><strong>${esc(r.name)}</strong>${byId[r.key] ? '' : ' <span style="font-size:0.68rem;color:#aaa">(not in directory)</span>'}`;
+  const spendTbl = rank('Top Vendors by Awarded Spend', `${awarded.length} awarded`, bySpend.slice(0, 10),
+    [{ t: 'Vendor', f: nameCell }, { t: 'WPs', a: 'right', f: r => r.wpCount }, { t: 'Spend', a: 'right', f: r => money(r.spend) },
+     { t: 'Savings', a: 'right', f: r => `<span style="color:${savColor(r.savings)};font-weight:700">${r.savings >= 0 ? '+' : '-'}${money(Math.abs(r.savings))}</span>` },
+     { t: '% Sav', a: 'right', f: r => `<span style="color:${savColor(r.savings)}">${r.savPct.toFixed(1)}%</span>` }]);
+  const savTbl = rank('Top Vendors by Savings Delivered', 'BCB − awarded cost, awarded WPs', [...awarded].sort((a, b) => b.savings - a.savings).slice(0, 10),
+    [{ t: 'Vendor', f: nameCell }, { t: 'WPs', a: 'right', f: r => r.wpCount }, { t: 'BCB', a: 'right', f: r => money(r.bcb) }, { t: 'Awarded', a: 'right', f: r => money(r.spend) },
+     { t: 'Savings', a: 'right', f: r => `<span style="color:${savColor(r.savings)};font-weight:700">${r.savings >= 0 ? '+' : '-'}${money(Math.abs(r.savings))}</span>` }]);
+  const winList = rows.filter(r => r.participated >= 3).map(r => ({ ...r, rate: r.participated ? r.wins / r.participated * 100 : 0 })).sort((a, b) => b.rate - a.rate || b.participated - a.participated).slice(0, 10);
+  const winTbl = rank('Bid Win Rate', 'vendors on ≥3 WPs (proposed or awarded)', winList,
+    [{ t: 'Vendor', f: nameCell }, { t: 'Participated', a: 'right', f: r => r.participated }, { t: 'Won', a: 'right', f: r => r.wins },
+     { t: 'Win Rate', a: 'right', f: r => `<strong>${r.rate.toFixed(0)}%</strong>` }]);
+
+  // Vendors per canonical trade (directory coverage)
+  const tradeCount = {};
+  allVendors.forEach(v => (v.trade_categories || []).forEach(t => { tradeCount[t] = (tradeCount[t] || 0) + 1; }));
+  const tradeRows = Object.entries(tradeCount).sort((a, b) => b[1] - a[1]);
+  const tradeTbl = `<div class="section-card" style="margin-bottom:14px;padding:14px 16px">
+    <div style="font-weight:800;font-size:0.95rem;margin-bottom:8px">Vendor Coverage by Trade</div>
+    ${tradeRows.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px">${tradeRows.map(([t, n]) => `<div style="border:1px solid var(--border,#eee);border-radius:8px;padding:7px 12px;font-size:0.8rem"><strong>${n}</strong> <span style="color:#888">${esc(t)}</span></div>`).join('')}</div>` : '<div style="color:#888;font-size:0.85rem">No trade data.</div>'}</div>`;
+
+  const conc = `<div class="section-card" style="margin-bottom:14px;padding:14px 16px">
+    <div style="font-weight:800;font-size:0.95rem;margin-bottom:8px">Spend Concentration</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+      <div><div style="font-size:0.72rem;color:#888;text-transform:uppercase">Top vendor</div><div style="font-size:1.3rem;font-weight:800">${top1.toFixed(1)}%</div><div style="font-size:0.75rem;color:#888">of awarded spend</div></div>
+      <div><div style="font-size:0.72rem;color:#888;text-transform:uppercase">Top 5 vendors</div><div style="font-size:1.3rem;font-weight:800">${top5.toFixed(1)}%</div><div style="font-size:0.75rem;color:#888">of awarded spend</div></div>
+    </div></div>`;
+
+  el.innerHTML = kpis + conc + spendTbl + savTbl + winTbl + tradeTbl;
 }
 
 /* ── Bulk select ── */
