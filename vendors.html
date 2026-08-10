@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810q"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810q"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810q"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810s"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810s"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810s"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810q">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810s">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -128,8 +128,11 @@
     .split-empty{text-align:center;color:#888;padding:30px 0;font-size:0.9286rem}
     .mg-card-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
     .mg-card-title{font-size:0.8125rem;color:#888;font-weight:600}
-    .mg-keep-row{display:flex;align-items:center;gap:8px;padding:6px 8px;background:#D1FAE5;border-radius:8px;margin-bottom:6px;font-size:0.8571rem}
-    .mg-keep-row select{flex:1;padding:5px 8px;border:1px solid #e5e5e5;border-radius:6px;font-family:inherit;font-size:0.8rem}
+    .mg-keep-row{padding:8px 10px;background:#D1FAE5;border-radius:8px;margin-bottom:6px;font-size:0.8571rem}
+    .mg-keep-list{display:flex;flex-direction:column;gap:4px}
+    .mg-keep-opt{display:flex;align-items:flex-start;gap:8px;font-size:0.8571rem;color:#231F20;padding:3px 4px;border-radius:6px;line-height:1.35;word-break:break-word}
+    .mg-keep-opt:hover{background:rgba(0,0,0,.04)}
+    .mg-keep-opt input{margin-top:3px;flex-shrink:0}
     .mg-src-list{display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;margin-bottom:8px}
     .mg-src-list label{display:flex;align-items:center;gap:8px;font-size:0.8571rem;color:#231F20;padding:2px 0}
     .mg-truncate-note{font-size:0.8125rem;color:#888;text-align:center;padding:8px 0}
@@ -143,7 +146,9 @@
     body.dark-mode .btn-skip{color:var(--text-hint);border-color:var(--border-md)!important}
     body.dark-mode .split-empty,body.dark-mode .mg-card-title,body.dark-mode .mg-truncate-note,body.dark-mode .section-divider{color:var(--text-hint)}
     body.dark-mode .mg-keep-row{background:#102B1F}
-    body.dark-mode .mg-keep-row select,body.dark-mode #mergeSearch,body.dark-mode #splitSearch,body.dark-mode .seg-add input{background:var(--surface-2);color:var(--text-primary);border-color:var(--border-md)}
+    body.dark-mode .mg-keep-opt{color:var(--text-primary)}
+    body.dark-mode .mg-keep-opt:hover{background:rgba(255,255,255,.06)}
+    body.dark-mode #mergeSearch,body.dark-mode #splitSearch,body.dark-mode .seg-add input{background:var(--surface-2);color:var(--text-primary);border-color:var(--border-md)}
     body.dark-mode .section-divider{border-top-color:var(--border)}
 
     /* ── Dark mode — this page's inline components use hardcoded light colors
@@ -320,29 +325,32 @@
 <div class="modal-overlay" id="mergeModal" style="display:none">
   <div class="modal" style="max-width:720px">
     <div class="modal-header">
-      <div><div class="modal-title">Merge Vendors</div><div class="modal-subtitle">Fold duplicate records (typos / different names for one company) into a single canonical vendor. All their products, certifications, personnel, rates, bids and linked work packages move to the one you keep; the duplicates are then deleted.</div></div>
+      <div><div class="modal-title">Merge Vendors</div><div class="modal-subtitle">Fold duplicate records (typos / different names for one company) into a single canonical vendor. All their products, certifications, personnel, rates, bids and linked work packages move to the one you keep; the duplicates are then deleted. Garbled entries that look like SEVERAL company names joined together are handled by the separate <strong>Split</strong> tool instead — they never appear here as a suggested duplicate.</div></div>
       <button class="modal-close" onclick="closeMergeModal()">&times;</button>
     </div>
     <div class="modal-body">
       <div class="msg" id="mergeMsg" style="display:none;font-size:0.8571rem;padding:8px 12px;border-radius:8px;margin-bottom:12px"></div>
 
-      <div class="section-divider" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div class="section-divider" style="display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:none;padding-top:0;margin-top:0">
         <span>Suggested Duplicate Groups</span>
         <button class="btn-cancel" id="btn-merge-all" style="padding:5px 12px;font-size:0.7857rem" onclick="mergeAllGroups()">Merge All Groups</button>
       </div>
       <div style="font-size:0.8125rem;color:#888;margin-bottom:10px">Auto-detected by comparing vendor names — review each group, then merge or uncheck any entry that doesn't actually belong. "Merge All Groups" processes every group at once using whatever canonical/checked selections are currently shown.</div>
       <div id="mergeGroups"></div>
 
-      <div class="section-divider">Manual Merge</div>
-      <input id="mergeSearch" type="text" placeholder="Filter vendor list by name…" oninput="renderMergeSources()">
-      <div class="field">
-        <label>Keep this vendor (canonical)</label>
-        <select id="merge-target" onchange="renderMergeSources()"></select>
-      </div>
-      <div class="field">
-        <label>Merge these duplicates into it</label>
-        <div class="trade-checklist" id="merge-sources" style="max-height:260px"></div>
-      </div>
+      <details style="margin-top:16px">
+        <summary class="section-divider" style="cursor:pointer;display:inline-block;user-select:none">Manual Merge (advanced)</summary>
+        <div style="font-size:0.8125rem;color:#888;margin:4px 0 10px">Didn't see a duplicate above? Search and pick it yourself.</div>
+        <input id="mergeSearch" type="text" placeholder="Filter vendor list by name…" oninput="renderMergeSources()">
+        <div class="field">
+          <label>Keep this vendor (canonical)</label>
+          <select id="merge-target" onchange="renderMergeSources()"></select>
+        </div>
+        <div class="field">
+          <label>Merge these duplicates into it</label>
+          <div class="trade-checklist" id="merge-sources" style="max-height:260px"></div>
+        </div>
+      </details>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeMergeModal()">Cancel</button>
@@ -400,10 +408,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810q"></script>
-<script src="assets/js/db.js?v=20260810q"></script>
-<script src="assets/js/ui.js?v=20260810q"></script>
-<script src="assets/js/onboarding.js?v=20260810q"></script>
+<script src="assets/js/auth.js?v=20260810s"></script>
+<script src="assets/js/db.js?v=20260810s"></script>
+<script src="assets/js/ui.js?v=20260810s"></script>
+<script src="assets/js/onboarding.js?v=20260810s"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -845,19 +853,41 @@ function skipSplit(vendorId) {
 }
 
 /* ── Merge — auto-suggested duplicate groups ──────────────────────────
-   Similarity = Jaccard index over normalized word-token sets, boosted to
-   >=0.85 whenever one vendor's token set is a subset of the other's (covers
-   the common "A.L Design, BCS" ⊂ "A.L Design, BCS, JCDC" prefix-extension
-   pattern seen in this imported data). Vendors are grouped into connected
-   components (union-find) over every pair scoring >=0.6. O(n²) over ~1000
-   vendors is fine for a one-time client-side computation on modal open —
-   this would need real indexing/bucketing well before a few thousand rows. */
-const MERGE_SIM_THRESHOLD = 0.6;
+   Similarity = Jaccard index over normalized, STOPWORD-STRIPPED word-token
+   sets, boosted to >=0.85 whenever one vendor's (stripped) token set is a
+   subset of the other's AND the smaller set has >=2 tokens (covers the
+   common "A.L Design, BCS" ⊂ "A.L Design, BCS, JCDC" prefix-extension
+   pattern seen in this imported data, without letting one shared generic
+   word force a high score). Vendors whose name is a Split candidate
+   (_splitSegments length >= 2 — garbled multi-name entries) are EXCLUDED
+   from the comparison pool entirely: a garbled record's substrings
+   superficially match dozens of unrelated real companies and acted as a
+   hub that chained the whole graph into one giant group (real incident,
+   2026-08-10: a 431-vendor "group" driven by one slash-joined garbled
+   name — see CLAUDE.md). Vendors are grouped into connected components
+   (union-find) over every pair scoring >=0.75. Any resulting group over
+   MERGE_GROUP_SIZE_CAP members is treated as an algorithm artifact (real
+   duplicate clusters for one company are realistically 2-6 variants) and
+   is suppressed from the list rather than shown/auto-merged. O(n²) over
+   ~1000 vendors is fine for a one-time client-side computation on modal
+   open — this would need real indexing/bucketing well before a few
+   thousand rows. */
+const MERGE_SIM_THRESHOLD = 0.75;
+const MERGE_GROUP_SIZE_CAP = 8;
+// Generic industry/legal boilerplate that carries no distinguishing signal
+// for THIS dataset — stripped from both names before comparing. Deliberately
+// conservative: only clearly-generic words, never anything that could be a
+// short but real distinguishing part of a company name.
+const MERGE_STOPWORDS = new Set([
+  'INC','INCORPORATED','CORP','CORPORATION','LTD','LIMITED','LLC','CO','COMPANY',
+  'CONSTRUCTION','SERVICES','SERVICE','SUPPLY','SUPPLIES','TRADING','ENTERPRISES',
+  'ENTERPRISE','INDUSTRIES','INDUSTRIAL','PHILIPPINES','PHILS','AND','OF','THE'
+]);
 function _mgNormalize(name) {
   return (name || '').toUpperCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 function _mgTokens(name) {
-  return new Set(_mgNormalize(name).split(' ').filter(Boolean));
+  return new Set(_mgNormalize(name).split(' ').filter(t => t && !MERGE_STOPWORDS.has(t)));
 }
 function _mgSimilarity(setA, setB) {
   if (!setA.size || !setB.size) return 0;
@@ -866,9 +896,22 @@ function _mgSimilarity(setA, setB) {
   const union = setA.size + setB.size - inter;
   const jaccard = union ? inter / union : 0;
   const isSubset = (small, big) => { for (const t of small) if (!big.has(t)) return false; return true; };
-  if ((setA.size <= setB.size && isSubset(setA, setB)) || (setB.size < setA.size && isSubset(setB, setA))) {
-    return Math.max(jaccard, 0.85);
-  }
+  const smaller = setA.size <= setB.size ? setA : setB, bigger = setA.size <= setB.size ? setB : setA;
+  // Size-ratio gate on the subset-boost: without this, a garbled multi-name
+  // entry's huge token bag trivially "contains" almost any short real
+  // vendor's 1-2 distinctive tokens, forcing a false 0.85+ score regardless
+  // of how tiny the real overlap actually is relative to the garbled
+  // entry's size (this — not segment-count exclusion — is what actually
+  // caused the real 431-vendor over-chaining incident; verified by testing
+  // the exact garbled name from that incident against several short real
+  // vendor names: without this gate they scored 0.85+ via pure subset
+  // match, with it they score ~0.07, correctly far below threshold).
+  // Requiring the smaller set to be at least half the bigger set's size
+  // still lets close-in-size genuine variants boost normally, e.g.
+  // "A.L Design, BCS" (4 tokens) vs "A.L Design, BCS, JCDC" (5 tokens) —
+  // ratio 0.8 — scores 0.85 as intended.
+  const ratio = smaller.size / bigger.size;
+  if (smaller.size >= 2 && ratio >= 0.5 && isSubset(smaller, bigger)) return Math.max(jaccard, 0.85);
   return jaccard;
 }
 function _mgFind(parent, i) {
@@ -884,14 +927,32 @@ function _mgUnion(parent, rank, a, b) {
 }
 const MERGE_GROUPS_MAX_SHOWN = 150;
 function _computeMergeGroups() {
-  const vs = allVendors;
+  // Exclusion by segment-count is deliberately a LIGHT backstop, not the
+  // primary defense against garbled entries — the real defense is
+  // _mgSimilarity's size-ratio-gated subset-boost above, verified by
+  // testing to correctly score the real 431-vendor incident's garbled
+  // name at ~0.07 against short real vendor names (nowhere near the 0.75
+  // threshold), with no exclusion needed at all. A tight exclusion
+  // (originally tried at >=2, then >=3 segments) silently broke the
+  // classic "A.L Design, BCS" <-> "A.L Design, BCS, JCDC" merge case that
+  // predates this fix (the 3-segment comma name IS the correct Merge
+  // partner for its 2-segment sibling, scoring 0.85 via subset-match —
+  // excluding it at >=3 removed it from the comparison pool entirely and
+  // silently returned zero groups, caught only by testing before shipping).
+  // >=6 segments only ever fires on genuinely extreme multi-way garbles
+  // (delimiter chains or suffix-runs with 6+ real pieces), never on the
+  // common 2-4 segment ambiguous names Split and Merge both have a
+  // legitimate claim to.
+  const vs = allVendors.filter(v => _splitSegments(v.name).length < 6);
   const n = vs.length;
-  if (n < 2) return { groups: [], truncated: 0 };
+  if (n < 2) return { groups: [], truncated: 0, suppressed: 0 };
   const tokenSets = vs.map(v => _mgTokens(v.name));
   const parent = vs.map((_, i) => i);
   const rank = vs.map(() => 0);
   for (let i = 0; i < n; i++) {
+    if (!tokenSets[i].size) continue; // pure-boilerplate name: nothing distinctive to compare
     for (let j = i + 1; j < n; j++) {
+      if (!tokenSets[j].size) continue;
       if (_mgSimilarity(tokenSets[i], tokenSets[j]) >= MERGE_SIM_THRESHOLD) _mgUnion(parent, rank, i, j);
     }
   }
@@ -902,42 +963,59 @@ function _computeMergeGroups() {
     buckets.get(r).push(vs[i]);
   }
   let groups = [...buckets.values()].filter(g => g.length > 1);
+  // Safety valve: an oversized group is almost certainly an over-chaining
+  // artifact, not a real duplicate cluster — suppress rather than show it.
+  const suppressed = groups.filter(g => g.length > MERGE_GROUP_SIZE_CAP).length;
+  groups = groups.filter(g => g.length <= MERGE_GROUP_SIZE_CAP);
   groups.sort((a, b) => b.length - a.length);
   const truncated = Math.max(0, groups.length - MERGE_GROUPS_MAX_SHOWN);
   groups = groups.slice(0, MERGE_GROUPS_MAX_SHOWN);
-  // Pick a suggested canonical per group: approved > claimed login > longest name.
+  // Pick a suggested canonical per group: approved > claimed login >
+  // has trade categories populated (proxy for "more complete / less likely
+  // garbled" without an extra child-table fetch) > shortest name (a better
+  // proxy for "not garbled" on this dataset than longest — garbled
+  // slash-joined entries are disproportionately the LONGEST names).
   groups = groups.map(members => {
     const sorted = [...members].sort((a, b) => {
       const aApproved = a.status === 'approved' ? 1 : 0, bApproved = b.status === 'approved' ? 1 : 0;
       if (aApproved !== bApproved) return bApproved - aApproved;
       const aClaimed = a.invite_claimed_at ? 1 : 0, bClaimed = b.invite_claimed_at ? 1 : 0;
       if (aClaimed !== bClaimed) return bClaimed - aClaimed;
-      return (b.name || '').length - (a.name || '').length;
+      const aTrades = (a.trade_categories || []).length > 0 ? 1 : 0, bTrades = (b.trade_categories || []).length > 0 ? 1 : 0;
+      if (aTrades !== bTrades) return bTrades - aTrades;
+      return (a.name || '').length - (b.name || '').length;
     });
     return { canonicalId: sorted[0].id, members };
   });
-  return { groups, truncated };
+  return { groups, truncated, suppressed };
 }
 let _mgGroupsState = []; // [{canonicalId, members, checked:Set}]
 let _mgTruncated = 0;
+let _mgSuppressed = 0;
 function renderMergeGroups() {
-  const { groups, truncated } = _computeMergeGroups();
+  const { groups, truncated, suppressed } = _computeMergeGroups();
   _mgTruncated = truncated;
+  _mgSuppressed = suppressed || 0;
   _mgGroupsState = groups.map(g => ({ canonicalId: g.canonicalId, members: g.members, checked: new Set(g.members.filter(m => m.id !== g.canonicalId).map(m => m.id)) }));
   const el = document.getElementById('mergeGroups');
-  if (!_mgGroupsState.length) { el.innerHTML = '<div class="mg-truncate-note">No likely duplicate groups detected.</div>'; return; }
+  const suppressedNote = _mgSuppressed
+    ? `<div class="mg-truncate-note">${_mgSuppressed} large low-confidence cluster${_mgSuppressed===1?'':'s'} hidden — review manually via search below.</div>` : '';
+  if (!_mgGroupsState.length) { el.innerHTML = suppressedNote || '<div class="mg-truncate-note">No likely duplicate groups detected.</div>'; return; }
   el.innerHTML = _mgGroupsState.map((g, gi) => `<div class="mg-card" id="mg-card-${gi}">${_mgCardHtml(gi)}</div>`).join('')
-    + (_mgTruncated ? `<div class="mg-truncate-note">${_mgTruncated} more small group${_mgTruncated===1?'':'s'} not shown — use manual search below.</div>` : '');
+    + (_mgTruncated ? `<div class="mg-truncate-note">${_mgTruncated} more small group${_mgTruncated===1?'':'s'} not shown — use manual search below.</div>` : '')
+    + suppressedNote;
 }
 function _mgCardHtml(gi) {
   const g = _mgGroupsState[gi];
-  const optsHtml = g.members.map(m => `<option value="${m.id}" ${m.id === g.canonicalId ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
+  // A radio-row list (not a cramped single-line <select>) so a long vendor
+  // name wraps and reads in full, matching the checkbox rows below it.
+  const keepHtml = g.members.map(m => `<label class="mg-keep-opt"><input type="radio" name="mg-keep-${gi}" value="${m.id}" ${m.id === g.canonicalId ? 'checked' : ''} onchange="_mgChangeCanonical(${gi}, this.value)"> ${esc(m.name)} <span style="color:#aaa;font-size:0.75rem">(${esc(m.status.replace('_',' '))})</span></label>`).join('');
   const srcHtml = g.members.filter(m => m.id !== g.canonicalId).map(m =>
     `<label><input type="checkbox" data-gi="${gi}" value="${m.id}" ${g.checked.has(m.id) ? 'checked' : ''} onchange="_mgToggleGroupSrc(this)"> ${esc(m.name)} <span style="color:#aaa;font-size:0.75rem">(${esc(m.status.replace('_',' '))})</span></label>`
   ).join('');
   return `<div class="mg-card-head"><span class="mg-card-title">${g.members.length} similar names</span></div>
-    <div class="mg-keep-row"><i class="ti ti-star-filled" style="color:#16A34A"></i> Keep:
-      <select onchange="_mgChangeCanonical(${gi}, this.value)">${optsHtml}</select>
+    <div class="mg-keep-row"><div style="margin-bottom:4px"><i class="ti ti-star-filled" style="color:#16A34A"></i> Keep this one:</div>
+      <div class="mg-keep-list">${keepHtml}</div>
     </div>
     <div class="mg-src-list">${srcHtml}</div>
     <button class="btn-primary" style="padding:8px 14px;font-size:0.8571rem" onclick="mergeGroup(${gi})">Merge Group</button>`;
