@@ -1551,8 +1551,17 @@ function renderDetailFooter() {
   if (v.status === 'pending_review') btns += ` <button class="btn-primary" onclick="quickApprove('${v.id}');closeDetailModal()">Approve</button> <button class="action-btn btn-reject-row" style="padding:10px 16px" onclick="quickReject('${v.id}');closeDetailModal()">Reject</button>`;
   else if (v.status === 'approved') btns += ` <button class="action-btn btn-reject-row" style="padding:10px 16px" onclick="setInactive('${v.id}')">Mark Inactive</button>`;
   else if (v.status === 'inactive') btns += ` <button class="btn-primary" onclick="quickApprove('${v.id}');closeDetailModal()">Reactivate</button>`;
+  if (_canManage) btns += ` <button class="action-btn" style="padding:10px 16px" onclick="splitVendorFromDetail('${v.id}')" title="Open the Split tool for this vendor — for a record that is several companies in one name"><i class="ti ti-cut"></i> Split</button>`;
   btns += ` <button class="action-btn btn-reject-row" style="padding:10px 16px;margin-left:auto" onclick="deleteVendorFromDetail('${v.id}')" title="Permanently delete this vendor and all its records"><i class="ti ti-trash"></i> Delete</button>`;
   el.innerHTML = btns;
+}
+// Jump from a vendor's profile straight into the Split tool with that vendor
+// pulled in (and split points suggested if its name is a single segment).
+function splitVendorFromDetail(id) {
+  closeDetailModal();
+  openSplitModal();
+  _splitAddVendor(id);
+  if ((_splitSegs[id] || []).length < 2) _splitSuggest(id);
 }
 async function deleteVendorFromDetail(id) {
   const v = allVendors.find(x => x.id === id);
