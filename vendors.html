@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810p"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810p"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810p"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810q"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810q"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810q"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810p">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810q">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -326,8 +326,11 @@
     <div class="modal-body">
       <div class="msg" id="mergeMsg" style="display:none;font-size:0.8571rem;padding:8px 12px;border-radius:8px;margin-bottom:12px"></div>
 
-      <div class="section-divider">Suggested Duplicate Groups</div>
-      <div style="font-size:0.8125rem;color:#888;margin-bottom:10px">Auto-detected by comparing vendor names — review each group, then merge or uncheck any entry that doesn't actually belong.</div>
+      <div class="section-divider" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <span>Suggested Duplicate Groups</span>
+        <button class="btn-cancel" id="btn-merge-all" style="padding:5px 12px;font-size:0.7857rem" onclick="mergeAllGroups()">Merge All Groups</button>
+      </div>
+      <div style="font-size:0.8125rem;color:#888;margin-bottom:10px">Auto-detected by comparing vendor names — review each group, then merge or uncheck any entry that doesn't actually belong. "Merge All Groups" processes every group at once using whatever canonical/checked selections are currently shown.</div>
       <div id="mergeGroups"></div>
 
       <div class="section-divider">Manual Merge</div>
@@ -352,10 +355,13 @@
 <div class="modal-overlay" id="splitModal" style="display:none">
   <div class="modal" style="max-width:700px">
     <div class="modal-header">
-      <div><div class="modal-title">Split Garbled Vendor Names</div><div class="modal-subtitle">These vendor records look like several company names joined together by commas (from a source spreadsheet cell that listed multiple vendors in one field). Review the segments below, fix them if needed, then split each into separate vendor records.</div></div>
+      <div><div class="modal-title">Split Garbled Vendor Names</div><div class="modal-subtitle">These vendor records look like several company names joined together (comma, slash, colon, or just run together with a repeating "Inc./Corp." suffix). Review the segments below, fix them if needed, then split each into separate vendor records — a segment that already matches an existing vendor links to it instead of creating a duplicate.</div></div>
       <button class="modal-close" onclick="closeSplitModal()">&times;</button>
     </div>
     <div class="modal-body" id="splitModalBody">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button class="btn-cancel" id="btn-split-all" onclick="splitAll()">Split All</button>
+      </div>
       <div id="splitList"></div>
     </div>
     <div class="modal-footer">
@@ -394,10 +400,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810p"></script>
-<script src="assets/js/db.js?v=20260810p"></script>
-<script src="assets/js/ui.js?v=20260810p"></script>
-<script src="assets/js/onboarding.js?v=20260810p"></script>
+<script src="assets/js/auth.js?v=20260810q"></script>
+<script src="assets/js/db.js?v=20260810q"></script>
+<script src="assets/js/ui.js?v=20260810q"></script>
+<script src="assets/js/onboarding.js?v=20260810q"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -769,6 +775,25 @@ function _splitSegAdd(vid) {
   (_splitSegs[vid] = _splitSegs[vid] || []).push(val);
   renderSplitList();
 }
+// Core split executor, shared by the single-row action and Split All so
+// the create-or-link logic can never drift between the two call sites.
+// Returns {created, linked} or null if there aren't enough segments.
+async function _executeSplit(vendorId) {
+  const v = allVendors.find(x => x.id === vendorId);
+  const segs = (_splitSegs[vendorId] || []).map(s => s.trim()).filter(Boolean);
+  if (segs.length < 2) return null;
+  const plan = segs.map(seg => ({ seg, match: _findExistingVendorByName(seg, vendorId) }));
+  for (const { seg, match } of plan) {
+    if (match) {
+      const union = Array.from(new Set([...(match.trade_categories || []), ...((v && v.trade_categories) || [])]));
+      if (union.length !== (match.trade_categories || []).length) await VendorDb.updateVendor(match.id, { trade_categories: union });
+    } else {
+      await VendorDb.createVendor({ name: seg, trade_categories: v ? (v.trade_categories || []) : [], invite_email: _addVendorPlaceholderEmail() }, userProfile);
+    }
+  }
+  await VendorDb.deleteVendorCascade(vendorId);
+  return { created: plan.filter(p => !p.match).length, linked: plan.filter(p => p.match).length };
+}
 async function doSplit(vendorId) {
   const v = allVendors.find(x => x.id === vendorId);
   const segs = (_splitSegs[vendorId] || []).map(s => s.trim()).filter(Boolean);
@@ -779,21 +804,38 @@ async function doSplit(vendorId) {
   const planText = plan.map(p => p.match ? `${p.seg} (→ links to existing "${p.match.name}")` : `${p.seg} (new)`).join('\n  ');
   if (!confirm(`Split "${v ? v.name : ''}" into ${segs.length} vendors?\n\n  ${planText}\n\n${newOnes.length} new vendor record(s) will be created; ${linked.length} segment(s) already match an existing vendor and will be linked to it (its trade categories are updated, no duplicate is created).\n\nThe original garbled record and any of its own products/certifications/personnel/rates/bids will be permanently deleted. Any work packages currently linked to it will need to be manually re-linked to the correct new/linked vendor afterward — this tool does not attempt to redistribute those links.\n\nThis cannot be undone.`)) return;
   try {
-    for (const { seg, match } of plan) {
-      if (match) {
-        const union = Array.from(new Set([...(match.trade_categories || []), ...((v && v.trade_categories) || [])]));
-        if (union.length !== (match.trade_categories || []).length) await VendorDb.updateVendor(match.id, { trade_categories: union });
-      } else {
-        await VendorDb.createVendor({ name: seg, trade_categories: v ? (v.trade_categories || []) : [], invite_email: _addVendorPlaceholderEmail() }, userProfile);
-      }
-    }
-    await VendorDb.deleteVendorCascade(vendorId);
+    const res = await _executeSplit(vendorId);
     _splitSkipped.delete(vendorId);
     delete _splitSegs[vendorId];
     await loadAll();
     renderSplitList();
-    AppNotify && AppNotify.success(`Split complete — ${newOnes.length} new vendor(s) created, ${linked.length} linked to existing.`);
+    AppNotify && AppNotify.success(`Split complete — ${res.created} new vendor(s) created, ${res.linked} linked to existing.`);
   } catch (e) { AppNotify ? AppNotify.fromError(e, 'Split failed') : alert(e.message); }
+}
+// Processes every candidate CURRENTLY in the queue using whatever segments
+// are shown for it right now — reviewing/editing a row's chips before
+// clicking this still applies, it's a bulk COMMIT, not a bulk auto-detect.
+async function splitAll() {
+  const cands = _splitCandidates().filter(v => (_splitSegs[v.id] || []).map(s => s.trim()).filter(Boolean).length >= 2);
+  if (!cands.length) { AppNotify ? AppNotify.warn('Nothing to split — no candidate currently has 2+ segments.') : alert('Nothing to split.'); return; }
+  let estNew = 0, estLinked = 0;
+  cands.forEach(v => (_splitSegs[v.id] || []).forEach(seg => { if (_findExistingVendorByName(seg, v.id)) estLinked++; else estNew++; }));
+  if (!confirm(`Split ALL ${cands.length} flagged vendor record(s) using their currently shown segments?\n\nEstimated: ${estNew} new vendor(s) created, ${estLinked} segment(s) linked to existing vendors, ${cands.length} garbled original(s) deleted.\n\nReview/edit any row's segments first if something looks wrong — this processes the list exactly as currently shown.\n\nThis cannot be undone.`)) return;
+  const btn = document.getElementById('btn-split-all');
+  if (btn) { btn.disabled = true; btn.textContent = 'Splitting…'; }
+  let createdTotal = 0, linkedTotal = 0; const failed = [];
+  for (const v of cands) {
+    try {
+      const res = await _executeSplit(v.id);
+      if (res) { createdTotal += res.created; linkedTotal += res.linked; _splitSkipped.delete(v.id); delete _splitSegs[v.id]; }
+    } catch (e) { failed.push(v.name); console.error('[splitAll] failed for', v.id, v.name, e); }
+  }
+  await loadAll();
+  renderSplitList();
+  if (btn) { btn.disabled = false; btn.textContent = 'Split All'; }
+  const summary = `Split All complete — ${createdTotal} new vendor(s) created, ${linkedTotal} linked to existing, ${cands.length - failed.length} original(s) removed.`;
+  if (failed.length) AppNotify && AppNotify.error(`${summary} (${failed.length} failed)`, { title: 'Split All finished with errors', detail: failed.join(', ') });
+  else AppNotify && AppNotify.success(summary);
 }
 function skipSplit(vendorId) {
   _splitSkipped.add(vendorId);
@@ -929,6 +971,33 @@ async function mergeGroup(gi) {
     renderMergeSources();
     AppNotify && AppNotify.success(`Merged ${sources.length} vendor(s).`);
   } catch (e) { AppNotify ? AppNotify.fromError(e, 'Merge failed') : alert(e.message); }
+}
+// Processes every suggested group at once, using whatever canonical pick
+// and checked duplicates are CURRENTLY shown per group (a manual override
+// via _mgChangeCanonical/_mgToggleGroupSrc before clicking this still
+// applies — it's a bulk COMMIT of the current state, not a bulk re-guess).
+async function mergeAllGroups() {
+  const groups = _mgGroupsState.filter(g => [...g.checked].filter(id => id !== g.canonicalId).length > 0);
+  if (!groups.length) { AppNotify ? AppNotify.warn('No suggested group currently has a duplicate checked to merge.') : alert('Nothing to merge.'); return; }
+  const totalSources = groups.reduce((n, g) => n + [...g.checked].filter(id => id !== g.canonicalId).length, 0);
+  if (!confirm(`Merge ALL ${groups.length} suggested group(s)?\n\nThis will fold ${totalSources} duplicate vendor record(s) into their group's currently-selected "Keep" vendor, using whatever duplicates are currently checked per group.\n\nThis cannot be undone.`)) return;
+  const btn = document.getElementById('btn-merge-all');
+  if (btn) { btn.disabled = true; btn.textContent = 'Merging…'; }
+  let mergedGroups = 0, mergedVendors = 0; const failed = [];
+  for (const g of groups) {
+    const sources = [...g.checked].filter(id => id !== g.canonicalId);
+    try {
+      await VendorDb.mergeVendors(g.canonicalId, sources);
+      mergedGroups++; mergedVendors += sources.length;
+    } catch (e) { failed.push(g.canonicalId); console.error('[mergeAllGroups] failed for group', g, e); }
+  }
+  await loadAll();
+  renderMergeGroups();
+  renderMergeSources();
+  if (btn) { btn.disabled = false; btn.textContent = 'Merge All Groups'; }
+  const summary = `Merge All complete — ${mergedGroups} group(s) merged, ${mergedVendors} duplicate(s) folded in.`;
+  if (failed.length) AppNotify && AppNotify.error(`${summary} (${failed.length} group(s) failed)`, { title: 'Merge All finished with errors' });
+  else AppNotify && AppNotify.success(summary);
 }
 
 function renderKpis() {
