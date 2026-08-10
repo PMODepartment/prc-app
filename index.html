@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810z"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810z"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810z"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260810z"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260810z"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810aa"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810aa"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810aa"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260810aa"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260810aa"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260803a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260810z"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260810aa"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810z"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810aa"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -178,7 +178,7 @@
 
           <div class="view-tabs" id="view-tabs" style="flex:1;margin-bottom:0">
             <button class="view-tab active" onclick="switchTab('overview')"><i class="ti ti-layout-dashboard"></i>Overview</button>
-            <button class="view-tab" onclick="switchTab('actions')"><i class="ti ti-alert-triangle"></i>Action Center</button>
+            <button class="view-tab" onclick="switchTab('cycle')"><i class="ti ti-gauge"></i>Cycle Time</button>
             <button class="view-tab" onclick="switchTab('backlog')"><i class="ti ti-clock"></i>Backlog</button>
             <button id="tab-budget-btn" class="view-tab" onclick="switchTab('budget')"><i class="ti ti-report-money"></i>Budget</button>
             <button class="view-tab" onclick="switchTab('schedule')"><i class="ti ti-calendar"></i>Schedule</button>
@@ -692,16 +692,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810z"></script>
-<script src="assets/js/db.js?v=20260810z"></script>
-<script src="assets/js/ui.js?v=20260810z"></script>
-<script src="assets/js/onboarding.js?v=20260810z"></script>
-<script src="assets/js/coachmarks.js?v=20260810z"></script>
+<script src="assets/js/auth.js?v=20260810aa"></script>
+<script src="assets/js/db.js?v=20260810aa"></script>
+<script src="assets/js/ui.js?v=20260810aa"></script>
+<script src="assets/js/onboarding.js?v=20260810aa"></script>
+<script src="assets/js/coachmarks.js?v=20260810aa"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260803a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260810z"></script>
+<script src="assets/js/charts.js?v=20260810aa"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -1639,8 +1639,15 @@
         const el = document.getElementById('tab-' + t);
         if (el) el.style.display = t === tab ? '' : 'none';
       });
-      document.querySelectorAll('#view-tabs .view-tab').forEach((btn, i) => {
-        btn.classList.toggle('active', ALL_TABS[i] === tab);
+      // Match by the button's own switchTab('key') onclick, not DOM position —
+      // ALL_TABS' order doesn't necessarily match #view-tabs' button order
+      // (e.g. the Cycle Time button has no ALL_TABS entry, and Action Center
+      // was removed from the bar entirely but stays a valid switchTab target
+      // reachable from the profile menu), so index-based matching silently
+      // mis-highlights every button after the first mismatch.
+      document.querySelectorAll('#view-tabs .view-tab').forEach(btn => {
+        const m = (btn.getAttribute('onclick') || '').match(/switchTab\('(\w+)'\)/);
+        btn.classList.toggle('active', !!m && m[1] === tab);
       });
       if (tab === 'claims') { renderClaimsTab(); return; }
       // Lazy-render charts when tab first becomes visible
