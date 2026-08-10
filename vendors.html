@@ -106,6 +106,7 @@
     .btn-reject-row{background:#f5f5f5;color:#666}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
     .modal{background:#fff;border-radius:12px;width:100%;max-width:640px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden}
+    body.modal-open{overflow:hidden}
     .modal-header{padding:20px 20px 0;flex-shrink:0;display:flex;justify-content:space-between;align-items:flex-start}
     .modal-body{padding:16px 20px;overflow-y:auto;flex:1}
     .modal-footer{padding:12px 20px 20px;flex-shrink:0;border-top:1px solid #f0f0f0;display:flex;gap:10px}
@@ -142,9 +143,10 @@
     /* Split-candidate + merge-group cards */
     .split-row,.mg-card{border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:10px}
     .split-orig{font-weight:700;font-size:0.9286rem;color:#231F20;margin-bottom:8px;word-break:break-word}
-    .split-segs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
-    .seg-chip{display:inline-flex;align-items:center;gap:6px;background:#FDECEA;color:#C42127;padding:4px 8px 4px 10px;border-radius:14px;font-size:0.8125rem}
-    .seg-chip input{border:none;background:transparent;color:inherit;font:inherit;padding:0;width:auto;min-width:40px;outline:none}
+    .split-segs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-width:0}
+    .seg-chip{display:inline-flex;align-items:center;gap:6px;background:#FDECEA;color:#C42127;padding:4px 8px 4px 10px;border-radius:14px;font-size:0.8125rem;max-width:100%}
+    .seg-chip input{border:none;background:transparent;color:inherit;font:inherit;padding:0;width:auto;min-width:40px;max-width:100%;outline:none}
+    #splitModalBody{overflow-x:hidden}
     .seg-chip .seg-x{cursor:pointer;font-weight:700;opacity:.6;padding:0 2px}
     .seg-chip .seg-x:hover{opacity:1}
     .seg-match{display:inline-flex;align-items:center;gap:3px;background:#D1FAE5;color:#065F46;padding:1px 7px;border-radius:10px;font-size:0.7143rem;font-weight:600;white-space:nowrap}
@@ -714,6 +716,14 @@ async function backfillFromWPs() {
   finally { _backfillRunning = false; }
 }
 
+/* ── Modal scroll lock ── keep the background page from scrolling while any
+   modal overlay is open. Called from every modal open/close; checks all
+   overlays so closing one while another is open keeps the lock. */
+function _syncModalScrollLock() {
+  const anyOpen = [...document.querySelectorAll('.modal-overlay')].some(m => m.style.display && m.style.display !== 'none');
+  document.body.classList.toggle('modal-open', anyOpen);
+}
+
 /* ── Merge vendors ── */
 let _mergeSel = new Set();
 function openMergeModal() {
@@ -724,8 +734,9 @@ function openMergeModal() {
   renderMergeGroups();
   renderMergeSources();
   document.getElementById('mergeModal').style.display = 'flex';
+  _syncModalScrollLock();
 }
-function closeMergeModal() { document.getElementById('mergeModal').style.display = 'none'; }
+function closeMergeModal() { document.getElementById('mergeModal').style.display = 'none'; _syncModalScrollLock(); }
 // The target <select> always lists ALL vendors (a search shouldn't be able to
 // hide the vendor currently picked as canonical out from under the user) —
 // only the checkbox source list below is narrowed by the search text.
@@ -807,6 +818,15 @@ const CORP_SUFFIX_RE = /^(inc\.?|incorporated|corp\.?|corporation|ltd\.?|limited
 // the very last token in the string.
 const SUFFIX_TOKEN_RE = /\b(?:inc|incorporated|corp|corporation|ltd|limited|llc|co|company)\b\.?/gi;
 const SUFFIX_BOUNDARY_RE = /\b(inc|incorporated|corp|corporation|ltd|limited|llc|co|company)\b\.?/gi;
+// A delimiter split can strand a legal suffix at the START of the NEXT
+// segment: "Affordaink ... Philippines, Inc. MCC - EPC ..." splits on the
+// comma into ["Affordaink ... Philippines", "Inc. MCC - EPC ..."] — leaving
+// "Inc." (which belongs to Affordaink) glued to the front of MCC. This
+// matches a leading suffix word FOLLOWED BY more content so it can be moved
+// back onto the preceding company. The remainder must start with an
+// uppercase letter or digit (checked separately, since the /i flag would
+// otherwise let it match a lowercase continuation like "Co. of Manila").
+const LEADING_SUFFIX_RE = /^((?:inc|incorporated|corp|corporation|ltd|limited|llc|co|company)\.?)[\s.,]+(\S.*)$/i;
 function _countSuffixTokens(name) {
   const m = (name || '').match(SUFFIX_TOKEN_RE);
   return m ? m.length : 0;
@@ -824,9 +844,18 @@ function _splitSegments(name) {
   let raw = n.split(/[,/;:|\r\n]+/).map(s => s.trim()).filter(Boolean);
   if (raw.length < 2 && _countSuffixTokens(n) >= 2) raw = _splitOnSuffixRuns(n);
   const merged = [];
-  for (const seg of raw) {
-    if (CORP_SUFFIX_RE.test(seg) && merged.length) merged[merged.length - 1] += ', ' + seg;
-    else merged.push(seg);
+  for (let seg of raw) {
+    // A segment that is JUST a legal suffix ("Inc.", "Corp") belongs to the
+    // company before it, not a vendor of its own.
+    if (CORP_SUFFIX_RE.test(seg) && merged.length) { merged[merged.length - 1] += ', ' + seg; continue; }
+    // A segment that STARTS with a legal suffix + more content: the suffix is
+    // the tail of the previous company; the rest is this segment's real name.
+    const lead = seg.match(LEADING_SUFFIX_RE);
+    if (lead && merged.length && /^[A-Z0-9]/.test(lead[2])) {
+      merged[merged.length - 1] += ', ' + lead[1];
+      seg = lead[2].trim();
+    }
+    if (seg) merged.push(seg);
   }
   return merged;
 }
@@ -862,8 +891,9 @@ function openSplitModal() {
   });
   renderSplitList();
   document.getElementById('splitModal').style.display = 'flex';
+  _syncModalScrollLock();
 }
-function closeSplitModal() { document.getElementById('splitModal').style.display = 'none'; }
+function closeSplitModal() { document.getElementById('splitModal').style.display = 'none'; _syncModalScrollLock(); }
 // Finds an already-existing vendor whose name normalizes to the same
 // value as `name` (case/punctuation/whitespace-insensitive, same
 // normalization Merge's duplicate-suggestion uses) — excludes `excludeId`
@@ -885,7 +915,7 @@ function renderSplitList() {
     const chips = segs.map((s, i) => {
       const match = _findExistingVendorByName(s, v.id);
       return `<span class="seg-chip">
-        <input type="text" value="${esc(s)}" data-vid="${v.id}" data-idx="${i}" onchange="_splitSegEdit(this)" style="width:${Math.max(40, s.length * 7)}px">
+        <input type="text" value="${esc(s)}" data-vid="${v.id}" data-idx="${i}" onchange="_splitSegEdit(this)" style="width:${Math.max(40, Math.min(s.length * 7, 440))}px;max-width:100%">
         <span class="seg-x" onclick="_splitSegRemove('${v.id}',${i})" title="Remove segment">&times;</span>
         ${match ? `<span class="seg-match" title="Will LINK to the existing vendor “${esc(match.name)}” instead of creating a new one"><i class="ti ti-link"></i> links to existing</span>` : ''}
       </span>`;
@@ -1069,6 +1099,29 @@ function _mgUnion(parent, rank, a, b) {
   else { parent[rb] = ra; rank[ra]++; }
 }
 const MERGE_GROUPS_MAX_SHOWN = 150;
+// A garbled multi-company record ("Cebu Oversea, Felport") can still be
+// pulled into a suggested group because it shares ONE segment with the
+// group's real company. Merging it would DELETE the record and discard the
+// OTHER company's name ("Felport") — data loss, since no vendor named Felport
+// exists. This returns true when a member is a genuine multi-name Split
+// candidate AND at least one of its segments is FOREIGN to the rest of the
+// group (its distinctive tokens appear in no other member) — i.e. merging it
+// would strand a company. Such members are removed from the group and left
+// for the Split tool. A single-segment typo/abbreviation variant ("Cebu
+// Oversea Harware Co.") has only one segment, so it is never flagged and
+// still merges normally — Merge's core job is untouched. The subset-variant
+// pattern ("A.L Design, BCS" ⊂ "A.L Design, BCS, JCDC") is intentionally
+// NOT auto-suggested anymore: the extension ("...JCDC") carries a token
+// absent from its sibling, so it reads as a possibly-distinct company and is
+// routed to Manual Merge rather than risk silently dropping it (per the
+// data-safety decision, 2026-08-10).
+function _mgUnsafeMultiName(member, groupMembers) {
+  const segTokenSets = _splitSegments(member.name).map(s => _mgTokens(s)).filter(t => t.size);
+  if (segTokenSets.length < 2) return false;
+  const union = new Set();
+  for (const o of groupMembers) { if (o.id === member.id) continue; for (const t of _mgTokens(o.name)) union.add(t); }
+  return segTokenSets.some(seg => { for (const t of seg) if (!union.has(t)) return true; return false; });
+}
 function _computeMergeGroups() {
   // Exclusion by segment-count is deliberately a LIGHT backstop, not the
   // primary defense against garbled entries — the real defense is
@@ -1088,7 +1141,7 @@ function _computeMergeGroups() {
   // legitimate claim to.
   const vs = allVendors.filter(v => _splitSegments(v.name).length < 6);
   const n = vs.length;
-  if (n < 2) return { groups: [], truncated: 0, suppressed: 0 };
+  if (n < 2) return { groups: [], truncated: 0, suppressed: 0, garbledExcluded: 0 };
   const tokenSets = vs.map(v => _mgTokens(v.name));
   const parent = vs.map((_, i) => i);
   const rank = vs.map(() => 0);
@@ -1106,6 +1159,15 @@ function _computeMergeGroups() {
     buckets.get(r).push(vs[i]);
   }
   let groups = [...buckets.values()].filter(g => g.length > 1);
+  // Data-safety pass: strip any multi-company record whose merge would strand
+  // a company name (see _mgUnsafeMultiName). These are left for the Split
+  // tool. A group that drops below 2 members after stripping is discarded.
+  let garbledExcluded = 0;
+  groups = groups.map(g => {
+    const safe = g.filter(m => !_mgUnsafeMultiName(m, g));
+    garbledExcluded += g.length - safe.length;
+    return safe;
+  }).filter(g => g.length > 1);
   // Safety valve: an oversized group is almost certainly an over-chaining
   // artifact, not a real duplicate cluster — suppress rather than show it.
   const suppressed = groups.filter(g => g.length > MERGE_GROUP_SIZE_CAP).length;
@@ -1130,23 +1192,25 @@ function _computeMergeGroups() {
     });
     return { canonicalId: sorted[0].id, members };
   });
-  return { groups, truncated, suppressed };
+  return { groups, truncated, suppressed, garbledExcluded };
 }
 let _mgGroupsState = []; // [{canonicalId, members, checked:Set}]
 let _mgTruncated = 0;
 let _mgSuppressed = 0;
 function renderMergeGroups() {
-  const { groups, truncated, suppressed } = _computeMergeGroups();
+  const { groups, truncated, suppressed, garbledExcluded } = _computeMergeGroups();
   _mgTruncated = truncated;
   _mgSuppressed = suppressed || 0;
   _mgGroupsState = groups.map(g => ({ canonicalId: g.canonicalId, members: g.members, checked: new Set(g.members.filter(m => m.id !== g.canonicalId).map(m => m.id)) }));
   const el = document.getElementById('mergeGroups');
+  const garbledNote = garbledExcluded
+    ? `<div class="mg-truncate-note"><i class="ti ti-scissors" style="color:#C42127"></i> ${garbledExcluded} multi-company record${garbledExcluded===1?'':'s'} kept out of these suggestions to avoid dropping a company name — fix ${garbledExcluded===1?'it':'them'} in the <strong>Split</strong> tool (Data Tools).</div>` : '';
   const suppressedNote = _mgSuppressed
     ? `<div class="mg-truncate-note">${_mgSuppressed} large low-confidence cluster${_mgSuppressed===1?'':'s'} hidden — review manually via search below.</div>` : '';
-  if (!_mgGroupsState.length) { el.innerHTML = suppressedNote || '<div class="mg-truncate-note">No likely duplicate groups detected.</div>'; return; }
+  if (!_mgGroupsState.length) { el.innerHTML = garbledNote + (suppressedNote || '<div class="mg-truncate-note">No likely duplicate groups detected.</div>'); return; }
   el.innerHTML = _mgGroupsState.map((g, gi) => `<div class="mg-card" id="mg-card-${gi}">${_mgCardHtml(gi)}</div>`).join('')
     + (_mgTruncated ? `<div class="mg-truncate-note">${_mgTruncated} more small group${_mgTruncated===1?'':'s'} not shown — use manual search below.</div>` : '')
-    + suppressedNote;
+    + suppressedNote + garbledNote;
 }
 function _mgCardHtml(gi) {
   const g = _mgGroupsState[gi];
@@ -1278,8 +1342,9 @@ function openInviteModal() {
   document.getElementById('btnCreateInvite').style.display = '';
   document.getElementById('btnCreateInvite').textContent = 'Add Vendor';
   document.getElementById('inviteModal').style.display = 'flex';
+  _syncModalScrollLock();
 }
-function closeInviteModal() { document.getElementById('inviteModal').style.display = 'none'; }
+function closeInviteModal() { document.getElementById('inviteModal').style.display = 'none'; _syncModalScrollLock(); }
 
 // vendors.invite_email is NOT NULL — when staff leaves the (now optional)
 // Invite Email field blank, synthesize the same placeholder format used by
@@ -1347,6 +1412,7 @@ async function openDetailModal(id) {
   document.getElementById('detailSub').innerHTML = `<span class="badge badge-${activeVendor.status}">${esc(activeVendor.status.replace('_',' '))}</span>`;
   renderDetailFooter();
   document.getElementById('detailModal').style.display = 'flex';
+  _syncModalScrollLock();
   document.getElementById('detailModalBody').scrollTop = 0;
   await Promise.all([renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates(), renderDetailBids()]);
   renderDetailOverview();
@@ -1354,6 +1420,7 @@ async function openDetailModal(id) {
 }
 function closeDetailModal() {
   document.getElementById('detailModal').style.display = 'none';
+  _syncModalScrollLock();
   activeVendor = null;
   if (_detailScrollSpy) { _detailScrollSpy.disconnect(); _detailScrollSpy = null; }
 }
