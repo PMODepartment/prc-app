@@ -376,6 +376,12 @@ function _initials(name) {
   if (!p.length) return '?';
   return (p.length === 1 ? p[0].slice(0, 2) : p[0][0] + p[p.length - 1][0]).toUpperCase();
 }
+// Real, displayable email — hides the synthesized import/quick-create
+// placeholders (…@no-invite.local), which are internal, not real addresses.
+function _displayEmail(v) {
+  const e = v.contact_email || v.invite_email || '';
+  return /@no-invite\.local$/i.test(e) ? '' : e;
+}
 function renderCards() {
   const rows = _vendorFiltered();
   const el = document.getElementById('vendorCards');
@@ -386,7 +392,7 @@ function renderCards() {
     const chips = trades.length
       ? shown.map(t => `<span class="vcard-chip">${esc(t)}</span>`).join('') + (moreN > 0 ? `<span class="vcard-chip more">+${moreN}</span>` : '')
       : '<span class="vcard-chip none">No trades listed</span>';
-    const email = v.contact_email || v.invite_email;
+    const email = _displayEmail(v);
     const contact = [
       v.contact_person ? `<div><i class="ti ti-user"></i><span>${esc(v.contact_person)}</span></div>` : '',
       email ? `<div><i class="ti ti-mail"></i><span>${esc(email)}</span></div>` : '',
@@ -480,7 +486,7 @@ function renderTable() {
     <tr onclick="openDetailModal('${v.id}')">
       <td><strong>${esc(v.name)}</strong></td>
       <td>${esc((v.trade_categories||[]).join(', ') || '—')}</td>
-      <td>${esc(v.contact_person || v.invite_email || '—')}</td>
+      <td>${esc(v.contact_person || _displayEmail(v) || '—')}</td>
       <td><span class="badge badge-${v.status}">${esc(v.status.replace('_',' '))}</span></td>
       <td onclick="event.stopPropagation()">
         ${v.status === 'pending_review' ? `<button class="action-btn btn-approve-row" onclick="quickApprove('${v.id}')">Approve</button> <button class="action-btn btn-reject-row" onclick="quickReject('${v.id}')">Reject</button>` : ''}
