@@ -1330,3 +1330,148 @@ window.WPCsv = (function(){
 
   return { parse, dataRowCount, toWPData, isHeaderMode };
 })();
+
+/* ── VendorDb (Phase 2a — Vendor Management) ─────────────────────────
+   Directory + self-service portal. Staff creates a vendor skeleton
+   (name + invite_email) → vendor claims it via vendor-register.html →
+   edits their own contact/products/certs/personnel via vendor-portal.html
+   (any post-approval edit is forced back to 'pending_review' server-side
+   by the vendor_edit_guard trigger — see MIGRATION_vendor_management.sql).
+   vendor_rates is staff-only. Phase 2b adds work_packages.vendor_id +
+   vendor_bids on top of this — not present yet. */
+const VendorDb = (() => {
+  function _stamp() {
+    const p = (typeof window !== 'undefined' && window.__profile) || {};
+    return { updated_at: new Date().toISOString(), updated_by: p.id || null, updated_by_name: p.name || p.email || null };
+  }
+  function _isMissingCol(error, re) {
+    if (!error) return false;
+    const m = (error.message || '') + (error.details || '');
+    return (error.code === '42703' || /column|does not exist|schema cache/i.test(m)) && re.test(m);
+  }
+
+  // ── Vendors ────────────────────────────────────────────────────────
+  async function getVendors() {
+    const sb = await getSB();
+    const { data, error } = await sb.from('vendors').select('*').order('name');
+    if (error) throw error;
+    return data || [];
+  }
+  async function getVendor(id) {
+    const sb = await getSB();
+    const { data, error } = await sb.from('vendors').select('*').eq('id', id).single();
+    if (error) throw error;
+    return data;
+  }
+  async function createVendor(fields, profile) {
+    const sb = await getSB();
+    const payload = { ...fields, status: 'pending_review', created_by: profile?.id || null, ...(_stamp()) };
+    let { data, error } = await sb.from('vendors').insert(payload).select().single();
+    if (error && _isMissingCol(error, /created_by|updated_by|updated_by_name|updated_at/)) {
+      const d2 = { ...payload }; delete d2.created_by; delete d2.updated_by; delete d2.updated_by_name; delete d2.updated_at;
+      ({ data, error } = await sb.from('vendors').insert(d2).select().single());
+    }
+    if (error) throw error;
+    return data;
+  }
+  async function updateVendor(id, fields) {
+    const sb = await getSB();
+    const payload = { ...fields, ...(_stamp()) };
+    let { data, error } = await sb.from('vendors').update(payload).eq('id', id).select().single();
+    if (error && _isMissingCol(error, /updated_by|updated_by_name|updated_at/)) {
+      const d2 = { ...payload }; delete d2.updated_by; delete d2.updated_by_name; delete d2.updated_at;
+      ({ data, error } = await sb.from('vendors').update(d2).eq('id', id).select().single());
+    }
+    if (error) throw error;
+    return data;
+  }
+  async function approveVendor(id) { return updateVendor(id, { status: 'approved' }); }
+  async function rejectVendor(id) { return updateVendor(id, { status: 'rejected' }); }
+  async function setVendorStatus(id, status) { return updateVendor(id, { status }); }
+  async function deleteVendor(id) {
+    const sb = await getSB();
+    const { error } = await sb.from('vendors').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  // ── Child tables (products / certifications / personnel) ────────────
+  function _child(table) {
+    return {
+      async list(vendorId) {
+        const sb = await getSB();
+        const { data, error } = await sb.from(table).select('*').eq('vendor_id', vendorId).order('created_at');
+        if (error) throw error;
+        return data || [];
+      },
+      async add(vendorId, fields) {
+        const sb = await getSB();
+        const { data, error } = await sb.from(table).insert({ ...fields, vendor_id: vendorId }).select().single();
+        if (error) throw error;
+        return data;
+      },
+      async update(id, fields) {
+        const sb = await getSB();
+        const { data, error } = await sb.from(table).update(fields).eq('id', id).select().single();
+        if (error) throw error;
+        return data;
+      },
+      async remove(id) {
+        const sb = await getSB();
+        const { error } = await sb.from(table).delete().eq('id', id);
+        if (error) throw error;
+      },
+    };
+  }
+  const products = _child('vendor_products');
+  const certifications = _child('vendor_certifications');
+  const personnel = _child('vendor_personnel');
+
+  // ── Vendor rates (staff-only, RLS-enforced) ──────────────────────────
+  async function getVendorRates(vendorId) {
+    const sb = await getSB();
+    const { data, error } = await sb.from('vendor_rates').select('*').eq('vendor_id', vendorId).order('date_quoted', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+  async function addVendorRate(vendorId, fields, profile) {
+    const sb = await getSB();
+    const { data, error } = await sb.from('vendor_rates').insert({ ...fields, vendor_id: vendorId, created_by: profile?.id || null }).select().single();
+    if (error) throw error;
+    return data;
+  }
+  async function deleteVendorRate(id) {
+    const sb = await getSB();
+    const { error } = await sb.from('vendor_rates').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  // ── Certification file uploads (Supabase Storage, private bucket) ───
+  async function uploadCertFile(vendorId, certId, file) {
+    const sb = await getSB();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${vendorId}/${certId}_${Date.now()}_${safeName}`;
+    const { error } = await sb.storage.from('vendor-certs').upload(path, file, { upsert: false });
+    if (error) throw error;
+    return path;
+  }
+  async function getCertFileUrl(path) {
+    if (!path) return null;
+    const sb = await getSB();
+    const { data, error } = await sb.storage.from('vendor-certs').createSignedUrl(path, 3600);
+    if (error) throw error;
+    return data?.signedUrl || null;
+  }
+  async function deleteCertFile(path) {
+    if (!path) return;
+    const sb = await getSB();
+    await sb.storage.from('vendor-certs').remove([path]);
+  }
+
+  return {
+    getVendors, getVendor, createVendor, updateVendor, approveVendor, rejectVendor, setVendorStatus, deleteVendor,
+    products, certifications, personnel,
+    getVendorRates, addVendorRate, deleteVendorRate,
+    uploadCertFile, getCertFileUrl, deleteCertFile,
+  };
+})();
+window.VendorDb = VendorDb;

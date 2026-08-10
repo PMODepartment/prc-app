@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https://cayjeqeleenizbdzrums.supabase.co wss://cayjeqeleenizbdzrums.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'"/>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Vendors — Megawide PRC Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
+  <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
+  <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810a"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810a">
+  <style>
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+    @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+    .kpi-card{background:#fff;border:1px solid #f0f0f0;border-radius:10px;padding:14px 16px}
+    .kpi-value{font-size:1.5714rem;font-weight:700;color:#231F20;line-height:1}
+    .kpi-label{font-size:0.7143rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;margin-top:4px}
+    .page-content{padding:20px;max-width:100%}
+    .section-card{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:20px;margin-bottom:20px}
+    .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .v-table{width:100%;min-width:640px;border-collapse:collapse}
+    .v-table th{font-size:0.7143rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#999;padding:9px 10px;text-align:left;border-bottom:2px solid #f0f0f0;background:#fafafa;white-space:nowrap}
+    .v-table td{padding:10px 10px;font-size:0.9286rem;color:#231F20;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+    .v-table tr:hover td{background:#fafafa;cursor:pointer}
+    .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7857rem;font-weight:600}
+    .badge-pending_review{background:#FEF3C7;color:#92400E}
+    .badge-approved{background:#D1FAE5;color:#065F46}
+    .badge-rejected{background:#FEE2E2;color:#991B1B}
+    .badge-inactive{background:#F3F4F6;color:#555}
+    .action-btn{padding:4px 10px;border-radius:6px;font-size:0.7857rem;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:opacity .15s}
+    .action-btn:hover{opacity:.8}
+    .btn-approve-row{background:#16A34A;color:#fff}
+    .btn-reject-row{background:#f5f5f5;color:#666}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
+    .modal{background:#fff;border-radius:12px;width:100%;max-width:640px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden}
+    .modal-header{padding:20px 20px 0;flex-shrink:0;display:flex;justify-content:space-between;align-items:flex-start}
+    .modal-body{padding:16px 20px;overflow-y:auto;flex:1}
+    .modal-footer{padding:12px 20px 20px;flex-shrink:0;border-top:1px solid #f0f0f0;display:flex;gap:10px}
+    .modal-title{font-size:1.1429rem;font-weight:600;color:#231F20;margin:0 0 4px}
+    .modal-subtitle{font-size:0.9286rem;color:#888;margin:0 0 16px}
+    .modal-close{background:none;border:none;font-size:20px;color:#999;cursor:pointer;line-height:1}
+    .field{margin-bottom:14px}
+    .field label{display:block;font-size:0.7857rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#888;margin-bottom:6px}
+    .field input,.field select,.field textarea{width:100%;padding:9px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:'Montserrat',sans-serif;color:#231F20;outline:none}
+    .field textarea{resize:vertical;min-height:60px}
+    .chip-select{display:flex;flex-wrap:wrap;gap:6px}
+    .chip{padding:5px 12px;border:1.5px solid #e5e5e5;border-radius:20px;font-size:0.8rem;cursor:pointer;user-select:none}
+    .chip.on{background:#EE3124;border-color:#EE3124;color:#fff}
+    .btn-primary{padding:10px 18px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:0.9286rem;font-weight:600;font-family:inherit;cursor:pointer}
+    .btn-primary:hover{background:#C42127}
+    .btn-cancel{padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;cursor:pointer}
+    .invite-link-box{background:#f5f5f5;border-radius:8px;padding:10px 12px;font-size:0.8rem;word-break:break-all;font-family:monospace;margin-top:8px}
+    .detail-tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}
+    .detail-tab{padding:6px 14px;border:1px solid #e5e5e5;border-radius:8px;background:transparent;font-size:0.8571rem;font-weight:600;font-family:inherit;cursor:pointer;color:#888}
+    .detail-tab.active{background:#231F20;border-color:#231F20;color:#fff}
+    .row-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f5f5f5}
+    .row-item:last-child{border-bottom:none}
+    .row-item-title{font-size:0.8571rem;font-weight:600}
+    .row-item-sub{font-size:0.7857rem;color:#888;margin-top:2px}
+    .empty{font-size:0.8571rem;color:#aaa;padding:8px 0}
+    .file-badge{font-size:0.7857rem;color:#2563EB;text-decoration:underline;cursor:pointer}
+    .add-form{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed #e5e5e5}
+    .add-form input,.add-form select{flex:1;min-width:110px;padding:7px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8rem;font-family:inherit}
+  </style>
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="Procurement"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+</head>
+<body>
+<a class="skip-link" href="#main-content-region">Skip to main content</a>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <img src="assets/img/megawide-logo.png" alt="Megawide Construction"/>
+      <div class="app-label">Procurement Dashboard</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Navigation</div>
+      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Portfolio Overview</a>
+      <a class="nav-item active" href="vendors.html"><i class="ti ti-building-store"></i>Vendors</a>
+    </div>
+    <div class="sidebar-section" id="nav-admin-section" style="display:none">
+      <div class="sidebar-section-label">Admin</div>
+      <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+    </div>
+    <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
+        <div class="page-title">Vendors</div>
+      </div>
+      <div class="topbar-right"><div id="user-bar"></div></div>
+    </div>
+    <div class="content" id="main-content-region" role="main" tabindex="-1">
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading vendors…</span></div>
+      <div id="main-content" style="display:none">
+        <div class="page-content">
+          <div class="kpi-grid">
+            <div class="kpi-card"><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-label">Total Vendors</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiPending" style="color:#92400E">—</div><div class="kpi-label">Pending Review</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiApproved" style="color:#065F46">—</div><div class="kpi-label">Approved</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiRejected" style="color:#6B7280">—</div><div class="kpi-label">Rejected / Inactive</div></div>
+          </div>
+          <div class="section-card">
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+              <div style="position:relative;flex:1;min-width:200px">
+                <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#aaa;font-size:1rem;pointer-events:none"></i>
+                <input id="vendor-search" type="text" placeholder="Search by company name…" oninput="renderTable()"
+                  style="width:100%;padding:8px 12px 8px 34px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;outline:none">
+              </div>
+              <select id="vendor-status-filter" onchange="renderTable()" style="padding:8px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:#fff;color:#231F20">
+                <option value="all">All Statuses</option>
+                <option value="pending_review">Pending Review</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Invite Vendor</button>
+            </div>
+            <div class="table-wrapper">
+              <table class="v-table">
+                <thead><tr>
+                  <th>Company</th><th>Trade Categories</th><th>Contact</th><th>Status</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="vendorTableBody"><tr><td colspan="5" style="text-align:center;color:#888;padding:24px">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Invite Vendor Modal -->
+<div class="modal-overlay" id="inviteModal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div><div class="modal-title">Invite a Vendor</div><div class="modal-subtitle">Creates a vendor skeleton and an invite link you send them to activate their own login.</div></div>
+      <button class="modal-close" onclick="closeInviteModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="msg" id="inviteMsg" style="display:none;font-size:0.8571rem;padding:8px 12px;border-radius:8px;margin-bottom:12px"></div>
+      <div class="field"><label>Company Name</label><input id="inv-name" placeholder="e.g. ABC Construction Supply Inc."></div>
+      <div class="field"><label>Invite Email</label><input id="inv-email" type="email" placeholder="contact@vendor.com"></div>
+      <div class="field"><label>Trade Categories</label><div class="chip-select" id="inviteTradeChips"></div></div>
+      <div id="inviteLinkWrap" style="display:none">
+        <label style="display:block;font-size:0.7857rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">Send this link to the vendor</label>
+        <div class="invite-link-box" id="inviteLinkText"></div>
+        <button class="btn-cancel" style="margin-top:8px" onclick="copyInviteLink()">Copy Link</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeInviteModal()">Close</button>
+      <button class="btn-primary" id="btnCreateInvite" onclick="createInvite()">Create Vendor + Get Link</button>
+    </div>
+  </div>
+</div>
+
+<!-- Vendor Detail Modal -->
+<div class="modal-overlay" id="detailModal" style="display:none">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="detailTitle">Vendor</div><div class="modal-subtitle" id="detailSub"></div></div>
+      <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-tabs">
+        <button class="detail-tab active" data-t="overview" onclick="switchDetailTab('overview')">Overview</button>
+        <button class="detail-tab" data-t="products" onclick="switchDetailTab('products')">Products</button>
+        <button class="detail-tab" data-t="certs" onclick="switchDetailTab('certs')">Certifications</button>
+        <button class="detail-tab" data-t="personnel" onclick="switchDetailTab('personnel')">Personnel</button>
+        <button class="detail-tab" data-t="rates" onclick="switchDetailTab('rates')">Rates</button>
+      </div>
+      <div id="dtab-overview"></div>
+      <div id="dtab-products" style="display:none"></div>
+      <div id="dtab-certs" style="display:none"></div>
+      <div id="dtab-personnel" style="display:none"></div>
+      <div id="dtab-rates" style="display:none"></div>
+    </div>
+    <div class="modal-footer" id="detailFooter"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/js/auth.js?v=20260810a"></script>
+<script src="assets/js/db.js?v=20260810a"></script>
+<script src="assets/js/ui.js?v=20260810a"></script>
+<script>
+const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
+let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null;
+
+AppAuth.requireLogin((user, profile) => {
+  userProfile = profile;
+  if (profile.role === 'vendor') { window.location.href = 'vendor-portal.html'; return; }
+  if (AppAuth.isAdmin(profile)) document.getElementById('nav-admin-section').style.display = '';
+  renderUserBar(profile);
+  initMobileMenu();
+  loadAll();
+});
+
+async function loadAll() {
+  try { allVendors = await VendorDb.getVendors(); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not load vendors') : alert(e.message); allVendors = []; }
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main-content').style.display = '';
+  renderKpis();
+  renderTable();
+  buildInviteChips();
+}
+
+function renderKpis() {
+  document.getElementById('kpiTotal').textContent = allVendors.length;
+  document.getElementById('kpiPending').textContent = allVendors.filter(v => v.status === 'pending_review').length;
+  document.getElementById('kpiApproved').textContent = allVendors.filter(v => v.status === 'approved').length;
+  document.getElementById('kpiRejected').textContent = allVendors.filter(v => v.status === 'rejected' || v.status === 'inactive').length;
+}
+
+function renderTable() {
+  const q = (document.getElementById('vendor-search').value || '').toLowerCase();
+  const statusF = document.getElementById('vendor-status-filter').value;
+  const rows = allVendors.filter(v =>
+    (statusF === 'all' || v.status === statusF) &&
+    (!q || (v.name || '').toLowerCase().includes(q))
+  );
+  const tbody = document.getElementById('vendorTableBody');
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888;padding:24px">No vendors found.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(v => `
+    <tr onclick="openDetailModal('${v.id}')">
+      <td><strong>${esc(v.name)}</strong></td>
+      <td>${esc((v.trade_categories||[]).join(', ') || '—')}</td>
+      <td>${esc(v.contact_person || v.invite_email || '—')}</td>
+      <td><span class="badge badge-${v.status}">${esc(v.status.replace('_',' '))}</span></td>
+      <td onclick="event.stopPropagation()">
+        ${v.status === 'pending_review' ? `<button class="action-btn btn-approve-row" onclick="quickApprove('${v.id}')">Approve</button> <button class="action-btn btn-reject-row" onclick="quickReject('${v.id}')">Reject</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+async function quickApprove(id) {
+  try { await VendorDb.approveVendor(id); await loadAll(); AppNotify && AppNotify.success('Vendor approved.'); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Approve failed') : alert(e.message); }
+}
+async function quickReject(id) {
+  if (!confirm('Reject this vendor submission?')) return;
+  try { await VendorDb.rejectVendor(id); await loadAll(); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Reject failed') : alert(e.message); }
+}
+
+/* ── Invite modal ── */
+function buildInviteChips() {
+  document.getElementById('inviteTradeChips').innerHTML = TRADES.map(t =>
+    `<span class="chip" data-t="${esc(t)}" onclick="toggleInviteTrade(this)">${esc(t)}</span>`).join('');
+}
+function toggleInviteTrade(el) {
+  const t = el.dataset.t;
+  if (inviteTrades.has(t)) inviteTrades.delete(t); else inviteTrades.add(t);
+  el.classList.toggle('on');
+}
+function openInviteModal() {
+  document.getElementById('inv-name').value = '';
+  document.getElementById('inv-email').value = '';
+  document.getElementById('inviteLinkWrap').style.display = 'none';
+  document.getElementById('inviteMsg').style.display = 'none';
+  inviteTrades = new Set();
+  buildInviteChips();
+  document.getElementById('btnCreateInvite').style.display = '';
+  document.getElementById('inviteModal').style.display = 'flex';
+}
+function closeInviteModal() { document.getElementById('inviteModal').style.display = 'none'; }
+
+async function createInvite() {
+  const name = document.getElementById('inv-name').value.trim();
+  const invite_email = document.getElementById('inv-email').value.trim();
+  const msgBox = document.getElementById('inviteMsg');
+  if (!name || !invite_email) {
+    msgBox.textContent = 'Company name and invite email are both required.';
+    msgBox.style.cssText = 'display:block;background:#FEE2E2;color:#991B1B;font-size:0.8571rem;padding:8px 12px;border-radius:8px;margin-bottom:12px';
+    return;
+  }
+  const btn = document.getElementById('btnCreateInvite');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    const v = await VendorDb.createVendor({ name, invite_email, trade_categories: [...inviteTrades] }, userProfile);
+    const link = window.location.origin + window.location.pathname.replace('vendors.html','') + 'vendor-register.html?vendor=' + v.id;
+    document.getElementById('inviteLinkText').textContent = link;
+    document.getElementById('inviteLinkWrap').style.display = 'block';
+    btn.style.display = 'none';
+    msgBox.style.display = 'none';
+    await loadAll();
+  } catch (e) {
+    msgBox.textContent = 'Could not create vendor: ' + (e.message || e);
+    msgBox.style.cssText = 'display:block;background:#FEE2E2;color:#991B1B;font-size:0.8571rem;padding:8px 12px;border-radius:8px;margin-bottom:12px';
+  }
+  btn.disabled = false; btn.textContent = 'Create Vendor + Get Link';
+}
+function copyInviteLink() {
+  const text = document.getElementById('inviteLinkText').textContent;
+  navigator.clipboard.writeText(text).then(() => AppNotify && AppNotify.success('Link copied.'));
+}
+
+/* ── Detail modal ── */
+async function openDetailModal(id) {
+  activeVendor = allVendors.find(v => v.id === id);
+  if (!activeVendor) return;
+  document.getElementById('detailTitle').textContent = activeVendor.name;
+  document.getElementById('detailSub').innerHTML = `<span class="badge badge-${activeVendor.status}">${esc(activeVendor.status.replace('_',' '))}</span>`;
+  renderDetailFooter();
+  switchDetailTab('overview');
+  document.getElementById('detailModal').style.display = 'flex';
+  await Promise.all([renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates()]);
+  renderDetailOverview();
+}
+function closeDetailModal() { document.getElementById('detailModal').style.display = 'none'; activeVendor = null; }
+function switchDetailTab(t) {
+  ['overview','products','certs','personnel','rates'].forEach(k => document.getElementById('dtab-'+k).style.display = k===t ? 'block' : 'none');
+  document.querySelectorAll('.detail-tab').forEach(b => b.classList.toggle('active', b.dataset.t === t));
+}
+function renderDetailFooter() {
+  const el = document.getElementById('detailFooter');
+  const v = activeVendor;
+  let btns = '<button class="btn-cancel" onclick="closeDetailModal()">Close</button>';
+  if (v.status === 'pending_review') btns += ` <button class="btn-primary" onclick="quickApprove('${v.id}');closeDetailModal()">Approve</button> <button class="action-btn btn-reject-row" style="padding:10px 16px" onclick="quickReject('${v.id}');closeDetailModal()">Reject</button>`;
+  else if (v.status === 'approved') btns += ` <button class="action-btn btn-reject-row" style="padding:10px 16px" onclick="setInactive('${v.id}')">Mark Inactive</button>`;
+  else if (v.status === 'inactive') btns += ` <button class="btn-primary" onclick="quickApprove('${v.id}');closeDetailModal()">Reactivate</button>`;
+  el.innerHTML = btns;
+}
+async function setInactive(id) {
+  try { await VendorDb.setVendorStatus(id, 'inactive'); await loadAll(); closeDetailModal(); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Update failed') : alert(e.message); }
+}
+function renderDetailOverview() {
+  const v = activeVendor;
+  document.getElementById('dtab-overview').innerHTML = `
+    <div class="field"><label>Trade Categories</label><div>${esc((v.trade_categories||[]).join(', ')) || '—'}</div></div>
+    <div class="field"><label>Contact Person</label><div>${esc(v.contact_person) || '—'}</div></div>
+    <div class="field"><label>Contact Number</label><div>${esc(v.contact_number) || '—'}</div></div>
+    <div class="field"><label>Contact Email</label><div>${esc(v.contact_email || v.invite_email) || '—'}</div></div>
+    <div class="field"><label>Address</label><div>${esc(v.address) || '—'}</div></div>
+    <div class="field"><label>Notes</label><div>${esc(v.notes) || '—'}</div></div>
+    <div class="field"><label>Login Status</label><div>${v.invite_claimed_at ? 'Activated ' + esc(new Date(v.invite_claimed_at).toLocaleDateString()) : 'Invite not yet claimed'}</div></div>`;
+}
+async function renderDetailProducts() {
+  const list = await VendorDb.products.list(activeVendor.id);
+  document.getElementById('dtab-products').innerHTML = list.length ? list.map(p =>
+    `<div class="row-item"><div><div class="row-item-title">${esc(p.description)}${p.unit?' ('+esc(p.unit)+')':''}</div><div class="row-item-sub">${esc(p.category||'Uncategorized')}</div></div></div>`
+  ).join('') : '<div class="empty">No products/services on file.</div>';
+}
+async function renderDetailCerts() {
+  const list = await VendorDb.certifications.list(activeVendor.id);
+  document.getElementById('dtab-certs').innerHTML = list.length ? list.map(c => {
+    const exp = c.expiry_date ? new Date(c.expiry_date) : null;
+    const expired = exp && exp < new Date();
+    return `<div class="row-item"><div><div class="row-item-title">${esc(c.cert_name)}${c.cert_number?' #'+esc(c.cert_number):''}</div>
+      <div class="row-item-sub">${esc(c.issuing_body||'')}${c.expiry_date?' · Expires '+esc(c.expiry_date)+(expired?' <span style="color:#EE3124;font-weight:700">EXPIRED</span>':''):''}
+      ${c.file_path ? ' · <span class="file-badge" onclick="viewCertFileStaff(\''+c.file_path.replace(/'/g,"\\'")+'\')">View file</span>' : ''}</div></div></div>`;
+  }).join('') : '<div class="empty">No certifications on file.</div>';
+}
+async function viewCertFileStaff(path) {
+  try { const url = await VendorDb.getCertFileUrl(path); if (url) window.open(url, '_blank'); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not open file') : alert(e.message); }
+}
+async function renderDetailPersonnel() {
+  const list = await VendorDb.personnel.list(activeVendor.id);
+  document.getElementById('dtab-personnel').innerHTML = list.length ? list.map(p =>
+    `<div class="row-item"><div><div class="row-item-title">${esc(p.name)}${p.is_primary?' <span style="color:#EE3124;font-size:0.7rem;font-weight:700">PRIMARY</span>':''}</div>
+    <div class="row-item-sub">${esc(p.role_title||'')}${p.contact_number?' · '+esc(p.contact_number):''}${p.email?' · '+esc(p.email):''}</div></div></div>`
+  ).join('') : '<div class="empty">No personnel on file.</div>';
+}
+async function renderDetailRates() {
+  const list = await VendorDb.getVendorRates(activeVendor.id);
+  const el = document.getElementById('dtab-rates');
+  el.innerHTML = (list.length ? list.map(r =>
+    `<div class="row-item"><div><div class="row-item-title">${esc(r.item_description)} — ₱${Number(r.rate||0).toLocaleString()}${r.unit?'/'+esc(r.unit):''}</div>
+    <div class="row-item-sub">${esc(r.trade||'')}${r.project_id?' · '+esc(r.project_id):''}${r.date_quoted?' · '+esc(r.date_quoted):''}${r.source?' · '+esc(r.source):''}</div></div>
+    <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeRate('${r.id}')"><i class="ti ti-trash"></i></button></div>`
+  ).join('') : '<div class="empty">No reference rates on file yet.</div>') + `
+    <div class="add-form">
+      <input id="nr-desc" placeholder="Item description">
+      <input id="nr-trade" placeholder="Trade">
+      <input id="nr-rate" type="number" placeholder="Rate (₱)">
+      <input id="nr-unit" placeholder="Unit">
+      <input id="nr-date" type="date">
+      <select id="nr-source"><option value="quotation">Quotation</option><option value="negotiation">Negotiation</option><option value="awarded contract">Awarded Contract</option></select>
+      <button class="btn-primary" onclick="addRate()">Add</button>
+    </div>`;
+}
+async function addRate() {
+  const item_description = document.getElementById('nr-desc').value.trim();
+  const rate = parseFloat(document.getElementById('nr-rate').value) || null;
+  if (!item_description) { AppNotify && AppNotify.warn('Enter an item description first.'); return; }
+  try {
+    await VendorDb.addVendorRate(activeVendor.id, {
+      item_description, rate,
+      trade: document.getElementById('nr-trade').value.trim(),
+      unit: document.getElementById('nr-unit').value.trim(),
+      date_quoted: document.getElementById('nr-date').value || null,
+      source: document.getElementById('nr-source').value,
+    }, userProfile);
+    await renderDetailRates();
+  } catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not add rate') : alert(e.message); }
+}
+async function removeRate(id) {
+  if (!confirm('Remove this rate entry?')) return;
+  await VendorDb.deleteVendorRate(id);
+  await renderDetailRates();
+}
+</script>
+</body>
+</html>

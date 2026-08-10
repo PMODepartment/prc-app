@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https://cayjeqeleenizbdzrums.supabase.co wss://cayjeqeleenizbdzrums.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'"/>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Vendor Portal — Megawide PRC Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{font-family:'Montserrat',sans-serif;background:#f5f5f5;color:#231F20}
+    body{overflow-x:hidden}
+    .topbar{height:60px;background:#231F20;display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:10}
+    .topbar-left{display:flex;align-items:center;gap:10px}
+    .topbar-left img{height:26px}
+    .topbar-title{color:#fff;font-weight:700;font-size:15px}
+    .topbar-right{display:flex;align-items:center;gap:12px}
+    .status-pill{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+    .status-pending_review{background:#FEF3C7;color:#92400E}
+    .status-approved{background:#D1FAE5;color:#065F46}
+    .status-rejected{background:#FEE2E2;color:#991B1B}
+    .status-inactive{background:#F3F4F6;color:#555}
+    .btn-logout{background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;padding:6px 14px;border-radius:8px;font-family:inherit;font-size:12px;cursor:pointer}
+    .btn-logout:hover{background:rgba(255,255,255,.1)}
+    .wrap{max-width:960px;margin:0 auto;padding:24px 16px 60px}
+    .banner{border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.5;margin-bottom:20px}
+    .banner-pending{background:#FEF3C7;color:#92400E;border:1px solid #FDE68A}
+    .banner-approved{background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0}
+    .banner-rejected{background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5}
+    .banner-inactive{background:#F3F4F6;color:#555;border:1px solid #e5e5e5}
+    .tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+    .tab-btn{padding:8px 16px;border:1px solid #e5e5e5;border-radius:8px;background:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;color:#888}
+    .tab-btn.active{background:#EE3124;border-color:#EE3124;color:#fff}
+    .panel{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:20px;margin-bottom:16px}
+    .panel-title{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+    .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .field{margin-bottom:14px}
+    .field label{display:block;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#888;margin-bottom:6px}
+    .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:'Montserrat',sans-serif;color:#231F20;outline:none}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:#EE3124}
+    .field textarea{resize:vertical;min-height:70px}
+    .chip-select{display:flex;flex-wrap:wrap;gap:6px}
+    .chip{padding:5px 12px;border:1.5px solid #e5e5e5;border-radius:20px;font-size:12px;cursor:pointer;user-select:none}
+    .chip.on{background:#EE3124;border-color:#EE3124;color:#fff}
+    .btn-primary{padding:10px 20px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer}
+    .btn-primary:hover{background:#C42127}
+    .btn-primary:disabled{background:#e8a09b;cursor:default}
+    .btn-ghost{padding:8px 14px;background:transparent;border:1px solid #e5e5e5;border-radius:8px;font-size:12px;font-family:inherit;cursor:pointer;color:#555}
+    .btn-ghost:hover{background:#f5f5f5}
+    .row-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5}
+    .row-item:last-child{border-bottom:none}
+    .row-item-body{flex:1;min-width:0}
+    .row-item-title{font-size:13px;font-weight:600}
+    .row-item-sub{font-size:11.5px;color:#888;margin-top:2px}
+    .row-item-del{background:none;border:none;color:#EE3124;cursor:pointer;font-size:16px;padding:4px}
+    .add-form{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed #e5e5e5}
+    .add-form input,.add-form select{flex:1;min-width:120px;padding:8px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:12.5px;font-family:inherit}
+    .file-badge{font-size:11px;color:#2563EB;text-decoration:underline;cursor:pointer}
+    .msg{font-size:12.5px;padding:8px 12px;border-radius:8px;margin-bottom:12px;display:none}
+    .msg.error{background:#FEE2E2;color:#991B1B;display:block}
+    .msg.success{background:#D1FAE5;color:#065F46;display:block}
+    .empty{font-size:12.5px;color:#aaa;padding:8px 0}
+    .primary-badge{font-size:10px;background:#EE3124;color:#fff;padding:1px 6px;border-radius:8px;margin-left:6px}
+    @media(max-width:640px){.field-row{grid-template-columns:1fr}}
+  </style>
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <img src="assets/img/megawide-logo.png" alt="Megawide"/>
+    <span class="topbar-title">Vendor Portal</span>
+  </div>
+  <div class="topbar-right">
+    <span class="status-pill" id="statusPill">—</span>
+    <button class="btn-logout" onclick="AppAuth.logout()">Sign out</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="statusBanner" class="banner" style="display:none"></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Company Info</button>
+    <button class="tab-btn" data-tab="products" onclick="switchTab('products')">Products / Services</button>
+    <button class="tab-btn" data-tab="certs" onclick="switchTab('certs')">Certifications</button>
+    <button class="tab-btn" data-tab="personnel" onclick="switchTab('personnel')">Personnel</button>
+  </div>
+
+  <div class="msg" id="msgBox"></div>
+
+  <!-- ── Company Info ── -->
+  <div class="panel" id="panel-overview">
+    <div class="panel-title">Company Information</div>
+    <div class="field"><label>Company Name</label><input id="f-name" type="text" placeholder="Company Name"></div>
+    <div class="field">
+      <label>Trade Categories</label>
+      <div class="chip-select" id="tradeChips"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Contact Person</label><input id="f-contact-person" type="text"></div>
+      <div class="field"><label>Contact Number</label><input id="f-contact-number" type="text"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Contact Email</label><input id="f-contact-email" type="email"></div>
+      <div class="field"><label>Address</label><input id="f-address" type="text"></div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="f-notes" placeholder="Anything else worth noting about your company"></textarea></div>
+    <button class="btn-primary" id="btnSaveOverview" onclick="saveOverview()">Save Company Info</button>
+  </div>
+
+  <!-- ── Products ── -->
+  <div class="panel" id="panel-products" style="display:none">
+    <div class="panel-title">Products / Services Offered</div>
+    <div id="productsList"></div>
+    <div class="add-form">
+      <select id="np-category"><option value="">Category…</option></select>
+      <input id="np-description" placeholder="Description (e.g. Ready-Mix Concrete)">
+      <input id="np-unit" placeholder="Unit (e.g. cu.m.)">
+      <button class="btn-primary" onclick="addProduct()">Add</button>
+    </div>
+  </div>
+
+  <!-- ── Certifications ── -->
+  <div class="panel" id="panel-certs" style="display:none">
+    <div class="panel-title">Certifications</div>
+    <div id="certsList"></div>
+    <div class="add-form" style="flex-direction:column;align-items:stretch">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input id="nc-name" placeholder="Certification Name (e.g. PCAB License)">
+        <input id="nc-number" placeholder="Cert Number">
+        <input id="nc-issuer" placeholder="Issuing Body">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <input id="nc-issue" type="date" placeholder="Issue Date">
+        <input id="nc-expiry" type="date" placeholder="Expiry Date">
+        <input id="nc-file" type="file" accept=".pdf,.jpg,.jpeg,.png" style="flex:1;min-width:160px">
+        <button class="btn-primary" onclick="addCert()">Add Certification</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Personnel ── -->
+  <div class="panel" id="panel-personnel" style="display:none">
+    <div class="panel-title">Personnel / Stakeholder Contacts</div>
+    <div id="personnelList"></div>
+    <div class="add-form">
+      <input id="np-name" placeholder="Name">
+      <input id="np-role" placeholder="Role (e.g. Sales Rep)">
+      <input id="np-number" placeholder="Contact Number">
+      <input id="np-email" placeholder="Email">
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#555"><input type="checkbox" id="np-primary" style="width:auto"> Primary</label>
+      <button class="btn-primary" onclick="addPersonnel()">Add</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/js/auth.js?v=20260810a"></script>
+<script src="assets/js/db.js?v=20260810a"></script>
+<script>
+const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
+
+let vendor = null, myProfile = null, selectedTrades = new Set();
+
+AppAuth.requireLogin((user, profile) => {
+  myProfile = profile;
+  if (profile.role !== 'vendor' || !profile.vendor_id) { window.location.href = 'login.html'; return; }
+  loadAll();
+});
+
+function msg(text, type) {
+  const box = document.getElementById('msgBox');
+  box.textContent = text; box.className = 'msg ' + (type || 'success');
+  setTimeout(() => { box.className = 'msg'; }, 4000);
+}
+
+async function loadAll() {
+  try {
+    vendor = await VendorDb.getVendor(myProfile.vendor_id);
+  } catch (e) {
+    msg('Could not load your vendor profile: ' + (e.message || e), 'error');
+    return;
+  }
+  renderStatus();
+  renderOverviewForm();
+  buildTradeChips();
+  renderProductCategoryOptions();
+  await Promise.all([renderProducts(), renderCerts(), renderPersonnel()]);
+}
+
+function renderStatus() {
+  const pill = document.getElementById('statusPill');
+  const banner = document.getElementById('statusBanner');
+  const s = vendor.status;
+  pill.textContent = s.replace('_',' ');
+  pill.className = 'status-pill status-' + s;
+  const copy = {
+    pending_review: 'Your profile is awaiting review by Megawide Procurement. It will not appear in the vendor directory until approved. You can keep editing while you wait.',
+    approved: 'Your profile is approved and visible in the Megawide vendor directory. Any further edit will send it back for review before it goes live again.',
+    rejected: 'Your submission was not approved. Please review your information and resubmit, or contact Megawide Procurement for details.',
+    inactive: 'Your vendor account is currently marked inactive by Megawide Procurement.',
+  };
+  banner.style.display = 'block';
+  banner.className = 'banner banner-' + s;
+  banner.textContent = copy[s] || '';
+}
+
+function renderOverviewForm() {
+  document.getElementById('f-name').value = vendor.name || '';
+  document.getElementById('f-contact-person').value = vendor.contact_person || '';
+  document.getElementById('f-contact-number').value = vendor.contact_number || '';
+  document.getElementById('f-contact-email').value = vendor.contact_email || '';
+  document.getElementById('f-address').value = vendor.address || '';
+  document.getElementById('f-notes').value = vendor.notes || '';
+  selectedTrades = new Set(vendor.trade_categories || []);
+}
+
+function buildTradeChips() {
+  const wrap = document.getElementById('tradeChips');
+  wrap.innerHTML = TRADES.map(t => `<span class="chip ${selectedTrades.has(t)?'on':''}" data-t="${esc(t)}" onclick="toggleTrade(this)">${esc(t)}</span>`).join('');
+}
+function toggleTrade(el) {
+  const t = el.dataset.t;
+  if (selectedTrades.has(t)) selectedTrades.delete(t); else selectedTrades.add(t);
+  el.classList.toggle('on');
+}
+function esc(v) { return window.esc ? window.esc(v) : String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function renderProductCategoryOptions() {
+  const sel = document.getElementById('np-category');
+  sel.innerHTML = '<option value="">Category…</option>' + TRADES.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+}
+
+async function saveOverview() {
+  const btn = document.getElementById('btnSaveOverview');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const fields = {
+    name: document.getElementById('f-name').value.trim(),
+    contact_person: document.getElementById('f-contact-person').value.trim(),
+    contact_number: document.getElementById('f-contact-number').value.trim(),
+    contact_email: document.getElementById('f-contact-email').value.trim(),
+    address: document.getElementById('f-address').value.trim(),
+    notes: document.getElementById('f-notes').value.trim(),
+    trade_categories: [...selectedTrades],
+  };
+  try {
+    vendor = await VendorDb.updateVendor(vendor.id, fields);
+    renderStatus();
+    msg('Company info saved. It will be reviewed by Megawide Procurement before it goes live.', 'success');
+  } catch (e) {
+    msg('Save failed: ' + (e.message || e), 'error');
+  }
+  btn.disabled = false; btn.textContent = 'Save Company Info';
+}
+
+/* ── Tabs ── */
+function switchTab(t) {
+  ['overview','products','certs','personnel'].forEach(k => {
+    document.getElementById('panel-' + k).style.display = k === t ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+}
+
+/* ── Products ── */
+async function renderProducts() {
+  const list = await VendorDb.products.list(vendor.id);
+  const el = document.getElementById('productsList');
+  el.innerHTML = list.length ? list.map(p => `
+    <div class="row-item">
+      <div class="row-item-body">
+        <div class="row-item-title">${esc(p.description)}${p.unit ? ' <span style="color:#aaa;font-weight:400">('+esc(p.unit)+')</span>' : ''}</div>
+        <div class="row-item-sub">${esc(p.category || 'Uncategorized')}</div>
+      </div>
+      <button class="row-item-del" onclick="removeProduct('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button>
+    </div>`).join('') : '<div class="empty">No products/services added yet.</div>';
+}
+async function addProduct() {
+  const category = document.getElementById('np-category').value;
+  const description = document.getElementById('np-description').value.trim();
+  const unit = document.getElementById('np-unit').value.trim();
+  if (!description) { msg('Enter a description first.', 'error'); return; }
+  try {
+    await VendorDb.products.add(vendor.id, { category, description, unit });
+    document.getElementById('np-description').value = ''; document.getElementById('np-unit').value = '';
+    await renderProducts();
+    await flagEdited();
+  } catch (e) { msg('Could not add: ' + (e.message || e), 'error'); }
+}
+async function removeProduct(id) {
+  if (!confirm('Remove this product/service?')) return;
+  await VendorDb.products.remove(id);
+  await renderProducts();
+  await flagEdited();
+}
+
+/* ── Certifications ── */
+async function renderCerts() {
+  const list = await VendorDb.certifications.list(vendor.id);
+  const el = document.getElementById('certsList');
+  if (!list.length) { el.innerHTML = '<div class="empty">No certifications added yet.</div>'; return; }
+  el.innerHTML = list.map(c => {
+    const exp = c.expiry_date ? new Date(c.expiry_date) : null;
+    const expired = exp && exp < new Date();
+    return `<div class="row-item">
+      <div class="row-item-body">
+        <div class="row-item-title">${esc(c.cert_name)}${c.cert_number ? ' <span style="color:#aaa;font-weight:400">#'+esc(c.cert_number)+'</span>' : ''}</div>
+        <div class="row-item-sub">${esc(c.issuing_body||'')}${c.expiry_date ? ' · Expires ' + esc(c.expiry_date) + (expired ? ' <span style="color:#EE3124;font-weight:700">EXPIRED</span>' : '') : ''}
+          ${c.file_path ? ' · <span class="file-badge" onclick="viewCertFile(\''+c.file_path.replace(/'/g,"\\'")+'\')">View file</span>' : ''}</div>
+      </div>
+      <button class="row-item-del" onclick="removeCert('${c.id}','${(c.file_path||'').replace(/'/g,"\\'")}')" title="Remove"><i class="ti ti-trash"></i></button>
+    </div>`;
+  }).join('');
+}
+async function addCert() {
+  const cert_name = document.getElementById('nc-name').value.trim();
+  const cert_number = document.getElementById('nc-number').value.trim();
+  const issuing_body = document.getElementById('nc-issuer').value.trim();
+  const issue_date = document.getElementById('nc-issue').value || null;
+  const expiry_date = document.getElementById('nc-expiry').value || null;
+  const fileInput = document.getElementById('nc-file');
+  if (!cert_name) { msg('Enter a certification name first.', 'error'); return; }
+  try {
+    const row = await VendorDb.certifications.add(vendor.id, { cert_name, cert_number, issuing_body, issue_date, expiry_date });
+    if (fileInput.files[0]) {
+      const path = await VendorDb.uploadCertFile(vendor.id, row.id, fileInput.files[0]);
+      await VendorDb.certifications.update(row.id, { file_path: path });
+    }
+    ['nc-name','nc-number','nc-issuer','nc-issue','nc-expiry'].forEach(id => document.getElementById(id).value = '');
+    fileInput.value = '';
+    await renderCerts();
+    await flagEdited();
+  } catch (e) { msg('Could not add: ' + (e.message || e), 'error'); }
+}
+async function removeCert(id, filePath) {
+  if (!confirm('Remove this certification?')) return;
+  await VendorDb.certifications.remove(id);
+  if (filePath) await VendorDb.deleteCertFile(filePath);
+  await renderCerts();
+  await flagEdited();
+}
+async function viewCertFile(path) {
+  try {
+    const url = await VendorDb.getCertFileUrl(path);
+    if (url) window.open(url, '_blank');
+  } catch (e) { msg('Could not open file: ' + (e.message || e), 'error'); }
+}
+
+/* ── Personnel ── */
+async function renderPersonnel() {
+  const list = await VendorDb.personnel.list(vendor.id);
+  const el = document.getElementById('personnelList');
+  el.innerHTML = list.length ? list.map(p => `
+    <div class="row-item">
+      <div class="row-item-body">
+        <div class="row-item-title">${esc(p.name)}${p.is_primary ? '<span class="primary-badge">PRIMARY</span>' : ''}</div>
+        <div class="row-item-sub">${esc(p.role_title||'')}${p.contact_number ? ' · '+esc(p.contact_number) : ''}${p.email ? ' · '+esc(p.email) : ''}</div>
+      </div>
+      <button class="row-item-del" onclick="removePersonnel('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button>
+    </div>`).join('') : '<div class="empty">No personnel added yet.</div>';
+}
+async function addPersonnel() {
+  const name = document.getElementById('np-name').value.trim();
+  const role_title = document.getElementById('np-role').value.trim();
+  const contact_number = document.getElementById('np-number').value.trim();
+  const email = document.getElementById('np-email').value.trim();
+  const is_primary = document.getElementById('np-primary').checked;
+  if (!name) { msg('Enter a name first.', 'error'); return; }
+  try {
+    await VendorDb.personnel.add(vendor.id, { name, role_title, contact_number, email, is_primary });
+    ['np-name','np-role','np-number','np-email'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('np-primary').checked = false;
+    await renderPersonnel();
+    await flagEdited();
+  } catch (e) { msg('Could not add: ' + (e.message || e), 'error'); }
+}
+async function removePersonnel(id) {
+  if (!confirm('Remove this contact?')) return;
+  await VendorDb.personnel.remove(id);
+  await renderPersonnel();
+  await flagEdited();
+}
+
+// Any child-table edit (product/cert/personnel add or remove) should also
+// requeue the vendor for staff review, same as an overview field edit —
+// touch the parent row so the vendor_edit_guard trigger fires.
+async function flagEdited() {
+  try { vendor = await VendorDb.updateVendor(vendor.id, {}); renderStatus(); } catch (e) {}
+}
+</script>
+</body>
+</html>
