@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810a"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260810a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810b"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260810b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810a"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810b"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -58,6 +58,22 @@
     .ms-opt input[type=checkbox]{flex-shrink:0;width:16px;height:16px;accent-color:#C42127;cursor:pointer}
     .ms-opt .ms-name{flex:1;min-width:0;font-weight:500}
     .ms-opt .ms-role{font-size:0.7143rem;color:#aaa;font-weight:400;margin-top:1px}
+    /* Vendor combobox (Phase 2b) — mirrors import-monitoring.html's project combobox */
+    .vc-wrap{position:relative}
+    .vc-pop{position:absolute;z-index:400;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1.5px solid #5B9DEA;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:220px;overflow-y:auto;display:none}
+    .vc-pop.open{display:block}
+    .vc-opt{padding:9px 12px;font-size:0.8929rem;cursor:pointer;border-bottom:1px solid #f8f8f8}
+    .vc-opt:last-child{border-bottom:none}
+    .vc-opt:hover,.vc-opt.active{background:#FDECEA}
+    .vc-opt .vc-status{font-size:0.7143rem;color:#aaa;font-weight:400;margin-left:6px;text-transform:uppercase}
+    .vc-empty{padding:10px 12px;font-size:0.7857rem;color:#999}
+    .vc-add{padding:10px 12px;font-size:0.8571rem;cursor:pointer;color:#C42127;font-weight:600;border-top:1px solid #f0f0f0}
+    .vc-add:hover{background:#FDECEA}
+    body.dark-mode .vc-pop{background:var(--surface);border-color:#5B9DEA}
+    body.dark-mode .vc-opt{color:var(--text-primary);border-bottom-color:rgba(255,255,255,.06)}
+    body.dark-mode .vc-opt:hover,body.dark-mode .vc-opt.active{background:rgba(91,157,234,.16)}
+    body.dark-mode .vc-add{border-top-color:rgba(255,255,255,.09)}
+    body.dark-mode .vc-add:hover{background:rgba(91,157,234,.16)}
     @media(max-width:767px){
       .ms-dd{position:fixed;left:12px;right:12px;top:auto;z-index:500;border-radius:12px}
       /* Single-column form on mobile so nothing feels "all over the place" */
@@ -522,9 +538,11 @@
                 </select>
                 <span class="hint">Set automatically from Procurement Status (Awarded → Awarded)</span>
               </div>
-              <div class="form-group">
+              <div class="form-group vc-wrap">
                 <label>Awarded Vendor</label>
-                <input type="text" id="f-contractor" placeholder="Leave blank if not yet awarded"/>
+                <input type="text" id="f-contractor" placeholder="Search or type a vendor name…" autocomplete="off"/>
+                <input type="hidden" id="f-vendor-id"/>
+                <div id="vc-pop" class="vc-pop"></div>
               </div>
               <div class="form-group full" id="ntba-group">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">
@@ -677,10 +695,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810a"></script>
-<script src="assets/js/ui.js?v=20260810a"></script>
-<script src="assets/js/db.js?v=20260810a"></script>
-<script src="assets/js/coachmarks.js?v=20260810a"></script>
+<script src="assets/js/auth.js?v=20260810b"></script>
+<script src="assets/js/ui.js?v=20260810b"></script>
+<script src="assets/js/db.js?v=20260810b"></script>
+<script src="assets/js/coachmarks.js?v=20260810b"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -871,6 +889,76 @@
     const cog = document.getElementById('charging-co-group');
     if(cg) cg.style.display = v === 'Main Contract' ? '' : 'none';
     if(cog) cog.style.display = v === 'Change Order' ? '' : 'none';
+  }
+
+  /* ── Awarded Vendor combobox (Phase 2b) ──────────────────────────────
+     #f-contractor stays the visible text field (so it still saves as plain
+     text if nothing is picked); #f-vendor-id (hidden) carries the matched
+     vendors.id. Mirrors import-monitoring.html's searchable project
+     combobox structurally. Typing an unmatched name offers a one-click
+     "Add as a new vendor" (VendorDb.quickCreateVendor) so officers aren't
+     blocked waiting on the vendors.html invite flow. */
+  let _selectedVendorId = null;
+  let _vcResults = [];
+  let _vcDebounce = null;
+  function _vcRender(list, query) {
+    const pop = document.getElementById('vc-pop');
+    if (!pop) return;
+    _vcResults = list;
+    let html = '';
+    if (!list.length) {
+      html += '<div class="vc-empty">No matching approved vendors</div>';
+    } else {
+      html += list.map((v,i) => `<div class="vc-opt" data-i="${i}">${esc ? esc(v.name) : v.name}<span class="vc-status">approved</span></div>`).join('');
+    }
+    if (query && query.trim() && !list.some(v => v.name.toLowerCase() === query.trim().toLowerCase())) {
+      html += `<div class="vc-add" id="vc-add-new">+ Add "${(esc?esc(query.trim()):query.trim())}" as a new vendor</div>`;
+    }
+    pop.innerHTML = html;
+    pop.classList.add('open');
+  }
+  function _vcSelect(v) {
+    _selectedVendorId = v.id;
+    const inp = document.getElementById('f-contractor');
+    if (inp) inp.value = v.name;
+    document.getElementById('f-vendor-id').value = v.id;
+    document.getElementById('vc-pop').classList.remove('open');
+    markDirty();
+  }
+  async function _vcAddNew(name) {
+    try {
+      const created = await VendorDb.quickCreateVendor(name, userProfile);
+      _vcSelect(created);
+      AppNotify.success('New vendor "' + name + '" added — pending staff review.');
+    } catch(e) {
+      AppNotify.fromError(e, 'Could not create that vendor.');
+    }
+  }
+  function initVendorCombo() {
+    const inp = document.getElementById('f-contractor');
+    const pop = document.getElementById('vc-pop');
+    if (!inp || !pop || typeof VendorDb === 'undefined') return;
+    const search = (q) => {
+      clearTimeout(_vcDebounce);
+      _vcDebounce = setTimeout(async () => {
+        try { _vcRender(await VendorDb.searchApprovedVendors(q), q); }
+        catch(e) { _vcRender([], q); }
+      }, 250);
+    };
+    inp.addEventListener('focus', () => search(inp.value));
+    inp.addEventListener('input', () => {
+      if (_selectedVendorId) { _selectedVendorId = null; document.getElementById('f-vendor-id').value = ''; }
+      search(inp.value);
+    });
+    pop.addEventListener('mousedown', (e) => {
+      const addEl = e.target.closest('#vc-add-new');
+      if (addEl) { e.preventDefault(); _vcAddNew(inp.value.trim()); return; }
+      const opt = e.target.closest('.vc-opt');
+      if (opt) { e.preventDefault(); const v = _vcResults[parseInt(opt.dataset.i,10)]; if (v) _vcSelect(v); }
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.vc-wrap')) pop.classList.remove('open');
+    });
   }
 
   // When "Requires Approval?" is No, the submittal fields are Not Applicable — set them to N/A and
@@ -1461,6 +1549,8 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-submittal', existingWP.submittal_type);
       fillSelectLegacy('f-delivery-status', existingWP.delivery_status);
       fill('f-contractor', existingWP.contractor);
+      _selectedVendorId = existingWP.vendor_id || null;
+      document.getElementById('f-vendor-id').value = _selectedVendorId || '';
       document.getElementById('f-not-to-be-awarded').checked = !!existingWP.not_to_be_awarded;
       onNotToBeAwardedChange();   // re-apply the disabled/cleared Awarded Cost+Vendor state
       fill('f-remarks', existingWP.remarks);
@@ -1477,6 +1567,7 @@ AppAuth.requireLogin(async (user, profile) => {
       document.getElementById('nav-project-link').href = 'project.html?id=' + existingWP.project_id;
     }
 
+    initVendorCombo();
     onRequiresApprovalChange();   // apply N/A on first load (new WP defaults to "No")
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
@@ -1629,6 +1720,7 @@ AppAuth.requireLogin(async (user, profile) => {
       submittal_type:           getVal('f-submittal'),
       delivery_status:          getVal('f-delivery-status'),
       contractor:               getVal('f-contractor') || null,
+      vendor_id:                _selectedVendorId || null,
       remarks:                  getVal('f-remarks') || '',
       charging_type:            getVal('f-charging'),
       contract_package_no:      getVal('f-contract-package-no') || null,
@@ -1639,6 +1731,7 @@ AppAuth.requireLogin(async (user, profile) => {
     const spinner = document.getElementById('save-spinner');
     btn.disabled = true; spinner.style.display = 'flex';
 
+    let _savedWpId = editId || null;
     try {
       const autoApprove = AppAuth.isAutoApprove(userProfile);
       if (editId && existingWP) {
@@ -1652,16 +1745,24 @@ AppAuth.requireLogin(async (user, profile) => {
       } else {
         if (autoApprove) {
           const newWP = await WPDb.submitWP(data, userProfile);
+          _savedWpId = newWP?.id || null;
           if (newWP?.id) await WPDb.approveWP(newWP.id);
           document.getElementById('success-text').textContent = 'Work package saved and approved.';
         } else {
-          await WPDb.submitWP(data, userProfile);
+          const newWP = await WPDb.submitWP(data, userProfile);
+          _savedWpId = newWP?.id || null;
           document.getElementById('success-text').textContent = 'Work package submitted for review.';
         }
         // First-run checklist progress (this page doesn't load onboarding.js, so write the
         // shared localStorage key directly — same convention as GettingStarted.markStep).
         _gsMark('addWP');
         if ((data.award_status || '') === 'Awarded') _gsMark('awardIt');
+      }
+      // Vendor bid reconciliation (Phase 2b) — fire-and-forget, must never block the save
+      // flow/toast. Only meaningful once the WP is actually Awarded with a vendor + cost.
+      if (_savedWpId && data.award_status === 'Awarded' && data.vendor_id && data.awarded_cost) {
+        VendorDb.reconcileBidsOnAward(_savedWpId, data.vendor_id, data.awarded_cost)
+          .catch(err => console.error('reconcileBidsOnAward failed:', err));
       }
       successEl.className = 'alert alert-success';
       successEl.scrollIntoView({ behavior:'smooth' });
@@ -1678,9 +1779,10 @@ AppAuth.requireLogin(async (user, profile) => {
       /* Clear form if new */
       if (!editId) {
         ['f-cost-code','f-wp-no','f-description','f-zone','f-actual-awarding-date',
-         'f-target-installation','f-contract','f-contractor','f-remarks'].forEach(id=>{
+         'f-target-installation','f-contract','f-contractor','f-remarks','f-vendor-id'].forEach(id=>{
           document.getElementById(id).value='';
         });
+        _selectedVendorId = null;
         updateVariance();
       }
     } catch(e) {

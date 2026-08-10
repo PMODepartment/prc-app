@@ -47,8 +47,10 @@ const WPDb = (() => {
   function _stripBcb(obj) { const d = {...obj}; delete d.budget_bcb0; delete d.budget_bcb1; delete d.budget_bcb2; return d; }
   // Retry helper: strip whichever optional column set the DB is missing, then try again.
   function _stripOptional(obj, error) {
-    if (_isMissingBcbCol(error)) return _stripBcb(_stripAudit(obj));
-    return _stripAudit(obj);
+    let d = _stripAudit(obj);
+    if (_isMissingBcbCol(error)) d = _stripBcb(d);
+    if (_isMissingVendorCol(error)) d = _stripVendor(d);
+    return d;
   }
   // Same deploy-order guard again for projects.group_head (MIGRATION_project_group_head.sql):
   // every project write retries without the column if the DB hasn't been migrated yet.
@@ -58,6 +60,14 @@ const WPDb = (() => {
     return /group_head/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
   function _stripGroupHead(obj) { const d = {...obj}; delete d.group_head; return d; }
+  // Same deploy-order guard for work_packages.vendor_id (MIGRATION_vendor_phase2b.sql):
+  // every WP write retries without it if that migration hasn't run yet.
+  function _isMissingVendorCol(error) {
+    if (!error) return false;
+    const m = (error.message || '') + (error.details || '');
+    return /vendor_id/.test(m) && /column|does not exist|schema cache/i.test(m);
+  }
+  function _stripVendor(obj) { const d = {...obj}; delete d.vendor_id; return d; }
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
   async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
   async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
@@ -86,28 +96,34 @@ const WPDb = (() => {
   async function submitWP(d,p) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null};
     let {data,error}=await sb.from('work_packages').insert({...base,..._auditStamp()}).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error)))
       ({data,error}=await sb.from('work_packages').insert(_stripOptional(base,error)).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').insert(_stripBcb(_stripAudit(base))).select().single());
+    if(error && _isMissingVendorCol(error))
+      ({data,error}=await sb.from('work_packages').insert(_stripVendor(_stripAudit(base))).select().single());
     if(error) throw error; return data;
   }
   async function updateWP(id,d) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review'};
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error)))
       ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
+    if(error && _isMissingVendorCol(error))
+      ({data,error}=await sb.from('work_packages').update(_stripVendor(_stripAudit(base))).eq('id',id).select().single());
     if(error) throw error; return data;
   }
   async function updateWPDirect(id,d) {
     const sb=await getSB(); const base=unmap(d);
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error)))
       ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
+    if(error && _isMissingVendorCol(error))
+      ({data,error}=await sb.from('work_packages').update(_stripVendor(_stripAudit(base))).eq('id',id).select().single());
     if(error) throw error; return data;
   }
   async function createProject(d) {
@@ -1467,11 +1483,131 @@ const VendorDb = (() => {
     await sb.storage.from('vendor-certs').remove([path]);
   }
 
+  // ── Vendor bids (Phase 2b — per-WP competitive bidding) ──────────────
+  // vendor_bids only exists once MIGRATION_vendor_phase2b.sql has run; every
+  // write here is deploy-order-safe the same way the rest of this file is —
+  // a missing-table/column error is swallowed (logged, not thrown) so an
+  // award save on an un-migrated environment doesn't fail the WP save it's
+  // attached to.
+  function _isMissingBidsTable(error) {
+    if (!error) return false;
+    const m = (error.message || '') + (error.details || '');
+    return error.code === '42P01' || /vendor_bids/i.test(m) && /does not exist|schema cache|relation/i.test(m);
+  }
+  async function getBidsForWP(wpId) {
+    const sb = await getSB();
+    const { data, error } = await sb.from('vendor_bids').select('*').eq('wp_id', wpId).order('created_at');
+    if (error) { if (_isMissingBidsTable(error)) return []; throw error; }
+    const rows = data || [];
+    if (!rows.length) return rows;
+    const ids = [...new Set(rows.map(r => r.vendor_id))];
+    const { data: vs } = await sb.from('vendors').select('id,name').in('id', ids);
+    const nameById = {}; (vs || []).forEach(v => { nameById[v.id] = v.name; });
+    return rows.map(r => ({ ...r, vendor_name: nameById[r.vendor_id] || null }));
+  }
+  async function getBidsForVendor(vendorId) {
+    const sb = await getSB();
+    const { data, error } = await sb.from('vendor_bids').select('*').eq('vendor_id', vendorId).order('created_at', { ascending: false });
+    if (error) { if (_isMissingBidsTable(error)) return []; throw error; }
+    return data || [];
+  }
+  async function upsertBid(wpId, vendorId, projectId, fields, profile) {
+    const sb = await getSB();
+    const payload = {
+      ...fields,
+      wp_id: wpId,
+      vendor_id: vendorId,
+      project_id: projectId || null,
+      updated_by: profile?.id || null,
+      updated_by_name: profile?.name || profile?.email || null,
+      updated_at: new Date().toISOString(),
+    };
+    let { data, error } = await sb.from('vendor_bids')
+      .upsert(payload, { onConflict: 'vendor_id,wp_id' })
+      .select().single();
+    if (error && _isMissingCol(error, /updated_by|updated_by_name|updated_at/)) {
+      const d2 = { ...payload }; delete d2.updated_by; delete d2.updated_by_name; delete d2.updated_at;
+      ({ data, error } = await sb.from('vendor_bids').upsert(d2, { onConflict: 'vendor_id,wp_id' }).select().single());
+    }
+    if (error) throw error;
+    return data;
+  }
+  async function deleteBid(id) {
+    const sb = await getSB();
+    const { error } = await sb.from('vendor_bids').delete().eq('id', id);
+    if (error) throw error;
+  }
+  // Award-time reconciliation: the winning vendor's bid → 'awarded' with the
+  // final amount + today's award date; every OTHER bid on the same WP → 'lost'
+  // (unless already 'withdrawn' — a vendor that pulled out isn't "lost").
+  // No-op (never throws) when vendorId is empty — a WP can be awarded without
+  // being linked to a directory vendor yet.
+  async function reconcileBidsOnAward(wpId, vendorId, finalAmount) {
+    if (!wpId || !vendorId) return;
+    try {
+      const sb = await getSB();
+      const todayIso = new Date().toISOString().slice(0, 10);
+      await upsertBid(wpId, vendorId, null, {
+        status: 'awarded',
+        final_amount: finalAmount ?? null,
+        award_date: todayIso,
+      }, (typeof window !== 'undefined' && window.__profile) || null);
+      const { error } = await sb.from('vendor_bids')
+        .update({ status: 'lost' })
+        .eq('wp_id', wpId)
+        .neq('vendor_id', vendorId)
+        .neq('status', 'withdrawn');
+      if (error && !_isMissingBidsTable(error)) throw error;
+    } catch (err) {
+      if (!_isMissingBidsTable(err)) throw err;
+    }
+  }
+  // ── Vendor search / quick-create (used by the WP-form / Status-Tracker
+  // Awarded Vendor combobox) ───────────────────────────────────────────
+  async function searchApprovedVendors(query) {
+    const sb = await getSB();
+    let q = sb.from('vendors').select('id,name,status').eq('status', 'approved').order('name').limit(20);
+    if (query && query.trim()) q = q.ilike('name', `%${query.trim()}%`);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  }
+  // vendors.invite_email is NOT NULL (Phase 2a schema) — a staff-side quick
+  // create from the WP form has no invite email to give it (that's only
+  // collected via the vendors.html "Invite Vendor" flow), so this uses a
+  // synthesized placeholder rather than relaxing the column to nullable.
+  // The placeholder is never a real address a vendor could register with —
+  // vendor-register.html only matches on invite_email + invite_claimed_at
+  // is null, so this can't accidentally let someone claim a login; staff
+  // can overwrite it later in vendors.html when formally inviting them.
+  async function quickCreateVendor(name, profile) {
+    const sb = await getSB();
+    const placeholderEmail = `pending+${Date.now()}.${Math.random().toString(36).slice(2, 8)}@no-invite.local`;
+    const payload = {
+      name: (name || '').trim(),
+      status: 'pending_review',
+      invite_email: placeholderEmail,
+      created_by: profile?.id || null,
+      updated_by: profile?.id || null,
+      updated_by_name: profile?.name || profile?.email || null,
+      updated_at: new Date().toISOString(),
+    };
+    let { data, error } = await sb.from('vendors').insert(payload).select().single();
+    if (error && _isMissingCol(error, /created_by|updated_by|updated_by_name|updated_at/)) {
+      const d2 = { ...payload }; delete d2.created_by; delete d2.updated_by; delete d2.updated_by_name; delete d2.updated_at;
+      ({ data, error } = await sb.from('vendors').insert(d2).select().single());
+    }
+    if (error) throw error;
+    return data;
+  }
+
   return {
     getVendors, getVendor, createVendor, updateVendor, approveVendor, rejectVendor, setVendorStatus, deleteVendor,
     products, certifications, personnel,
     getVendorRates, addVendorRate, deleteVendorRate,
     uploadCertFile, getCertFileUrl, deleteCertFile,
+    getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
+    searchApprovedVendors, quickCreateVendor,
   };
 })();
 window.VendorDb = VendorDb;
