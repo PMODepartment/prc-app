@@ -143,6 +143,14 @@
     /* Split-candidate + merge-group cards */
     .split-row,.mg-card{border:1px solid #eee;border-radius:10px;padding:12px 14px;margin-bottom:10px}
     .split-orig{font-weight:700;font-size:0.9286rem;color:#231F20;margin-bottom:8px;word-break:break-word}
+    .split-toolbar{display:flex;gap:8px;align-items:flex-start;margin-bottom:12px}
+    .split-search-wrap{position:relative;flex:1;min-width:0}
+    .split-search-wrap input{width:100%;padding:8px 11px;border:1px solid #e5e5e5;border-radius:8px;font-size:0.85rem;font-family:inherit}
+    .split-search-pop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid #e5e5e5;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);max-height:240px;overflow-y:auto;z-index:5}
+    .split-search-opt{display:block;width:100%;text-align:left;padding:8px 11px;border:none;background:transparent;cursor:pointer;font-size:0.8375rem;font-family:inherit;color:#231F20}
+    .split-search-opt:hover{background:var(--mw-red-light,#FDECEA)}
+    .split-search-empty{padding:8px 11px;color:#888;font-size:0.8rem}
+    .split-manual-tag{display:inline-block;background:#EEF2FF;color:#3730A3;font-size:0.7143rem;font-weight:600;padding:1px 7px;border-radius:10px;vertical-align:middle;margin-left:6px}
     .split-segs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-width:0}
     .seg-chip{display:inline-flex;align-items:center;gap:6px;background:#FDECEA;color:#C42127;padding:4px 8px 4px 10px;border-radius:14px;font-size:0.8125rem;max-width:100%}
     .seg-chip input{border:none;background:transparent;color:inherit;font:inherit;padding:0;width:auto;min-width:40px;max-width:100%;outline:none}
@@ -180,6 +188,11 @@
     body.dark-mode .mg-keep-opt{color:var(--text-primary)}
     body.dark-mode .mg-keep-opt:hover{background:rgba(255,255,255,.06)}
     body.dark-mode #mergeSearch,body.dark-mode #splitSearch,body.dark-mode .seg-add input{background:var(--surface-2);color:var(--text-primary);border-color:var(--border-md)}
+    body.dark-mode .split-search-wrap input,body.dark-mode .split-search-pop{background:var(--surface-2);color:var(--text-primary);border-color:var(--border-md)}
+    body.dark-mode .split-search-opt{color:var(--text-primary)}
+    body.dark-mode .split-search-opt:hover{background:rgba(238,49,36,.18)}
+    body.dark-mode .split-search-empty{color:var(--text-hint)}
+    body.dark-mode .split-manual-tag{background:rgba(99,102,241,.22);color:#C7D2FE}
     body.dark-mode .section-divider{border-top-color:var(--border)}
 
     /* ── Dark mode — this page's inline components use hardcoded light colors
@@ -417,11 +430,15 @@
 <div class="modal-overlay" id="splitModal" style="display:none">
   <div class="modal" style="max-width:700px">
     <div class="modal-header">
-      <div><div class="modal-title">Split Garbled Vendor Names</div><div class="modal-subtitle">These vendor records look like several company names joined together (comma, slash, colon, or just run together with a repeating "Inc./Corp." suffix). Review the segments below, fix them if needed, then split each into separate vendor records — a segment that already matches an existing vendor links to it instead of creating a duplicate.</div></div>
+      <div><div class="modal-title">Split Garbled Vendor Names</div><div class="modal-subtitle">These vendor records look like several company names joined together (comma, slash, colon, or just run together with a repeating "Inc./Corp." suffix). Review the segments below, fix them if needed, then split each into separate vendor records — a segment that already matches an existing vendor links to it instead of creating a duplicate. Records with no delimiter aren't auto-flagged — <b>use the search below</b> to pull one in and split it manually.</div></div>
       <button class="modal-close" onclick="closeSplitModal()">&times;</button>
     </div>
     <div class="modal-body" id="splitModalBody">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <div class="split-toolbar">
+        <div class="split-search-wrap">
+          <input id="split-vendor-search" type="text" autocomplete="off" placeholder="Find any vendor to split manually…" oninput="_splitVendorSearch()" onblur="setTimeout(_splitHideSearch,150)">
+          <div id="split-vendor-results" class="split-search-pop" style="display:none"></div>
+        </div>
         <button class="btn-cancel" id="btn-split-all" onclick="splitAll()">Split All</button>
       </div>
       <div id="splitList"></div>
@@ -465,7 +482,7 @@
 <script src="assets/js/auth.js?v=20260810w"></script>
 <script src="assets/js/db.js?v=20260810w"></script>
 <script src="assets/js/ui.js?v=20260810w"></script>
-<script src="assets/js/vendor-guide.js?v=20260810w"></script>
+<script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -839,17 +856,16 @@ function _splitOnSuffixRuns(name) {
   });
   return marked.split(marker).map(s => s.trim()).filter(Boolean);
 }
-function _splitSegments(name) {
-  const n = name || '';
-  let raw = n.split(/[,/;:|\r\n]+/).map(s => s.trim()).filter(Boolean);
-  if (raw.length < 2 && _countSuffixTokens(n) >= 2) raw = _splitOnSuffixRuns(n);
+// Shared cleanup pass over a raw segment list: (a) a segment that is JUST a
+// legal suffix ("Inc.", "Corp") belongs to the company before it, not a
+// vendor of its own; (b) a segment that STARTS with a legal suffix + more
+// content has that suffix as the tail of the PREVIOUS company, and the rest
+// as its own real name. Used by both the auto detector and the manual
+// suggester so the two can never drift.
+function _coalesceSegments(raw) {
   const merged = [];
   for (let seg of raw) {
-    // A segment that is JUST a legal suffix ("Inc.", "Corp") belongs to the
-    // company before it, not a vendor of its own.
     if (CORP_SUFFIX_RE.test(seg) && merged.length) { merged[merged.length - 1] += ', ' + seg; continue; }
-    // A segment that STARTS with a legal suffix + more content: the suffix is
-    // the tail of the previous company; the rest is this segment's real name.
     const lead = seg.match(LEADING_SUFFIX_RE);
     if (lead && merged.length && /^[A-Z0-9]/.test(lead[2])) {
       merged[merged.length - 1] += ', ' + lead[1];
@@ -859,8 +875,53 @@ function _splitSegments(name) {
   }
   return merged;
 }
+function _splitSegments(name) {
+  const n = name || '';
+  let raw = n.split(/[,/;:|\r\n]+/).map(s => s.trim()).filter(Boolean);
+  if (raw.length < 2 && _countSuffixTokens(n) >= 2) raw = _splitOnSuffixRuns(n);
+  return _coalesceSegments(raw);
+}
+// MANUAL-ONLY, opt-in split-point guesser for records with NO delimiter and
+// NO repeated legal suffix — e.g. "Comanchesteel Corporation Rheymar
+// Trading" — that _splitSegments() cannot detect. Deliberately NOT wired into
+// _splitCandidates() or the Needs-Splitting badge: it's too aggressive to
+// auto-flag across ~1,000 legitimate single-company names (it WILL
+// mis-suggest on names like "First Balfour Construction Group"). It only
+// runs when staff pull a specific vendor into the Split tool and click
+// "Suggest split points", and every suggested segment is editable before
+// anything is committed. It inserts a split after a company-boundary word
+// only when the NEXT word starts with a capital (a new company name begins),
+// then runs the shared coalesce pass so a suffix continuation ("... Trading
+// Corporation") rejoins instead of stranding a bare suffix. Falls back to the
+// whole name as a single segment when it finds nothing.
+const SPLIT_HINT_RE = /\b(inc|incorporated|corp|corporation|ltd|limited|llc|co|company|trading|enterprises|enterprise|industries|industrial|ventures|construction|builders|resources|manufacturing|merchandising|marketing)\b\.?/gi;
+function _suggestSplitPoints(name) {
+  const marker = '\u0001';
+  const marked = (name || '').replace(SPLIT_HINT_RE, (m, w, offset, str) => {
+    const rest = str.slice(offset + m.length);
+    return /^\s+[A-Z]/.test(rest) ? m + marker : m; // next word capitalized => new company
+  });
+  const segs = _coalesceSegments(marked.split(marker).map(s => s.trim()).filter(Boolean));
+  return segs.length >= 2 ? segs : [(name || '').trim()].filter(Boolean);
+}
 function _splitCandidates() {
   return allVendors.filter(v => _splitSegments(v.name).length >= 2 && !_splitSkipped.has(v.id));
+}
+// Vendors staff manually pulled into the Split tool via search (records with
+// no delimiter / no repeated suffix that _splitCandidates can't auto-detect).
+// Reset each time the modal opens.
+let _splitManual = new Set();
+// The rows the Split modal shows = auto-detected candidates + manual adds,
+// deduped by id, minus skipped.
+function _splitRows() {
+  const byId = new Map();
+  _splitCandidates().forEach(v => byId.set(v.id, v));
+  _splitManual.forEach(id => {
+    if (_splitSkipped.has(id) || byId.has(id)) return;
+    const v = allVendors.find(x => x.id === id);
+    if (v) byId.set(id, v);
+  });
+  return [...byId.values()];
 }
 function updateSplitBadge() {
   const n = _splitCandidates().length;
@@ -886,6 +947,10 @@ function _toolsMenuOutsideClick(e) {
 let _splitSegs = {}; // vendorId -> [segment strings]
 function openSplitModal() {
   _splitSegs = {};
+  _splitManual = new Set();
+  const search = document.getElementById('split-vendor-search');
+  if (search) search.value = '';
+  _splitHideSearch();
   _splitCandidates().forEach(v => {
     _splitSegs[v.id] = _splitSegments(v.name);
   });
@@ -907,11 +972,12 @@ function _findExistingVendorByName(name, excludeId) {
   return allVendors.find(v => v.id !== excludeId && _mgNormalize(v.name) === norm) || null;
 }
 function renderSplitList() {
-  const cands = _splitCandidates();
+  const cands = _splitRows();
   const el = document.getElementById('splitList');
-  if (!cands.length) { el.innerHTML = '<div class="split-empty">No garbled vendor names left to review.</div>'; return; }
+  if (!cands.length) { el.innerHTML = '<div class="split-empty">No garbled vendor names flagged. Use the search above to pull in a vendor whose name is several companies run together, then split it manually.</div>'; return; }
   el.innerHTML = cands.map(v => {
-    const segs = _splitSegs[v.id] || [];
+    // Lazily seed a manually-added row's segments (candidates are seeded on open).
+    const segs = _splitSegs[v.id] || (_splitSegs[v.id] = _splitSegments(v.name));
     const chips = segs.map((s, i) => {
       const match = _findExistingVendorByName(s, v.id);
       return `<span class="seg-chip">
@@ -925,12 +991,14 @@ function renderSplitList() {
     const summary = segs.length
       ? `${newCount ? newCount + ' new' : ''}${newCount && linkCount ? ' + ' : ''}${linkCount ? linkCount + ' linked to existing' : ''}`
       : '';
+    const manualTag = _splitManual.has(v.id) ? ` <span class="split-manual-tag">manually added</span>` : '';
     return `<div class="split-row" id="split-row-${v.id}">
-      <div class="split-orig">${esc(v.name)}</div>
+      <div class="split-orig">${esc(v.name)}${manualTag}</div>
       <div class="split-segs" id="split-segs-${v.id}">${chips}</div>
       <div class="seg-add">
         <input type="text" id="split-add-${v.id}" placeholder="+ add segment" onkeydown="if(event.key==='Enter'){event.preventDefault();_splitSegAdd('${v.id}')}">
         <button class="btn-cancel" style="padding:5px 10px" onclick="_splitSegAdd('${v.id}')">Add</button>
+        <button class="btn-cancel" style="padding:5px 10px" onclick="_splitSuggest('${v.id}')" title="Guess split points from company-boundary words (Corporation, Trading, Enterprises…). Fully editable — review before splitting."><i class="ti ti-wand"></i> Suggest split points</button>
       </div>
       <div class="split-row-actions">
         <button class="btn-split" onclick="doSplit('${v.id}')">Split (${summary || (segs.length||0)+' vendors'})</button>
@@ -938,6 +1006,40 @@ function renderSplitList() {
       </div>
     </div>`;
   }).join('');
+}
+// Search box in the Split modal to pull ANY vendor into the tool for manual
+// splitting (records auto-detection misses — no delimiter, no repeated suffix).
+function _splitVendorSearch() {
+  const q = (document.getElementById('split-vendor-search').value || '').trim().toLowerCase();
+  const pop = document.getElementById('split-vendor-results');
+  if (!pop) return;
+  if (q.length < 2) { pop.style.display = 'none'; pop.innerHTML = ''; return; }
+  const inList = new Set(_splitRows().map(v => v.id));
+  const matches = allVendors.filter(v => v.name && v.name.toLowerCase().includes(q) && !inList.has(v.id)).slice(0, 10);
+  pop.innerHTML = matches.length
+    ? matches.map(v => `<button type="button" class="split-search-opt" onclick="_splitAddVendor('${v.id}')">${esc(v.name)} <span style="color:#aaa">(${esc(v.status.replace('_', ' '))})</span></button>`).join('')
+    : '<div class="split-search-empty">No matching vendor.</div>';
+  pop.style.display = 'block';
+}
+function _splitHideSearch() { const p = document.getElementById('split-vendor-results'); if (p) { p.style.display = 'none'; p.innerHTML = ''; } }
+function _splitAddVendor(id) {
+  const v = allVendors.find(x => x.id === id);
+  if (!v) return;
+  _splitSkipped.delete(id);
+  _splitManual.add(id);
+  if (!_splitSegs[id]) _splitSegs[id] = _splitSegments(v.name);
+  const search = document.getElementById('split-vendor-search');
+  if (search) search.value = '';
+  _splitHideSearch();
+  renderSplitList();
+  const row = document.getElementById('split-row-' + id);
+  if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function _splitSuggest(vid) {
+  const v = allVendors.find(x => x.id === vid);
+  if (!v) return;
+  _splitSegs[vid] = _suggestSplitPoints(v.name);
+  renderSplitList();
 }
 function _splitSegEdit(input) {
   const vid = input.dataset.vid, idx = +input.dataset.idx;
@@ -997,7 +1099,7 @@ async function doSplit(vendorId) {
 // are shown for it right now — reviewing/editing a row's chips before
 // clicking this still applies, it's a bulk COMMIT, not a bulk auto-detect.
 async function splitAll() {
-  const cands = _splitCandidates().filter(v => (_splitSegs[v.id] || []).map(s => s.trim()).filter(Boolean).length >= 2);
+  const cands = _splitRows().filter(v => (_splitSegs[v.id] || []).map(s => s.trim()).filter(Boolean).length >= 2);
   if (!cands.length) { AppNotify ? AppNotify.warn('Nothing to split — no candidate currently has 2+ segments.') : alert('Nothing to split.'); return; }
   let estNew = 0, estLinked = 0;
   cands.forEach(v => (_splitSegs[v.id] || []).forEach(seg => { if (_findExistingVendorByName(seg, v.id)) estLinked++; else estNew++; }));

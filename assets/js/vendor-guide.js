@@ -34,7 +34,11 @@
     s.textContent = [
       '.vg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:4000;display:flex;align-items:center;justify-content:center;padding:20px}',
       '.vg-card{background:var(--surface,#fff);color:var(--text-primary,#231F20);width:100%;max-width:520px;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.3);display:flex;flex-direction:column;overflow:hidden}',
-      '.vg-body{padding:30px 30px 8px;text-align:center;min-height:230px}',
+      /* Fixed height (not min-height) so every slide occupies the same
+         vertical space — otherwise a taller (bulleted) slide pushes the
+         footer down and the "Next" button jumps between clicks. Taller
+         content scrolls inside the body instead. */
+      '.vg-body{padding:30px 30px 8px;text-align:center;height:300px;overflow-y:auto}',
       '.vg-ic{width:60px;height:60px;border-radius:15px;background:var(--mw-red-light,#FDECEA);color:var(--mw-red,#EE3124);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}',
       '.vg-ic i{font-size:30px}',
       '.vg-title{font-size:20px;font-weight:800;margin-bottom:10px}',
