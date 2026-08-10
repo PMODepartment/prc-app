@@ -1803,7 +1803,12 @@ const VendorDb = (() => {
       });
     });
 
-    let tradesUpdated = 0;
+    // Each loop is independently try/caught so one bad row (e.g. an
+    // unmigrated column, an RLS-denied project, a transient network error)
+    // can't abort the rest of the backfill. Since every write here is an
+    // upsert/dedup-by-description, a partial run followed by a second run
+    // safely finishes whatever didn't complete the first time.
+    let tradesUpdated = 0, tradesFailed = 0;
     for (const v of vendors) {
       const set = tradeSets[v.id];
       if (!set) continue;
@@ -1811,31 +1816,57 @@ const VendorDb = (() => {
       const union = [...set];
       const changed = union.length !== orig.size || union.some(t => !orig.has(t));
       if (!changed) continue;
-      await updateVendor(v.id, { trade_categories: union });
-      tradesUpdated++;
-    }
-
-    let productsAdded = 0;
-    for (const vendorId of Object.keys(newProducts)) {
-      for (const { category, description } of newProducts[vendorId].values()) {
-        await products.add(vendorId, { category, description, unit: null });
-        productsAdded++;
+      try {
+        await updateVendor(v.id, { trade_categories: union });
+        tradesUpdated++;
+      } catch (err) {
+        tradesFailed++;
+        console.error('[backfillVendorDataFromWPs] trade update failed', { vendorId: v.id, err });
       }
     }
 
-    let bidsUpserted = 0;
+    let productsAdded = 0, productsFailed = 0;
+    for (const vendorId of Object.keys(newProducts)) {
+      for (const { category, description } of newProducts[vendorId].values()) {
+        try {
+          await products.add(vendorId, { category, description, unit: null });
+          productsAdded++;
+        } catch (err) {
+          productsFailed++;
+          console.error('[backfillVendorDataFromWPs] product add failed', { vendorId, description, err });
+        }
+      }
+    }
+
+    let bidsUpserted = 0, bidsFailed = 0;
     for (const b of bidsToUpsert) {
-      await upsertBid(b.wpId, b.vendorId, b.projectId, b.fields, profile);
-      bidsUpserted++;
+      try {
+        await upsertBid(b.wpId, b.vendorId, b.projectId, b.fields, profile);
+        bidsUpserted++;
+      } catch (err) {
+        bidsFailed++;
+        console.error('[backfillVendorDataFromWPs] bid upsert failed', { wpId: b.wpId, vendorId: b.vendorId, err });
+      }
     }
 
-    let ratesUpserted = 0;
+    let ratesUpserted = 0, ratesFailed = 0;
     for (const r of ratesToUpsert) {
-      await upsertRate(r.wpId, r.vendorId, r.projectId, r.fields, profile);
-      ratesUpserted++;
+      try {
+        await upsertRate(r.wpId, r.vendorId, r.projectId, r.fields, profile);
+        ratesUpserted++;
+      } catch (err) {
+        ratesFailed++;
+        console.error('[backfillVendorDataFromWPs] rate upsert failed', { wpId: r.wpId, vendorId: r.vendorId, err });
+      }
     }
 
-    return { tradesUpdated, productsAdded, bidsUpserted, ratesUpserted, skippedNoVendor };
+    return {
+      tradesUpdated, tradesFailed,
+      productsAdded, productsFailed,
+      bidsUpserted, bidsFailed,
+      ratesUpserted, ratesFailed,
+      skippedNoVendor,
+    };
   }
 
   // All product rows across vendors (id + searchable text), for the directory's

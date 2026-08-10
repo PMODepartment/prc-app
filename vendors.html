@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810h"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810h"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810h"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810i"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810i"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810i"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810h">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810i">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -228,7 +228,7 @@
             <button class="btn-cancel" onclick="importFromWPs()" title="Scan all work packages and add any awarded/proposed vendors not already in the directory"><i class="ti ti-file-import" style="margin-right:4px"></i>Import from WPs</button>
             <button id="btn-backfill-vendor-data" class="btn-cancel" onclick="backfillFromWPs()" title="Fill in trade categories, products, bid history and rates for vendors from their work packages"><i class="ti ti-refresh-dot" style="margin-right:4px"></i>Backfill Trade/Bid Data</button>
             <button class="btn-cancel" onclick="openMergeModal()" title="Combine duplicate vendor records (typos / different names for the same company) into one"><i class="ti ti-arrows-join" style="margin-right:4px"></i>Merge</button>
-            <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Invite Vendor</button>
+            <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Add Vendor</button>
           </div>
           <div class="vendor-meta"><span class="vendor-count" id="vendorCount"></span></div>
           <div class="vendor-cards" id="vendorCards"></div>
@@ -249,27 +249,32 @@
   </div>
 </div>
 
-<!-- Invite Vendor Modal -->
+<!-- Add Vendor Modal -->
 <div class="modal-overlay" id="inviteModal" style="display:none">
   <div class="modal">
     <div class="modal-header">
-      <div><div class="modal-title">Invite a Vendor</div><div class="modal-subtitle">Creates a vendor skeleton and an invite link you send them to activate their own login.</div></div>
+      <div><div class="modal-title">Add a Vendor</div><div class="modal-subtitle">Add a vendor to the directory — fill in what you know now, invite them to self-manage their profile later if needed.</div></div>
       <button class="modal-close" onclick="closeInviteModal()">&times;</button>
     </div>
     <div class="modal-body">
       <div class="msg" id="inviteMsg" style="display:none;font-size:0.8571rem;padding:8px 12px;border-radius:8px;margin-bottom:12px"></div>
-      <div class="field"><label>Company Name</label><input id="inv-name" placeholder="e.g. ABC Construction Supply Inc."></div>
-      <div class="field"><label>Invite Email</label><input id="inv-email" type="email" placeholder="contact@vendor.com"></div>
+      <div class="field"><label>Company Name *</label><input id="inv-name" placeholder="e.g. ABC Construction Supply Inc."></div>
       <div class="field"><label>Trade Categories</label><div class="trade-checklist" id="inviteTradeChips"></div></div>
+      <div class="field"><label>Contact Person</label><input id="inv-contact-person" type="text" placeholder="Full name"></div>
+      <div class="field"><label>Contact Number</label><input id="inv-contact-number" type="text" placeholder="e.g. 0917 000 0000"></div>
+      <div class="field"><label>Contact Email</label><input id="inv-contact-email" type="email" placeholder="contact@vendor.com"></div>
+      <div class="field"><label>Address</label><input id="inv-address" type="text" placeholder="Company address"></div>
+      <div class="field"><label>Notes</label><textarea id="inv-notes" placeholder="Anything else worth recording about this vendor"></textarea></div>
+      <div class="field"><label>Invite Email <span style="font-weight:400;text-transform:none;color:#999">(optional — only needed if this vendor should self-manage their profile)</span></label><input id="inv-email" type="email" placeholder="contact@vendor.com"></div>
       <div id="inviteLinkWrap" style="display:none">
-        <label style="display:block;font-size:0.7857rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">Send this link to the vendor</label>
+        <label style="display:block;font-size:0.7857rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">An invite link was also generated — send it if you'd like this vendor to self-manage their own profile</label>
         <div class="invite-link-box" id="inviteLinkText"></div>
         <button class="btn-cancel" style="margin-top:8px" onclick="copyInviteLink()">Copy Link</button>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeInviteModal()">Close</button>
-      <button class="btn-primary" id="btnCreateInvite" onclick="createInvite()">Create Vendor + Get Link</button>
+      <button class="btn-primary" id="btnCreateInvite" onclick="createInvite()">Add Vendor</button>
     </div>
   </div>
 </div>
@@ -329,10 +334,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810h"></script>
-<script src="assets/js/db.js?v=20260810h"></script>
-<script src="assets/js/ui.js?v=20260810h"></script>
-<script src="assets/js/onboarding.js?v=20260810h"></script>
+<script src="assets/js/auth.js?v=20260810i"></script>
+<script src="assets/js/db.js?v=20260810i"></script>
+<script src="assets/js/ui.js?v=20260810i"></script>
+<script src="assets/js/onboarding.js?v=20260810i"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -489,7 +494,13 @@ async function backfillFromWPs() {
     AppNotify && AppNotify.info('Backfilling vendor trade/bid data from work packages…');
     const r = await VendorDb.backfillVendorDataFromWPs(userProfile);
     await loadAll();
-    AppNotify && AppNotify.success(`Backfill complete: ${r.tradesUpdated} vendor(s) trades updated, ${r.productsAdded} product(s) added, ${r.bidsUpserted} bid(s) synced, ${r.ratesUpserted} rate(s) synced.`);
+    const totalFailed = (r.tradesFailed||0) + (r.productsFailed||0) + (r.bidsFailed||0) + (r.ratesFailed||0);
+    const summary = `Backfill complete: ${r.tradesUpdated} vendor(s) trades updated, ${r.productsAdded} product(s) added, ${r.bidsUpserted} bid(s) synced, ${r.ratesUpserted} rate(s) synced.`;
+    if (totalFailed > 0) {
+      AppNotify && AppNotify.warn(`${summary} (${totalFailed} failure(s) — see console; safe to re-run.)`);
+    } else {
+      AppNotify && AppNotify.success(summary);
+    }
   } catch (e) { AppNotify ? AppNotify.fromError(e, 'Backfill failed') : alert(e.message); }
   finally { if (btn) { btn.disabled = false; btn.innerHTML = orig; } }
 }
@@ -582,39 +593,73 @@ function toggleInviteTrade(el) {
 function openInviteModal() {
   document.getElementById('inv-name').value = '';
   document.getElementById('inv-email').value = '';
+  document.getElementById('inv-contact-person').value = '';
+  document.getElementById('inv-contact-number').value = '';
+  document.getElementById('inv-contact-email').value = '';
+  document.getElementById('inv-address').value = '';
+  document.getElementById('inv-notes').value = '';
   document.getElementById('inviteLinkWrap').style.display = 'none';
   document.getElementById('inviteMsg').style.display = 'none';
   inviteTrades = new Set();
   buildInviteChips();
   document.getElementById('btnCreateInvite').style.display = '';
+  document.getElementById('btnCreateInvite').textContent = 'Add Vendor';
   document.getElementById('inviteModal').style.display = 'flex';
 }
 function closeInviteModal() { document.getElementById('inviteModal').style.display = 'none'; }
 
+// vendors.invite_email is NOT NULL — when staff leaves the (now optional)
+// Invite Email field blank, synthesize the same placeholder format used by
+// VendorDb.quickCreateVendor so a directory-only vendor (no self-service
+// login yet) can still be created. Staff can fill in a real email later via
+// the detail modal's "Login & Self-Service Access" block.
+function _addVendorPlaceholderEmail() {
+  return `pending+${Date.now()}.${Math.random().toString(36).slice(2, 8)}@no-invite.local`;
+}
 async function createInvite() {
   const name = document.getElementById('inv-name').value.trim();
   const invite_email = document.getElementById('inv-email').value.trim();
   const msgBox = document.getElementById('inviteMsg');
-  if (!name || !invite_email) {
-    msgBox.textContent = 'Company name and invite email are both required.';
+  if (!name) {
+    msgBox.textContent = 'Company name is required.';
     msgBox.style.cssText = 'display:block;background:#FEE2E2;color:#991B1B;font-size:0.8571rem;padding:8px 12px;border-radius:8px;margin-bottom:12px';
     return;
   }
   const btn = document.getElementById('btnCreateInvite');
-  btn.disabled = true; btn.textContent = 'Creating…';
+  btn.disabled = true; btn.textContent = 'Adding…';
   try {
-    const v = await VendorDb.createVendor({ name, invite_email, trade_categories: [...inviteTrades] }, userProfile);
-    const link = window.location.origin + window.location.pathname.replace('vendors.html','') + 'vendor-register.html?vendor=' + v.id;
-    document.getElementById('inviteLinkText').textContent = link;
-    document.getElementById('inviteLinkWrap').style.display = 'block';
-    btn.style.display = 'none';
+    const fields = {
+      name,
+      invite_email: invite_email || _addVendorPlaceholderEmail(),
+      trade_categories: [...inviteTrades],
+      contact_person: document.getElementById('inv-contact-person').value.trim(),
+      contact_number: document.getElementById('inv-contact-number').value.trim(),
+      contact_email: document.getElementById('inv-contact-email').value.trim(),
+      address: document.getElementById('inv-address').value.trim(),
+      notes: document.getElementById('inv-notes').value.trim(),
+    };
+    // Staff has already reviewed this data at creation time (unlike vendor
+    // self-registration, or the bulk import/quick-create paths, which stay
+    // pending_review) — createVendor always inserts as pending_review, so
+    // immediately flip it to approved.
+    let v = await VendorDb.createVendor(fields, userProfile);
+    v = await VendorDb.approveVendor(v.id);
+    if (invite_email) {
+      const link = window.location.origin + window.location.pathname.replace('vendors.html','') + 'vendor-register.html?vendor=' + v.id;
+      document.getElementById('inviteLinkText').textContent = link;
+      document.getElementById('inviteLinkWrap').style.display = 'block';
+      btn.style.display = 'none';
+    } else {
+      closeInviteModal();
+    }
     msgBox.style.display = 'none';
     await loadAll();
+    AppNotify && AppNotify.success(`Vendor "${name}" added.`);
   } catch (e) {
     msgBox.textContent = 'Could not create vendor: ' + (e.message || e);
     msgBox.style.cssText = 'display:block;background:#FEE2E2;color:#991B1B;font-size:0.8571rem;padding:8px 12px;border-radius:8px;margin-bottom:12px';
   }
-  btn.disabled = false; btn.textContent = 'Create Vendor + Get Link';
+  btn.disabled = false; btn.textContent = 'Add Vendor';
 }
 function copyInviteLink() {
   const text = document.getElementById('inviteLinkText').textContent;
