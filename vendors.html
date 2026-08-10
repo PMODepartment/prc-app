@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810v"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810v"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810v"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810w"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810w"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810w"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810v">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810w">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -75,6 +75,26 @@
     .vendor-pager .pager-info{font-size:0.8125rem;color:#888;min-width:120px;text-align:center}
     body.dark-mode .vendor-count,body.dark-mode .vendor-pager .pager-info{color:var(--text-hint)}
     body.dark-mode .vendor-pager button{background:var(--surface);color:var(--text-primary);border-color:var(--border-md)}
+    /* Bulk select */
+    .vendor-selall{display:flex;align-items:center;gap:8px;cursor:pointer}
+    .vendor-selall input{width:16px;height:16px;accent-color:#EE3124;cursor:pointer}
+    .vendor-bulkbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface,#fff);border:1.5px solid #EE3124;border-radius:10px;padding:6px 10px}
+    .vendor-bulkbar .bulk-count{font-size:0.8125rem;font-weight:700;color:#EE3124;margin-right:2px}
+    .vendor-bulkbar button{border:1px solid #e5e5e5;background:#fff;border-radius:7px;padding:6px 11px;font-size:0.8rem;font-weight:600;font-family:inherit;cursor:pointer;color:#231F20}
+    .vendor-bulkbar button:hover{border-color:#EE3124}
+    .vendor-bulkbar .b-approve{background:#16A34A;color:#fff;border-color:#16A34A}
+    .vendor-bulkbar .b-reject{background:#f5f5f5;color:#666}
+    .vendor-bulkbar .b-delete{background:#EE3124;color:#fff;border-color:#EE3124}
+    .vendor-bulkbar .b-link{border:none;background:none;color:#2563EB;text-decoration:underline;padding:6px 4px}
+    .vcard-check{width:17px;height:17px;accent-color:#EE3124;cursor:pointer;flex-shrink:0;align-self:flex-start;margin-top:2px}
+    .vcard.selected{border-color:#EE3124;box-shadow:0 0 0 2px rgba(238,49,36,.25)}
+    .v-table .v-check{width:16px;height:16px;accent-color:#EE3124;cursor:pointer}
+    .v-table tr.row-selected td{background:var(--mw-red-light,#FDECEA)}
+    body.dark-mode .v-table tr.row-selected td{background:rgba(238,49,36,.16)}
+    body.dark-mode .vendor-bulkbar{background:var(--surface)}
+    body.dark-mode .vendor-bulkbar button{background:var(--surface-2);color:var(--text-primary);border-color:var(--border-md)}
+    body.dark-mode .vendor-bulkbar .b-approve{background:#16A34A;color:#fff}
+    body.dark-mode .vendor-bulkbar .b-delete{background:#EE3124;color:#fff}
     .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7857rem;font-weight:600}
     .badge-pending_review{background:#FEF3C7;color:#92400E}
     .badge-approved{background:#D1FAE5;color:#065F46}
@@ -294,15 +314,25 @@
             <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Add Vendor</button>
             </div>
           </div>
-          <div class="vendor-meta"><span class="vendor-count" id="vendorCount"></span></div>
+          <div class="vendor-meta">
+            <label class="vendor-selall"><input type="checkbox" id="vendorSelAll" onchange="toggleSelectPage(this.checked)" style="display:none"><span class="vendor-count" id="vendorCount"></span></label>
+            <div class="vendor-bulkbar" id="vendorBulkBar" style="display:none">
+              <span class="bulk-count" id="bulkCount">0 selected</span>
+              <button class="b-link" id="bulkSelAllFiltered" onclick="bulkSelectAllFiltered()">Select all matching</button>
+              <button class="b-approve" onclick="bulkApprove()">Approve</button>
+              <button class="b-reject" onclick="bulkReject()">Reject</button>
+              <button class="b-delete" id="bulkDeleteBtn" onclick="bulkDelete()">Delete</button>
+              <button onclick="clearVendorSel()">Clear</button>
+            </div>
+          </div>
           <div class="vendor-cards" id="vendorCards"></div>
           <div class="section-card" id="vendorTableWrap" style="display:none">
             <div class="table-wrapper">
               <table class="v-table">
                 <thead><tr>
-                  <th>Company</th><th>Trade Categories</th><th>Contact</th><th>Status</th><th>Actions</th>
+                  <th class="vth-check" style="width:34px"></th><th>Company</th><th>Trade Categories</th><th>Contact</th><th>Status</th><th>Actions</th>
                 </tr></thead>
-                <tbody id="vendorTableBody"><tr><td colspan="5" style="text-align:center;color:#888;padding:24px">Loading…</td></tr></tbody>
+                <tbody id="vendorTableBody"><tr><td colspan="6" style="text-align:center;color:#888;padding:24px">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -430,22 +460,40 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810v"></script>
-<script src="assets/js/db.js?v=20260810v"></script>
-<script src="assets/js/ui.js?v=20260810v"></script>
-<script src="assets/js/onboarding.js?v=20260810v"></script>
+<script src="assets/js/auth.js?v=20260810w"></script>
+<script src="assets/js/db.js?v=20260810w"></script>
+<script src="assets/js/ui.js?v=20260810w"></script>
+<script src="assets/js/onboarding.js?v=20260810w"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
+// Bulk-select: which write roles may act, current selection (persists across
+// pages/filter/view), and the ids on the currently-rendered page.
+let _canManage = false, _canBulkDelete = false;
+const _selectedVendors = new Set();
+let _pageIds = [];
 
 AppAuth.requireLogin((user, profile) => {
   userProfile = profile;
   if (profile.role === 'vendor') { window.location.href = 'vendor-portal.html'; return; }
+  _canManage = !['viewer', 'viewer_budget'].includes(profile.role);   // write roles only
+  _canBulkDelete = AppAuth.isAdmin(profile);                            // delete is admin-only (matches RLS)
   if (AppAuth.isAdmin(profile)) document.getElementById('nav-admin-section').style.display = '';
   renderUserBar('user-bar', profile);
   initMobileMenu();
+  _initBulkUI();
   loadAll();
 });
+
+function _initBulkUI() {
+  if (!_canManage) {
+    // strip the table's leading checkbox column header so it stays 5 columns
+    const th = document.querySelector('.vth-check'); if (th) th.remove();
+    return;
+  }
+  const sa = document.getElementById('vendorSelAll'); if (sa) sa.style.display = '';
+  const del = document.getElementById('bulkDeleteBtn'); if (del && !_canBulkDelete) del.remove();
+}
 
 let _vendorProductText = {};  // vendorId -> lowercased "category description …" for product search
 async function loadAll() {
@@ -506,12 +554,63 @@ function renderVendorList() {
   if (_vendorPage < 0) _vendorPage = 0;
   const start = _vendorPage * _VENDOR_PAGE_SIZE;
   const pageRows = all.slice(start, start + _VENDOR_PAGE_SIZE);
+  _pageIds = pageRows.map(v => v.id);
   const cnt = document.getElementById('vendorCount');
   if (cnt) cnt.textContent = total
     ? `${total.toLocaleString()} vendor${total === 1 ? '' : 's'}` + (total > _VENDOR_PAGE_SIZE ? ` · showing ${start + 1}–${Math.min(start + _VENDOR_PAGE_SIZE, total)}` : '')
     : 'No vendors';
   _vendorView === 'table' ? renderTable(pageRows) : renderCards(pageRows);
   renderPager(total, pages);
+  _syncBulkUI();
+}
+
+/* ── Bulk select ── */
+function toggleVendorSel(id, checked) {
+  if (checked) _selectedVendors.add(id); else _selectedVendors.delete(id);
+  // toggle just the affected row/card's highlight without a full re-render
+  const cb = document.querySelector(`.vcard-check[onclick*="${id}"], .v-check[onclick*="${id}"]`);
+  const host = cb && cb.closest('.vcard, tr');
+  if (host) host.classList.toggle(host.classList.contains('vcard') ? 'selected' : 'row-selected', checked);
+  _syncBulkUI();
+}
+function toggleSelectPage(checked) {
+  _pageIds.forEach(id => { if (checked) _selectedVendors.add(id); else _selectedVendors.delete(id); });
+  renderVendorList();
+}
+function bulkSelectAllFiltered() {
+  _vendorFiltered().forEach(v => _selectedVendors.add(v.id));
+  renderVendorList();
+}
+function clearVendorSel() { _selectedVendors.clear(); renderVendorList(); }
+function _syncBulkUI() {
+  const bar = document.getElementById('vendorBulkBar');
+  const n = _selectedVendors.size;
+  if (bar) bar.style.display = n > 0 ? 'flex' : 'none';
+  const cnt = document.getElementById('bulkCount'); if (cnt) cnt.textContent = `${n.toLocaleString()} selected`;
+  const sa = document.getElementById('vendorSelAll');
+  if (sa && _canManage) {
+    const onPage = _pageIds.filter(id => _selectedVendors.has(id)).length;
+    sa.checked = onPage > 0 && onPage === _pageIds.length;
+    sa.indeterminate = onPage > 0 && onPage < _pageIds.length;
+  }
+}
+async function bulkApprove() {
+  const ids = [..._selectedVendors]; if (!ids.length) return;
+  if (!confirm(`Approve ${ids.length} selected vendor(s)? They'll go live in the directory.`)) return;
+  try { await VendorDb.bulkSetVendorStatus(ids, 'approved'); _selectedVendors.clear(); await loadAll(); AppNotify && AppNotify.success(`Approved ${ids.length} vendor(s).`); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Bulk approve failed') : alert(e.message); }
+}
+async function bulkReject() {
+  const ids = [..._selectedVendors]; if (!ids.length) return;
+  if (!confirm(`Reject ${ids.length} selected vendor(s)?`)) return;
+  try { await VendorDb.bulkSetVendorStatus(ids, 'rejected'); _selectedVendors.clear(); await loadAll(); AppNotify && AppNotify.success(`Rejected ${ids.length} vendor(s).`); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Bulk reject failed') : alert(e.message); }
+}
+async function bulkDelete() {
+  const ids = [..._selectedVendors]; if (!ids.length) return;
+  if (!confirm(`Permanently DELETE ${ids.length} selected vendor(s) and all their records? Linked work packages are unlinked (not deleted). This cannot be undone.`)) return;
+  try { await VendorDb.bulkDeleteVendors(ids); _selectedVendors.clear(); await loadAll(); AppNotify && AppNotify.success(`Deleted ${ids.length} vendor(s).`); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Bulk delete failed') : alert(e.message); }
 }
 function renderPager(total, pages) {
   const el = document.getElementById('vendorPager');
@@ -555,9 +654,12 @@ function renderCards(rows) {
     const foot = v.status === 'pending_review'
       ? `<button class="action-btn btn-approve-row" onclick="event.stopPropagation();quickApprove('${v.id}')">Approve</button><button class="action-btn btn-reject-row" onclick="event.stopPropagation();quickReject('${v.id}')">Reject</button>`
       : `<span class="view-hint">View profile <i class="ti ti-arrow-right"></i></span>`;
-    return `<div class="vcard" tabindex="0" role="button" onclick="openDetailModal('${v.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetailModal('${v.id}')}">
+    const sel = _selectedVendors.has(v.id);
+    const check = _canManage ? `<input type="checkbox" class="vcard-check" ${sel ? 'checked' : ''} onclick="event.stopPropagation();toggleVendorSel('${v.id}',this.checked)" aria-label="Select vendor">` : '';
+    return `<div class="vcard${sel ? ' selected' : ''}" tabindex="0" role="button" onclick="openDetailModal('${v.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetailModal('${v.id}')}">
       <div class="vcard-head">
         <div class="vcard-idwrap">
+          ${check}
           <div class="vcard-avatar">${esc(_initials(v.name))}</div>
           <div style="min-width:0"><div class="vcard-name">${esc(v.name)}</div>${sub ? `<div class="vcard-sub">${esc(sub)}</div>` : ''}</div>
         </div>
@@ -1127,9 +1229,10 @@ function renderKpis() {
 
 function renderTable(rows) {
   const tbody = document.getElementById('vendorTableBody');
-  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888;padding:24px">No vendors found.</td></tr>'; return; }
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;padding:24px">No vendors found.</td></tr>'; return; }
   tbody.innerHTML = rows.map(v => `
-    <tr onclick="openDetailModal('${v.id}')">
+    <tr class="${_selectedVendors.has(v.id) ? 'row-selected' : ''}" onclick="openDetailModal('${v.id}')">
+      ${_canManage ? `<td onclick="event.stopPropagation()" style="width:34px;text-align:center"><input type="checkbox" class="v-check" ${_selectedVendors.has(v.id) ? 'checked' : ''} onclick="toggleVendorSel('${v.id}',this.checked)" aria-label="Select vendor"></td>` : ''}
       <td><strong>${esc(v.name)}</strong></td>
       <td>${esc((v.trade_categories||[]).join(', ') || '—')}</td>
       <td>${esc(v.contact_person || _displayEmail(v) || '—')}</td>

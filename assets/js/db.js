@@ -1932,6 +1932,34 @@ const VendorDb = (() => {
   // Full cascade delete via the delete_vendor_cascade RPC. Falls back to a
   // plain vendors delete if the RPC isn't deployed yet (PGRST202) — that plain
   // delete still fails on FK-linked vendors, surfaced as a normal error.
+  // Bulk status change (approve/reject many). Chunked so a large id list can't
+  // blow the PostgREST URL length; stamps audit + updated_at like updateVendor.
+  async function bulkSetVendorStatus(ids, status) {
+    if (!ids || !ids.length) return;
+    const sb = await getSB();
+    const patch = { status, ..._stamp() };
+    const CH = 200;
+    for (let i = 0; i < ids.length; i += CH) {
+      const { error } = await sb.from('vendors').update(patch).in('id', ids.slice(i, i + CH));
+      if (error) throw error;
+    }
+  }
+  // Bulk cascade delete via delete_vendors_cascade RPC (chunked). Falls back to
+  // looping the single-id RPC if the bulk one isn't deployed yet.
+  async function bulkDeleteVendors(ids) {
+    if (!ids || !ids.length) return;
+    const sb = await getSB();
+    const CH = 200;
+    for (let i = 0; i < ids.length; i += CH) {
+      const chunk = ids.slice(i, i + CH);
+      const { error } = await sb.rpc('delete_vendors_cascade', { p_ids: chunk });
+      if (error) {
+        if (error.code === 'PGRST202' || /schema cache|does not exist/i.test((error.message || '') + (error.details || ''))) {
+          for (const id of chunk) await deleteVendorCascade(id);
+        } else throw error;
+      }
+    }
+  }
   async function deleteVendorCascade(id) {
     const sb = await getSB();
     const { error } = await sb.rpc('delete_vendor_cascade', { p_id: id });
@@ -1951,6 +1979,7 @@ const VendorDb = (() => {
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
+    bulkSetVendorStatus, bulkDeleteVendors,
     backfillVendorDataFromWPs,
   };
 })();

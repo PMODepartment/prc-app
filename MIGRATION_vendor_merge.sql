@@ -112,7 +112,43 @@ begin
 end;
 $$;
 
+-- Bulk cascade-delete (directory bulk-select). Same admin-only allow-list and
+-- cascade steps as delete_vendor_cascade, but over an array in one call so
+-- triaging hundreds of imported vendors isn't hundreds of round trips.
+create or replace function public.delete_vendors_cascade(p_ids uuid[])
+returns void
+language plpgsql
+security definer
+set search_path = public, internal
+as $$
+declare
+  r text;
+begin
+  r := internal.get_my_role();
+  if r is null or r not in ('super_admin','admin') then
+    raise exception 'not authorized to delete vendors' using errcode = '42501';
+  end if;
+  if p_ids is null or array_length(p_ids, 1) is null then return; end if;
+  update work_packages set vendor_id = null where vendor_id = any(p_ids);
+  if exists (select 1 from information_schema.columns
+             where table_name = 'work_packages' and column_name = 'proposed_vendor_ids') then
+    update work_packages set proposed_vendor_ids = (
+      select array(select e from unnest(proposed_vendor_ids) e where not (e = any(p_ids)))
+    ) where proposed_vendor_ids && p_ids;
+  end if;
+  delete from vendor_bids          where vendor_id = any(p_ids);
+  delete from vendor_rates         where vendor_id = any(p_ids);
+  delete from vendor_products      where vendor_id = any(p_ids);
+  delete from vendor_certifications where vendor_id = any(p_ids);
+  delete from vendor_personnel     where vendor_id = any(p_ids);
+  update users set vendor_id = null where vendor_id = any(p_ids);
+  delete from vendors where id = any(p_ids);
+end;
+$$;
+
 revoke all on function public.merge_vendors(uuid, uuid[]) from public, anon;
+revoke all on function public.delete_vendors_cascade(uuid[]) from public, anon;
+grant execute on function public.delete_vendors_cascade(uuid[]) to authenticated;
 revoke all on function public.delete_vendor_cascade(uuid) from public, anon;
 grant execute on function public.merge_vendors(uuid, uuid[]) to authenticated;
 grant execute on function public.delete_vendor_cascade(uuid) to authenticated;
