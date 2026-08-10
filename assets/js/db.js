@@ -2029,6 +2029,37 @@ const VendorDb = (() => {
     }
   }
 
+  // Work packages this vendor is linked to — as the AWARDED vendor
+  // (work_packages.vendor_id, or a name match on the free-text `contractor`)
+  // and/or a PROPOSED vendor (proposed_vendor_ids array, or a name match in
+  // the free-text `proposed_vendors`). Gathers candidate rows via a few
+  // targeted queries (id-based via .or(); name-based via separate .ilike()
+  // queries so a vendor name containing a comma can't break PostgREST's
+  // comma-delimited or()), then the CALLER computes the precise per-WP
+  // proposed/awarded flags and drops any candidate that matches neither
+  // (ilike is a broad substring gather, not the final test). Deploy-safe:
+  // falls back to vendor_id-only if proposed_vendor_ids doesn't exist yet.
+  async function getWorkPackagesForVendor(vendorId, vendorName) {
+    const sb = await getSB();
+    const cols = 'id,project_id,wp_no,description,trade,works,award_status,procurement_status,delivery_status,approved_budget_bcb,total_awarded,awarded_cost,contractor,vendor_id,proposed_vendors,proposed_vendor_ids,awarding_date,actual_awarding_date';
+    const byId = new Map();
+    const add = rows => (rows || []).forEach(w => byId.set(w.id, w));
+    try {
+      const { data, error } = await sb.from('work_packages').select(cols).or(`vendor_id.eq.${vendorId},proposed_vendor_ids.cs.{${vendorId}}`);
+      if (error) throw error;
+      add(data);
+    } catch (e) {
+      try { const { data } = await sb.from('work_packages').select(cols.replace(',proposed_vendor_ids', '')).eq('vendor_id', vendorId); add(data); } catch (e2) { /* ignore */ }
+    }
+    const nm = (vendorName || '').trim();
+    if (nm) {
+      const like = '%' + nm.replace(/[%_,]/g, ' ').trim() + '%';
+      try { const { data } = await sb.from('work_packages').select(cols).ilike('contractor', like); add(data); } catch (e) { /* ignore */ }
+      try { const { data } = await sb.from('work_packages').select(cols).ilike('proposed_vendors', like); add(data); } catch (e) { /* ignore */ }
+    }
+    return [...byId.values()];
+  }
+
   return {
     getVendors, getVendor, createVendor, updateVendor, approveVendor, rejectVendor, setVendorStatus, deleteVendor,
     products, certifications, personnel,
@@ -2038,7 +2069,7 @@ const VendorDb = (() => {
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
     bulkSetVendorStatus, bulkDeleteVendors,
-    backfillVendorDataFromWPs,
+    backfillVendorDataFromWPs, getWorkPackagesForVendor,
   };
 })();
 window.VendorDb = VendorDb;

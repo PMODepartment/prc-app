@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810y"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810y"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810y"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810z"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810z"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810z"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810y">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810z">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -151,6 +151,11 @@
     .split-search-opt:hover{background:var(--mw-red-light,#FDECEA)}
     .split-search-empty{padding:8px 11px;color:#888;font-size:0.8rem}
     .split-manual-tag{display:inline-block;background:#EEF2FF;color:#3730A3;font-size:0.7143rem;font-weight:600;padding:1px 7px;border-radius:10px;vertical-align:middle;margin-left:6px}
+    .wp-role-badge{display:inline-block;font-size:0.66rem;font-weight:700;padding:1px 7px;border-radius:10px;white-space:nowrap;text-transform:uppercase;letter-spacing:.02em}
+    .wp-role-awarded{background:#D1FAE5;color:#065F46}
+    .wp-role-proposed{background:#DBEAFE;color:#1E40AF}
+    body.dark-mode .wp-role-awarded{background:rgba(22,163,74,.22);color:#5FD3A3}
+    body.dark-mode .wp-role-proposed{background:rgba(37,99,235,.22);color:#93C5FD}
     .split-segs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-width:0}
     .seg-chip{display:inline-flex;align-items:center;gap:6px;background:#FDECEA;color:#C42127;padding:4px 8px 4px 10px;border-radius:14px;font-size:0.8125rem;max-width:100%}
     .seg-chip input{border:none;background:transparent;color:inherit;font:inherit;padding:0;width:auto;min-width:40px;max-width:100%;outline:none}
@@ -460,6 +465,7 @@
     <div class="modal-body" id="detailModalBody">
       <nav class="detail-jump" id="detailJump">
         <a href="#dsec-overview">Overview</a>
+        <a href="#dsec-wps">Work Packages</a>
         <a href="#dsec-products">Products</a>
         <a href="#dsec-certs">Certifications</a>
         <a href="#dsec-personnel">Personnel</a>
@@ -468,6 +474,7 @@
       </nav>
       <div class="detail-scroll" id="detailScroll">
         <section class="detail-section" id="dsec-overview"><h3 class="detail-section-title">Overview</h3><div id="dtab-overview"></div></section>
+        <section class="detail-section" id="dsec-wps"><h3 class="detail-section-title">Work Packages</h3><div id="dtab-wps"></div></section>
         <section class="detail-section" id="dsec-products"><h3 class="detail-section-title">Products &amp; Services</h3><div id="dtab-products"></div></section>
         <section class="detail-section" id="dsec-certs"><h3 class="detail-section-title">Certifications</h3><div id="dtab-certs"></div></section>
         <section class="detail-section" id="dsec-personnel"><h3 class="detail-section-title">Personnel</h3><div id="dtab-personnel"></div></section>
@@ -480,9 +487,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810y"></script>
-<script src="assets/js/db.js?v=20260810y"></script>
-<script src="assets/js/ui.js?v=20260810y"></script>
+<script src="assets/js/auth.js?v=20260810z"></script>
+<script src="assets/js/db.js?v=20260810z"></script>
+<script src="assets/js/ui.js?v=20260810z"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1560,7 +1567,7 @@ async function openDetailModal(id) {
   document.getElementById('detailModal').style.display = 'flex';
   _syncModalScrollLock();
   document.getElementById('detailModalBody').scrollTop = 0;
-  await Promise.all([renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates(), renderDetailBids()]);
+  await Promise.all([renderDetailWps(), renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates(), renderDetailBids()]);
   renderDetailOverview();
   _wireDetailScrollSpy();
 }
@@ -1844,6 +1851,67 @@ async function removeRate(id) {
   if (!confirm('Remove this rate entry?')) return;
   await VendorDb.deleteVendorRate(id);
   await renderDetailRates();
+}
+// Project id → name cache (WPs store project_id like 'AVR101'; show the name).
+let _projNameCache = null;
+async function _projName(pid) {
+  if (!_projNameCache) {
+    _projNameCache = {};
+    try { (await WPDb.getProjects()).forEach(p => { _projNameCache[p.id] = p.name; }); } catch (e) { /* fall back to id */ }
+  }
+  return _projNameCache[pid] || pid;
+}
+async function renderDetailWps() {
+  const el = document.getElementById('dtab-wps');
+  const v = activeVendor;
+  el.innerHTML = '<div style="color:#888;font-size:0.85rem;padding:6px 0">Loading work packages…</div>';
+  const nm = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const splitV = s => String(s || '').split(/[\r\n;|]+/).map(x => x.trim()).filter(Boolean);
+  const vn = nm(v.name);
+  const hideCost = userProfile && userProfile.role === 'viewer';
+  let rows;
+  try { rows = await VendorDb.getWorkPackagesForVendor(v.id, v.name); }
+  catch (e) { el.innerHTML = '<div style="color:#EE3124;font-size:0.85rem;padding:6px 0">Could not load work packages.</div>'; return; }
+  // Precise per-WP flags; drop candidates that match neither (ilike gathered broadly).
+  const linked = [];
+  for (const w of rows) {
+    const isAwd = (w.vendor_id && w.vendor_id === v.id) || (w.contractor && nm(w.contractor) === vn);
+    const isProp = (Array.isArray(w.proposed_vendor_ids) && w.proposed_vendor_ids.includes(v.id)) || splitV(w.proposed_vendors).some(n => nm(n) === vn);
+    if (isAwd || isProp) linked.push({ w, isAwd, isProp });
+  }
+  if (!linked.length) { el.innerHTML = '<div style="color:#888;font-size:0.85rem;padding:6px 0">This vendor isn’t linked to any work package yet (as a proposed or awarded vendor).</div>'; return; }
+  // Sort: awarded first, then by project, then WP no.
+  linked.sort((a, b) => (b.isAwd - a.isAwd) || String(a.w.project_id).localeCompare(String(b.w.project_id)) || String(a.w.wp_no).localeCompare(String(b.w.wp_no), undefined, { numeric: true }));
+  // Resolve project names.
+  const pids = [...new Set(linked.map(x => x.w.project_id))];
+  const pmap = {}; for (const pid of pids) pmap[pid] = await _projName(pid);
+  const nAwd = linked.filter(x => x.isAwd).length, nProp = linked.filter(x => x.isProp && !x.isAwd).length;
+  const money = val => (val || val === 0) ? Fmt.moneyShort(val) : '—';
+  const roleBadge = x => {
+    const a = x.isAwd ? '<span class="wp-role-badge wp-role-awarded">Awarded</span>' : '';
+    const p = x.isProp ? '<span class="wp-role-badge wp-role-proposed">Proposed</span>' : '';
+    return a + (a && p ? ' ' : '') + p;
+  };
+  const TH = 'padding:8px 9px;border-bottom:2px solid var(--border-md,#ddd);font-size:0.68rem;text-transform:uppercase;letter-spacing:.02em;color:#888;white-space:nowrap;text-align:left';
+  const TD = 'padding:7px 9px;border-bottom:1px solid var(--border,#eee);font-size:0.8rem;vertical-align:top';
+  const costHead = hideCost ? '' : `<th style="${TH};text-align:right">BCB</th><th style="${TH};text-align:right">Awarded</th>`;
+  const body = linked.map(x => {
+    const w = x.w;
+    const costCells = hideCost ? '' : `<td style="${TD};text-align:right">${money(w.approved_budget_bcb)}</td><td style="${TD};text-align:right">${money(w.total_awarded)}</td>`;
+    return `<tr>
+      <td style="${TD}">${roleBadge(x)}</td>
+      <td style="${TD}"><strong>${esc(w.wp_no || '')}</strong></td>
+      <td style="${TD}">${esc(pmap[w.project_id] || w.project_id)}</td>
+      <td style="${TD};max-width:260px">${esc(w.description || '—')}${w.works ? `<div style="color:#888;font-size:0.72rem">${esc(w.works)}</div>` : ''}</td>
+      <td style="${TD}">${esc(w.trade || '—')}</td>
+      <td style="${TD}">${esc((w.award_status || w.procurement_status || '—'))}</td>
+      ${costCells}
+    </tr>`;
+  }).join('');
+  el.innerHTML = `<div style="font-size:0.82rem;color:#555;margin-bottom:8px">${linked.length} work package${linked.length === 1 ? '' : 's'} — <span style="color:#2D9B6F;font-weight:700">${nAwd} awarded</span>${nProp ? ` · <span style="color:#2563EB;font-weight:700">${nProp} proposed only</span>` : ''}.</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      <thead><tr><th style="${TH}">Role</th><th style="${TH}">WP No.</th><th style="${TH}">Project</th><th style="${TH}">Description</th><th style="${TH}">Trade</th><th style="${TH}">Status</th>${costHead}</tr></thead>
+      <tbody>${body}</tbody></table></div>`;
 }
 async function renderDetailBids() {
   // Read-only per-vendor bid history (+ staff delete). Bids are LOGGED per
