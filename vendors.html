@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810e"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810e"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810e"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810f"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810f"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810f"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810e">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810f">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -198,7 +198,7 @@
           <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
             <div style="position:relative;flex:1;min-width:200px">
               <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#aaa;font-size:1rem;pointer-events:none"></i>
-              <input id="vendor-search" type="text" placeholder="Search by company name…" oninput="renderVendorList()"
+              <input id="vendor-search" type="text" placeholder="Search by company, trade, or product…" oninput="renderVendorList()"
                 style="width:100%;padding:8px 12px 8px 34px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;outline:none">
             </div>
             <select id="vendor-status-filter" onchange="renderVendorList()" style="padding:8px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:#fff;color:#231F20">
@@ -212,6 +212,8 @@
               <button id="vv-cards" class="active" onclick="setVendorView('cards')" aria-label="Card view"><i class="ti ti-layout-grid"></i> Cards</button>
               <button id="vv-table" onclick="setVendorView('table')" aria-label="Table view"><i class="ti ti-table"></i> Table</button>
             </div>
+            <button class="btn-cancel" onclick="importFromWPs()" title="Scan all work packages and add any awarded/proposed vendors not already in the directory"><i class="ti ti-file-import" style="margin-right:4px"></i>Import from WPs</button>
+            <button class="btn-cancel" onclick="openMergeModal()" title="Combine duplicate vendor records (typos / different names for the same company) into one"><i class="ti ti-arrows-join" style="margin-right:4px"></i>Merge</button>
             <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Invite Vendor</button>
           </div>
           <div class="vendor-cards" id="vendorCards"></div>
@@ -256,6 +258,31 @@
   </div>
 </div>
 
+<!-- Merge Vendors Modal -->
+<div class="modal-overlay" id="mergeModal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div><div class="modal-title">Merge Vendors</div><div class="modal-subtitle">Fold duplicate records (typos / different names for one company) into a single canonical vendor. All their products, certifications, personnel, rates, bids and linked work packages move to the one you keep; the duplicates are then deleted.</div></div>
+      <button class="modal-close" onclick="closeMergeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="msg" id="mergeMsg" style="display:none;font-size:0.8571rem;padding:8px 12px;border-radius:8px;margin-bottom:12px"></div>
+      <div class="field">
+        <label>Keep this vendor (canonical)</label>
+        <select id="merge-target" onchange="renderMergeSources()"></select>
+      </div>
+      <div class="field">
+        <label>Merge these duplicates into it</label>
+        <div class="trade-checklist" id="merge-sources" style="max-height:260px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeMergeModal()">Cancel</button>
+      <button class="btn-primary" id="btnDoMerge" onclick="doMerge()">Merge Selected</button>
+    </div>
+  </div>
+</div>
+
 <!-- Vendor Detail Modal -->
 <div class="modal-overlay" id="detailModal" style="display:none">
   <div class="modal" style="max-width:760px">
@@ -286,9 +313,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810e"></script>
-<script src="assets/js/db.js?v=20260810e"></script>
-<script src="assets/js/ui.js?v=20260810e"></script>
+<script src="assets/js/auth.js?v=20260810f"></script>
+<script src="assets/js/db.js?v=20260810f"></script>
+<script src="assets/js/ui.js?v=20260810f"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -297,14 +324,24 @@ AppAuth.requireLogin((user, profile) => {
   userProfile = profile;
   if (profile.role === 'vendor') { window.location.href = 'vendor-portal.html'; return; }
   if (AppAuth.isAdmin(profile)) document.getElementById('nav-admin-section').style.display = '';
-  renderUserBar(profile);
+  renderUserBar('user-bar', profile);
   initMobileMenu();
   loadAll();
 });
 
+let _vendorProductText = {};  // vendorId -> lowercased "category description …" for product search
 async function loadAll() {
   try { allVendors = await VendorDb.getVendors(); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not load vendors') : alert(e.message); allVendors = []; }
+  // Load products once so the directory search can also match a vendor's
+  // products/services (one query; degrades to name+trade search if it fails).
+  _vendorProductText = {};
+  try {
+    (await VendorDb.getAllVendorProducts()).forEach(p => {
+      const t = ((p.category || '') + ' ' + (p.description || '')).toLowerCase();
+      _vendorProductText[p.vendor_id] = (_vendorProductText[p.vendor_id] || '') + ' ' + t;
+    });
+  } catch (e) { /* search just won't match products */ }
   document.getElementById('loading').style.display = 'none';
   document.getElementById('main-content').style.display = '';
   renderKpis();
@@ -322,12 +359,16 @@ function setVendorView(v) {
   renderVendorList();
 }
 function _vendorFiltered() {
-  const q = (document.getElementById('vendor-search').value || '').toLowerCase();
+  const q = (document.getElementById('vendor-search').value || '').toLowerCase().trim();
   const statusF = document.getElementById('vendor-status-filter').value;
-  return allVendors.filter(v =>
-    (statusF === 'all' || v.status === statusF) &&
-    (!q || (v.name || '').toLowerCase().includes(q))
-  );
+  return allVendors.filter(v => {
+    if (statusF !== 'all' && v.status !== statusF) return false;
+    if (!q) return true;
+    const hay = (v.name || '').toLowerCase()
+      + ' ' + (v.trade_categories || []).join(' ').toLowerCase()
+      + ' ' + (_vendorProductText[v.id] || '');
+    return hay.includes(q);
+  });
 }
 function renderVendorList() { _vendorView === 'table' ? renderTable() : renderCards(); }
 function _initials(name) {
@@ -367,6 +408,61 @@ function renderCards() {
       <div class="vcard-foot">${foot}</div>
     </div>`;
   }).join('');
+}
+
+/* ── Import vendors from Work Packages ── */
+async function importFromWPs() {
+  if (!confirm('Scan all work packages and add any awarded or proposed vendors that aren’t already in the directory?\n\nNew vendors are added as "pending review". Work packages will be linked to their awarded vendor where the name matches exactly.')) return;
+  try {
+    AppNotify && AppNotify.info('Importing vendors from work packages…');
+    const r = await VendorDb.importVendorsFromWPs({ includeProposed: true, linkWPs: true }, userProfile);
+    await loadAll();
+    AppNotify && AppNotify.success(`Import complete: ${r.created} new vendor(s) added, ${r.linked} work package(s) linked (${r.distinct} distinct names found).`);
+  } catch (e) { AppNotify ? AppNotify.fromError(e, 'Import failed') : alert(e.message); }
+}
+
+/* ── Merge vendors ── */
+let _mergeSel = new Set();
+function openMergeModal() {
+  _mergeSel = new Set();
+  const sel = document.getElementById('merge-target');
+  const sorted = [...allVendors].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  sel.innerHTML = sorted.map(v => `<option value="${v.id}">${esc(v.name)} (${esc(v.status.replace('_',' '))})</option>`).join('');
+  document.getElementById('mergeMsg').style.display = 'none';
+  renderMergeSources();
+  document.getElementById('mergeModal').style.display = 'flex';
+}
+function closeMergeModal() { document.getElementById('mergeModal').style.display = 'none'; }
+function renderMergeSources() {
+  const targetId = document.getElementById('merge-target').value;
+  const sorted = [...allVendors].filter(v => v.id !== targetId).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  document.getElementById('merge-sources').innerHTML = sorted.length
+    ? sorted.map(v => `<label><input type="checkbox" value="${v.id}" ${_mergeSel.has(v.id) ? 'checked' : ''} onchange="_toggleMergeSrc(this)"> ${esc(v.name)} <span style="color:#aaa;font-size:0.75rem">(${esc(v.status.replace('_',' '))})</span></label>`).join('')
+    : '<div style="color:#aaa;font-size:0.8571rem">No other vendors to merge.</div>';
+  // dropping the now-target from any prior selection
+  _mergeSel.delete(targetId);
+}
+function _toggleMergeSrc(el) { el.checked ? _mergeSel.add(el.value) : _mergeSel.delete(el.value); }
+async function doMerge() {
+  const targetId = document.getElementById('merge-target').value;
+  const sources = [..._mergeSel].filter(id => id !== targetId);
+  const msg = document.getElementById('mergeMsg');
+  if (!sources.length) {
+    msg.textContent = 'Pick at least one duplicate to merge into the vendor you’re keeping.';
+    msg.style.cssText = 'display:block;background:#FEE2E2;color:#991B1B;font-size:0.8571rem;padding:8px 12px;border-radius:8px;margin-bottom:12px';
+    return;
+  }
+  const target = allVendors.find(v => v.id === targetId);
+  if (!confirm(`Merge ${sources.length} vendor(s) into "${target ? target.name : ''}"? The duplicates will be deleted and all their records + linked work packages moved. This cannot be undone.`)) return;
+  const btn = document.getElementById('btnDoMerge');
+  btn.disabled = true; btn.textContent = 'Merging…';
+  try {
+    await VendorDb.mergeVendors(targetId, sources);
+    closeMergeModal();
+    await loadAll();
+    AppNotify && AppNotify.success(`Merged ${sources.length} vendor(s).`);
+  } catch (e) { AppNotify ? AppNotify.fromError(e, 'Merge failed') : alert(e.message); }
+  btn.disabled = false; btn.textContent = 'Merge Selected';
 }
 
 function renderKpis() {
@@ -496,7 +592,14 @@ function renderDetailFooter() {
   if (v.status === 'pending_review') btns += ` <button class="btn-primary" onclick="quickApprove('${v.id}');closeDetailModal()">Approve</button> <button class="action-btn btn-reject-row" style="padding:10px 16px" onclick="quickReject('${v.id}');closeDetailModal()">Reject</button>`;
   else if (v.status === 'approved') btns += ` <button class="action-btn btn-reject-row" style="padding:10px 16px" onclick="setInactive('${v.id}')">Mark Inactive</button>`;
   else if (v.status === 'inactive') btns += ` <button class="btn-primary" onclick="quickApprove('${v.id}');closeDetailModal()">Reactivate</button>`;
+  btns += ` <button class="action-btn btn-reject-row" style="padding:10px 16px;margin-left:auto" onclick="deleteVendorFromDetail('${v.id}')" title="Permanently delete this vendor and all its records"><i class="ti ti-trash"></i> Delete</button>`;
   el.innerHTML = btns;
+}
+async function deleteVendorFromDetail(id) {
+  const v = allVendors.find(x => x.id === id);
+  if (!confirm(`Permanently delete "${v ? v.name : 'this vendor'}" and ALL its products, certifications, personnel, rates and bids? Linked work packages will be unlinked (not deleted). This cannot be undone.`)) return;
+  try { await VendorDb.deleteVendorCascade(id); closeDetailModal(); await loadAll(); AppNotify && AppNotify.success('Vendor deleted.'); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not delete vendor') : alert(e.message); }
 }
 async function setInactive(id) {
   try { await VendorDb.setVendorStatus(id, 'inactive'); await loadAll(); closeDetailModal(); }

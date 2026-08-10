@@ -1609,6 +1609,83 @@ const VendorDb = (() => {
     return data;
   }
 
+  // ── Import vendors from the work-package directory (contractor +
+  //    proposed_vendors free text) ────────────────────────────────────────
+  //  Dedups by normalized name against existing vendors, creates the missing
+  //  ones (as pending_review via createVendor), and — when opts.linkWPs — sets
+  //  work_packages.vendor_id on WPs whose `contractor` EXACTLY matches (RLS
+  //  limits the WP updates to projects the caller can edit). Returns
+  //  { created, linked, distinct }.
+  function _normName(s) { return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
+  function _splitVendors(s) { return String(s || '').split(/[\r\n;|]+/).map(x => x.trim()).filter(Boolean); }
+  async function importVendorsFromWPs(opts, profile) {
+    opts = opts || {};
+    const includeProposed = opts.includeProposed !== false;
+    const linkWPs = !!opts.linkWPs;
+    const sb = await getSB();
+    const { data: wps, error } = await sb.from('work_packages').select('id,contractor,proposed_vendors,vendor_id');
+    if (error) throw error;
+    const rows = wps || [];
+    const existing = await getVendors();
+    const byNorm = {}; existing.forEach(v => { byNorm[_normName(v.name)] = v; });
+    // distinct display names from the WPs
+    const names = new Map(); // norm -> best display string
+    rows.forEach(w => {
+      const push = nm => { const k = _normName(nm); if (k && !names.has(k)) names.set(k, nm.trim().replace(/\s+/g, ' ')); };
+      if (w.contractor) push(w.contractor);
+      if (includeProposed) _splitVendors(w.proposed_vendors).forEach(push);
+    });
+    let created = 0;
+    for (const [k, disp] of names) {
+      if (byNorm[k]) continue;
+      const placeholder = `import+${Date.now()}.${created}.${Math.random().toString(36).slice(2, 7)}@no-invite.local`;
+      const v = await createVendor({ name: disp, invite_email: placeholder, trade_categories: [] }, profile);
+      byNorm[k] = v; created++;
+    }
+    let linked = 0;
+    if (linkWPs) {
+      for (const w of rows) {
+        if (w.vendor_id) continue;
+        const v = byNorm[_normName(w.contractor)];
+        if (!v) continue;
+        const { error: e3 } = await sb.from('work_packages').update({ vendor_id: v.id }).eq('id', w.id);
+        if (!e3) linked++;
+      }
+    }
+    return { created, linked, distinct: names.size };
+  }
+
+  // All product rows across vendors (id + searchable text), for the directory's
+  // "search by product/service" filter. Returns [] if the table is absent.
+  async function getAllVendorProducts() {
+    const sb = await getSB();
+    const { data, error } = await sb.from('vendor_products').select('vendor_id,category,description');
+    if (error) return [];
+    return data || [];
+  }
+
+  // Merge duplicate vendors into a canonical one via the merge_vendors RPC
+  // (MIGRATION_vendor_merge.sql). Throws a readable error if the migration
+  // hasn't been run yet.
+  async function mergeVendors(targetId, sourceIds) {
+    const sb = await getSB();
+    const { error } = await sb.rpc('merge_vendors', { p_target: targetId, p_sources: sourceIds });
+    if (error) throw error;
+  }
+  // Full cascade delete via the delete_vendor_cascade RPC. Falls back to a
+  // plain vendors delete if the RPC isn't deployed yet (PGRST202) — that plain
+  // delete still fails on FK-linked vendors, surfaced as a normal error.
+  async function deleteVendorCascade(id) {
+    const sb = await getSB();
+    const { error } = await sb.rpc('delete_vendor_cascade', { p_id: id });
+    if (error) {
+      if (error.code === 'PGRST202' || /schema cache|does not exist/i.test((error.message || '') + (error.details || ''))) {
+        return deleteVendor(id);
+      }
+      throw error;
+    }
+  }
+
   return {
     getVendors, getVendor, createVendor, updateVendor, approveVendor, rejectVendor, setVendorStatus, deleteVendor,
     products, certifications, personnel,
@@ -1616,6 +1693,7 @@ const VendorDb = (() => {
     uploadCertFile, getCertFileUrl, deleteCertFile,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
     searchApprovedVendors, quickCreateVendor,
+    importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
   };
 })();
 window.VendorDb = VendorDb;
