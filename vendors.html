@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810u"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810u"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810u"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810v"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810v"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810v"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810u">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810v">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -430,10 +430,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810u"></script>
-<script src="assets/js/db.js?v=20260810u"></script>
-<script src="assets/js/ui.js?v=20260810u"></script>
-<script src="assets/js/onboarding.js?v=20260810u"></script>
+<script src="assets/js/auth.js?v=20260810v"></script>
+<script src="assets/js/db.js?v=20260810v"></script>
+<script src="assets/js/ui.js?v=20260810v"></script>
+<script src="assets/js/onboarding.js?v=20260810v"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -456,7 +456,7 @@ async function loadAll() {
   _vendorProductText = {};
   try {
     (await VendorDb.getAllVendorProducts()).forEach(p => {
-      const t = ((p.category || '') + ' ' + (p.description || '')).toLowerCase();
+      const t = ((p.category || '') + ' ' + (p.description || '') + ' ' + (p.item_type || '')).toLowerCase();
       _vendorProductText[p.vendor_id] = (_vendorProductText[p.vendor_id] || '') + ' ' + t;
     });
   } catch (e) { /* search just won't match products */ }
@@ -1369,12 +1369,13 @@ async function saveDetailOverview() {
 async function renderDetailProducts() {
   const list = await VendorDb.products.list(activeVendor.id);
   const rows = list.length ? list.map(p =>
-    `<div class="row-item"><div style="flex:1;min-width:0"><div class="row-item-title">${esc(p.description)}${p.unit?' ('+esc(p.unit)+')':''}</div><div class="row-item-sub">${esc(p.category||'Uncategorized')}</div></div>
+    `<div class="row-item"><div style="flex:1;min-width:0"><div class="row-item-title">${esc(p.description)}${p.unit?' ('+esc(p.unit)+')':''}</div><div class="row-item-sub">${esc(p.category||'Uncategorized')}${p.item_type?' · '+esc(p.item_type):''}</div></div>
     <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailProduct('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button></div>`
   ).join('') : '<div class="empty">No products/services on file.</div>';
   document.getElementById('dtab-products').innerHTML = rows + `
     <div class="add-form">
       <select id="dnp-category"><option value="">Category…</option>${TRADES.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select>
+      <select id="dnp-type"><option value="Materials">Materials</option><option value="Labor">Labor</option><option value="Service">Service</option></select>
       <input id="dnp-description" placeholder="Description (e.g. Ready-Mix Concrete)">
       <input id="dnp-unit" placeholder="Unit (e.g. cu.m.)">
       <button class="btn-primary" onclick="addDetailProduct()">Add</button>
@@ -1382,10 +1383,11 @@ async function renderDetailProducts() {
 }
 async function addDetailProduct() {
   const category = document.getElementById('dnp-category').value;
+  const item_type = document.getElementById('dnp-type').value;
   const description = document.getElementById('dnp-description').value.trim();
   const unit = document.getElementById('dnp-unit').value.trim();
   if (!description) { AppNotify && AppNotify.warn('Enter a description first.'); return; }
-  try { await VendorDb.products.add(activeVendor.id, { category, description, unit }); await renderDetailProducts(); }
+  try { await VendorDb.products.add(activeVendor.id, { category, item_type, description, unit }); await renderDetailProducts(); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not add') : alert(e.message); }
 }
 async function removeDetailProduct(id) {

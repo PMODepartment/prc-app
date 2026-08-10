@@ -123,6 +123,7 @@
     <div id="productsList"></div>
     <div class="add-form">
       <select id="np-category"><option value="">Category…</option></select>
+      <select id="np-type"><option value="Materials">Materials</option><option value="Labor">Labor</option><option value="Service">Service</option></select>
       <input id="np-description" placeholder="Description (e.g. Ready-Mix Concrete)">
       <input id="np-unit" placeholder="Unit (e.g. cu.m.)">
       <button class="btn-primary" onclick="addProduct()">Add</button>
@@ -164,8 +165,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810u"></script>
-<script src="assets/js/db.js?v=20260810u"></script>
+<script src="assets/js/auth.js?v=20260810v"></script>
+<script src="assets/js/db.js?v=20260810v"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -277,18 +278,19 @@ async function renderProducts() {
     <div class="row-item">
       <div class="row-item-body">
         <div class="row-item-title">${esc(p.description)}${p.unit ? ' <span style="color:#aaa;font-weight:400">('+esc(p.unit)+')</span>' : ''}</div>
-        <div class="row-item-sub">${esc(p.category || 'Uncategorized')}</div>
+        <div class="row-item-sub">${esc(p.category || 'Uncategorized')}${p.item_type ? ' · ' + esc(p.item_type) : ''}</div>
       </div>
       <button class="row-item-del" onclick="removeProduct('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button>
     </div>`).join('') : '<div class="empty">No products/services added yet.</div>';
 }
 async function addProduct() {
   const category = document.getElementById('np-category').value;
+  const item_type = document.getElementById('np-type').value;
   const description = document.getElementById('np-description').value.trim();
   const unit = document.getElementById('np-unit').value.trim();
   if (!description) { msg('Enter a description first.', 'error'); return; }
   try {
-    await VendorDb.products.add(vendor.id, { category, description, unit });
+    await VendorDb.products.add(vendor.id, { category, item_type, description, unit });
     document.getElementById('np-description').value = ''; document.getElementById('np-unit').value = '';
     await renderProducts();
     await flagEdited();

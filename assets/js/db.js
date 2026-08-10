@@ -1456,7 +1456,32 @@ const VendorDb = (() => {
       },
     };
   }
-  const products = _child('vendor_products');
+  const _productsBase = _child('vendor_products');
+  const products = {
+    ..._productsBase,
+    // Deploy-safe: drop item_type and retry if that column's migration
+    // (MIGRATION_vendor_product_type.sql) hasn't run yet.
+    async add(vendorId, fields) {
+      try { return await _productsBase.add(vendorId, fields); }
+      catch (e) {
+        if (fields && 'item_type' in fields && _isMissingCol(e, /item_type/)) {
+          const f2 = { ...fields }; delete f2.item_type;
+          return _productsBase.add(vendorId, f2);
+        }
+        throw e;
+      }
+    },
+    async update(id, fields) {
+      try { return await _productsBase.update(id, fields); }
+      catch (e) {
+        if (fields && 'item_type' in fields && _isMissingCol(e, /item_type/)) {
+          const f2 = { ...fields }; delete f2.item_type;
+          return _productsBase.update(id, f2);
+        }
+        throw e;
+      }
+    },
+  };
   const certifications = _child('vendor_certifications');
   const personnel = _child('vendor_personnel');
 
@@ -1734,7 +1759,7 @@ const VendorDb = (() => {
   async function backfillVendorDataFromWPs(profile) {
     const sb = await getSB();
     const { data: wps, error } = await sb.from('work_packages')
-      .select('id,project_id,wp_no,description,trade,contractor,proposed_vendors,vendor_id,award_status,awarded_cost,awarding_date,actual_awarding_date');
+      .select('id,project_id,wp_no,description,trade,type_of_works,contractor,proposed_vendors,vendor_id,award_status,awarded_cost,awarding_date,actual_awarding_date');
     if (error) throw error;
     const rows = wps || [];
 
@@ -1784,7 +1809,9 @@ const VendorDb = (() => {
         if (!seen.has(nk)) {
           seen.add(nk);
           const map = newProducts[awardedVid] = newProducts[awardedVid] || new Map();
-          if (!map.has(nk)) map.set(nk, { category: w.trade || null, description: w.description });
+          // item_type from the WP's own Type field (Materials/Labor/Service) when set.
+          const _it = ['Materials','Labor','Service'].includes(w.type_of_works) ? w.type_of_works : null;
+          if (!map.has(nk)) map.set(nk, { category: w.trade || null, description: w.description, item_type: _it });
         }
       }
       const bidDate = w.awarding_date || w.actual_awarding_date || null;
@@ -1838,9 +1865,9 @@ const VendorDb = (() => {
 
     let productsAdded = 0, productsFailed = 0, productsError = null;
     for (const vendorId of Object.keys(newProducts)) {
-      for (const { category, description } of newProducts[vendorId].values()) {
+      for (const { category, description, item_type } of newProducts[vendorId].values()) {
         try {
-          await products.add(vendorId, { category, description, unit: null });
+          await products.add(vendorId, { category, description, unit: null, item_type: item_type || null });
           productsAdded++;
         } catch (err) {
           productsFailed++;
@@ -1887,7 +1914,9 @@ const VendorDb = (() => {
   // "search by product/service" filter. Returns [] if the table is absent.
   async function getAllVendorProducts() {
     const sb = await getSB();
-    const { data, error } = await sb.from('vendor_products').select('vendor_id,category,description');
+    // select('*') so item_type flows through when present but the query still
+    // works before MIGRATION_vendor_product_type.sql runs.
+    const { data, error } = await sb.from('vendor_products').select('*');
     if (error) return [];
     return data || [];
   }
