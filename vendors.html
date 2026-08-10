@@ -1035,10 +1035,16 @@ function _splitAddVendor(id) {
   const row = document.getElementById('split-row-' + id);
   if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
+// Drill-down: re-run the boundary-word guesser on the row's CURRENT segments
+// (not just the original name), so it further-breaks segments that still
+// contain several companies joined by spaces + mid-name Inc./Corp. words
+// (which a delimiter split alone can't separate). Idempotent-ish: clicking
+// again only splits what still has a boundary word, and preserves manual
+// edits. Falls back to the original name when there are no segments yet.
 function _splitSuggest(vid) {
   const v = allVendors.find(x => x.id === vid);
-  if (!v) return;
-  _splitSegs[vid] = _suggestSplitPoints(v.name);
+  const cur = (_splitSegs[vid] && _splitSegs[vid].length) ? _splitSegs[vid] : [v ? v.name : ''];
+  _splitSegs[vid] = cur.flatMap(seg => _suggestSplitPoints(seg)).map(s => s.trim()).filter(Boolean);
   renderSplitList();
 }
 function _splitSegEdit(input) {
