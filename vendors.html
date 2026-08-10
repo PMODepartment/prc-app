@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810t"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810t"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810t"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810u"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810u"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810u"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810t">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810u">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -430,10 +430,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810t"></script>
-<script src="assets/js/db.js?v=20260810t"></script>
-<script src="assets/js/ui.js?v=20260810t"></script>
-<script src="assets/js/onboarding.js?v=20260810t"></script>
+<script src="assets/js/auth.js?v=20260810u"></script>
+<script src="assets/js/db.js?v=20260810u"></script>
+<script src="assets/js/ui.js?v=20260810u"></script>
+<script src="assets/js/onboarding.js?v=20260810u"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -582,11 +582,14 @@ async function importFromWPs() {
 }
 
 /* ── Backfill trade categories / products / bid history / rates from WPs ── */
+let _backfillRunning = false;
 async function backfillFromWPs() {
+  // The trigger lives in the Data Tools dropdown, which closes on click, so
+  // feedback is the AppNotify toast below; a module flag prevents a re-trigger
+  // while it's still running (the op can take a while on large portfolios).
+  if (_backfillRunning) { AppNotify && AppNotify.info('Backfill already running…'); return; }
   if (!confirm('Backfill trade categories, products, bid history and rates for vendors from their work packages?\n\nThis is a one-time (but re-runnable) action — trade categories are unioned from all their WPs, while products/bids/rates are added only from AWARDED work packages. This may take a while for large portfolios.')) return;
-  const btn = document.getElementById('btn-backfill-vendor-data');
-  const orig = btn ? btn.innerHTML : null;
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin" style="margin-right:4px"></i>Backfilling…'; }
+  _backfillRunning = true;
   try {
     AppNotify && AppNotify.info('Backfilling vendor trade/bid data from work packages…');
     const r = await VendorDb.backfillVendorDataFromWPs(userProfile);
@@ -605,7 +608,7 @@ async function backfillFromWPs() {
       AppNotify && AppNotify.success(summary);
     }
   } catch (e) { AppNotify ? AppNotify.fromError(e, 'Backfill failed') : alert(e.message); }
-  finally { if (btn) { btn.disabled = false; btn.innerHTML = orig; } }
+  finally { _backfillRunning = false; }
 }
 
 /* ── Merge vendors ── */
@@ -706,7 +709,7 @@ function _countSuffixTokens(name) {
   return m ? m.length : 0;
 }
 function _splitOnSuffixRuns(name) {
-  const marker = ' ';
+  const marker = '\u0001';
   const marked = (name || '').replace(SUFFIX_BOUNDARY_RE, (m, suffix, offset, str) => {
     const rest = str.slice(offset + m.length);
     return /[A-Za-z0-9]/.test(rest) ? m + marker : m;

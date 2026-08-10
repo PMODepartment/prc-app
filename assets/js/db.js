@@ -1499,7 +1499,11 @@ const VendorDb = (() => {
     let { data, error } = await sb.from('vendor_rates')
       .upsert(payload, { onConflict: 'vendor_id,wp_id' })
       .select().single();
-    if (error && _isMissingWpIdCol(error)) {
+    // Fall back to a plain insert when wp_id is missing (pre-link migration) OR
+    // when the (vendor_id,wp_id) unique CONSTRAINT isn't there yet — the partial
+    // deploy state where MIGRATION_vendor_rates_wp_link ran but not the _fix
+    // (the ON CONFLICT error text names no column, so _isMissingWpIdCol misses it).
+    if (error && (_isMissingWpIdCol(error) || /on conflict|unique or exclusion constraint/i.test((error.message || '') + (error.details || '')))) {
       const d2 = { ...payload }; delete d2.wp_id;
       ({ data, error } = await sb.from('vendor_rates').insert(d2).select().single());
     }
