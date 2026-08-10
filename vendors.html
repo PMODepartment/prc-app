@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810i"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810i"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810i"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810j"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810j"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810j"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810i">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810j">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -334,10 +334,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810i"></script>
-<script src="assets/js/db.js?v=20260810i"></script>
-<script src="assets/js/ui.js?v=20260810i"></script>
-<script src="assets/js/onboarding.js?v=20260810i"></script>
+<script src="assets/js/auth.js?v=20260810j"></script>
+<script src="assets/js/db.js?v=20260810j"></script>
+<script src="assets/js/ui.js?v=20260810j"></script>
+<script src="assets/js/onboarding.js?v=20260810j"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -497,7 +497,13 @@ async function backfillFromWPs() {
     const totalFailed = (r.tradesFailed||0) + (r.productsFailed||0) + (r.bidsFailed||0) + (r.ratesFailed||0);
     const summary = `Backfill complete: ${r.tradesUpdated} vendor(s) trades updated, ${r.productsAdded} product(s) added, ${r.bidsUpserted} bid(s) synced, ${r.ratesUpserted} rate(s) synced.`;
     if (totalFailed > 0) {
-      AppNotify && AppNotify.warn(`${summary} (${totalFailed} failure(s) — see console; safe to re-run.)`);
+      const errLines = [
+        r.tradesFailed ? `Trades (${r.tradesFailed}): ${r.tradesError}` : null,
+        r.productsFailed ? `Products (${r.productsFailed}): ${r.productsError}` : null,
+        r.bidsFailed ? `Bids (${r.bidsFailed}): ${r.bidsError}` : null,
+        r.ratesFailed ? `Rates (${r.ratesFailed}): ${r.ratesError}` : null,
+      ].filter(Boolean).join('\n');
+      AppNotify && AppNotify.error(`${summary} (${totalFailed} failure(s) — safe to re-run.)`, { title: 'Backfill completed with errors', detail: errLines });
     } else {
       AppNotify && AppNotify.success(summary);
     }

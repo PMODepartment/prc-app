@@ -1808,7 +1808,13 @@ const VendorDb = (() => {
     // can't abort the rest of the backfill. Since every write here is an
     // upsert/dedup-by-description, a partial run followed by a second run
     // safely finishes whatever didn't complete the first time.
-    let tradesUpdated = 0, tradesFailed = 0;
+    // Sample-error capture: the FIRST failure message per category is kept
+    // (and surfaced in the vendors.html toast) so a failing backfill is
+    // diagnosable without opening devtools — a raw Postgres/PostgREST error
+    // (code/message/hint) is far more actionable than a bare failure count.
+    const errMsg = (err) => (err && (err.message || err.hint || err.details)) ? [err.message, err.hint, err.details].filter(Boolean).join(' — ') : String(err);
+
+    let tradesUpdated = 0, tradesFailed = 0, tradesError = null;
     for (const v of vendors) {
       const set = tradeSets[v.id];
       if (!set) continue;
@@ -1821,11 +1827,12 @@ const VendorDb = (() => {
         tradesUpdated++;
       } catch (err) {
         tradesFailed++;
+        if (!tradesError) tradesError = errMsg(err);
         console.error('[backfillVendorDataFromWPs] trade update failed', { vendorId: v.id, err });
       }
     }
 
-    let productsAdded = 0, productsFailed = 0;
+    let productsAdded = 0, productsFailed = 0, productsError = null;
     for (const vendorId of Object.keys(newProducts)) {
       for (const { category, description } of newProducts[vendorId].values()) {
         try {
@@ -1833,38 +1840,41 @@ const VendorDb = (() => {
           productsAdded++;
         } catch (err) {
           productsFailed++;
+          if (!productsError) productsError = errMsg(err);
           console.error('[backfillVendorDataFromWPs] product add failed', { vendorId, description, err });
         }
       }
     }
 
-    let bidsUpserted = 0, bidsFailed = 0;
+    let bidsUpserted = 0, bidsFailed = 0, bidsError = null;
     for (const b of bidsToUpsert) {
       try {
         await upsertBid(b.wpId, b.vendorId, b.projectId, b.fields, profile);
         bidsUpserted++;
       } catch (err) {
         bidsFailed++;
+        if (!bidsError) bidsError = errMsg(err);
         console.error('[backfillVendorDataFromWPs] bid upsert failed', { wpId: b.wpId, vendorId: b.vendorId, err });
       }
     }
 
-    let ratesUpserted = 0, ratesFailed = 0;
+    let ratesUpserted = 0, ratesFailed = 0, ratesError = null;
     for (const r of ratesToUpsert) {
       try {
         await upsertRate(r.wpId, r.vendorId, r.projectId, r.fields, profile);
         ratesUpserted++;
       } catch (err) {
         ratesFailed++;
+        if (!ratesError) ratesError = errMsg(err);
         console.error('[backfillVendorDataFromWPs] rate upsert failed', { wpId: r.wpId, vendorId: r.vendorId, err });
       }
     }
 
     return {
-      tradesUpdated, tradesFailed,
-      productsAdded, productsFailed,
-      bidsUpserted, bidsFailed,
-      ratesUpserted, ratesFailed,
+      tradesUpdated, tradesFailed, tradesError,
+      productsAdded, productsFailed, productsError,
+      bidsUpserted, bidsFailed, bidsError,
+      ratesUpserted, ratesFailed, ratesError,
       skippedNoVendor,
     };
   }
