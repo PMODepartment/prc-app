@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810s"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810s"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810s"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810t"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260810t"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810t"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810s">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810t">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -34,6 +34,15 @@
     .view-toggle{display:inline-flex;border:1.5px solid #e5e5e5;border-radius:8px;overflow:hidden;flex-shrink:0}
     .view-toggle button{border:none;background:#fff;padding:8px 12px;font-size:0.8rem;font-family:inherit;cursor:pointer;color:#888;display:flex;align-items:center;gap:5px}
     .view-toggle button.active{background:#231F20;color:#fff}
+    #btn-tools-menu{position:relative}
+    #btn-tools-menu.has-alert::after{content:'';position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:#EE3124}
+    .tools-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:50;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:300px;padding:6px;overflow:hidden}
+    .tools-menu button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;background:none;border:none;border-radius:7px;padding:8px 10px;cursor:pointer;font-family:inherit}
+    .tools-menu button:hover{background:var(--mw-red-light,#FDECEA)}
+    .tools-menu button i{font-size:1rem;color:#EE3124;margin-bottom:2px}
+    .tools-menu button span{font-size:0.8571rem;font-weight:600;color:#231F20;display:flex;align-items:center;gap:6px}
+    .tools-menu button small{font-size:0.7143rem;color:#888;font-weight:400}
+    .tools-menu-badge{background:#EE3124;color:#fff;border-radius:9px;padding:1px 7px;font-size:0.7143rem;font-weight:700}
     /* Vendor cards — compact, content-sized (handles hundreds of rows) */
     .vendor-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:11px}
     .vcard{background:#fff;border:1px solid #eee;border-radius:11px;padding:13px 14px;cursor:pointer;display:flex;flex-direction:column;gap:9px;transition:box-shadow .15s,border-color .15s,transform .15s}
@@ -162,6 +171,10 @@
     body.dark-mode .view-toggle{border-color:var(--border-md)}
     body.dark-mode .view-toggle button{background:var(--surface);color:var(--text-hint)}
     body.dark-mode .view-toggle button.active{background:var(--mw-red);color:#fff}
+    body.dark-mode .tools-menu{background:var(--surface);border-color:var(--border-md)}
+    body.dark-mode .tools-menu button:hover{background:rgba(238,49,36,.15)}
+    body.dark-mode .tools-menu button span{color:var(--text-primary)}
+    body.dark-mode .tools-menu button small{color:var(--text-hint)}
     body.dark-mode .vcard{background:var(--surface);border-color:var(--border)}
     body.dark-mode .vcard:hover{border-color:var(--mw-red)}
     body.dark-mode .vcard-name{color:var(--text-primary)}
@@ -249,7 +262,8 @@
             <div class="kpi-card"><div class="kpi-value" id="kpiApproved" style="color:#065F46">—</div><div class="kpi-label">Approved</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiRejected" style="color:#6B7280">—</div><div class="kpi-label">Rejected / Inactive</div></div>
           </div>
-          <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+          <div class="vendor-toolbar" style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+            <div class="vendor-toolbar-filters" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1 1 320px;min-width:0">
             <div style="position:relative;flex:1;min-width:200px">
               <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#aaa;font-size:1rem;pointer-events:none"></i>
               <input id="vendor-search" type="text" placeholder="Search by company, trade, or product…" oninput="onVendorFilterChange()"
@@ -266,11 +280,19 @@
               <button id="vv-cards" class="active" onclick="setVendorView('cards')" aria-label="Card view"><i class="ti ti-layout-grid"></i> Cards</button>
               <button id="vv-table" onclick="setVendorView('table')" aria-label="Table view"><i class="ti ti-table"></i> Table</button>
             </div>
-            <button class="btn-cancel" onclick="importFromWPs()" title="Scan all work packages and add any awarded/proposed vendors not already in the directory"><i class="ti ti-file-import" style="margin-right:4px"></i>Import from WPs</button>
-            <button id="btn-backfill-vendor-data" class="btn-cancel" onclick="backfillFromWPs()" title="Fill in trade categories, products, bid history and rates for vendors from their work packages"><i class="ti ti-refresh-dot" style="margin-right:4px"></i>Backfill Trade/Bid Data</button>
-            <button class="btn-cancel" onclick="openMergeModal()" title="Combine duplicate vendor records (typos / different names for the same company) into one"><i class="ti ti-arrows-join" style="margin-right:4px"></i>Merge</button>
-            <button class="btn-cancel" id="btn-split-needed" style="display:none" onclick="openSplitModal()" title="Some vendor names look like several companies joined by commas — split them apart"><i class="ti ti-cut" style="margin-right:4px"></i>Needs Splitting (<span id="split-count">0</span>)</button>
+            </div>
+            <div class="vendor-toolbar-actions" style="display:flex;gap:10px;align-items:center;flex-shrink:0">
+            <div class="tools-menu-wrap" id="toolsMenuWrap" style="position:relative;flex-shrink:0">
+              <button class="btn-cancel" id="btn-tools-menu" onclick="toggleToolsMenu()"><i class="ti ti-tool" style="margin-right:4px"></i>Data Tools <i class="ti ti-chevron-down" style="margin-left:2px;font-size:0.75em"></i></button>
+              <div class="tools-menu" id="toolsMenu" style="display:none">
+                <button onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs</span><small>Scan work packages for vendors not yet in the directory</small></button>
+                <button onclick="closeToolsMenu();backfillFromWPs()"><i class="ti ti-refresh-dot"></i><span>Backfill Trade/Bid Data</span><small>Fill in trades, products, bid history and rates from WPs</small></button>
+                <button onclick="closeToolsMenu();openMergeModal()"><i class="ti ti-arrows-join"></i><span>Merge Duplicates</span><small>Combine records that are the same company under different names</small></button>
+                <button id="tools-menu-split" onclick="closeToolsMenu();openSplitModal()"><i class="ti ti-cut"></i><span>Needs Splitting <span class="tools-menu-badge" id="split-count-badge" style="display:none"><span id="split-count">0</span></span></span><small>Records that look like several companies joined together</small></button>
+              </div>
+            </div>
             <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Add Vendor</button>
+            </div>
           </div>
           <div class="vendor-meta"><span class="vendor-count" id="vendorCount"></span></div>
           <div class="vendor-cards" id="vendorCards"></div>
@@ -408,10 +430,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810s"></script>
-<script src="assets/js/db.js?v=20260810s"></script>
-<script src="assets/js/ui.js?v=20260810s"></script>
-<script src="assets/js/onboarding.js?v=20260810s"></script>
+<script src="assets/js/auth.js?v=20260810t"></script>
+<script src="assets/js/db.js?v=20260810t"></script>
+<script src="assets/js/ui.js?v=20260810t"></script>
+<script src="assets/js/onboarding.js?v=20260810t"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -707,9 +729,24 @@ function _splitCandidates() {
 }
 function updateSplitBadge() {
   const n = _splitCandidates().length;
-  const btn = document.getElementById('btn-split-needed');
   document.getElementById('split-count').textContent = n;
-  if (btn) btn.style.display = n ? '' : 'none';
+  const badge = document.getElementById('split-count-badge');
+  if (badge) badge.style.display = n ? '' : 'none';
+  const toolsBtn = document.getElementById('btn-tools-menu');
+  if (toolsBtn) toolsBtn.classList.toggle('has-alert', n > 0);
+}
+function toggleToolsMenu() {
+  const menu = document.getElementById('toolsMenu');
+  const opening = menu.style.display === 'none';
+  menu.style.display = opening ? 'block' : 'none';
+  if (opening) setTimeout(() => document.addEventListener('click', _toolsMenuOutsideClick), 0);
+}
+function closeToolsMenu() {
+  document.getElementById('toolsMenu').style.display = 'none';
+  document.removeEventListener('click', _toolsMenuOutsideClick);
+}
+function _toolsMenuOutsideClick(e) {
+  if (!document.getElementById('toolsMenuWrap').contains(e.target)) closeToolsMenu();
 }
 let _splitSegs = {}; // vendorId -> [segment strings]
 function openSplitModal() {
