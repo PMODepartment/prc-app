@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811e"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260811e"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811e"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811f"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260811f"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811f"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811e">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811f">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -489,9 +489,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260811e"></script>
-<script src="assets/js/db.js?v=20260811e"></script>
-<script src="assets/js/ui.js?v=20260811e"></script>
+<script src="assets/js/auth.js?v=20260811f"></script>
+<script src="assets/js/db.js?v=20260811f"></script>
+<script src="assets/js/ui.js?v=20260811f"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -2016,6 +2016,10 @@ async function renderDetailWps() {
   const splitV = s => String(s || '').split(/[\r\n;|]+/).map(x => x.trim()).filter(Boolean);
   const splitAw = s => String(s || '').split(/[\r\n;|/]+/).map(x => x.trim()).filter(Boolean);
   const vn = nm(v.name);
+  // fuzzy core-name (shared with db.js's gather) so a "(LOCAL)"/legal-suffix
+  // variant links to the WP's plainer vendor text.
+  const vcore = (window.VendorMatch && window.VendorMatch.core) ? window.VendorMatch.core(v.name) : '';
+  const coreOk = n => !!(window.VendorMatch && vcore && window.VendorMatch.coreMatch(vcore, n));
   const hideCost = userProfile && userProfile.role === 'viewer';
   let rows;
   try { rows = await VendorDb.getWorkPackagesForVendor(v.id, v.name); }
@@ -2023,8 +2027,8 @@ async function renderDetailWps() {
   // Precise per-WP flags; drop candidates that match neither (ilike gathered broadly).
   const linked = [];
   for (const w of rows) {
-    const isAwd = (w.vendor_id && w.vendor_id === v.id) || (Array.isArray(w.awarded_vendor_ids) && w.awarded_vendor_ids.includes(v.id)) || splitAw(w.contractor).some(n => nm(n) === vn);
-    const isProp = (Array.isArray(w.proposed_vendor_ids) && w.proposed_vendor_ids.includes(v.id)) || splitV(w.proposed_vendors).some(n => nm(n) === vn);
+    const isAwd = (w.vendor_id && w.vendor_id === v.id) || (Array.isArray(w.awarded_vendor_ids) && w.awarded_vendor_ids.includes(v.id)) || splitAw(w.contractor).some(n => nm(n) === vn || coreOk(n));
+    const isProp = (Array.isArray(w.proposed_vendor_ids) && w.proposed_vendor_ids.includes(v.id)) || splitV(w.proposed_vendors).some(n => nm(n) === vn || coreOk(n));
     if (isAwd || isProp) linked.push({ w, isAwd, isProp });
   }
   if (!linked.length) { el.innerHTML = '<div style="color:#888;font-size:0.85rem;padding:6px 0">This vendor isn’t linked to any work package yet (as a proposed or awarded vendor).</div>'; return; }

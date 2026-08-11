@@ -2128,6 +2128,38 @@ const VendorDb = (() => {
     }
   }
 
+  // ── Fuzzy "core name" matching ──────────────────────────────────────────
+  // A directory vendor's name often carries extras the WP's free-text vendor
+  // field doesn't — a leading "*", a "(LOCAL)"/"(IMPORTED)" tag, or trailing
+  // legal/generic words (Inc, Corp, Construction, Trading…). Stripping those to
+  // a comparable "core" lets "*JANGHO (LOCAL)" link to a WP that just says
+  // "JANGHO" (or "JANGHO CURTAIN WALL"). Exposed on window so vendors.html's
+  // precise per-WP filter uses the SAME rule as this gather.
+  const _CORE_STOP = /\b(incorporated|inc|corporation|corp|company|co|limited|ltd|llc|enterprises|enterprise|construction|constructions|trading|traders|services|service|supply|supplies|industries|industrial|philippines|phils|ph|international|intl|and|the|of)\b/g;
+  function _coreName(s) {
+    let x = String(s == null ? '' : s).toLowerCase();
+    x = x.replace(/\([^)]*\)/g, ' ');            // drop parentheticals e.g. (local)
+    x = x.replace(/[*"'`.,/\\|;:&()\-_]+/g, ' '); // markers/punctuation → space
+    x = x.replace(_CORE_STOP, ' ');               // legal/generic filler words
+    return x.replace(/\s+/g, ' ').trim();
+  }
+  // needle appears in hay as a whole-word run (so "jangho" matches
+  // "jangho curtain wall" but not "janghoo"); guarded to ≥4-char needles so a
+  // tiny fragment can't match half the portfolio.
+  function _coreWordContains(hay, needle) {
+    if (!hay || !needle || needle.length < 4) return false;
+    return new RegExp('\\b' + needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(hay);
+  }
+  // True if a directory vendor's core name matches one WP vendor-name string's
+  // core (equal, or either is a whole-word run inside the other).
+  function _coreMatch(vendorCore, wpName) {
+    if (!vendorCore) return false;
+    const nc = _coreName(wpName);
+    if (!nc) return false;
+    return nc === vendorCore || _coreWordContains(nc, vendorCore) || _coreWordContains(vendorCore, nc);
+  }
+  if (typeof window !== 'undefined') window.VendorMatch = { core: _coreName, wordContains: _coreWordContains, coreMatch: _coreMatch };
+
   // Work packages this vendor is linked to — as the AWARDED vendor
   // (work_packages.vendor_id, or a name match on the free-text `contractor`)
   // and/or a PROPOSED vendor (proposed_vendor_ids array, or a name match in
@@ -2162,6 +2194,15 @@ const VendorDb = (() => {
       const like = '%' + nm.replace(/[%_,]/g, ' ').trim() + '%';
       try { const { data } = await sb.from('work_packages').select(cols).ilike('contractor', like); add(data); } catch (e) { /* ignore */ }
       try { const { data } = await sb.from('work_packages').select(cols).ilike('proposed_vendors', like); add(data); } catch (e) { /* ignore */ }
+      // Also gather by the fuzzy CORE name so a WP whose vendor text differs by a
+      // "(LOCAL)" tag / legal suffix ("*JANGHO (LOCAL)" vs "JANGHO CURTAIN WALL")
+      // still surfaces; the caller's core-aware filter confirms the real match.
+      const core = _coreName(nm);
+      if (core && core.length >= 4 && core !== nm.replace(/[%_,]/g, ' ').trim().toLowerCase()) {
+        const likeCore = '%' + core.replace(/[%_,]/g, ' ').trim() + '%';
+        try { const { data } = await sb.from('work_packages').select(cols).ilike('contractor', likeCore); add(data); } catch (e) { /* ignore */ }
+        try { const { data } = await sb.from('work_packages').select(cols).ilike('proposed_vendors', likeCore); add(data); } catch (e) { /* ignore */ }
+      }
     }
     return [...byId.values()];
   }
