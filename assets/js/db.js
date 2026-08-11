@@ -1470,6 +1470,20 @@ const VendorDb = (() => {
     const m = (error.message || '') + (error.details || '');
     return (error.code === '42703' || /column|does not exist|schema cache/i.test(m)) && re.test(m);
   }
+  // Page past PostgREST's 1000-row default (own copy — VendorDb is a separate
+  // closure from WPDb where the twin lives). makeQuery MUST return a FRESH builder.
+  async function _pagedSelect(makeQuery) {
+    const PAGE = 1000; let all = [], from = 0;
+    for (;;) {
+      const { data, error } = await makeQuery().range(from, from + PAGE - 1);
+      if (error) throw error;
+      const batch = data || [];
+      all = all.concat(batch);
+      if (batch.length < PAGE) break;
+      from += PAGE;
+    }
+    return all;
+  }
 
   // ── Vendors ────────────────────────────────────────────────────────
   async function getVendors() {
