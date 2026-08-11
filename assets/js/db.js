@@ -52,7 +52,7 @@ const WPDb = (() => {
     if (_isMissingVendorCol(error)) d = _stripVendor(d);
     if (_isMissingProposedVendorIdsCol(error)) d = _stripProposedVendorIds(d);
     if (_isMissingAwardedVendorIdsCol(error)) d = _stripAwardedVendorIds(d);
-    if (_isMissingBuybackCol(error)) d = _stripBuyback(d);
+    if (_isMissingBuybackCol(error)) d = _stripBuyback(d, error);
     return d;
   }
   // Same deploy-order guard again for projects.group_head (MIGRATION_project_group_head.sql):
@@ -100,7 +100,30 @@ const WPDb = (() => {
     const m = (error.message || '') + (error.details || '');
     return /buyback/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
-  function _stripBuyback(obj) { const d = {...obj}; delete d.buyback; delete d.buyback_depreciation_percent; delete d.buyback_amount; return d; }
+  // Strip only what the error actually names: an environment that has `buyback` but not the
+  // newer `buyback_amount` must still persist the flag (and the %), so a blanket strip of all
+  // three would silently discard columns the DB can accept.
+  function _stripBuyback(obj, error) {
+    const d = {...obj};
+    const m = error ? ((error.message || '') + (error.details || '')) : '';
+    const named = /buyback_amount/.test(m) || /buyback_depreciation_percent/.test(m);
+    if (!named || /buyback_amount/.test(m)) delete d.buyback_amount;
+    if (!named || /buyback_depreciation_percent/.test(m)) delete d.buyback_depreciation_percent;
+    if (!named) delete d.buyback;   // the base column itself is missing -> drop the whole set
+    return d;
+  }
+  // A retry can strip a patch down to nothing (e.g. the grid staged ONLY a buyback edit on a
+  // DB that lacks those columns). PostgREST treats an empty update body as 0 rows, so .single()
+  // then throws an opaque "Cannot coerce the result to a single JSON object". Nothing is
+  // persistable in that case, so return the row unchanged rather than surfacing a fake failure.
+  async function _retryUpdate(sb, id, patch) {
+    if (!patch || Object.keys(patch).length === 0) {
+      console.warn('[WPDb] Nothing left to write after dropping columns this database does not have (pending migration). No changes saved for WP', id);
+      const r = await sb.from('work_packages').select('*').eq('id', id).single();
+      return { data: r.data, error: null };
+    }
+    return await sb.from('work_packages').update(patch).eq('id', id).select().single();
+  }
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
   async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
   async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
@@ -160,26 +183,26 @@ const WPDb = (() => {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review'};
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
     if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error)))
-      ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
+      ({data,error}=await _retryUpdate(sb,id,_stripOptional(base,error)));
     if(error && _isMissingBcbCol(error))
-      ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
+      ({data,error}=await _retryUpdate(sb,id,_stripBcb(_stripAudit(base))));
     if(error && _isMissingVendorCol(error))
-      ({data,error}=await sb.from('work_packages').update(_stripVendor(_stripAudit(base))).eq('id',id).select().single());
+      ({data,error}=await _retryUpdate(sb,id,_stripVendor(_stripAudit(base))));
     if(error && _isMissingProposedVendorIdsCol(error))
-      ({data,error}=await sb.from('work_packages').update(_stripProposedVendorIds(_stripAudit(base))).eq('id',id).select().single());
+      ({data,error}=await _retryUpdate(sb,id,_stripProposedVendorIds(_stripAudit(base))));
     if(error) throw error; return data;
   }
   async function updateWPDirect(id,d) {
     const sb=await getSB(); const base=unmap(d);
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
     if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error)))
-      ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
+      ({data,error}=await _retryUpdate(sb,id,_stripOptional(base,error)));
     if(error && _isMissingBcbCol(error))
-      ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
+      ({data,error}=await _retryUpdate(sb,id,_stripBcb(_stripAudit(base))));
     if(error && _isMissingVendorCol(error))
-      ({data,error}=await sb.from('work_packages').update(_stripVendor(_stripAudit(base))).eq('id',id).select().single());
+      ({data,error}=await _retryUpdate(sb,id,_stripVendor(_stripAudit(base))));
     if(error && _isMissingProposedVendorIdsCol(error))
-      ({data,error}=await sb.from('work_packages').update(_stripProposedVendorIds(_stripAudit(base))).eq('id',id).select().single());
+      ({data,error}=await _retryUpdate(sb,id,_stripProposedVendorIds(_stripAudit(base))));
     if(error) throw error; return data;
   }
   async function createProject(d) {
