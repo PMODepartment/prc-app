@@ -1762,6 +1762,11 @@ const VendorDb = (() => {
   //  { created, linked, distinct }.
   function _normName(s) { return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
   function _splitVendors(s) { return String(s || '').split(/[\r\n;|]+/).map(x => x.trim()).filter(Boolean); }
+  // Awarded-vendor splitter — the awarded `contractor` field can hold MULTIPLE
+  // co-awarded vendors. Unlike proposed vendors it may use a SLASH separator
+  // ("Vendor A / Vendor B"), so this adds "/" to the delimiter set. Comma/space
+  // are still excluded on purpose ("Company, Inc." must stay intact).
+  function _splitAwarded(s) { return String(s || '').split(/[\r\n;|/]+/).map(x => x.trim()).filter(Boolean); }
   async function importVendorsFromWPs(opts, profile) {
     opts = opts || {};
     const includeProposed = opts.includeProposed !== false;
@@ -1776,7 +1781,8 @@ const VendorDb = (() => {
     const names = new Map(); // norm -> best display string
     rows.forEach(w => {
       const push = nm => { const k = _normName(nm); if (k && !names.has(k)) names.set(k, nm.trim().replace(/\s+/g, ' ')); };
-      if (w.contractor) push(w.contractor);
+      // contractor can hold MULTIPLE co-awarded vendors (incl. slash-separated)
+      _splitAwarded(w.contractor).forEach(push);
       if (includeProposed) _splitVendors(w.proposed_vendors).forEach(push);
     });
     let created = 0;
@@ -1790,7 +1796,12 @@ const VendorDb = (() => {
     if (linkWPs) {
       for (const w of rows) {
         if (w.vendor_id) continue;
-        const v = byNorm[_normName(w.contractor)];
+        // Only FK-link when the WP has exactly ONE awarded vendor — vendor_id is
+        // a single FK and can't represent a co-award. Multi-vendor WPs still get
+        // their vendor identity rows created above; analytics resolves them by name.
+        const awardedNames = _splitAwarded(w.contractor);
+        if (awardedNames.length !== 1) continue;
+        const v = byNorm[_normName(awardedNames[0])];
         if (!v) continue;
         const { error: e3 } = await sb.from('work_packages').update({ vendor_id: v.id }).eq('id', w.id);
         if (!e3) linked++;
@@ -1844,7 +1855,8 @@ const VendorDb = (() => {
     const resolveVendors = w => {
       const out = new Set();
       if (w.vendor_id) out.add(w.vendor_id);
-      else if (w.contractor) { const v = byNorm[_normName(w.contractor)]; if (v) out.add(v.id); }
+      // contractor may hold multiple co-awarded vendors (incl. slash-separated)
+      _splitAwarded(w.contractor).forEach(nm => { const v = byNorm[_normName(nm)]; if (v) out.add(v.id); });
       _splitVendors(w.proposed_vendors).forEach(nm => { const v = byNorm[_normName(nm)]; if (v) out.add(v.id); });
       return out;
     };
@@ -1860,39 +1872,46 @@ const VendorDb = (() => {
         vids.forEach(vid => { if (tradeSets[vid]) tradeSets[vid].add(ct); });
       }
       if (!isAwarded(w)) return;
-      // Awarded-only: products / bids / rates. The "awarded vendor" for these
-      // is the one matching contractor/vendor_id specifically (not every
-      // proposed-but-not-won vendor).
-      let awardedVid = w.vendor_id || (w.contractor ? (byNorm[_normName(w.contractor)] || {}).id : null);
-      if (!awardedVid) return;
-      if (w.description) {
-        const nk = _normName(w.description);
-        const seen = productKeys[awardedVid] = productKeys[awardedVid] || new Set();
-        if (!seen.has(nk)) {
-          seen.add(nk);
-          const map = newProducts[awardedVid] = newProducts[awardedVid] || new Map();
-          // item_type from the WP's own Type field (Materials/Labor/Service) when set.
-          const _it = ['Materials','Labor','Service'].includes(w.type_of_works) ? w.type_of_works : null;
-          if (!map.has(nk)) map.set(nk, { category: w.trade || null, description: w.description, item_type: _it });
-        }
-      }
+      // Awarded-only: products / bids / rates. A WP can be awarded to MORE THAN
+      // ONE vendor (co-award) — credit each. Money (bid final_amount, rate) is
+      // split evenly so co-awarded totals reconcile with the WP's awarded cost;
+      // a single-vendor award (the common case) gets the full amount unchanged.
+      const awardedVids = [];
+      const addAw = id => { if (id && !awardedVids.includes(id)) awardedVids.push(id); };
+      if (w.vendor_id) addAw(w.vendor_id);
+      _splitAwarded(w.contractor).forEach(nm => { const v = byNorm[_normName(nm)]; if (v) addAw(v.id); });
+      if (!awardedVids.length) return;
       const bidDate = w.awarding_date || w.actual_awarding_date || null;
       const awardDate = w.actual_awarding_date || w.awarding_date || null;
-      bidsToUpsert.push({
-        wpId: w.id, vendorId: awardedVid, projectId: w.project_id,
-        fields: {
-          original_offer: null, negotiated_offer: null, final_amount: w.awarded_cost,
-          status: 'awarded', bid_date: bidDate, award_date: awardDate,
-          notes: `Backfilled from WP ${w.wp_no || ''}`.trim(),
-        },
-      });
-      ratesToUpsert.push({
-        wpId: w.id, vendorId: awardedVid, projectId: w.project_id,
-        fields: {
-          item_description: w.description || null, trade: w.trade || null,
-          rate: w.awarded_cost, unit: null, date_quoted: awardDate,
-          source: 'awarded contract',
-        },
+      // item_type from the WP's own Type field (Materials/Labor/Service) when set.
+      const _it = ['Materials','Labor','Service'].includes(w.type_of_works) ? w.type_of_works : null;
+      const share = (w.awarded_cost || 0) / awardedVids.length;
+      awardedVids.forEach(awardedVid => {
+        if (w.description) {
+          const nk = _normName(w.description);
+          const seen = productKeys[awardedVid] = productKeys[awardedVid] || new Set();
+          if (!seen.has(nk)) {
+            seen.add(nk);
+            const map = newProducts[awardedVid] = newProducts[awardedVid] || new Map();
+            if (!map.has(nk)) map.set(nk, { category: w.trade || null, description: w.description, item_type: _it });
+          }
+        }
+        bidsToUpsert.push({
+          wpId: w.id, vendorId: awardedVid, projectId: w.project_id,
+          fields: {
+            original_offer: null, negotiated_offer: null, final_amount: share,
+            status: 'awarded', bid_date: bidDate, award_date: awardDate,
+            notes: `Backfilled from WP ${w.wp_no || ''}`.trim(),
+          },
+        });
+        ratesToUpsert.push({
+          wpId: w.id, vendorId: awardedVid, projectId: w.project_id,
+          fields: {
+            item_description: w.description || null, trade: w.trade || null,
+            rate: share, unit: null, date_quoted: awardDate,
+            source: 'awarded contract',
+          },
+        });
       });
     });
 

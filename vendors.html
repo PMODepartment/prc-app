@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260810aa"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260810aa"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260810aa"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260811a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260810aa">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811a">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -489,9 +489,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260810aa"></script>
-<script src="assets/js/db.js?v=20260810aa"></script>
-<script src="assets/js/ui.js?v=20260810aa"></script>
+<script src="assets/js/auth.js?v=20260811a"></script>
+<script src="assets/js/db.js?v=20260811a"></script>
+<script src="assets/js/ui.js?v=20260811a"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -621,6 +621,9 @@ async function renderVendorAnalytics() {
   const wps = _vaWPs;
   const nm = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const splitV = s => String(s || '').split(/[\r\n;|]+/).map(x => x.trim()).filter(Boolean);
+  // Awarded contractor may co-award to several vendors joined by a slash
+  // ("Vendor A / Vendor B") — split those too (comma/space stay intact).
+  const splitAw = s => String(s || '').split(/[\r\n;|/]+/).map(x => x.trim()).filter(Boolean);
   const money = v => Fmt.moneyShort(v || 0);
   const byId = {}, byName = {};
   allVendors.forEach(v => { byId[v.id] = v; byName[nm(v.name)] = v; });
@@ -630,17 +633,37 @@ async function renderVendorAnalytics() {
   // normalized free-text name (so un-imported contractors still tally).
   const agg = {};
   const ensure = (key, name) => (agg[key] = agg[key] || { key, name, spend: 0, bcb: 0, wpCount: 0, wins: 0, participated: 0 });
+  // Resolve one WP's awarded vendor(s). A WP can be awarded to MORE THAN ONE
+  // vendor (co-award) — contractor holds several names on the shared
+  // /[\r\n;|]+/ delimiter. Resolve each to a directory id via the FK first,
+  // then BY NAME (so a vendor that IS in the directory but whose WP was never
+  // FK-linked resolves instead of reading "(not in directory)"), else fall
+  // back to the normalized name as the key.
+  const awardedOf = w => {
+    const out = []; const seen = new Set();
+    const add = (key, name) => { if (key && !seen.has(key)) { seen.add(key); out.push({ key, name }); } };
+    if (w.vendor_id && byId[w.vendor_id]) add(w.vendor_id, byId[w.vendor_id].name);
+    splitAw(w.contractor).forEach(n => { const v = byName[nm(n)]; add(v ? v.id : nm(n), v ? v.name : n.trim()); });
+    return out;
+  };
+  let awardedWpTotal = 0;
   wps.forEach(w => {
-    const awardedKey = (w.vendor_id && byId[w.vendor_id]) ? w.vendor_id : (w.contractor ? nm(w.contractor) : null);
-    const awardedName = (w.vendor_id && byId[w.vendor_id]) ? byId[w.vendor_id].name : (w.contractor ? w.contractor.trim() : '');
+    const awarded = awardedOf(w);
     const parts = new Set();
     if (Array.isArray(w.proposed_vendor_ids)) w.proposed_vendor_ids.forEach(id => { if (byId[id]) parts.add(id); });
     splitV(w.proposed_vendors).forEach(n => { const v = byName[nm(n)]; parts.add(v ? v.id : nm(n)); });
-    if (awardedKey) parts.add(awardedKey);
+    awarded.forEach(a => parts.add(a.key));
     parts.forEach(pk => { if (pk) ensure(pk, byId[pk] ? byId[pk].name : pk).participated++; });
-    if (window.isMoneyAwarded(w) && awardedKey) {
-      const a = ensure(awardedKey, awardedName || (byId[awardedKey] ? byId[awardedKey].name : awardedKey));
-      a.spend += window.effectiveAwardedCost(w); a.bcb += (w.approved_budget_bcb || 0); a.wpCount++; a.wins++;
+    if (window.isMoneyAwarded(w) && awarded.length) {
+      awardedWpTotal++;
+      // Split spend/BCB evenly across co-awarded vendors so portfolio totals
+      // reconcile (Σ splits = the WP's full cost); each co-awarded vendor still
+      // gets credit for one win.
+      const cost = window.effectiveAwardedCost(w), bcb = (w.approved_budget_bcb || 0), share = 1 / awarded.length;
+      awarded.forEach(a => {
+        const agr = ensure(a.key, a.name || (byId[a.key] ? byId[a.key].name : a.key));
+        agr.spend += cost * share; agr.bcb += bcb * share; agr.wpCount++; agr.wins++;
+      });
     }
   });
   const rows = Object.values(agg);
@@ -649,7 +672,6 @@ async function renderVendorAnalytics() {
   const totalBcb = awarded.reduce((s, r) => s + r.bcb, 0);
   const totalSav = totalBcb - totalSpend;
   const totalSavPct = totalBcb ? totalSav / totalBcb * 100 : 0;
-  const awardedWpTotal = awarded.reduce((s, r) => s + r.wpCount, 0);
   const approvedCount = allVendors.filter(v => v.status === 'approved').length;
   const bySpend = [...awarded].sort((a, b) => b.spend - a.spend);
   const top1 = totalSpend && bySpend[0] ? bySpend[0].spend / totalSpend * 100 : 0;
@@ -1972,6 +1994,7 @@ async function renderDetailWps() {
   el.innerHTML = '<div style="color:#888;font-size:0.85rem;padding:6px 0">Loading work packages…</div>';
   const nm = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const splitV = s => String(s || '').split(/[\r\n;|]+/).map(x => x.trim()).filter(Boolean);
+  const splitAw = s => String(s || '').split(/[\r\n;|/]+/).map(x => x.trim()).filter(Boolean);
   const vn = nm(v.name);
   const hideCost = userProfile && userProfile.role === 'viewer';
   let rows;
@@ -1980,7 +2003,7 @@ async function renderDetailWps() {
   // Precise per-WP flags; drop candidates that match neither (ilike gathered broadly).
   const linked = [];
   for (const w of rows) {
-    const isAwd = (w.vendor_id && w.vendor_id === v.id) || (w.contractor && nm(w.contractor) === vn);
+    const isAwd = (w.vendor_id && w.vendor_id === v.id) || splitAw(w.contractor).some(n => nm(n) === vn);
     const isProp = (Array.isArray(w.proposed_vendor_ids) && w.proposed_vendor_ids.includes(v.id)) || splitV(w.proposed_vendors).some(n => nm(n) === vn);
     if (isAwd || isProp) linked.push({ w, isAwd, isProp });
   }
