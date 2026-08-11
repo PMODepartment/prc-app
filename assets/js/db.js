@@ -81,15 +81,16 @@ const WPDb = (() => {
     return /proposed_vendor_ids/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
   function _stripProposedVendorIds(obj) { const d = {...obj}; delete d.proposed_vendor_ids; return d; }
-  // Same deploy-order guard for work_packages.awarded_vendor_ids (MIGRATION_wp_awarded_vendor_ids.sql):
-  // every WP write retries without it if that migration hasn't run yet. Precise column-name match so
-  // it can't cross-trigger with _isMissingVendorCol (vendor_id\b) or _isMissingProposedVendorIdsCol.
+  // Same deploy-order guard for the awarded-vendor columns (MIGRATION_wp_awarded_vendor_ids.sql:
+  // awarded_vendor_ids + awarded_vendor_amounts). Every WP write retries without them if that
+  // migration hasn't run yet. Precise column-name match so it can't cross-trigger with
+  // _isMissingVendorCol (vendor_id\b) or _isMissingProposedVendorIdsCol.
   function _isMissingAwardedVendorIdsCol(error) {
     if (!error) return false;
     const m = (error.message || '') + (error.details || '');
-    return /awarded_vendor_ids/.test(m) && /column|does not exist|schema cache/i.test(m);
+    return /awarded_vendor_(ids|amounts)/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
-  function _stripAwardedVendorIds(obj) { const d = {...obj}; delete d.awarded_vendor_ids; return d; }
+  function _stripAwardedVendorIds(obj) { const d = {...obj}; delete d.awarded_vendor_ids; delete d.awarded_vendor_amounts; return d; }
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
   async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
   async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
@@ -1691,23 +1692,32 @@ const VendorDb = (() => {
   }
   // Award-time reconciliation: each winning vendor's bid → 'awarded' with today's
   // award date; every OTHER bid on the same WP → 'lost' (unless already
-  // 'withdrawn' — a vendor that pulled out isn't "lost"). Accepts a SINGLE vendor
-  // id or an ARRAY of co-awarded ids; the final amount is split evenly across
-  // them so each winner's bid reconciles with the WP's awarded cost. No-op (never
-  // throws) when no vendor id is given — a WP can be awarded without a directory link.
-  async function reconcileBidsOnAward(wpId, vendorIds, finalAmount) {
-    const ids = (Array.isArray(vendorIds) ? vendorIds : [vendorIds]).filter(Boolean);
-    // dedupe
-    const uniq = [...new Set(ids)];
-    if (!wpId || !uniq.length) return;
+  // 'withdrawn' — a vendor that pulled out isn't "lost").
+  //   `awards` accepts, in order of preference:
+  //     • [{vendorId, amount}]  — each vendor's OWN negotiated awarded amount
+  //     • [id, id, …] or a single id — no per-vendor breakdown; `totalAmount`
+  //       is split EVENLY across them (fallback, e.g. Status-Tracker quick award)
+  // No-op (never throws) when no vendor id is given.
+  async function reconcileBidsOnAward(wpId, awards, totalAmount) {
+    let list;
+    if (Array.isArray(awards) && awards.length && awards[0] && typeof awards[0] === 'object' && 'vendorId' in awards[0]) {
+      list = awards.filter(a => a && a.vendorId).map(a => ({ vendorId: a.vendorId, amount: (a.amount != null ? a.amount : null) }));
+    } else {
+      const ids = (Array.isArray(awards) ? awards : [awards]).filter(Boolean);
+      const per = (totalAmount != null && ids.length) ? totalAmount / ids.length : null;
+      list = ids.map(id => ({ vendorId: id, amount: per }));
+    }
+    // dedupe by vendorId (keep first)
+    const seen = new Set();
+    list = list.filter(a => !seen.has(a.vendorId) && seen.add(a.vendorId));
+    if (!wpId || !list.length) return;
     try {
       const sb = await getSB();
       const todayIso = new Date().toISOString().slice(0, 10);
-      const per = (finalAmount != null) ? finalAmount / uniq.length : null;
-      for (const vid of uniq) {
-        await upsertBid(wpId, vid, null, {
+      for (const a of list) {
+        await upsertBid(wpId, a.vendorId, null, {
           status: 'awarded',
-          final_amount: per,
+          final_amount: a.amount,
           award_date: todayIso,
         }, (typeof window !== 'undefined' && window.__profile) || null);
       }
@@ -1715,7 +1725,7 @@ const VendorDb = (() => {
       const { error } = await sb.from('vendor_bids')
         .update({ status: 'lost' })
         .eq('wp_id', wpId)
-        .not('vendor_id', 'in', `(${uniq.join(',')})`)
+        .not('vendor_id', 'in', `(${list.map(a => a.vendorId).join(',')})`)
         .neq('status', 'withdrawn');
       if (error && !_isMissingBidsTable(error)) throw error;
     } catch (err) {
@@ -1846,8 +1856,12 @@ const VendorDb = (() => {
   //     so bids only populate final_amount.
   async function backfillVendorDataFromWPs(profile) {
     const sb = await getSB();
-    const { data: wps, error } = await sb.from('work_packages')
-      .select('id,project_id,wp_no,description,trade,type_of_works,contractor,proposed_vendors,vendor_id,award_status,awarded_cost,awarding_date,actual_awarding_date');
+    const _bfCols = 'id,project_id,wp_no,description,trade,type_of_works,contractor,proposed_vendors,vendor_id,awarded_vendor_ids,awarded_vendor_amounts,award_status,awarded_cost,awarding_date,actual_awarding_date';
+    let { data: wps, error } = await sb.from('work_packages').select(_bfCols);
+    if (error && _isMissingAwardedVendorIdsCol(error)) {
+      // pre-migration: the awarded-vendor array columns don't exist yet
+      ({ data: wps, error } = await sb.from('work_packages').select(_bfCols.replace(',awarded_vendor_ids,awarded_vendor_amounts', '')));
+    }
     if (error) throw error;
     const rows = wps || [];
 
@@ -1891,20 +1905,31 @@ const VendorDb = (() => {
       }
       if (!isAwarded(w)) return;
       // Awarded-only: products / bids / rates. A WP can be awarded to MORE THAN
-      // ONE vendor (co-award) — credit each. Money (bid final_amount, rate) is
-      // split evenly so co-awarded totals reconcile with the WP's awarded cost;
-      // a single-vendor award (the common case) gets the full amount unchanged.
+      // ONE vendor (co-award) — credit each. Per-vendor amount preference:
+      //   1. the WP's own awarded_vendor_amounts[] (each vendor's negotiated
+      //      awarded amount, index-aligned with awarded_vendor_ids) — authored
+      //      via the WP form; use it verbatim so a re-run never clobbers the
+      //      real breakdown with an even split.
+      //   2. else split the WP's awarded_cost evenly across resolved vendors.
       const awardedVids = [];
-      const addAw = id => { if (id && !awardedVids.includes(id)) awardedVids.push(id); };
-      if (w.vendor_id) addAw(w.vendor_id);
-      _splitAwarded(w.contractor).forEach(nm => { const v = byNorm[_normName(nm)]; if (v) addAw(v.id); });
+      const amtByVid = {};
+      const addAw = (id, amt) => { if (id && !awardedVids.includes(id)) { awardedVids.push(id); if (amt != null) amtByVid[id] = amt; } };
+      const _ids = Array.isArray(w.awarded_vendor_ids) ? w.awarded_vendor_ids : [];
+      const _amts = Array.isArray(w.awarded_vendor_amounts) ? w.awarded_vendor_amounts : [];
+      if (_ids.length) {
+        _ids.forEach((id, i) => addAw(id, _amts[i] != null ? _amts[i] : null));
+      } else {
+        if (w.vendor_id) addAw(w.vendor_id);
+        _splitAwarded(w.contractor).forEach(nm => { const v = byNorm[_normName(nm)]; if (v) addAw(v.id); });
+      }
       if (!awardedVids.length) return;
       const bidDate = w.awarding_date || w.actual_awarding_date || null;
       const awardDate = w.actual_awarding_date || w.awarding_date || null;
       // item_type from the WP's own Type field (Materials/Labor/Service) when set.
       const _it = ['Materials','Labor','Service'].includes(w.type_of_works) ? w.type_of_works : null;
-      const share = (w.awarded_cost || 0) / awardedVids.length;
+      const evenShare = (w.awarded_cost || 0) / awardedVids.length;
       awardedVids.forEach(awardedVid => {
+        const share = (amtByVid[awardedVid] != null) ? amtByVid[awardedVid] : evenShare;
         if (w.description) {
           const nk = _normName(w.description);
           const seen = productKeys[awardedVid] = productKeys[awardedVid] || new Set();
@@ -2085,7 +2110,7 @@ const VendorDb = (() => {
   // falls back to vendor_id-only if proposed_vendor_ids doesn't exist yet.
   async function getWorkPackagesForVendor(vendorId, vendorName) {
     const sb = await getSB();
-    const cols = 'id,project_id,wp_no,description,trade,works,award_status,procurement_status,delivery_status,approved_budget_bcb,total_awarded,awarded_cost,contractor,vendor_id,awarded_vendor_ids,proposed_vendors,proposed_vendor_ids,awarding_date,actual_awarding_date';
+    const cols = 'id,project_id,wp_no,description,trade,works,award_status,procurement_status,delivery_status,approved_budget_bcb,total_awarded,awarded_cost,contractor,vendor_id,awarded_vendor_ids,awarded_vendor_amounts,proposed_vendors,proposed_vendor_ids,awarding_date,actual_awarding_date';
     const byId = new Map();
     const add = rows => (rows || []).forEach(w => byId.set(w.id, w));
     try {
@@ -2093,12 +2118,13 @@ const VendorDb = (() => {
       if (error) throw error;
       add(data);
     } catch (e) {
-      // Deploy-safe fallback if awarded_vendor_ids/proposed_vendor_ids don't exist yet.
+      // Deploy-safe fallback if awarded_vendor_ids/awarded_vendor_amounts/proposed_vendor_ids don't exist yet.
+      const colsNoAwd = cols.replace(',awarded_vendor_ids', '').replace(',awarded_vendor_amounts', '');
       try {
-        const { data, error: e2 } = await sb.from('work_packages').select(cols.replace(',awarded_vendor_ids', '')).or(`vendor_id.eq.${vendorId},proposed_vendor_ids.cs.{${vendorId}}`);
+        const { data, error: e2 } = await sb.from('work_packages').select(colsNoAwd).or(`vendor_id.eq.${vendorId},proposed_vendor_ids.cs.{${vendorId}}`);
         if (e2) throw e2; add(data);
       } catch (e3) {
-        try { const { data } = await sb.from('work_packages').select(cols.replace(',awarded_vendor_ids', '').replace(',proposed_vendor_ids', '')).eq('vendor_id', vendorId); add(data); } catch (e4) { /* ignore */ }
+        try { const { data } = await sb.from('work_packages').select(colsNoAwd.replace(',proposed_vendor_ids', '')).eq('vendor_id', vendorId); add(data); } catch (e4) { /* ignore */ }
       }
     }
     const nm = (vendorName || '').trim();

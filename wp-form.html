@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260811b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811b"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260811b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260811c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811c"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260811c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811b"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811c"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -86,6 +86,13 @@
     .pv-chip-x:hover{opacity:1}
     .pv-chip-legacy-tag{font-size:0.6429rem;text-transform:uppercase;letter-spacing:.03em;opacity:.75;margin-left:2px}
     body.dark-mode .pv-chip{background:rgba(238,49,36,.22);color:#FF9E96}
+    /* Co-award rows: vendor chip + its own negotiated amount */
+    .av-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+    .av-row .pv-chip{flex:0 1 auto;max-width:55%;overflow:hidden;text-overflow:ellipsis}
+    .av-amt{flex:1;min-width:0;padding:6px 9px;border:1.5px solid var(--border-md);border-radius:8px;font-size:0.8571rem;font-family:inherit;background:var(--surface);color:var(--text-primary)}
+    .av-row-x{font-size:1.0714rem}
+    .av-total{margin-top:2px;font-size:0.8214rem;color:var(--text-secondary)}
+    .av-cost-locked{background:var(--surface-2)!important;cursor:not-allowed}
     @media(max-width:767px){
       .ms-dd{position:fixed;left:12px;right:12px;top:auto;z-index:500;border-radius:12px}
       /* Single-column form on mobile so nothing feels "all over the place" */
@@ -716,10 +723,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260811b"></script>
-<script src="assets/js/ui.js?v=20260811b"></script>
-<script src="assets/js/db.js?v=20260811b"></script>
-<script src="assets/js/coachmarks.js?v=20260811b"></script>
+<script src="assets/js/auth.js?v=20260811c"></script>
+<script src="assets/js/ui.js?v=20260811c"></script>
+<script src="assets/js/db.js?v=20260811c"></script>
+<script src="assets/js/coachmarks.js?v=20260811c"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -927,20 +934,60 @@
   let _avResults = [];
   let _avDebounce = null;
 
+  // A WP co-awarded to several vendors: each vendor is awarded their OWN
+  // negotiated amount, and the WP's Awarded Cost is the SUM. So with ≥2 vendors
+  // each chip gains an amount input and #f-contract becomes the read-only sum;
+  // with a single vendor the editable Awarded Cost field is authoritative and
+  // the vendor's amount is taken from it at save time.
+  function _avIsMulti() { return _avChips.length >= 2; }
+  function _avParse(v) { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isNaN(n) ? null : n; }
+  function _avTotal() { return _avChips.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0); }
+  function _avSyncCost() {
+    const costEl = document.getElementById('f-contract');
+    if (!costEl) return;
+    if (_avIsMulti()) {
+      const t = _avTotal();
+      costEl.value = t ? String(t) : '';
+      costEl.readOnly = true;
+      costEl.classList.add('av-cost-locked');
+      costEl.title = 'Sum of the per-vendor awarded amounts (co-award)';
+    } else {
+      costEl.readOnly = false;
+      costEl.classList.remove('av-cost-locked');
+      costEl.title = '';
+    }
+    if (typeof updateVariance === 'function') updateVariance();
+    if (typeof _updateBcbDeltas === 'function') _updateBcbDeltas();
+  }
   function _avSyncHidden() {
     const c = document.getElementById('f-contractor');
     const vid = document.getElementById('f-vendor-id');
     if (c) c.value = _avChips.map(x => x.name).join('\n');
     if (vid) vid.value = (_avChips.find(x => x.id) || {}).id || '';
+    _avSyncCost();
   }
   function _avRenderChips() {
     const wrap = document.getElementById('av-chips');
     if (!wrap) return;
-    wrap.innerHTML = _avChips.map((c, i) => {
-      const nm = esc ? esc(c.name) : c.name;
-      const legacy = !c.id;
-      return `<span class="pv-chip${legacy ? ' pv-chip-legacy' : ''}">${nm}${legacy ? '<span class="pv-chip-legacy-tag">unlinked</span>' : ''}<span class="pv-chip-x" data-av-remove="${i}">&times;</span></span>`;
-    }).join('');
+    if (_avIsMulti()) {
+      // Co-award: one row per vendor with its own negotiated amount.
+      wrap.innerHTML = _avChips.map((c, i) => {
+        const nm = esc ? esc(c.name) : c.name;
+        const legacy = !c.id;
+        const amt = (c.amount != null && !isNaN(c.amount)) ? c.amount : '';
+        return `<div class="av-row">
+          <span class="pv-chip${legacy ? ' pv-chip-legacy' : ''}" style="margin:0">${nm}${legacy ? '<span class="pv-chip-legacy-tag">unlinked</span>' : ''}</span>
+          <input type="number" class="av-amt" min="0" step="0.01" placeholder="Awarded amount (₱)" data-av-amt="${i}" value="${amt}"/>
+          <span class="pv-chip-x av-row-x" data-av-remove="${i}" title="Remove">&times;</span>
+        </div>`;
+      }).join('') + `<div class="av-total">Total awarded: <strong>₱${_avTotal().toLocaleString('en-US', { maximumFractionDigits: 2 })}</strong> <span style="color:var(--text-hint)">→ auto-fills Awarded Cost</span></div>`;
+    } else {
+      wrap.innerHTML = _avChips.map((c, i) => {
+        const nm = esc ? esc(c.name) : c.name;
+        const legacy = !c.id;
+        return `<span class="pv-chip${legacy ? ' pv-chip-legacy' : ''}">${nm}${legacy ? '<span class="pv-chip-legacy-tag">unlinked</span>' : ''}<span class="pv-chip-x" data-av-remove="${i}">&times;</span></span>`;
+      }).join('');
+    }
   }
   function _avHasChip(nameOrId) {
     return _avChips.some(c => (nameOrId.id && c.id === nameOrId.id) || c.name.toLowerCase() === (nameOrId.name || '').trim().toLowerCase());
@@ -948,7 +995,13 @@
   function _avAdd(chip) {
     const name = (chip.name || '').trim();
     if (!name || _avHasChip({ id: chip.id, name })) return;
-    _avChips.push({ id: chip.id || null, name });
+    // Transitioning single → co-award: capture the current single vendor's amount
+    // from the (until-now authoritative) Awarded Cost field so it isn't lost.
+    if (_avChips.length === 1) {
+      const costEl = document.getElementById('f-contract');
+      _avChips[0].amount = costEl ? _avParse(costEl.value) : _avChips[0].amount;
+    }
+    _avChips.push({ id: chip.id || null, name, amount: (chip.amount != null ? chip.amount : null) });
     _avRenderChips();
     _avSyncHidden();
     markDirty();
@@ -957,6 +1010,12 @@
     _avChips.splice(i, 1);
     _avRenderChips();
     _avSyncHidden();
+    // Back down to a single vendor: reflect its amount into the (now editable)
+    // Awarded Cost field, which becomes authoritative again.
+    if (_avChips.length === 1 && _avChips[0].amount != null) {
+      const costEl = document.getElementById('f-contract');
+      if (costEl) { costEl.value = String(_avChips[0].amount); if (typeof updateVariance === 'function') updateVariance(); if (typeof _updateBcbDeltas === 'function') _updateBcbDeltas(); }
+    }
     markDirty();
   }
   function _avRenderResults(list, query) {
@@ -1014,10 +1073,24 @@
       }
     });
     const chips = document.getElementById('av-chips');
-    if (chips) chips.addEventListener('click', (e) => {
-      const x = e.target.closest('[data-av-remove]');
-      if (x) _avRemoveAt(parseInt(x.dataset.avRemove, 10));
-    });
+    if (chips) {
+      chips.addEventListener('click', (e) => {
+        const x = e.target.closest('[data-av-remove]');
+        if (x) _avRemoveAt(parseInt(x.dataset.avRemove, 10));
+      });
+      // Per-vendor amount edits — update state + the live total/Awarded Cost WITHOUT
+      // re-rendering (a re-render would drop focus mid-typing).
+      chips.addEventListener('input', (e) => {
+        const a = e.target.closest('[data-av-amt]');
+        if (!a) return;
+        const i = parseInt(a.dataset.avAmt, 10);
+        if (_avChips[i]) _avChips[i].amount = _avParse(a.value);
+        _avSyncCost();
+        const tot = chips.querySelector('.av-total strong');
+        if (tot) tot.textContent = '₱' + _avTotal().toLocaleString('en-US', { maximumFractionDigits: 2 });
+        markDirty();
+      });
+    }
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.av-wrap')) pop.classList.remove('open');
     });
@@ -1029,18 +1102,21 @@
   async function _avLoadFromWP(wp) {
     _avChips = [];
     const ids = Array.isArray(wp.awarded_vendor_ids) ? wp.awarded_vendor_ids.filter(Boolean) : [];
+    const amts = Array.isArray(wp.awarded_vendor_amounts) ? wp.awarded_vendor_amounts : [];
     if (ids.length) {
       try {
         const rows = await VendorDb.getVendorsByIds(ids);
         const byId = {}; rows.forEach(r => byId[r.id] = r.name);
-        ids.forEach(id => { if (byId[id]) _avChips.push({ id, name: byId[id] }); });
+        // preserve id↔amount alignment against the ORIGINAL (unfiltered) index
+        const orig = Array.isArray(wp.awarded_vendor_ids) ? wp.awarded_vendor_ids : [];
+        orig.forEach((id, i) => { if (id && byId[id]) _avChips.push({ id, name: byId[id], amount: (amts[i] != null ? amts[i] : null) }); });
       } catch (e) { /* directory lookup failed — chips just stay empty */ }
     }
     // Also fold in any legacy contractor names not already represented by an id
     // (covers pre-migration rows and single-vendor rows that only set vendor_id).
     if (!_avChips.length && wp.contractor) {
       String(wp.contractor).split(/[\r\n;|/]+/).map(s => s.trim()).filter(Boolean)
-        .forEach(name => { if (!_avChips.some(c => c.name.toLowerCase() === name.toLowerCase())) _avChips.push({ id: null, name }); });
+        .forEach(name => { if (!_avChips.some(c => c.name.toLowerCase() === name.toLowerCase())) _avChips.push({ id: null, name, amount: null }); });
       // If the row had a single linked vendor_id, upgrade that matching chip to linked.
       if (wp.vendor_id && _avChips.length === 1 && !_avChips[0].id) _avChips[0].id = wp.vendor_id;
     }
@@ -1879,6 +1955,11 @@ AppAuth.requireLogin(async (user, profile) => {
     if (getVal('f-award-status') === 'Awarded' && !notToBeAwarded) {
       if (!getNum('f-contract'))     return showErr('This WP is marked Awarded — enter the Awarded Cost (Net), set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'f-contract');
       if (!getVal('f-contractor'))   return showErr('This WP is marked Awarded — add at least one Awarded Vendor, set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'av-input');
+      // Co-award: every awarded vendor needs its own negotiated amount (they sum to the Awarded Cost).
+      if (_avIsMulti()) {
+        const missing = _avChips.filter(c => c.id && (c.amount == null || isNaN(c.amount) || c.amount <= 0));
+        if (missing.length) return showErr('Enter each awarded vendor\'s amount — the Awarded Cost is their sum. Missing: ' + missing.map(c => c.name).join(', '), 'av-input');
+      }
     }
 
     /* No. of PO/JO must match the count of entries in PO/JO Numbers */
@@ -1957,6 +2038,9 @@ AppAuth.requireLogin(async (user, profile) => {
       contractor:               getVal('f-contractor') || null,
       vendor_id:                (_avChips.find(c => c.id) || {}).id || null,
       awarded_vendor_ids:       _avChips.filter(c => c.id).map(c => c.id),
+      // per-vendor negotiated amounts, index-aligned with awarded_vendor_ids;
+      // for a single vendor the amount IS the (editable) Awarded Cost field
+      awarded_vendor_amounts:   _avChips.filter(c => c.id).map(c => _avIsMulti() ? (c.amount != null ? c.amount : null) : getNum('f-contract')),
       remarks:                  getVal('f-remarks') || '',
       charging_type:            getVal('f-charging'),
       contract_package_no:      getVal('f-contract-package-no') || null,
@@ -1996,9 +2080,11 @@ AppAuth.requireLogin(async (user, profile) => {
       }
       // Vendor bid reconciliation (Phase 2b) — fire-and-forget, must never block the save
       // flow/toast. Only meaningful once the WP is actually Awarded with a vendor + cost.
-      const _awIds = (data.awarded_vendor_ids && data.awarded_vendor_ids.length) ? data.awarded_vendor_ids : (data.vendor_id ? [data.vendor_id] : []);
-      if (_savedWpId && data.award_status === 'Awarded' && _awIds.length && data.awarded_cost && typeof VendorDb !== 'undefined') {
-        VendorDb.reconcileBidsOnAward(_savedWpId, _awIds, data.awarded_cost)
+      const _awArr = (data.awarded_vendor_ids && data.awarded_vendor_ids.length)
+        ? data.awarded_vendor_ids.map((id, i) => ({ vendorId: id, amount: (data.awarded_vendor_amounts && data.awarded_vendor_amounts[i] != null) ? data.awarded_vendor_amounts[i] : null }))
+        : (data.vendor_id ? [{ vendorId: data.vendor_id, amount: data.awarded_cost }] : []);
+      if (_savedWpId && data.award_status === 'Awarded' && _awArr.length && data.awarded_cost && typeof VendorDb !== 'undefined') {
+        VendorDb.reconcileBidsOnAward(_savedWpId, _awArr, data.awarded_cost)
           .catch(err => console.error('reconcileBidsOnAward failed:', err));
       }
       successEl.className = 'alert alert-success';

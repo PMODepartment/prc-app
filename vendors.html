@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260811b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260811c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811b">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811c">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -489,9 +489,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260811b"></script>
-<script src="assets/js/db.js?v=20260811b"></script>
-<script src="assets/js/ui.js?v=20260811b"></script>
+<script src="assets/js/auth.js?v=20260811c"></script>
+<script src="assets/js/db.js?v=20260811c"></script>
+<script src="assets/js/ui.js?v=20260811c"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -641,12 +641,14 @@ async function renderVendorAnalytics() {
   // back to the normalized name as the key.
   const awardedOf = w => {
     const out = []; const seen = new Set();
-    const add = (key, name) => { if (key && !seen.has(key)) { seen.add(key); out.push({ key, name }); } };
-    // Precise links first: the awarded_vendor_ids array (co-award) + the vendor_id FK.
-    if (Array.isArray(w.awarded_vendor_ids)) w.awarded_vendor_ids.forEach(id => { if (byId[id]) add(id, byId[id].name); });
-    if (w.vendor_id && byId[w.vendor_id]) add(w.vendor_id, byId[w.vendor_id].name);
+    const add = (key, name, amount) => { if (key && !seen.has(key)) { seen.add(key); out.push({ key, name, amount: (amount != null ? amount : null) }); } };
+    const amts = Array.isArray(w.awarded_vendor_amounts) ? w.awarded_vendor_amounts : [];
+    // Precise links first: awarded_vendor_ids (co-award) with each vendor's OWN
+    // negotiated amount, then the vendor_id FK.
+    if (Array.isArray(w.awarded_vendor_ids)) w.awarded_vendor_ids.forEach((id, i) => { if (byId[id]) add(id, byId[id].name, amts[i]); });
+    if (w.vendor_id && byId[w.vendor_id]) add(w.vendor_id, byId[w.vendor_id].name, null);
     // Then the free-text contractor names (slash-aware), resolved by name.
-    splitAw(w.contractor).forEach(n => { const v = byName[nm(n)]; add(v ? v.id : nm(n), v ? v.name : n.trim()); });
+    splitAw(w.contractor).forEach(n => { const v = byName[nm(n)]; add(v ? v.id : nm(n), v ? v.name : n.trim(), null); });
     return out;
   };
   let awardedWpTotal = 0;
@@ -659,13 +661,17 @@ async function renderVendorAnalytics() {
     parts.forEach(pk => { if (pk) ensure(pk, byId[pk] ? byId[pk].name : pk).participated++; });
     if (window.isMoneyAwarded(w) && awarded.length) {
       awardedWpTotal++;
-      // Split spend/BCB evenly across co-awarded vendors so portfolio totals
-      // reconcile (Σ splits = the WP's full cost); each co-awarded vendor still
-      // gets credit for one win.
-      const cost = window.effectiveAwardedCost(w), bcb = (w.approved_budget_bcb || 0), share = 1 / awarded.length;
+      const cost = window.effectiveAwardedCost(w), bcb = (w.approved_budget_bcb || 0);
+      // Prefer each vendor's OWN negotiated amount (awarded_vendor_amounts) when
+      // every awarded vendor has one; otherwise split evenly. Either way Σ spend
+      // reconciles with the WP's awarded cost.
+      const sumAmts = awarded.reduce((s, a) => s + (a.amount != null ? a.amount : 0), 0);
+      const haveAmts = awarded.every(a => a.amount != null) && sumAmts > 0;
       awarded.forEach(a => {
         const agr = ensure(a.key, a.name || (byId[a.key] ? byId[a.key].name : a.key));
-        agr.spend += cost * share; agr.bcb += bcb * share; agr.wpCount++; agr.wins++;
+        if (haveAmts) { agr.spend += a.amount; agr.bcb += bcb * (a.amount / sumAmts); }
+        else { agr.spend += cost / awarded.length; agr.bcb += bcb / awarded.length; }
+        agr.wpCount++; agr.wins++;
       });
     }
   });
@@ -2026,9 +2032,20 @@ async function renderDetailWps() {
   const TH = 'padding:8px 9px;border-bottom:2px solid var(--border-md,#ddd);font-size:0.68rem;text-transform:uppercase;letter-spacing:.02em;color:#888;white-space:nowrap;text-align:left';
   const TD = 'padding:7px 9px;border-bottom:1px solid var(--border,#eee);font-size:0.8rem;vertical-align:top';
   const costHead = hideCost ? '' : `<th style="${TH};text-align:right">BCB</th><th style="${TH};text-align:right">Awarded</th>`;
+  // For a co-award, show THIS vendor's own negotiated amount (from
+  // awarded_vendor_amounts, aligned with awarded_vendor_ids), not the WP total.
+  const vendorAmt = w => {
+    if (Array.isArray(w.awarded_vendor_ids) && Array.isArray(w.awarded_vendor_amounts)) {
+      const i = w.awarded_vendor_ids.indexOf(v.id);
+      if (i >= 0 && w.awarded_vendor_amounts[i] != null) return w.awarded_vendor_amounts[i];
+    }
+    return w.total_awarded;
+  };
   const body = linked.map(x => {
     const w = x.w;
-    const costCells = hideCost ? '' : `<td style="${TD};text-align:right">${money(w.approved_budget_bcb)}</td><td style="${TD};text-align:right">${money(w.total_awarded)}</td>`;
+    const _coAward = Array.isArray(w.awarded_vendor_ids) && w.awarded_vendor_ids.length > 1;
+    const _awCell = x.isAwd ? (money(vendorAmt(w)) + (_coAward ? ' <span style="color:#888;font-size:0.68rem" title="Co-awarded — this vendor\'s share">(share)</span>' : '')) : '—';
+    const costCells = hideCost ? '' : `<td style="${TD};text-align:right">${money(w.approved_budget_bcb)}</td><td style="${TD};text-align:right">${_awCell}</td>`;
     return `<tr>
       <td style="${TD}">${roleBadge(x)}</td>
       <td style="${TD}"><strong>${esc(w.wp_no || '')}</strong></td>
