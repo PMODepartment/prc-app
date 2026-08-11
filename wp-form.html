@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260811a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811a"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260811a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260811b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811b"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260811b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811a"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811b"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -77,7 +77,7 @@
     /* Proposed Vendors multi-select (chip/tag combobox) — same popover styling as the
        single-select Awarded Vendor combobox (.vc-pop/.vc-opt/.vc-add/.vc-empty), but
        supports adding several vendors instead of replacing the selection. */
-    .pv-wrap{position:relative}
+    .pv-wrap,.av-wrap{position:relative}
     .pv-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
     .pv-chips:empty{display:none}
     .pv-chip{display:inline-flex;align-items:center;gap:6px;background:#FBD9D5;color:#9B1B1B;border-radius:8px;padding:4px 6px 4px 10px;font-size:0.7857rem;font-weight:600;white-space:nowrap}
@@ -554,11 +554,16 @@
                 </select>
                 <span class="hint">Set automatically from Procurement Status (Awarded → Awarded)</span>
               </div>
-              <div class="form-group vc-wrap">
-                <label>Awarded Vendor</label>
-                <input type="text" id="f-contractor" placeholder="Search or type a vendor name…" autocomplete="off"/>
+              <div class="form-group full av-wrap" id="av-wrap">
+                <label>Awarded Vendor(s)</label>
+                <div class="pv-chips" id="av-chips"></div>
+                <input type="text" id="av-input" placeholder="Search or type a vendor name…" autocomplete="off"/>
+                <!-- hidden mirrors regenerated from the chip set so existing readers keep working:
+                     f-contractor = newline-joined names, f-vendor-id = the first/primary chip's id -->
+                <input type="hidden" id="f-contractor"/>
                 <input type="hidden" id="f-vendor-id"/>
-                <div id="vc-pop" class="vc-pop"></div>
+                <div id="av-pop" class="vc-pop"></div>
+                <span class="hint">Search the vendor directory or type a new name — a work package can be co-awarded to several vendors.</span>
               </div>
               <div class="form-group full" id="ntba-group">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">
@@ -711,10 +716,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260811a"></script>
-<script src="assets/js/ui.js?v=20260811a"></script>
-<script src="assets/js/db.js?v=20260811a"></script>
-<script src="assets/js/coachmarks.js?v=20260811a"></script>
+<script src="assets/js/auth.js?v=20260811b"></script>
+<script src="assets/js/ui.js?v=20260811b"></script>
+<script src="assets/js/db.js?v=20260811b"></script>
+<script src="assets/js/coachmarks.js?v=20260811b"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -907,74 +912,140 @@
     if(cog) cog.style.display = v === 'Change Order' ? '' : 'none';
   }
 
-  /* ── Awarded Vendor combobox (Phase 2b) ──────────────────────────────
-     #f-contractor stays the visible text field (so it still saves as plain
-     text if nothing is picked); #f-vendor-id (hidden) carries the matched
-     vendors.id. Mirrors import-monitoring.html's searchable project
-     combobox structurally. Typing an unmatched name offers a one-click
-     "Add as a new vendor" (VendorDb.quickCreateVendor) so officers aren't
-     blocked waiting on the vendors.html invite flow. */
-  let _selectedVendorId = null;
-  let _vcResults = [];
-  let _vcDebounce = null;
-  function _vcRender(list, query) {
-    const pop = document.getElementById('vc-pop');
+  /* ── Awarded Vendor(s) multi-select chip combobox (Phase 2b, multi 2026-08-11) ──
+     A work package can be co-awarded to several vendors, so this mirrors the
+     Proposed Vendors chip combobox below (duplicate-per-purpose per this file's
+     convention). _avChips is the ordered source of truth: {id, name} where id is
+     a real vendors.id for a linked chip, or null for a legacy/unlinked name
+     carried over from the old free-text contractor column. Two hidden mirrors are
+     regenerated on every change so all existing readers keep working unmodified:
+       #f-contractor  = chip names, newline-joined (the free-text column; readers
+                        split it via _splitAwarded elsewhere)
+       #f-vendor-id   = the FIRST linked chip's id (back-compat single-FK readers)
+     The precise id array (awarded_vendor_ids) is built at save time from _avChips. */
+  let _avChips = [];         // [{id: uuid|null, name: string}]
+  let _avResults = [];
+  let _avDebounce = null;
+
+  function _avSyncHidden() {
+    const c = document.getElementById('f-contractor');
+    const vid = document.getElementById('f-vendor-id');
+    if (c) c.value = _avChips.map(x => x.name).join('\n');
+    if (vid) vid.value = (_avChips.find(x => x.id) || {}).id || '';
+  }
+  function _avRenderChips() {
+    const wrap = document.getElementById('av-chips');
+    if (!wrap) return;
+    wrap.innerHTML = _avChips.map((c, i) => {
+      const nm = esc ? esc(c.name) : c.name;
+      const legacy = !c.id;
+      return `<span class="pv-chip${legacy ? ' pv-chip-legacy' : ''}">${nm}${legacy ? '<span class="pv-chip-legacy-tag">unlinked</span>' : ''}<span class="pv-chip-x" data-av-remove="${i}">&times;</span></span>`;
+    }).join('');
+  }
+  function _avHasChip(nameOrId) {
+    return _avChips.some(c => (nameOrId.id && c.id === nameOrId.id) || c.name.toLowerCase() === (nameOrId.name || '').trim().toLowerCase());
+  }
+  function _avAdd(chip) {
+    const name = (chip.name || '').trim();
+    if (!name || _avHasChip({ id: chip.id, name })) return;
+    _avChips.push({ id: chip.id || null, name });
+    _avRenderChips();
+    _avSyncHidden();
+    markDirty();
+  }
+  function _avRemoveAt(i) {
+    _avChips.splice(i, 1);
+    _avRenderChips();
+    _avSyncHidden();
+    markDirty();
+  }
+  function _avRenderResults(list, query) {
+    const pop = document.getElementById('av-pop');
     if (!pop) return;
-    _vcResults = list;
+    _avResults = list;
     let html = '';
     if (!list.length) {
       html += '<div class="vc-empty">No matching approved vendors</div>';
     } else {
-      html += list.map((v,i) => `<div class="vc-opt" data-i="${i}">${esc ? esc(v.name) : v.name}<span class="vc-status">approved</span></div>`).join('');
+      html += list.map((v, i) => `<div class="vc-opt" data-i="${i}">${esc ? esc(v.name) : v.name}<span class="vc-status">approved</span></div>`).join('');
     }
-    if (query && query.trim() && !list.some(v => v.name.toLowerCase() === query.trim().toLowerCase())) {
-      html += `<div class="vc-add" id="vc-add-new">+ Add "${(esc?esc(query.trim()):query.trim())}" as a new vendor</div>`;
+    const q = (query || '').trim();
+    if (q && !list.some(v => v.name.toLowerCase() === q.toLowerCase()) && !_avChips.some(c => c.name.toLowerCase() === q.toLowerCase())) {
+      html += `<div class="vc-add" id="av-add-new">+ Add "${(esc ? esc(q) : q)}" as a new vendor</div>`;
     }
     pop.innerHTML = html;
     pop.classList.add('open');
   }
-  function _vcSelect(v) {
-    _selectedVendorId = v.id;
-    const inp = document.getElementById('f-contractor');
-    if (inp) inp.value = v.name;
-    document.getElementById('f-vendor-id').value = v.id;
-    document.getElementById('vc-pop').classList.remove('open');
-    markDirty();
-  }
-  async function _vcAddNew(name) {
+  async function _avAddNew(name) {
     try {
       const created = await VendorDb.quickCreateVendor(name, userProfile);
-      _vcSelect(created);
+      _avAdd({ id: created.id, name: created.name });
+      const inp = document.getElementById('av-input');
+      if (inp) inp.value = '';
+      document.getElementById('av-pop').classList.remove('open');
       AppNotify.success('New vendor "' + name + '" added — pending staff review.');
-    } catch(e) {
+    } catch (e) {
       AppNotify.fromError(e, 'Could not create that vendor.');
     }
   }
   function initVendorCombo() {
-    const inp = document.getElementById('f-contractor');
-    const pop = document.getElementById('vc-pop');
+    const inp = document.getElementById('av-input');
+    const pop = document.getElementById('av-pop');
     if (!inp || !pop || typeof VendorDb === 'undefined') return;
     const search = (q) => {
-      clearTimeout(_vcDebounce);
-      _vcDebounce = setTimeout(async () => {
-        try { _vcRender(await VendorDb.searchApprovedVendors(q), q); }
-        catch(e) { _vcRender([], q); }
+      clearTimeout(_avDebounce);
+      _avDebounce = setTimeout(async () => {
+        try {
+          const results = (await VendorDb.searchApprovedVendors(q)).filter(v => !_avChips.some(c => c.id === v.id));
+          _avRenderResults(results, q);
+        } catch (e) { _avRenderResults([], q); }
       }, 250);
     };
     inp.addEventListener('focus', () => search(inp.value));
-    inp.addEventListener('input', () => {
-      if (_selectedVendorId) { _selectedVendorId = null; document.getElementById('f-vendor-id').value = ''; }
-      search(inp.value);
-    });
+    inp.addEventListener('input', () => search(inp.value));
     pop.addEventListener('mousedown', (e) => {
-      const addEl = e.target.closest('#vc-add-new');
-      if (addEl) { e.preventDefault(); _vcAddNew(inp.value.trim()); return; }
+      const addEl = e.target.closest('#av-add-new');
+      if (addEl) { e.preventDefault(); _avAddNew(inp.value.trim()); return; }
       const opt = e.target.closest('.vc-opt');
-      if (opt) { e.preventDefault(); const v = _vcResults[parseInt(opt.dataset.i,10)]; if (v) _vcSelect(v); }
+      if (opt) {
+        e.preventDefault();
+        const v = _avResults[parseInt(opt.dataset.i, 10)];
+        if (v) { _avAdd({ id: v.id, name: v.name }); inp.value = ''; pop.classList.remove('open'); }
+      }
+    });
+    const chips = document.getElementById('av-chips');
+    if (chips) chips.addEventListener('click', (e) => {
+      const x = e.target.closest('[data-av-remove]');
+      if (x) _avRemoveAt(parseInt(x.dataset.avRemove, 10));
     });
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.vc-wrap')) pop.classList.remove('open');
+      if (!e.target.closest('.av-wrap')) pop.classList.remove('open');
     });
+  }
+  // Seed the chip set from an existing WP on edit-mode load. Prefers the linked
+  // awarded_vendor_ids array (resolved to names via VendorDb.getVendorsByIds);
+  // falls back to parsing the legacy free-text contractor column (slash/newline/
+  // semicolon/pipe — the _splitAwarded convention) into unlinked "legacy" chips.
+  async function _avLoadFromWP(wp) {
+    _avChips = [];
+    const ids = Array.isArray(wp.awarded_vendor_ids) ? wp.awarded_vendor_ids.filter(Boolean) : [];
+    if (ids.length) {
+      try {
+        const rows = await VendorDb.getVendorsByIds(ids);
+        const byId = {}; rows.forEach(r => byId[r.id] = r.name);
+        ids.forEach(id => { if (byId[id]) _avChips.push({ id, name: byId[id] }); });
+      } catch (e) { /* directory lookup failed — chips just stay empty */ }
+    }
+    // Also fold in any legacy contractor names not already represented by an id
+    // (covers pre-migration rows and single-vendor rows that only set vendor_id).
+    if (!_avChips.length && wp.contractor) {
+      String(wp.contractor).split(/[\r\n;|/]+/).map(s => s.trim()).filter(Boolean)
+        .forEach(name => { if (!_avChips.some(c => c.name.toLowerCase() === name.toLowerCase())) _avChips.push({ id: null, name }); });
+      // If the row had a single linked vendor_id, upgrade that matching chip to linked.
+      if (wp.vendor_id && _avChips.length === 1 && !_avChips[0].id) _avChips[0].id = wp.vendor_id;
+    }
+    _avRenderChips();
+    _avSyncHidden();
   }
 
   /* ── Proposed Vendors multi-select (chip combobox) ──────────────────
@@ -1137,13 +1208,15 @@
   function onNotToBeAwardedChange() {
     const ntba = document.getElementById('f-not-to-be-awarded').checked;
     const cost = document.getElementById('f-contract');
-    const vendor = document.getElementById('f-contractor');
+    const avInput = document.getElementById('av-input');
     if (ntba) {
       if (cost) { cost.value = ''; cost.disabled = true; }
-      if (vendor) { vendor.value = ''; vendor.disabled = true; vendor.placeholder = 'Not applicable — not to be awarded'; }
+      // Clear the awarded-vendor chips + disable the search input.
+      _avChips = []; _avRenderChips(); _avSyncHidden();
+      if (avInput) { avInput.value = ''; avInput.disabled = true; avInput.placeholder = 'Not applicable — not to be awarded'; }
     } else {
       if (cost) { cost.disabled = false; }
-      if (vendor) { vendor.disabled = false; vendor.placeholder = 'Leave blank if not yet awarded'; }
+      if (avInput) { avInput.disabled = false; avInput.placeholder = 'Search or type a vendor name…'; }
     }
     markDirty();
   }
@@ -1433,6 +1506,7 @@ function saveDraftNow(){
       values,
       ms: { responsible: [..._msState.responsible], support: [..._msState.support] },
       pv: _pvChips.slice(),
+      av: _avChips.slice(),
       savedAt: Date.now()
     };
     localStorage.setItem(_draftKey(), JSON.stringify(draft));
@@ -1485,8 +1559,13 @@ function restoreDraft(){
     _pvChips = Array.isArray(draft.pv) ? draft.pv.slice() : [];
     _pvRenderChips();
     _pvSyncHidden();
+    // Awarded Vendor chips — same treatment as Proposed Vendors; the hidden
+    // f-contractor / f-vendor-id mirrors are regenerated from the restored chips.
+    _avChips = Array.isArray(draft.av) ? draft.av.slice() : [];
+    _avRenderChips();
+    _avSyncHidden();
     // Everything else — plain value/checked restore, cascade fields already handled above.
-    const skip = { 'f-trade':1, 'f-works':1, 'f-type':1, 'f-proposed-vendors':1 };
+    const skip = { 'f-trade':1, 'f-works':1, 'f-type':1, 'f-proposed-vendors':1, 'f-contractor':1, 'f-vendor-id':1 };
     Object.keys(v).forEach(id => {
       if (skip[id]) return;
       const el = document.getElementById(id);
@@ -1704,9 +1783,7 @@ AppAuth.requireLogin(async (user, profile) => {
       onProcStatusChange();   // Award Status is derived from Procurement Status
       fill('f-submittal', existingWP.submittal_type);
       fillSelectLegacy('f-delivery-status', existingWP.delivery_status);
-      fill('f-contractor', existingWP.contractor);
-      _selectedVendorId = existingWP.vendor_id || null;
-      document.getElementById('f-vendor-id').value = _selectedVendorId || '';
+      _avLoadFromWP(existingWP);
       document.getElementById('f-not-to-be-awarded').checked = !!existingWP.not_to_be_awarded;
       onNotToBeAwardedChange();   // re-apply the disabled/cleared Awarded Cost+Vendor state
       fill('f-remarks', existingWP.remarks);
@@ -1801,7 +1878,7 @@ AppAuth.requireLogin(async (user, profile) => {
     const notToBeAwarded = document.getElementById('f-not-to-be-awarded').checked;
     if (getVal('f-award-status') === 'Awarded' && !notToBeAwarded) {
       if (!getNum('f-contract'))     return showErr('This WP is marked Awarded — enter the Awarded Cost (Net), set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'f-contract');
-      if (!getVal('f-contractor'))   return showErr('This WP is marked Awarded — enter the Awarded Vendor, set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'f-contractor');
+      if (!getVal('f-contractor'))   return showErr('This WP is marked Awarded — add at least one Awarded Vendor, set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'av-input');
     }
 
     /* No. of PO/JO must match the count of entries in PO/JO Numbers */
@@ -1878,7 +1955,8 @@ AppAuth.requireLogin(async (user, profile) => {
       submittal_type:           getVal('f-submittal'),
       delivery_status:          getVal('f-delivery-status'),
       contractor:               getVal('f-contractor') || null,
-      vendor_id:                _selectedVendorId || null,
+      vendor_id:                (_avChips.find(c => c.id) || {}).id || null,
+      awarded_vendor_ids:       _avChips.filter(c => c.id).map(c => c.id),
       remarks:                  getVal('f-remarks') || '',
       charging_type:            getVal('f-charging'),
       contract_package_no:      getVal('f-contract-package-no') || null,
@@ -1918,8 +1996,9 @@ AppAuth.requireLogin(async (user, profile) => {
       }
       // Vendor bid reconciliation (Phase 2b) — fire-and-forget, must never block the save
       // flow/toast. Only meaningful once the WP is actually Awarded with a vendor + cost.
-      if (_savedWpId && data.award_status === 'Awarded' && data.vendor_id && data.awarded_cost && typeof VendorDb !== 'undefined') {
-        VendorDb.reconcileBidsOnAward(_savedWpId, data.vendor_id, data.awarded_cost)
+      const _awIds = (data.awarded_vendor_ids && data.awarded_vendor_ids.length) ? data.awarded_vendor_ids : (data.vendor_id ? [data.vendor_id] : []);
+      if (_savedWpId && data.award_status === 'Awarded' && _awIds.length && data.awarded_cost && typeof VendorDb !== 'undefined') {
+        VendorDb.reconcileBidsOnAward(_savedWpId, _awIds, data.awarded_cost)
           .catch(err => console.error('reconcileBidsOnAward failed:', err));
       }
       successEl.className = 'alert alert-success';
@@ -1941,7 +2020,8 @@ AppAuth.requireLogin(async (user, profile) => {
          'f-proposed-vendors'].forEach(id=>{
           document.getElementById(id).value='';
         });
-        _selectedVendorId = null;
+        _avChips = [];
+        _avRenderChips();
         _pvChips = [];
         _pvRenderChips();
         updateVariance();

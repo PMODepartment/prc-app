@@ -51,6 +51,7 @@ const WPDb = (() => {
     if (_isMissingBcbCol(error)) d = _stripBcb(d);
     if (_isMissingVendorCol(error)) d = _stripVendor(d);
     if (_isMissingProposedVendorIdsCol(error)) d = _stripProposedVendorIds(d);
+    if (_isMissingAwardedVendorIdsCol(error)) d = _stripAwardedVendorIds(d);
     return d;
   }
   // Same deploy-order guard again for projects.group_head (MIGRATION_project_group_head.sql):
@@ -80,6 +81,15 @@ const WPDb = (() => {
     return /proposed_vendor_ids/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
   function _stripProposedVendorIds(obj) { const d = {...obj}; delete d.proposed_vendor_ids; return d; }
+  // Same deploy-order guard for work_packages.awarded_vendor_ids (MIGRATION_wp_awarded_vendor_ids.sql):
+  // every WP write retries without it if that migration hasn't run yet. Precise column-name match so
+  // it can't cross-trigger with _isMissingVendorCol (vendor_id\b) or _isMissingProposedVendorIdsCol.
+  function _isMissingAwardedVendorIdsCol(error) {
+    if (!error) return false;
+    const m = (error.message || '') + (error.details || '');
+    return /awarded_vendor_ids/.test(m) && /column|does not exist|schema cache/i.test(m);
+  }
+  function _stripAwardedVendorIds(obj) { const d = {...obj}; delete d.awarded_vendor_ids; return d; }
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
   async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
   async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
@@ -108,7 +118,7 @@ const WPDb = (() => {
   async function submitWP(d,p) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null};
     let {data,error}=await sb.from('work_packages').insert({...base,..._auditStamp()}).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error)))
       ({data,error}=await sb.from('work_packages').insert(_stripOptional(base,error)).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').insert(_stripBcb(_stripAudit(base))).select().single());
@@ -121,7 +131,7 @@ const WPDb = (() => {
   async function updateWP(id,d) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review'};
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error)))
       ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
@@ -134,7 +144,7 @@ const WPDb = (() => {
   async function updateWPDirect(id,d) {
     const sb=await getSB(); const base=unmap(d);
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error)))
       ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
@@ -1679,25 +1689,33 @@ const VendorDb = (() => {
     const { error } = await sb.from('vendor_bids').delete().eq('id', id);
     if (error) throw error;
   }
-  // Award-time reconciliation: the winning vendor's bid → 'awarded' with the
-  // final amount + today's award date; every OTHER bid on the same WP → 'lost'
-  // (unless already 'withdrawn' — a vendor that pulled out isn't "lost").
-  // No-op (never throws) when vendorId is empty — a WP can be awarded without
-  // being linked to a directory vendor yet.
-  async function reconcileBidsOnAward(wpId, vendorId, finalAmount) {
-    if (!wpId || !vendorId) return;
+  // Award-time reconciliation: each winning vendor's bid → 'awarded' with today's
+  // award date; every OTHER bid on the same WP → 'lost' (unless already
+  // 'withdrawn' — a vendor that pulled out isn't "lost"). Accepts a SINGLE vendor
+  // id or an ARRAY of co-awarded ids; the final amount is split evenly across
+  // them so each winner's bid reconciles with the WP's awarded cost. No-op (never
+  // throws) when no vendor id is given — a WP can be awarded without a directory link.
+  async function reconcileBidsOnAward(wpId, vendorIds, finalAmount) {
+    const ids = (Array.isArray(vendorIds) ? vendorIds : [vendorIds]).filter(Boolean);
+    // dedupe
+    const uniq = [...new Set(ids)];
+    if (!wpId || !uniq.length) return;
     try {
       const sb = await getSB();
       const todayIso = new Date().toISOString().slice(0, 10);
-      await upsertBid(wpId, vendorId, null, {
-        status: 'awarded',
-        final_amount: finalAmount ?? null,
-        award_date: todayIso,
-      }, (typeof window !== 'undefined' && window.__profile) || null);
+      const per = (finalAmount != null) ? finalAmount / uniq.length : null;
+      for (const vid of uniq) {
+        await upsertBid(wpId, vid, null, {
+          status: 'awarded',
+          final_amount: per,
+          award_date: todayIso,
+        }, (typeof window !== 'undefined' && window.__profile) || null);
+      }
+      // Mark every bid on this WP that ISN'T one of the winners as lost.
       const { error } = await sb.from('vendor_bids')
         .update({ status: 'lost' })
         .eq('wp_id', wpId)
-        .neq('vendor_id', vendorId)
+        .not('vendor_id', 'in', `(${uniq.join(',')})`)
         .neq('status', 'withdrawn');
       if (error && !_isMissingBidsTable(error)) throw error;
     } catch (err) {
@@ -2067,15 +2085,21 @@ const VendorDb = (() => {
   // falls back to vendor_id-only if proposed_vendor_ids doesn't exist yet.
   async function getWorkPackagesForVendor(vendorId, vendorName) {
     const sb = await getSB();
-    const cols = 'id,project_id,wp_no,description,trade,works,award_status,procurement_status,delivery_status,approved_budget_bcb,total_awarded,awarded_cost,contractor,vendor_id,proposed_vendors,proposed_vendor_ids,awarding_date,actual_awarding_date';
+    const cols = 'id,project_id,wp_no,description,trade,works,award_status,procurement_status,delivery_status,approved_budget_bcb,total_awarded,awarded_cost,contractor,vendor_id,awarded_vendor_ids,proposed_vendors,proposed_vendor_ids,awarding_date,actual_awarding_date';
     const byId = new Map();
     const add = rows => (rows || []).forEach(w => byId.set(w.id, w));
     try {
-      const { data, error } = await sb.from('work_packages').select(cols).or(`vendor_id.eq.${vendorId},proposed_vendor_ids.cs.{${vendorId}}`);
+      const { data, error } = await sb.from('work_packages').select(cols).or(`vendor_id.eq.${vendorId},awarded_vendor_ids.cs.{${vendorId}},proposed_vendor_ids.cs.{${vendorId}}`);
       if (error) throw error;
       add(data);
     } catch (e) {
-      try { const { data } = await sb.from('work_packages').select(cols.replace(',proposed_vendor_ids', '')).eq('vendor_id', vendorId); add(data); } catch (e2) { /* ignore */ }
+      // Deploy-safe fallback if awarded_vendor_ids/proposed_vendor_ids don't exist yet.
+      try {
+        const { data, error: e2 } = await sb.from('work_packages').select(cols.replace(',awarded_vendor_ids', '')).or(`vendor_id.eq.${vendorId},proposed_vendor_ids.cs.{${vendorId}}`);
+        if (e2) throw e2; add(data);
+      } catch (e3) {
+        try { const { data } = await sb.from('work_packages').select(cols.replace(',awarded_vendor_ids', '').replace(',proposed_vendor_ids', '')).eq('vendor_id', vendorId); add(data); } catch (e4) { /* ignore */ }
+      }
     }
     const nm = (vendorName || '').trim();
     if (nm) {
