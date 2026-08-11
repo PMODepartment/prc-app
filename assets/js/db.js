@@ -106,13 +106,30 @@ const WPDb = (() => {
     catch(_) { _wpRelCache='work_packages'; }
     return _wpRelCache;
   }
-  async function getApprovedWPs(pid) { const sb=await getSB(); let q=sb.from(await _wpRel()).select('*').eq('review_status','approved'); if(pid) q=q.eq('project_id',pid); const {data}=await q.order('wp_no'); return (data||[]).map(mapWP); }
-  async function getAllWPs(pid) { const sb=await getSB(); let q=sb.from(await _wpRel()).select('*'); if(pid) q=q.eq('project_id',pid); const {data}=await q.order('wp_no'); return (data||[]).map(mapWP); }
+  // PostgREST caps a single SELECT at a default of 1000 rows, so a plain
+  // .select() silently truncates once a table (vendors, work_packages) grows past
+  // that — the "exactly 1000" symptom. Fetch ALL rows by paging with .range().
+  // `makeQuery` MUST return a FRESH query builder each call (a builder is consumed
+  // once awaited), e.g. () => sb.from('t').select('*').order('id').
+  async function _pagedSelect(makeQuery) {
+    const PAGE = 1000; let all = [], from = 0;
+    for (;;) {
+      const { data, error } = await makeQuery().range(from, from + PAGE - 1);
+      if (error) throw error;
+      const batch = data || [];
+      all = all.concat(batch);
+      if (batch.length < PAGE) break;
+      from += PAGE;
+    }
+    return all;
+  }
+  async function getApprovedWPs(pid) { const sb=await getSB(); const rel=await _wpRel(); const rows=await _pagedSelect(()=>{ let q=sb.from(rel).select('*').eq('review_status','approved'); if(pid) q=q.eq('project_id',pid); return q.order('wp_no'); }); return rows.map(mapWP); }
+  async function getAllWPs(pid) { const sb=await getSB(); const rel=await _wpRel(); const rows=await _pagedSelect(()=>{ let q=sb.from(rel).select('*'); if(pid) q=q.eq('project_id',pid); return q.order('wp_no'); }); return rows.map(mapWP); }
   async function getAllApprovedWPs() { return getApprovedWPs(null); }
-  async function getApprovedWPsForProjects(ids) { if(!ids||!ids.length) return []; const sb=await getSB(); const {data}=await sb.from(await _wpRel()).select('*').eq('review_status','approved').in('project_id',ids).order('wp_no'); return (data||[]).map(mapWP); }
+  async function getApprovedWPsForProjects(ids) { if(!ids||!ids.length) return []; const sb=await getSB(); const rel=await _wpRel(); const rows=await _pagedSelect(()=>sb.from(rel).select('*').eq('review_status','approved').in('project_id',ids).order('wp_no')); return rows.map(mapWP); }
   async function getPendingWPs() { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('review_status','pending_review').order('created_at',{ascending:false}); return (data||[]).map(mapWP); }
-  async function getAllWPsForAdmin() { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').order('created_at',{ascending:false}); return (data||[]).map(mapWP); }
-  async function getAllWPsForProjects(ids) { if(!ids||!ids.length) return []; const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').in('project_id',ids).order('created_at',{ascending:false}); return (data||[]).map(mapWP); }
+  async function getAllWPsForAdmin() { const sb=await getSB(); const rows=await _pagedSelect(()=>sb.from('work_packages').select('*').order('created_at',{ascending:false})); return rows.map(mapWP); }
+  async function getAllWPsForProjects(ids) { if(!ids||!ids.length) return []; const sb=await getSB(); const rows=await _pagedSelect(()=>sb.from('work_packages').select('*').in('project_id',ids).order('created_at',{ascending:false})); return rows.map(mapWP); }
   async function getOfficerWPs(uid) { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('assigned_officer',uid).order('wp_no'); return (data||[]).map(mapWP); }
   async function getWP(id) { const sb=await getSB(); const {data}=await sb.from(await _wpRel()).select('*').eq('id',id).single(); return mapWP(data); }
   async function getProjectWPs(pid) { return getAllWPs(pid); }
@@ -1457,9 +1474,8 @@ const VendorDb = (() => {
   // ── Vendors ────────────────────────────────────────────────────────
   async function getVendors() {
     const sb = await getSB();
-    const { data, error } = await sb.from('vendors').select('*').order('name');
-    if (error) throw error;
-    return data || [];
+    // paginate — the directory can exceed PostgREST's 1000-row default
+    return _pagedSelect(() => sb.from('vendors').select('*').order('name'));
   }
   async function getVendor(id) {
     const sb = await getSB();
@@ -2042,10 +2058,10 @@ const VendorDb = (() => {
   async function getAllVendorProducts() {
     const sb = await getSB();
     // select('*') so item_type flows through when present but the query still
-    // works before MIGRATION_vendor_product_type.sql runs.
-    const { data, error } = await sb.from('vendor_products').select('*');
-    if (error) return [];
-    return data || [];
+    // works before MIGRATION_vendor_product_type.sql runs. Paginated — products
+    // across ~1000 vendors easily exceed the 1000-row default cap.
+    try { return await _pagedSelect(() => sb.from('vendor_products').select('*')); }
+    catch (e) { return []; }
   }
 
   // Merge duplicate vendors into a canonical one via the merge_vendors RPC

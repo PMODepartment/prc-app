@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260811c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260811d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811c">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811d">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -489,9 +489,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260811c"></script>
-<script src="assets/js/db.js?v=20260811c"></script>
-<script src="assets/js/ui.js?v=20260811c"></script>
+<script src="assets/js/auth.js?v=20260811d"></script>
+<script src="assets/js/db.js?v=20260811d"></script>
+<script src="assets/js/ui.js?v=20260811d"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -845,12 +845,17 @@ function renderCards(rows) {
 /* ── Import vendors from Work Packages ── */
 async function importFromWPs() {
   if (!confirm('Scan all work packages and add any awarded or proposed vendors that aren’t already in the directory?\n\nNew vendors are added as "pending review". Work packages will be linked to their awarded vendor where the name matches exactly.')) return;
+  const prog = AppNotify && AppNotify.progress ? AppNotify.progress('Importing vendors from work packages… please wait.') : null;
   try {
-    AppNotify && AppNotify.info('Importing vendors from work packages…');
     const r = await VendorDb.importVendorsFromWPs({ includeProposed: true, linkWPs: true }, userProfile);
+    if (prog) prog.update('Refreshing directory…');
     await loadAll();
-    AppNotify && AppNotify.success(`Import complete: ${r.created} new vendor(s) added, ${r.linked} work package(s) linked (${r.distinct} distinct names found).`);
-  } catch (e) { AppNotify ? AppNotify.fromError(e, 'Import failed') : alert(e.message); }
+    const msg = `Import complete: ${r.created} new vendor(s) added, ${r.linked} work package(s) linked (${r.distinct} distinct names found).`;
+    if (prog) prog.done(msg, { title: 'Import from WPs — done' }); else AppNotify && AppNotify.success(msg);
+  } catch (e) {
+    if (prog) prog.fail((e && e.message) || 'Import failed', { title: 'Import from WPs — failed' });
+    else if (AppNotify) AppNotify.fromError(e, 'Import failed'); else alert(e.message);
+  }
 }
 
 /* ── Backfill trade categories / products / bid history / rates from WPs ── */
@@ -862,9 +867,10 @@ async function backfillFromWPs() {
   if (_backfillRunning) { AppNotify && AppNotify.info('Backfill already running…'); return; }
   if (!confirm('Backfill trade categories, products, bid history and rates for vendors from their work packages?\n\nThis is a one-time (but re-runnable) action — trade categories are unioned from all their WPs, while products/bids/rates are added only from AWARDED work packages. This may take a while for large portfolios.')) return;
   _backfillRunning = true;
+  const prog = AppNotify && AppNotify.progress ? AppNotify.progress('Backfilling vendor trade/bid data… this can take a minute on large portfolios.') : null;
   try {
-    AppNotify && AppNotify.info('Backfilling vendor trade/bid data from work packages…');
     const r = await VendorDb.backfillVendorDataFromWPs(userProfile);
+    if (prog) prog.update('Refreshing directory…');
     await loadAll();
     const totalFailed = (r.tradesFailed||0) + (r.productsFailed||0) + (r.bidsFailed||0) + (r.ratesFailed||0);
     const summary = `Backfill complete: ${r.tradesUpdated} vendor(s) trades updated, ${r.productsAdded} product(s) added, ${r.bidsUpserted} bid(s) synced, ${r.ratesUpserted} rate(s) synced.`;
@@ -875,11 +881,15 @@ async function backfillFromWPs() {
         r.bidsFailed ? `Bids (${r.bidsFailed}): ${r.bidsError}` : null,
         r.ratesFailed ? `Rates (${r.ratesFailed}): ${r.ratesError}` : null,
       ].filter(Boolean).join('\n');
-      AppNotify && AppNotify.error(`${summary} (${totalFailed} failure(s) — safe to re-run.)`, { title: 'Backfill completed with errors', detail: errLines });
+      if (prog) prog.fail(`${summary} (${totalFailed} failure(s) — safe to re-run.)`, { title: 'Backfill completed with errors', detail: errLines });
+      else AppNotify && AppNotify.error(`${summary} (${totalFailed} failure(s) — safe to re-run.)`, { title: 'Backfill completed with errors', detail: errLines });
     } else {
-      AppNotify && AppNotify.success(summary);
+      if (prog) prog.done(summary, { title: 'Backfill — done' }); else AppNotify && AppNotify.success(summary);
     }
-  } catch (e) { AppNotify ? AppNotify.fromError(e, 'Backfill failed') : alert(e.message); }
+  } catch (e) {
+    if (prog) prog.fail((e && e.message) || 'Backfill failed', { title: 'Backfill — failed' });
+    else if (AppNotify) AppNotify.fromError(e, 'Backfill failed'); else alert(e.message);
+  }
   finally { _backfillRunning = false; }
 }
 
@@ -901,17 +911,18 @@ async function normalizeVendorTrades() {
   if (!todo.length) { AppNotify && AppNotify.success('All vendor trades are already standardized.'); return; }
   if (!confirm(`Standardize trade categories on ${todo.length} vendor(s)?\n\nVariants like "GENERAL REQUIREMENT" and "General Requirements" collapse into one canonical trade, and duplicates within a vendor are removed. This writes to the directory and cannot be auto-undone (but is safe to re-run).`)) return;
   _normTradesRunning = true;
-  AppNotify && AppNotify.info(`Standardizing trades on ${todo.length} vendor(s)…`);
+  const prog = AppNotify && AppNotify.progress ? AppNotify.progress(`Standardizing trades on ${todo.length} vendor(s)…`) : null;
   let ok = 0; const failed = []; let firstErr = null;
   for (const { v, canon } of todo) {
-    try { await VendorDb.updateVendor(v.id, { trade_categories: canon }); ok++; }
+    try { await VendorDb.updateVendor(v.id, { trade_categories: canon }); ok++; if (prog && ok % 25 === 0) prog.update(`Standardizing trades… ${ok}/${todo.length}`); }
     catch (e) { failed.push(v.id); if (!firstErr) firstErr = (e && (e.message || e.hint)) || String(e); console.error('[normalizeVendorTrades] failed', v.id, e); }
   }
+  if (prog) prog.update('Refreshing directory…');
   await loadAll();
   renderVendorList();
   _normTradesRunning = false;
-  if (failed.length) AppNotify && AppNotify.error(`Standardized ${ok} vendor(s); ${failed.length} failed — safe to re-run.`, { title: 'Normalize Trades finished with errors', detail: firstErr });
-  else AppNotify && AppNotify.success(`Standardized trades on ${ok} vendor(s).`);
+  if (failed.length) { if (prog) prog.fail(`Standardized ${ok} vendor(s); ${failed.length} failed — safe to re-run.`, { title: 'Normalize Trades finished with errors', detail: firstErr }); else AppNotify && AppNotify.error(`Standardized ${ok} vendor(s); ${failed.length} failed — safe to re-run.`, { title: 'Normalize Trades finished with errors', detail: firstErr }); }
+  else { if (prog) prog.done(`Standardized trades on ${ok} vendor(s).`, { title: 'Normalize Trades — done' }); else AppNotify && AppNotify.success(`Standardized trades on ${ok} vendor(s).`); }
 }
 
 /* ── Modal scroll lock ── keep the background page from scrolling while any

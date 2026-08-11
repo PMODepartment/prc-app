@@ -504,6 +504,7 @@ window.AppNotify = (function(){
     warn:    { icon:'ti-alert-triangle', cls:'ntf-warn',    ttl:8000  },
     success: { icon:'ti-circle-check',   cls:'ntf-success', ttl:4000  },
     info:    { icon:'ti-info-circle',    cls:'ntf-info',    ttl:5000  },
+    progress:{ icon:'ti-loader-2',       cls:'ntf-info',    ttl:0     },
   };
   function host(){
     let h = document.getElementById('app-notify');
@@ -533,8 +534,9 @@ window.AppNotify = (function(){
       '</div>' +
       '<button class="ntf-x" aria-label="Dismiss">&times;</button>';
     n.querySelector('.ntf-x').addEventListener('click', () => close(n));
+    if (kind === 'progress') { const ic = n.querySelector('.ntf-ico'); if (ic) ic.classList.add('spin'); }
     host().appendChild(n);
-    if (k.ttl) setTimeout(() => close(n), k.ttl);
+    if (k.ttl && !opts.sticky) setTimeout(() => close(n), k.ttl);
     return n;
   }
   function close(n){
@@ -547,6 +549,21 @@ window.AppNotify = (function(){
     warn:    (m,o) => show('warn',    m, o),
     success: (m,o) => show('success', m, o),
     info:    (m,o) => show('info',    m, o),
+    /* A sticky "working…" toast (spinner, never auto-dismisses) that you finish
+       explicitly. Returns a handle: .update(msg) to change the text mid-run,
+       .done(msg,opts) → sticky green success, .fail(msg,opts) → red error,
+       .close() to just remove it. Use for long Data-Tools actions so the user
+       has an unmistakable running→finished signal. */
+    progress: function(msg, opts){
+      const n = show('progress', msg, opts);
+      return {
+        node: n,
+        update(m){ const b = n && n.querySelector('.ntf-msg'); if (b) b.textContent = m; },
+        done(m, o){ close(n); return show('success', m, Object.assign({ sticky:true }, o||{})); },
+        fail(m, o){ close(n); return show('error', m, o); },
+        close(){ close(n); }
+      };
+    },
     /* Turn a thrown error into a readable headline + the raw text behind a
        disclosure. Postgres/PostgREST messages are unreadable to an officer. */
     fromError: function(err, headline){
