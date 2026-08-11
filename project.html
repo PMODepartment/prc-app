@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811f"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260811f"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811f"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260811f"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260811f"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811g"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260811g"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811g"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260811g"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260811g"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260803a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260811f"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260811g"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811f"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811g"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -401,6 +401,11 @@
               <option value="main">Main Contract</option>
               <option value="co">Change Order</option>
             </select>
+            <select id="f-buyback" style="flex-shrink:0" title="Filter by Buyback arrangement">
+              <option value="all">All (Buyback + Non-buyback)</option>
+              <option value="yes">Buyback only</option>
+              <option value="no">Non-buyback only</option>
+            </select>
             <div class="msf" id="msf-works" style="flex-shrink:0">
               <button type="button" class="msf-btn" onclick="msfToggle('works')"><span id="msf-works-label">All Works</span><i class="ti ti-chevron-down"></i></button>
               <div class="msf-pop" id="msf-works-pop"></div>
@@ -527,16 +532,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260811f"></script>
-<script src="assets/js/ui.js?v=20260811f"></script>
-<script src="assets/js/db.js?v=20260811f"></script>
-<script src="assets/js/onboarding.js?v=20260811f"></script>
-<script src="assets/js/coachmarks.js?v=20260811f"></script>
+<script src="assets/js/auth.js?v=20260811g"></script>
+<script src="assets/js/ui.js?v=20260811g"></script>
+<script src="assets/js/db.js?v=20260811g"></script>
+<script src="assets/js/onboarding.js?v=20260811g"></script>
+<script src="assets/js/coachmarks.js?v=20260811g"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260803a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260811f"></script>
+<script src="assets/js/charts.js?v=20260811g"></script>
 <script>
 
   // Segmented toggle state — swaps a class instead of rewriting cssText.
@@ -750,7 +755,14 @@ function openWPDetail(idOrObj) {
   const fmtD = d => { if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'});}catch{return d;} };
   const fmtPct = v => v != null ? (parseFloat(v)*100).toFixed(0)+'%' : '—';
   const row = (label, val, isHtml) => val && val !== '—' ? `<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f5f5f5"><span style="font-size:0.7143rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;min-width:140px;flex-shrink:0">${label}</span><span style="font-size:0.8571rem;color:#231F20;word-break:break-word">${isHtml?val:esc(val)}</span></div>` : '';
-  const bud=w.approved_budget_bcb||0, awd=w.total_awarded||0, vari=bud-awd;
+  const bud=w.approved_budget_bcb||0, awd=w.total_awarded||0;
+  // BUYBACK: part of the awarded cost is recovered when the vendor takes the item back,
+  // so the panel's Variance must use the EFFECTIVE cost (awarded x depreciation%) to agree
+  // with the dashboard KPIs. Non-buyback WPs are unaffected (eff === awd).
+  const bbEff = w.buyback ? window.effectiveAwardedCost(w) : awd;
+  const bbVal = window.buybackValue(w);
+  const bbDep = window.buybackDepFraction(w);
+  const vari=bud-bbEff;
   const sc=w.not_to_be_awarded?'#374151':(w.award_status==='Awarded'?'#2D9B6F':'#EE3124');
   const awardLabel = w.not_to_be_awarded ? 'Not to be Awarded' : (w.award_status||'—');
   let html = `
@@ -793,6 +805,9 @@ function openWPDetail(idOrObj) {
       <div class="sec-label">Financials</div>
       ${row('Procurement Budget',fmtM(bud))}
       ${row('Awarded',fmtM(awd))}
+      ${bbDep!=null?row('Buyback',(bbDep*100).toFixed(bbDep*100%1?2:0)+'% depreciated'):''}
+      ${bbVal?row('Buyback Value',`<span style="color:#2D9B6F;font-weight:600">${fmtM(bbVal)}</span>`,true):''}
+      ${w.buyback&&awd?row('Effective Cost',fmtM(bbEff)):''}
       ${row('Variance',(bud||awd)?`<span style="color:${vari>=0?'#2D9B6F':'#EE3124'};font-weight:600">${vari>=0?'+':''}${fmtM(vari)}</span>`:'—',true)}
       ${row('Surety Bond',w.surety_bond||'—')}
       ${row('Perf. Bond',w.performance_bond||'—')}
@@ -1445,6 +1460,7 @@ function getFiltered(){
   const st=document.getElementById('f-status').value;
   const tr=document.getElementById('f-trade').value;
   const ch=document.getElementById('f-charging')?.value||'all';
+  const bb=document.getElementById('f-buyback')?.value||'all';
   const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search').value||'').toLowerCase();
   // ovWPs() applies the page-wide Charging Scope switch (2026-08-07); the local #f-charging
@@ -1454,6 +1470,8 @@ function getFiltered(){
     if(tr!=='all'&&w.trade!==tr)return false;
     if(ch==='main'&&_isCO(w))return false;
     if(ch==='co'&&!_isCO(w))return false;
+    if(bb==='yes'&&!w.buyback)return false;
+    if(bb==='no'&&w.buyback)return false;
     if(works.size&&!works.has(w.works||''))return false;
     if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
@@ -2201,6 +2219,7 @@ function getFilteredSorted(){
   const st=document.getElementById('f-status').value;
   const tr=document.getElementById('f-trade').value;
   const ch=document.getElementById('f-charging')?.value||'all';
+  const bb=document.getElementById('f-buyback')?.value||'all';
   const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search').value||'').toLowerCase();
   // ovWPs() applies the page-wide Charging Scope switch (2026-08-07); #f-charging still narrows
@@ -2210,6 +2229,8 @@ function getFilteredSorted(){
     if(tr!=='all'&&w.trade!==tr)return false;
     if(ch==='main'&&_isCO(w))return false;
     if(ch==='co'&&!_isCO(w))return false;
+    if(bb==='yes'&&!w.buyback)return false;
+    if(bb==='no'&&w.buyback)return false;
     if(works.size&&!works.has(w.works||''))return false;
     if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
@@ -2257,6 +2278,7 @@ function _pwaFilteredWPs(){
   const st=document.getElementById('f-status')?.value||'all';
   const tr=document.getElementById('f-trade')?.value||'all';
   const ch=document.getElementById('f-charging')?.value||'all';
+  const bb=document.getElementById('f-buyback')?.value||'all';
   const works=_msfSel.works, vendor=_msfSel.vendor;
   const sr=(document.getElementById('f-search')?.value||'').toLowerCase();
   return ovWPs().filter(w=>{
@@ -2264,6 +2286,8 @@ function _pwaFilteredWPs(){
     if(tr!=='all'&&w.trade!==tr)return false;
     if(ch==='main'&&_isCO(w))return false;
     if(ch==='co'&&!_isCO(w))return false;
+    if(bb==='yes'&&!w.buyback)return false;
+    if(bb==='no'&&w.buyback)return false;
     if(works.size&&!works.has(w.works||''))return false;
     if(vendor.size){const vs=_projVendors(w); if(!vs.some(v=>vendor.has(v)))return false;}
     if(sr&&!w.description?.toLowerCase().includes(sr)&&!w.wp_no?.toLowerCase().includes(sr)&&!w.cost_code?.toLowerCase().includes(sr))return false;
@@ -3013,7 +3037,7 @@ AppAuth.requireLogin(async (user, profile) => {
   _recomputeFilterOptions();   // build the Works/Vendor multiselect options (cascades from Trade)
 
   // Status/Charging re-filter only; Trade also recomputes the Works/Vendor cascade
-  ['f-status','f-charging'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', applyWpListFilters); });
+  ['f-status','f-charging','f-buyback'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', applyWpListFilters); });
   const trEl=document.getElementById('f-trade');
   if(trEl) trEl.addEventListener('change',()=>{ _msfSel.works.clear(); _msfSel.vendor.clear(); _recomputeFilterOptions(); applyWpListFilters(); });
   const srch = document.getElementById('f-search');

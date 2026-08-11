@@ -52,6 +52,7 @@ const WPDb = (() => {
     if (_isMissingVendorCol(error)) d = _stripVendor(d);
     if (_isMissingProposedVendorIdsCol(error)) d = _stripProposedVendorIds(d);
     if (_isMissingAwardedVendorIdsCol(error)) d = _stripAwardedVendorIds(d);
+    if (_isMissingBuybackCol(error)) d = _stripBuyback(d);
     return d;
   }
   // Same deploy-order guard again for projects.group_head (MIGRATION_project_group_head.sql):
@@ -91,6 +92,15 @@ const WPDb = (() => {
     return /awarded_vendor_(ids|amounts)/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
   function _stripAwardedVendorIds(obj) { const d = {...obj}; delete d.awarded_vendor_ids; delete d.awarded_vendor_amounts; return d; }
+  // Same deploy-order guard for the buyback columns (MIGRATION_wp_buyback.sql:
+  // buyback + buyback_depreciation_percent). Every WP write retries without them if
+  // that migration hasn't run yet.
+  function _isMissingBuybackCol(error) {
+    if (!error) return false;
+    const m = (error.message || '') + (error.details || '');
+    return /buyback/.test(m) && /column|does not exist|schema cache/i.test(m);
+  }
+  function _stripBuyback(obj) { const d = {...obj}; delete d.buyback; delete d.buyback_depreciation_percent; return d; }
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
   async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
   async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
@@ -136,7 +146,7 @@ const WPDb = (() => {
   async function submitWP(d,p) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null};
     let {data,error}=await sb.from('work_packages').insert({...base,..._auditStamp()}).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error)))
       ({data,error}=await sb.from('work_packages').insert(_stripOptional(base,error)).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').insert(_stripBcb(_stripAudit(base))).select().single());
@@ -149,7 +159,7 @@ const WPDb = (() => {
   async function updateWP(id,d) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review'};
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error)))
       ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
@@ -162,7 +172,7 @@ const WPDb = (() => {
   async function updateWPDirect(id,d) {
     const sb=await getSB(); const base=unmap(d);
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error)))
       ({data,error}=await sb.from('work_packages').update(_stripOptional(base,error)).eq('id',id).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').update(_stripBcb(_stripAudit(base))).eq('id',id).select().single());
@@ -303,8 +313,33 @@ window.isResolved = function (w) {
 window.isMoneyAwarded = function (w) {
   return !!w && (!!w.not_to_be_awarded || (w.award_status === 'Awarded' && (w.total_awarded || 0) > 0));
 };
+// BUYBACK: a WP procured under a buyback arrangement has part of its awarded cost
+// recovered when the vendor takes the item back, so only the DEPRECIATED (consumed)
+// portion is real spend. The depreciation % is how much value is lost, so:
+//   buybackValue        = awarded_cost x (1 - depreciation%)   <- recovered, counts as savings
+//   effectiveAwardedCost = awarded_cost x depreciation%        <- what actually stays spent
+// Returns 0 for a non-buyback WP (or one with no depreciation % / no cost yet), so
+// callers can add it unconditionally. Fraction is clamped to 0..1 so a bad stored
+// value can't produce a negative cost or a buyback bigger than the award.
+window.buybackDepFraction = function (w) {
+  if (!w || !w.buyback) return null;
+  const raw = w.buyback_depreciation_percent;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const f = parseFloat(raw);
+  if (!isFinite(f)) return null;
+  return Math.max(0, Math.min(1, f));
+};
+window.buybackValue = function (w) {
+  const f = window.buybackDepFraction(w);
+  if (f === null) return 0;
+  if (w.not_to_be_awarded) return 0;   // already booked at an effective PHP 0 cost
+  return ((w.total_awarded || 0)) * (1 - f);
+};
 window.effectiveAwardedCost = function (w) {
-  return (w && w.not_to_be_awarded) ? 0 : ((w && w.total_awarded) || 0);
+  if (w && w.not_to_be_awarded) return 0;
+  const cost = (w && w.total_awarded) || 0;
+  const f = window.buybackDepFraction(w);
+  return f === null ? cost : cost * f;
 };
 // Aggregate awarded metrics over a set of WPs (grouped by project), row-derived.
 function helpingMetrics(wps) {
