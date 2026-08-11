@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260811g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811h"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260811h"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811h"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811h"/>
   <style>
     .review-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow)}
     .review-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -460,9 +460,9 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260811g"></script>
-<script src="assets/js/ui.js?v=20260811g"></script>
-<script src="assets/js/db.js?v=20260811g"></script>
+<script src="assets/js/auth.js?v=20260811h"></script>
+<script src="assets/js/ui.js?v=20260811h"></script>
+<script src="assets/js/db.js?v=20260811h"></script>
 <script>
   let adminProfile, allWPs=[];
   let allProjects=[], currentProjId='ALL';
@@ -830,6 +830,9 @@
     // effective cost = awarded x dep%. See window.buybackValue/effectiveAwardedCost in db.js.
     { g:'budget',   k:'buyback',              label:'Buyback',              w:95,  type:'bool'  },
     { g:'budget',   k:'buyback_depreciation_percent', label:'Depreciation %', w:120, type:'pct', reqIfBuyback:true },
+    // EITHER a depreciation % OR an exact amount is entered (the amount wins when both
+    // are somehow present). reqIfBuyback on the % above is waived once an amount is given.
+    { g:'budget',   k:'buyback_amount',       label:'Buyback Amount',       w:130, type:'money' },
     { g:'budget',   k:'_buyback_value',       label:'Buyback Value',        w:120, type:'money', ro:true },
     /* ── Payment Terms ─────────────────────────────────────────────────── */
     { g:'payment',  k:'payment_terms_days',  label:'Terms (Days)',         w:95,  type:'num'   },
@@ -1118,10 +1121,15 @@
     const e = _gridEdits[w.id];
     if (e && Object.prototype.hasOwnProperty.call(e, k)) return e[k];
     if (k === '_buyback_value') {
-      // Recomputed live from the staged buyback flag / depreciation % / awarded cost.
+      // Recomputed live from the staged buyback flag / depreciation % / exact amount / awarded cost.
+      // An exact Buyback Amount wins over the % (same precedence as window.buybackValue in db.js).
       if (!xlVal(w,'buyback')) return null;
-      const d = xlNum(xlVal(w,'buyback_depreciation_percent')), a = xlNum(xlVal(w,'awarded_cost'));
-      if (d==null || a==null) return null;
+      const a = xlNum(xlVal(w,'awarded_cost'));
+      if (a==null) return null;
+      const ex = xlNum(xlVal(w,'buyback_amount'));
+      if (ex!=null) return Math.max(0, Math.min(ex, a));
+      const d = xlNum(xlVal(w,'buyback_depreciation_percent'));
+      if (d==null) return null;
       return a * (1 - Math.max(0, Math.min(1, d)));
     }
     if (k === '_variance') {
@@ -1452,7 +1460,12 @@
     if (col.reqIfAwarded) return xlVal(w,'award_status')==='Awarded' && !xlVal(w,'not_to_be_awarded');
     // Buyback WPs must carry a Depreciation % — it's what the buyback value (and therefore
     // the savings) is computed from. Waived for not_to_be_awarded (no real cost ever).
-    if (col.reqIfBuyback) return !!xlVal(w,'buyback') && !xlVal(w,'not_to_be_awarded');
+    // Either/or: a buyback needs a Depreciation % OR an exact Buyback Amount, not both.
+    if (col.reqIfBuyback) {
+      if (!xlVal(w,'buyback') || xlVal(w,'not_to_be_awarded')) return false;
+      const amt = xlVal(w,'buyback_amount');
+      return amt==null || String(amt).trim()==='';
+    }
     return false;
   }
   function _xlMissing(w, col){
@@ -1568,7 +1581,7 @@
     grpRow += '</tr>';
     const colRow = '<tr>' + VC.map(function(c,i){
         const fz = i < XL_FREEZE;
-        const rq = (c.req || c.reqIfAwarded) ? ' xl-req' : '';
+        const rq = (c.req || c.reqIfAwarded || c.reqIfBuyback) ? ' xl-req' : '';
         const rz = c.ph ? '' :
           '<span class="xl-rz" onmousedown="_xlResizeDown(event,\'' + c.k + '\')" ondblclick="_xlResizeReset(event,\'' + c.k + '\')" title="Drag to resize · double-click to reset"></span>';
         // "Set all" caret — bulk-set a whole column (great for the dropdowns). Not for
@@ -1583,7 +1596,7 @@
         const pin = c.ph ? '' :
           '<button class="xl-pin'+(isBoundary?' on':'')+'" title="'+(isBoundary?'Frozen up to here — click to unfreeze':'Freeze columns up to here')+'" '
           + 'onclick="xlSetFreeze(\'' + c.k + '\')"><i class="ti ti-'+(isBoundary?'pinned-filled':'pin')+'"></i></button>';
-        const star = (c.req || c.reqIfAwarded) ? '<span class="xl-req-star" title="Required">*</span>' : '';
+        const star = (c.req || c.reqIfAwarded || c.reqIfBuyback) ? '<span class="xl-req-star" title="Required">*</span>' : '';
         const lblHtml = '<span class="xl-hlbl">'+esc(c.label)+star+'</span>';
         return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+lblHtml+pin+setBtn+rz+'</th>';
       }).join('') + '</tr>';

@@ -100,7 +100,7 @@ const WPDb = (() => {
     const m = (error.message || '') + (error.details || '');
     return /buyback/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
-  function _stripBuyback(obj) { const d = {...obj}; delete d.buyback; delete d.buyback_depreciation_percent; return d; }
+  function _stripBuyback(obj) { const d = {...obj}; delete d.buyback; delete d.buyback_depreciation_percent; delete d.buyback_amount; return d; }
   async function getProjects() { const sb=await getSB(); const {data}=await sb.from('projects').select('*').order('id'); return data||[]; }
   async function getProject(id) { const sb=await getSB(); const {data}=await sb.from('projects').select('*').eq('id',id).single(); return data; }
   async function saveProject(d) { const sb=await getSB(); const {data}=await sb.from('projects').upsert(d,{onConflict:'id'}).select().single(); return data; }
@@ -329,17 +329,32 @@ window.buybackDepFraction = function (w) {
   if (!isFinite(f)) return null;
   return Math.max(0, Math.min(1, f));
 };
+// The buyback can be entered EITHER as a depreciation % OR as an exact amount. An exact
+// `buyback_amount` WINS (it's the figure the user actually typed); the % is used otherwise.
+// Returns null when this WP has no usable exact amount.
+window.buybackExactAmount = function (w) {
+  if (!w || !w.buyback) return null;
+  const raw = w.buyback_amount;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const v = parseFloat(raw);
+  if (!isFinite(v)) return null;
+  // Can never recover more than was awarded, nor a negative amount.
+  return Math.max(0, Math.min(v, (w.total_awarded || 0)));
+};
 window.buybackValue = function (w) {
+  if (!w || !w.buyback || w.not_to_be_awarded) return 0;   // NTBA is already booked at an effective PHP 0
+  const exact = window.buybackExactAmount(w);
+  if (exact !== null) return exact;
   const f = window.buybackDepFraction(w);
   if (f === null) return 0;
-  if (w.not_to_be_awarded) return 0;   // already booked at an effective PHP 0 cost
   return ((w.total_awarded || 0)) * (1 - f);
 };
 window.effectiveAwardedCost = function (w) {
   if (w && w.not_to_be_awarded) return 0;
   const cost = (w && w.total_awarded) || 0;
-  const f = window.buybackDepFraction(w);
-  return f === null ? cost : cost * f;
+  if (!w || !w.buyback) return cost;
+  const bv = window.buybackValue(w);
+  return Math.max(0, cost - bv);
 };
 // Aggregate awarded metrics over a set of WPs (grouped by project), row-derived.
 function helpingMetrics(wps) {

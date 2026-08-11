@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260811g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811g"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260811g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811h"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260811h"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811h"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260811h"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811h"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -586,6 +586,14 @@
                 </label>
                 <span class="hint">The vendor buys the item back — the recovered value counts towards savings.</span>
               </div>
+              <div class="form-group" id="buyback-mode-group" style="display:none">
+                <label>Buyback entered as</label>
+                <select id="f-buyback-mode" onchange="onBuybackModeChange()">
+                  <option value="pct">Depreciation %</option>
+                  <option value="amt">Exact buyback amount</option>
+                </select>
+                <span class="hint">Enter a depreciation % and let the value compute, or type the exact recovered amount.</span>
+              </div>
               <div class="form-group" id="buyback-dep-group" style="display:none">
                 <label>Depreciation % <span style="color:var(--mw-red)">*</span></label>
                 <div style="display:flex;align-items:center;gap:6px">
@@ -593,6 +601,11 @@
                   <span style="font-size:0.8571rem;color:var(--text-secondary);font-weight:600;flex-shrink:0">%</span>
                 </div>
                 <span class="hint">Portion of value consumed, e.g. 30 for 30% — the other 70% is bought back.</span>
+              </div>
+              <div class="form-group" id="buyback-amt-group" style="display:none">
+                <label>Buyback Amount <span style="color:var(--mw-red)">*</span></label>
+                <input type="text" inputmode="decimal" id="f-buyback-amt" placeholder="0.00" oninput="onBuybackDepInput()"/>
+                <span class="hint">Exact amount recovered from the vendor — cannot exceed the Awarded Cost.</span>
               </div>
               <div class="form-group" id="buyback-value-group" style="display:none">
                 <label>Buyback Value (auto)</label>
@@ -743,10 +756,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260811g"></script>
-<script src="assets/js/ui.js?v=20260811g"></script>
-<script src="assets/js/db.js?v=20260811g"></script>
-<script src="assets/js/coachmarks.js?v=20260811g"></script>
+<script src="assets/js/auth.js?v=20260811h"></script>
+<script src="assets/js/ui.js?v=20260811h"></script>
+<script src="assets/js/db.js?v=20260811h"></script>
+<script src="assets/js/coachmarks.js?v=20260811h"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -1335,36 +1348,61 @@
      keep them in step:
         buyback value  = awarded_cost × (1 − dep%)
         effective cost = awarded_cost × dep%                                       */
+  function _buybackMode() { const m=document.getElementById('f-buyback-mode'); return m ? m.value : 'pct'; }
   function onBuybackChange() {
     const on = document.getElementById('f-buyback').checked;
-    document.getElementById('buyback-dep-group').style.display   = on ? 'flex' : 'none';
+    document.getElementById('buyback-mode-group').style.display  = on ? 'flex' : 'none';
     document.getElementById('buyback-value-group').style.display = on ? 'flex' : 'none';
-    if (!on) document.getElementById('f-buyback-dep').value = '';
-    _updateBuybackValue();
+    if (!on) { document.getElementById('f-buyback-dep').value = ''; document.getElementById('f-buyback-amt').value = ''; }
+    onBuybackModeChange(true);
     markDirty();
+  }
+  // Switching mode hides (and clears) the input that no longer applies, so only ONE of
+  // buyback_depreciation_percent / buyback_amount is ever saved and they can't drift apart.
+  function onBuybackModeChange(keepValues) {
+    const on = document.getElementById('f-buyback').checked;
+    const amt = _buybackMode() === 'amt';
+    document.getElementById('buyback-dep-group').style.display = (on && !amt) ? 'flex' : 'none';
+    document.getElementById('buyback-amt-group').style.display = (on &&  amt) ? 'flex' : 'none';
+    if (!keepValues) {
+      if (amt) document.getElementById('f-buyback-dep').value = '';
+      else     document.getElementById('f-buyback-amt').value = '';
+    }
+    // In amount mode the buyback value IS the typed figure, so the useful derived number
+    // to show is the effective cost — relabel the readout instead of echoing their input.
+    const lbl = document.querySelector('#buyback-value-group label');
+    if (lbl) lbl.textContent = amt ? 'Effective Cost (auto)' : 'Buyback Value (auto)';
+    _updateBuybackValue();
+    if (!keepValues) markDirty();
   }
   function onBuybackDepInput() { _updateBuybackValue(); markDirty(); }
   function _updateBuybackValue() {
     const el = document.getElementById('buyback-value-display');
     if (!el) return;
     const on   = document.getElementById('f-buyback').checked;
-    const dep  = parseFloat((document.getElementById('f-buyback-dep').value || '').replace(/,/g, ''));
-    const cost = parseFloat((document.getElementById('f-contract').value || '').replace(/,/g, ''));
+    const mode = _buybackMode();
+    const num  = id => parseFloat((document.getElementById(id).value || '').replace(/,/g, ''));
+    const dep  = num('f-buyback-dep'), amt = num('f-buyback-amt'), cost = num('f-contract');
     const hint = document.getElementById('buyback-value-hint');
-    if (!on || !isFinite(dep) || dep < 0 || dep > 100) {
-      el.textContent = '—';
-      if (hint) hint.textContent = 'Awarded Cost × (100% − depreciation %) — counts towards savings.';
-      return;
+    const bad  = msg => { el.textContent = '—'; if (hint) hint.textContent = msg; };
+    if (!on) return bad('Awarded Cost × (100% − depreciation %) — counts towards savings.');
+    if (!isFinite(cost) || cost <= 0)
+      return bad('Enter an Awarded Cost (Net) above to compute the buyback value.');
+    let bv;
+    if (mode === 'amt') {
+      if (!isFinite(amt) || amt < 0) return bad('Enter the exact buyback amount recovered from the vendor.');
+      if (amt > cost) return bad('The buyback amount can\'t exceed the Awarded Cost of ' + fmtPeso(cost) + '.');
+      bv = amt;
+    } else {
+      if (!isFinite(dep) || dep < 0 || dep > 100) return bad('Enter a depreciation % between 0 and 100.');
+      bv = cost * (1 - dep / 100);
     }
-    if (!isFinite(cost) || cost <= 0) {
-      el.textContent = '—';
-      if (hint) hint.textContent = 'Enter an Awarded Cost (Net) above to compute the buyback value.';
-      return;
-    }
-    const bv  = cost * (1 - dep / 100);
     const eff = cost - bv;
-    el.textContent = fmtPeso(bv);
-    if (hint) hint.textContent = 'Effective cost booked: ' + fmtPeso(eff) + ' (' + dep + '% depreciated). The buyback value counts towards savings.';
+    el.textContent = fmtPeso(mode === 'amt' ? eff : bv);
+    const pct = cost ? (bv / cost * 100) : 0;
+    if (hint) hint.textContent = mode === 'amt'
+      ? 'Effective cost booked after a ' + fmtPeso(bv) + ' buyback (' + (100 - pct).toFixed(1) + '% depreciated). The buyback counts towards savings.'
+      : 'Effective cost booked: ' + fmtPeso(eff) + ' (' + dep + '% depreciated). The buyback value counts towards savings.';
   }
 
   const params = new URLSearchParams(location.search);
@@ -1401,7 +1439,7 @@
     const raw = parseFloat(el.value.replace(/,/g, ''));
     if (!isNaN(raw)) el.value = raw.toLocaleString('en-US');
   }
-  ['f-budget','f-bcb1','f-bcb2','f-contract'].forEach(id => {
+  ['f-budget','f-bcb1','f-bcb2','f-contract','f-buyback-amt'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('input', updateVariance);
     el.addEventListener('blur',  () => fmtComma(el));
@@ -1605,7 +1643,7 @@ function _updateBcbDeltas(){
     prev = v;
   });
 }
-['f-budget','f-bcb1','f-bcb2','f-contract'].forEach(id => {
+['f-budget','f-bcb1','f-bcb2','f-contract','f-buyback-amt'].forEach(id => {
   document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', _updateBcbDeltas);
@@ -1722,7 +1760,7 @@ function restoreDraft(){
     // Re-apply dependent UI state driven by the fields we just restored.
     onRequiresApprovalChange();
     onNotToBeAwardedChange();
-    onBuybackChange();          // reveal/hide the Depreciation % + computed buyback value
+    onBuybackChange();          // reveal/hide the mode + Depreciation %/Amount + computed value
     onProcStatusChange();
     onChargingChange();
     _updateBcbDeltas();
@@ -1915,7 +1953,11 @@ AppAuth.requireLogin(async (user, profile) => {
       document.getElementById('f-buyback').checked = !!existingWP.buyback;
       if (existingWP.buyback_depreciation_percent != null)
         document.getElementById('f-buyback-dep').value = parseFloat((existingWP.buyback_depreciation_percent * 100).toFixed(4)).toString();
-      onBuybackChange();   // reveal/hide the dep% + computed-value fields to match
+      if (existingWP.buyback_amount != null)
+        document.getElementById('f-buyback-amt').value = parseFloat(existingWP.buyback_amount).toLocaleString('en-US');
+      // An exact amount on file means the WP was authored in amount mode (only one is ever stored).
+      document.getElementById('f-buyback-mode').value = (existingWP.buyback_amount != null) ? 'amt' : 'pct';
+      onBuybackChange();   // reveal/hide the mode + dep%/amount + computed-value fields to match
       fill('f-payment-terms-days', existingWP.payment_terms_days);
       if (existingWP.dp_percent != null) document.getElementById('f-dp-percent').value = parseFloat((existingWP.dp_percent * 100).toFixed(4)).toString();
       fill('f-dp-terms', existingWP.dp_terms);
@@ -2032,12 +2074,22 @@ AppAuth.requireLogin(async (user, profile) => {
     // Buyback: the depreciation % is REQUIRED once the box is ticked (it's what the
     // buyback value — and therefore the savings — is computed from).
     const isBuyback = document.getElementById('f-buyback').checked && !notToBeAwarded;
-    let buybackDep = null;
+    // Exactly ONE of the two is stored, whichever mode the user chose, so they can't drift.
+    let buybackDep = null, buybackAmt = null;
     if (isBuyback) {
-      const _d = parseFloat((document.getElementById('f-buyback-dep').value || '').replace(/,/g, ''));
-      if (!isFinite(_d)) return showErr('This WP is marked Buyback — enter the Depreciation % (Budget & Contract), or untick Buyback.', 'f-buyback-dep');
-      if (_d < 0 || _d > 100) return showErr('Depreciation % must be between 0 and 100.', 'f-buyback-dep');
-      buybackDep = Math.round((_d / 100) * 10000) / 10000;   // stored as a decimal fraction, like dp_percent
+      if (_buybackMode() === 'amt') {
+        const _a = parseFloat((document.getElementById('f-buyback-amt').value || '').replace(/,/g, ''));
+        if (!isFinite(_a)) return showErr('This WP is marked Buyback — enter the Buyback Amount (Budget & Contract), switch to Depreciation %, or untick Buyback.', 'f-buyback-amt');
+        if (_a < 0) return showErr("The Buyback Amount can't be negative.", 'f-buyback-amt');
+        const _c = getNum('f-contract') || 0;
+        if (_a > _c) return showErr("The Buyback Amount can't exceed the Awarded Cost (Net).", 'f-buyback-amt');
+        buybackAmt = Math.round(_a * 100) / 100;
+      } else {
+        const _d = parseFloat((document.getElementById('f-buyback-dep').value || '').replace(/,/g, ''));
+        if (!isFinite(_d)) return showErr('This WP is marked Buyback — enter the Depreciation % (Budget & Contract), switch to an exact amount, or untick Buyback.', 'f-buyback-dep');
+        if (_d < 0 || _d > 100) return showErr('Depreciation % must be between 0 and 100.', 'f-buyback-dep');
+        buybackDep = Math.round((_d / 100) * 10000) / 10000;   // stored as a decimal fraction, like dp_percent
+      }
     }
     if (getVal('f-award-status') === 'Awarded' && !notToBeAwarded) {
       if (!getNum('f-contract'))     return showErr('This WP is marked Awarded — enter the Awarded Cost (Net), set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'f-contract');
@@ -2112,6 +2164,7 @@ AppAuth.requireLogin(async (user, profile) => {
       not_to_be_awarded:        notToBeAwarded,
       buyback:                  isBuyback,
       buyback_depreciation_percent: isBuyback ? buybackDep : null,
+      buyback_amount:           isBuyback ? buybackAmt : null,
       payment_terms_days:       getNum('f-payment-terms-days'),
       dp_percent:               (() => { const v = parseFloat(document.getElementById('f-dp-percent').value); return isNaN(v) ? null : v / 100; })(),
       dp_terms:                 getVal('f-dp-terms') || null,

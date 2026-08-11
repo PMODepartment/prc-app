@@ -28,6 +28,11 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS buyback boolean DEFAULT false;
 ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS buyback_depreciation_percent numeric(5,4);
+-- ALTERNATIVE INPUT MODE (2026-08-11): the buyback can be entered as an EXACT AMOUNT
+-- instead of a depreciation %. When buyback_amount is set it WINS over the % (it is the
+-- figure the user actually typed); the % column is then left null, and vice versa, so the
+-- two can never drift. buybackValue() clamps the amount to [0, awarded_cost].
+ALTER TABLE work_packages ADD COLUMN IF NOT EXISTS buyback_amount numeric(18,2);
 
 -- NOTE: `buyback` itself is a status modifier (not money), but
 -- buyback_depreciation_percent is cost-bearing — do NOT add that one to
