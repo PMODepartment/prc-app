@@ -2216,7 +2216,13 @@ const VendorDb = (() => {
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i];
       try {
-        await mergeVendors(g.keep.id, g.remove.map(v => v.id));
+        // ONE SOURCE PER CALL. Folding several at once lets two sources collide with each
+        // OTHER on vendor_rates/vendor_bids' UNIQUE(vendor_id, wp_id) — the server-side
+        // cleanup can only compare against the target's rows as they stand at call time.
+        // Sequentially, each source is de-duplicated against a target that already absorbed
+        // the previous one, so the clash cannot arise (and it works on databases where the
+        // hardened merge_vendors hasn't been re-run yet).
+        for (const v of g.remove) await mergeVendors(g.keep.id, [v.id]);
         merged++; removed += g.remove.length;
       } catch (e) {
         failed++;

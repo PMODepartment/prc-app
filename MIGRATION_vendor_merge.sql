@@ -44,18 +44,34 @@ begin
   -- while cleaning up import duplicates). Same treatment as vendor_bids below: drop the
   -- source rows that would collide, then reassign the rest. Rows with wp_id IS NULL are
   -- manual staff entries and are never constrained, so they always just move across.
+  -- Collisions come from TWO directions and both must be cleared before the reassign:
+  --   (a) the target already holds a rate for that WP, and
+  --   (b) two SOURCES each hold one for the same WP — they collide with each other the
+  --       moment both are moved onto the target. (b) is what still failed after (a) was
+  --       fixed, on a 5-copy duplicate group; keep the lowest id so the choice is stable.
   delete from vendor_rates r
     where r.vendor_id = any(p_sources)
       and r.wp_id is not null
-      and exists (select 1 from vendor_rates t
-                   where t.vendor_id = p_target and t.wp_id = r.wp_id);
+      and (
+        exists (select 1 from vendor_rates t
+                 where t.vendor_id = p_target and t.wp_id = r.wp_id)
+        or exists (select 1 from vendor_rates o
+                    where o.vendor_id = any(p_sources) and o.wp_id = r.wp_id and o.id < r.id)
+      );
   update vendor_rates set vendor_id = p_target where vendor_id = any(p_sources);
 
   -- vendor_bids has UNIQUE(vendor_id, wp_id): if the target already has a bid
   -- on the same WP, drop the source's duplicate; otherwise reassign it.
+  -- Same two-directional collision rule as vendor_rates above (this originally only
+  -- compared against the target, so two sources bidding on the same WP would collide).
   delete from vendor_bids b
     where b.vendor_id = any(p_sources)
-      and exists (select 1 from vendor_bids t where t.vendor_id = p_target and t.wp_id = b.wp_id);
+      and (
+        exists (select 1 from vendor_bids t
+                 where t.vendor_id = p_target and t.wp_id = b.wp_id)
+        or exists (select 1 from vendor_bids o
+                    where o.vendor_id = any(p_sources) and o.wp_id = b.wp_id and o.id < b.id)
+      );
   update vendor_bids set vendor_id = p_target where vendor_id = any(p_sources);
 
   -- linked work packages (awarded vendor FK)
