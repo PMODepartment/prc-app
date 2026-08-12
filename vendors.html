@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260811i"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260811i"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260811i"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260812a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260811i">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812a">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -330,6 +330,7 @@
                 <button onclick="closeToolsMenu();backfillFromWPs()"><i class="ti ti-refresh-dot"></i><span>Backfill Trade/Bid Data</span><small>Fill in trades, products, bid history and rates from WPs</small></button>
                 <button onclick="closeToolsMenu();normalizeVendorTrades()"><i class="ti ti-tags"></i><span>Normalize Trades</span><small>Collapse trade variants (e.g. "GENERAL REQUIREMENT" → "General Requirements") to the 10 standard trades</small></button>
                 <button onclick="closeToolsMenu();openMergeModal()"><i class="ti ti-arrows-join"></i><span>Merge Duplicates</span><small>Combine records that are the same company under different names</small></button>
+                <button id="tools-menu-dupes" onclick="closeToolsMenu();openDupModal()"><i class="ti ti-copy-off"></i><span>Remove Exact Duplicates <span class="tools-menu-badge" id="dup-count-badge" style="display:none"><span id="dup-count">0</span></span></span><small>Fold byte-identical vendor names into one record (keeps children, links and trades)</small></button>
                 <button id="tools-menu-split" onclick="closeToolsMenu();openSplitModal()"><i class="ti ti-cut"></i><span>Needs Splitting <span class="tools-menu-badge" id="split-count-badge" style="display:none"><span id="split-count">0</span></span></span><small>Records that look like several companies joined together</small></button>
               </div>
             </div>
@@ -435,6 +436,24 @@
 </div>
 
 <!-- Split Vendor Names Modal -->
+<div class="modal-overlay" id="dupModal" style="display:none">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">Remove Exact Duplicates</div>
+        <div class="modal-sub" id="dupSub">Vendors whose names are identical after ignoring case and extra spaces. One record is kept per name and the rest are folded into it — products, certifications, personnel, rates, bid history, work-package links and trade categories all move to the record that is kept, so nothing is lost.</div>
+      </div>
+      <button class="modal-x" onclick="closeDupModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="dupModalBody" style="overflow-x:hidden">
+      <div id="dupList" style="color:#888">Scanning…</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeDupModal()">Close</button>
+      <button class="btn-primary" id="dupRunBtn" onclick="runDupCleanup()" disabled>Merge duplicates</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="splitModal" style="display:none">
   <div class="modal" style="max-width:700px">
     <div class="modal-header">
@@ -489,9 +508,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260811i"></script>
-<script src="assets/js/db.js?v=20260811i"></script>
-<script src="assets/js/ui.js?v=20260811i"></script>
+<script src="assets/js/auth.js?v=20260812a"></script>
+<script src="assets/js/db.js?v=20260812a"></script>
+<script src="assets/js/ui.js?v=20260812a"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -551,6 +570,7 @@ async function loadAll() {
   renderVendorList();
   buildInviteChips();
   updateSplitBadge();
+  updateDupBadge();
 }
 
 async function refreshVendors() {
@@ -643,11 +663,19 @@ async function renderVendorAnalytics() {
     const out = []; const seen = new Set();
     const add = (key, name, amount) => { if (key && !seen.has(key)) { seen.add(key); out.push({ key, name, amount: (amount != null ? amount : null) }); } };
     const amts = Array.isArray(w.awarded_vendor_amounts) ? w.awarded_vendor_amounts : [];
-    // Precise links first: awarded_vendor_ids (co-award) with each vendor's OWN
-    // negotiated amount, then the vendor_id FK.
+    // awarded_vendor_ids is AUTHORITATIVE when it resolves to anything: the WP form writes
+    // it together with `contractor` (a newline-joined mirror of the SAME chips), so parsing
+    // the text again can only add noise. It actively corrupted the figures for the 400+
+    // directory vendors whose NAME CONTAINS A SLASH — splitAw() shredded such a name into
+    // fragments that resolve to nothing, adding phantom vendors, which flipped `haveAmts`
+    // false below and silently replaced each vendor's real negotiated amount with an even
+    // split. Only fall through to the free text when the ids resolve to nothing (legacy
+    // rows, or every id dangling after a vendor delete).
     if (Array.isArray(w.awarded_vendor_ids)) w.awarded_vendor_ids.forEach((id, i) => { if (byId[id]) add(id, byId[id].name, amts[i]); });
+    if (out.length) return out;
+    // No precise link — fall back to the vendor_id FK, then the free-text contractor
+    // names (slash-aware), resolved by name.
     if (w.vendor_id && byId[w.vendor_id]) add(w.vendor_id, byId[w.vendor_id].name, null);
-    // Then the free-text contractor names (slash-aware), resolved by name.
     splitAw(w.contractor).forEach(n => { const v = byName[nm(n)]; add(v ? v.id : nm(n), v ? v.name : n.trim(), null); });
     return out;
   };
@@ -1323,6 +1351,7 @@ function skipSplit(vendorId) {
   delete _splitSegs[vendorId];
   renderSplitList();
   updateSplitBadge();
+  updateDupBadge();
 }
 
 /* ── Merge — auto-suggested duplicate groups ──────────────────────────
@@ -1771,6 +1800,24 @@ async function setInactive(id) {
   try { await VendorDb.setVendorStatus(id, 'inactive'); await loadAll(); closeDetailModal(); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Update failed') : alert(e.message); }
 }
+// Read-only roles (viewer / viewer_budget) may READ the directory but never write it —
+// RLS enforces that server-side, so leaving live inputs and Add/Delete buttons on screen
+// only yields permission errors. These two strip the write affordances after a render.
+function _lockDetailInputs(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.querySelectorAll('input,textarea,select,button').forEach(n => {
+    if (n.tagName === 'BUTTON') { if (!/copy/i.test(n.textContent || '')) n.remove(); return; }
+    n.disabled = true;
+    n.style.background = 'var(--surface-2)';
+    n.style.cursor = 'not-allowed';
+  });
+}
+function _stripRowDeletes(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.querySelectorAll('.row-item-del').forEach(n => n.remove());
+}
 function renderDetailOverview() {
   const v = activeVendor;
   detailTrades = new Set(v.trade_categories || []);
@@ -1796,7 +1843,10 @@ function renderDetailOverview() {
       </div>
       <div style="font-size:0.72rem;color:#999;margin-top:6px">The vendor must register using the Invite Email above; the link works once, until the account is claimed.</div>`}
     </div>
-    <button class="btn-primary" id="btnSaveDetailOverview" onclick="saveDetailOverview()">Save Changes</button>`;
+    ${_canManage ? '<button class="btn-primary" id="btnSaveDetailOverview" onclick="saveDetailOverview()">Save Changes</button>' : ''}`;
+  // Read-only roles (viewer / viewer_budget) get the profile as plain text — RLS rejects
+  // their writes anyway, so showing live inputs + a Save button only produces errors.
+  if (!_canManage) _lockDetailInputs('dtab-overview');
   buildDetailTradeChips();
 }
 function _placeholderEmail(e) { return /@no-invite\.local$/i.test(e || ''); }
@@ -1852,14 +1902,15 @@ async function renderDetailProducts() {
     `<div class="row-item"><div style="flex:1;min-width:0"><div class="row-item-title">${esc(p.description)}${p.unit?' ('+esc(p.unit)+')':''}</div><div class="row-item-sub">${esc(p.category||'Uncategorized')}${p.item_type?' · '+esc(p.item_type):''}</div></div>
     <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailProduct('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button></div>`
   ).join('') : '<div class="empty">No products/services on file.</div>';
-  document.getElementById('dtab-products').innerHTML = rows + `
+  document.getElementById('dtab-products').innerHTML = rows + (!_canManage ? '' : `
     <div class="add-form">
       <select id="dnp-category"><option value="">Category…</option>${TRADES.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select>
       <select id="dnp-type"><option value="Materials">Materials</option><option value="Labor">Labor</option><option value="Service">Service</option></select>
       <input id="dnp-description" placeholder="Description (e.g. Ready-Mix Concrete)">
       <input id="dnp-unit" placeholder="Unit (e.g. cu.m.)">
       <button class="btn-primary" onclick="addDetailProduct()">Add</button>
-    </div>`;
+    </div>`);
+  if (!_canManage) _stripRowDeletes('dtab-products');
 }
 async function addDetailProduct() {
   const category = document.getElementById('dnp-category').value;
@@ -1885,7 +1936,7 @@ async function renderDetailCerts() {
       ${c.file_path ? ' · <span class="file-badge" onclick="viewCertFileStaff(\''+c.file_path.replace(/'/g,"\\'")+'\')">View file</span>' : ''}</div></div>
       <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailCert('${c.id}','${(c.file_path||'').replace(/'/g,"\\'")}')" title="Remove"><i class="ti ti-trash"></i></button></div>`;
   }).join('') : '<div class="empty">No certifications on file.</div>';
-  document.getElementById('dtab-certs').innerHTML = rows + `
+  document.getElementById('dtab-certs').innerHTML = rows + (!_canManage ? '' : `
     <div class="add-form" style="flex-direction:column;align-items:stretch">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <input id="dnc-name" placeholder="Certification Name (e.g. PCAB License)">
@@ -1898,7 +1949,8 @@ async function renderDetailCerts() {
         <input id="dnc-file" type="file" accept=".pdf,.jpg,.jpeg,.png" style="flex:1;min-width:160px">
         <button class="btn-primary" onclick="addDetailCert()">Add Certification</button>
       </div>
-    </div>`;
+    </div>`);
+  if (!_canManage) _stripRowDeletes('dtab-certs');
 }
 async function addDetailCert() {
   const cert_name = document.getElementById('dnc-name').value.trim();
@@ -1934,7 +1986,7 @@ async function renderDetailPersonnel() {
     <div class="row-item-sub">${esc(p.role_title||'')}${p.contact_number?' · '+esc(p.contact_number):''}${p.email?' · '+esc(p.email):''}</div></div>
     <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailPersonnel('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button></div>`
   ).join('') : '<div class="empty">No personnel on file.</div>';
-  document.getElementById('dtab-personnel').innerHTML = rows + `
+  document.getElementById('dtab-personnel').innerHTML = rows + (!_canManage ? '' : `
     <div class="add-form">
       <input id="dnp2-name" placeholder="Name">
       <input id="dnp2-role" placeholder="Role (e.g. Sales Rep)">
@@ -1942,7 +1994,8 @@ async function renderDetailPersonnel() {
       <input id="dnp2-email" placeholder="Email">
       <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;color:#555"><input type="checkbox" id="dnp2-primary" style="width:auto"> Primary</label>
       <button class="btn-primary" onclick="addDetailPersonnel()">Add</button>
-    </div>`;
+    </div>`);
+  if (!_canManage) _stripRowDeletes('dtab-personnel');
 }
 async function addDetailPersonnel() {
   const name = document.getElementById('dnp2-name').value.trim();
@@ -1968,7 +2021,7 @@ async function renderDetailRates() {
     `<div class="row-item"><div><div class="row-item-title">${esc(r.item_description)} — ₱${Number(r.rate||0).toLocaleString()}${r.unit?'/'+esc(r.unit):''}</div>
     <div class="row-item-sub">${esc(r.trade||'')}${r.project_id?' · '+esc(r.project_id):''}${r.date_quoted?' · '+esc(r.date_quoted):''}${r.source?' · '+esc(r.source):''}</div></div>
     <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeRate('${r.id}')"><i class="ti ti-trash"></i></button></div>`
-  ).join('') : '<div class="empty">No reference rates on file yet.</div>') + `
+  ).join('') : '<div class="empty">No reference rates on file yet.</div>') + (!_canManage ? '' : `
     <div class="add-form">
       <input id="nr-desc" placeholder="Item description">
       <input id="nr-trade" placeholder="Trade">
@@ -1977,7 +2030,8 @@ async function renderDetailRates() {
       <input id="nr-date" type="date">
       <select id="nr-source"><option value="quotation">Quotation</option><option value="negotiation">Negotiation</option><option value="awarded contract">Awarded Contract</option></select>
       <button class="btn-primary" onclick="addRate()">Add</button>
-    </div>`;
+    </div>`);
+  if (!_canManage) _stripRowDeletes('dtab-rates');
 }
 async function addRate() {
   const item_description = document.getElementById('nr-desc').value.trim();
@@ -2082,6 +2136,116 @@ async function renderDetailBids() {
   // viewer (vendor_bids RLS denies that role writes anyway).
   await BidWidget.mountForVendor('dtab-bids', { vendorId: activeVendor.id, canEdit: userProfile && userProfile.role !== 'viewer' });
 }
+/* ── Exact-duplicate cleanup ───────────────────────────────────────────────
+   Repeated "Import from WPs" runs against a getVendors() that stopped at
+   PostgREST's 1000-row default re-created every vendor sorting past the cutoff,
+   so the directory filled with byte-identical duplicates. The cap is fixed;
+   this clears the rows it already produced. Grouping is EXACT on the normalized
+   name (trim + collapse whitespace + lowercase) — never fuzzy, so a suggestion
+   here is never a judgement call, unlike the Merge tool. Admin-only, because
+   merge_vendors() rejects every other role server-side.                      */
+let _dupGroups = [];
+function _dupActiveIds() {
+  // Vendors with something attached — preferred as the record to KEEP.
+  const act = new Set();
+  (_vaWPs || []).forEach(w => { if (w.vendor_id) act.add(w.vendor_id); });
+  Object.keys(_vendorProductText || {}).forEach(id => act.add(id));
+  return act;
+}
+async function openDupModal() {
+  document.getElementById('dupModal').style.display = 'flex';
+  _syncModalScrollLock();
+  const list = document.getElementById('dupList');
+  const btn = document.getElementById('dupRunBtn');
+  btn.disabled = true;
+  list.innerHTML = '<div style="color:#888">Scanning the directory…</div>';
+  _dupGroups = VendorDb.findExactDuplicateGroups(allVendors, _dupActiveIds());
+  renderDupList();
+}
+function closeDupModal() {
+  document.getElementById('dupModal').style.display = 'none';
+  _syncModalScrollLock();
+}
+function renderDupList() {
+  const list = document.getElementById('dupList');
+  const btn = document.getElementById('dupRunBtn');
+  const groups = _dupGroups;
+  const removable = groups.reduce((n, g) => n + g.remove.length, 0);
+  if (!groups.length) {
+    list.innerHTML = '<div class="empty">No exact duplicates — every vendor name in the directory is unique.</div>';
+    btn.disabled = true; btn.textContent = 'Merge duplicates';
+    return;
+  }
+  const SHOW = 60;
+  const rows = groups.slice(0, SHOW).map(g => {
+    const keep = g.keep;
+    const sub = [keep.status, (keep.trade_categories || []).length ? (keep.trade_categories.length + ' trades') : null,
+                 keep.created_at ? ('added ' + esc(String(keep.created_at).slice(0, 10))) : null].filter(Boolean).join(' · ');
+    return `<div class="split-row">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
+        <div style="font-weight:700;min-width:0;word-break:break-word">${esc(g.name)}</div>
+        <div style="font-size:0.75rem;color:#EE3124;font-weight:700;flex-shrink:0">${g.remove.length + 1} copies → 1</div>
+      </div>
+      <div style="font-size:0.75rem;color:#888;margin-top:3px">Keeping the record ${sub ? '(' + sub + ')' : ''} — removing ${g.remove.length}.</div>
+    </div>`;
+  }).join('');
+  const more = groups.length > SHOW ? `<div style="color:#888;font-size:0.8rem;margin-top:8px">…and ${groups.length - SHOW} more group(s). All ${groups.length} are merged when you run this.</div>` : '';
+  list.innerHTML = `<div style="margin-bottom:10px;font-size:0.85rem">
+      <strong>${groups.length}</strong> duplicated name(s) · <strong>${removable}</strong> record(s) will be removed ·
+      directory goes from <strong>${allVendors.length}</strong> to <strong>${allVendors.length - removable}</strong>.
+    </div>${rows}${more}`;
+  btn.disabled = false;
+  btn.textContent = 'Merge ' + groups.length + ' group(s) — remove ' + removable;
+}
+async function runDupCleanup() {
+  const groups = _dupGroups;
+  if (!groups.length) return;
+  const removable = groups.reduce((n, g) => n + g.remove.length, 0);
+  if (!confirm('Merge ' + groups.length + ' duplicate name group(s)?\n\n' + removable +
+      ' vendor record(s) will be permanently removed. Their products, certifications, personnel, rates, bid history, work-package links and trade categories are moved to the record kept for each name first, so no data is lost.\n\nThis cannot be undone.')) return;
+  const btn = document.getElementById('dupRunBtn');
+  btn.disabled = true;
+  const prog = (window.AppNotify && AppNotify.progress)
+    ? AppNotify.progress('Merging duplicates… 0 / ' + groups.length)
+    : null;
+  let res;
+  try {
+    res = await VendorDb.mergeExactDuplicates(groups, (done, total) => {
+      btn.textContent = 'Merging ' + done + ' / ' + total + '…';
+      if (prog && (done % 10 === 0 || done === total)) prog.update('Merging duplicates… ' + done + ' / ' + total);
+    });
+  } catch (e) {
+    if (prog) prog.fail('Duplicate cleanup failed: ' + (e && (e.message || e.code) || 'error'));
+    else AppNotify && AppNotify.fromError(e, 'Duplicate cleanup failed');
+    btn.disabled = false; renderDupList();
+    return;
+  }
+  if (prog) prog.update('Reloading directory…');
+  await loadAll();
+  _dupGroups = VendorDb.findExactDuplicateGroups(allVendors, _dupActiveIds());
+  renderDupList();
+  updateDupBadge();
+  const msg = 'Removed ' + res.removed + ' duplicate record(s) across ' + res.merged + ' name(s).' +
+              (res.failed ? ' ' + res.failed + ' group(s) failed — see console.' : '');
+  if (res.failed && res.errors.length) console.error('[dup cleanup] failures:', res.errors);
+  if (prog) { res.failed ? prog.fail(msg) : prog.done(msg); }
+  else if (window.AppNotify) { res.failed ? AppNotify.warn(msg) : AppNotify.success(msg); }
+}
+// Badge on the Data Tools menu — same treatment as the Split tool's count.
+function updateDupBadge() {
+  const item = document.getElementById('tools-menu-dupes');
+  if (!item) return;
+  if (!_canBulkDelete) { item.style.display = 'none'; return; }   // merge_vendors is admin-only
+  let n = 0;
+  try { n = VendorDb.findExactDuplicateGroups(allVendors, _dupActiveIds()).reduce((a, g) => a + g.remove.length, 0); }
+  catch (_) { n = 0; }
+  const badge = document.getElementById('dup-count-badge');
+  const cnt = document.getElementById('dup-count');
+  if (badge && cnt) { cnt.textContent = n; badge.style.display = n ? '' : 'none'; }
+  const wrap = document.getElementById('toolsMenuWrap');
+  if (wrap && n) wrap.classList.add('has-alert');
+}
+
 </script>
 </body>
 </html>

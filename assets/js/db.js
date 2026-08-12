@@ -1903,9 +1903,9 @@ const VendorDb = (() => {
     const includeProposed = opts.includeProposed !== false;
     const linkWPs = !!opts.linkWPs;
     const sb = await getSB();
-    const { data: wps, error } = await sb.from('work_packages').select('id,contractor,proposed_vendors,vendor_id');
-    if (error) throw error;
-    const rows = wps || [];
+    // PAGINATED — a plain .select() stops at PostgREST's 1000-row default, which silently
+    // hid ~40% of the work packages from this import (see CLAUDE.md / _pagedSelect).
+    const rows = await _pagedSelect(() => sb.from('work_packages').select('id,contractor,proposed_vendors,vendor_id'));
     const existing = await getVendors();
     const byNorm = {}; existing.forEach(v => { byNorm[_normName(v.name)] = v; });
     // distinct display names from the WPs
@@ -1960,13 +1960,16 @@ const VendorDb = (() => {
   async function backfillVendorDataFromWPs(profile) {
     const sb = await getSB();
     const _bfCols = 'id,project_id,wp_no,description,trade,type_of_works,contractor,proposed_vendors,vendor_id,awarded_vendor_ids,awarded_vendor_amounts,award_status,awarded_cost,awarding_date,actual_awarding_date';
-    let { data: wps, error } = await sb.from('work_packages').select(_bfCols);
-    if (error && _isMissingAwardedVendorIdsCol(error)) {
+    // PAGINATED for the same reason as importVendorsFromWPs above — this read used to stop
+    // at 1000 rows, so trades/products/bids/rates were never backfilled for the rest.
+    let rows;
+    try { rows = await _pagedSelect(() => sb.from('work_packages').select(_bfCols)); }
+    catch (e) {
+      if (!_isMissingAwardedVendorIdsCol(e)) throw e;
       // pre-migration: the awarded-vendor array columns don't exist yet
-      ({ data: wps, error } = await sb.from('work_packages').select(_bfCols.replace(',awarded_vendor_ids,awarded_vendor_amounts', '')));
+      const cols2 = _bfCols.replace(',awarded_vendor_ids,awarded_vendor_amounts', '');
+      rows = await _pagedSelect(() => sb.from('work_packages').select(cols2));
     }
-    if (error) throw error;
-    const rows = wps || [];
 
     const vendors = await getVendors();
     const byNorm = {}; vendors.forEach(v => { byNorm[_normName(v.name)] = v; });
@@ -2164,6 +2167,66 @@ const VendorDb = (() => {
   // delete still fails on FK-linked vendors, surfaced as a normal error.
   // Bulk status change (approve/reject many). Chunked so a large id list can't
   // blow the PostgREST URL length; stamps audit + updated_at like updateVendor.
+  // ── Exact-duplicate cleanup ────────────────────────────────────────────
+  // Repeated runs of importVendorsFromWPs against a getVendors() that was capped at
+  // PostgREST's 1000-row default re-created every vendor whose name sorted past the
+  // cutoff, so the directory accumulated thousands of byte-identical duplicates. The
+  // cap is fixed, but the rows remain. This groups vendors by NORMALIZED NAME (exact
+  // match after trim/collapse-whitespace/lowercase — no fuzzy matching, so a group is
+  // never a judgement call) and picks one canonical row per group.
+  //
+  // Canonical preference, most significant first: approved > has a claimed login >
+  // has trade categories > has any linked activity (WP/bid/rate/product) > oldest
+  // (the original import) > lowest id for a stable tie-break.
+  function findExactDuplicateGroups(vendors, activeIds) {
+    const act = activeIds instanceof Set ? activeIds : new Set(activeIds || []);
+    const byNorm = new Map();
+    (vendors || []).forEach(v => {
+      const k = _normName(v.name);
+      if (!k) return;                       // a blank name is not a "duplicate" of anything
+      if (!byNorm.has(k)) byNorm.set(k, []);
+      byNorm.get(k).push(v);
+    });
+    const score = v => (
+      (v.status === 'approved'      ? 16 : 0) +
+      (v.invite_claimed_at          ? 8  : 0) +
+      ((v.trade_categories || []).length ? 4 : 0) +
+      (act.has(v.id)                ? 2  : 0)
+    );
+    const groups = [];
+    byNorm.forEach((rows, k) => {
+      if (rows.length < 2) return;
+      const sorted = [...rows].sort((a, b) => {
+        const d = score(b) - score(a); if (d) return d;
+        const ta = Date.parse(a.created_at || '') || Infinity, tb = Date.parse(b.created_at || '') || Infinity;
+        if (ta !== tb) return ta - tb;      // oldest wins
+        return String(a.id) < String(b.id) ? -1 : 1;
+      });
+      groups.push({ key: k, name: sorted[0].name, keep: sorted[0], remove: sorted.slice(1) });
+    });
+    // biggest groups first so a capped/aborted run clears the worst offenders
+    groups.sort((a, b) => b.remove.length - a.remove.length);
+    return groups;
+  }
+  // Fold each group's duplicates into its canonical row via the merge_vendors RPC, so
+  // any child rows (products/certs/personnel/rates/bids) and WP links are reassigned
+  // rather than deleted. onProgress(done, total, group) is called after each group.
+  async function mergeExactDuplicates(groups, onProgress) {
+    let merged = 0, removed = 0, failed = 0; const errors = [];
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i];
+      try {
+        await mergeVendors(g.keep.id, g.remove.map(v => v.id));
+        merged++; removed += g.remove.length;
+      } catch (e) {
+        failed++;
+        if (errors.length < 5) errors.push((g.name || '?') + ': ' + (e && (e.message || e.code) || 'error'));
+      }
+      if (onProgress) { try { onProgress(i + 1, groups.length, g); } catch (_) {} }
+    }
+    return { merged, removed, failed, errors };
+  }
+
   async function bulkSetVendorStatus(ids, status) {
     if (!ids || !ids.length) return;
     const sb = await getSB();
@@ -2288,7 +2351,7 @@ const VendorDb = (() => {
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
-    bulkSetVendorStatus, bulkDeleteVendors,
+    bulkSetVendorStatus, findExactDuplicateGroups, mergeExactDuplicates, bulkDeleteVendors,
     backfillVendorDataFromWPs, getWorkPackagesForVendor,
   };
 })();

@@ -60,6 +60,38 @@ begin
     ) where proposed_vendor_ids && p_sources;
   end if;
 
+  -- awarded_vendor_ids uuid[] + awarded_vendor_amounts numeric[] are INDEX-ALIGNED
+  -- (element i of one belongs with element i of the other), so they must be rebuilt
+  -- together — never with array_remove/array_replace, which would shift one array
+  -- against the other and reattribute every later vendor's money.
+  -- On merge: substitute each source id with the target, then collapse duplicates
+  -- (target already co-awarded on the same WP) by SUMMING their amounts, keeping the
+  -- earliest position so the surviving order is stable.
+  if exists (select 1 from information_schema.columns
+             where table_name = 'work_packages' and column_name = 'awarded_vendor_ids') then
+    update work_packages w
+       set awarded_vendor_ids = agg.ids,
+           awarded_vendor_amounts = case when w.awarded_vendor_amounts is null then null else agg.amts end
+      from (
+        select x.wid,
+               array_agg(x.vid order by x.ord) as ids,
+               array_agg(x.amt order by x.ord) as amts
+          from (
+            select w2.id as wid,
+                   case when u.e = any(p_sources) then p_target else u.e end as vid,
+                   min(u.ord) as ord,
+                   case when count(w2.awarded_vendor_amounts[u.ord]) = 0
+                        then null else sum(w2.awarded_vendor_amounts[u.ord]) end as amt
+              from work_packages w2
+              cross join lateral unnest(w2.awarded_vendor_ids) with ordinality as u(e, ord)
+             where w2.awarded_vendor_ids && p_sources
+             group by w2.id, 2
+          ) x
+         group by x.wid
+      ) agg
+     where w.id = agg.wid;
+  end if;
+
   -- any vendor logins pointing at a source now point at the target
   update users set vendor_id = p_target where vendor_id = any(p_sources);
 
@@ -102,6 +134,29 @@ begin
     update work_packages set proposed_vendor_ids = array_remove(proposed_vendor_ids, p_id)
       where p_id = any(proposed_vendor_ids);
   end if;
+
+  -- awarded_vendor_ids / awarded_vendor_amounts are INDEX-ALIGNED — drop the deleted
+  -- vendor's POSITION from both arrays together. Using array_remove on the ids alone
+  -- would leave the amounts array longer and shift every later vendor's amount onto
+  -- the wrong vendor.
+  if exists (select 1 from information_schema.columns
+             where table_name = 'work_packages' and column_name = 'awarded_vendor_ids') then
+    update work_packages w
+       set awarded_vendor_ids = agg.ids,
+           awarded_vendor_amounts = case when w.awarded_vendor_amounts is null then null else agg.amts end
+      from (
+        select w2.id as wid,
+               coalesce(array_agg(u.e order by u.ord)
+                        filter (where not (u.e = any(array[p_id]))), '{}'::uuid[]) as ids,
+               coalesce(array_agg(w2.awarded_vendor_amounts[u.ord] order by u.ord)
+                        filter (where not (u.e = any(array[p_id]))), '{}'::numeric[]) as amts
+          from work_packages w2
+          cross join lateral unnest(w2.awarded_vendor_ids) with ordinality as u(e, ord)
+         where w2.awarded_vendor_ids && array[p_id]
+         group by w2.id
+      ) agg
+     where w.id = agg.wid;
+  end if;
   delete from vendor_bids          where vendor_id = p_id;
   delete from vendor_rates         where vendor_id = p_id;
   delete from vendor_products      where vendor_id = p_id;
@@ -135,6 +190,29 @@ begin
     update work_packages set proposed_vendor_ids = (
       select array(select e from unnest(proposed_vendor_ids) e where not (e = any(p_ids)))
     ) where proposed_vendor_ids && p_ids;
+  end if;
+
+  -- awarded_vendor_ids / awarded_vendor_amounts are INDEX-ALIGNED — drop the deleted
+  -- vendor's POSITION from both arrays together. Using array_remove on the ids alone
+  -- would leave the amounts array longer and shift every later vendor's amount onto
+  -- the wrong vendor.
+  if exists (select 1 from information_schema.columns
+             where table_name = 'work_packages' and column_name = 'awarded_vendor_ids') then
+    update work_packages w
+       set awarded_vendor_ids = agg.ids,
+           awarded_vendor_amounts = case when w.awarded_vendor_amounts is null then null else agg.amts end
+      from (
+        select w2.id as wid,
+               coalesce(array_agg(u.e order by u.ord)
+                        filter (where not (u.e = any(p_ids))), '{}'::uuid[]) as ids,
+               coalesce(array_agg(w2.awarded_vendor_amounts[u.ord] order by u.ord)
+                        filter (where not (u.e = any(p_ids))), '{}'::numeric[]) as amts
+          from work_packages w2
+          cross join lateral unnest(w2.awarded_vendor_ids) with ordinality as u(e, ord)
+         where w2.awarded_vendor_ids && p_ids
+         group by w2.id
+      ) agg
+     where w.id = agg.wid;
   end if;
   delete from vendor_bids          where vendor_id = any(p_ids);
   delete from vendor_rates         where vendor_id = any(p_ids);
