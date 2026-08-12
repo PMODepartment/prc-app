@@ -74,6 +74,30 @@ begin
       );
   update vendor_bids set vendor_id = p_target where vendor_id = any(p_sources);
 
+  -- Collapse child rows the reassign just duplicated on the target. Merging N copies of
+  -- the same vendor otherwise leaves the target holding the same product/person/cert N
+  -- times — folding ~1,400 import duplicates produced 178 duplicate product rows across
+  -- 82 vendors before this was added. Compared on the same normalized key the app uses
+  -- elsewhere (trim + collapse whitespace + lowercase); lowest id wins, so it is stable.
+  delete from vendor_products a
+    where a.vendor_id = p_target
+      and exists (select 1 from vendor_products b
+                   where b.vendor_id = p_target and b.id < a.id
+                     and lower(btrim(regexp_replace(coalesce(b.description,''), '\s+', ' ', 'g')))
+                       = lower(btrim(regexp_replace(coalesce(a.description,''), '\s+', ' ', 'g'))));
+  delete from vendor_personnel a
+    where a.vendor_id = p_target
+      and exists (select 1 from vendor_personnel b
+                   where b.vendor_id = p_target and b.id < a.id
+                     and lower(btrim(regexp_replace(coalesce(b.name,''), '\s+', ' ', 'g')))
+                       = lower(btrim(regexp_replace(coalesce(a.name,''), '\s+', ' ', 'g'))));
+  delete from vendor_certifications a
+    where a.vendor_id = p_target
+      and exists (select 1 from vendor_certifications b
+                   where b.vendor_id = p_target and b.id < a.id
+                     and lower(btrim(regexp_replace(coalesce(b.cert_name,''), '\s+', ' ', 'g')))
+                       = lower(btrim(regexp_replace(coalesce(a.cert_name,''), '\s+', ' ', 'g'))));
+
   -- linked work packages (awarded vendor FK)
   update work_packages set vendor_id = p_target where vendor_id = any(p_sources);
 
