@@ -361,7 +361,12 @@ function normTrade(t){
   if(/structural/.test(k)) return 'Structural Works';
   if(/site develop/.test(k)) return 'Site Development Works';
   if(/masonry|tiling|tile|drywall|ceiling|glazing|aluminum|aluminium|paint|stone|metal|finish|architectural/.test(k)) return 'Architectural Works';
-  if(/general requirement|services$/.test(k)) return 'General Requirements';
+  // 'Allied' must be tested BEFORE the generic services rule: 'MEPF (Other Allied Services)'
+  // reaches here as its own non-canonical trade (the exact-match map misses it because of the
+  // MEPF prefix, and 'services$' misses it because of the trailing bracket), which left it
+  // forming a junk trade group of its own in every trade-grouped chart and table.
+  if(/allied/.test(k)) return 'Allied Services';
+  if(/general requirement|services\W*$/.test(k)) return 'General Requirements';
   if(/\bsite\b/.test(k)) return 'Site Works';
   return String(t).trim();
 }
