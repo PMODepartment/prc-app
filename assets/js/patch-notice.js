@@ -1,12 +1,13 @@
 /* ============================================================================
- * Patch Notice — one-off "What's New" announcement, Jul 27 – Aug 3 2026 update
+ * Patch Notice — one-off "What's New" announcement, Aug 4 – Aug 10 2026 update
  * ----------------------------------------------------------------------------
  * TEMPORARY component. Auto-shows once to contributor-tier accounts
  * (specialist / manager / user) AND admin / super_admin — never viewer/
- * viewer_budget — to call out the "Not to be Awarded" flag and a couple of
- * other changes from this update.
+ * viewer_budget, never vendor (vendor logins never load this page at all) —
+ * to call out the new Vendor Management Dashboard and the Megawide PRC
+ * rebrand from this update.
  *
- * Hard-expires 2026-08-08 00:00 — both maybeAutoOpen() and open() refuse to
+ * Hard-expires 2026-08-19 00:00 — both maybeAutoOpen() and open() refuse to
  * render past that instant, so no leftover code path (a stale localStorage
  * miss, a manual call, a slow tab) can show this late. Once that date has
  * passed this file and its <script> include on index.html/project.html can
@@ -22,8 +23,8 @@
 (function () {
   'use strict';
 
-  var SEEN_PREFIX = 'wpm_patch_202608_seen_';
-  var EXPIRES = new Date('2026-08-08T00:00:00');   // hard cutoff (exclusive)
+  var SEEN_PREFIX = 'wpm_patch_202608b_seen_';
+  var EXPIRES = new Date('2026-08-19T00:00:00');   // hard cutoff (exclusive)
 
   function isContributor(role) {
     return role === 'specialist' || role === 'manager' || role === 'user' ||
@@ -103,32 +104,32 @@
         '<div class="pn-top">' +
           '<div class="pn-badge" aria-hidden="true"><i class="ti ti-sparkles"></i></div>' +
           '<div class="pn-top-text">' +
-            '<div class="pn-eyebrow"><span>Product update</span><span class="pn-dot"></span><span class="pn-range">Jul 27 &ndash; Aug 3</span></div>' +
+            '<div class="pn-eyebrow"><span>Product update</span><span class="pn-dot"></span><span class="pn-range">Aug 4 &ndash; Aug 10</span></div>' +
             '<h2 id="pn-title">What&#39;s new in your dashboard</h2>' +
             '<p class="pn-lede">A few changes worth knowing about before you start work this week.</p>' +
           '</div>' +
         '</div>' +
         '<div class="pn-body">' +
           '<div class="pn-feature">' +
-            '<div class="pn-feature-icon" aria-hidden="true"><i class="ti ti-flag-off"></i></div>' +
+            '<div class="pn-feature-icon" aria-hidden="true"><i class="ti ti-rotate-2"></i></div>' +
             '<div style="min-width:0">' +
-              '<p class="pn-feature-title">&quot;Not to be Awarded&quot; tag <span class="pn-new">New</span></p>' +
-              '<p class="pn-feature-copy">For a work package OPS has pulled out of the award pipeline for good &mdash; handled outside procurement, or dropped from scope &mdash; check <b>Not to be Awarded</b> in the WP Form or the All&nbsp;Work&nbsp;Packages grid.</p>' +
+              '<p class="pn-feature-title">Buyback work packages <span class="pn-new">New</span></p>' +
+              '<p class="pn-feature-copy">For WPs where the vendor takes the item back at the end of use, the recovered value now counts toward savings &mdash; enter it as a <b>depreciation %</b> or an <b>exact amount</b> in the WP Form or the review grid.</p>' +
             '</div>' +
           '</div>' +
           '<p class="pn-section-label">Also this week</p>' +
           '<div class="pn-item">' +
-            '<div class="pn-item-icon" aria-hidden="true"><i class="ti ti-pin"></i></div>' +
+            '<div class="pn-item-icon" aria-hidden="true"><i class="ti ti-timeline"></i></div>' +
             '<div>' +
-              '<p class="pn-item-title">Pin more than one column</p>' +
-              '<p class="pn-item-copy">The WP List now lets you freeze several columns at once &mdash; e.g. Description and Procurement Status together &mdash; so they stay put while you scroll right.</p>' +
+              '<p class="pn-item-title">BCB0 / BCB1 / BCB2 budget baselines</p>' +
+              '<p class="pn-item-copy">Track re-baselined budgets over time &mdash; a WP can show a saving against BCB0 and a loss against BCB1. Switch baselines from the dropdown on the Overview tab.</p>' +
             '</div>' +
           '</div>' +
           '<div class="pn-item">' +
-            '<div class="pn-item-icon" aria-hidden="true"><i class="ti ti-menu-2"></i></div>' +
+            '<div class="pn-item-icon" aria-hidden="true"><i class="ti ti-tag"></i></div>' +
             '<div>' +
-              '<p class="pn-item-title">Sidebar starts collapsed</p>' +
-              '<p class="pn-item-copy">More room for your tables by default. The project switcher moved into the topbar with a quicker search-and-select popover.</p>' +
+              '<p class="pn-item-title">Group Head tagging + filter</p>' +
+              '<p class="pn-item-copy">Projects can now be tagged with a Group Head. On the Portfolio Overview, filter, sort, or group the whole dashboard by Group Head from the project-selection dropdown.</p>' +
             '</div>' +
           '</div>' +
         '</div>' +

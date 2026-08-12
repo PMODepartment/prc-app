@@ -786,6 +786,13 @@ function renderUserBar(id, profile) {
             font-family:inherit;cursor:pointer;border-bottom:1px solid #f5f5f5;">
             <i class="ti ti-alert-triangle" style="font-size:1.1429rem;color:#888"></i>Action Center
           </a>` : ''}
+          ${typeof window.PatchNotice !== 'undefined' ? `
+          <a onclick="event.preventDefault();(function(){var m=document.getElementById('user-menu');if(m)m.style.display='none';PatchNotice.open();})()" style="
+            display:flex;align-items:center;gap:8px;padding:12px 16px;
+            font-size:0.9286rem;color:#231F20;font-weight:600;text-decoration:none;
+            font-family:inherit;cursor:pointer;border-bottom:1px solid #f5f5f5;">
+            <i class="ti ti-sparkles" style="font-size:1.1429rem;color:#888"></i>What's New
+          </a>` : ''}
           <a onclick="event.preventDefault();(function(){var m=document.getElementById('user-menu');if(m)m.style.display='none';if(window.CoachTour&&CoachTour.available()){CoachTour.start(true);}else if(window.Onboarding&&Onboarding.open){Onboarding.open();}else{window.location.href='onboarding.html';}})()" style="
             display:flex;align-items:center;gap:8px;padding:12px 16px;
             font-size:0.9286rem;color:#231F20;font-weight:600;text-decoration:none;
