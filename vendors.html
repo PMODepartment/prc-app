@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260812b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260812c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812b">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812c">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -508,9 +508,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260812b"></script>
-<script src="assets/js/db.js?v=20260812b"></script>
-<script src="assets/js/ui.js?v=20260812b"></script>
+<script src="assets/js/auth.js?v=20260812c"></script>
+<script src="assets/js/db.js?v=20260812c"></script>
+<script src="assets/js/ui.js?v=20260812c"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1292,16 +1292,27 @@ async function _executeSplit(vendorId) {
   const segs = (_splitSegs[vendorId] || []).map(s => s.trim()).filter(Boolean);
   if (segs.length < 2) return null;
   const plan = segs.map(seg => ({ seg, match: _findExistingVendorByName(seg, vendorId) }));
-  for (const { seg, match } of plan) {
-    if (match) {
-      const union = Array.from(new Set([...(match.trade_categories || []), ...((v && v.trade_categories) || [])]));
-      if (union.length !== (match.trade_categories || []).length) await VendorDb.updateVendor(match.id, { trade_categories: union });
+  let primaryId = null;   // the first segment's vendor — inherits the original's data
+  for (const p of plan) {
+    if (p.match) {
+      const union = Array.from(new Set([...(p.match.trade_categories || []), ...((v && v.trade_categories) || [])]));
+      if (union.length !== (p.match.trade_categories || []).length) await VendorDb.updateVendor(p.match.id, { trade_categories: union });
+      if (!primaryId) primaryId = p.match.id;
     } else {
-      await VendorDb.createVendor({ name: seg, trade_categories: v ? (v.trade_categories || []) : [], invite_email: _addVendorPlaceholderEmail() }, userProfile);
+      const created = await VendorDb.createVendor({ name: p.seg, trade_categories: v ? (v.trade_categories || []) : [], invite_email: _addVendorPlaceholderEmail() }, userProfile);
+      if (!primaryId) primaryId = created.id;
     }
   }
-  await VendorDb.deleteVendorCascade(vendorId);
-  return { created: plan.filter(p => !p.match).length, linked: plan.filter(p => p.match).length };
+  // The original used to be deleted outright with deleteVendorCascade — which DESTROYS its
+  // bids, rates, products, certifications and personnel and nulls its work-package links.
+  // 104 of the garbled records carry exactly that data, so splitting them was silently
+  // lossy. Folding the original into the FIRST segment instead reassigns everything (and
+  // still removes the garbled row), so nothing is thrown away. mergeVendors handles the
+  // (vendor_id, wp_id) collisions on rates/bids. Falls back to the old delete only if no
+  // segment vendor could be resolved, which _executeSplit's >=2 guard makes unreachable.
+  if (primaryId) await VendorDb.mergeVendors(primaryId, [vendorId]);
+  else await VendorDb.deleteVendorCascade(vendorId);
+  return { created: plan.filter(p => !p.match).length, linked: plan.filter(p => p.match).length, primaryId };
 }
 async function doSplit(vendorId) {
   const v = allVendors.find(x => x.id === vendorId);
@@ -1311,7 +1322,7 @@ async function doSplit(vendorId) {
   const newOnes = plan.filter(p => !p.match);
   const linked = plan.filter(p => p.match);
   const planText = plan.map(p => p.match ? `${p.seg} (→ links to existing "${p.match.name}")` : `${p.seg} (new)`).join('\n  ');
-  if (!confirm(`Split "${v ? v.name : ''}" into ${segs.length} vendors?\n\n  ${planText}\n\n${newOnes.length} new vendor record(s) will be created; ${linked.length} segment(s) already match an existing vendor and will be linked to it (its trade categories are updated, no duplicate is created).\n\nThe original garbled record and any of its own products/certifications/personnel/rates/bids will be permanently deleted. Any work packages currently linked to it will need to be manually re-linked to the correct new/linked vendor afterward — this tool does not attempt to redistribute those links.\n\nThis cannot be undone.`)) return;
+  if (!confirm(`Split "${v ? v.name : ''}" into ${segs.length} vendors?\n\n  ${planText}\n\n${newOnes.length} new vendor record(s) will be created; ${linked.length} segment(s) already match an existing vendor and will be linked to it (its trade categories are updated, no duplicate is created).\n\nThe garbled record itself is removed, and anything attached to it (products, certifications, personnel, rates, bid history and work-package links) moves to the FIRST segment — "${esc(plan[0].seg)}" — so nothing is lost. If some of that data really belongs to one of the other companies, move it from that vendor's profile afterward; this tool cannot tell which segment it belonged to.\n\nThis cannot be undone.`)) return;
   try {
     const res = await _executeSplit(vendorId);
     _splitSkipped.delete(vendorId);
