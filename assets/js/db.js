@@ -45,6 +45,25 @@ const WPDb = (() => {
     return /budget_bcb[0-9]/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
   function _stripBcb(obj) { const d = {...obj}; delete d.budget_bcb0; delete d.budget_bcb1; delete d.budget_bcb2; return d; }
+  // Every deploy guard below decides, from a free-text Postgres error, that a column is
+  // absent and DROPS it from the payload — then the write succeeds and the caller is told
+  // everything saved. That silence is the dangerous part: the two bugs these guards have
+  // actually caused were both over-matches that discarded columns the database really had
+  // (`/vendor_id/` also matching a `proposed_vendor_ids` error, and _stripBuyback dropping
+  // all three buyback fields when only buyback_amount was missing) — and nothing anywhere
+  // reported it. Rewriting the matching wouldn't have caught either; SEEING the drop would.
+  // So: never strip quietly. If this ever fires for a column whose migration HAS been run,
+  // that is a guard bug and this warning is the only thing that will say so.
+  function _warnDropped(where, before, after, error) {
+    const gone = Object.keys(before).filter(k => !(k in after));
+    if (!gone.length) return;
+    console.warn('[WPDb] ' + where + ': dropped ' + gone.join(', ') +
+      ' — this database appears not to have those column(s), so they were NOT saved.' +
+      ' If the migration for them has already been run, this is a false positive in the' +
+      ' missing-column guard, not a schema problem. Postgres said: ' +
+      ((error && (error.message || error.details)) || 'unknown'));
+  }
+  function _warn2(before, after, error) { _warnDropped('insert retry', before, after, error); return after; }
   // Retry helper: strip whichever optional column set the DB is missing, then try again.
   function _stripOptional(obj, error) {
     let d = _stripAudit(obj);
@@ -53,6 +72,7 @@ const WPDb = (() => {
     if (_isMissingProposedVendorIdsCol(error)) d = _stripProposedVendorIds(d);
     if (_isMissingAwardedVendorIdsCol(error)) d = _stripAwardedVendorIds(d);
     if (_isMissingBuybackCol(error)) d = _stripBuyback(d, error);
+    _warnDropped('write retry', obj, d, error);
     return d;
   }
   // Same deploy-order guard again for projects.group_head (MIGRATION_project_group_head.sql):
@@ -172,11 +192,11 @@ const WPDb = (() => {
     if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error)))
       ({data,error}=await sb.from('work_packages').insert(_stripOptional(base,error)).select().single());
     if(error && _isMissingBcbCol(error))
-      ({data,error}=await sb.from('work_packages').insert(_stripBcb(_stripAudit(base))).select().single());
+      ({data,error}=await sb.from('work_packages').insert(_warn2(base,_stripBcb(_stripAudit(base)),error)).select().single());
     if(error && _isMissingVendorCol(error))
-      ({data,error}=await sb.from('work_packages').insert(_stripVendor(_stripAudit(base))).select().single());
+      ({data,error}=await sb.from('work_packages').insert(_warn2(base,_stripVendor(_stripAudit(base)),error)).select().single());
     if(error && _isMissingProposedVendorIdsCol(error))
-      ({data,error}=await sb.from('work_packages').insert(_stripProposedVendorIds(_stripAudit(base))).select().single());
+      ({data,error}=await sb.from('work_packages').insert(_warn2(base,_stripProposedVendorIds(_stripAudit(base)),error)).select().single());
     if(error) throw error; return data;
   }
   async function updateWP(id,d) {
