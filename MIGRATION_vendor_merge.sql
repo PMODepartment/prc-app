@@ -37,7 +37,19 @@ begin
   update vendor_products       set vendor_id = p_target where vendor_id = any(p_sources);
   update vendor_certifications set vendor_id = p_target where vendor_id = any(p_sources);
   update vendor_personnel      set vendor_id = p_target where vendor_id = any(p_sources);
-  update vendor_rates          set vendor_id = p_target where vendor_id = any(p_sources);
+
+  -- vendor_rates gained UNIQUE(vendor_id, wp_id) in MIGRATION_vendor_rates_wp_link_fix.sql,
+  -- AFTER this function was first written — a plain reassign therefore aborts the whole merge
+  -- with 23505 whenever the target already has a rate for the same WP (hit in production
+  -- while cleaning up import duplicates). Same treatment as vendor_bids below: drop the
+  -- source rows that would collide, then reassign the rest. Rows with wp_id IS NULL are
+  -- manual staff entries and are never constrained, so they always just move across.
+  delete from vendor_rates r
+    where r.vendor_id = any(p_sources)
+      and r.wp_id is not null
+      and exists (select 1 from vendor_rates t
+                   where t.vendor_id = p_target and t.wp_id = r.wp_id);
+  update vendor_rates set vendor_id = p_target where vendor_id = any(p_sources);
 
   -- vendor_bids has UNIQUE(vendor_id, wp_id): if the target already has a bid
   -- on the same WP, drop the source's duplicate; otherwise reassign it.
