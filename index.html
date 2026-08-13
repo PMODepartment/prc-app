@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812h"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260812h"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812h"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260812h"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260812h"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812i"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260812i"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812i"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260812i"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260812i"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260810b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260812h"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260812i"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812h"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812i"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -229,6 +229,7 @@
               </div>
             </div>
             <div class="chart-mob-h" style="position:relative;height:240px"><canvas id="c-idx-dash-period"></canvas></div>
+            <div id="idx-dash-period-note" style="display:none;font-size:0.7143rem;color:#999;margin-top:6px"></div>
           </div>
           <!-- Top 5 panels -->
           <div class="top5-row" style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin-bottom:18px">
@@ -696,16 +697,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260812h"></script>
-<script src="assets/js/db.js?v=20260812h"></script>
-<script src="assets/js/ui.js?v=20260812h"></script>
-<script src="assets/js/onboarding.js?v=20260812h"></script>
-<script src="assets/js/coachmarks.js?v=20260812h"></script>
+<script src="assets/js/auth.js?v=20260812i"></script>
+<script src="assets/js/db.js?v=20260812i"></script>
+<script src="assets/js/ui.js?v=20260812i"></script>
+<script src="assets/js/onboarding.js?v=20260812i"></script>
+<script src="assets/js/coachmarks.js?v=20260812i"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260810b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260812h"></script>
+<script src="assets/js/charts.js?v=20260812i"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -1353,7 +1354,25 @@
       batteryCard('idx-ov-battery-val', valPct, valDuePct, '% Awarded by Value',  `${Fmt.money(awd)} awarded`, `of ${Fmt.money(bcb)} BCB`);
     }
 
+    // Shared footnote for any period-chart panel whose Forecast line can read above
+    // Cumulative Planned because some not-yet-resolved WPs have no Planned Award
+    // Date at all (Known Issue #32). `noteId` is the footnote <div>'s id; clicking
+    // it jumps to the Action Center's "Missing Planned Award Date" section for
+    // super_admin (the only role that can reach that tab — see its profile-menu
+    // gating), else it's just informational text with no click affordance.
+    function _renderMissingPlanNote(noteId, wps) {
+      const el = document.getElementById(noteId);
+      if (!el) return;
+      const n = window.wpMissingPlanCount(wps);
+      if (!n) { el.style.display = 'none'; el.onclick = null; return; }
+      const isSuperAdmin = window.__profile && window.__profile.role === 'super_admin';
+      el.textContent = `*${n} work package${n===1?'':'s'} missing a Planned Award Date — excluded from Planned, but counted in Forecast.${isSuperAdmin ? ' See Action Center.' : ''}`;
+      el.style.cssText = `display:block;font-size:0.7143rem;color:#999;margin-top:6px${isSuperAdmin ? ';cursor:pointer;text-decoration:underline' : ''}`;
+      el.onclick = isSuperAdmin ? () => window.switchTab && window.switchTab('actions') : null;
+      el.title = isSuperAdmin ? 'Open Action Center' : '';
+    }
     function _idxDashRenderPeriod(wps) {
+      _renderMissingPlanNote('idx-dash-period-note', wps);
       const titleEl = document.getElementById('idx-dash-period-title');
       if(_idxDashDataMode === 'count') {
         if(titleEl) titleEl.textContent = 'Work Packages by Period — Planned vs Actual';

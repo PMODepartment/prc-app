@@ -356,6 +356,14 @@ window.isResolved = function (w) {
 window.isMoneyAwarded = function (w) {
   return !!w && (!!w.not_to_be_awarded || (w.award_status === 'Awarded' && (w.total_awarded || 0) > 0));
 };
+// A not-resolved WP with no Planned Award Date is silently excluded from every
+// "Cumulative Planned" line (period charts, S-Curve) but IS counted in "Forecast"
+// (which treats no-plan as "due next period") — so Forecast can visibly climb
+// above Planned's own ceiling on a project with this data gap (Known Issue #32).
+// Shared so every period-chart panel's footnote reads the same count.
+window.wpMissingPlanCount = function (wps) {
+  return (wps || []).filter(w => !window.isResolved(w) && !w.awarding_date).length;
+};
 // BUYBACK: a WP procured under a buyback arrangement has part of its awarded cost
 // recovered when the vendor takes the item back, so only the DEPRECIATED (consumed)
 // portion is real spend. The depreciation % is how much value is lost, so:
