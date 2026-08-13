@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260812g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812g"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260812g"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260812g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812h"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260812h"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812h"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260812h"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260812h"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260810b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260812g"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260812h"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812h"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -696,16 +696,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260812g"></script>
-<script src="assets/js/db.js?v=20260812g"></script>
-<script src="assets/js/ui.js?v=20260812g"></script>
-<script src="assets/js/onboarding.js?v=20260812g"></script>
-<script src="assets/js/coachmarks.js?v=20260812g"></script>
+<script src="assets/js/auth.js?v=20260812h"></script>
+<script src="assets/js/db.js?v=20260812h"></script>
+<script src="assets/js/ui.js?v=20260812h"></script>
+<script src="assets/js/onboarding.js?v=20260812h"></script>
+<script src="assets/js/coachmarks.js?v=20260812h"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260810b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260812g"></script>
+<script src="assets/js/charts.js?v=20260812h"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -1737,6 +1737,15 @@
       const upcoming = wps.filter(w => !window.isResolved(w) && (() => { const d = parseD(w.awarding_date); return d && d >= T; })())
         .map(w => ({ w, days: Math.round((parseD(w.awarding_date) - T) / DAY), bcb: w.approved_budget_bcb || 0 }))
         .sort((a, b) => a.days - b.days);
+      // 5. Missing Planned Award Date — not resolved, no awarding_date at all. These WPs are
+      // silently excluded from every "Cumulative Planned" line (Overview period chart, S-Curve,
+      // WP List Filtered Analysis) but ARE counted in "Forecast" (which treats no-plan as
+      // "due next period") — so Forecast can visibly climb ABOVE Planned's own ceiling, which reads
+      // as a nonsensical chart until you know why. Surfacing them here is the fix: get real Planned
+      // Award Dates entered so the two lines reconcile, rather than special-casing the chart math.
+      const noPlan = wps.filter(w => !window.isResolved(w) && !w.awarding_date)
+        .map(w => ({ w, bcb: w.approved_budget_bcb || 0 }))
+        .sort((a, b) => b.bcb - a.bcb);
       const sumBcb = arr => arr.reduce((s, x) => s + (x.bcb || 0), 0);
       const inRange = (lo, hi) => upcoming.filter(u => u.days >= lo && (hi == null || u.days <= hi));
       const b30 = inRange(0, 30), b60 = inRange(31, 60), b90 = inRange(61, 90);
@@ -1748,6 +1757,7 @@
         tile('Awarded Over Budget', over.length, over.length ? 'red' : 'green', over.length ? ('+' + money(over.reduce((s, x) => s + x.ovr, 0)) + ' overrun') : 'None'),
         tile('Data Gaps', gaps.length, gaps.length ? 'amber' : 'green', 'Awarded, missing cost/vendor'),
         tile('Awards Next 30 Days', b30.length, '', money(sumBcb(b30)) + ' to award'),
+        tile('Missing Planned Date', noPlan.length, noPlan.length ? 'amber' : 'green', noPlan.length ? (money(sumBcb(noPlan)) + ' BCB unplanned') : 'None'),
       ].join('');
 
       // Table plumbing
@@ -1806,11 +1816,24 @@
           + td(x.w.awarding_date?Fmt.date(x.w.awarding_date):'—') + td(x.days+'d', R) + td(money(x.bcb), R) + '</tr>'),
         'No upcoming awards scheduled.') + trunc(upcoming.length);
 
+      // 5. Missing Planned Award Date
+      const projBreakdown = (() => {
+        const by = {}; noPlan.forEach(x => { by[x.w.project_id] = (by[x.w.project_id]||0) + 1; });
+        return Object.entries(by).sort((a,b) => b[1]-a[1]).map(([pid,n]) => `${esc2(projName(pid))} (${n})`).join(', ');
+      })();
+      const s5 = (noPlan.length ? `<div style="font-size:0.8rem;color:#888;margin-bottom:10px">By project: ${projBreakdown}</div>` : '') + tbl(
+        [{t:'WP No.'},{t:'Project'},{t:'Trade'},{t:'Description'},{t:'BCB',a:'right'}],
+        noPlan.slice(0, CAP).map(x => rowOpen(x.w)
+          + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.trade||'—'))
+          + td(esc2(x.w.description||'—')) + td(money(x.bcb), R) + '</tr>'),
+        'Every not-yet-awarded WP has a Planned Award Date.') + trunc(noPlan.length);
+
       document.getElementById('actions-sections').innerHTML =
         panel('ti-alarm', 'Overdue Awards', `${overdue.length} WP${overdue.length===1?'':'s'} past planned award · ${money(sumBcb(overdue))} BCB`, s1) +
         panel('ti-trending-up', 'Awarded Over Budget', `${over.length} WP${over.length===1?'':'s'}`, s2) +
         panel('ti-alert-circle', 'Data Gaps (Awarded, incomplete)', `${gaps.length} WP${gaps.length===1?'':'s'} — fix so KPIs reconcile`, s3) +
-        panel('ti-calendar-due', 'Upcoming Award Pipeline', `${upcoming.length} WP${upcoming.length===1?'':'s'} ahead · ${money(sumBcb(upcoming))} BCB`, s4);
+        panel('ti-calendar-due', 'Upcoming Award Pipeline', `${upcoming.length} WP${upcoming.length===1?'':'s'} ahead · ${money(sumBcb(upcoming))} BCB`, s4) +
+        panel('ti-calendar-off', 'Missing Planned Award Date', `${noPlan.length} WP${noPlan.length===1?'':'s'} — skews the Planned-vs-Forecast period charts`, s5);
     }
 
     function _renderTab(tab, wps, filt, allStats) {

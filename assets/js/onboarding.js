@@ -52,7 +52,7 @@
       '.ob-badge{margin-left:auto;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.35);padding:5px 11px;border-radius:20px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}',
       '.ob-x{position:absolute;top:12px;right:14px;background:rgba(255,255,255,.18);border:none;color:#fff;width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s}',
       '.ob-x:hover{background:rgba(255,255,255,.34)}',
-      '.ob-body{padding:24px 26px 8px;overflow-y:auto;flex:1;min-height:0}',
+      '.ob-body{padding:24px 26px 8px;overflow-y:auto;height:340px;flex-shrink:0}',
       '.ob-s-ico{width:52px;height:52px;border-radius:13px;background:var(--mw-red-light,#FDECEA);color:var(--mw-red,#EE3124);display:flex;align-items:center;justify-content:center;font-size:27px;margin-bottom:14px}',
       '.ob-s-title{font-size:19px;font-weight:800;margin:0 0 8px;line-height:1.25}',
       '.ob-s-lead{font-size:13.5px;line-height:1.6;color:var(--text-secondary,#5A5858);margin:0 0 14px}',
@@ -79,9 +79,15 @@
       '.ob-btn-next:hover:not(:disabled){filter:brightness(1.06)}',
       '.ob-chk{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-hint,#9B9999);cursor:pointer;user-select:none;margin-right:4px}',
       '.ob-chk input{cursor:pointer}',
-      '.btn-guide{width:34px;height:34px;border-radius:8px;border:1px solid var(--border-md,rgba(0,0,0,.14));background:var(--surface,#fff);color:var(--text-secondary,#5A5858);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:color .12s,border-color .12s}',
-      '.btn-guide:hover{color:var(--mw-red,#EE3124);border-color:var(--mw-red,#EE3124)}',
+      '.btn-guide{width:34px;height:34px;border-radius:8px;border:1px solid var(--border-md,rgba(0,0,0,.14));background:var(--surface,#fff);color:var(--text-secondary,#5A5858);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:color .12s,border-color .12s;position:relative}',
+      '.btn-guide:hover,.btn-guide[aria-expanded="true"]{color:var(--mw-red,#EE3124);border-color:var(--mw-red,#EE3124)}',
       '.btn-guide i{font-size:17px}',
+      '.btn-guide-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--surface,#fff);border:1px solid var(--border,rgba(0,0,0,.08));border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.16);width:190px;z-index:9999;overflow:hidden}',
+      '.btn-guide-menu.show{display:block}',
+      '.btn-guide-menu a{display:flex;align-items:center;gap:9px;padding:11px 14px;font-size:13px;color:var(--text-primary,#231F20);font-weight:600;text-decoration:none;font-family:inherit;cursor:pointer;border-bottom:1px solid var(--border,rgba(0,0,0,.08))}',
+      '.btn-guide-menu a:last-child{border-bottom:none}',
+      '.btn-guide-menu a:hover{background:var(--surface-2,#f5f5f5)}',
+      '.btn-guide-menu a i{font-size:15px;color:var(--text-hint,#9B9999);flex-shrink:0}',
       /* Mobile: .ob-foot crammed 4 items (progress dots, "Don\'t show on login" checkbox, Back,
          Next) onto one nowrap row — the checkbox label wrapped to 2 lines and squeezed against
          the buttons. Wrap it into three stacked rows instead: dots, then the checkbox, then
@@ -90,7 +96,7 @@
         + '.ob-overlay{padding:10px}'
         + '.ob-head{padding:14px 44px 14px 16px}.ob-head h2{font-size:15px}.ob-badge{display:none}'
         + '.ob-x{width:26px;height:26px;top:10px;right:10px}'
-        + '.ob-s-title{font-size:17px}.ob-body{padding:16px 16px 6px}'
+        + '.ob-s-title{font-size:17px}.ob-body{padding:16px 16px 6px;height:min(340px,50vh)}'
         + '.ob-foot{flex-wrap:wrap;row-gap:10px;padding:12px 16px 16px}'
         + '.ob-dots{order:1;flex:0 0 100%;justify-content:center}'
         + '.ob-chk{order:2;flex:0 0 100%;justify-content:center;margin-right:0;white-space:nowrap}'
@@ -387,19 +393,68 @@
     if (!seen) setTimeout(open, 650);   // let the page settle first
   }
 
-  /* ---- topbar Guide button (injected, idempotent) ------------------------ */
+  /* ---- topbar Guide button (injected, idempotent) ------------------------
+     Clicking "?" opens a small menu — Dashboard Guide + What's New — rather
+     than jumping straight into the tour, so the patch notes (previously only
+     reachable from the avatar dropdown) are discoverable from the same "?"
+     entry point users already look to for help. */
+  function closeGuideMenu() {
+    var m = document.getElementById('btn-guide-menu');
+    var b = document.getElementById('btn-guide');
+    if (m) m.classList.remove('show');
+    if (b) b.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('mousedown', onGuideMenuOutsideClick);
+  }
+  function onGuideMenuOutsideClick(e) {
+    var m = document.getElementById('btn-guide-menu');
+    var b = document.getElementById('btn-guide');
+    if (m && !m.contains(e.target) && e.target !== b && !(b && b.contains(e.target))) closeGuideMenu();
+  }
+  function toggleGuideMenu(e) {
+    e.stopPropagation();
+    var m = document.getElementById('btn-guide-menu');
+    var b = document.getElementById('btn-guide');
+    if (!m || !b) return;
+    var opening = !m.classList.contains('show');
+    if (opening) {
+      // Build fresh each open so a "What's New" item that loaded after this
+      // script (patch-notice.js is included later in the page) is picked up.
+      var items = '<a id="gm-guide"><i class="ti ti-book-2"></i>Dashboard Guide</a>';
+      if (window.PatchNotice && window.PatchNotice.open) {
+        items += '<a id="gm-whatsnew"><i class="ti ti-sparkles"></i>What&#39;s New</a>';
+      }
+      m.innerHTML = items;
+      document.getElementById('gm-guide').onclick = function () { closeGuideMenu(); open(); };
+      var wn = document.getElementById('gm-whatsnew');
+      if (wn) wn.onclick = function () { closeGuideMenu(); window.PatchNotice.open(); };
+      m.classList.add('show');
+      b.setAttribute('aria-expanded', 'true');
+      setTimeout(function () { document.addEventListener('mousedown', onGuideMenuOutsideClick); }, 0);
+    } else {
+      closeGuideMenu();
+    }
+  }
   function injectButton() {
     var tr = document.querySelector('.topbar-right');
     if (!tr || document.getElementById('btn-guide')) return;
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;flex-shrink:0';
     var b = document.createElement('button');
     b.className = 'btn-guide';
     b.id = 'btn-guide';
-    b.title = 'Dashboard guide';
-    b.setAttribute('aria-label', 'Open dashboard guide');
+    b.title = 'Help';
+    b.setAttribute('aria-label', 'Open help menu');
+    b.setAttribute('aria-expanded', 'false');
+    b.setAttribute('aria-haspopup', 'true');
     b.innerHTML = '<i class="ti ti-help"></i>';
-    b.onclick = open;
+    b.onclick = toggleGuideMenu;
+    var menu = document.createElement('div');
+    menu.className = 'btn-guide-menu';
+    menu.id = 'btn-guide-menu';
+    wrap.appendChild(b);
+    wrap.appendChild(menu);
     var ub = document.getElementById('user-bar');
-    if (ub) tr.insertBefore(b, ub); else tr.appendChild(b);
+    if (ub) tr.insertBefore(wrap, ub); else tr.appendChild(wrap);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectButton);
