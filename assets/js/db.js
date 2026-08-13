@@ -411,7 +411,7 @@ window.effectiveAwardedCost = function (w) {
 function helpingMetrics(wps) {
   const byProj = {};
   (wps||[]).forEach(w => { (byProj[w.project_id] = byProj[w.project_id] || []).push(w); });
-  let awarded=0, totalBudget=0, awardedCost=0, budgetAwarded=0, hsCovered=true;
+  let awarded=0, totalBudget=0, awardedCost=0, budgetAwarded=0, hsCovered=true, buybackTotal=0;
   Object.keys(byProj).forEach(pid => {
     const arr = byProj[pid], hs = HELPING_FIGURES[pid];
     if (hs) {
@@ -443,10 +443,45 @@ function helpingMetrics(wps) {
       totalBudget += arr.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
       awardedCost += awd.reduce((s,w)=>s+window.effectiveAwardedCost(w),0);
       budgetAwarded += awd.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+      // Buyback recovery over the SAME money-awarded set, kept as a separate figure —
+      // NOT folded into awardedCost here (that stays the real, effective spend, so
+      // Actual Award / CTC / EAC keep reflecting genuine cash flow). Callers that want
+      // a "Savings/Loss excluding buyback" figure compute it as
+      // (budgetAwarded - awardedCost - buybackTotal), i.e. against the RAW awarded cost,
+      // and show buybackTotal as a separate "(+₱X Buyback)" annotation — per explicit
+      // 2026-08-12 request not to silently auto-fold buyback into the headline number.
+      buybackTotal += awd.reduce((s,w)=>s+(w.buyback?window.buybackValue(w):0),0);
     }
   });
-  return {awarded, totalBudget, awardedCost, budgetAwarded, hsCovered};
+  return {awarded, totalBudget, awardedCost, budgetAwarded, hsCovered, buybackTotal};
 }
+
+// Savings/Loss display, with buyback broken out as a separate annotation instead of
+// silently folded into the headline number (2026-08-12, explicit request). `hm` is a
+// helpingMetrics() result. `hm.awardedCost` is already buyback-netted (effective spend,
+// used unchanged by Actual Award/CTC/EAC elsewhere), so the COMBINED savings figure
+// (budgetAwarded − awardedCost) already has buyback's benefit baked in; subtracting
+// hm.buybackTotal back out gives the RAW savings (as if buyback recovery didn't happen),
+// which is what's now shown as the primary number, with buyback shown alongside it.
+window.fmtSavingsBuyback = function (hm) {
+  const combined = (hm.budgetAwarded || 0) - (hm.awardedCost || 0);
+  const bb = hm.buybackTotal || 0;
+  const raw = combined - bb;
+  const rawPct = hm.budgetAwarded ? (raw / hm.budgetAwarded * 100) : 0;
+  const bbPct = hm.budgetAwarded ? (bb / hm.budgetAwarded * 100) : 0;
+  const cls = raw >= 0 ? 'green' : 'red';
+  const color = raw >= 0 ? '#2D9B6F' : '#EE3124';
+  const sign = raw >= 0 ? '+' : '-';
+  const hasBB = bb > 0.5; // ignore rounding dust
+  const bbMoneyNote = hasBB ? ` <span style="font-size:0.6em;font-weight:600;color:#888">(+${Fmt.moneyShort(bb)} Buyback)</span>` : '';
+  const bbPctNote = hasBB ? ` <span style="font-weight:600;color:#888">(+${bbPct.toFixed(1)}% Buyback)</span>` : '';
+  return {
+    val: sign + Fmt.moneyShort(Math.abs(raw)) + bbMoneyNote,
+    full: sign + Fmt.moneyFull(Math.abs(raw)) + (hasBB ? ' (+' + Fmt.moneyFull(bb) + ' Buyback recovery, shown separately)' : ''),
+    sub: (raw >= 0 ? '+' : '') + rawPct.toFixed(1) + '%' + bbPctNote,
+    cls, color, raw, bb,
+  };
+};
 
 /* ── Status glyphs — never encode meaning in colour alone ──────────────────
    Award/procurement/submittal/delivery states were distinguished ONLY by red vs
@@ -892,13 +927,18 @@ function buildRankTable(id, items, type) {
         </div>
       </div>
     </td>`;
+    // Buyback recovery is shown as a separate annotation next to Savings/%/%WT, not folded
+    // into the main figure — matches the 2026-08-12 KPI change (item.savings/val/pct/wt above
+    // are already computed against RAW awarded cost, excluding buyback).
+    const bbNote = item.bb > 0.5
+      ? ` <span style="font-size:0.6em;font-weight:600;color:#888;white-space:nowrap">(+${Fmt.money(item.bb)} BB)</span>` : '';
     if (isValue) {
       const rowColor = (item.savings!=null && item.savings<0) ? '#EE3124' : '#2D9B6F';
       const savingsTxt = item.savings!=null ? (item.savings>=0?'+':'-')+Fmt.money(Math.abs(item.savings)) : '—';
       return `<tr class="rank-row" data-rn="${safe}"${click} style="${cursor}border-bottom:1px solid #f5f5f5">${wpCell}
         <td class="rank-side" style="font-size:0.8571rem;font-weight:700;color:#231F20;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.val)}</td>
         <td class="rank-side" style="font-size:0.7143rem;color:#777;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
-        <td class="rank-side" style="font-size:0.8571rem;font-weight:700;color:${rowColor};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Budget (BCB) − Awarded Cost">${savingsTxt}</td>
+        <td class="rank-side" style="font-size:0.8571rem;font-weight:700;color:${rowColor};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Budget (BCB) − Awarded Cost, excluding buyback recovery">${savingsTxt}${bbNote}</td>
         <td class="rank-side" style="font-size:0.7857rem;font-weight:600;color:${rowColor};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Savings/Loss ÷ Budget (BCB)">${item.pct!=null?item.pct:'—'}</td>
         <td class="rank-side" style="font-size:0.7857rem;font-weight:600;color:${rowColor};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Savings/Loss ÷ Total BCB">${item.wt!=null?item.wt:'—'}</td>
       </tr>`;
@@ -906,7 +946,7 @@ function buildRankTable(id, items, type) {
     return `<tr class="rank-row" data-rn="${safe}"${click} style="${cursor}border-bottom:1px solid #f5f5f5">${wpCell}
       <td class="rank-side" style="font-size:0.7143rem;color:#888;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.bcb)}</td>
       <td class="rank-side" style="font-size:0.7143rem;color:#777;font-weight:500;padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${Fmt.money(item.awarded)}</td>
-      <td class="rank-side" style="font-size:0.8571rem;font-weight:700;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${valSign}${Fmt.money(item.val)}</td>
+      <td class="rank-side" style="font-size:0.8571rem;font-weight:700;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Excludes buyback recovery">${valSign}${Fmt.money(item.val)}${bbNote}</td>
       <td class="rank-side" style="font-size:0.7857rem;font-weight:600;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap">${item.pct}</td>
       <td class="rank-side" style="font-size:0.7857rem;font-weight:600;color:${accent};padding:9px 8px;text-align:right;vertical-align:middle;white-space:nowrap" title="Savings ÷ Total BCB">${item.wt!=null?item.wt:'—'}</td>
     </tr>`;

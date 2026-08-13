@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812i"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260812i"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812i"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260812i"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260812i"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812j"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260812j"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812j"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260812j"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260812j"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260810b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260812i"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260812j"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812i"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812j"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -697,16 +697,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260812i"></script>
-<script src="assets/js/db.js?v=20260812i"></script>
-<script src="assets/js/ui.js?v=20260812i"></script>
-<script src="assets/js/onboarding.js?v=20260812i"></script>
-<script src="assets/js/coachmarks.js?v=20260812i"></script>
+<script src="assets/js/auth.js?v=20260812j"></script>
+<script src="assets/js/db.js?v=20260812j"></script>
+<script src="assets/js/ui.js?v=20260812j"></script>
+<script src="assets/js/onboarding.js?v=20260812j"></script>
+<script src="assets/js/coachmarks.js?v=20260812j"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260810b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260812i"></script>
+<script src="assets/js/charts.js?v=20260812j"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -1731,7 +1731,34 @@
     /* ══ Risk & Action Center ══ decision-first "what needs attention now"
        view over the selected projects' approved WPs. Tables only (no canvas),
        every row opens the WP detail panel. Desktop non-viewer tab only. */
+    // Action Center table UX state (2026-08-12): per-section collapse + column sort, and a
+    // Data Gaps missing-field filter. Kept module-level so it survives re-render (every toggle/
+    // sort/filter click just re-invokes renderActionsTab against the same cached WP set — cheap
+    // enough at Action Center's row counts, and far simpler than patching individual DOM nodes).
+    let _acCollapsed = {}, _acSortState = {}, _acGapFilter = 'all', _acLastWPs = null;
+    window._acToggle = function (section) { _acCollapsed[section] = !_acCollapsed[section]; if (_acLastWPs) renderActionsTab(_acLastWPs); };
+    window._acSort = function (section, key) {
+      const cur = _acSortState[section];
+      if (cur && cur.key === key) cur.dir = -cur.dir; else _acSortState[section] = { key, dir: 1 };
+      if (_acLastWPs) renderActionsTab(_acLastWPs);
+    };
+    window._acSetGapFilter = function (v) { _acGapFilter = v; if (_acLastWPs) renderActionsTab(_acLastWPs); };
+    function _acApplySort(section, rows, keyFns) {
+      const s = _acSortState[section];
+      if (!s || !keyFns[s.key]) return rows;
+      const get = keyFns[s.key];
+      return [...rows].sort((a, b) => {
+        const va = get(a), vb = get(b);
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        if (typeof va === 'string') return s.dir * va.localeCompare(vb);
+        return s.dir * (va - vb);
+      });
+    }
+
     function renderActionsTab(wps) {
+      _acLastWPs = wps;
       const T = new Date(); T.setHours(0,0,0,0);            // local midnight
       const DAY = 86400000;
       const esc2 = window.esc || (s => s);
@@ -1750,8 +1777,13 @@
         .sort((a, b) => b.ovr - a.ovr);
       // 3. Data gaps — flagged Awarded but missing cost or vendor (breaks KPI
       //    reconciliation; deliberate "Not to be Awarded" WPs are excluded).
-      const gaps = wps.filter(w => w.award_status === 'Awarded' && !w.not_to_be_awarded && (!((w.total_awarded || 0) > 0) || !(w.contractor && String(w.contractor).trim())))
+      const gapsAll = wps.filter(w => w.award_status === 'Awarded' && !w.not_to_be_awarded && (!((w.total_awarded || 0) > 0) || !(w.contractor && String(w.contractor).trim())))
         .map(w => ({ w, noCost: !((w.total_awarded || 0) > 0), noVendor: !(w.contractor && String(w.contractor).trim()), bcb: w.approved_budget_bcb || 0 }));
+      // Missing-field filter (2026-08-12): All / Missing Cost only / Missing Vendor only / Missing Both.
+      const gaps = gapsAll.filter(x => _acGapFilter === 'all' ? true
+        : _acGapFilter === 'cost' ? x.noCost
+        : _acGapFilter === 'vendor' ? x.noVendor
+        : /* 'both' */ (x.noCost && x.noVendor));
       // 4. Upcoming award pipeline — not resolved, planned award today or later.
       const upcoming = wps.filter(w => !window.isResolved(w) && (() => { const d = parseD(w.awarding_date); return d && d >= T; })())
         .map(w => ({ w, days: Math.round((parseD(w.awarding_date) - T) / DAY), bcb: w.approved_budget_bcb || 0 }))
@@ -1774,52 +1806,90 @@
       document.getElementById('actions-summary').innerHTML = [
         tile('Overdue Awards', overdue.length, overdue.length ? 'red' : 'green', money(sumBcb(overdue)) + ' BCB at risk'),
         tile('Awarded Over Budget', over.length, over.length ? 'red' : 'green', over.length ? ('+' + money(over.reduce((s, x) => s + x.ovr, 0)) + ' overrun') : 'None'),
-        tile('Data Gaps', gaps.length, gaps.length ? 'amber' : 'green', 'Awarded, missing cost/vendor'),
+        tile('Data Gaps', gapsAll.length, gapsAll.length ? 'amber' : 'green', 'Awarded, missing cost/vendor'),
         tile('Awards Next 30 Days', b30.length, '', money(sumBcb(b30)) + ' to award'),
         tile('Missing Planned Date', noPlan.length, noPlan.length ? 'amber' : 'green', noPlan.length ? (money(sumBcb(noPlan)) + ' BCB unplanned') : 'None'),
       ].join('');
 
       // Table plumbing
-      const TH = 'padding:8px 10px;border-bottom:2px solid var(--border-md,#ddd);font-size:0.72rem;text-transform:uppercase;letter-spacing:.02em;color:#888;white-space:nowrap';
+      const TH = 'padding:8px 10px;border-bottom:2px solid var(--border-md,#ddd);font-size:0.72rem;text-transform:uppercase;letter-spacing:.02em;color:#888;white-space:nowrap;position:sticky;top:0;background:var(--surface,#fff);z-index:1';
       const TDB = 'padding:7px 10px;border-bottom:1px solid var(--border,#eee);font-size:0.8rem;vertical-align:top';
       const td = (content, extra) => `<td style="${TDB};${extra || ''}">${content}</td>`;
-      const tbl = (heads, rows, empty) => rows.length
-        ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
-            <thead><tr>${heads.map(h => `<th style="${TH};text-align:${h.a || 'left'}">${h.t}</th>`).join('')}</tr></thead>
+      // Sortable header cell — click toggles asc/desc on that column; `key` must match a keyFn
+      // passed to _acApplySort for the same section. Sticky (see TH) so headers stay visible
+      // while scrolling a long table (each table's own scroll region, not the page).
+      const acTh = (section, key, label, align) => {
+        const s = _acSortState[section];
+        const active = s && s.key === key;
+        const arrow = active ? (s.dir === 1 ? ' ▲' : ' ▼') : '';
+        return `<th onclick="_acSort('${section}','${key}')" style="${TH};text-align:${align || 'left'};cursor:pointer;user-select:none${active ? ';color:#EE3124' : ''}">${label}${arrow}</th>`;
+      };
+      const tbl = (theadHtml, rows, empty) => rows.length
+        ? `<div style="overflow:auto;max-height:420px"><table style="width:100%;border-collapse:collapse">
+            <thead><tr>${theadHtml}</tr></thead>
             <tbody>${rows.join('')}</tbody></table></div>`
         : `<div style="color:#2D9B6F;font-size:0.85rem;padding:6px 0"><i class="ti ti-circle-check" style="margin-right:4px"></i>${empty}</div>`;
       const trunc = n => n > CAP ? `<div style="font-size:0.75rem;color:#aaa;margin-top:8px">Showing top ${CAP} of ${n}.</div>` : '';
       const rowOpen = w => `<tr onclick="openWPDetail('${w.id}')" style="cursor:pointer" onmouseover="this.style.background='var(--mw-red-light,#FDECEA)'" onmouseout="this.style.background=''">`;
       const R = 'text-align:right';
-      const panel = (icon, title, sub, body) => `<div class="panel" style="margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-          <div class="panel-title" style="margin:0"><i class="ti ${icon}" style="margin-right:6px;color:var(--mw-red)"></i>${title}</div>
-          <div style="font-size:0.8rem;color:#888">${sub}</div></div>${body}</div>`;
+      // Collapsible panel (2026-08-12) — click the header row to collapse/expand; state persists
+      // (per section id) across re-renders via _acCollapsed, restored via window._acToggle.
+      const panel = (section, icon, title, sub, extra, body) => {
+        const collapsed = !!_acCollapsed[section];
+        return `<div class="panel" style="margin-bottom:14px">
+        <div onclick="_acToggle('${section}')" style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:${collapsed ? '0' : '10px'};flex-wrap:wrap;cursor:pointer;user-select:none">
+          <div class="panel-title" style="margin:0"><i class="ti ti-chevron-down" style="margin-right:4px;display:inline-block;transition:transform .15s;transform:${collapsed ? 'rotate(-90deg)' : 'none'}" aria-hidden="true"></i><i class="ti ${icon}" style="margin-right:6px;color:var(--mw-red)"></i>${title}</div>
+          <div style="font-size:0.8rem;color:#888">${sub}</div></div>
+        ${collapsed ? '' : (extra || '') + body}</div>`;
+      };
 
       // 1. Overdue
+      const overdueSorted = _acApplySort('overdue', overdue, {
+        wp_no: x => x.w.wp_no||'', project: x => projName(x.w.project_id), trade: x => x.w.trade||'',
+        planned: x => x.w.awarding_date ? new Date(x.w.awarding_date).getTime() : null, days: x => x.days, bcb: x => x.bcb,
+      });
       const s1 = tbl(
-        [{t:'WP No.'},{t:'Project'},{t:'Trade'},{t:'Planned Award'},{t:'Days Overdue',a:'right'},{t:'BCB',a:'right'}],
-        overdue.slice(0, CAP).map(x => rowOpen(x.w)
+        acTh('overdue','wp_no','WP No.') + acTh('overdue','project','Project') + acTh('overdue','trade','Trade')
+          + acTh('overdue','planned','Planned Award') + acTh('overdue','days','Days Overdue','right') + acTh('overdue','bcb','BCB','right'),
+        overdueSorted.slice(0, CAP).map(x => rowOpen(x.w)
           + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.trade||'—'))
           + td(x.w.awarding_date?Fmt.date(x.w.awarding_date):'—') + td(x.days+'d', R+';color:#EE3124;font-weight:700') + td(money(x.bcb), R) + '</tr>'),
         'No overdue awards — every not-yet-awarded WP is still within its planned date.') + trunc(overdue.length);
 
       // 2. Over budget
+      const overSorted = _acApplySort('over', over, {
+        wp_no: x => x.w.wp_no||'', project: x => projName(x.w.project_id), vendor: x => x.w.contractor||'',
+        bcb: x => x.bcb, awarded: x => x.awd, overrun: x => x.ovr,
+      });
       const s2 = tbl(
-        [{t:'WP No.'},{t:'Project'},{t:'Vendor'},{t:'BCB',a:'right'},{t:'Awarded',a:'right'},{t:'Overrun',a:'right'}],
-        over.slice(0, CAP).map(x => rowOpen(x.w)
+        acTh('over','wp_no','WP No.') + acTh('over','project','Project') + acTh('over','vendor','Vendor')
+          + acTh('over','bcb','BCB','right') + acTh('over','awarded','Awarded','right') + acTh('over','overrun','Overrun','right'),
+        overSorted.slice(0, CAP).map(x => rowOpen(x.w)
           + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.contractor||'—'))
           + td(money(x.bcb), R) + td(money(x.awd), R) + td('+'+money(x.ovr), R+';color:#EE3124;font-weight:700') + '</tr>'),
         'No awarded WP is over its BCB.') + trunc(over.length);
 
-      // 3. Data gaps
+      // 3. Data gaps — filter (All / Missing Cost / Missing Vendor / Missing Both) above the table
+      const gapFilterBar = `<div style="margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:0.75rem;color:#888;text-transform:uppercase;letter-spacing:.03em">Missing</span>
+        <select onchange="_acSetGapFilter(this.value)" style="padding:5px 8px;border:1px solid var(--border-md,#ddd);border-radius:6px;font-size:0.8rem;background:var(--surface,#fff);color:inherit">
+          <option value="all"${_acGapFilter==='all'?' selected':''}>All (${gapsAll.length})</option>
+          <option value="cost"${_acGapFilter==='cost'?' selected':''}>Cost only (${gapsAll.filter(x=>x.noCost).length})</option>
+          <option value="vendor"${_acGapFilter==='vendor'?' selected':''}>Vendor only (${gapsAll.filter(x=>x.noVendor).length})</option>
+          <option value="both"${_acGapFilter==='both'?' selected':''}>Both (${gapsAll.filter(x=>x.noCost&&x.noVendor).length})</option>
+        </select></div>`;
+      const gapsSorted = _acApplySort('gaps', gaps, {
+        wp_no: x => x.w.wp_no||'', project: x => projName(x.w.project_id), trade: x => x.w.trade||'',
+        missing: x => (x.noCost?'1':'0')+(x.noVendor?'1':'0'), bcb: x => x.bcb,
+      });
       const s3 = tbl(
-        [{t:'WP No.'},{t:'Project'},{t:'Trade'},{t:'Missing'},{t:'BCB',a:'right'}],
-        gaps.slice(0, CAP).map(x => { const tags = [x.noCost?'<span style="color:#B45309;font-weight:700">Cost</span>':'', x.noVendor?'<span style="color:#B45309;font-weight:700">Vendor</span>':''].filter(Boolean).join(', ');
+        acTh('gaps','wp_no','WP No.') + acTh('gaps','project','Project') + acTh('gaps','trade','Trade')
+          + acTh('gaps','missing','Missing') + acTh('gaps','bcb','BCB','right'),
+        gapsSorted.slice(0, CAP).map(x => { const tags = [x.noCost?'<span style="color:#B45309;font-weight:700">Cost</span>':'', x.noVendor?'<span style="color:#B45309;font-weight:700">Vendor</span>':''].filter(Boolean).join(', ');
           return rowOpen(x.w)
           + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.trade||'—'))
           + td(tags) + td(money(x.bcb), R) + '</tr>'; }),
-        'No data gaps — every Awarded WP has a cost and vendor.') + trunc(gaps.length);
+        gapsAll.length ? 'No rows match this filter.' : 'No data gaps — every Awarded WP has a cost and vendor.') + trunc(gaps.length);
 
       // 4. Upcoming pipeline (bucket summary + table)
       const buckets = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -1828,9 +1898,14 @@
             <div style="font-size:0.72rem;color:#888;text-transform:uppercase">${lbl}</div>
             <div style="font-size:1.1rem;font-weight:800">${arr.length} <span style="font-size:0.8rem;font-weight:600;color:#888">WP${arr.length===1?'':'s'}</span></div>
             <div style="font-size:0.8rem;color:#2563EB;font-weight:700">${money(sumBcb(arr))}</div></div>`).join('')}</div>`;
-      const s4 = buckets + tbl(
-        [{t:'WP No.'},{t:'Project'},{t:'Trade'},{t:'Planned Award'},{t:'In',a:'right'},{t:'BCB',a:'right'}],
-        upcoming.slice(0, CAP).map(x => rowOpen(x.w)
+      const upcomingSorted = _acApplySort('upcoming', upcoming, {
+        wp_no: x => x.w.wp_no||'', project: x => projName(x.w.project_id), trade: x => x.w.trade||'',
+        planned: x => x.w.awarding_date ? new Date(x.w.awarding_date).getTime() : null, days: x => x.days, bcb: x => x.bcb,
+      });
+      const s4 = tbl(
+        acTh('upcoming','wp_no','WP No.') + acTh('upcoming','project','Project') + acTh('upcoming','trade','Trade')
+          + acTh('upcoming','planned','Planned Award') + acTh('upcoming','days','In','right') + acTh('upcoming','bcb','BCB','right'),
+        upcomingSorted.slice(0, CAP).map(x => rowOpen(x.w)
           + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.trade||'—'))
           + td(x.w.awarding_date?Fmt.date(x.w.awarding_date):'—') + td(x.days+'d', R) + td(money(x.bcb), R) + '</tr>'),
         'No upcoming awards scheduled.') + trunc(upcoming.length);
@@ -1840,19 +1915,25 @@
         const by = {}; noPlan.forEach(x => { by[x.w.project_id] = (by[x.w.project_id]||0) + 1; });
         return Object.entries(by).sort((a,b) => b[1]-a[1]).map(([pid,n]) => `${esc2(projName(pid))} (${n})`).join(', ');
       })();
-      const s5 = (noPlan.length ? `<div style="font-size:0.8rem;color:#888;margin-bottom:10px">By project: ${projBreakdown}</div>` : '') + tbl(
-        [{t:'WP No.'},{t:'Project'},{t:'Trade'},{t:'Description'},{t:'BCB',a:'right'}],
-        noPlan.slice(0, CAP).map(x => rowOpen(x.w)
+      const noPlanSorted = _acApplySort('noplan', noPlan, {
+        wp_no: x => x.w.wp_no||'', project: x => projName(x.w.project_id), trade: x => x.w.trade||'',
+        description: x => x.w.description||'', bcb: x => x.bcb,
+      });
+      const s5 = tbl(
+        acTh('noplan','wp_no','WP No.') + acTh('noplan','project','Project') + acTh('noplan','trade','Trade')
+          + acTh('noplan','description','Description') + acTh('noplan','bcb','BCB','right'),
+        noPlanSorted.slice(0, CAP).map(x => rowOpen(x.w)
           + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.trade||'—'))
           + td(esc2(x.w.description||'—')) + td(money(x.bcb), R) + '</tr>'),
         'Every not-yet-awarded WP has a Planned Award Date.') + trunc(noPlan.length);
+      const s5Extra = noPlan.length ? `<div style="font-size:0.8rem;color:#888;margin-bottom:10px">By project: ${projBreakdown}</div>` : '';
 
       document.getElementById('actions-sections').innerHTML =
-        panel('ti-alarm', 'Overdue Awards', `${overdue.length} WP${overdue.length===1?'':'s'} past planned award · ${money(sumBcb(overdue))} BCB`, s1) +
-        panel('ti-trending-up', 'Awarded Over Budget', `${over.length} WP${over.length===1?'':'s'}`, s2) +
-        panel('ti-alert-circle', 'Data Gaps (Awarded, incomplete)', `${gaps.length} WP${gaps.length===1?'':'s'} — fix so KPIs reconcile`, s3) +
-        panel('ti-calendar-due', 'Upcoming Award Pipeline', `${upcoming.length} WP${upcoming.length===1?'':'s'} ahead · ${money(sumBcb(upcoming))} BCB`, s4) +
-        panel('ti-calendar-off', 'Missing Planned Award Date', `${noPlan.length} WP${noPlan.length===1?'':'s'} — skews the Planned-vs-Forecast period charts`, s5);
+        panel('overdue', 'ti-alarm', 'Overdue Awards', `${overdue.length} WP${overdue.length===1?'':'s'} past planned award · ${money(sumBcb(overdue))} BCB`, '', s1) +
+        panel('over', 'ti-trending-up', 'Awarded Over Budget', `${over.length} WP${over.length===1?'':'s'}`, '', s2) +
+        panel('gaps', 'ti-alert-circle', 'Data Gaps (Awarded, incomplete)', `${gapsAll.length} WP${gapsAll.length===1?'':'s'} — fix so KPIs reconcile`, gapFilterBar, s3) +
+        panel('upcoming', 'ti-calendar-due', 'Upcoming Award Pipeline', `${upcoming.length} WP${upcoming.length===1?'':'s'} ahead · ${money(sumBcb(upcoming))} BCB`, buckets, s4) +
+        panel('noplan', 'ti-calendar-off', 'Missing Planned Award Date', `${noPlan.length} WP${noPlan.length===1?'':'s'} — skews the Planned-vs-Forecast period charts`, s5Extra, s5);
     }
 
     function _renderTab(tab, wps, filt, allStats) {
@@ -1959,7 +2040,11 @@
         // isMoneyAwarded in db.js), so an in-progress (Not Yet Awarded) WP can't
         // show phantom savings.
         const withBoth = wps.filter(w=>window.isMoneyAwarded(w)&&(w.approved_budget_bcb||0)>0);
-        const variance = w => (w.approved_budget_bcb||0)-window.effectiveAwardedCost(w);
+        // RAW variance (excludes buyback recovery) — matches the Cost Overview KPI change:
+        // buyback is no longer silently folded into the headline Savings/Loss figure. Per-row
+        // buyback contribution is exposed separately as `bb` so buildRankTable can annotate it.
+        const variance = w => (w.approved_budget_bcb||0)-(w.not_to_be_awarded?0:(w.total_awarded||0));
+        const bbOf = w => w.buyback ? window.buybackValue(w) : 0;
         const totBCB = window._idxTotalBCB || 0;                          // for %WT = Savings ÷ Total BCB
         const wtPct = (v,sign) => totBCB ? (sign+(Math.abs(v)/totBCB*100).toFixed(2)+'%') : '—';
         buildRankTable('idx-rank-value',
@@ -1967,22 +2052,22 @@
             .map(w=>{
               const v = variance(w), sign = v>=0?'+':'-';
               return {id:w.id,name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:''),
-                val:w.approved_budget_bcb, awarded:window.effectiveAwardedCost(w), savings:v,
+                val:w.approved_budget_bcb, awarded:(w.not_to_be_awarded?0:(w.total_awarded||0)), savings:v,
                 pct:w.approved_budget_bcb?(sign+(Math.abs(v)/w.approved_budget_bcb*100).toFixed(1)+'%'):'—',
-                wt:wtPct(v,sign)};
+                wt:wtPct(v,sign), bb:bbOf(w)};
             }),
           'value');
         buildRankTable('idx-rank-gains',
           withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
             .map(w=>({id:w.id,name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:''),
-              val:variance(w), bcb:w.approved_budget_bcb, awarded:window.effectiveAwardedCost(w),
-              pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%', wt:wtPct(variance(w),'+')})),
+              val:variance(w), bcb:w.approved_budget_bcb, awarded:(w.not_to_be_awarded?0:(w.total_awarded||0)),
+              pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%', wt:wtPct(variance(w),'+'), bb:bbOf(w)})),
           'savings');
         buildRankTable('idx-rank-losses',
           withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
             .map(w=>({id:w.id,name:w.description,sub:(w.wp_no||'')+(w.trade?' · '+w.trade:''),
-              val:Math.abs(variance(w)), bcb:w.approved_budget_bcb, awarded:window.effectiveAwardedCost(w),
-              pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%', wt:wtPct(variance(w),'-')})),
+              val:Math.abs(variance(w)), bcb:w.approved_budget_bcb, awarded:(w.not_to_be_awarded?0:(w.total_awarded||0)),
+              pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%', wt:wtPct(variance(w),'-'), bb:bbOf(w)})),
           'loss');
 
       } else if (tab === 'backlog') {
@@ -2177,8 +2262,7 @@
         const totalAwd = hm.awardedCost;
         const ctc = hm.totalBudget - hm.budgetAwarded;         // budget remaining to award
         const eac = totalAwd + ctc;
-        const savings = hm.budgetAwarded - totalAwd;           // = totalBCB − eac; matches Overview Savings/Loss
-        const savingsPct = hm.budgetAwarded ? (savings/hm.budgetAwarded*100) : 0;
+        const sv = window.fmtSavingsBuyback(hm);
         const budCards = document.getElementById('bud-cost-cards');
         if (budCards) {
           const card = (lbl,val,cls,full) => `<div class="metric-card"><div class="metric-label"${window.kpiLabelAttrs?window.kpiLabelAttrs(lbl):''}>${lbl}</div><div class="metric-value ${cls}"${full?` title="${full}"`:''}>${val}</div></div>`;
@@ -2187,8 +2271,8 @@
             card('Awarded Cost', Fmt.moneyShort(totalAwd), 'green', Fmt.moneyFull(totalAwd)),
             card('Procurement Cost to Complete', Fmt.moneyShort(ctc), '', Fmt.moneyFull(ctc)),
             card('Procurement Estimate at Completion', Fmt.moneyShort(eac), '', Fmt.moneyFull(eac)),
-            card('Savings / Loss', (savings>=0?'+':'-')+Fmt.moneyShort(Math.abs(savings)), savings>=0?'green':'red', (savings>=0?'+':'-')+Fmt.moneyFull(Math.abs(savings))),
-            card('% Savings / Loss', (savingsPct>=0?'+':'')+savingsPct.toFixed(1)+'%', savingsPct>=0?'green':'red'),
+            card('Savings / Loss', sv.val, sv.cls, sv.full),
+            card('% Savings / Loss', sv.sub, sv.cls),
           ].join('');
         }
         _destroyCharts(['c-idx-bud-period','c-idx-bud-trade','c-idx-bud-by-proj']);
@@ -3033,14 +3117,13 @@
       const card = (lbl,val,cls,full,sub,subColor) => `<div class="metric-card"><div class="metric-label"${window.kpiLabelAttrs?window.kpiLabelAttrs(lbl):''}>${lbl}</div><div class="metric-value ${cls}"${full?` title="${full}"`:''}>${val}</div>${sub?`<div class="metric-sub" style="font-size:1rem;font-weight:700;margin-top:4px;color:${subColor||'#888'}">${sub}</div>`:''}</div>`;
       const balanceAmt = ctc;                                       // budget remaining to award (= totalBudget − budgetAwarded)
       const balanceQty = Math.max(0, filtWPs.length - awardedCount);// WPs not yet awarded
-      const savings    = hm.budgetAwarded - totalAwd;               // Helping-Sheet savings (budget for awarded − awarded cost)
-      const savingsPct = hm.budgetAwarded ? (savings/hm.budgetAwarded*100) : 0;
+      const sv = window.fmtSavingsBuyback(hm);
       const costEl = document.getElementById('metrics-cost');
       if(costEl) costEl.innerHTML = [
         card('Procurement Budget (BCB)', Fmt.moneyShort(totalBCB), '', Fmt.moneyFull(totalBCB)),
         card('Actual Award', Fmt.moneyShort(totalAwd), 'green', Fmt.moneyFull(totalAwd)),
         card('Balance to Award', Fmt.moneyShort(balanceAmt), '', Fmt.moneyFull(balanceAmt), balanceQty+' WP'+(balanceQty===1?'':'s')+' remaining'),
-        card('Savings / Loss', (savings>=0?'+':'-')+Fmt.moneyShort(Math.abs(savings)), savings>=0?'green':'red', (savings>=0?'+':'-')+Fmt.moneyFull(Math.abs(savings)), (savings>=0?'+':'')+savingsPct.toFixed(1)+'%', savings>=0?'#2D9B6F':'#EE3124'),
+        card('Savings / Loss', sv.val, sv.cls, sv.full, sv.sub, sv.color),
       ].join('');
       if(costEl) fitMetricValues(costEl);
 

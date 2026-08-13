@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812i"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260812i"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812i"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260812i"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260812i"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812j"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260812j"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812j"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260812j"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260812j"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260810b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260812i"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260812j"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812i"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812j"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -533,16 +533,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260812i"></script>
-<script src="assets/js/ui.js?v=20260812i"></script>
-<script src="assets/js/db.js?v=20260812i"></script>
-<script src="assets/js/onboarding.js?v=20260812i"></script>
-<script src="assets/js/coachmarks.js?v=20260812i"></script>
+<script src="assets/js/auth.js?v=20260812j"></script>
+<script src="assets/js/ui.js?v=20260812j"></script>
+<script src="assets/js/db.js?v=20260812j"></script>
+<script src="assets/js/onboarding.js?v=20260812j"></script>
+<script src="assets/js/coachmarks.js?v=20260812j"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260810b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260812i"></script>
+<script src="assets/js/charts.js?v=20260812j"></script>
 <script>
 
   // Segmented toggle state — swaps a class instead of rewriting cssText.
@@ -1602,13 +1602,12 @@ function buildMetrics(wps){
   // 4-card Cost Overview: BCB, Actual Award, Balance to Award (amount + WP qty), Savings/Loss (₱ + %)
   const balanceAmt = totalBudget - hm.budgetAwarded;          // budget remaining to award
   const balanceQty = Math.max(0, total - awarded);            // WPs not yet awarded
-  const savings    = hm.budgetAwarded - actualAward;          // Helping-Sheet savings (budget for awarded − awarded cost)
-  const savingsPct = hm.budgetAwarded ? (savings/hm.budgetAwarded*100) : 0;
+  const sv = window.fmtSavingsBuyback(hm);
   const costCards = [
     card('Procurement Budget (BCB)', Fmt.moneyShort(totalBudget), '', Fmt.moneyFull(totalBudget)),
     card('Actual Award', Fmt.moneyShort(actualAward), 'green', Fmt.moneyFull(actualAward)),
     card('Balance to Award', Fmt.moneyShort(balanceAmt), '', Fmt.moneyFull(balanceAmt), balanceQty+' WP'+(balanceQty===1?'':'s')+' remaining'),
-    card('Savings / Loss', (savings>=0?'+':'-')+Fmt.moneyShort(Math.abs(savings)), savings>=0?'green':'red', (savings>=0?'+':'-')+Fmt.moneyFull(Math.abs(savings)), (savings>=0?'+':'')+savingsPct.toFixed(1)+'%', savings>=0?'#2D9B6F':'#EE3124'),
+    card('Savings / Loss', sv.val, sv.cls, sv.full, sv.sub, sv.color),
   ].join('');
 
   const costEl = document.getElementById('metrics-cost');
@@ -1967,7 +1966,9 @@ function renderTop5(wps){
   // awarded" (real cost, or explicitly not_to_be_awarded — see isMoneyAwarded
   // in db.js) — a Not Yet Awarded WP would otherwise show phantom savings.
   const withBoth = wps.filter(w=>window.isMoneyAwarded(w)&&(w.approved_budget_bcb||0)>0);
-  const variance = w => (w.approved_budget_bcb||0)-window.effectiveAwardedCost(w);
+  // RAW variance (excludes buyback recovery) — see index.html's matching comment.
+  const variance = w => (w.approved_budget_bcb||0)-(w.not_to_be_awarded?0:(w.total_awarded||0));
+  const bbOf = w => w.buyback ? window.buybackValue(w) : 0;
   const totBCB = window._projTotalBCB || 0;                              // for %WT = Savings ÷ Total BCB
   const wtPct = (v,sign) => totBCB ? (sign+(Math.abs(v)/totBCB*100).toFixed(2)+'%') : '—';
   buildRankTable('rank-value',
@@ -1975,22 +1976,22 @@ function renderTop5(wps){
       .map(w=>{
         const v = variance(w), sign = v>=0?'+':'-';
         return {id:w.id,name:w.description,sub:w.wp_no+(w.trade?' · '+w.trade:''),
-          val:w.approved_budget_bcb, awarded:window.effectiveAwardedCost(w), savings:v,
+          val:w.approved_budget_bcb, awarded:(w.not_to_be_awarded?0:(w.total_awarded||0)), savings:v,
           pct:w.approved_budget_bcb?(sign+(Math.abs(v)/w.approved_budget_bcb*100).toFixed(1)+'%'):'—',
-          wt:wtPct(v,sign)};
+          wt:wtPct(v,sign), bb:bbOf(w)};
       }),
     'value');
   buildRankTable('rank-gains',
     withBoth.filter(w=>variance(w)>0).sort((a,b)=>variance(b)-variance(a)).slice(0,5)
       .map(w=>({id:w.id,name:w.description,sub:w.wp_no+' · '+w.trade,val:variance(w),
-        bcb:w.approved_budget_bcb, awarded:window.effectiveAwardedCost(w),
-        pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%', wt:wtPct(variance(w),'+')})),
+        bcb:w.approved_budget_bcb, awarded:(w.not_to_be_awarded?0:(w.total_awarded||0)),
+        pct:'+'+((variance(w)/w.approved_budget_bcb)*100).toFixed(1)+'%', wt:wtPct(variance(w),'+'), bb:bbOf(w)})),
     'savings');
   buildRankTable('rank-losses',
     withBoth.filter(w=>variance(w)<0).sort((a,b)=>variance(a)-variance(b)).slice(0,5)
       .map(w=>({id:w.id,name:w.description,sub:w.wp_no+' · '+w.trade,val:Math.abs(variance(w)),
-        bcb:w.approved_budget_bcb, awarded:window.effectiveAwardedCost(w),
-        pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%', wt:wtPct(variance(w),'-')})),
+        bcb:w.approved_budget_bcb, awarded:(w.not_to_be_awarded?0:(w.total_awarded||0)),
+        pct:'-'+((Math.abs(variance(w))/w.approved_budget_bcb)*100).toFixed(1)+'%', wt:wtPct(variance(w),'-'), bb:bbOf(w)})),
     'loss');
 }
 
