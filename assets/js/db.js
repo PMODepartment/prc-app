@@ -1653,6 +1653,10 @@ const VendorDb = (() => {
       const d2 = { ...payload }; delete d2.created_by; delete d2.updated_by; delete d2.updated_by_name; delete d2.updated_at;
       ({ data, error } = await sb.from('vendors').insert(d2).select().single());
     }
+    if (error && _isMissingCol(error, /vendor_code/)) {
+      const d3 = { ...payload }; delete d3.vendor_code;
+      ({ data, error } = await sb.from('vendors').insert(d3).select().single());
+    }
     if (error) throw error;
     return data;
   }
@@ -1663,6 +1667,10 @@ const VendorDb = (() => {
     if (error && _isMissingCol(error, /updated_by|updated_by_name|updated_at/)) {
       const d2 = { ...payload }; delete d2.updated_by; delete d2.updated_by_name; delete d2.updated_at;
       ({ data, error } = await sb.from('vendors').update(d2).eq('id', id).select().single());
+    }
+    if (error && _isMissingCol(error, /vendor_code/)) {
+      const d3 = { ...payload }; delete d3.vendor_code;
+      ({ data, error } = await sb.from('vendors').update(d3).eq('id', id).select().single());
     }
     if (error) throw error;
     return data;

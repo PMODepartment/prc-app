@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812k"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260812k"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812k"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812l"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260812l"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812l"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812k">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812l">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -508,9 +508,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260812k"></script>
-<script src="assets/js/db.js?v=20260812k"></script>
-<script src="assets/js/ui.js?v=20260812k"></script>
+<script src="assets/js/auth.js?v=20260812l"></script>
+<script src="assets/js/db.js?v=20260812l"></script>
+<script src="assets/js/ui.js?v=20260812l"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -602,6 +602,7 @@ function _vendorFiltered() {
     if (statusF !== 'all' && v.status !== statusF) return false;
     if (!q) return true;
     const hay = (v.name || '').toLowerCase()
+      + ' ' + (v.vendor_code || '').toLowerCase()
       + ' ' + (v.trade_categories || []).join(' ').toLowerCase()
       + ' ' + (_vendorProductText[v.id] || '');
     return hay.includes(q);
@@ -848,7 +849,7 @@ function renderCards(rows) {
       v.contact_number ? `<div><i class="ti ti-phone"></i><span>${esc(v.contact_number)}</span></div>` : '',
     ].filter(Boolean).join('');
     const contactHtml = contactRows ? `<div class="vcard-contact">${contactRows}</div>` : '';
-    const sub = v.contact_person || email || (trades.length ? '' : 'Imported — needs review');
+    const sub = [v.vendor_code, v.contact_person || email || (trades.length ? '' : 'Imported — needs review')].filter(Boolean).join(' · ');
     const foot = v.status === 'pending_review'
       ? `<button class="action-btn btn-approve-row" onclick="event.stopPropagation();quickApprove('${v.id}')">Approve</button><button class="action-btn btn-reject-row" onclick="event.stopPropagation();quickReject('${v.id}')">Reject</button>`
       : `<span class="view-hint">View profile <i class="ti ti-arrow-right"></i></span>`;
@@ -1638,7 +1639,7 @@ function renderTable(rows) {
   tbody.innerHTML = rows.map(v => `
     <tr class="${_selectedVendors.has(v.id) ? 'row-selected' : ''}" onclick="openDetailModal('${v.id}')">
       ${_canManage ? `<td onclick="event.stopPropagation()" style="width:34px;text-align:center"><input type="checkbox" class="v-check" ${_selectedVendors.has(v.id) ? 'checked' : ''} onclick="toggleVendorSel('${v.id}',this.checked)" aria-label="Select vendor"></td>` : ''}
-      <td><strong>${esc(v.name)}</strong></td>
+      <td><strong>${esc(v.name)}</strong>${v.vendor_code ? `<div style="font-size:0.7rem;color:#999;font-family:monospace">${esc(v.vendor_code)}</div>` : ''}</td>
       <td>${esc((v.trade_categories||[]).join(', ') || '—')}</td>
       <td>${esc(v.contact_person || _displayEmail(v) || '—')}</td>
       <td><span class="badge badge-${v.status}">${esc(v.status.replace('_',' '))}</span></td>
@@ -1834,6 +1835,8 @@ function renderDetailOverview() {
   detailTrades = new Set(v.trade_categories || []);
   document.getElementById('dtab-overview').innerHTML = `
     <div class="field"><label>Company Name</label><input id="dov-name" type="text" value="${esc(v.name)}"></div>
+    <div class="field"><label>Vendor Code</label><input id="dov-vendor-code" type="text" value="${esc(v.vendor_code)}" placeholder="e.g. V-01250" style="max-width:180px">
+      <div style="font-size:0.72rem;color:#999;margin-top:4px">SAP/ERP identifier from the PO system — matches the same vendor across purchase orders. Leave blank if unknown.</div></div>
     <div class="field"><label>Trade Categories</label><div class="trade-checklist" id="dovTradeChips"></div></div>
     <div class="field"><label>Contact Person</label><input id="dov-contact-person" type="text" value="${esc(v.contact_person)}"></div>
     <div class="field"><label>Contact Number</label><input id="dov-contact-number" type="text" value="${esc(v.contact_number)}"></div>
@@ -1879,6 +1882,7 @@ async function saveDetailOverview() {
   const btn = document.getElementById('btnSaveDetailOverview');
   const fields = {
     name: document.getElementById('dov-name').value.trim(),
+    vendor_code: document.getElementById('dov-vendor-code').value.trim() || null,
     contact_person: document.getElementById('dov-contact-person').value.trim(),
     contact_number: document.getElementById('dov-contact-number').value.trim(),
     contact_email: document.getElementById('dov-contact-email').value.trim(),
