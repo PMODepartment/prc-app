@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812j"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260812j"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812j"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260812j"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260812j"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812k"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260812k"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812k"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260812k"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260812k"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260810b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260812j"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260812k"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812j"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812k"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -697,16 +697,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260812j"></script>
-<script src="assets/js/db.js?v=20260812j"></script>
-<script src="assets/js/ui.js?v=20260812j"></script>
-<script src="assets/js/onboarding.js?v=20260812j"></script>
-<script src="assets/js/coachmarks.js?v=20260812j"></script>
+<script src="assets/js/auth.js?v=20260812k"></script>
+<script src="assets/js/db.js?v=20260812k"></script>
+<script src="assets/js/ui.js?v=20260812k"></script>
+<script src="assets/js/onboarding.js?v=20260812k"></script>
+<script src="assets/js/coachmarks.js?v=20260812k"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260810b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260812j"></script>
+<script src="assets/js/charts.js?v=20260812k"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -1775,28 +1775,31 @@
       const over = wps.filter(w => window.isMoneyAwarded(w) && (w.approved_budget_bcb || 0) > 0 && window.effectiveAwardedCost(w) > (w.approved_budget_bcb || 0))
         .map(w => ({ w, bcb: w.approved_budget_bcb || 0, awd: window.effectiveAwardedCost(w), ovr: window.effectiveAwardedCost(w) - (w.approved_budget_bcb || 0) }))
         .sort((a, b) => b.ovr - a.ovr);
-      // 3. Data gaps — flagged Awarded but missing cost or vendor (breaks KPI
-      //    reconciliation; deliberate "Not to be Awarded" WPs are excluded).
-      const gapsAll = wps.filter(w => w.award_status === 'Awarded' && !w.not_to_be_awarded && (!((w.total_awarded || 0) > 0) || !(w.contractor && String(w.contractor).trim())))
-        .map(w => ({ w, noCost: !((w.total_awarded || 0) > 0), noVendor: !(w.contractor && String(w.contractor).trim()), bcb: w.approved_budget_bcb || 0 }));
-      // Missing-field filter (2026-08-12): All / Missing Cost only / Missing Vendor only / Missing Both.
+      // 3. Data gaps — ONE unified "incomplete data" section (2026-08-12, folded together per
+      //    explicit request — was two separate panels). Two kinds of gap, both mean "this WP is
+      //    missing something the dashboards/reports need": (a) Awarded but missing cost or vendor
+      //    (breaks KPI reconciliation; deliberate "Not to be Awarded" WPs are excluded), and
+      //    (b) not yet resolved with no Planned Award Date at all — these are silently excluded
+      //    from every "Cumulative Planned" line (period charts) but ARE counted in "Forecast"
+      //    (which treats no-plan as "due next period"), so Forecast can visibly climb ABOVE
+      //    Planned's own ceiling (Known Issue #32). The two kinds never overlap on the same WP
+      //    (one requires award_status==='Awarded', the other requires NOT resolved), so a row is
+      //    always exactly one kind, but they share one table/filter/sort now instead of two.
+      const gapsAll = [
+        ...wps.filter(w => w.award_status === 'Awarded' && !w.not_to_be_awarded && (!((w.total_awarded || 0) > 0) || !(w.contractor && String(w.contractor).trim())))
+          .map(w => ({ w, noCost: !((w.total_awarded || 0) > 0), noVendor: !(w.contractor && String(w.contractor).trim()), noPlanDate: false, bcb: w.approved_budget_bcb || 0 })),
+        ...wps.filter(w => !window.isResolved(w) && !w.awarding_date)
+          .map(w => ({ w, noCost: false, noVendor: false, noPlanDate: true, bcb: w.approved_budget_bcb || 0 })),
+      ];
+      // Missing-field filter (2026-08-12): All / Cost / Vendor / Planned Date.
       const gaps = gapsAll.filter(x => _acGapFilter === 'all' ? true
         : _acGapFilter === 'cost' ? x.noCost
         : _acGapFilter === 'vendor' ? x.noVendor
-        : /* 'both' */ (x.noCost && x.noVendor));
+        : /* 'planned' */ x.noPlanDate);
       // 4. Upcoming award pipeline — not resolved, planned award today or later.
       const upcoming = wps.filter(w => !window.isResolved(w) && (() => { const d = parseD(w.awarding_date); return d && d >= T; })())
         .map(w => ({ w, days: Math.round((parseD(w.awarding_date) - T) / DAY), bcb: w.approved_budget_bcb || 0 }))
         .sort((a, b) => a.days - b.days);
-      // 5. Missing Planned Award Date — not resolved, no awarding_date at all. These WPs are
-      // silently excluded from every "Cumulative Planned" line (Overview period chart, S-Curve,
-      // WP List Filtered Analysis) but ARE counted in "Forecast" (which treats no-plan as
-      // "due next period") — so Forecast can visibly climb ABOVE Planned's own ceiling, which reads
-      // as a nonsensical chart until you know why. Surfacing them here is the fix: get real Planned
-      // Award Dates entered so the two lines reconcile, rather than special-casing the chart math.
-      const noPlan = wps.filter(w => !window.isResolved(w) && !w.awarding_date)
-        .map(w => ({ w, bcb: w.approved_budget_bcb || 0 }))
-        .sort((a, b) => b.bcb - a.bcb);
       const sumBcb = arr => arr.reduce((s, x) => s + (x.bcb || 0), 0);
       const inRange = (lo, hi) => upcoming.filter(u => u.days >= lo && (hi == null || u.days <= hi));
       const b30 = inRange(0, 30), b60 = inRange(31, 60), b90 = inRange(61, 90);
@@ -1806,9 +1809,8 @@
       document.getElementById('actions-summary').innerHTML = [
         tile('Overdue Awards', overdue.length, overdue.length ? 'red' : 'green', money(sumBcb(overdue)) + ' BCB at risk'),
         tile('Awarded Over Budget', over.length, over.length ? 'red' : 'green', over.length ? ('+' + money(over.reduce((s, x) => s + x.ovr, 0)) + ' overrun') : 'None'),
-        tile('Data Gaps', gapsAll.length, gapsAll.length ? 'amber' : 'green', 'Awarded, missing cost/vendor'),
+        tile('Data Gaps', gapsAll.length, gapsAll.length ? 'amber' : 'green', 'Missing cost, vendor, or planned date'),
         tile('Awards Next 30 Days', b30.length, '', money(sumBcb(b30)) + ' to award'),
-        tile('Missing Planned Date', noPlan.length, noPlan.length ? 'amber' : 'green', noPlan.length ? (money(sumBcb(noPlan)) + ' BCB unplanned') : 'None'),
       ].join('');
 
       // Table plumbing
@@ -1869,27 +1871,31 @@
           + td(money(x.bcb), R) + td(money(x.awd), R) + td('+'+money(x.ovr), R+';color:#EE3124;font-weight:700') + '</tr>'),
         'No awarded WP is over its BCB.') + trunc(over.length);
 
-      // 3. Data gaps — filter (All / Missing Cost / Missing Vendor / Missing Both) above the table
+      // 3. Data gaps — filter (All / Cost / Vendor / Planned Date) above the table
       const gapFilterBar = `<div style="margin-bottom:10px;display:flex;align-items:center;gap:8px">
         <span style="font-size:0.75rem;color:#888;text-transform:uppercase;letter-spacing:.03em">Missing</span>
         <select onchange="_acSetGapFilter(this.value)" style="padding:5px 8px;border:1px solid var(--border-md,#ddd);border-radius:6px;font-size:0.8rem;background:var(--surface,#fff);color:inherit">
           <option value="all"${_acGapFilter==='all'?' selected':''}>All (${gapsAll.length})</option>
-          <option value="cost"${_acGapFilter==='cost'?' selected':''}>Cost only (${gapsAll.filter(x=>x.noCost).length})</option>
-          <option value="vendor"${_acGapFilter==='vendor'?' selected':''}>Vendor only (${gapsAll.filter(x=>x.noVendor).length})</option>
-          <option value="both"${_acGapFilter==='both'?' selected':''}>Both (${gapsAll.filter(x=>x.noCost&&x.noVendor).length})</option>
+          <option value="cost"${_acGapFilter==='cost'?' selected':''}>Cost (${gapsAll.filter(x=>x.noCost).length})</option>
+          <option value="vendor"${_acGapFilter==='vendor'?' selected':''}>Vendor (${gapsAll.filter(x=>x.noVendor).length})</option>
+          <option value="planned"${_acGapFilter==='planned'?' selected':''}>Planned Date (${gapsAll.filter(x=>x.noPlanDate).length})</option>
         </select></div>`;
       const gapsSorted = _acApplySort('gaps', gaps, {
         wp_no: x => x.w.wp_no||'', project: x => projName(x.w.project_id), trade: x => x.w.trade||'',
-        missing: x => (x.noCost?'1':'0')+(x.noVendor?'1':'0'), bcb: x => x.bcb,
+        missing: x => (x.noCost?'1':'0')+(x.noVendor?'1':'0')+(x.noPlanDate?'1':'0'), bcb: x => x.bcb,
       });
       const s3 = tbl(
         acTh('gaps','wp_no','WP No.') + acTh('gaps','project','Project') + acTh('gaps','trade','Trade')
           + acTh('gaps','missing','Missing') + acTh('gaps','bcb','BCB','right'),
-        gapsSorted.slice(0, CAP).map(x => { const tags = [x.noCost?'<span style="color:#B45309;font-weight:700">Cost</span>':'', x.noVendor?'<span style="color:#B45309;font-weight:700">Vendor</span>':''].filter(Boolean).join(', ');
+        gapsSorted.slice(0, CAP).map(x => { const tags = [
+            x.noCost?'<span style="color:#B45309;font-weight:700">Cost</span>':'',
+            x.noVendor?'<span style="color:#B45309;font-weight:700">Vendor</span>':'',
+            x.noPlanDate?'<span style="color:#B45309;font-weight:700">Planned Date</span>':'',
+          ].filter(Boolean).join(', ');
           return rowOpen(x.w)
           + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.trade||'—'))
           + td(tags) + td(money(x.bcb), R) + '</tr>'; }),
-        gapsAll.length ? 'No rows match this filter.' : 'No data gaps — every Awarded WP has a cost and vendor.') + trunc(gaps.length);
+        gapsAll.length ? 'No rows match this filter.' : 'No data gaps — every WP has its cost, vendor, and planned date.') + trunc(gaps.length);
 
       // 4. Upcoming pipeline (bucket summary + table)
       const buckets = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -1910,30 +1916,11 @@
           + td(x.w.awarding_date?Fmt.date(x.w.awarding_date):'—') + td(x.days+'d', R) + td(money(x.bcb), R) + '</tr>'),
         'No upcoming awards scheduled.') + trunc(upcoming.length);
 
-      // 5. Missing Planned Award Date
-      const projBreakdown = (() => {
-        const by = {}; noPlan.forEach(x => { by[x.w.project_id] = (by[x.w.project_id]||0) + 1; });
-        return Object.entries(by).sort((a,b) => b[1]-a[1]).map(([pid,n]) => `${esc2(projName(pid))} (${n})`).join(', ');
-      })();
-      const noPlanSorted = _acApplySort('noplan', noPlan, {
-        wp_no: x => x.w.wp_no||'', project: x => projName(x.w.project_id), trade: x => x.w.trade||'',
-        description: x => x.w.description||'', bcb: x => x.bcb,
-      });
-      const s5 = tbl(
-        acTh('noplan','wp_no','WP No.') + acTh('noplan','project','Project') + acTh('noplan','trade','Trade')
-          + acTh('noplan','description','Description') + acTh('noplan','bcb','BCB','right'),
-        noPlanSorted.slice(0, CAP).map(x => rowOpen(x.w)
-          + td(`<strong>${esc2(x.w.wp_no||'')}</strong>`) + td(esc2(projName(x.w.project_id))) + td(esc2(x.w.trade||'—'))
-          + td(esc2(x.w.description||'—')) + td(money(x.bcb), R) + '</tr>'),
-        'Every not-yet-awarded WP has a Planned Award Date.') + trunc(noPlan.length);
-      const s5Extra = noPlan.length ? `<div style="font-size:0.8rem;color:#888;margin-bottom:10px">By project: ${projBreakdown}</div>` : '';
-
       document.getElementById('actions-sections').innerHTML =
         panel('overdue', 'ti-alarm', 'Overdue Awards', `${overdue.length} WP${overdue.length===1?'':'s'} past planned award · ${money(sumBcb(overdue))} BCB`, '', s1) +
         panel('over', 'ti-trending-up', 'Awarded Over Budget', `${over.length} WP${over.length===1?'':'s'}`, '', s2) +
-        panel('gaps', 'ti-alert-circle', 'Data Gaps (Awarded, incomplete)', `${gapsAll.length} WP${gapsAll.length===1?'':'s'} — fix so KPIs reconcile`, gapFilterBar, s3) +
-        panel('upcoming', 'ti-calendar-due', 'Upcoming Award Pipeline', `${upcoming.length} WP${upcoming.length===1?'':'s'} ahead · ${money(sumBcb(upcoming))} BCB`, buckets, s4) +
-        panel('noplan', 'ti-calendar-off', 'Missing Planned Award Date', `${noPlan.length} WP${noPlan.length===1?'':'s'} — skews the Planned-vs-Forecast period charts`, s5Extra, s5);
+        panel('gaps', 'ti-alert-circle', 'Data Gaps', `${gapsAll.length} WP${gapsAll.length===1?'':'s'} — missing cost, vendor, or a planned award date`, gapFilterBar, s3) +
+        panel('upcoming', 'ti-calendar-due', 'Upcoming Award Pipeline', `${upcoming.length} WP${upcoming.length===1?'':'s'} ahead · ${money(sumBcb(upcoming))} BCB`, buckets, s4);
     }
 
     function _renderTab(tab, wps, filt, allStats) {
