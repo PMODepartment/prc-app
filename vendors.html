@@ -251,6 +251,37 @@
     body.dark-mode .badge-approved{background:#102B1F;color:#6EE7B7}
     body.dark-mode .badge-rejected{background:#3D1A19;color:#FCA5A5}
     body.dark-mode .badge-inactive{background:var(--surface-2);color:var(--text-hint)}
+
+    /* ── Vendor Grid (Excel-style) — same visual language as review.html's WP grid,
+       a lighter engine (single-cell click/type/nav + staged edits, no fill-handle/
+       copy-paste/undo — see CLAUDE.md "Vendor grid" entry for the scope decision). ── */
+    .vxl-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-bottom:8px}
+    .vxl-bar-right{display:flex;align-items:center;gap:10px;margin-left:auto;flex-shrink:0}
+    .vxl-legend{display:inline-flex;align-items:center;gap:12px;font-size:0.7143rem;color:var(--text-secondary);padding:3px 10px;border:1px solid var(--border-md);border-radius:999px;background:var(--surface-2)}
+    .vxl-swatch{width:11px;height:11px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.12)}
+    .vxl-hint{font-size:0.7143rem;color:var(--text-hint)}
+    .vxl-wrap{border:1px solid var(--border-md);border-radius:var(--radius-md);overflow:auto;max-height:calc(100vh - 260px);background:var(--surface);position:relative}
+    .vxl-wrap:focus-visible:has(td.vxl-sel){outline:none!important}
+    table.vxl{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:0.7857rem}
+    table.vxl th,table.vxl td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:0 8px;height:30px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:var(--surface)}
+    table.vxl thead th{position:sticky;top:0;z-index:8;height:30px;background:#F3F3F3;color:var(--text-primary);font-size:0.7143rem;font-weight:700;letter-spacing:.02em;text-align:left;padding:6px 8px;border-bottom:2px solid var(--border-md);white-space:nowrap}
+    body.dark-mode table.vxl thead th{background:#3a3a3a}
+    table.vxl tbody tr:nth-child(even) td{background:#F7F7F7}
+    body.dark-mode table.vxl tbody tr:nth-child(even) td{background:#333433}
+    table.vxl tbody tr:hover td{background:var(--mw-red-light)}
+    table.vxl td.vxl-frozen,table.vxl th.vxl-frozen{position:sticky;left:0;z-index:6;box-shadow:2px 0 0 var(--border-md)}
+    table.vxl td.vxl-req-star{color:#EE3124}
+    table.vxl td.vxl-sel{box-shadow:inset 0 0 0 2px #EE3124;position:relative;z-index:2}
+    table.vxl td.vxl-dirty{background:#FFF6DA!important}
+    body.dark-mode table.vxl td.vxl-dirty{background:#3a2f0f!important}
+    table.vxl td.vxl-missing{box-shadow:inset 3px 0 0 #EE3124;background:#FDECEA!important}
+    body.dark-mode table.vxl td.vxl-missing{background:#3D1A19!important}
+    table.vxl td.vxl-clickable{cursor:cell}
+    .vxl-ed{position:absolute;z-index:20;font-family:inherit;font-size:0.7857rem;padding:3px 6px;border:2px solid #EE3124;border-radius:0;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box}
+    .vxl-trade-pop{position:fixed;z-index:200;background:var(--surface);border:1px solid var(--border-md);border-radius:var(--radius-md);box-shadow:var(--shadow-lg,0 8px 24px rgba(0,0,0,.18));padding:8px;max-height:260px;overflow-y:auto;min-width:220px}
+    .vxl-trade-pop label{display:flex;align-items:center;gap:6px;font-size:0.8214rem;padding:4px 4px;cursor:pointer;border-radius:6px;color:var(--text-primary)}
+    .vxl-trade-pop label:hover{background:var(--mw-red-light)}
+    .vxl-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;flex-wrap:wrap}
   </style>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -319,6 +350,7 @@
             <div class="view-toggle" role="group" aria-label="View mode">
               <button id="vv-cards" class="active" onclick="setVendorView('cards')" aria-label="Card view"><i class="ti ti-layout-grid"></i> Cards</button>
               <button id="vv-table" onclick="setVendorView('table')" aria-label="Table view"><i class="ti ti-table"></i> Table</button>
+              <button id="vv-grid" onclick="setVendorView('grid')" aria-label="Grid view"><i class="ti ti-grid-dots"></i> Grid</button>
               <button id="vv-analytics" onclick="setVendorView('analytics')" aria-label="Analytics view"><i class="ti ti-chart-bar"></i> Analytics</button>
             </div>
             </div>
@@ -349,6 +381,18 @@
             </div>
           </div>
           <div id="vendorAnalytics" style="display:none"></div>
+          <div id="vendorGridPanel" style="display:none">
+            <div class="vxl-bar">
+              <span class="vxl-hint">Click a cell to select, click/type/Enter to edit, Tab/Enter/Arrows to move, Esc to cancel.</span>
+              <div class="vxl-bar-right">
+                <span class="vxl-legend"><span class="vxl-swatch" style="background:#FDECEA"></span> required, empty <span class="vxl-swatch" style="background:#FFF6DA"></span> unsaved</span>
+                <span class="vxl-hint" id="vxl-missing-count"></span>
+                <button class="btn-cancel" id="vxl-discard-btn" onclick="vxlDiscard()" disabled>Discard</button>
+                <button class="btn-primary" id="vxl-save-btn" onclick="vxlSave()" disabled><i class="ti ti-device-floppy" style="margin-right:4px"></i>Save changes</button>
+              </div>
+            </div>
+            <div class="vxl-wrap" id="vxl-wrap" tabindex="0"><table class="vxl" id="vxl-table"></table></div>
+          </div>
           <div class="vendor-cards" id="vendorCards"></div>
           <div class="section-card" id="vendorTableWrap" style="display:none">
             <div class="table-wrapper">
@@ -582,13 +626,17 @@ async function refreshVendors() {
 let _vendorView = 'cards';
 function setVendorView(v) {
   if (v === 'analytics' && userProfile && userProfile.role === 'viewer') return; // cost view — not for plain viewer
+  if (v === 'grid' && _vxlDirty()) { if (!confirm('You have unsaved grid edits. Switch view and discard them?')) return; vxlDiscard(true); }
   _vendorView = v;
   const isAn = v === 'analytics';
+  const isGrid = v === 'grid';
   document.getElementById('vv-cards').classList.toggle('active', v === 'cards');
   document.getElementById('vv-table').classList.toggle('active', v === 'table');
+  const vvg = document.getElementById('vv-grid'); if (vvg) vvg.classList.toggle('active', isGrid);
   const vab = document.getElementById('vv-analytics'); if (vab) vab.classList.toggle('active', isAn);
   document.getElementById('vendorCards').style.display = (v === 'cards') ? 'grid' : 'none';
   document.getElementById('vendorTableWrap').style.display = (v === 'table') ? 'block' : 'none';
+  document.getElementById('vendorGridPanel').style.display = isGrid ? 'block' : 'none';
   document.getElementById('vendorAnalytics').style.display = isAn ? 'block' : 'none';
   // Hide directory chrome (count/bulk bar + pager) in analytics mode.
   const meta = document.querySelector('.vendor-meta'); if (meta) meta.style.display = isAn ? 'none' : '';
@@ -624,7 +672,9 @@ function renderVendorList() {
   if (cnt) cnt.textContent = total
     ? `${total.toLocaleString()} vendor${total === 1 ? '' : 's'}` + (total > _VENDOR_PAGE_SIZE ? ` · showing ${start + 1}–${Math.min(start + _VENDOR_PAGE_SIZE, total)}` : '')
     : 'No vendors';
-  _vendorView === 'table' ? renderTable(pageRows) : renderCards(pageRows);
+  if (_vendorView === 'table') renderTable(pageRows);
+  else if (_vendorView === 'grid') renderVendorGrid(pageRows);
+  else renderCards(pageRows);
   renderPager(total, pages);
   _syncBulkUI();
 }
@@ -1631,6 +1681,238 @@ function renderKpis() {
   document.getElementById('kpiPending').textContent = allVendors.filter(v => v.status === 'pending_review').length;
   document.getElementById('kpiApproved').textContent = allVendors.filter(v => v.status === 'approved').length;
   document.getElementById('kpiRejected').textContent = allVendors.filter(v => v.status === 'rejected' || v.status === 'inactive').length;
+}
+
+/* ── Vendor Grid (Excel-style) ─────────────────────────────────────────
+   Same visual language / interaction shape as review.html's WP grid (click-select,
+   click/type/Enter/F2 to edit, Tab/Enter/Arrow nav, staged amber edits, a Save/Discard
+   bar, required-empty highlighting, frozen first column, sticky header). Deliberately
+   NOT full parity — no multi-cell range select, TSV copy/paste, fill-handle drag, or
+   undo stack: those depend on a much larger surface of coordinate math that isn't worth
+   the risk for ~1,600 vendor rows edited a handful of fields at a time. Flag if any of
+   those specific features turn out to be wanted later; the cell-editor plumbing here
+   (VXL_COLS, _vxlEdits, _vxlBeginEdit/_vxlCommit) is built so they could be layered in. */
+const VXL_COLS = [
+  { k: 'name',             label: 'Company Name',    w: 220, type: 'text',   req: true },
+  { k: 'vendor_code',      label: 'Vendor Code',     w: 110, type: 'text' },
+  { k: 'status',           label: 'Status',          w: 130, type: 'select', opts: ['pending_review', 'approved', 'rejected', 'inactive'] },
+  { k: 'trade_categories', label: 'Trade Categories',w: 240, type: 'trades' },
+  { k: 'contact_person',   label: 'Contact Person',  w: 160, type: 'text' },
+  { k: 'contact_number',   label: 'Contact Number',  w: 140, type: 'text' },
+  { k: 'contact_email',    label: 'Contact Email',   w: 200, type: 'text' },
+  { k: 'address',          label: 'Address',         w: 220, type: 'text' },
+  { k: 'notes',            label: 'Notes',           w: 220, type: 'text' },
+];
+let _vxlRows = [];               // current page of vendors, in grid row order
+let _vxlEdits = {};              // vendorId -> { field: value }
+let _vxlSel = null;              // { r, c }
+let _vxlEditing = null;          // { r, c } while an <input> is live
+
+function _vxlDirty() { return Object.keys(_vxlEdits).length > 0; }
+function _vxlVal(v, col) {
+  const staged = _vxlEdits[v.id];
+  if (staged && Object.prototype.hasOwnProperty.call(staged, col.k)) return staged[col.k];
+  if (col.k === 'trade_categories') return (v.trade_categories || []).join(', ');
+  return v[col.k] || '';
+}
+function _vxlDisplay(v, col) {
+  const raw = _vxlVal(v, col);
+  if (col.k === 'status') return raw ? raw.replace('_', ' ') : '';
+  return raw;
+}
+function _vxlMissing(v, col) { return !!col.req && !_vxlVal(v, col); }
+function _vxlIsDirty(v, col) { const s = _vxlEdits[v.id]; return !!s && Object.prototype.hasOwnProperty.call(s, col.k); }
+
+function renderVendorGrid(rows) {
+  _vxlRows = rows;
+  _vxlSel = null; _vxlEditing = null;
+  const table = document.getElementById('vxl-table');
+  if (!table) return;
+  const totalW = VXL_COLS.reduce((s, c) => s + c.w, 0);
+  table.style.width = totalW + 'px';
+  const cg = '<colgroup>' + VXL_COLS.map(c => `<col style="width:${c.w}px;min-width:${c.w}px">`).join('') + '</colgroup>';
+  const thead = '<thead><tr>' + VXL_COLS.map((c, i) =>
+    `<th class="${i === 0 ? 'vxl-frozen' : ''}" style="${i === 0 ? 'left:0;' : ''}width:${c.w}px">${c.label}${c.req ? '<span class="vxl-req-star">*</span>' : ''}</th>`
+  ).join('') + '</tr></thead>';
+  const tbody = '<tbody>' + rows.map((v, r) => {
+    return '<tr>' + VXL_COLS.map((col, c) => {
+      const missing = _vxlMissing(v, col);
+      const dirty = _vxlIsDirty(v, col);
+      const cls = ['vxl-clickable'];
+      if (c === 0) cls.push('vxl-frozen');
+      if (missing) cls.push('vxl-missing');
+      if (dirty) cls.push('vxl-dirty');
+      const style = c === 0 ? 'left:0;' : '';
+      return `<td class="${cls.join(' ')}" style="${style}" data-r="${r}" data-c="${c}" onmousedown="_vxlSelect(${r},${c})" ondblclick="_vxlBeginEdit(${r},${c})">${esc(_vxlDisplay(v, col))}</td>`;
+    }).join('') + '</tr>';
+  }).join('') + '</tbody>';
+  table.innerHTML = cg + thead + tbody;
+  _vxlSyncBar();
+  const wrap = document.getElementById('vxl-wrap');
+  if (wrap && !wrap._vxlWired) {
+    wrap._vxlWired = true;
+    wrap.addEventListener('keydown', _vxlKeydown);
+  }
+}
+function _vxlSyncBar() {
+  let missing = 0;
+  _vxlRows.forEach(v => VXL_COLS.forEach(col => { if (_vxlMissing(v, col)) missing++; }));
+  const mc = document.getElementById('vxl-missing-count');
+  if (mc) mc.textContent = missing ? `${missing} required field${missing === 1 ? '' : 's'} empty` : '';
+  const dirty = _vxlDirty();
+  const saveBtn = document.getElementById('vxl-save-btn');
+  const discardBtn = document.getElementById('vxl-discard-btn');
+  if (saveBtn) saveBtn.disabled = !dirty || !_canManage;
+  if (discardBtn) discardBtn.disabled = !dirty;
+}
+function _vxlSelect(r, c) {
+  if (_vxlEditing) _vxlCommitEdit();
+  _vxlSel = { r, c };
+  document.querySelectorAll('#vxl-table td.vxl-sel').forEach(td => td.classList.remove('vxl-sel'));
+  const td = document.querySelector(`#vxl-table td[data-r="${r}"][data-c="${c}"]`);
+  if (td) td.classList.add('vxl-sel');
+  const wrap = document.getElementById('vxl-wrap');
+  if (wrap) wrap.focus();
+}
+function _vxlBeginEdit(r, c) {
+  if (!_canManage) return;
+  const v = _vxlRows[r]; const col = VXL_COLS[c];
+  if (!v || !col) return;
+  _vxlSelect(r, c);
+  _vxlEditing = { r, c };
+  const td = document.querySelector(`#vxl-table td[data-r="${r}"][data-c="${c}"]`);
+  if (!td) return;
+  const rect = td.getBoundingClientRect();
+  const wrapRect = document.getElementById('vxl-wrap').getBoundingClientRect();
+  const top = rect.top - wrapRect.top + document.getElementById('vxl-wrap').scrollTop;
+  const left = rect.left - wrapRect.left + document.getElementById('vxl-wrap').scrollLeft;
+  const w = rect.width, h = rect.height;
+  if (col.type === 'trades') { _vxlOpenTradePop(v, td); return; }
+  let el;
+  if (col.type === 'select') {
+    el = document.createElement('select');
+    el.className = 'vxl-ed';
+    el.innerHTML = col.opts.map(o => `<option value="${o}">${o.replace('_', ' ')}</option>`).join('');
+    el.value = _vxlVal(v, col) || col.opts[0];
+  } else {
+    el = document.createElement('input');
+    el.className = 'vxl-ed';
+    el.type = 'text';
+    el.value = _vxlVal(v, col);
+  }
+  el.style.top = top + 'px'; el.style.left = left + 'px'; el.style.width = w + 'px'; el.style.height = h + 'px';
+  el.addEventListener('keydown', function (e) {
+    // stopPropagation is load-bearing here: without it, this keydown still bubbles to
+    // #vxl-wrap's own listener AFTER _vxlCommitEdit() has already cleared _vxlEditing,
+    // so the wrap's handler no longer sees "editing in progress" and reprocesses the
+    // same Enter/Tab as a SECOND navigation — double-move, or an immediate re-open of
+    // the editor on the cell just moved to.
+    if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); _vxlCommitEdit(); _vxlMove(1, 0); }
+    else if (e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); _vxlCommitEdit(); _vxlMove(0, e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); _vxlEditing = null; el.remove(); }
+  });
+  el.addEventListener('blur', () => { if (_vxlEditing && _vxlEditing.r === r && _vxlEditing.c === c) _vxlCommitEdit(); });
+  document.getElementById('vxl-wrap').appendChild(el);
+  el.focus();
+  if (el.select) el.select();
+}
+function _vxlCommitEdit() {
+  if (!_vxlEditing) return;
+  const { r, c } = _vxlEditing;
+  const el = document.querySelector('.vxl-ed');
+  const v = _vxlRows[r]; const col = VXL_COLS[c];
+  _vxlEditing = null;
+  if (!el || !v || !col) { if (el) el.remove(); return; }
+  const val = el.value;
+  el.remove();
+  _vxlStage(v, col, val);
+  renderVendorGrid(_vxlRows);
+  _vxlSelect(r, c);
+}
+function _vxlStage(v, col, val) {
+  if (col.k === 'name' && !val.trim()) return; // company name can't be blanked out
+  const cur = col.k === 'trade_categories' ? (v.trade_categories || []).join(', ') : (v[col.k] || '');
+  if (!_vxlEdits[v.id]) _vxlEdits[v.id] = {};
+  if (val === cur) { delete _vxlEdits[v.id][col.k]; if (!Object.keys(_vxlEdits[v.id]).length) delete _vxlEdits[v.id]; }
+  else _vxlEdits[v.id][col.k] = val;
+}
+function _vxlOpenTradePop(v, td) {
+  document.querySelectorAll('.vxl-trade-pop').forEach(p => p.remove());
+  const current = new Set((_vxlVal(v, VXL_COLS.find(c => c.k === 'trade_categories')).split(',').map(s => s.trim()).filter(Boolean)));
+  const pop = document.createElement('div');
+  pop.className = 'vxl-trade-pop';
+  pop.innerHTML = TRADES.map(t => `<label><input type="checkbox" value="${esc(t)}" ${current.has(t) ? 'checked' : ''}> ${esc(t)}</label>`).join('');
+  const rect = td.getBoundingClientRect();
+  pop.style.top = (rect.bottom + 4) + 'px';
+  pop.style.left = rect.left + 'px';
+  document.body.appendChild(pop);
+  const apply = () => {
+    const chosen = [...pop.querySelectorAll('input:checked')].map(i => i.value);
+    _vxlStage(v, VXL_COLS.find(c => c.k === 'trade_categories'), chosen.join(', '));
+    pop.remove();
+    document.removeEventListener('mousedown', outside, true);
+    renderVendorGrid(_vxlRows);
+  };
+  pop.addEventListener('change', apply);
+  function outside(e) { if (!pop.contains(e.target)) apply(); }
+  setTimeout(() => document.addEventListener('mousedown', outside, true), 0);
+}
+function _vxlMove(dr, dc) {
+  if (!_vxlSel) return;
+  let r = Math.min(Math.max(_vxlSel.r + dr, 0), _vxlRows.length - 1);
+  let c = Math.min(Math.max(_vxlSel.c + dc, 0), VXL_COLS.length - 1);
+  _vxlSelect(r, c);
+  const td = document.querySelector(`#vxl-table td[data-r="${r}"][data-c="${c}"]`);
+  if (td && td.scrollIntoView) td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+function _vxlKeydown(e) {
+  if (_vxlEditing) return; // the <input>'s own handler owns Enter/Tab/Esc while editing
+  if (!_vxlSel) return;
+  const nav = { ArrowDown: [1, 0], ArrowUp: [-1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  if (nav[e.key]) { e.preventDefault(); _vxlMove(nav[e.key][0], nav[e.key][1]); return; }
+  if (e.key === 'Tab') { e.preventDefault(); _vxlMove(0, e.shiftKey ? -1 : 1); return; }
+  if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); _vxlBeginEdit(_vxlSel.r, _vxlSel.c); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault();
+    const v = _vxlRows[_vxlSel.r]; const col = VXL_COLS[_vxlSel.c];
+    if (v && col && col.k !== 'name') { _vxlStage(v, col, ''); renderVendorGrid(_vxlRows); _vxlSelect(_vxlSel.r, _vxlSel.c); }
+    return;
+  }
+  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    _vxlBeginEdit(_vxlSel.r, _vxlSel.c);
+    setTimeout(() => { const el = document.querySelector('.vxl-ed'); if (el && el.tagName === 'INPUT') el.value = e.key; }, 0);
+  }
+}
+async function vxlSave() {
+  if (!_vxlDirty() || !_canManage) return;
+  const btn = document.getElementById('vxl-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const ids = Object.keys(_vxlEdits);
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    const patch = { ..._vxlEdits[id] };
+    if (Object.prototype.hasOwnProperty.call(patch, 'trade_categories')) {
+      patch.trade_categories = patch.trade_categories.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    try {
+      const updated = await VendorDb.updateVendor(id, patch);
+      const idx = allVendors.findIndex(x => x.id === id);
+      if (idx > -1) allVendors[idx] = updated;
+      ok++;
+    } catch (e) { fail++; console.error('Vendor grid save failed for', id, e); }
+  }
+  _vxlEdits = {};
+  btn.textContent = 'Save changes';
+  if (fail) AppNotify && AppNotify.warn(`Saved ${ok}, ${fail} failed — see console.`);
+  else AppNotify && AppNotify.success(`Saved ${ok} vendor${ok === 1 ? '' : 's'}.`);
+  renderKpis();
+  renderVendorList();
+}
+function vxlDiscard(silent) {
+  if (!_vxlDirty()) return;
+  if (!silent && !confirm('Discard all unsaved grid edits?')) return;
+  _vxlEdits = {};
+  if (_vendorView === 'grid') renderVendorGrid(_vxlRows);
 }
 
 function renderTable(rows) {
