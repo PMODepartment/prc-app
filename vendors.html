@@ -641,6 +641,18 @@ function onVendorFilterChange() { _vendorPage = 0; renderVendorList(); }
 function renderVendorList() {
   const all = _vendorFiltered();
   const total = all.length;
+  // Grid shows every filtered row, unpaginated — same as review.html's WP grid (a
+  // plain <table> with a sticky header scrolls fine at thousands of rows; it's only
+  // the heavy per-card DOM in Cards view that needed pagination to stay responsive).
+  if (_vendorView === 'grid') {
+    _pageIds = all.map(v => v.id);
+    const cnt = document.getElementById('vendorCount');
+    if (cnt) cnt.textContent = total ? `${total.toLocaleString()} vendor${total === 1 ? '' : 's'}` : 'No vendors';
+    renderVendorGrid(all);
+    renderPager(total, 1); // clears/hides the pager — grid has nothing to page through
+    _syncBulkUI();
+    return;
+  }
   const pages = Math.max(1, Math.ceil(total / _VENDOR_PAGE_SIZE));
   if (_vendorPage >= pages) _vendorPage = pages - 1;
   if (_vendorPage < 0) _vendorPage = 0;
@@ -651,8 +663,7 @@ function renderVendorList() {
   if (cnt) cnt.textContent = total
     ? `${total.toLocaleString()} vendor${total === 1 ? '' : 's'}` + (total > _VENDOR_PAGE_SIZE ? ` · showing ${start + 1}–${Math.min(start + _VENDOR_PAGE_SIZE, total)}` : '')
     : 'No vendors';
-  if (_vendorView === 'grid') renderVendorGrid(pageRows);
-  else renderCards(pageRows);
+  renderCards(pageRows);
   renderPager(total, pages);
   _syncBulkUI();
 }
