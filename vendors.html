@@ -25,11 +25,6 @@
     .kpi-label{font-size:0.7143rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;margin-top:4px}
     .page-content{padding:20px;max-width:100%}
     .section-card{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:20px;margin-bottom:20px}
-    .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch}
-    .v-table{width:100%;min-width:640px;border-collapse:collapse}
-    .v-table th{font-size:0.7143rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#999;padding:9px 10px;text-align:left;border-bottom:2px solid #f0f0f0;background:#fafafa;white-space:nowrap}
-    .v-table td{padding:10px 10px;font-size:0.9286rem;color:#231F20;border-bottom:1px solid #f5f5f5;vertical-align:middle}
-    .v-table tr:hover td{background:#fafafa;cursor:pointer}
     /* View toggle (Cards | Table) */
     .view-toggle{display:inline-flex;border:1.5px solid #e5e5e5;border-radius:8px;overflow:hidden;flex-shrink:0}
     .view-toggle button{border:none;background:#fff;padding:8px 12px;font-size:0.8rem;font-family:inherit;cursor:pointer;color:#888;display:flex;align-items:center;gap:5px}
@@ -88,9 +83,6 @@
     .vendor-bulkbar .b-link{border:none;background:none;color:#2563EB;text-decoration:underline;padding:6px 4px}
     .vcard-check{width:17px;height:17px;accent-color:#EE3124;cursor:pointer;flex-shrink:0;align-self:flex-start;margin-top:2px}
     .vcard.selected{border-color:#EE3124;box-shadow:0 0 0 2px rgba(238,49,36,.25)}
-    .v-table .v-check{width:16px;height:16px;accent-color:#EE3124;cursor:pointer}
-    .v-table tr.row-selected td{background:var(--mw-red-light,#FDECEA)}
-    body.dark-mode .v-table tr.row-selected td{background:rgba(238,49,36,.16)}
     body.dark-mode .vendor-bulkbar{background:var(--surface)}
     body.dark-mode .vendor-bulkbar button{background:var(--surface-2);color:var(--text-primary);border-color:var(--border-md)}
     body.dark-mode .vendor-bulkbar .b-approve{background:#16A34A;color:#fff}
@@ -206,8 +198,6 @@
     body.dark-mode .kpi-card{background:var(--surface);border-color:var(--border)}
     body.dark-mode .kpi-value{color:var(--text-primary)}
     body.dark-mode .section-card{background:var(--surface);border-color:var(--border)}
-    body.dark-mode .v-table th{background:var(--surface-2);color:var(--text-hint);border-bottom-color:var(--border)}
-    body.dark-mode .v-table td{color:var(--text-primary);border-bottom-color:var(--border)}
     body.dark-mode .view-toggle{border-color:var(--border-md)}
     body.dark-mode .view-toggle button{background:var(--surface);color:var(--text-hint)}
     body.dark-mode .view-toggle button.active{background:var(--mw-red);color:#fff}
@@ -223,7 +213,6 @@
     body.dark-mode .vcard-chip{background:rgba(238,49,36,.18);color:#FF9E96}
     body.dark-mode .vcard-chip.more,body.dark-mode .vcard-chip.none{background:var(--surface-2);color:var(--text-hint)}
     body.dark-mode .vcard-foot{border-top-color:var(--border)}
-    body.dark-mode .v-table tr:hover td{background:var(--surface-2)}
     body.dark-mode #vendor-search,body.dark-mode #vendor-status-filter{background:var(--surface-2);color:var(--text-primary);border-color:var(--border-md)}
     body.dark-mode .btn-reject-row{background:var(--surface-2);color:var(--text-primary)}
     body.dark-mode .modal{background:var(--surface)}
@@ -276,7 +265,12 @@
     body.dark-mode table.vxl td.vxl-dirty{background:#3a2f0f!important}
     table.vxl td.vxl-missing{box-shadow:inset 3px 0 0 #EE3124;background:#FDECEA!important}
     body.dark-mode table.vxl td.vxl-missing{background:#3D1A19!important}
-    table.vxl td.vxl-clickable{cursor:cell}
+    table.vxl td.vxl-cell{cursor:cell}
+    table.vxl td.vxl-range{box-shadow:inset 0 0 0 9999px rgba(238,49,36,.15)}
+    body.dark-mode table.vxl td.vxl-range{box-shadow:inset 0 0 0 9999px rgba(255,122,110,.20)}
+    table.vxl td.vxl-fillprev{box-shadow:inset 0 0 0 1px #EE3124,inset 0 0 0 9999px rgba(238,49,36,.08)}
+    #vxl-fill-handle{position:absolute;width:8px;height:8px;background:#EE3124;border:1px solid #fff;z-index:19;cursor:crosshair;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+    #vxl-sel-info{font-size:0.7143rem;color:var(--text-hint)}
     .vxl-ed{position:absolute;z-index:20;font-family:inherit;font-size:0.7857rem;padding:3px 6px;border:2px solid #EE3124;border-radius:0;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box}
     .vxl-trade-pop{position:fixed;z-index:200;background:var(--surface);border:1px solid var(--border-md);border-radius:var(--radius-md);box-shadow:var(--shadow-lg,0 8px 24px rgba(0,0,0,.18));padding:8px;max-height:260px;overflow-y:auto;min-width:220px}
     .vxl-trade-pop label{display:flex;align-items:center;gap:6px;font-size:0.8214rem;padding:4px 4px;cursor:pointer;border-radius:6px;color:var(--text-primary)}
@@ -349,7 +343,6 @@
             </select>
             <div class="view-toggle" role="group" aria-label="View mode">
               <button id="vv-cards" class="active" onclick="setVendorView('cards')" aria-label="Card view"><i class="ti ti-layout-grid"></i> Cards</button>
-              <button id="vv-table" onclick="setVendorView('table')" aria-label="Table view"><i class="ti ti-table"></i> Table</button>
               <button id="vv-grid" onclick="setVendorView('grid')" aria-label="Grid view"><i class="ti ti-grid-dots"></i> Grid</button>
               <button id="vv-analytics" onclick="setVendorView('analytics')" aria-label="Analytics view"><i class="ti ti-chart-bar"></i> Analytics</button>
             </div>
@@ -383,10 +376,12 @@
           <div id="vendorAnalytics" style="display:none"></div>
           <div id="vendorGridPanel" style="display:none">
             <div class="vxl-bar">
-              <span class="vxl-hint">Click a cell to select, click/type/Enter to edit, Tab/Enter/Arrows to move, Esc to cancel.</span>
+              <span class="vxl-hint">Click a cell, or drag to select a range. Type/Enter/F2 to edit, Tab/Enter/Arrows (+Ctrl to jump) to move, Shift to extend, drag the corner handle to fill, Ctrl+C/V to copy/paste, Ctrl+D fill-down, Ctrl+Z undo, Esc to cancel.</span>
               <div class="vxl-bar-right">
                 <span class="vxl-legend"><span class="vxl-swatch" style="background:#FDECEA"></span> required, empty <span class="vxl-swatch" style="background:#FFF6DA"></span> unsaved</span>
+                <span id="vxl-sel-info" style="display:none"></span>
                 <span class="vxl-hint" id="vxl-missing-count"></span>
+                <button class="btn-cancel" id="vxl-undo-btn" onclick="vxlUndo()" disabled title="Ctrl+Z"><i class="ti ti-arrow-back-up" style="margin-right:4px"></i>Undo</button>
                 <button class="btn-cancel" id="vxl-discard-btn" onclick="vxlDiscard()" disabled>Discard</button>
                 <button class="btn-primary" id="vxl-save-btn" onclick="vxlSave()" disabled><i class="ti ti-device-floppy" style="margin-right:4px"></i>Save changes</button>
               </div>
@@ -394,16 +389,6 @@
             <div class="vxl-wrap" id="vxl-wrap" tabindex="0"><table class="vxl" id="vxl-table"></table></div>
           </div>
           <div class="vendor-cards" id="vendorCards"></div>
-          <div class="section-card" id="vendorTableWrap" style="display:none">
-            <div class="table-wrapper">
-              <table class="v-table">
-                <thead><tr>
-                  <th class="vth-check" style="width:34px"></th><th>Company</th><th>Trade Categories</th><th>Contact</th><th>Status</th><th>Actions</th>
-                </tr></thead>
-                <tbody id="vendorTableBody"><tr><td colspan="6" style="text-align:center;color:#888;padding:24px">Loading…</td></tr></tbody>
-              </table>
-            </div>
-          </div>
           <div class="vendor-pager" id="vendorPager"></div>
         </div>
       </div>
@@ -580,11 +565,7 @@ AppAuth.requireLogin((user, profile) => {
 });
 
 function _initBulkUI() {
-  if (!_canManage) {
-    // strip the table's leading checkbox column header so it stays 5 columns
-    const th = document.querySelector('.vth-check'); if (th) th.remove();
-    return;
-  }
+  if (!_canManage) return;
   const sa = document.getElementById('vendorSelAll'); if (sa) sa.style.display = '';
   const del = document.getElementById('bulkDeleteBtn'); if (del && !_canBulkDelete) del.remove();
 }
@@ -631,11 +612,9 @@ function setVendorView(v) {
   const isAn = v === 'analytics';
   const isGrid = v === 'grid';
   document.getElementById('vv-cards').classList.toggle('active', v === 'cards');
-  document.getElementById('vv-table').classList.toggle('active', v === 'table');
   const vvg = document.getElementById('vv-grid'); if (vvg) vvg.classList.toggle('active', isGrid);
   const vab = document.getElementById('vv-analytics'); if (vab) vab.classList.toggle('active', isAn);
   document.getElementById('vendorCards').style.display = (v === 'cards') ? 'grid' : 'none';
-  document.getElementById('vendorTableWrap').style.display = (v === 'table') ? 'block' : 'none';
   document.getElementById('vendorGridPanel').style.display = isGrid ? 'block' : 'none';
   document.getElementById('vendorAnalytics').style.display = isAn ? 'block' : 'none';
   // Hide directory chrome (count/bulk bar + pager) in analytics mode.
@@ -672,8 +651,7 @@ function renderVendorList() {
   if (cnt) cnt.textContent = total
     ? `${total.toLocaleString()} vendor${total === 1 ? '' : 's'}` + (total > _VENDOR_PAGE_SIZE ? ` · showing ${start + 1}–${Math.min(start + _VENDOR_PAGE_SIZE, total)}` : '')
     : 'No vendors';
-  if (_vendorView === 'table') renderTable(pageRows);
-  else if (_vendorView === 'grid') renderVendorGrid(pageRows);
+  if (_vendorView === 'grid') renderVendorGrid(pageRows);
   else renderCards(pageRows);
   renderPager(total, pages);
   _syncBulkUI();
@@ -817,9 +795,9 @@ async function renderVendorAnalytics() {
 function toggleVendorSel(id, checked) {
   if (checked) _selectedVendors.add(id); else _selectedVendors.delete(id);
   // toggle just the affected row/card's highlight without a full re-render
-  const cb = document.querySelector(`.vcard-check[onclick*="${id}"], .v-check[onclick*="${id}"]`);
-  const host = cb && cb.closest('.vcard, tr');
-  if (host) host.classList.toggle(host.classList.contains('vcard') ? 'selected' : 'row-selected', checked);
+  const cb = document.querySelector(`.vcard-check[onclick*="${id}"]`);
+  const host = cb && cb.closest('.vcard');
+  if (host) host.classList.toggle('selected', checked);
   _syncBulkUI();
 }
 function toggleSelectPage(checked) {
@@ -1683,15 +1661,16 @@ function renderKpis() {
   document.getElementById('kpiRejected').textContent = allVendors.filter(v => v.status === 'rejected' || v.status === 'inactive').length;
 }
 
-/* ── Vendor Grid (Excel-style) ─────────────────────────────────────────
-   Same visual language / interaction shape as review.html's WP grid (click-select,
-   click/type/Enter/F2 to edit, Tab/Enter/Arrow nav, staged amber edits, a Save/Discard
-   bar, required-empty highlighting, frozen first column, sticky header). Deliberately
-   NOT full parity — no multi-cell range select, TSV copy/paste, fill-handle drag, or
-   undo stack: those depend on a much larger surface of coordinate math that isn't worth
-   the risk for ~1,600 vendor rows edited a handful of fields at a time. Flag if any of
-   those specific features turn out to be wanted later; the cell-editor plumbing here
-   (VXL_COLS, _vxlEdits, _vxlBeginEdit/_vxlCommit) is built so they could be layered in. */
+/* ── Vendor Grid (Excel-style, full parity with review.html's WP grid) ─────────
+   Click-select, click/type/Enter/F2 to edit, Tab/Enter/Arrow (+Ctrl for edge-jump)
+   nav, Shift+click/Shift+Arrow range select, a corner fill-handle drag (repeats the
+   source block down, like Excel), TSV copy/paste (Excel interop), Ctrl+D fill-down,
+   Ctrl+Z undo, Ctrl+A select-all, Delete/Backspace clears a range, staged amber
+   edits with a Save/Discard bar, required-empty highlighting. Mirrors review.html's
+   `_xl*` engine function-for-function (same names with a `_vxl` prefix) so the two
+   stay easy to compare; NOT a literal copy-paste of that file since the data shape
+   differs (one flat vendors array with no per-project edit-scope or generated
+   columns, so several WP-grid-specific guards don't apply here). */
 const VXL_COLS = [
   { k: 'name',             label: 'Company Name',    w: 220, type: 'text',   req: true },
   { k: 'vendor_code',      label: 'Vendor Code',     w: 110, type: 'text' },
@@ -1705,8 +1684,14 @@ const VXL_COLS = [
 ];
 let _vxlRows = [];               // current page of vendors, in grid row order
 let _vxlEdits = {};              // vendorId -> { field: value }
-let _vxlSel = null;              // { r, c }
-let _vxlEditing = null;          // { r, c } while an <input> is live
+let _vxlSel = null;               // { r, c } active cell
+let _vxlAnchor = null;            // range anchor (shift-select / drag-select)
+let _vxlEditing = null;           // { r, c } while an <input>/<select> is live
+let _vxlUndo = [];                // [ [{id,k,had,prev}, …], … ]
+let _vxlDragMode = null;          // 'select' | 'fill' while a mouse drag is in progress
+let _vxlDragOrigin = null;        // {r,c} where a 'select' drag started
+let _vxlFillSrc = null;           // {r1,r2,c1,c2} source range of a fill-handle drag
+let _vxlFillTo = null;            // row the fill drag currently reaches
 
 function _vxlDirty() { return Object.keys(_vxlEdits).length > 0; }
 function _vxlVal(v, col) {
@@ -1722,10 +1707,13 @@ function _vxlDisplay(v, col) {
 }
 function _vxlMissing(v, col) { return !!col.req && !_vxlVal(v, col); }
 function _vxlIsDirty(v, col) { const s = _vxlEdits[v.id]; return !!s && Object.prototype.hasOwnProperty.call(s, col.k); }
+function _vxlTd(r, c) { return document.querySelector(`#vxl-table td[data-r="${r}"][data-c="${c}"]`); }
+function _vxlToast(msg) { if (window.AppNotify && AppNotify.warn) AppNotify.warn(msg); else console.warn(msg); }
 
 function renderVendorGrid(rows) {
   _vxlRows = rows;
-  _vxlSel = null; _vxlEditing = null;
+  _vxlSel = null; _vxlAnchor = null; _vxlEditing = null;
+  document.querySelectorAll('.vxl-trade-pop').forEach(p => p.remove());
   const table = document.getElementById('vxl-table');
   if (!table) return;
   const totalW = VXL_COLS.reduce((s, c) => s + c.w, 0);
@@ -1738,21 +1726,18 @@ function renderVendorGrid(rows) {
     return '<tr>' + VXL_COLS.map((col, c) => {
       const missing = _vxlMissing(v, col);
       const dirty = _vxlIsDirty(v, col);
-      const cls = ['vxl-clickable'];
+      const cls = ['vxl-cell'];
       if (c === 0) cls.push('vxl-frozen');
       if (missing) cls.push('vxl-missing');
       if (dirty) cls.push('vxl-dirty');
       const style = c === 0 ? 'left:0;' : '';
-      return `<td class="${cls.join(' ')}" style="${style}" data-r="${r}" data-c="${c}" onmousedown="_vxlSelect(${r},${c})" ondblclick="_vxlBeginEdit(${r},${c})">${esc(_vxlDisplay(v, col))}</td>`;
+      return `<td class="${cls.join(' ')}" style="${style}" data-r="${r}" data-c="${c}">${esc(_vxlDisplay(v, col))}</td>`;
     }).join('') + '</tr>';
   }).join('') + '</tbody>';
   table.innerHTML = cg + thead + tbody;
   _vxlSyncBar();
-  const wrap = document.getElementById('vxl-wrap');
-  if (wrap && !wrap._vxlWired) {
-    wrap._vxlWired = true;
-    wrap.addEventListener('keydown', _vxlKeydown);
-  }
+  _vxlPaintRange();
+  _vxlSyncFill();
 }
 function _vxlSyncBar() {
   let missing = 0;
@@ -1762,32 +1747,117 @@ function _vxlSyncBar() {
   const dirty = _vxlDirty();
   const saveBtn = document.getElementById('vxl-save-btn');
   const discardBtn = document.getElementById('vxl-discard-btn');
+  const undoBtn = document.getElementById('vxl-undo-btn');
   if (saveBtn) saveBtn.disabled = !dirty || !_canManage;
   if (discardBtn) discardBtn.disabled = !dirty;
+  if (undoBtn) undoBtn.disabled = !_vxlUndo.length;
 }
-function _vxlSelect(r, c) {
-  if (_vxlEditing) _vxlCommitEdit();
-  _vxlSel = { r, c };
+function _vxlSelect(r, c, scroll) {
+  if (scroll === undefined) scroll = true;
+  if (r < 0 || c < 0 || r >= _vxlRows.length || c >= VXL_COLS.length) return;
   document.querySelectorAll('#vxl-table td.vxl-sel').forEach(td => td.classList.remove('vxl-sel'));
-  const td = document.querySelector(`#vxl-table td[data-r="${r}"][data-c="${c}"]`);
-  if (td) td.classList.add('vxl-sel');
-  const wrap = document.getElementById('vxl-wrap');
-  if (wrap) wrap.focus();
+  _vxlSel = { r, c };
+  const td = _vxlTd(r, c);
+  if (td) { td.classList.add('vxl-sel'); if (scroll) td.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+  _vxlSyncFill();
 }
-function _vxlBeginEdit(r, c) {
-  if (!_canManage) return;
-  const v = _vxlRows[r]; const col = VXL_COLS[c];
-  if (!v || !col) return;
+function _vxlRange() {
+  const a = _vxlAnchor || _vxlSel || { r: 0, c: 0 };
+  const s = _vxlSel || a;
+  return { r1: Math.min(a.r, s.r), r2: Math.max(a.r, s.r), c1: Math.min(a.c, s.c), c2: Math.max(a.c, s.c) };
+}
+function _vxlPaintRange() {
+  document.querySelectorAll('#vxl-table td.vxl-range').forEach(td => td.classList.remove('vxl-range'));
+  const info = document.getElementById('vxl-sel-info');
+  if (_vxlAnchor && _vxlSel) {
+    const R = _vxlRange();
+    let painted = 0;
+    for (let r = R.r1; r <= R.r2; r++) for (let c = R.c1; c <= R.c2; c++) { const td = _vxlTd(r, c); if (td) { td.classList.add('vxl-range'); painted++; } }
+    if (info) {
+      const nr = R.r2 - R.r1 + 1, nc = R.c2 - R.c1 + 1;
+      if (nr > 1 || nc > 1) { info.textContent = `${painted} cell${painted === 1 ? '' : 's'} selected (${nr} row${nr === 1 ? '' : 's'} × ${nc} col${nc === 1 ? '' : 's'})`; info.style.display = ''; }
+      else info.style.display = 'none';
+    }
+  } else if (info) info.style.display = 'none';
+  _vxlSyncFill();
+}
+// Ctrl+Arrow / Ctrl+Shift+Arrow "jump to the edge of the data block" — same rule as
+// review.html's WP grid: from a filled cell, skip to the last filled cell before a
+// gap; from an empty cell (or when the next cell is empty), skip to the next filled
+// cell, or the grid edge either way.
+function _vxlJumpEdge(r, c, dr, dc) {
+  const inBounds = (rr, cc) => rr >= 0 && cc >= 0 && rr < _vxlRows.length && cc < VXL_COLS.length;
+  const isEmpty = (rr, cc) => { const v = _vxlVal(_vxlRows[rr], VXL_COLS[cc]); return v == null || v === ''; };
+  if (!inBounds(r + dr, c + dc)) return { r, c };
+  let rr = r, cc = c;
+  const startEmpty = isEmpty(r, c), nextEmpty = isEmpty(r + dr, c + dc);
+  if (startEmpty || nextEmpty) {
+    rr = r + dr; cc = c + dc;
+    while (inBounds(rr, cc) && isEmpty(rr, cc)) { rr += dr; cc += dc; }
+    if (!inBounds(rr, cc)) { rr -= dr; cc -= dc; }
+  } else {
+    while (inBounds(rr + dr, cc + dc) && !isEmpty(rr + dr, cc + dc)) { rr += dr; cc += dc; }
+  }
+  return { r: rr, c: cc };
+}
+// Stage one cell edit (with an undo entry). Returns false when the write is rejected
+// (blank Company Name, or a Status value that doesn't normalize to one of the 4 valid
+// states) — callers count rejections so paste/fill can report "N cells skipped".
+function _vxlSet(r, c, raw, undoBatch) {
+  const v = _vxlRows[r], col = VXL_COLS[c];
+  if (!v || !col || !_canManage) return false;
+  let val = raw == null ? '' : String(raw);
+  if (col.k === 'name' && !val.trim()) return false;
+  if (col.k === 'status') {
+    const norm = val.trim().toLowerCase().replace(/\s+/g, '_');
+    if (col.opts.includes(norm)) val = norm;
+    else if (!col.opts.includes(val)) return false;
+  }
+  const cur = col.k === 'trade_categories' ? (v.trade_categories || []).join(', ') : (v[col.k] || '');
+  const staged = _vxlEdits[v.id];
+  const hadStaged = !!(staged && Object.prototype.hasOwnProperty.call(staged, col.k));
+  const effectiveCur = hadStaged ? staged[col.k] : cur;
+  if (val === effectiveCur) return true; // no-op, not blocked
+  if (undoBatch) undoBatch.push({ id: v.id, k: col.k, had: hadStaged, prev: hadStaged ? staged[col.k] : undefined });
+  if (!_vxlEdits[v.id]) _vxlEdits[v.id] = {};
+  if (val === cur) { delete _vxlEdits[v.id][col.k]; if (!Object.keys(_vxlEdits[v.id]).length) delete _vxlEdits[v.id]; }
+  else _vxlEdits[v.id][col.k] = val;
+  return true;
+}
+function _vxlRefreshRow(r) {
+  const v = _vxlRows[r]; if (!v) return;
+  VXL_COLS.forEach((col, c) => {
+    const td = _vxlTd(r, c); if (!td) return;
+    td.textContent = _vxlDisplay(v, col);
+    td.classList.toggle('vxl-dirty', _vxlIsDirty(v, col));
+    td.classList.toggle('vxl-missing', _vxlMissing(v, col));
+  });
+  _vxlSyncBar();
+}
+function _vxlMove(dr, dc) {
+  if (!_vxlSel) return;
+  const r = Math.min(Math.max(_vxlSel.r + dr, 0), _vxlRows.length - 1);
+  const c = Math.min(Math.max(_vxlSel.c + dc, 0), VXL_COLS.length - 1);
+  _vxlAnchor = null; _vxlPaintRange();
   _vxlSelect(r, c);
-  _vxlEditing = { r, c };
-  const td = document.querySelector(`#vxl-table td[data-r="${r}"][data-c="${c}"]`);
+}
+
+/* ── Cell editor ────────────────────────────────────────────────────────── */
+function _vxlBeginEdit(seed) {
+  if (!_canManage || !_vxlSel) return;
+  const r = _vxlSel.r, c = _vxlSel.c;
+  const v = _vxlRows[r], col = VXL_COLS[c];
+  if (!v || !col) return;
+  const td = _vxlTd(r, c);
   if (!td) return;
-  const rect = td.getBoundingClientRect();
-  const wrapRect = document.getElementById('vxl-wrap').getBoundingClientRect();
-  const top = rect.top - wrapRect.top + document.getElementById('vxl-wrap').scrollTop;
-  const left = rect.left - wrapRect.left + document.getElementById('vxl-wrap').scrollLeft;
-  const w = rect.width, h = rect.height;
   if (col.type === 'trades') { _vxlOpenTradePop(v, td); return; }
+  _vxlEditing = { r, c };
+  _vxlSyncFill(); // hide the fill handle while the editor is open
+  const wrap = document.getElementById('vxl-wrap');
+  const wrapRect = wrap.getBoundingClientRect();
+  const rect = td.getBoundingClientRect();
+  const top = rect.top - wrapRect.top + wrap.scrollTop;
+  const left = rect.left - wrapRect.left + wrap.scrollLeft;
   let el;
   if (col.type === 'select') {
     el = document.createElement('select');
@@ -1798,47 +1868,45 @@ function _vxlBeginEdit(r, c) {
     el = document.createElement('input');
     el.className = 'vxl-ed';
     el.type = 'text';
-    el.value = _vxlVal(v, col);
+    el.value = seed || _vxlVal(v, col);
   }
-  el.style.top = top + 'px'; el.style.left = left + 'px'; el.style.width = w + 'px'; el.style.height = h + 'px';
+  el.style.top = top + 'px'; el.style.left = left + 'px'; el.style.width = rect.width + 'px'; el.style.height = rect.height + 'px';
+  function finish(commit, dir) {
+    if (!_vxlEditing) return;
+    _vxlEditing = null;
+    const val = el.value;
+    el.remove();
+    if (commit) {
+      const b = [];
+      _vxlSet(r, c, val, b);
+      if (b.length) _vxlUndo.push(b);
+      _vxlRefreshRow(r);
+    }
+    _vxlSelect(r, c, false);
+    if (dir === 'down') _vxlMove(1, 0);
+    else if (dir === 'right') _vxlMove(0, 1);
+    else if (dir === 'left') _vxlMove(0, -1);
+    _vxlSyncFill();
+  }
   el.addEventListener('keydown', function (e) {
-    // stopPropagation is load-bearing here: without it, this keydown still bubbles to
-    // #vxl-wrap's own listener AFTER _vxlCommitEdit() has already cleared _vxlEditing,
-    // so the wrap's handler no longer sees "editing in progress" and reprocesses the
-    // same Enter/Tab as a SECOND navigation — double-move, or an immediate re-open of
-    // the editor on the cell just moved to.
-    if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); _vxlCommitEdit(); _vxlMove(1, 0); }
-    else if (e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); _vxlCommitEdit(); _vxlMove(0, e.shiftKey ? -1 : 1); }
-    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); _vxlEditing = null; el.remove(); }
+    if (e.key === 'Enter') { e.preventDefault(); finish(true, 'down'); }
+    else if (e.key === 'Tab') { e.preventDefault(); finish(true, e.shiftKey ? 'left' : 'right'); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    // stopPropagation is load-bearing: without it, this keydown still bubbles to the
+    // document-level grid keydown handler AFTER finish() has already cleared
+    // _vxlEditing, so that handler no longer sees "editing in progress" and
+    // reprocesses the same Enter/Tab as a SECOND navigation.
+    e.stopPropagation();
   });
-  el.addEventListener('blur', () => { if (_vxlEditing && _vxlEditing.r === r && _vxlEditing.c === c) _vxlCommitEdit(); });
-  document.getElementById('vxl-wrap').appendChild(el);
+  el.addEventListener('blur', () => finish(true));
+  if (el.tagName === 'SELECT') el.addEventListener('change', () => finish(true, 'down'));
+  wrap.appendChild(el);
   el.focus();
-  if (el.select) el.select();
-}
-function _vxlCommitEdit() {
-  if (!_vxlEditing) return;
-  const { r, c } = _vxlEditing;
-  const el = document.querySelector('.vxl-ed');
-  const v = _vxlRows[r]; const col = VXL_COLS[c];
-  _vxlEditing = null;
-  if (!el || !v || !col) { if (el) el.remove(); return; }
-  const val = el.value;
-  el.remove();
-  _vxlStage(v, col, val);
-  renderVendorGrid(_vxlRows);
-  _vxlSelect(r, c);
-}
-function _vxlStage(v, col, val) {
-  if (col.k === 'name' && !val.trim()) return; // company name can't be blanked out
-  const cur = col.k === 'trade_categories' ? (v.trade_categories || []).join(', ') : (v[col.k] || '');
-  if (!_vxlEdits[v.id]) _vxlEdits[v.id] = {};
-  if (val === cur) { delete _vxlEdits[v.id][col.k]; if (!Object.keys(_vxlEdits[v.id]).length) delete _vxlEdits[v.id]; }
-  else _vxlEdits[v.id][col.k] = val;
+  if (!seed && el.select) el.select();
 }
 function _vxlOpenTradePop(v, td) {
   document.querySelectorAll('.vxl-trade-pop').forEach(p => p.remove());
-  const current = new Set((_vxlVal(v, VXL_COLS.find(c => c.k === 'trade_categories')).split(',').map(s => s.trim()).filter(Boolean)));
+  const current = new Set(_vxlVal(v, VXL_COLS.find(c => c.k === 'trade_categories')).split(',').map(s => s.trim()).filter(Boolean));
   const pop = document.createElement('div');
   pop.className = 'vxl-trade-pop';
   pop.innerHTML = TRADES.map(t => `<label><input type="checkbox" value="${esc(t)}" ${current.has(t) ? 'checked' : ''}> ${esc(t)}</label>`).join('');
@@ -1846,43 +1914,207 @@ function _vxlOpenTradePop(v, td) {
   pop.style.top = (rect.bottom + 4) + 'px';
   pop.style.left = rect.left + 'px';
   document.body.appendChild(pop);
+  const r = +td.dataset.r, c = +td.dataset.c;
   const apply = () => {
     const chosen = [...pop.querySelectorAll('input:checked')].map(i => i.value);
-    _vxlStage(v, VXL_COLS.find(c => c.k === 'trade_categories'), chosen.join(', '));
+    const b = [];
+    _vxlSet(r, c, chosen.join(', '), b);
+    if (b.length) _vxlUndo.push(b);
+    _vxlRefreshRow(r);
     pop.remove();
     document.removeEventListener('mousedown', outside, true);
-    renderVendorGrid(_vxlRows);
   };
   pop.addEventListener('change', apply);
   function outside(e) { if (!pop.contains(e.target)) apply(); }
   setTimeout(() => document.addEventListener('mousedown', outside, true), 0);
 }
-function _vxlMove(dr, dc) {
-  if (!_vxlSel) return;
-  let r = Math.min(Math.max(_vxlSel.r + dr, 0), _vxlRows.length - 1);
-  let c = Math.min(Math.max(_vxlSel.c + dc, 0), VXL_COLS.length - 1);
-  _vxlSelect(r, c);
-  const td = document.querySelector(`#vxl-table td[data-r="${r}"][data-c="${c}"]`);
-  if (td && td.scrollIntoView) td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+
+/* ── Fill handle (corner drag to copy down, like Excel) ────────────────────── */
+function _vxlSyncFill() {
+  const wrap = document.getElementById('vxl-wrap'); if (!wrap) return;
+  let h = document.getElementById('vxl-fill-handle');
+  if (_vendorView !== 'grid' || _vxlEditing || _vxlDragMode === 'fill' || !_vxlRows.length || !_vxlSel) { if (h) h.style.display = 'none'; return; }
+  const R = _vxlRange();
+  const td = _vxlTd(R.r2, R.c2);
+  if (!td) { if (h) h.style.display = 'none'; return; }
+  if (!h) { h = document.createElement('div'); h.id = 'vxl-fill-handle'; wrap.appendChild(h); }
+  const tr = td.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+  h.style.display = 'block';
+  h.style.left = (tr.right - wr.left + wrap.scrollLeft - 4) + 'px';
+  h.style.top = (tr.bottom - wr.top + wrap.scrollTop - 4) + 'px';
 }
-function _vxlKeydown(e) {
-  if (_vxlEditing) return; // the <input>'s own handler owns Enter/Tab/Esc while editing
-  if (!_vxlSel) return;
-  const nav = { ArrowDown: [1, 0], ArrowUp: [-1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
-  if (nav[e.key]) { e.preventDefault(); _vxlMove(nav[e.key][0], nav[e.key][1]); return; }
-  if (e.key === 'Tab') { e.preventDefault(); _vxlMove(0, e.shiftKey ? -1 : 1); return; }
-  if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); _vxlBeginEdit(_vxlSel.r, _vxlSel.c); return; }
-  if (e.key === 'Delete' || e.key === 'Backspace') {
+function _vxlPaintFillPreview() {
+  document.querySelectorAll('#vxl-table td.vxl-fillprev').forEach(td => td.classList.remove('vxl-fillprev'));
+  if (_vxlFillTo == null || !_vxlFillSrc) return;
+  const S = _vxlFillSrc;
+  const lo = Math.min(S.r1, _vxlFillTo), hi = Math.max(S.r2, _vxlFillTo);
+  for (let r = lo; r <= hi; r++) {
+    if (r >= S.r1 && r <= S.r2) continue;
+    for (let c = S.c1; c <= S.c2; c++) { const td = _vxlTd(r, c); if (td) td.classList.add('vxl-fillprev'); }
+  }
+}
+// value that target row rr / column cc receives — repeats the source block, Excel-style.
+function _vxlFillValue(cc, rr, S) {
+  const span = S.r2 - S.r1 + 1;
+  const off = ((rr - S.r1) % span + span) % span;
+  return _vxlVal(_vxlRows[S.r1 + off], VXL_COLS[cc]);
+}
+function _vxlCommitFill() {
+  document.querySelectorAll('#vxl-table td.vxl-fillprev').forEach(td => td.classList.remove('vxl-fillprev'));
+  const S = _vxlFillSrc, to = _vxlFillTo;
+  _vxlFillSrc = null; _vxlFillTo = null;
+  if (!S || to == null) { _vxlSyncFill(); return; }
+  const lo = Math.min(S.r1, to), hi = Math.max(S.r2, to);
+  if (lo === S.r1 && hi === S.r2) { _vxlSyncFill(); return; }
+  const b = []; let blocked = 0;
+  for (let r = lo; r <= hi; r++) {
+    if (r >= S.r1 && r <= S.r2) continue;
+    for (let c = S.c1; c <= S.c2; c++) { if (!_vxlSet(r, c, _vxlFillValue(c, r, S), b)) blocked++; }
+    _vxlRefreshRow(r);
+  }
+  if (b.length) _vxlUndo.push(b);
+  if (blocked) _vxlToast(`${blocked} cell${blocked === 1 ? '' : 's'} skipped (Company Name can't be blank, or Status doesn't match a valid value).`);
+  _vxlAnchor = { r: lo, c: S.c1 }; _vxlSel = { r: hi, c: S.c2 };
+  _vxlSelect(hi, S.c2, false); _vxlPaintRange();
+}
+
+/* ── Mouse + keyboard (wired once, top-level — see the bottom of this file) ── */
+function _vxlMouseDown(e) {
+  if (_vendorView !== 'grid' || _vxlEditing) return;
+  if (e.button !== 0) return;
+  if (e.target.id === 'vxl-fill-handle') {
     e.preventDefault();
-    const v = _vxlRows[_vxlSel.r]; const col = VXL_COLS[_vxlSel.c];
-    if (v && col && col.k !== 'name') { _vxlStage(v, col, ''); renderVendorGrid(_vxlRows); _vxlSelect(_vxlSel.r, _vxlSel.c); }
+    _vxlFillSrc = _vxlRange(); _vxlFillTo = _vxlFillSrc.r2; _vxlDragMode = 'fill';
     return;
   }
-  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    _vxlBeginEdit(_vxlSel.r, _vxlSel.c);
-    setTimeout(() => { const el = document.querySelector('.vxl-ed'); if (el && el.tagName === 'INPUT') el.value = e.key; }, 0);
+  const td = e.target.closest && e.target.closest('#vxl-table td.vxl-cell');
+  if (!td) return;
+  const r = +td.dataset.r, c = +td.dataset.c;
+  if (e.shiftKey) {
+    if (!_vxlAnchor) _vxlAnchor = _vxlSel ? { r: _vxlSel.r, c: _vxlSel.c } : { r, c };
+    _vxlSel = { r, c }; _vxlSelect(r, c, false); _vxlPaintRange();
+  } else {
+    _vxlAnchor = null; _vxlSel = { r, c }; _vxlSelect(r, c, false); _vxlPaintRange();
+    _vxlDragMode = 'select'; _vxlDragOrigin = { r, c };
   }
+  e.preventDefault();
+  const wrap = document.getElementById('vxl-wrap'); if (wrap) wrap.focus();
 }
+function _vxlMouseMove(e) {
+  if (!_vxlDragMode) return;
+  const td = e.target.closest && e.target.closest('#vxl-table td.vxl-cell');
+  if (!td) return;
+  const r = +td.dataset.r, c = +td.dataset.c;
+  if (_vxlDragMode === 'fill') { if (r === _vxlFillTo) return; _vxlFillTo = r; _vxlPaintFillPreview(); return; }
+  if (_vxlSel && r === _vxlSel.r && c === _vxlSel.c) return;
+  if (!_vxlAnchor) _vxlAnchor = { r: _vxlDragOrigin.r, c: _vxlDragOrigin.c };
+  _vxlSel = { r, c }; _vxlSelect(r, c, false); _vxlPaintRange();
+}
+function _vxlMouseUp() {
+  if (_vxlDragMode === 'fill') _vxlCommitFill();
+  _vxlDragMode = null; _vxlDragOrigin = null;
+}
+function _vxlDblClick(e) {
+  if (_vendorView !== 'grid') return;
+  const td = e.target.closest && e.target.closest('#vxl-table td.vxl-cell');
+  if (td) { _vxlSelect(+td.dataset.r, +td.dataset.c); _vxlBeginEdit(); }
+}
+function _vxlKeydown(e) {
+  if (_vendorView !== 'grid' || _vxlEditing) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') return; // toolbar/search has focus
+  if (!_vxlSel) return;
+  const r = _vxlSel.r, c = _vxlSel.c;
+  const nav = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
+  if (nav) {
+    e.preventDefault();
+    const jump = e.ctrlKey || e.metaKey;
+    const dest = jump ? _vxlJumpEdge(r, c, nav[0], nav[1])
+      : { r: Math.max(0, Math.min(_vxlRows.length - 1, r + nav[0])), c: Math.max(0, Math.min(VXL_COLS.length - 1, c + nav[1])) };
+    if (e.shiftKey) { if (!_vxlAnchor) _vxlAnchor = { r, c }; _vxlSel = dest; _vxlSelect(_vxlSel.r, _vxlSel.c, true); _vxlPaintRange(); }
+    else { _vxlAnchor = null; _vxlPaintRange(); _vxlSelect(dest.r, dest.c); }
+    return;
+  }
+  if (e.key === 'Tab') { e.preventDefault(); _vxlMove(0, e.shiftKey ? -1 : 1); return; }
+  if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); _vxlBeginEdit(); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault();
+    const R = _vxlRange(), b = [];
+    for (let rr = R.r1; rr <= R.r2; rr++) { for (let cc = R.c1; cc <= R.c2; cc++) _vxlSet(rr, cc, '', b); _vxlRefreshRow(rr); }
+    if (b.length) _vxlUndo.push(b);
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {   // fill down from the top row of the range
+    e.preventDefault();
+    const R = _vxlRange(), b = [];
+    for (let cc = R.c1; cc <= R.c2; cc++) {
+      const src = _vxlVal(_vxlRows[R.r1], VXL_COLS[cc]);
+      for (let rr = R.r1 + 1; rr <= R.r2; rr++) _vxlSet(rr, cc, src, b);
+    }
+    for (let rr = R.r1; rr <= R.r2; rr++) _vxlRefreshRow(rr);
+    if (b.length) _vxlUndo.push(b);
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); vxlUndo(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+    e.preventDefault();
+    if (_vxlRows.length) { _vxlAnchor = { r: 0, c: 0 }; _vxlSel = { r: _vxlRows.length - 1, c: VXL_COLS.length - 1 }; _vxlSelect(_vxlSel.r, _vxlSel.c, false); _vxlPaintRange(); }
+    return;
+  }
+  if (e.ctrlKey || e.metaKey) return;                      // let the browser's copy/paste handlers run
+  if (e.key.length === 1) { e.preventDefault(); _vxlBeginEdit(e.key); }
+}
+function _vxlCopy(e) {
+  if (_vendorView !== 'grid' || _vxlEditing || !_vxlSel || !_vxlRows.length) return;
+  const R = _vxlRange(), out = [];
+  for (let r = R.r1; r <= R.r2; r++) {
+    const row = [];
+    for (let c = R.c1; c <= R.c2; c++) row.push(_vxlVal(_vxlRows[r], VXL_COLS[c]));
+    out.push(row.join('\t'));
+  }
+  e.clipboardData.setData('text/plain', out.join('\n'));
+  e.preventDefault();
+}
+function _vxlPaste(e) {
+  if (_vendorView !== 'grid' || _vxlEditing || !_vxlSel || !_canManage) return;
+  const txt = (e.clipboardData || window.clipboardData).getData('text');
+  if (!txt) return;
+  e.preventDefault();
+  const rows = txt.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n$/, '').split('\n').map(l => l.split('\t'));
+  const b = []; let blocked = 0; const touched = new Set();
+  rows.forEach((cells, dr) => cells.forEach((val, dc) => {
+    const r = _vxlSel.r + dr, c = _vxlSel.c + dc;
+    if (r >= _vxlRows.length || c >= VXL_COLS.length) return;
+    touched.add(r);
+    if (!_vxlSet(r, c, val, b)) blocked++;
+  }));
+  if (b.length) _vxlUndo.push(b);
+  touched.forEach(r => _vxlRefreshRow(r));
+  if (blocked) _vxlToast(`${blocked} cell${blocked === 1 ? '' : 's'} skipped (Company Name can't be blank, or Status doesn't match a valid value).`);
+}
+window.vxlUndo = function () {
+  const batch = _vxlUndo.pop();
+  if (!batch) return;
+  batch.slice().reverse().forEach(u => {
+    if (!_vxlEdits[u.id]) return;
+    if (u.had) _vxlEdits[u.id][u.k] = u.prev; else delete _vxlEdits[u.id][u.k];
+    if (!Object.keys(_vxlEdits[u.id]).length) delete _vxlEdits[u.id];
+  });
+  const seen = {};
+  batch.forEach(u => { if (seen[u.id]) return; seen[u.id] = 1; const r = _vxlRows.findIndex(v => v.id === u.id); if (r >= 0) _vxlRefreshRow(r); });
+  _vxlSyncBar();
+};
+// Wired once at module scope (not per-render) — matches review.html's WP grid, where
+// these same five listeners live at the top level of the script rather than being
+// re-attached on every renderGrid() call.
+document.addEventListener('mousedown', _vxlMouseDown);
+document.addEventListener('mousemove', _vxlMouseMove);
+document.addEventListener('mouseup', _vxlMouseUp);
+document.addEventListener('dblclick', _vxlDblClick);
+document.addEventListener('keydown', _vxlKeydown);
+document.addEventListener('copy', _vxlCopy);
+document.addEventListener('paste', _vxlPaste);
+
 async function vxlSave() {
   if (!_vxlDirty() || !_canManage) return;
   const btn = document.getElementById('vxl-save-btn');
@@ -1901,7 +2133,7 @@ async function vxlSave() {
       ok++;
     } catch (e) { fail++; console.error('Vendor grid save failed for', id, e); }
   }
-  _vxlEdits = {};
+  _vxlEdits = {}; _vxlUndo = []; _vxlAnchor = null;
   btn.textContent = 'Save changes';
   if (fail) AppNotify && AppNotify.warn(`Saved ${ok}, ${fail} failed — see console.`);
   else AppNotify && AppNotify.success(`Saved ${ok} vendor${ok === 1 ? '' : 's'}.`);
@@ -1911,24 +2143,8 @@ async function vxlSave() {
 function vxlDiscard(silent) {
   if (!_vxlDirty()) return;
   if (!silent && !confirm('Discard all unsaved grid edits?')) return;
-  _vxlEdits = {};
+  _vxlEdits = {}; _vxlUndo = []; _vxlAnchor = null;
   if (_vendorView === 'grid') renderVendorGrid(_vxlRows);
-}
-
-function renderTable(rows) {
-  const tbody = document.getElementById('vendorTableBody');
-  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;padding:24px">No vendors found.</td></tr>'; return; }
-  tbody.innerHTML = rows.map(v => `
-    <tr class="${_selectedVendors.has(v.id) ? 'row-selected' : ''}" onclick="openDetailModal('${v.id}')">
-      ${_canManage ? `<td onclick="event.stopPropagation()" style="width:34px;text-align:center"><input type="checkbox" class="v-check" ${_selectedVendors.has(v.id) ? 'checked' : ''} onclick="toggleVendorSel('${v.id}',this.checked)" aria-label="Select vendor"></td>` : ''}
-      <td><strong>${esc(v.name)}</strong>${v.vendor_code ? `<div style="font-size:0.7rem;color:#999;font-family:monospace">${esc(v.vendor_code)}</div>` : ''}</td>
-      <td>${esc((v.trade_categories||[]).join(', ') || '—')}</td>
-      <td>${esc(v.contact_person || _displayEmail(v) || '—')}</td>
-      <td><span class="badge badge-${v.status}">${esc(v.status.replace('_',' '))}</span></td>
-      <td onclick="event.stopPropagation()">
-        ${v.status === 'pending_review' ? `<button class="action-btn btn-approve-row" onclick="quickApprove('${v.id}')">Approve</button> <button class="action-btn btn-reject-row" onclick="quickReject('${v.id}')">Reject</button>` : ''}
-      </td>
-    </tr>`).join('');
 }
 
 async function quickApprove(id) {
