@@ -202,10 +202,6 @@
        order, so at equal (single-class) specificity their padding would win instead. */
     .xl-btn.xl-btn-ico{position:relative;padding:5px 8px;line-height:1;gap:0}
     .xl-btn.xl-btn-ico i{font-size:1rem;vertical-align:-2px}
-    /* Pending-paste count, since the button has no room for "Paste 87 WPs". */
-    .xl-btn-badge{position:absolute;top:-5px;right:-5px;min-width:15px;height:15px;padding:0 3px;
-      border-radius:8px;background:var(--mw-red);color:#fff;font-size:0.6429rem;font-weight:700;
-      line-height:15px;text-align:center}
 
     /* ── Non-scrolling Grid view ──────────────────────────────────────────────
        A spreadsheet shouldn't have two nested scrollbars: the PAGE stays fixed at
@@ -425,8 +421,10 @@
                    which is what forced the second toolbar row whenever the sidebar is expanded.
                    Add WP keeps its label — it's the primary action. -->
               <button class="xl-btn xl-btn-ico" onclick="xlSelectAllCells()" title="Select all — select every cell in the grid (Ctrl+A)" aria-label="Select all cells"><i class="ti ti-box-multiple"></i></button>
-              <button class="xl-btn xl-btn-ico" onclick="xlCopyWPs()" title="Copy WPs — copy the selected work packages, then open another project's grid and click Paste to add them there" aria-label="Copy work packages"><i class="ti ti-copy"></i></button>
-              <button class="xl-btn xl-btn-ico" id="xl-paste-wps" onclick="xlPasteWPs()" title="Paste WPs — add the copied work packages as new rows in this project" aria-label="Paste work packages"><i class="ti ti-clipboard-plus"></i></button>
+              <!-- Copy/Paste keep their text labels: they're the cross-project workflow, not an
+                   obvious-from-the-icon utility, and there's width to spare after the cuts above. -->
+              <button class="xl-btn" onclick="xlCopyWPs()" title="Copy the selected work packages — then open another project's grid and click Paste WPs to add them there"><i class="ti ti-copy"></i> Copy WPs</button>
+              <button class="xl-btn" id="xl-paste-wps" onclick="xlPasteWPs()" title="Add the copied work packages as new rows in this project"><i class="ti ti-clipboard-plus"></i> Paste WPs</button>
               <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer" title="Show only work packages that still have a required field empty">
                 <input type="checkbox" id="xl-only-missing" onchange="renderGrid()" style="cursor:pointer"> Incomplete
               </label>
@@ -1321,17 +1319,15 @@
   function _xlSyncPasteBtn(){
     const btn = document.getElementById('xl-paste-wps'); if (!btn) return;
     const p = _xlReadClip();
-    // The button is icon-only (toolbar width), so the pending count lives in the tooltip
-    // plus a small badge on the icon rather than in a text label.
     if (p){
       btn.disabled = false;
-      btn.title = 'Paste WPs — add the ' + p.rows.length + ' work package' + (p.rows.length===1?'':'s')
+      btn.title = 'Add the ' + p.rows.length + ' work package' + (p.rows.length===1?'':'s')
         + ' copied from ' + (p.source||'another project') + ' as new rows in this project.';
-      btn.innerHTML = '<i class="ti ti-clipboard-plus"></i><span class="xl-btn-badge">' + p.rows.length + '</span>';
+      btn.innerHTML = '<i class="ti ti-clipboard-plus"></i> Paste ' + p.rows.length + ' WP' + (p.rows.length===1?'':'s');
     } else {
       btn.disabled = true;
-      btn.title = 'Paste WPs — copy work packages from a project first (Select all → Copy WPs), then paste them here.';
-      btn.innerHTML = '<i class="ti ti-clipboard-plus"></i>';
+      btn.title = 'Copy work packages from a project first (Select all → Copy WPs), then paste them here.';
+      btn.innerHTML = '<i class="ti ti-clipboard-plus"></i> Paste WPs';
     }
   }
 
