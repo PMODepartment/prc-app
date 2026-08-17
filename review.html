@@ -142,11 +142,15 @@
     table.xl tbody tr:hover .xl-rownum{color:var(--mw-red);font-weight:700}
     /* Level-1 trade group rows (subtotals). Not selectable cells — no data-r/data-c —
        so they sit outside the grid's coordinate space entirely. */
-    table.xl tbody tr.xl-grouprow td.xl-grouphead{background:#FDECEA !important;cursor:default;
+    table.xl tbody tr.xl-grouprow{cursor:pointer}
+    table.xl tbody tr.xl-grouprow td.xl-grouphead{background:#FDECEA !important;cursor:pointer;
       border-top:2px solid var(--mw-red);border-bottom:1px solid #F5B8B3;padding:5px 6px;
       font-size:0.7143rem;font-weight:700;color:#231F20;white-space:nowrap}
     body.dark-mode table.xl tbody tr.xl-grouprow td.xl-grouphead{background:#33211F !important;
       border-bottom-color:#5A2E2A;color:#DCDBDB}
+    /* AFTER the base rule — both carry !important at equal specificity, so source order decides. */
+    table.xl tbody tr.xl-grouprow:hover td.xl-grouphead{background:#FBD9D5 !important}
+    body.dark-mode table.xl tbody tr.xl-grouprow:hover td.xl-grouphead{background:#4a2f2c !important}
     .xl-grouplbl{text-transform:uppercase;letter-spacing:.05em;color:var(--mw-red)}
     .xl-groupn{margin-left:8px;font-weight:400;color:var(--text-hint)}
     .xl-groupsum{font-variant-numeric:tabular-nums}
@@ -412,6 +416,9 @@
               <span id="xl-count" class="xl-hint"></span>
               <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer">
                 <input type="checkbox" id="xl-only-missing" onchange="renderGrid()" style="cursor:pointer"> Only incomplete
+              </label>
+              <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer" title="Group the rows under collapsible Trade headers, each showing a subtotal of its budget and awarded cost">
+                <input type="checkbox" id="xl-group-trades" onchange="xlSetGroupTrades(this.checked)" style="cursor:pointer"> Group by trade
               </label>
               <span class="xl-sep"></span>
               <!-- The Sections label + its 3 buttons are ONE inline-flex unit so a tight row can
@@ -888,7 +895,7 @@
   function _xlLoadPrefs(){
     if (_xlPrefsLoaded || !adminProfile) return;
     _xlPrefsLoaded = true;
-    _xlLoadGroups(); _xlLoadWidths(); _xlLoadFreeze();
+    _xlLoadGroups(); _xlLoadWidths(); _xlLoadFreeze(); _xlLoadGroupMode();
   }
   /* Column freeze — the user picks how many left columns stay pinned (default Project + WP No.).
      Stored as the KEY of the last frozen column so it survives group collapse/expand; the count
@@ -1527,6 +1534,27 @@
     'Architectural Works','Mechanical Works','Electrical and Auxiliary Works',
     'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
   const XL_SUBTOTAL_COLS = ['budget_bcb0','budget_bcb1','budget_bcb2','awarded_cost','total_awarded','_variance','buyback_amount','_buyback_value'];
+  // OPT-IN — the flat grid stays the default. Persisted per user alongside the other grid prefs.
+  let _xlGrouped = false;
+  let _xlTradeCollapsed = new Set();
+  function _xlGroupModeKey(){ return 'wpm_grid_tradegroup_' + ((adminProfile&&adminProfile.id)||'anon'); }
+  function _xlLoadGroupMode(){
+    try { _xlGrouped = localStorage.getItem(_xlGroupModeKey()) === '1'; } catch(_){}
+    const cb = document.getElementById('xl-group-trades');
+    if (cb) cb.checked = _xlGrouped;
+  }
+  window.xlSetGroupTrades = function(on){
+    _xlGrouped = !!on;
+    try { localStorage.setItem(_xlGroupModeKey(), _xlGrouped ? '1' : '0'); } catch(_){}
+    if (!_xlGrouped) _xlTradeCollapsed = new Set();   // ungrouped has nothing to collapse
+    _xlSel = { r:0, c:_xlSel.c }; _xlAnchor = null;
+    renderGrid();
+  };
+  window.xlToggleTradeGroup = function(key){
+    if (_xlTradeCollapsed.has(key)) _xlTradeCollapsed.delete(key); else _xlTradeCollapsed.add(key);
+    _xlSel = { r:0, c:_xlSel.c }; _xlAnchor = null;
+    renderGrid();
+  };
   function _xlTradeKey(w){ return (xlVal(w,'trade')||'').toString().trim() || '(No trade)'; }
   function _xlGroupKeyOf(w){ return w.__new ? ' new' : _xlTradeKey(w); }
   function _xlGroupLabel(k){ return k === ' new' ? 'New work packages' : k; }
@@ -1536,10 +1564,16 @@
     return (n<0?'-':'') + '₱' + Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:0});
   }
   // One subtotal row for a contiguous run of same-trade rows.
+  // Subtotals are computed over the group's FULL row set (`rows`), which is captured before
+  // collapsing hides them — so a collapsed trade still shows its true totals.
   function _xlGroupRow(key, rows){
     const sums = {};
     XL_SUBTOTAL_COLS.forEach(function(k){ sums[k] = rows.reduce(function(s,w){ return s + _xlNum(xlVal(w,k)); }, 0); });
-    let html = '<tr class="xl-grouprow"><td class="xl-freeze xl-grouphead" style="left:0"></td>';
+    const collapsed = _xlTradeCollapsed.has(key);
+    const onclick = ' onclick="xlToggleTradeGroup(' + JSON.stringify(key).replace(/"/g,'&quot;') + ')"';
+    let html = '<tr class="xl-grouprow"' + onclick + ' title="' + (collapsed?'Show':'Hide')
+      + ' this trade\'s work packages"><td class="xl-freeze xl-grouphead" style="left:0;text-align:center">'
+      + '<i class="ti ti-chevron-' + (collapsed?'right':'down') + '"></i></td>';
     let labelled = false;
     VC.forEach(function(c,i){
       const fz = i < XL_FREEZE;
@@ -1563,6 +1597,9 @@
     // the approval workflow is retired, so it was almost always "All" anyway; the legacy-strip
     // above already surfaces + fixes any pre-auto-approve rows without a filter dropdown.
     const statusF = 'all';
+    // Prefs FIRST — _xlGrouped drives the sort + grouping below, so loading it later
+    // (as this used to) meant the stored "Group by trade" pref was ignored on first render.
+    _xlLoadPrefs();
     const tradeEl = document.getElementById('trade-filter');
     const trade   = tradeEl ? tradeEl.value : 'ALL';
     const srchEl  = document.getElementById('review-search');
@@ -1573,11 +1610,15 @@
       if (q && !((w.wp_no||'').toString().toLowerCase().indexOf(q)>=0 || (w.description||'').toLowerCase().indexOf(q)>=0)) return false;
       return true;
     }).sort(function(a,b){
-      // Level 1 = Trade, level 2 = the WP rows (project, then WP No.)
-      const ta = _xlTradeKey(a), tb = _xlTradeKey(b);
-      const oa = XL_TRADE_ORDER.indexOf(ta), ob = XL_TRADE_ORDER.indexOf(tb);
-      return ((oa<0?999:oa) - (ob<0?999:ob)) || ta.localeCompare(tb) ||
-        (a.project_id||'').localeCompare(b.project_id||'') ||
+      // Grouped: level 1 = Trade, level 2 = the WP rows. Ungrouped keeps the original
+      // project → WP No. order (the grid's long-standing default).
+      if (_xlGrouped){
+        const ta = _xlTradeKey(a), tb = _xlTradeKey(b);
+        const oa = XL_TRADE_ORDER.indexOf(ta), ob = XL_TRADE_ORDER.indexOf(tb);
+        const t = ((oa<0?999:oa) - (ob<0?999:ob)) || ta.localeCompare(tb);
+        if (t) return t;
+      }
+      return (a.project_id||'').localeCompare(b.project_id||'') ||
         (a.wp_no||'').toString().localeCompare((b.wp_no||'').toString(), undefined, {numeric:true, sensitivity:'base'});
     });
 
@@ -1589,6 +1630,23 @@
     const total = _gridRows.length;
     if (onlyMissEl && onlyMissEl.checked)
       _gridRows = _gridRows.filter(function(w){ return w.__new || _xlRowMissing(w).length > 0; });
+
+    /* Trade grouping (opt-in). `_xlGroups` is built from the rows BEFORE collapsing, so a
+       collapsed trade's subtotal still reflects every WP in it; only the rendering of its
+       member rows is suppressed. Collapsed rows drop out of `_gridRows` — i.e. out of the
+       coordinate space — exactly like the "Only incomplete" filter above. Staged edits on a
+       hidden row are unaffected: gridSave() falls back to `allWPs` when a dirty id isn't in
+       `_gridRows`, so collapsing can never silently drop an unsaved change. */
+    let _xlGroups = [];
+    if (_xlGrouped){
+      let cur = null;
+      _gridRows.forEach(function(w){
+        const k = _xlGroupKeyOf(w);
+        if (!cur || cur.key !== k){ cur = { key:k, rows:[] }; _xlGroups.push(cur); }
+        cur.rows.push(w);
+      });
+      _gridRows = _gridRows.filter(function(w){ return !_xlTradeCollapsed.has(_xlGroupKeyOf(w)); });
+    }
 
     // Consolidated grid: pick which project a new WP goes to.
     const npSel = document.getElementById('xl-new-proj');
@@ -1610,7 +1668,9 @@
     _xlBuildVC();
     _xlComputeFreeze();
     const tbl = document.getElementById('xl-table');
-    if (!_gridRows.length){
+    // Every group collapsed ⇒ no data rows, but the group headers MUST still render or the
+    // user could never expand them again. Fall through to the normal render in that case.
+    if (!_gridRows.length && !(_xlGrouped && _xlGroups.length)){
       tbl.innerHTML = '<tbody><tr><td style="padding:40px;text-align:center;color:#aaa;border:none">No work packages match the current filters.</td></tr></tbody>';
       _xlUpdateBar();
       _xlFitHeight();
@@ -1655,22 +1715,34 @@
         return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+lblHtml+pin+setBtn+rz+'</th>';
       }).join('') + '</tr>';
     const thead = '<thead>' + grpRow + colRow + '</thead>';
-    // Pre-compute the contiguous trade runs so each group's subtotal row can be emitted
-    // immediately before its first WP row.
+    // A group's subtotal row is emitted immediately before its first VISIBLE member row
+    // (keyed by that row's index in _gridRows). A fully-collapsed group has no visible member,
+    // so its header is emitted from the trailing pass below instead.
     const _groupStart = {};
-    let _gk = null;
-    _gridRows.forEach(function(w,r){
-      const k = _xlGroupKeyOf(w);
-      if (k !== _gk){ _gk = k; _groupStart[r] = { key:k, rows:[] }; }
+    if (_xlGrouped){
+      let seen = 0;
+      _xlGroups.forEach(function(g){
+        if (_xlTradeCollapsed.has(g.key)) { g.__pendingAt = seen; return; }
+        _groupStart[seen] = g;
+        seen += g.rows.length;
+      });
+    }
+    // Headers for collapsed groups, keyed by the _gridRows index they should precede.
+    const _collapsedAt = {};
+    if (_xlGrouped) _xlGroups.forEach(function(g){
+      if (!_xlTradeCollapsed.has(g.key)) return;
+      const at = g.__pendingAt || 0;
+      (_collapsedAt[at] = _collapsedAt[at] || []).push(g);
     });
-    Object.keys(_groupStart).forEach(function(sr){
-      const s = parseInt(sr,10), g = _groupStart[sr];
-      for (let i=s; i<_gridRows.length && _xlGroupKeyOf(_gridRows[i])===g.key; i++) g.rows.push(_gridRows[i]);
-    });
+    function _headsBefore(r){
+      let h = (_collapsedAt[r]||[]).map(function(g){ return _xlGroupRow(g.key, g.rows); }).join('');
+      if (_groupStart[r]) h += _xlGroupRow(_groupStart[r].key, _groupStart[r].rows);
+      return h;
+    }
 
     const tbody = '<tbody>' + _gridRows.map(function(w,r){
       const locked = !AppAuth.canEditProject(adminProfile, w.project_id);
-      const gh = _groupStart[r] ? _xlGroupRow(_groupStart[r].key, _groupStart[r].rows) : '';
+      const gh = _xlGrouped ? _headsBefore(r) : '';
       return gh + '<tr data-id="'+w.id+'"'+(w.__new?' class="xl-newrow"':'')+'>' +
         (w.__new
           ? '<td class="xl-freeze xl-ro" style="left:0;text-align:center;padding:0">'
@@ -1686,7 +1758,7 @@
           const st  = fz ? ' style="left:'+_xlLeft(i)+'px"' : '';
           return '<td class="'+cls+'" data-r="'+r+'" data-c="'+i+'"'+st+'>'+esc(xlFmt(xlVal(w,c.k), c))+'</td>';
         }).join('') + '</tr>';
-    }).join('') + '</tbody>';
+    }).join('') + (_xlGrouped ? _headsBefore(_gridRows.length) : '') + '</tbody>';
     tbl.innerHTML = cg + thead + tbody;
     tbl.style.width = _xlTotalW() + 'px';   // explicit width — see the table-layout note in the CSS
     // Keep the fill handle glued to the selection as the grid scrolls (bind once).

@@ -2592,7 +2592,10 @@ function buildTable(){
       const sColspan=nSticky||1;
       const rColspan=nCols+1-Math.max(nSticky,1); // +1 for edit col; at least 1
       const tdS=`<td colspan="${sColspan}" style="position:sticky;left:0;z-index:2;background:#f8f8f8;padding:7px 12px;font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:table-cell">${esc(item.trade)}${btn}</td>`;
-      const tdR=rColspan>0?`<td colspan="${rColspan}" style="background:#f8f8f8;padding:7px 12px;text-align:right;vertical-align:middle">${cnt}</td>`:'';
+      // LEFT-aligned, not right: this cell spans every remaining column of a very wide,
+      // horizontally-scrolling table, so right-aligned content lands far off-screen and is
+      // effectively invisible. Left puts it immediately after the frozen columns.
+      const tdR=rColspan>0?`<td colspan="${rColspan}" style="background:#f8f8f8;padding:7px 12px;text-align:left;vertical-align:middle">${cnt}</td>`:'';
       html+=`<tr class="trade-group-header" data-trade="${item.trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5">${tdS}${tdR}</tr>`;
     } else {
       const editLink=(window.__isViewer||window.__archived)?'':`<a href="wp-form.html?id=${item.wp.id}&project=${item.wp.project_id}" style="font-size:0.7857rem;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
