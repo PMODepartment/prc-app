@@ -140,6 +140,16 @@
     table.xl tbody tr:hover td:not(.xl-dirty):not(.xl-missing){background:var(--mw-red-light)}
     body.dark-mode table.xl tbody tr:hover td:not(.xl-dirty):not(.xl-missing){background:#3a2422}
     table.xl tbody tr:hover .xl-rownum{color:var(--mw-red);font-weight:700}
+    /* Level-1 trade group rows (subtotals). Not selectable cells — no data-r/data-c —
+       so they sit outside the grid's coordinate space entirely. */
+    table.xl tbody tr.xl-grouprow td.xl-grouphead{background:#FDECEA !important;cursor:default;
+      border-top:2px solid var(--mw-red);border-bottom:1px solid #F5B8B3;padding:5px 6px;
+      font-size:0.7143rem;font-weight:700;color:#231F20;white-space:nowrap}
+    body.dark-mode table.xl tbody tr.xl-grouprow td.xl-grouphead{background:#33211F !important;
+      border-bottom-color:#5A2E2A;color:#DCDBDB}
+    .xl-grouplbl{text-transform:uppercase;letter-spacing:.05em;color:var(--mw-red)}
+    .xl-groupn{margin-left:8px;font-weight:400;color:var(--text-hint)}
+    .xl-groupsum{font-variant-numeric:tabular-nums}
     .xl-ed{position:absolute;z-index:20;font-family:inherit;font-size:0.7857rem;padding:3px 5px;border:2px solid #EE3124;border-radius:0;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box}
     /* fill handle (corner drag to copy down) + its live preview */
     table.xl td.xl-fillprev{background:rgba(238,49,36,.16);outline:1px dashed rgba(238,49,36,.6);outline-offset:-1px}
@@ -1508,6 +1518,46 @@
     return jumpC != null ? { r:r, c:jumpC } : { r:r, c:c + (forward?1:-1) };
   }
 
+  /* ── Two-level grid: Trade (level 1, subtotal row) → work packages (level 2) ──────────
+     The group rows are EXTRA <tr>s injected between the data rows. They carry no
+     data-r/data-c attributes, so the grid's whole coordinate space (selection, nav,
+     copy/paste, fill, dirty repaint — all of which look cells up by those attributes or
+     index into _gridRows) is completely unaffected by their presence. */
+  const XL_TRADE_ORDER = ['General Requirements','Site Works','Structural Works',
+    'Architectural Works','Mechanical Works','Electrical and Auxiliary Works',
+    'Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
+  const XL_SUBTOTAL_COLS = ['budget_bcb0','budget_bcb1','budget_bcb2','awarded_cost','total_awarded','_variance','buyback_amount','_buyback_value'];
+  function _xlTradeKey(w){ return (xlVal(w,'trade')||'').toString().trim() || '(No trade)'; }
+  function _xlGroupKeyOf(w){ return w.__new ? ' new' : _xlTradeKey(w); }
+  function _xlGroupLabel(k){ return k === ' new' ? 'New work packages' : k; }
+  function _xlNum(v){ const n = parseFloat(String(v==null?'':v).replace(/,/g,'')); return isFinite(n) ? n : 0; }
+  function _xlMoney(n){
+    if (!n) return '';
+    return (n<0?'-':'') + '₱' + Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:0});
+  }
+  // One subtotal row for a contiguous run of same-trade rows.
+  function _xlGroupRow(key, rows){
+    const sums = {};
+    XL_SUBTOTAL_COLS.forEach(function(k){ sums[k] = rows.reduce(function(s,w){ return s + _xlNum(xlVal(w,k)); }, 0); });
+    let html = '<tr class="xl-grouprow"><td class="xl-freeze xl-grouphead" style="left:0"></td>';
+    let labelled = false;
+    VC.forEach(function(c,i){
+      const fz = i < XL_FREEZE;
+      const st = fz ? ' style="left:'+_xlLeft(i)+'px"' : '';
+      let inner = '';
+      if (!labelled && !c.ph){
+        inner = '<span class="xl-grouplbl">'+esc(_xlGroupLabel(key))+'</span>'
+              + '<span class="xl-groupn">'+rows.length+' WP'+(rows.length===1?'':'s')+'</span>';
+        labelled = true;
+      } else if (XL_SUBTOTAL_COLS.indexOf(c.k) >= 0 && sums[c.k]){
+        inner = '<span class="xl-groupsum">'+esc(_xlMoney(sums[c.k]))+'</span>';
+      }
+      html += '<td class="xl-grouphead'+(fz?' xl-freeze':'')
+            + ((XL_SUBTOTAL_COLS.indexOf(c.k)>=0)?' xl-num':'')+'"'+st+'>'+inner+'</td>';
+    });
+    return html + '</tr>';
+  }
+
   window.renderGrid = function(){
     // The "Show" review_status filter (All/Approved/Pending/Rejected) was removed 2026-08-06 —
     // the approval workflow is retired, so it was almost always "All" anyway; the legacy-strip
@@ -1523,7 +1573,11 @@
       if (q && !((w.wp_no||'').toString().toLowerCase().indexOf(q)>=0 || (w.description||'').toLowerCase().indexOf(q)>=0)) return false;
       return true;
     }).sort(function(a,b){
-      return (a.project_id||'').localeCompare(b.project_id||'') ||
+      // Level 1 = Trade, level 2 = the WP rows (project, then WP No.)
+      const ta = _xlTradeKey(a), tb = _xlTradeKey(b);
+      const oa = XL_TRADE_ORDER.indexOf(ta), ob = XL_TRADE_ORDER.indexOf(tb);
+      return ((oa<0?999:oa) - (ob<0?999:ob)) || ta.localeCompare(tb) ||
+        (a.project_id||'').localeCompare(b.project_id||'') ||
         (a.wp_no||'').toString().localeCompare((b.wp_no||'').toString(), undefined, {numeric:true, sensitivity:'base'});
     });
 
@@ -1601,9 +1655,23 @@
         return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+lblHtml+pin+setBtn+rz+'</th>';
       }).join('') + '</tr>';
     const thead = '<thead>' + grpRow + colRow + '</thead>';
+    // Pre-compute the contiguous trade runs so each group's subtotal row can be emitted
+    // immediately before its first WP row.
+    const _groupStart = {};
+    let _gk = null;
+    _gridRows.forEach(function(w,r){
+      const k = _xlGroupKeyOf(w);
+      if (k !== _gk){ _gk = k; _groupStart[r] = { key:k, rows:[] }; }
+    });
+    Object.keys(_groupStart).forEach(function(sr){
+      const s = parseInt(sr,10), g = _groupStart[sr];
+      for (let i=s; i<_gridRows.length && _xlGroupKeyOf(_gridRows[i])===g.key; i++) g.rows.push(_gridRows[i]);
+    });
+
     const tbody = '<tbody>' + _gridRows.map(function(w,r){
       const locked = !AppAuth.canEditProject(adminProfile, w.project_id);
-      return '<tr data-id="'+w.id+'"'+(w.__new?' class="xl-newrow"':'')+'>' +
+      const gh = _groupStart[r] ? _xlGroupRow(_groupStart[r].key, _groupStart[r].rows) : '';
+      return gh + '<tr data-id="'+w.id+'"'+(w.__new?' class="xl-newrow"':'')+'>' +
         (w.__new
           ? '<td class="xl-freeze xl-ro" style="left:0;text-align:center;padding:0">'
             + '<button class="xl-rm" onclick="xlRemoveNewRow(\'' + w.id + '\',event)" title="Discard this new row">&times;</button></td>'

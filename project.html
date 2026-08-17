@@ -2535,7 +2535,9 @@ function buildTable(){
   const items=[];
   groups.forEach(({trade,wps})=>{
     const collapsed=!!_collapseState.get(trade);
-    items.push({type:'header',trade,count:wps.length,collapsed});
+    const budgetSum=wps.reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
+    const awardedSum=wps.reduce((s,w)=>s+(window.effectiveAwardedCost?window.effectiveAwardedCost(w):(w.total_awarded||0)),0);
+    items.push({type:'header',trade,count:wps.length,collapsed,budgetSum,awardedSum});
     if(!collapsed) wps.forEach(w=>items.push({type:'row',trade,wp:w}));
   });
 
@@ -2583,7 +2585,10 @@ function buildTable(){
   items.slice(start,end).forEach(item=>{
     if(item.type==='header'){
       const btn=`<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:3px;background:#e0e0e0;color:#555;font-size:0.9286rem;font-weight:700;margin-left:6px;flex-shrink:0">${item.collapsed?'+':'−'}</span>`;
-      const cnt=`<span style="font-size:0.7143rem;color:#aaa;font-weight:400;white-space:nowrap">${item.count} WPs</span>`;
+      const subtotal=(!window.__hideBudget && (item.budgetSum||item.awardedSum))
+        ? ` · Budget ${fmt(item.budgetSum)} · Awarded ${fmt(item.awardedSum)}`
+        : '';
+      const cnt=`<span style="font-size:0.7143rem;color:#aaa;font-weight:400;white-space:nowrap">${item.count} WPs${subtotal}</span>`;
       const sColspan=nSticky||1;
       const rColspan=nCols+1-Math.max(nSticky,1); // +1 for edit col; at least 1
       const tdS=`<td colspan="${sColspan}" style="position:sticky;left:0;z-index:2;background:#f8f8f8;padding:7px 12px;font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:table-cell">${esc(item.trade)}${btn}</td>`;
@@ -2646,7 +2651,10 @@ function buildTable(){
     let ch='';
     items.slice(start,end).forEach(item=>{
       if(item.type==='header'){
-        ch+=`<div class="wpc-trade">${esc(item.trade)}<span class="wpc-trade-count">${item.count} WPs</span></div>`;
+        const subtotal=(!isViewer && (item.budgetSum||item.awardedSum))
+          ? ` · ${fmt(item.budgetSum)} / ${fmt(item.awardedSum)}`
+          : '';
+        ch+=`<div class="wpc-trade">${esc(item.trade)}<span class="wpc-trade-count">${item.count} WPs${subtotal}</span></div>`;
       } else {
         const wp=item.wp;
         const sc=_sc(wp.award_status),bc=_bc(wp.award_status);
