@@ -194,8 +194,18 @@
     .xl-foot .xl-help[open]{flex-basis:100%}
     /* Grid-only Discard/Save, hosted on the filter bar (hidden in Cards view by setReviewView). */
     .rv-grid-actions{flex-shrink:0}
-    /* Sections label + its 3 buttons wrap as ONE unit, never split across rows. */
-    .xl-sections{display:inline-flex;align-items:center;gap:8px;flex-shrink:0}
+    /* Sections buttons wrap as ONE unit, never split across rows. */
+    .xl-sections{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+    /* Icon-only toolbar buttons — square, so the row fits on one line with the sidebar open.
+       Every one carries a `title` + `aria-label` since there's no visible text. */
+    /* Two-class selector deliberately: this rule sits ABOVE `.xl-btn`/`.xl-btn-mini` in source
+       order, so at equal (single-class) specificity their padding would win instead. */
+    .xl-btn.xl-btn-ico{position:relative;padding:5px 8px;line-height:1;gap:0}
+    .xl-btn.xl-btn-ico i{font-size:1rem;vertical-align:-2px}
+    /* Pending-paste count, since the button has no room for "Paste 87 WPs". */
+    .xl-btn-badge{position:absolute;top:-5px;right:-5px;min-width:15px;height:15px;padding:0 3px;
+      border-radius:8px;background:var(--mw-red);color:#fff;font-size:0.6429rem;font-weight:700;
+      line-height:15px;text-align:center}
 
     /* ── Non-scrolling Grid view ──────────────────────────────────────────────
        A spreadsheet shouldn't have two nested scrollbars: the PAGE stays fixed at
@@ -410,26 +420,27 @@
               <input type="number" id="xl-add-count" min="1" max="100" value="1" title="How many blank rows to add at once" style="width:52px;font-size:0.7857rem;padding:5px 6px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);text-align:center">
               <select id="xl-new-proj" style="display:none;font-size:0.7857rem;padding:5px 8px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;background:var(--surface);color:var(--text-primary);cursor:pointer" title="Project the new work package belongs to"></select>
               <span class="xl-sep"></span>
-              <button class="xl-btn" onclick="xlSelectAllCells()" title="Select every cell in the grid (Ctrl+A)"><i class="ti ti-box-multiple"></i> Select all</button>
-              <button class="xl-btn" onclick="xlCopyWPs()" title="Copy the selected work packages — then open another project's grid and click Paste WPs to add them there"><i class="ti ti-copy"></i> Copy WPs</button>
-              <button class="xl-btn" id="xl-paste-wps" onclick="xlPasteWPs()" title="Add the copied work packages as new rows in this project"><i class="ti ti-clipboard-plus"></i> Paste WPs</button>
-              <span id="xl-count" class="xl-hint"></span>
-              <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer">
-                <input type="checkbox" id="xl-only-missing" onchange="renderGrid()" style="cursor:pointer"> Only incomplete
+              <!-- Icon-only from here on. These are secondary tools with self-explanatory icons
+                   and full `title` tooltips; their text labels were ~450px of the ~1330px row,
+                   which is what forced the second toolbar row whenever the sidebar is expanded.
+                   Add WP keeps its label — it's the primary action. -->
+              <button class="xl-btn xl-btn-ico" onclick="xlSelectAllCells()" title="Select all — select every cell in the grid (Ctrl+A)" aria-label="Select all cells"><i class="ti ti-box-multiple"></i></button>
+              <button class="xl-btn xl-btn-ico" onclick="xlCopyWPs()" title="Copy WPs — copy the selected work packages, then open another project's grid and click Paste to add them there" aria-label="Copy work packages"><i class="ti ti-copy"></i></button>
+              <button class="xl-btn xl-btn-ico" id="xl-paste-wps" onclick="xlPasteWPs()" title="Paste WPs — add the copied work packages as new rows in this project" aria-label="Paste work packages"><i class="ti ti-clipboard-plus"></i></button>
+              <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer" title="Show only work packages that still have a required field empty">
+                <input type="checkbox" id="xl-only-missing" onchange="renderGrid()" style="cursor:pointer"> Incomplete
               </label>
               <label class="xl-hint" style="display:flex;align-items:center;gap:5px;cursor:pointer" title="Group the rows under collapsible Trade headers, each showing a subtotal of its budget and awarded cost">
                 <input type="checkbox" id="xl-group-trades" onchange="xlSetGroupTrades(this.checked)" style="cursor:pointer"> Group by trade
               </label>
               <span class="xl-sep"></span>
-              <!-- The Sections label + its 3 buttons are ONE inline-flex unit so a tight row can
-                   never strand "Collapse all"/"Reset widths" on a line of their own, split from
-                   the "Sections:" label they belong to (the reported 3rd-row spill). If it has
-                   to wrap it wraps as a whole group. -->
+              <!-- The Sections buttons are ONE inline-flex unit so a tight row can never strand
+                   one of them on a line of its own (the reported 3rd-row spill). If it has to
+                   wrap it wraps as a whole group. -->
               <span class="xl-sections">
-                <span class="xl-hint">Sections:</span>
-                <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(false)" title="Show every WP-form section">Expand all</button>
-                <button class="xl-btn xl-btn-mini" onclick="xlGroupsAll(true)" title="Collapse every section to the key columns">Collapse all</button>
-                <button class="xl-btn xl-btn-mini" onclick="xlResetWidths()" title="Restore every column to its default width">Reset widths</button>
+                <button class="xl-btn xl-btn-mini xl-btn-ico" onclick="xlGroupsAll(false)" title="Expand all sections — show every WP-form section's columns" aria-label="Expand all sections"><i class="ti ti-chevrons-down"></i></button>
+                <button class="xl-btn xl-btn-mini xl-btn-ico" onclick="xlGroupsAll(true)" title="Collapse all sections — hide every section down to its key columns" aria-label="Collapse all sections"><i class="ti ti-chevrons-up"></i></button>
+                <button class="xl-btn xl-btn-mini xl-btn-ico" onclick="xlResetWidths()" title="Reset column widths — restore every column to its default width" aria-label="Reset column widths"><i class="ti ti-arrow-autofit-width"></i></button>
               </span>
             </div>
           </div>
@@ -461,6 +472,9 @@
                 <span class="xl-legend"><span class="xl-swatch" style="background:#FDECEA;box-shadow:inset 3px 0 0 #EE3124"></span>required, empty</span>
                 <span class="xl-legend"><span class="xl-swatch" style="background:#FFF6DA;border-color:#E0B94D"></span>unsaved</span>
               </span>
+              <!-- Row count sits here with the other status readouts, not in the toolbar —
+                   it's information, not an action, and the toolbar needed the width. -->
+              <span id="xl-count" class="xl-hint"></span>
               <span id="xl-sel-info" class="xl-hint" style="display:none;font-weight:700;color:#EE3124"></span>
               <span id="xl-missing-count" class="xl-hint" style="color:#B45309;font-weight:700;display:none"></span>
               <span id="xl-dirty-count" class="xl-hint" style="color:#D97706;font-weight:700"></span>
@@ -1307,15 +1321,17 @@
   function _xlSyncPasteBtn(){
     const btn = document.getElementById('xl-paste-wps'); if (!btn) return;
     const p = _xlReadClip();
+    // The button is icon-only (toolbar width), so the pending count lives in the tooltip
+    // plus a small badge on the icon rather than in a text label.
     if (p){
       btn.disabled = false;
-      btn.title = 'Add the ' + p.rows.length + ' work package' + (p.rows.length===1?'':'s')
+      btn.title = 'Paste WPs — add the ' + p.rows.length + ' work package' + (p.rows.length===1?'':'s')
         + ' copied from ' + (p.source||'another project') + ' as new rows in this project.';
-      btn.innerHTML = '<i class="ti ti-clipboard-plus"></i> Paste ' + p.rows.length + ' WP' + (p.rows.length===1?'':'s');
+      btn.innerHTML = '<i class="ti ti-clipboard-plus"></i><span class="xl-btn-badge">' + p.rows.length + '</span>';
     } else {
       btn.disabled = true;
-      btn.title = 'Copy work packages from a project first (Select all → Copy WPs), then paste them here.';
-      btn.innerHTML = '<i class="ti ti-clipboard-plus"></i> Paste WPs';
+      btn.title = 'Paste WPs — copy work packages from a project first (Select all → Copy WPs), then paste them here.';
+      btn.innerHTML = '<i class="ti ti-clipboard-plus"></i>';
     }
   }
 
