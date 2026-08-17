@@ -1313,12 +1313,15 @@
       const awardedN = hm.awarded;
       const dueN = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).length;
       const bcb = hm.totalBudget;
-      const awd = hm.awardedCost;
+      const awd = hm.awardedCost;      // real spend — shown as text, NOT used to fill the battery
+      // Battery fill is BCB-based (see the matching note in project.html's renderOvBattery):
+      // measuring the awarded segment by actual cost let an over-budget portfolio exceed 100%.
+      const awdBcb = hm.budgetAwarded;
       const dueBcb = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
       const wpPct     = total ? Math.round(awardedN/total*100) : 0;
-      const valPct    = bcb   ? Math.round(awd/bcb*100) : 0;
+      const valPct    = bcb   ? Math.min(100, Math.round(awdBcb/bcb*100)) : 0;
       const wpDuePct  = total ? Math.round(dueN/total*100) : 0;
-      const valDuePct = bcb   ? Math.round(dueBcb/bcb*100) : 0;
+      const valDuePct = bcb   ? Math.min(100 - valPct, Math.round(dueBcb/bcb*100)) : 0;
 
       const LEGEND = `<div style="display:flex;flex-direction:column;gap:3px;margin-top:10px;align-self:flex-start">
         <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:#2D9B6F"></div><span style="font-size:0.7143rem;color:#777;white-space:nowrap"><span aria-hidden="true">✔</span> Awarded</span></div>
@@ -1351,7 +1354,7 @@
       }
 
       batteryCard('idx-ov-battery-wp',  wpPct,  wpDuePct,  '% Awarded by WP',    `${awardedN} / ${total} WPs`, `${wpPct}% award rate`);
-      batteryCard('idx-ov-battery-val', valPct, valDuePct, '% Awarded by Value',  `${Fmt.money(awd)} awarded`, `of ${Fmt.money(bcb)} BCB`);
+      batteryCard('idx-ov-battery-val', valPct, valDuePct, '% Awarded by Value',  `${Fmt.money(awdBcb)} of ${Fmt.money(bcb)} BCB`, `awarded at ${Fmt.money(awd)} actual cost`);
     }
 
     // Shared footnote for any period-chart panel whose Forecast line can read above

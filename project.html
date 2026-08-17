@@ -1652,12 +1652,18 @@ function renderOvBattery(wps) {
   const awardedN = hm.awarded;
   const dueN = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).length;
   const bcb = hm.totalBudget;
-  const awd = hm.awardedCost;
+  const awd = hm.awardedCost;          // real spend — shown as text, NOT used to fill the battery
+  // The battery measures PROGRESS THROUGH THE BUDGET, so its awarded segment is the BCB of the
+  // awarded WPs (hm.budgetAwarded), not what they actually cost. Using awardedCost meant an
+  // over-budget portfolio filled past 100% (and pushed the Due/Not-Due segments off the battery),
+  // which a "% of budget awarded" gauge can't sensibly show. All three segments are now BCB-based
+  // slices of the SAME total, so they can only ever sum to 100%.
+  const awdBcb = hm.budgetAwarded;
   const dueBcb = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
   const wpPct     = total ? Math.round(awardedN/total*100) : 0;
-  const valPct    = bcb   ? Math.round(awd/bcb*100) : 0;
+  const valPct    = bcb   ? Math.min(100, Math.round(awdBcb/bcb*100)) : 0;
   const wpDuePct  = total ? Math.round(dueN/total*100) : 0;
-  const valDuePct = bcb   ? Math.round(dueBcb/bcb*100) : 0;
+  const valDuePct = bcb   ? Math.min(100 - valPct, Math.round(dueBcb/bcb*100)) : 0;
 
   const LEGEND = `<div style="display:flex;flex-direction:column;gap:3px;margin-top:10px;align-self:flex-start">
     <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:#2D9B6F"></div><span style="font-size:0.7143rem;color:#777;white-space:nowrap"><span aria-hidden="true">✔</span> Awarded</span></div>
@@ -1690,7 +1696,7 @@ function renderOvBattery(wps) {
   }
 
   batteryCard('ov-battery-wp',  wpPct,  wpDuePct,  '% Awarded by WP',    `${awardedN} / ${total} WPs`, `${wpPct}% award rate`);
-  batteryCard('ov-battery-val', valPct, valDuePct, '% Awarded by Value',  `${Fmt.money(awd)} awarded`, `of ${Fmt.money(bcb)} BCB`);
+  batteryCard('ov-battery-val', valPct, valDuePct, '% Awarded by Value',  `${Fmt.money(awdBcb)} of ${Fmt.money(bcb)} BCB`, `awarded at ${Fmt.money(awd)} actual cost`);
 }
 
 function renderOverview(){
