@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260812l"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260812l"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260812l"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260819a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260819a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260819a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260812l">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260819a">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -92,6 +92,22 @@
     .badge-approved{background:#D1FAE5;color:#065F46}
     .badge-rejected{background:#FEE2E2;color:#991B1B}
     .badge-inactive{background:#F3F4F6;color:#555}
+    /* Accreditation badges — a SEPARATE visual track from the workflow-status
+       badges above (a vendor carries one of each), so they deliberately share
+       the .badge pill shape but get their own class prefix + a leading icon. */
+    .abadge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:0.7857rem;font-weight:600}
+    .abadge i{font-size:0.9em}
+    .abadge-accredited{background:#D1FAE5;color:#065F46}
+    .abadge-unaccredited{background:#FEF3C7;color:#92400E}
+    .abadge-problematic{background:#FEE2E2;color:#991B1B}
+    .abadge-none{background:#F3F4F6;color:#555}
+    /* A problematic vendor is a risk flag, not just a label — give its card a
+       red left edge so it is spottable while scanning the grid of cards. */
+    .vcard.vcard-problematic{border-left:3px solid #EE3124}
+    .accred-fieldset{border:1.5px solid var(--border-md,#e5e5e5);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+    .accred-fieldset legend{font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#888;padding:0 6px}
+    .accred-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+    .accred-row > div{flex:1 1 180px;min-width:0}
     .action-btn{padding:4px 10px;border-radius:6px;font-size:0.7857rem;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:opacity .15s}
     .action-btn:hover{opacity:.8}
     .btn-approve-row{background:#16A34A;color:#fff}
@@ -240,6 +256,11 @@
     body.dark-mode .badge-approved{background:#102B1F;color:#6EE7B7}
     body.dark-mode .badge-rejected{background:#3D1A19;color:#FCA5A5}
     body.dark-mode .badge-inactive{background:var(--surface-2);color:var(--text-hint)}
+    body.dark-mode .abadge-accredited{background:#102B1F;color:#6EE7B7}
+    body.dark-mode .abadge-unaccredited{background:#3D2E0F;color:#FCD34D}
+    body.dark-mode .abadge-problematic{background:#3D1A19;color:#FCA5A5}
+    body.dark-mode .abadge-none{background:var(--surface-2);color:var(--text-hint)}
+    body.dark-mode .accred-fieldset{border-color:var(--border-md)}
 
     /* ── Vendor Grid (Excel-style) — same visual language as review.html's WP grid,
        a lighter engine (single-cell click/type/nav + staged edits, no fill-handle/
@@ -326,6 +347,10 @@
             <div class="kpi-card"><div class="kpi-value" id="kpiPending" style="color:#92400E">—</div><div class="kpi-label">Pending Review</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiApproved" style="color:#065F46">—</div><div class="kpi-label">Approved</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiRejected" style="color:#6B7280">—</div><div class="kpi-label">Rejected / Inactive</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiAccredited" style="color:#065F46">—</div><div class="kpi-label">Accredited</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiUnaccredited" style="color:#92400E">—</div><div class="kpi-label">Unaccredited</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiProblematic" style="color:#991B1B">—</div><div class="kpi-label">Problematic</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="kpiUnassessed" style="color:#6B7280">—</div><div class="kpi-label">Not Assessed</div></div>
           </div>
           <div class="vendor-toolbar" style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
             <div class="vendor-toolbar-filters" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1 1 320px;min-width:0">
@@ -341,6 +366,13 @@
               <option value="rejected">Rejected</option>
               <option value="inactive">Inactive</option>
             </select>
+            <select id="vendor-accred-filter" onchange="onVendorFilterChange()" title="Accreditation standing" style="padding:8px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:#fff;color:#231F20">
+              <option value="all">All Accreditation</option>
+              <option value="accredited">Accredited</option>
+              <option value="unaccredited">Unaccredited</option>
+              <option value="problematic">Problematic</option>
+              <option value="none">Not Assessed</option>
+            </select>
             <div class="view-toggle" role="group" aria-label="View mode">
               <button id="vv-cards" class="active" onclick="setVendorView('cards')" aria-label="Card view"><i class="ti ti-layout-grid"></i> Cards</button>
               <button id="vv-grid" onclick="setVendorView('grid')" aria-label="Grid view"><i class="ti ti-grid-dots"></i> Grid</button>
@@ -353,6 +385,8 @@
               <div class="tools-menu" id="toolsMenu" style="display:none">
                 <button onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs</span><small>Scan work packages for vendors not yet in the directory</small></button>
                 <button onclick="closeToolsMenu();backfillFromWPs()"><i class="ti ti-refresh-dot"></i><span>Backfill Trade/Bid Data</span><small>Fill in trades, products, bid history and rates from WPs</small></button>
+                <button onclick="closeToolsMenu();openAccredModal()"><i class="ti ti-file-check"></i><span>Import Accreditation List</span><small>Read a Vendor Masterdata spreadsheet and stamp each vendor Accredited / Unaccredited / Problematic</small></button>
+                <button id="tools-menu-unassessed" onclick="closeToolsMenu();markRestUnaccredited()"><i class="ti ti-help-circle"></i><span>Mark rest Unaccredited <span class="tools-menu-badge" id="unassessed-count-badge" style="display:none"><span id="unassessed-count">0</span></span></span><small>Set every Not-Assessed vendor to Unaccredited — run AFTER importing the accreditation list</small></button>
                 <button onclick="closeToolsMenu();normalizeVendorTrades()"><i class="ti ti-tags"></i><span>Normalize Trades</span><small>Collapse trade variants (e.g. "GENERAL REQUIREMENT" → "General Requirements") to the 10 standard trades</small></button>
                 <button onclick="closeToolsMenu();openMergeModal()"><i class="ti ti-arrows-join"></i><span>Merge Duplicates</span><small>Combine records that are the same company under different names</small></button>
                 <button id="tools-menu-dupes" onclick="closeToolsMenu();openDupModal()"><i class="ti ti-copy-off"></i><span>Remove Exact Duplicates <span class="tools-menu-badge" id="dup-count-badge" style="display:none"><span id="dup-count">0</span></span></span><small>Fold byte-identical vendor names into one record (keeps children, links and trades)</small></button>
@@ -368,6 +402,13 @@
               <span class="bulk-count" id="bulkCount">0 selected</span>
               <button class="b-link" id="bulkSelAllFiltered" onclick="bulkSelectAllFiltered()">Select all matching</button>
               <button class="b-approve" onclick="bulkApprove()">Approve</button>
+              <select id="bulkAccredSelect" onchange="bulkSetAccreditation(this.value);this.value=''" title="Set accreditation for the selected vendors" style="padding:4px 8px;border-radius:6px;border:1.5px solid #e5e5e5;font-family:inherit;font-size:0.7857rem;font-weight:600">
+                <option value="">Set accreditation…</option>
+                <option value="accredited">Accredited</option>
+                <option value="unaccredited">Unaccredited</option>
+                <option value="problematic">Problematic</option>
+                <option value="none">Clear (Not Assessed)</option>
+              </select>
               <button class="b-reject" onclick="bulkReject()">Reject</button>
               <button class="b-delete" id="bulkDeleteBtn" onclick="bulkDelete()">Delete</button>
               <button onclick="clearVendorSel()">Clear</button>
@@ -505,6 +546,46 @@
   </div>
 </div>
 
+<!-- Accreditation List Import Modal -->
+<div class="modal-overlay" id="accredModal" style="display:none">
+  <div class="modal" style="max-width:840px">
+    <div class="modal-header">
+      <div><div class="modal-title">Import Accreditation List</div><div class="modal-subtitle">Read a <b>Vendor Masterdata</b> workbook and stamp each directory vendor as Accredited, Unaccredited or Problematic. Each sheet is matched to a standing by its own name (an "Accredited Vendor List" sheet marks its rows accredited) — override any sheet below. Nothing is written until you press Apply.</div></div>
+      <button class="modal-close" onclick="closeAccredModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="accredModalBody" style="overflow-x:hidden">
+      <div class="field">
+        <label>Masterdata workbook (.xlsx / .xls / .csv)</label>
+        <input type="file" id="accred-file" accept=".xlsx,.xlsm,.xls,.csv" onchange="accredOnFile(this)">
+        <div style="font-size:0.72rem;color:#999;margin-top:6px">Read entirely in your browser — the file is never uploaded anywhere.</div>
+      </div>
+      <div id="accred-sheets" style="display:none">
+        <div class="section-divider"></div>
+        <label style="display:block;font-size:0.7143rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:8px">Sheets found — tick the ones to import</label>
+        <div id="accred-sheet-list"></div>
+        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:0.8571rem">
+          <input type="checkbox" id="accred-fill-contacts" checked style="margin-top:3px">
+          <span>Also fill in <b>blank</b> contact details (person, number, email, address) from the sheet — never overwrites data already on file.</span>
+        </label>
+        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:0.8571rem">
+          <input type="checkbox" id="accred-create-missing" style="margin-top:3px">
+          <span>Add masterdata vendors that aren’t in the directory yet as <b>new</b> records (created pending review, with their standing and contact details).</span>
+        </label>
+        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:0.8571rem">
+          <input type="checkbox" id="accred-fuzzy" checked style="margin-top:3px">
+          <span>Match on a vendor’s <b>core name</b> too (so “*JANGHO (LOCAL)” matches “Jangho”). Untick to require an exact vendor-code or name match.</span>
+        </label>
+        <button class="btn-primary" id="accred-analyze-btn" style="margin-top:14px" onclick="accredAnalyze()"><i class="ti ti-search" style="margin-right:4px"></i>Match against the directory</button>
+      </div>
+      <div id="accred-preview" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeAccredModal()">Close</button>
+      <button class="btn-primary" id="accred-apply-btn" style="display:none" onclick="accredApply()"><i class="ti ti-check" style="margin-right:4px"></i>Apply</button>
+    </div>
+  </div>
+</div>
+
 <!-- Vendor Detail Modal -->
 <div class="modal-overlay" id="detailModal" style="display:none">
   <div class="modal" style="max-width:760px">
@@ -537,9 +618,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260812l"></script>
-<script src="assets/js/db.js?v=20260812l"></script>
-<script src="assets/js/ui.js?v=20260812l"></script>
+<script src="assets/js/auth.js?v=20260819a"></script>
+<script src="assets/js/db.js?v=20260819a"></script>
+<script src="assets/js/ui.js?v=20260819a"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -622,15 +703,31 @@ function setVendorView(v) {
   const pager = document.getElementById('vendorPager'); if (pager) pager.style.display = isAn ? 'none' : '';
   if (isAn) renderVendorAnalytics(); else renderVendorList();
 }
+// Accreditation standing, as a filter/group key ('none' when blank). Uses the
+// shared window.accredKey so this page and db.js can never disagree; the
+// fallbacks keep the page working if db.js is served stale from cache.
+function _accredOf(v) { return window.accredKey ? window.accredKey(v.accreditation) : ((v.accreditation || 'none').toLowerCase()); }
+function _accredLabel(v) { return window.accredLabel ? window.accredLabel(v.accreditation) : (v.accreditation || 'Not Assessed'); }
+function _accredBadge(v) {
+  const k = _accredOf(v);
+  const m = window.accredMeta ? window.accredMeta(v.accreditation) : { label: _accredLabel(v), icon: 'ti-help-circle' };
+  const cls = ['accredited', 'unaccredited', 'problematic'].includes(k) ? k : 'none';
+  return `<span class="abadge abadge-${cls}" title="Accreditation standing"><i class="ti ${m.icon}"></i>${esc(m.label)}</span>`;
+}
 function _vendorFiltered() {
   const q = (document.getElementById('vendor-search').value || '').toLowerCase().trim();
   const statusF = document.getElementById('vendor-status-filter').value;
+  const accredEl = document.getElementById('vendor-accred-filter');
+  const accredF = accredEl ? accredEl.value : 'all';
   return allVendors.filter(v => {
     if (statusF !== 'all' && v.status !== statusF) return false;
+    if (accredF !== 'all' && _accredOf(v) !== accredF) return false;
     if (!q) return true;
     const hay = (v.name || '').toLowerCase()
       + ' ' + (v.vendor_code || '').toLowerCase()
       + ' ' + (v.trade_categories || []).join(' ').toLowerCase()
+      + ' ' + _accredLabel(v).toLowerCase()
+      + ' ' + (v.accreditation_notes || '').toLowerCase()
       + ' ' + (_vendorProductText[v.id] || '');
     return hay.includes(q);
   });
@@ -838,6 +935,57 @@ async function bulkApprove() {
   try { await VendorDb.bulkSetVendorStatus(ids, 'approved'); _selectedVendors.clear(); await loadAll(); AppNotify && AppNotify.success(`Approved ${ids.length} vendor(s).`); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Bulk approve failed') : alert(e.message); }
 }
+/* Bulk-set accreditation on the current selection. `value` is a roster key, or
+   'none' to clear back to Not Assessed. Deliberately does NOT touch
+   vendors.status — accreditation and the review workflow are independent. */
+async function bulkSetAccreditation(value) {
+  if (!value) return;
+  const ids = [..._selectedVendors]; if (!ids.length) return;
+  const clearing = value === 'none';
+  const label = clearing ? 'Not Assessed' : _accredLabel({ accreditation: value });
+  if (!confirm(`Set ${ids.length} selected vendor(s) to "${label}"?`)) return;
+  let notes = null;
+  if (value === 'problematic') {
+    // A blank reason makes the flag unactionable for whoever sees it next.
+    notes = prompt(`Why are these ${ids.length} vendor(s) problematic? (shown on their card — leave blank to skip)`, '');
+    if (notes === null) return;   // Cancel = abandon the whole action
+    notes = notes.trim();
+  }
+  const extra = {};
+  if (!clearing) extra.accreditation_date = new Date().toISOString().slice(0, 10);
+  if (notes) extra.accreditation_notes = notes;
+  const prog = AppNotify && AppNotify.progress ? AppNotify.progress(`Setting accreditation on ${ids.length} vendor(s)…`) : null;
+  try {
+    await VendorDb.bulkSetAccreditation(ids, clearing ? null : value, extra);
+    _selectedVendors.clear();
+    await loadAll();
+    const msg = `${ids.length} vendor(s) set to "${label}".`;
+    if (prog) prog.done(msg, { title: 'Accreditation updated' }); else AppNotify && AppNotify.success(msg);
+  } catch (e) {
+    if (prog) prog.fail((e && e.message) || 'Update failed', { title: 'Accreditation update failed' });
+    else if (AppNotify) AppNotify.fromError(e, 'Could not set accreditation'); else alert(e.message);
+  }
+}
+/* One-shot cleanup: everything still Not Assessed becomes Unaccredited. Meant to
+   run AFTER the masterdata import has stamped the known vendors — it asserts a
+   business fact ("we have no accreditation on file for these"), which is why it
+   is an explicit, confirmed action rather than a column default. */
+async function markRestUnaccredited() {
+  const ids = allVendors.filter(v => _accredOf(v) === 'none').map(v => v.id);
+  if (!ids.length) { AppNotify && AppNotify.info('Every vendor already has an accreditation standing.'); return; }
+  if (!confirm(`${ids.length} vendor(s) have no accreditation recorded.\n\nMark them all "Unaccredited"?\n\nRun the accreditation-list import FIRST so the genuinely accredited vendors aren't swept up. Vendors already marked accredited or problematic are not touched.`)) return;
+  const prog = AppNotify && AppNotify.progress ? AppNotify.progress(`Marking ${ids.length} vendor(s) unaccredited…`) : null;
+  try {
+    // No accreditation_date — nobody assessed these; a date would imply otherwise.
+    await VendorDb.bulkSetAccreditation(ids, 'unaccredited');
+    await loadAll();
+    const msg = `${ids.length} vendor(s) marked Unaccredited.`;
+    if (prog) prog.done(msg, { title: 'Accreditation backfilled' }); else AppNotify && AppNotify.success(msg);
+  } catch (e) {
+    if (prog) prog.fail((e && e.message) || 'Update failed', { title: 'Backfill failed' });
+    else if (AppNotify) AppNotify.fromError(e, 'Backfill failed'); else alert(e.message);
+  }
+}
 async function bulkReject() {
   const ids = [..._selectedVendors]; if (!ids.length) return;
   if (!confirm(`Reject ${ids.length} selected vendor(s)?`)) return;
@@ -888,23 +1036,32 @@ function renderCards(rows) {
       v.contact_number ? `<div><i class="ti ti-phone"></i><span>${esc(v.contact_number)}</span></div>` : '',
     ].filter(Boolean).join('');
     const contactHtml = contactRows ? `<div class="vcard-contact">${contactRows}</div>` : '';
+    // A problematic vendor's reason is the single most important thing on the
+    // card — an officer must not have to open the profile to find out why.
+    const accredNote = (_accredOf(v) === 'problematic' && v.accreditation_notes)
+      ? `<div style="font-size:0.75rem;color:#991B1B;margin-top:6px;display:flex;gap:5px"><i class="ti ti-alert-triangle" style="flex-shrink:0"></i><span>${esc(v.accreditation_notes)}</span></div>` : '';
     const sub = [v.vendor_code, v.contact_person || email || (trades.length ? '' : 'Imported — needs review')].filter(Boolean).join(' · ');
     const foot = v.status === 'pending_review'
       ? `<button class="action-btn btn-approve-row" onclick="event.stopPropagation();quickApprove('${v.id}')">Approve</button><button class="action-btn btn-reject-row" onclick="event.stopPropagation();quickReject('${v.id}')">Reject</button>`
       : `<span class="view-hint">View profile <i class="ti ti-arrow-right"></i></span>`;
     const sel = _selectedVendors.has(v.id);
     const check = _canManage ? `<input type="checkbox" class="vcard-check" ${sel ? 'checked' : ''} onclick="event.stopPropagation();toggleVendorSel('${v.id}',this.checked)" aria-label="Select vendor">` : '';
-    return `<div class="vcard${sel ? ' selected' : ''}" tabindex="0" role="button" onclick="openDetailModal('${v.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetailModal('${v.id}')}">
+    const problematic = _accredOf(v) === 'problematic';
+    return `<div class="vcard${sel ? ' selected' : ''}${problematic ? ' vcard-problematic' : ''}" tabindex="0" role="button" onclick="openDetailModal('${v.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetailModal('${v.id}')}">
       <div class="vcard-head">
         <div class="vcard-idwrap">
           ${check}
           <div class="vcard-avatar">${esc(_initials(v.name))}</div>
           <div style="min-width:0"><div class="vcard-name">${esc(v.name)}</div>${sub ? `<div class="vcard-sub">${esc(sub)}</div>` : ''}</div>
         </div>
-        <span class="badge badge-${v.status} vcard-status-badge">${esc(v.status.replace('_',' '))}</span>
+        <div class="vcard-status-badge" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
+          <span class="badge badge-${v.status}">${esc(v.status.replace('_',' '))}</span>
+          ${_accredBadge(v)}
+        </div>
       </div>
       ${tradesHtml}
       ${contactHtml}
+      ${accredNote}
       <div class="vcard-foot">${foot}</div>
     </div>`;
   }).join('');
@@ -1670,6 +1827,23 @@ function renderKpis() {
   document.getElementById('kpiPending').textContent = allVendors.filter(v => v.status === 'pending_review').length;
   document.getElementById('kpiApproved').textContent = allVendors.filter(v => v.status === 'approved').length;
   document.getElementById('kpiRejected').textContent = allVendors.filter(v => v.status === 'rejected' || v.status === 'inactive').length;
+  const byAccred = k => allVendors.filter(v => _accredOf(v) === k).length;
+  document.getElementById('kpiAccredited').textContent = byAccred('accredited');
+  document.getElementById('kpiUnaccredited').textContent = byAccred('unaccredited');
+  document.getElementById('kpiProblematic').textContent = byAccred('problematic');
+  document.getElementById('kpiUnassessed').textContent = byAccred('none');
+  updateUnassessedBadge();
+}
+// Data Tools badge for the "Mark rest Unaccredited" cleanup — mirrors
+// updateSplitBadge/updateDupBadge (count pill + the red dot on Data Tools).
+function updateUnassessedBadge() {
+  const n = allVendors.filter(v => _accredOf(v) === 'none').length;
+  const wrap = document.getElementById('unassessed-count-badge');
+  const num = document.getElementById('unassessed-count');
+  const item = document.getElementById('tools-menu-unassessed');
+  if (num) num.textContent = n;
+  if (wrap) wrap.style.display = n ? '' : 'none';
+  if (item) item.style.display = n ? '' : 'none';
 }
 
 /* ── Vendor Grid (Excel-style, full parity with review.html's WP grid) ─────────
@@ -1686,6 +1860,11 @@ const VXL_COLS = [
   { k: 'name',             label: 'Company Name',    w: 220, type: 'text',   req: true },
   { k: 'vendor_code',      label: 'Vendor Code',     w: 110, type: 'text' },
   { k: 'status',           label: 'Status',          w: 130, type: 'select', opts: ['pending_review', 'approved', 'rejected', 'inactive'] },
+  // Accreditation: '' is a legitimate value here (= Not Assessed), so the opts
+  // list leads with a blank — unlike `status`, which is NOT NULL in the DB.
+  { k: 'accreditation',       label: 'Accreditation',       w: 130, type: 'select', opts: ['', 'accredited', 'unaccredited', 'problematic'] },
+  { k: 'accreditation_notes', label: 'Accreditation Notes', w: 220, type: 'text' },
+  { k: 'accreditation_date',  label: 'Accredited / Assessed', w: 130, type: 'date' },
   { k: 'trade_categories', label: 'Trade Categories',w: 240, type: 'trades' },
   { k: 'contact_person',   label: 'Contact Person',  w: 160, type: 'text' },
   { k: 'contact_number',   label: 'Contact Number',  w: 140, type: 'text' },
@@ -1714,6 +1893,7 @@ function _vxlVal(v, col) {
 function _vxlDisplay(v, col) {
   const raw = _vxlVal(v, col);
   if (col.k === 'status') return raw ? raw.replace('_', ' ') : '';
+  if (col.k === 'accreditation') return raw ? _accredLabel({ accreditation: raw }) : '';
   return raw;
 }
 function _vxlMissing(v, col) { return !!col.req && !_vxlVal(v, col); }
@@ -1824,6 +2004,25 @@ function _vxlSet(r, c, raw, undoBatch) {
     if (col.opts.includes(norm)) val = norm;
     else if (!col.opts.includes(val)) return false;
   }
+  if (col.k === 'accreditation') {
+    // Blank clears back to Not Assessed. Otherwise accept a roster key, and fall
+    // back to the shared free-text mapper so a value PASTED straight out of the
+    // masterdata sheet ("BLACKLISTED", "For Accreditation") lands correctly
+    // instead of being rejected.
+    const norm = val.trim().toLowerCase();
+    if (!norm) val = '';
+    else if (col.opts.includes(norm)) val = norm;
+    else {
+      const mapped = window.accredFromText && window.accredFromText(norm);
+      if (!mapped) return false;
+      val = mapped;
+    }
+  }
+  if (col.k === 'accreditation_date') {
+    const norm = _accredParseDate(val);
+    if (val.trim() && !norm) return false;   // unparseable date — reject, don't store junk
+    val = norm || '';
+  }
   const cur = col.k === 'trade_categories' ? (v.trade_categories || []).join(', ') : (v[col.k] || '');
   const staged = _vxlEdits[v.id];
   const hadStaged = !!(staged && Object.prototype.hasOwnProperty.call(staged, col.k));
@@ -1873,8 +2072,17 @@ function _vxlBeginEdit(seed) {
   if (col.type === 'select') {
     el = document.createElement('select');
     el.className = 'vxl-ed';
-    el.innerHTML = col.opts.map(o => `<option value="${o}">${o.replace('_', ' ')}</option>`).join('');
+    el.innerHTML = col.opts.map(o => {
+      const lbl = o === '' ? '— not set —'
+        : (col.k === 'accreditation' ? _accredLabel({ accreditation: o }) : o.replace('_', ' '));
+      return `<option value="${o}">${esc(lbl)}</option>`;
+    }).join('');
     el.value = _vxlVal(v, col) || col.opts[0];
+  } else if (col.type === 'date') {
+    el = document.createElement('input');
+    el.className = 'vxl-ed';
+    el.type = 'date';
+    el.value = _accredParseDate(seed || _vxlVal(v, col)) || '';
   } else {
     el = document.createElement('input');
     el.className = 'vxl-ed';
@@ -1913,7 +2121,9 @@ function _vxlBeginEdit(seed) {
   if (el.tagName === 'SELECT') el.addEventListener('change', () => finish(true, 'down'));
   wrap.appendChild(el);
   el.focus();
-  if (!seed && el.select) el.select();
+  // try/catch: select() exists on <input type="date"> but throws InvalidStateError
+  // in Chromium — a date cell would otherwise break the editor on open.
+  if (!seed && el.select) { try { el.select(); } catch (_) { /* not a text-like input */ } }
 }
 function _vxlOpenTradePop(v, td) {
   document.querySelectorAll('.vxl-trade-pop').forEach(p => p.remove());
@@ -2137,6 +2347,12 @@ async function vxlSave() {
     if (Object.prototype.hasOwnProperty.call(patch, 'trade_categories')) {
       patch.trade_categories = patch.trade_categories.split(',').map(s => s.trim()).filter(Boolean);
     }
+    // accreditation / accreditation_date are nullable — a cleared cell must send
+    // NULL, not '' ('' would fail the date column's type cast, and would read as
+    // a non-null "blank standing" on the text column).
+    ['accreditation', 'accreditation_date', 'accreditation_notes'].forEach(k => {
+      if (Object.prototype.hasOwnProperty.call(patch, k) && !String(patch[k] || '').trim()) patch[k] = null;
+    });
     try {
       const updated = await VendorDb.updateVendor(id, patch);
       const idx = allVendors.findIndex(x => x.id === id);
@@ -2254,12 +2470,371 @@ function copyInviteLink() {
   navigator.clipboard.writeText(text).then(() => AppNotify && AppNotify.success('Link copied.'));
 }
 
+/* ══ Accreditation List Import ════════════════════════════════════════════════
+   Reads a Vendor Masterdata workbook in the browser (SheetJS, lazy-loaded on
+   first use like project.html's Excel export) and stamps each directory vendor's
+   accreditation.
+
+   Built against "EPC. PROC. Vendor Masterdata. 2023 07 27.xlsx", whose shape the
+   detection follows but does NOT hard-code — every field is found by HEADER TEXT
+   and every sheet's standing by its own SHEET NAME, so a re-issued or restructured
+   workbook keeps working (the same approach as import-monitoring.html's
+   header-name auto-detection, and for the same reason: these sheets differ per
+   issue). That workbook carries:
+     · "Accredited Vendor List_072123"  — 2,390 rows, SAP BP master (BP Code =
+       V-00001…, the SAME identifier already in vendors.vendor_code, so most of
+       these match on code rather than fuzzy name text)
+     · "Non-Accredited Vendors"         — ~32 rows, walk-in / FTA introductions
+     · "Problematic Vendors"            — 3 rows, with the REASON in REMARKS
+   Other sheets in that file (Employee List, KC Steps, Search Bar…) resolve to no
+   standing and are left unticked.
+
+   Matching precedence, strongest first: vendor_code → exact normalized name →
+   core name (VendorMatch, optional). Nothing is written until Apply. */
+let _accredWB = null;        // parsed SheetJS workbook
+let _accredSheets = [];      // [{name, standing, rows, cols, include}]
+let _accredPlan = null;      // computed by accredAnalyze()
+
+function openAccredModal() {
+  document.getElementById('accredModal').style.display = 'flex';
+  _syncModalScrollLock();
+  _accredWB = null; _accredSheets = []; _accredPlan = null;
+  document.getElementById('accred-file').value = '';
+  document.getElementById('accred-sheets').style.display = 'none';
+  document.getElementById('accred-preview').style.display = 'none';
+  document.getElementById('accred-apply-btn').style.display = 'none';
+}
+function closeAccredModal() {
+  document.getElementById('accredModal').style.display = 'none';
+  _syncModalScrollLock();
+}
+// SheetJS, on demand (allow-listed in this page's CSP script-src via cdn.jsdelivr.net).
+function _loadSheetJS() {
+  if (window.XLSX) return Promise.resolve();
+  if (_loadSheetJS._p) return _loadSheetJS._p;
+  _loadSheetJS._p = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload = res;
+    s.onerror = () => rej(new Error('Could not load the spreadsheet reader (check your connection).'));
+    document.head.appendChild(s);
+  });
+  return _loadSheetJS._p;
+}
+const _accredNorm = s => String(s == null ? '' : s).trim().replace(/\s+/g, ' ').toLowerCase();
+const _accredHdr = s => String(s == null ? '' : s).replace(/[^a-z0-9]+/gi, ' ').trim().toLowerCase();
+
+/* Locate the header row + the columns we care about. Scans the first 10 rows for
+   the one carrying a name-ish header, since a masterdata sheet may open with
+   title/spacer rows. Returns null when no name column can be found — that sheet
+   simply isn't importable, rather than being imported against column 0. */
+function _accredDetect(aoa) {
+  for (let h = 0; h < Math.min(10, aoa.length); h++) {
+    const row = (aoa[h] || []).map(_accredHdr);
+    if (!row.length) continue;
+    const find = (re, excl) => {
+      for (let i = 0; i < row.length; i++) {
+        if (!row[i]) continue;
+        if (excl && excl.test(row[i])) continue;
+        if (re.test(row[i])) return i;
+      }
+      return -1;
+    };
+    const name = find(/^(bp name|company name|vendor name|supplier name|name of vendor|name)$/) >= 0
+      ? find(/^(bp name|company name|vendor name|supplier name|name of vendor|name)$/)
+      : find(/\b(bp|company|vendor|supplier)\s*name\b/);
+    if (name < 0) continue;
+    return {
+      headerRow: h,
+      name,
+      // "old code no." / "tax code" / "wtcodes" are NOT the vendor code.
+      code: find(/\b(bp|vendor)\s*code\b|^code$/, /old|tax|wt|control|account/),
+      remarks: find(/^remarks?$/),
+      person: find(/contact\s*(person|name)/),
+      mobile: find(/mobile/),
+      phone: find(/telephone|contact number|phone/),
+      email: find(/e\s*mail/),
+      street: find(/bill to street|^address$|street/),
+      city: find(/bill to city|^city$/),
+    };
+  }
+  return null;
+}
+function accredOnFile(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const listEl = document.getElementById('accred-sheet-list');
+  document.getElementById('accred-sheets').style.display = '';
+  document.getElementById('accred-preview').style.display = 'none';
+  document.getElementById('accred-apply-btn').style.display = 'none';
+  listEl.innerHTML = '<div style="color:#888;padding:8px">Reading workbook…</div>';
+  _loadSheetJS()
+    .then(() => new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result);
+      fr.onerror = () => rej(new Error('Could not read that file.'));
+      fr.readAsArrayBuffer(f);
+    }))
+    .then(buf => {
+      _accredWB = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true });
+      _accredSheets = _accredWB.SheetNames.map(nm => {
+        const aoa = XLSX.utils.sheet_to_json(_accredWB.Sheets[nm], { header: 1, raw: true, defval: null, blankrows: false });
+        const cols = _accredDetect(aoa);
+        // The sheet NAME carries the standing in this workbook family
+        // ("Accredited Vendor List…", "Non-Accredited Vendors", "Problematic
+        // Vendors"). accredFromText tests the negative patterns first, so
+        // "Non-Accredited" can't be read as "Accredited".
+        const standing = window.accredFromText ? window.accredFromText(nm) : null;
+        let rows = [];
+        if (cols) {
+          rows = aoa.slice(cols.headerRow + 1).filter(r => {
+            const n = r && r[cols.name];
+            return n != null && String(n).trim() !== '';
+          });
+        }
+        return { name: nm, standing, cols, rows, include: !!(cols && standing && rows.length) };
+      });
+      _accredRenderSheets();
+    })
+    .catch(e => { listEl.innerHTML = `<div style="color:#EE3124;padding:8px">${esc(e.message || String(e))}</div>`; });
+}
+function _accredRenderSheets() {
+  const el = document.getElementById('accred-sheet-list');
+  el.innerHTML = _accredSheets.map((s, i) => {
+    const reason = !s.cols ? 'no vendor-name column found'
+      : !s.rows.length ? 'no data rows'
+      : !s.standing ? 'sheet name doesn’t say a standing — pick one to import it'
+      : `${s.rows.length.toLocaleString()} vendor row${s.rows.length === 1 ? '' : 's'}`
+        + (s.cols.code >= 0 ? ' · has vendor codes' : ' · name-matched only');
+    return `<label class="split-row" style="display:flex;gap:10px;align-items:center;padding:8px 0">
+      <input type="checkbox" ${s.include ? 'checked' : ''} ${s.cols && s.rows.length ? '' : 'disabled'} onchange="_accredToggleSheet(${i},this.checked)">
+      <span style="flex:1;min-width:0">
+        <span style="font-weight:600">${esc(s.name)}</span>
+        <span style="display:block;font-size:0.75rem;color:#888">${esc(reason)}</span>
+      </span>
+      <select onchange="_accredSetStanding(${i},this.value)" ${s.cols && s.rows.length ? '' : 'disabled'} style="padding:5px 8px;border-radius:6px;border:1.5px solid #e5e5e5;font-family:inherit;font-size:0.8rem">
+        <option value="">— no standing —</option>
+        ${['accredited', 'unaccredited', 'problematic'].map(k =>
+          `<option value="${k}" ${s.standing === k ? 'selected' : ''}>${esc(_accredLabel({ accreditation: k }))}</option>`).join('')}
+      </select>
+    </label>`;
+  }).join('');
+}
+function _accredToggleSheet(i, on) { _accredSheets[i].include = on && !!_accredSheets[i].standing; _accredRenderSheets(); }
+function _accredSetStanding(i, v) {
+  _accredSheets[i].standing = v || null;
+  if (!v) _accredSheets[i].include = false;
+  _accredRenderSheets();
+}
+
+/* Build the change plan. Read-only — touches nothing until accredApply(). */
+function accredAnalyze() {
+  const chosen = _accredSheets.filter(s => s.include && s.standing && s.cols);
+  const prev = document.getElementById('accred-preview');
+  prev.style.display = '';
+  if (!chosen.length) { prev.innerHTML = '<div style="color:#EE3124;padding:10px">Tick at least one sheet with a standing.</div>'; return; }
+  const fuzzy = document.getElementById('accred-fuzzy').checked;
+  const fillContacts = document.getElementById('accred-fill-contacts').checked;
+  const createMissing = document.getElementById('accred-create-missing').checked;
+
+  // Directory indexes. A name/code that maps to MORE THAN ONE directory vendor is
+  // ambiguous — those are reported, never auto-picked (the same rule the vendor_code
+  // backfill used: 0 ambiguous matches applied).
+  const byCode = new Map(), byName = new Map(), byCore = new Map();
+  const push = (m, k, v) => { if (!k) return; const a = m.get(k); if (a) a.push(v); else m.set(k, [v]); };
+  allVendors.forEach(v => {
+    push(byCode, _accredNorm(v.vendor_code), v);
+    push(byName, _accredNorm(v.name), v);
+    if (fuzzy && window.VendorMatch) push(byCore, _accredNorm(window.VendorMatch.core(v.name)), v);
+  });
+
+  const updates = new Map();   // vendorId -> {vendor, fields, how, src, standing}
+  const creates = [];
+  const unmatched = [], ambiguous = [], conflicts = [];
+  let noChange = 0;
+
+  chosen.forEach(s => {
+    const C = s.cols;
+    const cell = (r, i) => (i == null || i < 0 ? null : (r[i] == null ? null : String(r[i]).trim()));
+    s.rows.forEach(r => {
+      const rawName = cell(r, C.name); if (!rawName) return;
+      const code = cell(r, C.code);
+      let hit = null, how = '';
+      const tryKey = (m, k, label) => {
+        if (hit || !k) return;
+        const a = m.get(k);
+        if (!a) return;
+        if (a.length > 1) { ambiguous.push({ name: rawName, code, n: a.length, sheet: s.name }); return; }
+        hit = a[0]; how = label;
+      };
+      tryKey(byCode, _accredNorm(code), 'vendor code');
+      tryKey(byName, _accredNorm(rawName), 'exact name');
+      if (fuzzy && window.VendorMatch) tryKey(byCore, _accredNorm(window.VendorMatch.core(rawName)), 'core name');
+
+      // REMARKS is only a reason when the standing is problematic. On the SAP
+      // accredited sheet that column holds unrelated notes ("updated email add",
+      // "LAPU LAPU BRANCH"), so copying it into accreditation_notes there would
+      // be noise dressed up as an accreditation record.
+      const notes = s.standing === 'problematic' ? cell(r, C.remarks) : null;
+      const contact = {
+        contact_person: cell(r, C.person),
+        contact_number: cell(r, C.mobile) || cell(r, C.phone),
+        contact_email: cell(r, C.email),
+        address: [cell(r, C.street), cell(r, C.city)].filter(Boolean).join(', ') || null,
+      };
+
+      if (!hit) {
+        if (createMissing) creates.push({ name: rawName, code, standing: s.standing, notes, contact, sheet: s.name });
+        else unmatched.push({ name: rawName, code, sheet: s.name, standing: s.standing });
+        return;
+      }
+      // Two sheets disagreeing about one vendor: PROBLEMATIC WINS. A vendor listed
+      // both as accredited and as problematic must not be silently shown as clean —
+      // the risk flag is the safe reading, and the conflict is reported either way.
+      const existing = updates.get(hit.id);
+      if (existing && existing.standing !== s.standing) {
+        conflicts.push({ name: hit.name, a: existing.standing, b: s.standing });
+        if (existing.standing === 'problematic') return;
+      }
+      const fields = {};
+      if (_accredOf(hit) !== s.standing) fields.accreditation = s.standing;
+      if (notes && (hit.accreditation_notes || '') !== notes) fields.accreditation_notes = notes;
+      // Only stamp the code when the directory row has none — never overwrite an
+      // existing code with one reached via a fuzzy name match.
+      if (code && !hit.vendor_code && /^v-?\d+$/i.test(code)) fields.vendor_code = code;
+      if (fillContacts) {
+        Object.keys(contact).forEach(k => {
+          const cur = (hit[k] || '').trim();
+          if (contact[k] && !cur) fields[k] = contact[k];
+        });
+      }
+      if (!Object.keys(fields).length) { if (!existing) noChange++; return; }
+      updates.set(hit.id, { vendor: hit, fields, how, src: rawName, standing: s.standing });
+    });
+  });
+
+  _accredPlan = { updates: [...updates.values()], creates, unmatched, ambiguous, conflicts, noChange };
+  _accredRenderPreview();
+}
+function _accredRenderPreview() {
+  const P = _accredPlan;
+  const el = document.getElementById('accred-preview');
+  const tile = (n, label, color) =>
+    `<div class="kpi-card" style="padding:10px 12px"><div class="kpi-value" style="font-size:1.3rem;${color ? 'color:' + color : ''}">${n.toLocaleString()}</div><div class="kpi-label" style="font-size:0.7rem">${esc(label)}</div></div>`;
+  const byStanding = k => P.updates.filter(u => u.fields.accreditation === k).length;
+  const rows = P.updates.slice(0, 200).map(u => {
+    const from = _accredLabel(u.vendor), to = u.fields.accreditation ? _accredLabel({ accreditation: u.fields.accreditation }) : '—';
+    const other = Object.keys(u.fields).filter(k => k !== 'accreditation');
+    return `<tr>
+      <td style="padding:4px 8px">${esc(u.vendor.name)}</td>
+      <td style="padding:4px 8px;color:#888;font-size:0.75rem">${esc(u.how)}</td>
+      <td style="padding:4px 8px;color:#888">${esc(from)}</td>
+      <td style="padding:4px 8px;font-weight:600">${esc(to)}</td>
+      <td style="padding:4px 8px;color:#888;font-size:0.75rem">${esc(other.join(', '))}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="section-divider"></div>
+    <div class="kpi-grid" style="margin-bottom:12px">
+      ${tile(P.updates.length, 'Vendors to update')}
+      ${tile(byStanding('accredited'), '→ Accredited', '#065F46')}
+      ${tile(byStanding('unaccredited'), '→ Unaccredited', '#92400E')}
+      ${tile(byStanding('problematic'), '→ Problematic', '#991B1B')}
+      ${tile(P.creates.length, 'New vendors to add')}
+      ${tile(P.unmatched.length, 'Not in directory (skipped)', '#6B7280')}
+      ${tile(P.noChange, 'Already correct', '#6B7280')}
+      ${tile(P.ambiguous.length, 'Ambiguous (skipped)', '#92400E')}
+    </div>
+    ${P.conflicts.length ? `<div style="background:#FEF3C7;color:#92400E;padding:10px 12px;border-radius:8px;font-size:0.8rem;margin-bottom:10px">
+      <b>${P.conflicts.length} vendor(s) appear on sheets with different standings.</b> The problematic standing wins where one applies. ${esc(P.conflicts.slice(0, 5).map(c => c.name).join('; '))}${P.conflicts.length > 5 ? '…' : ''}</div>` : ''}
+    ${P.ambiguous.length ? `<div style="background:#FEF3C7;color:#92400E;padding:10px 12px;border-radius:8px;font-size:0.8rem;margin-bottom:10px">
+      <b>${P.ambiguous.length} masterdata row(s) matched more than one directory vendor</b> and were skipped rather than guessed — clean those up with Merge/Remove Duplicates, then re-run. ${esc(P.ambiguous.slice(0, 5).map(a => a.name).join('; '))}${P.ambiguous.length > 5 ? '…' : ''}</div>` : ''}
+    ${P.unmatched.length ? `<div style="font-size:0.8rem;color:#666;margin-bottom:10px">${P.unmatched.length.toLocaleString()} masterdata vendor(s) have no directory record. They're skipped — tick “Add masterdata vendors…” above and re-match if you want them created.</div>` : ''}
+    ${P.updates.length ? `<div style="max-height:280px;overflow:auto;border:1px solid #eee;border-radius:8px">
+      <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+        <thead><tr style="background:#F3F3F3;position:sticky;top:0">
+          <th style="text-align:left;padding:6px 8px">Directory vendor</th><th style="text-align:left;padding:6px 8px">Matched by</th>
+          <th style="text-align:left;padding:6px 8px">From</th><th style="text-align:left;padding:6px 8px">To</th><th style="text-align:left;padding:6px 8px">Also fills</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+      ${P.updates.length > 200 ? `<div style="padding:8px;color:#888;font-size:0.75rem">Showing the first 200 of ${P.updates.length.toLocaleString()} changes.</div>` : ''}
+    </div>` : '<div style="color:#888;padding:10px">Nothing to update.</div>'}`;
+  const btn = document.getElementById('accred-apply-btn');
+  const n = P.updates.length + P.creates.length;
+  btn.style.display = n ? '' : 'none';
+  btn.innerHTML = `<i class="ti ti-check" style="margin-right:4px"></i>Apply ${n.toLocaleString()} change${n === 1 ? '' : 's'}`;
+  btn.disabled = !_canManage;
+}
+let _accredApplying = false;
+async function accredApply() {
+  if (!_accredPlan || _accredApplying) return;
+  const P = _accredPlan;
+  const total = P.updates.length + P.creates.length;
+  if (!confirm(`Apply ${total.toLocaleString()} change(s)?\n\n· ${P.updates.length.toLocaleString()} existing vendor(s) updated\n· ${P.creates.length.toLocaleString()} new vendor(s) added\n\nThis writes to the live directory.`)) return;
+  _accredApplying = true;
+  const btn = document.getElementById('accred-apply-btn');
+  btn.disabled = true;
+  const prog = AppNotify && AppNotify.progress ? AppNotify.progress(`Applying accreditation — 0 / ${total.toLocaleString()}…`) : null;
+  const today = new Date().toISOString().slice(0, 10);
+  let ok = 0, fail = 0, made = 0;
+  const errs = [];
+  // Per-row writes (not a bulk .in() update) because each vendor gets a DIFFERENT
+  // patch — its own standing, notes and the specific blank contact fields being
+  // filled. Individually try/caught so one bad row can't abandon the rest, the
+  // same resilience rule as backfillVendorDataFromWPs.
+  for (const u of P.updates) {
+    try {
+      const fields = { ...u.fields };
+      if (fields.accreditation) fields.accreditation_date = today;
+      const updated = await VendorDb.updateVendor(u.vendor.id, fields);
+      const i = allVendors.findIndex(x => x.id === u.vendor.id);
+      if (i > -1) allVendors[i] = updated;
+      ok++;
+    } catch (e) { fail++; if (errs.length < 3) errs.push((e && e.message) || String(e)); console.error('Accreditation update failed for', u.vendor.id, e); }
+    if (prog && (ok + fail) % 25 === 0) prog.update(`Applying accreditation — ${(ok + fail).toLocaleString()} / ${total.toLocaleString()}…`);
+  }
+  for (const c of P.creates) {
+    try {
+      await VendorDb.createVendor({
+        name: c.name,
+        vendor_code: (c.code && /^v-?\d+$/i.test(c.code)) ? c.code : null,
+        accreditation: c.standing,
+        accreditation_notes: c.notes || null,
+        accreditation_date: today,
+        trade_categories: [],
+        contact_person: c.contact.contact_person || null,
+        contact_number: c.contact.contact_number || null,
+        contact_email: c.contact.contact_email || null,
+        address: c.contact.address || null,
+        // invite_email is NOT NULL and we have no invite to send — same synthesized
+        // placeholder the other bulk-create paths use (hidden by _displayEmail).
+        invite_email: _addVendorPlaceholderEmail(),
+      }, userProfile);
+      made++; ok++;
+    } catch (e) { fail++; if (errs.length < 3) errs.push((e && e.message) || String(e)); console.error('Accreditation create failed for', c.name, e); }
+    if (prog && (ok + fail) % 25 === 0) prog.update(`Applying accreditation — ${(ok + fail).toLocaleString()} / ${total.toLocaleString()}…`);
+  }
+  _accredApplying = false;
+  _accredPlan = null;
+  if (prog) prog.update('Refreshing directory…');
+  await loadAll();
+  // Reconcile the applied count against the plan — per-call successes alone don't
+  // prove the whole set landed (the Conso-PO backfill shipped a silently skipped
+  // chunk that every per-call result reported as clean).
+  const summary = `Accreditation applied: ${ok.toLocaleString()} of ${total.toLocaleString()} change(s)`
+    + (made ? `, ${made.toLocaleString()} new vendor(s) added` : '')
+    + (fail ? ` — ${fail.toLocaleString()} FAILED (see console)` : '.');
+  if (fail) { if (prog) prog.fail(summary, { title: 'Finished with errors', detail: errs.join('\n') }); else AppNotify && AppNotify.error(summary); }
+  else if (prog) prog.done(summary, { title: 'Accreditation import complete' });
+  else AppNotify && AppNotify.success(summary);
+  closeAccredModal();
+}
+
 /* ── Detail modal ── */
 async function openDetailModal(id) {
   activeVendor = allVendors.find(v => v.id === id);
   if (!activeVendor) return;
   document.getElementById('detailTitle').textContent = activeVendor.name;
-  document.getElementById('detailSub').innerHTML = `<span class="badge badge-${activeVendor.status}">${esc(activeVendor.status.replace('_',' '))}</span>`;
+  document.getElementById('detailSub').innerHTML = `<span class="badge badge-${activeVendor.status}">${esc(activeVendor.status.replace('_',' '))}</span> ${_accredBadge(activeVendor)}`;
   renderDetailFooter();
   document.getElementById('detailModal').style.display = 'flex';
   _syncModalScrollLock();
@@ -2346,6 +2921,26 @@ function renderDetailOverview() {
     <div class="field"><label>Company Name</label><input id="dov-name" type="text" value="${esc(v.name)}"></div>
     <div class="field"><label>Vendor Code</label><input id="dov-vendor-code" type="text" value="${esc(v.vendor_code)}" placeholder="e.g. V-01250" style="max-width:180px">
       <div style="font-size:0.72rem;color:#999;margin-top:4px">SAP/ERP identifier from the PO system — matches the same vendor across purchase orders. Leave blank if unknown.</div></div>
+    <fieldset class="accred-fieldset">
+      <legend>Accreditation</legend>
+      <div class="accred-row">
+        <div><label style="display:block;font-size:0.7143rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">Standing</label>
+          <select id="dov-accreditation" onchange="_dovSyncAccredHint()" style="width:100%">
+            <option value="">Not Assessed</option>
+            ${['accredited', 'unaccredited', 'problematic'].map(k =>
+              `<option value="${k}" ${_accredOf(v) === k ? 'selected' : ''}>${esc(_accredLabel({ accreditation: k }))}</option>`).join('')}
+            ${!['accredited', 'unaccredited', 'problematic', 'none'].includes(_accredOf(v))
+              // Preserve an off-roster legacy value rather than silently clearing it
+              // on the next save (same rescue as ghOptions/fillSelectLegacy).
+              ? `<option value="${esc(v.accreditation)}" selected>${esc(v.accreditation)} (legacy)</option>` : ''}
+          </select></div>
+        <div><label style="display:block;font-size:0.7143rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">Accredited / Last Assessed</label>
+          <input id="dov-accreditation-date" type="date" value="${esc(_accredParseDate(v.accreditation_date) || '')}" style="width:100%"></div>
+      </div>
+      <div style="margin-top:10px"><label style="display:block;font-size:0.7143rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">Notes <span id="dov-accred-hint" style="font-weight:400;text-transform:none;color:#999"></span></label>
+        <textarea id="dov-accreditation-notes" rows="2" placeholder="Accreditation reference, or the reason this vendor is problematic">${esc(v.accreditation_notes)}</textarea></div>
+      <div style="font-size:0.72rem;color:#999;margin-top:6px">Accreditation is separate from the review status above — it records whether the company is cleared to be engaged. Vendors cannot set this themselves.</div>
+    </fieldset>
     <div class="field"><label>Trade Categories</label><div class="trade-checklist" id="dovTradeChips"></div></div>
     <div class="field"><label>Contact Person</label><input id="dov-contact-person" type="text" value="${esc(v.contact_person)}"></div>
     <div class="field"><label>Contact Number</label><input id="dov-contact-number" type="text" value="${esc(v.contact_number)}"></div>
@@ -2369,10 +2964,44 @@ function renderDetailOverview() {
     ${_canManage ? '<button class="btn-primary" id="btnSaveDetailOverview" onclick="saveDetailOverview()">Save Changes</button>' : ''}`;
   // Read-only roles (viewer / viewer_budget) get the profile as plain text — RLS rejects
   // their writes anyway, so showing live inputs + a Save button only produces errors.
+  _dovSyncAccredHint();
   buildDetailTradeChips();
   // AFTER buildDetailTradeChips — it injects the 10 trade checkboxes into the container,
   // so locking before it ran left them clickable for read-only roles.
   if (!_canManage) _lockDetailInputs('dtab-overview');
+}
+// Nudge staff to say WHY when they flag a vendor problematic — the reason is what
+// makes the flag actionable for the next officer (and it shows on the card).
+function _dovSyncAccredHint() {
+  const sel = document.getElementById('dov-accreditation');
+  const hint = document.getElementById('dov-accred-hint');
+  if (!sel || !hint) return;
+  hint.textContent = sel.value === 'problematic' ? '— please record why this vendor is problematic' : '';
+  hint.style.color = sel.value === 'problematic' ? '#991B1B' : '#999';
+}
+/* Normalize any date-ish value (a Date, an ISO/Postgres timestamp, MM/DD/YYYY,
+   DD-Mon-YYYY, or an Excel serial number) to the 'YYYY-MM-DD' string both
+   <input type="date"> and Postgres accept; null when unparseable. Built from
+   LOCAL date parts — never `new Date('2026-06-30').toISOString()`, which is UTC
+   midnight and lands on June 29 in UTC+8 (the sCurve bug, documented in
+   CLAUDE.md). Shared by the grid, the detail form and the masterdata import. */
+function _accredParseDate(v) {
+  if (v == null || v === '') return null;
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  if (v instanceof Date) return isNaN(v) ? null : iso(v);
+  if (typeof v === 'number') {
+    // Excel serial (1899-12-30 epoch); the range guard matches db.js's importer.
+    if (v < 20000 || v > 80000) return null;
+    return iso(new Date(Date.UTC(1899, 11, 30 + Math.floor(v))));
+  }
+  const s = String(v).trim();
+  if (!s) return null;
+  const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})/);            // ISO / Postgres timestamp
+  if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`;
+  const mdy = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);  // MM/DD/YYYY
+  if (mdy) return `${mdy[3]}-${String(mdy[1]).padStart(2, '0')}-${String(mdy[2]).padStart(2, '0')}`;
+  const d = new Date(s);                                       // "27-Jul-2023", "July 27, 2023"
+  return isNaN(d) ? null : iso(d);
 }
 function _placeholderEmail(e) { return /@no-invite\.local$/i.test(e || ''); }
 function _vendorInviteLink(id) { return window.location.origin + window.location.pathname.replace('vendors.html', '') + 'vendor-register.html?vendor=' + id; }
@@ -2398,6 +3027,10 @@ async function saveDetailOverview() {
     address: document.getElementById('dov-address').value.trim(),
     notes: document.getElementById('dov-notes').value.trim(),
     trade_categories: [...detailTrades],
+    // Nullable — send NULL, not '', for a cleared standing/date (see vxlSave).
+    accreditation: document.getElementById('dov-accreditation').value || null,
+    accreditation_notes: document.getElementById('dov-accreditation-notes').value.trim() || null,
+    accreditation_date: _accredParseDate(document.getElementById('dov-accreditation-date').value),
   };
   // Persist a real invite email if the staff entered one (only present when the
   // vendor hasn't claimed a login yet). Never overwrite with blank — the column
@@ -2411,7 +3044,7 @@ async function saveDetailOverview() {
     const idx = allVendors.findIndex(v => v.id === activeVendor.id);
     if (idx > -1) allVendors[idx] = activeVendor;
     document.getElementById('detailTitle').textContent = activeVendor.name;
-    document.getElementById('detailSub').innerHTML = `<span class="badge badge-${activeVendor.status}">${esc(activeVendor.status.replace('_',' '))}</span>`;
+    document.getElementById('detailSub').innerHTML = `<span class="badge badge-${activeVendor.status}">${esc(activeVendor.status.replace('_',' '))}</span> ${_accredBadge(activeVendor)}`;
     renderDetailFooter();
     renderVendorList();
     renderKpis();
