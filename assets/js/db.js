@@ -1608,6 +1608,61 @@ function CanonTrades(arr){
 }
 if (typeof window !== 'undefined') { window.CanonTrade = CanonTrade; window.CanonTrades = CanonTrades; }
 
+/* ── Vendor accreditation (shared roster + helpers) ──────────────────
+   `vendors.accreditation` (MIGRATION_vendor_accreditation.sql) is a plain
+   text column, NOT an enum — the roster lives HERE, in one place, so the
+   vocabulary can change with no DB migration (same reasoning as
+   window.GROUP_HEADS). NULL/blank = "Not Assessed" (the ACCRED_NONE
+   sentinel), deliberately not treated as 'unaccredited': most existing rows
+   were auto-derived from WP vendor names and nobody has assessed them.
+
+   ACCREDITATION IS ORTHOGONAL TO vendors.status — status is the directory
+   review workflow (pending_review/approved/...), accreditation is a business
+   fact about the company. A problematic vendor still gets an approved record,
+   precisely so officers can see that it is problematic.
+
+   Use accredLabel()/accredMeta() rather than re-inlining a `|| 'Not Assessed'`
+   fallback or a colour map, or the filter/group/KPI keys stop matching. */
+const ACCREDITATIONS = ['accredited', 'unaccredited', 'problematic'];
+const ACCRED_NONE = 'none';   // filter/group key for a blank accreditation
+const _ACCRED_META = {
+  accredited:   { label: 'Accredited',   color: '#065F46', bg: '#D1FAE5', darkColor: '#6EE7B7', darkBg: '#102B1F', icon: 'ti-rosette-discount-check' },
+  unaccredited: { label: 'Unaccredited', color: '#92400E', bg: '#FEF3C7', darkColor: '#FCD34D', darkBg: '#3D2E0F', icon: 'ti-alert-circle' },
+  problematic:  { label: 'Problematic',  color: '#991B1B', bg: '#FEE2E2', darkColor: '#FCA5A5', darkBg: '#3D1A19', icon: 'ti-alert-triangle' },
+  none:         { label: 'Not Assessed', color: '#555',    bg: '#F3F4F6', darkColor: 'var(--text-hint)', darkBg: 'var(--surface-2)', icon: 'ti-help-circle' },
+};
+// Normalize a stored value to a roster key (case/space tolerant). An off-roster
+// legacy value is returned as-is so it still displays instead of blanking.
+function accredKey(v) {
+  const k = String(v == null ? '' : v).trim().toLowerCase();
+  if (!k) return ACCRED_NONE;
+  return ACCREDITATIONS.includes(k) ? k : k;
+}
+function accredMeta(v) { return _ACCRED_META[accredKey(v)] || { ..._ACCRED_META.none, label: String(v) }; }
+function accredLabel(v) { return accredMeta(v).label; }
+/* Map free text from a masterdata sheet ("BLACKLISTED", "For Accreditation",
+   "Accredited - 2023") onto a roster key; returns null when nothing matches, so
+   an unrecognized cell is reported rather than silently guessed. Order matters:
+   the negative/problematic patterns are tested BEFORE the positive ones so
+   "NOT ACCREDITED" can't match the /accredited/ rule. */
+function accredFromText(s) {
+  const t = String(s == null ? '' : s).trim().toLowerCase();
+  if (!t) return null;
+  if (/black\s*-?\s*list|blacklist|banned|barred|disqualif|derogat|negative|problem|on\s*hold|\bhold\b|suspend|terminat|litigat|do\s*not\s*(use|engage)|\bdnu\b|delist/.test(t)) return 'problematic';
+  if (/\bnot\s*accredit|non\s*-?\s*accredit|un\s*-?\s*accredit|de\s*-?\s*accredit|for\s*accredit|under\s*accredit|pending\s*accredit|no\s*accredit|expire|lapse|not\s*yet/.test(t)) return 'unaccredited';
+  if (/accredit|approved|qualified|passed|active|compliant|\bok\b|\byes\b/.test(t)) return 'accredited';
+  if (/^(no|none|n\/a|na)$/.test(t)) return 'unaccredited';
+  return null;
+}
+if (typeof window !== 'undefined') {
+  window.ACCREDITATIONS = ACCREDITATIONS;
+  window.ACCRED_NONE = ACCRED_NONE;
+  window.accredKey = accredKey;
+  window.accredMeta = accredMeta;
+  window.accredLabel = accredLabel;
+  window.accredFromText = accredFromText;
+}
+
 const VendorDb = (() => {
   function _stamp() {
     const p = (typeof window !== 'undefined' && window.__profile) || {};
@@ -1657,8 +1712,27 @@ const VendorDb = (() => {
       const d3 = { ...payload }; delete d3.vendor_code;
       ({ data, error } = await sb.from('vendors').insert(d3).select().single());
     }
+    if (error && _isMissingCol(error, /accreditation/)) {
+      const d4 = _stripAccred(payload, error);
+      ({ data, error } = await sb.from('vendors').insert(d4).select().single());
+    }
     if (error) throw error;
     return data;
+  }
+  // Deploy-safe strip for MIGRATION_vendor_accreditation.sql. Strips PRECISELY
+  // the column the error names (falling back to all three only when the base
+  // `accreditation` column itself is missing) — a coarse strip-them-all guard
+  // silently discarded a column the DB really did have when only the newest
+  // sibling was absent (the _stripBuyback lesson, Known Issues #28b).
+  function _stripAccred(payload, error) {
+    const m = (error && ((error.message || '') + (error.details || ''))) || '';
+    const out = { ...payload };
+    const cols = /accreditation_notes/.test(m) ? ['accreditation_notes']
+      : /accreditation_date/.test(m) ? ['accreditation_date']
+      : ['accreditation', 'accreditation_notes', 'accreditation_date'];
+    cols.forEach(c => delete out[c]);
+    console.warn('[VendorDb] Dropped ' + cols.join(', ') + ' — NOT saved. If MIGRATION_vendor_accreditation.sql has already run, this guard is wrong, not the schema. Postgres said: ' + m);
+    return out;
   }
   async function updateVendor(id, fields) {
     const sb = await getSB();
@@ -1671,6 +1745,10 @@ const VendorDb = (() => {
     if (error && _isMissingCol(error, /vendor_code/)) {
       const d3 = { ...payload }; delete d3.vendor_code;
       ({ data, error } = await sb.from('vendors').update(d3).eq('id', id).select().single());
+    }
+    if (error && _isMissingCol(error, /accreditation/)) {
+      const d4 = _stripAccred(payload, error);
+      ({ data, error } = await sb.from('vendors').update(d4).eq('id', id).select().single());
     }
     if (error) throw error;
     return data;
@@ -2326,6 +2404,27 @@ const VendorDb = (() => {
       if (error) throw error;
     }
   }
+  // Bulk-set accreditation standing. `value` is a roster key (accredited /
+  // unaccredited / problematic) or null to clear back to Not Assessed. Chunked
+  // like bulkSetVendorStatus; deploy-safe — if the accreditation migration
+  // hasn't run the whole call is refused loudly rather than silently no-oping
+  // (unlike the per-row write paths, a bulk stamp that quietly does nothing
+  // would read as "1,600 vendors updated" when nothing changed).
+  async function bulkSetAccreditation(ids, value, extra) {
+    if (!ids || !ids.length) return;
+    const sb = await getSB();
+    const patch = { accreditation: value || null, ...(extra || {}), ..._stamp() };
+    const CH = 200;
+    for (let i = 0; i < ids.length; i += CH) {
+      const { error } = await sb.from('vendors').update(patch).in('id', ids.slice(i, i + CH));
+      if (error) {
+        if (_isMissingCol(error, /accreditation/)) {
+          throw new Error('The accreditation columns are not in the database yet — run MIGRATION_vendor_accreditation.sql in the Supabase SQL editor first.');
+        }
+        throw error;
+      }
+    }
+  }
   // Bulk cascade delete via delete_vendors_cascade RPC (chunked). Falls back to
   // looping the single-id RPC if the bulk one isn't deployed yet.
   async function bulkDeleteVendors(ids) {
@@ -2440,7 +2539,7 @@ const VendorDb = (() => {
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
-    bulkSetVendorStatus, findExactDuplicateGroups, mergeExactDuplicates, bulkDeleteVendors,
+    bulkSetVendorStatus, bulkSetAccreditation, findExactDuplicateGroups, mergeExactDuplicates, bulkDeleteVendors,
     backfillVendorDataFromWPs, getWorkPackagesForVendor,
   };
 })();
