@@ -1616,10 +1616,13 @@ if (typeof window !== 'undefined') { window.CanonTrade = CanonTrade; window.Cano
    sentinel), deliberately not treated as 'unaccredited': most existing rows
    were auto-derived from WP vendor names and nobody has assessed them.
 
-   ACCREDITATION IS ORTHOGONAL TO vendors.status — status is the directory
-   review workflow (pending_review/approved/...), accreditation is a business
-   fact about the company. A problematic vendor still gets an approved record,
-   precisely so officers can see that it is problematic.
+   ACCREDITATION IS THE ONLY VENDOR STANDING THE APP SHOWS. The older
+   vendors.status review workflow (pending_review/approved/rejected/inactive)
+   was retired from the UI in 2026-08 — every staff-created vendor is written
+   as 'approved' and nothing reads the column back. It still EXISTS because
+   RLS, the invite-claim flow and internal.vendor_edit_guard key off it (a
+   vendor editing their OWN row is still forced back to 'pending_review'
+   server-side); it is simply not a concept officers see or set any more.
 
    Use accredLabel()/accredMeta() rather than re-inlining a `|| 'Not Assessed'`
    fallback or a colour map, or the filter/group/KPI keys stop matching. */
@@ -1702,7 +1705,7 @@ const VendorDb = (() => {
   }
   async function createVendor(fields, profile) {
     const sb = await getSB();
-    const payload = { ...fields, status: 'pending_review', created_by: profile?.id || null, ...(_stamp()) };
+    const payload = { ...fields, status: 'approved', created_by: profile?.id || null, ...(_stamp()) };
     let { data, error } = await sb.from('vendors').insert(payload).select().single();
     if (error && _isMissingCol(error, /created_by|updated_by|updated_by_name|updated_at/)) {
       const d2 = { ...payload }; delete d2.created_by; delete d2.updated_by; delete d2.updated_by_name; delete d2.updated_at;
@@ -2000,7 +2003,7 @@ const VendorDb = (() => {
   // Awarded Vendor combobox) ───────────────────────────────────────────
   async function searchApprovedVendors(query) {
     const sb = await getSB();
-    let q = sb.from('vendors').select('id,name,status').eq('status', 'approved').order('name').limit(20);
+    let q = sb.from('vendors').select('id,name,status').order('name').limit(20);
     if (query && query.trim()) q = q.ilike('name', `%${query.trim()}%`);
     const { data, error } = await q;
     if (error) throw error;
@@ -2029,7 +2032,7 @@ const VendorDb = (() => {
     const placeholderEmail = `pending+${Date.now()}.${Math.random().toString(36).slice(2, 8)}@no-invite.local`;
     const payload = {
       name: (name || '').trim(),
-      status: 'pending_review',
+      status: 'approved',
       invite_email: placeholderEmail,
       created_by: profile?.id || null,
       updated_by: profile?.id || null,
@@ -2048,7 +2051,7 @@ const VendorDb = (() => {
   // ── Import vendors from the work-package directory (contractor +
   //    proposed_vendors free text) ────────────────────────────────────────
   //  Dedups by normalized name against existing vendors, creates the missing
-  //  ones (as pending_review via createVendor), and — when opts.linkWPs — sets
+  //  ones (via createVendor), and — when opts.linkWPs — sets
   //  work_packages.vendor_id on WPs whose `contractor` EXACTLY matches (RLS
   //  limits the WP updates to projects the caller can edit). Returns
   //  { created, linked, distinct }.

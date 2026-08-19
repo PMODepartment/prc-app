@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260819a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260819a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260819a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260819b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260819b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260819b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260819a">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260819b">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -229,7 +229,7 @@
     body.dark-mode .vcard-chip{background:rgba(238,49,36,.18);color:#FF9E96}
     body.dark-mode .vcard-chip.more,body.dark-mode .vcard-chip.none{background:var(--surface-2);color:var(--text-hint)}
     body.dark-mode .vcard-foot{border-top-color:var(--border)}
-    body.dark-mode #vendor-search,body.dark-mode #vendor-status-filter{background:var(--surface-2);color:var(--text-primary);border-color:var(--border-md)}
+    body.dark-mode #vendor-search,body.dark-mode #vendor-accred-filter{background:var(--surface-2);color:var(--text-primary);border-color:var(--border-md)}
     body.dark-mode .btn-reject-row{background:var(--surface-2);color:var(--text-primary)}
     body.dark-mode .modal{background:var(--surface)}
     body.dark-mode .modal-title{color:var(--text-primary)}
@@ -344,9 +344,6 @@
         <div class="page-content">
           <div class="kpi-grid">
             <div class="kpi-card"><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-label">Total Vendors</div></div>
-            <div class="kpi-card"><div class="kpi-value" id="kpiPending" style="color:#92400E">—</div><div class="kpi-label">Pending Review</div></div>
-            <div class="kpi-card"><div class="kpi-value" id="kpiApproved" style="color:#065F46">—</div><div class="kpi-label">Approved</div></div>
-            <div class="kpi-card"><div class="kpi-value" id="kpiRejected" style="color:#6B7280">—</div><div class="kpi-label">Rejected / Inactive</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiAccredited" style="color:#065F46">—</div><div class="kpi-label">Accredited</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiUnaccredited" style="color:#92400E">—</div><div class="kpi-label">Unaccredited</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiProblematic" style="color:#991B1B">—</div><div class="kpi-label">Problematic</div></div>
@@ -359,13 +356,6 @@
               <input id="vendor-search" type="text" placeholder="Search by company, trade, or product…" oninput="onVendorFilterChange()"
                 style="width:100%;padding:8px 12px 8px 34px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.9286rem;font-family:inherit;outline:none">
             </div>
-            <select id="vendor-status-filter" onchange="onVendorFilterChange()" style="padding:8px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:#fff;color:#231F20">
-              <option value="all">All Statuses</option>
-              <option value="pending_review">Pending Review</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="inactive">Inactive</option>
-            </select>
             <select id="vendor-accred-filter" onchange="onVendorFilterChange()" title="Accreditation standing" style="padding:8px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:#fff;color:#231F20">
               <option value="all">All Accreditation</option>
               <option value="accredited">Accredited</option>
@@ -383,6 +373,7 @@
             <div class="tools-menu-wrap" id="toolsMenuWrap" style="position:relative;flex-shrink:0">
               <button class="btn-cancel" id="btn-tools-menu" onclick="toggleToolsMenu()"><i class="ti ti-tool" style="margin-right:4px"></i>Data Tools <i class="ti ti-chevron-down" style="margin-left:2px;font-size:0.75em"></i></button>
               <div class="tools-menu" id="toolsMenu" style="display:none">
+                <button onclick="closeToolsMenu();location.href='import-vendors.html'"><i class="ti ti-file-spreadsheet"></i><span>Import Vendor Masterlist</span><small>Load the accredited / non-accredited / problematic masterdata workbook</small></button>
                 <button onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs</span><small>Scan work packages for vendors not yet in the directory</small></button>
                 <button onclick="closeToolsMenu();backfillFromWPs()"><i class="ti ti-refresh-dot"></i><span>Backfill Trade/Bid Data</span><small>Fill in trades, products, bid history and rates from WPs</small></button>
                 <button id="tools-menu-unassessed" onclick="closeToolsMenu();markRestUnaccredited()"><i class="ti ti-help-circle"></i><span>Mark rest Unaccredited <span class="tools-menu-badge" id="unassessed-count-badge" style="display:none"><span id="unassessed-count">0</span></span></span><small>Set every Not-Assessed vendor to Unaccredited — run AFTER importing the accreditation list</small></button>
@@ -400,7 +391,6 @@
             <div class="vendor-bulkbar" id="vendorBulkBar" style="display:none">
               <span class="bulk-count" id="bulkCount">0 selected</span>
               <button class="b-link" id="bulkSelAllFiltered" onclick="bulkSelectAllFiltered()">Select all matching</button>
-              <button class="b-approve" onclick="bulkApprove()">Approve</button>
               <select id="bulkAccredSelect" onchange="bulkSetAccreditation(this.value);this.value=''" title="Set accreditation for the selected vendors" style="padding:4px 8px;border-radius:6px;border:1.5px solid #e5e5e5;font-family:inherit;font-size:0.7857rem;font-weight:600">
                 <option value="">Set accreditation…</option>
                 <option value="accredited">Accredited</option>
@@ -408,7 +398,6 @@
                 <option value="problematic">Problematic</option>
                 <option value="none">Clear (Not Assessed)</option>
               </select>
-              <button class="b-reject" onclick="bulkReject()">Reject</button>
               <button class="b-delete" id="bulkDeleteBtn" onclick="bulkDelete()">Delete</button>
               <button onclick="clearVendorSel()">Clear</button>
             </div>
@@ -577,9 +566,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260819a"></script>
-<script src="assets/js/db.js?v=20260819a"></script>
-<script src="assets/js/ui.js?v=20260819a"></script>
+<script src="assets/js/auth.js?v=20260819b"></script>
+<script src="assets/js/db.js?v=20260819b"></script>
+<script src="assets/js/ui.js?v=20260819b"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -675,11 +664,9 @@ function _accredBadge(v) {
 }
 function _vendorFiltered() {
   const q = (document.getElementById('vendor-search').value || '').toLowerCase().trim();
-  const statusF = document.getElementById('vendor-status-filter').value;
   const accredEl = document.getElementById('vendor-accred-filter');
   const accredF = accredEl ? accredEl.value : 'all';
   return allVendors.filter(v => {
-    if (statusF !== 'all' && v.status !== statusF) return false;
     if (accredF !== 'all' && _accredOf(v) !== accredF) return false;
     if (!q) return true;
     const hay = (v.name || '').toLowerCase()
@@ -805,14 +792,14 @@ async function renderVendorAnalytics() {
   const totalBcb = awarded.reduce((s, r) => s + r.bcb, 0);
   const totalSav = totalBcb - totalSpend;
   const totalSavPct = totalBcb ? totalSav / totalBcb * 100 : 0;
-  const approvedCount = allVendors.filter(v => v.status === 'approved').length;
+  const accreditedCount = allVendors.filter(v => _accredOf(v) === 'accredited').length;
   const bySpend = [...awarded].sort((a, b) => b.spend - a.spend);
   const top1 = totalSpend && bySpend[0] ? bySpend[0].spend / totalSpend * 100 : 0;
   const top5 = totalSpend ? bySpend.slice(0, 5).reduce((s, r) => s + r.spend, 0) / totalSpend * 100 : 0;
 
   const tile = (lbl, val, cls, sub) => `<div class="metric-card"><div class="metric-label">${lbl}</div><div class="metric-value ${cls || ''}">${val}</div>${sub ? `<div class="metric-sub" style="font-size:0.85rem;font-weight:700;margin-top:4px;color:#888">${sub}</div>` : ''}</div>`;
   const kpis = `<div class="metrics-grid" style="margin-bottom:16px">${[
-    tile('Total Vendors', allVendors.length.toLocaleString(), '', approvedCount + ' approved'),
+    tile('Total Vendors', allVendors.length.toLocaleString(), '', accreditedCount + ' accredited'),
     tile('Awarded Spend', money(totalSpend), 'green', awarded.length + ' vendor' + (awarded.length === 1 ? '' : 's')),
     tile('Awarded WPs', awardedWpTotal.toLocaleString(), '', 'across the portfolio'),
     tile('Portfolio Savings', (totalSav >= 0 ? '+' : '-') + money(Math.abs(totalSav)), totalSav >= 0 ? 'green' : 'red', (totalSav >= 0 ? '+' : '') + totalSavPct.toFixed(1) + '%'),
@@ -888,12 +875,6 @@ function _syncBulkUI() {
     sa.indeterminate = onPage > 0 && onPage < _pageIds.length;
   }
 }
-async function bulkApprove() {
-  const ids = [..._selectedVendors]; if (!ids.length) return;
-  if (!confirm(`Approve ${ids.length} selected vendor(s)? They'll go live in the directory.`)) return;
-  try { await VendorDb.bulkSetVendorStatus(ids, 'approved'); _selectedVendors.clear(); await loadAll(); AppNotify && AppNotify.success(`Approved ${ids.length} vendor(s).`); }
-  catch (e) { AppNotify ? AppNotify.fromError(e, 'Bulk approve failed') : alert(e.message); }
-}
 /* Bulk-set accreditation on the current selection. `value` is a roster key, or
    'none' to clear back to Not Assessed. Deliberately does NOT touch
    vendors.status — accreditation and the review workflow are independent. */
@@ -945,12 +926,6 @@ async function markRestUnaccredited() {
     else if (AppNotify) AppNotify.fromError(e, 'Backfill failed'); else alert(e.message);
   }
 }
-async function bulkReject() {
-  const ids = [..._selectedVendors]; if (!ids.length) return;
-  if (!confirm(`Reject ${ids.length} selected vendor(s)?`)) return;
-  try { await VendorDb.bulkSetVendorStatus(ids, 'rejected'); _selectedVendors.clear(); await loadAll(); AppNotify && AppNotify.success(`Rejected ${ids.length} vendor(s).`); }
-  catch (e) { AppNotify ? AppNotify.fromError(e, 'Bulk reject failed') : alert(e.message); }
-}
 async function bulkDelete() {
   const ids = [..._selectedVendors]; if (!ids.length) return;
   if (!confirm(`Permanently DELETE ${ids.length} selected vendor(s) and all their records? Linked work packages are unlinked (not deleted). This cannot be undone.`)) return;
@@ -1000,9 +975,7 @@ function renderCards(rows) {
     const accredNote = (_accredOf(v) === 'problematic' && v.accreditation_notes)
       ? `<div style="font-size:0.75rem;color:#991B1B;margin-top:6px;display:flex;gap:5px"><i class="ti ti-alert-triangle" style="flex-shrink:0"></i><span>${esc(v.accreditation_notes)}</span></div>` : '';
     const sub = [v.vendor_code, v.contact_person || email || (trades.length ? '' : 'Imported — needs review')].filter(Boolean).join(' · ');
-    const foot = v.status === 'pending_review'
-      ? `<button class="action-btn btn-approve-row" onclick="event.stopPropagation();quickApprove('${v.id}')">Approve</button><button class="action-btn btn-reject-row" onclick="event.stopPropagation();quickReject('${v.id}')">Reject</button>`
-      : `<span class="view-hint">View profile <i class="ti ti-arrow-right"></i></span>`;
+    const foot = `<span class="view-hint">View profile <i class="ti ti-arrow-right"></i></span>`;
     const sel = _selectedVendors.has(v.id);
     const check = _canManage ? `<input type="checkbox" class="vcard-check" ${sel ? 'checked' : ''} onclick="event.stopPropagation();toggleVendorSel('${v.id}',this.checked)" aria-label="Select vendor">` : '';
     const problematic = _accredOf(v) === 'problematic';
@@ -1014,7 +987,6 @@ function renderCards(rows) {
           <div style="min-width:0"><div class="vcard-name">${esc(v.name)}</div>${sub ? `<div class="vcard-sub">${esc(sub)}</div>` : ''}</div>
         </div>
         <div class="vcard-status-badge" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
-          <span class="badge badge-${v.status}">${esc(v.status.replace('_',' '))}</span>
           ${_accredBadge(v)}
         </div>
       </div>
@@ -1028,7 +1000,7 @@ function renderCards(rows) {
 
 /* ── Import vendors from Work Packages ── */
 async function importFromWPs() {
-  if (!confirm('Scan all work packages and add any awarded or proposed vendors that aren’t already in the directory?\n\nNew vendors are added as "pending review". Work packages will be linked to their awarded vendor where the name matches exactly.')) return;
+  if (!confirm('Scan all work packages and add any awarded or proposed vendors that aren’t already in the directory?\n\nNew vendors are added with no accreditation standing yet ("Not Assessed"). Work packages will be linked to their awarded vendor where the name matches exactly.')) return;
   const prog = AppNotify && AppNotify.progress ? AppNotify.progress('Importing vendors from work packages… please wait.') : null;
   try {
     const r = await VendorDb.importVendorsFromWPs({ includeProposed: true, linkWPs: true }, userProfile);
@@ -1137,7 +1109,7 @@ function _refreshMergeTargetOptions() {
   const sel = document.getElementById('merge-target');
   const prev = sel.value;
   const sorted = [...allVendors].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  sel.innerHTML = sorted.map(v => `<option value="${v.id}">${esc(v.name)} (${esc(v.status.replace('_',' '))})</option>`).join('');
+  sel.innerHTML = sorted.map(v => `<option value="${v.id}">${esc(v.name)} (${esc(_accredLabel(v))})</option>`).join('');
   if (prev && sorted.some(v => v.id === prev)) sel.value = prev;
 }
 function renderMergeSources() {
@@ -1147,7 +1119,7 @@ function renderMergeSources() {
   if (q) sorted = sorted.filter(v => (v.name || '').toLowerCase().includes(q));
   sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   document.getElementById('merge-sources').innerHTML = sorted.length
-    ? sorted.map(v => `<label><input type="checkbox" value="${v.id}" ${_mergeSel.has(v.id) ? 'checked' : ''} onchange="_toggleMergeSrc(this)"> ${esc(v.name)} <span style="color:#aaa;font-size:0.75rem">(${esc(v.status.replace('_',' '))})</span></label>`).join('')
+    ? sorted.map(v => `<label><input type="checkbox" value="${v.id}" ${_mergeSel.has(v.id) ? 'checked' : ''} onchange="_toggleMergeSrc(this)"> ${esc(v.name)} <span style="color:#aaa;font-size:0.75rem">(${esc(_accredLabel(v))})</span></label>`).join('')
     : '<div style="color:#aaa;font-size:0.8571rem">No matching vendors.</div>';
   // dropping the now-target from any prior selection
   _mergeSel.delete(targetId);
@@ -1393,7 +1365,7 @@ function _splitVendorSearch() {
   const inList = new Set(_splitRows().map(v => v.id));
   const matches = allVendors.filter(v => v.name && v.name.toLowerCase().includes(q) && !inList.has(v.id)).slice(0, 10);
   pop.innerHTML = matches.length
-    ? matches.map(v => `<button type="button" class="split-search-opt" onclick="_splitAddVendor('${v.id}')">${esc(v.name)} <span style="color:#aaa">(${esc(v.status.replace('_', ' '))})</span></button>`).join('')
+    ? matches.map(v => `<button type="button" class="split-search-opt" onclick="_splitAddVendor('${v.id}')">${esc(v.name)} <span style="color:#aaa">(${esc(_accredLabel(v))})</span></button>`).join('')
     : '<div class="split-search-empty">No matching vendor.</div>';
   pop.style.display = 'block';
 }
@@ -1671,15 +1643,15 @@ function _computeMergeGroups() {
   groups.sort((a, b) => b.length - a.length);
   const truncated = Math.max(0, groups.length - MERGE_GROUPS_MAX_SHOWN);
   groups = groups.slice(0, MERGE_GROUPS_MAX_SHOWN);
-  // Pick a suggested canonical per group: approved > claimed login >
+  // Pick a suggested canonical per group: has an accreditation standing > claimed login >
   // has trade categories populated (proxy for "more complete / less likely
   // garbled" without an extra child-table fetch) > shortest name (a better
   // proxy for "not garbled" on this dataset than longest — garbled
   // slash-joined entries are disproportionately the LONGEST names).
   groups = groups.map(members => {
     const sorted = [...members].sort((a, b) => {
-      const aApproved = a.status === 'approved' ? 1 : 0, bApproved = b.status === 'approved' ? 1 : 0;
-      if (aApproved !== bApproved) return bApproved - aApproved;
+      const aAcc = _accredOf(a) !== 'none' ? 1 : 0, bAcc = _accredOf(b) !== 'none' ? 1 : 0;
+      if (aAcc !== bAcc) return bAcc - aAcc;
       const aClaimed = a.invite_claimed_at ? 1 : 0, bClaimed = b.invite_claimed_at ? 1 : 0;
       if (aClaimed !== bClaimed) return bClaimed - aClaimed;
       const aTrades = (a.trade_categories || []).length > 0 ? 1 : 0, bTrades = (b.trade_categories || []).length > 0 ? 1 : 0;
@@ -1712,9 +1684,9 @@ function _mgCardHtml(gi) {
   const g = _mgGroupsState[gi];
   // A radio-row list (not a cramped single-line <select>) so a long vendor
   // name wraps and reads in full, matching the checkbox rows below it.
-  const keepHtml = g.members.map(m => `<label class="mg-keep-opt"><input type="radio" name="mg-keep-${gi}" value="${m.id}" ${m.id === g.canonicalId ? 'checked' : ''} onchange="_mgChangeCanonical(${gi}, this.value)"> ${esc(m.name)} <span style="color:#aaa;font-size:0.75rem">(${esc(m.status.replace('_',' '))})</span></label>`).join('');
+  const keepHtml = g.members.map(m => `<label class="mg-keep-opt"><input type="radio" name="mg-keep-${gi}" value="${m.id}" ${m.id === g.canonicalId ? 'checked' : ''} onchange="_mgChangeCanonical(${gi}, this.value)"> ${esc(m.name)} <span style="color:#aaa;font-size:0.75rem">(${esc(_accredLabel(m))})</span></label>`).join('');
   const srcHtml = g.members.filter(m => m.id !== g.canonicalId).map(m =>
-    `<label><input type="checkbox" data-gi="${gi}" value="${m.id}" ${g.checked.has(m.id) ? 'checked' : ''} onchange="_mgToggleGroupSrc(this)"> ${esc(m.name)} <span style="color:#aaa;font-size:0.75rem">(${esc(m.status.replace('_',' '))})</span></label>`
+    `<label><input type="checkbox" data-gi="${gi}" value="${m.id}" ${g.checked.has(m.id) ? 'checked' : ''} onchange="_mgToggleGroupSrc(this)"> ${esc(m.name)} <span style="color:#aaa;font-size:0.75rem">(${esc(_accredLabel(m))})</span></label>`
   ).join('');
   return `<div class="mg-card-head"><span class="mg-card-title">${g.members.length} similar names</span></div>
     <div class="mg-keep-row"><div style="margin-bottom:4px"><i class="ti ti-star-filled" style="color:#16A34A"></i> Keep this one:</div>
@@ -1783,9 +1755,6 @@ async function mergeAllGroups() {
 
 function renderKpis() {
   document.getElementById('kpiTotal').textContent = allVendors.length;
-  document.getElementById('kpiPending').textContent = allVendors.filter(v => v.status === 'pending_review').length;
-  document.getElementById('kpiApproved').textContent = allVendors.filter(v => v.status === 'approved').length;
-  document.getElementById('kpiRejected').textContent = allVendors.filter(v => v.status === 'rejected' || v.status === 'inactive').length;
   const byAccred = k => allVendors.filter(v => _accredOf(v) === k).length;
   document.getElementById('kpiAccredited').textContent = byAccred('accredited');
   document.getElementById('kpiUnaccredited').textContent = byAccred('unaccredited');
@@ -1818,7 +1787,6 @@ function updateUnassessedBadge() {
 const VXL_COLS = [
   { k: 'name',             label: 'Company Name',    w: 220, type: 'text',   req: true },
   { k: 'vendor_code',      label: 'Vendor Code',     w: 110, type: 'text' },
-  { k: 'status',           label: 'Status',          w: 130, type: 'select', opts: ['pending_review', 'approved', 'rejected', 'inactive'] },
   // Accreditation: '' is a legitimate value here (= Not Assessed), so the opts
   // list leads with a blank — unlike `status`, which is NOT NULL in the DB.
   { k: 'accreditation',       label: 'Accreditation',       w: 130, type: 'select', opts: ['', 'accredited', 'unaccredited', 'problematic'] },
@@ -1851,7 +1819,6 @@ function _vxlVal(v, col) {
 }
 function _vxlDisplay(v, col) {
   const raw = _vxlVal(v, col);
-  if (col.k === 'status') return raw ? raw.replace('_', ' ') : '';
   if (col.k === 'accreditation') return raw ? _accredLabel({ accreditation: raw }) : '';
   return raw;
 }
@@ -1958,11 +1925,6 @@ function _vxlSet(r, c, raw, undoBatch) {
   if (!v || !col || !_canManage) return false;
   let val = raw == null ? '' : String(raw);
   if (col.k === 'name' && !val.trim()) return false;
-  if (col.k === 'status') {
-    const norm = val.trim().toLowerCase().replace(/\s+/g, '_');
-    if (col.opts.includes(norm)) val = norm;
-    else if (!col.opts.includes(val)) return false;
-  }
   if (col.k === 'accreditation') {
     // Blank clears back to Not Assessed. Otherwise accept a roster key, and fall
     // back to the shared free-text mapper so a value PASTED straight out of the
@@ -2333,16 +2295,6 @@ function vxlDiscard(silent) {
   if (_vendorView === 'grid') renderVendorGrid(_vxlRows);
 }
 
-async function quickApprove(id) {
-  try { await VendorDb.approveVendor(id); await loadAll(); AppNotify && AppNotify.success('Vendor approved.'); }
-  catch (e) { AppNotify ? AppNotify.fromError(e, 'Approve failed') : alert(e.message); }
-}
-async function quickReject(id) {
-  if (!confirm('Reject this vendor submission?')) return;
-  try { await VendorDb.rejectVendor(id); await loadAll(); }
-  catch (e) { AppNotify ? AppNotify.fromError(e, 'Reject failed') : alert(e.message); }
-}
-
 /* ── Invite modal ── */
 function buildInviteChips() {
   document.getElementById('inviteTradeChips').innerHTML = TRADES.map((t, i) =>
@@ -2401,12 +2353,7 @@ async function createInvite() {
       address: document.getElementById('inv-address').value.trim(),
       notes: document.getElementById('inv-notes').value.trim(),
     };
-    // Staff has already reviewed this data at creation time (unlike vendor
-    // self-registration, or the bulk import/quick-create paths, which stay
-    // pending_review) — createVendor always inserts as pending_review, so
-    // immediately flip it to approved.
-    let v = await VendorDb.createVendor(fields, userProfile);
-    v = await VendorDb.approveVendor(v.id);
+    const v = await VendorDb.createVendor(fields, userProfile);
     if (invite_email) {
       const link = window.location.origin + window.location.pathname.replace('vendors.html','') + 'vendor-register.html?vendor=' + v.id;
       document.getElementById('inviteLinkText').textContent = link;
@@ -2434,7 +2381,7 @@ async function openDetailModal(id) {
   activeVendor = allVendors.find(v => v.id === id);
   if (!activeVendor) return;
   document.getElementById('detailTitle').textContent = activeVendor.name;
-  document.getElementById('detailSub').innerHTML = `<span class="badge badge-${activeVendor.status}">${esc(activeVendor.status.replace('_',' '))}</span> ${_accredBadge(activeVendor)}`;
+  document.getElementById('detailSub').innerHTML = _accredBadge(activeVendor);
   renderDetailFooter();
   document.getElementById('detailModal').style.display = 'flex';
   _syncModalScrollLock();
@@ -2471,9 +2418,6 @@ function renderDetailFooter() {
   const el = document.getElementById('detailFooter');
   const v = activeVendor;
   let btns = '<button class="btn-cancel" onclick="closeDetailModal()">Close</button>';
-  if (v.status === 'pending_review') btns += ` <button class="btn-primary" onclick="quickApprove('${v.id}');closeDetailModal()">Approve</button> <button class="action-btn btn-reject-row" style="padding:10px 16px" onclick="quickReject('${v.id}');closeDetailModal()">Reject</button>`;
-  else if (v.status === 'approved') btns += ` <button class="action-btn btn-reject-row" style="padding:10px 16px" onclick="setInactive('${v.id}')">Mark Inactive</button>`;
-  else if (v.status === 'inactive') btns += ` <button class="btn-primary" onclick="quickApprove('${v.id}');closeDetailModal()">Reactivate</button>`;
   if (_canManage) btns += ` <button class="action-btn" style="padding:10px 16px" onclick="splitVendorFromDetail('${v.id}')" title="Open the Split tool for this vendor — for a record that is several companies in one name"><i class="ti ti-cut"></i> Split</button>`;
   btns += ` <button class="action-btn btn-reject-row" style="padding:10px 16px;margin-left:auto" onclick="deleteVendorFromDetail('${v.id}')" title="Permanently delete this vendor and all its records"><i class="ti ti-trash"></i> Delete</button>`;
   el.innerHTML = btns;
@@ -2491,10 +2435,6 @@ async function deleteVendorFromDetail(id) {
   if (!confirm(`Permanently delete "${v ? v.name : 'this vendor'}" and ALL its products, certifications, personnel, rates and bids? Linked work packages will be unlinked (not deleted). This cannot be undone.`)) return;
   try { await VendorDb.deleteVendorCascade(id); closeDetailModal(); await loadAll(); AppNotify && AppNotify.success('Vendor deleted.'); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not delete vendor') : alert(e.message); }
-}
-async function setInactive(id) {
-  try { await VendorDb.setVendorStatus(id, 'inactive'); await loadAll(); closeDetailModal(); }
-  catch (e) { AppNotify ? AppNotify.fromError(e, 'Update failed') : alert(e.message); }
 }
 // Read-only roles (viewer / viewer_budget) may READ the directory but never write it —
 // RLS enforces that server-side, so leaving live inputs and Add/Delete buttons on screen
@@ -2644,7 +2584,7 @@ async function saveDetailOverview() {
     const idx = allVendors.findIndex(v => v.id === activeVendor.id);
     if (idx > -1) allVendors[idx] = activeVendor;
     document.getElementById('detailTitle').textContent = activeVendor.name;
-    document.getElementById('detailSub').innerHTML = `<span class="badge badge-${activeVendor.status}">${esc(activeVendor.status.replace('_',' '))}</span> ${_accredBadge(activeVendor)}`;
+    document.getElementById('detailSub').innerHTML = _accredBadge(activeVendor);
     renderDetailFooter();
     renderVendorList();
     renderKpis();
@@ -2938,7 +2878,7 @@ function renderDupList() {
   const SHOW = 60;
   const rows = groups.slice(0, SHOW).map(g => {
     const keep = g.keep;
-    const sub = [keep.status, (keep.trade_categories || []).length ? (keep.trade_categories.length + ' trades') : null,
+    const sub = [_accredLabel(keep), (keep.trade_categories || []).length ? (keep.trade_categories.length + ' trades') : null,
                  keep.created_at ? ('added ' + esc(String(keep.created_at).slice(0, 10))) : null].filter(Boolean).join(' · ');
     return `<div class="split-row">
       <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
