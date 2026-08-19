@@ -990,6 +990,20 @@ The actual cleanup ran as a **one-time SQL seed** (the user's explicit framing: 
 
 Four guards make the looser matching safe, and **all four were verified against Postgres 16** on a mock directory built specifically to trap them: it only touches rows still `accreditation is null` (**pass 1 is never overwritten** — a pass-1 accredited row stayed put), a core matching **more than one directory vendor is skipped** (`Summit Steel Corp` + `Summit Steel Trading` both collapse to `summit steel` → correctly left alone), a core claimed by more than one *masterdata* company is skipped, and **cores under 5 characters are ignored** (`"ABC Phils., Inc."` → `abc` → correctly skipped as too collision-prone). Confirmed working: `*ACERSTEEL INDUSTRIAL SALES (LOCAL)` → accredited + code `V-00010` stamped; `EIROS BUILDERS INC.` → **problematic** with its reason; a re-run reports `UPDATE 0` on every batch. **A `min(uuid)` in the first draft — Postgres has no such aggregate — was caught only by running it**; the uniqueness `having count(*) = 1` means `(array_agg(id))[1]` is the correct substitute.
 
+**PASS 2 RESULT, run against production 2026-08-19 — the import is now complete:**
+
+| standing | after pass 1 | after pass 2 |
+|---|---|---|
+| accredited | 295 | **514** |
+| problematic | 0 | **2** |
+| unaccredited | 0 | 0 |
+| not assessed | 1,089 | **868** |
+| TOTAL | 1,384 | 1,384 |
+
+Core-name matching added **219 accredited** and, the point of the exercise, **both blacklisted vendors that exact matching had missed** (`EIROS BUILDERS INC.`, `Pacific Timber Export Corporation`) now carry the `problematic` flag with their reason. TOTAL is unchanged, confirming the seed created and deleted nothing. `unaccredited` stayed 0 as predicted — those 31 are prospects with no work-package history, and the third problematic company (Magcalas-Romero) genuinely is not in the directory.
+
+**The remaining 868 Not-Assessed are NOT all unaccredited, and "Mark rest Unaccredited" should not be run reflexively.** 2,410 masterdata companies matched only 516 directory rows, and a large part of that shortfall is garbled WP-derived names (the reason the Split/Merge tools exist), not genuine absence from the masterdata — so a blanket stamp would mislabel some genuinely accredited vendors. The better sequence, if the count is worth reducing: run **Merge Duplicates / Remove Exact Duplicates / Needs Splitting** to un-garble the directory, **re-run pass 2** (it is idempotent and only fills gaps), and only then decide about the residue. Leaving them Not Assessed is the honest state, and the directory can be filtered to exactly that set.
+
 **Even with pass 2, expect a large Not-Assessed remainder, and that is the honest answer** — most of those vendors are simply not in the masterdata at all. Closing the rest is the business call behind "Mark rest Unaccredited".
 
 **No in-app importer.** One was built and then **removed at the user's request** ("it should only be a 1-time occurrence") — a permanent Data Tools item implied recurring use. If a future re-issue of the masterdata needs importing, regenerate and run the seed; the interactive niceties that tool had (fuzzy `VendorMatch.coreMatch` matching, optional creation of unmatched masterdata vendors, blank-contact fill) are worth rebuilding only if that becomes a recurring job. What remains in the app for ongoing maintenance is per-vendor editing (detail form + grid columns), the **bulk "Set accreditation…"** action, and **Data Tools → "Mark rest Unaccredited"**.
