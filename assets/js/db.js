@@ -1753,6 +1753,25 @@ const VendorDb = (() => {
     return all;
   }
 
+  /* Which relation a READ of a vendor row goes through — the twin of WPDb's
+     _wpRel(). A `vendor` login is denied SELECT on `vendors` itself
+     (MIGRATION_vendor_self_view.sql) because RLS cannot hide COLUMNS, so their
+     reads go through vendor_self_view, which omits the staff-only ones. The
+     probe is memoized and falls back to the base table if the view isn't
+     deployed yet, so this is safe to ship before the migration runs. */
+  let _vendorRelCache = null;
+  async function _vendorRel() {
+    if (typeof window === 'undefined' || window.__wpmRole !== 'vendor') return 'vendors';
+    if (_vendorRelCache) return _vendorRelCache;
+    try {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_self_view').select('id').limit(1);
+      _vendorRelCache = error ? 'vendors' : 'vendor_self_view';
+      if (error) console.warn('[VendorDb] vendor_self_view unavailable, falling back to vendors:', error.message);
+    } catch (_) { _vendorRelCache = 'vendors'; }
+    return _vendorRelCache;
+  }
+
   // ── Vendors ────────────────────────────────────────────────────────
   async function getVendors() {
     const sb = await getSB();
@@ -1761,7 +1780,7 @@ const VendorDb = (() => {
   }
   async function getVendor(id) {
     const sb = await getSB();
-    const { data, error } = await sb.from('vendors').select('*').eq('id', id).single();
+    const { data, error } = await sb.from(await _vendorRel()).select('*').eq('id', id).single();
     if (error) throw error;
     return data;
   }
@@ -1822,23 +1841,36 @@ const VendorDb = (() => {
   }
   async function updateVendor(id, fields) {
     const sb = await getSB();
-    const payload = { ...fields, ...(_stamp()) };
-    let { data, error } = await sb.from('vendors').update(payload).eq('id', id).select().single();
+    /* A vendor login writes through vendor_self_view, not `vendors`.
+       Removing their SELECT on the base table also breaks their UPDATE — an
+       UPDATE has to FIND its row and Postgres applies the SELECT policies to
+       the rows it reads, so a base-table write would silently match zero rows.
+       The view is auto-updatable, runs as its owner, and pins the row to the
+       caller's own vendor; internal.vendor_edit_guard still fires underneath.
+       updated_by / updated_by_name are NOT in the view (they can carry a
+       Megawide officer's name), so the trigger stamps them server-side — which
+       also means a vendor cannot forge the audit trail. */
+    const rel = await _vendorRel();
+    const viaView = rel === 'vendor_self_view';
+    const payload = viaView
+      ? { ...fields, updated_at: new Date().toISOString() }   // trigger overwrites; keeps the patch non-empty
+      : { ...fields, ...(_stamp()) };
+    const run = p => sb.from(rel).update(p).eq('id', id).select().single();
+
+    let { data, error } = await run(payload);
     if (error && _isMissingCol(error, /updated_by|updated_by_name|updated_at/)) {
       const d2 = { ...payload }; delete d2.updated_by; delete d2.updated_by_name; delete d2.updated_at;
-      ({ data, error } = await sb.from('vendors').update(d2).eq('id', id).select().single());
+      ({ data, error } = await run(d2));
     }
     if (error && _isMissingCol(error, /vendor_code/)) {
       const d3 = { ...payload }; delete d3.vendor_code;
-      ({ data, error } = await sb.from('vendors').update(d3).eq('id', id).select().single());
+      ({ data, error } = await run(d3));
     }
     if (error && _isMissingCol(error, /accreditation/)) {
-      const d4 = _stripAccred(payload, error);
-      ({ data, error } = await sb.from('vendors').update(d4).eq('id', id).select().single());
+      ({ data, error } = await run(_stripAccred(payload, error)));
     }
     if (error && _isMissingCol(error, _PROFILE_RE)) {
-      const d5 = _stripProfile(payload, error);
-      ({ data, error } = await sb.from('vendors').update(d5).eq('id', id).select().single());
+      ({ data, error } = await run(_stripProfile(payload, error)));
     }
     if (error) throw error;
     return data;
