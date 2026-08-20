@@ -11,18 +11,34 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820a">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820b">
   <style>
-    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
-    @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
-    .kpi-card{background:#fff;border:1px solid #f0f0f0;border-radius:10px;padding:14px 16px}
-    .kpi-value{font-size:1.5714rem;font-weight:700;color:#231F20;line-height:1}
-    .kpi-label{font-size:0.7143rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;margin-top:4px}
+    /* Page header — the directory used to open straight onto a row of bare
+       numbers with no title or context. */
+    .vm-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+    .vm-head h1{font-size:1.286rem;font-weight:800;margin:0;color:#231F20;letter-spacing:-.01em}
+    .vm-head p{font-size:0.8125rem;color:#888;margin:3px 0 0}
+    body.dark-mode .vm-head h1{color:var(--text-primary)}
+    /* KPI tiles ARE the standing filter — they were unlabelled counters that
+       you had to know were clickable. Now they read (and behave) as a chip
+       row: icon + count + label, with a live pressed state. */
+    .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+    @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:560px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+    .kpi-card{background:#fff;border:1.5px solid #f0f0f0;border-radius:11px;padding:12px 14px;text-align:left;font-family:inherit;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s;display:flex;flex-direction:column;gap:2px}
+    .kpi-card:hover{border-color:#EE3124;transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.06)}
+    .kpi-card[aria-pressed="true"]{border-color:#EE3124;box-shadow:0 0 0 2px rgba(238,49,36,.16)}
+    .kpi-card .kpi-top{display:flex;align-items:center;gap:7px}
+    .kpi-card .kpi-top i{font-size:1rem}
+    .kpi-value{font-size:1.5rem;font-weight:800;color:#231F20;line-height:1.05}
+    .kpi-label{font-size:0.7143rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#888}
+    body.dark-mode .kpi-card{background:var(--surface);border-color:var(--border)}
+    body.dark-mode .kpi-card[aria-pressed="true"]{border-color:#EE3124}
     .page-content{padding:20px;max-width:100%}
     .section-card{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:20px;margin-bottom:20px}
     /* View toggle (Cards | Table) */
@@ -59,7 +75,26 @@
     .vcard-foot .action-btn{flex:1;text-align:center}
     .vcard-foot .view-hint{margin-left:auto;font-size:0.72rem;color:#bbb;font-weight:600;display:flex;align-items:center;gap:4px}
     .vcard-status-badge{flex-shrink:0}
-    .vcard-empty{grid-column:1/-1;text-align:center;color:#888;padding:44px 0;font-size:0.9286rem}
+    .vcard-empty{grid-column:1/-1;text-align:center;color:#888;padding:52px 20px;font-size:0.9286rem}
+    .vcard-empty i{display:block;font-size:2.2rem;color:#ddd;margin-bottom:10px}
+    .vcard-empty button{margin-top:12px;border:1.5px solid #e5e5e5;background:var(--surface,#fff);color:#231F20;border-radius:8px;padding:7px 14px;font-size:0.8125rem;font-weight:600;font-family:inherit;cursor:pointer}
+    .vcard-empty button:hover{border-color:#EE3124;color:#EE3124}
+    body.dark-mode .vcard-empty button{color:var(--text-primary)}
+    body.dark-mode .vcard-empty i{color:var(--border-md)}
+    /* Avatar tint follows the standing, so a card's status reads at a glance
+       from the left edge as well as the badge on the right. */
+    .vcard-avatar.av-accredited{background:#D1FAE5;color:#065F46}
+    .vcard-avatar.av-problematic{background:#FEE2E2;color:#991B1B}
+    .vcard-avatar.av-none{background:#F1F1F1;color:#7A7878}
+    body.dark-mode .vcard-avatar.av-accredited{background:#102B1F;color:#6EE7B7}
+    body.dark-mode .vcard-avatar.av-problematic{background:#3D1A19;color:#FCA5A5}
+    body.dark-mode .vcard-avatar.av-none{background:var(--surface-2);color:var(--text-hint)}
+    /* Toolbar stays reachable while scrolling a long card list. */
+    /* Sticky under the topbar, which is itself sticky at top:0 with z-index:50
+       and is 60px tall (52px on mobile) — top:0 here would slide the toolbar
+       underneath it and out of sight. Stays below it in z-order deliberately. */
+    .vendor-toolbar{position:sticky;top:60px;z-index:20;background:var(--bg);padding:10px 0;margin-bottom:6px!important}
+    @media(max-width:767px){.vendor-toolbar{top:52px}}
     /* Result count + pager */
     .vendor-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
     .vendor-count{font-size:0.8125rem;color:#888;font-weight:600}
@@ -358,13 +393,28 @@
       <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading vendors…</span></div>
       <div id="main-content" style="display:none">
         <div class="page-content">
-          <div class="kpi-grid">
-            <div class="kpi-card"><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-label">Total Vendors</div></div>
-            <div class="kpi-card"><div class="kpi-value" id="kpiAccredited" style="color:#065F46">—</div><div class="kpi-label">Accredited</div></div>
-            <div class="kpi-card"><div class="kpi-value" id="kpiUnaccredited" style="color:#92400E">—</div><div class="kpi-label">Unaccredited</div></div>
-            <div class="kpi-card"><div class="kpi-value" id="kpiProblematic" style="color:#991B1B">—</div><div class="kpi-label">Problematic</div></div>
-            <div class="kpi-card"><div class="kpi-value" id="kpiUnassessed" style="color:#6B7280">—</div><div class="kpi-label">Not Assessed</div></div>
-            <div class="kpi-card" id="kpiRequestsCard" onclick="showAccredRequests()" style="cursor:pointer" title="Show vendors waiting for an accreditation decision"><div class="kpi-value" id="kpiRequests" style="color:#1D4ED8">—</div><div class="kpi-label">Requests to review</div></div>
+          <div class="vm-head">
+            <div>
+              <h1>Vendor Management</h1>
+              <p>Accreditation standing, contacts and bid history for every vendor Megawide engages.</p>
+            </div>
+          </div>
+          <div class="kpi-grid" role="group" aria-label="Filter by accreditation standing">
+            <button type="button" class="kpi-card" id="kpi-all" aria-pressed="true" onclick="setAccredFilter('all')" title="Show every vendor">
+              <div class="kpi-top"><i class="ti ti-building-store" style="color:#231F20"></i><span class="kpi-value" id="kpiTotal">—</span></div>
+              <span class="kpi-label">All vendors</span></button>
+            <button type="button" class="kpi-card" id="kpi-accredited" aria-pressed="false" onclick="setAccredFilter('accredited')" title="Show accredited vendors only">
+              <div class="kpi-top"><i class="ti ti-rosette-discount-check" style="color:#065F46"></i><span class="kpi-value" id="kpiAccredited" style="color:#065F46">—</span></div>
+              <span class="kpi-label">Accredited</span></button>
+            <button type="button" class="kpi-card" id="kpi-none" aria-pressed="false" onclick="setAccredFilter('none')" title="Show vendors that are not accredited">
+              <div class="kpi-top"><i class="ti ti-circle-dashed" style="color:#6B6A6A"></i><span class="kpi-value" id="kpiUnassessed" style="color:#6B6A6A">—</span></div>
+              <span class="kpi-label">Not accredited</span></button>
+            <button type="button" class="kpi-card" id="kpi-problematic" aria-pressed="false" onclick="setAccredFilter('problematic')" title="Show vendors flagged problematic">
+              <div class="kpi-top"><i class="ti ti-alert-triangle" style="color:#991B1B"></i><span class="kpi-value" id="kpiProblematic" style="color:#991B1B">—</span></div>
+              <span class="kpi-label">Problematic</span></button>
+            <button type="button" class="kpi-card" id="kpi-requested" aria-pressed="false" onclick="setAccredFilter('__requested')" title="Vendors waiting for an accreditation decision">
+              <div class="kpi-top"><i class="ti ti-clock-hour-4" style="color:#1D4ED8"></i><span class="kpi-value" id="kpiRequests" style="color:#1D4ED8">—</span></div>
+              <span class="kpi-label">Requests to review</span></button>
           </div>
           <div class="vendor-toolbar" style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
             <div class="vendor-toolbar-filters" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1 1 320px;min-width:0">
@@ -376,9 +426,8 @@
             <select id="vendor-accred-filter" onchange="onVendorFilterChange()" title="Accreditation standing" style="padding:8px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:#fff;color:#231F20">
               <option value="all">All Accreditation</option>
               <option value="accredited">Accredited</option>
-              <option value="unaccredited">Unaccredited</option>
+              <option value="none">Not accredited</option>
               <option value="problematic">Problematic</option>
-              <option value="none">Not Assessed</option>
               <option value="__requested">Awaiting my decision</option>
             </select>
             <div class="view-toggle" role="group" aria-label="View mode">
@@ -393,7 +442,6 @@
               <div class="tools-menu" id="toolsMenu" style="display:none">
                 <button onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs</span><small>Scan work packages for vendors not yet in the directory</small></button>
                 <button onclick="closeToolsMenu();backfillFromWPs()"><i class="ti ti-refresh-dot"></i><span>Backfill Trade/Bid Data</span><small>Fill in trades, products, bid history and rates from WPs</small></button>
-                <button id="tools-menu-unassessed" onclick="closeToolsMenu();markRestUnaccredited()"><i class="ti ti-help-circle"></i><span>Mark rest Unaccredited <span class="tools-menu-badge" id="unassessed-count-badge" style="display:none"><span id="unassessed-count">0</span></span></span><small>Set every Not-Assessed vendor to Unaccredited — run AFTER importing the accreditation list</small></button>
                 <button onclick="closeToolsMenu();normalizeVendorTrades()"><i class="ti ti-tags"></i><span>Normalize Trades</span><small>Collapse trade variants (e.g. "GENERAL REQUIREMENT" → "General Requirements") to the 10 standard trades</small></button>
                 <button onclick="closeToolsMenu();openMergeModal()"><i class="ti ti-arrows-join"></i><span>Merge Duplicates</span><small>Combine records that are the same company under different names</small></button>
                 <button id="tools-menu-dupes" onclick="closeToolsMenu();openDupModal()"><i class="ti ti-copy-off"></i><span>Remove Exact Duplicates <span class="tools-menu-badge" id="dup-count-badge" style="display:none"><span id="dup-count">0</span></span></span><small>Fold byte-identical vendor names into one record (keeps children, links and trades)</small></button>
@@ -411,9 +459,8 @@
               <select id="bulkAccredSelect" onchange="bulkSetAccreditation(this.value);this.value=''" title="Set accreditation for the selected vendors" style="padding:4px 8px;border-radius:6px;border:1.5px solid #e5e5e5;font-family:inherit;font-size:0.7857rem;font-weight:600">
                 <option value="">Set accreditation…</option>
                 <option value="accredited">Accredited</option>
-                <option value="unaccredited">Unaccredited</option>
                 <option value="problematic">Problematic</option>
-                <option value="none">Clear (Not Assessed)</option>
+                <option value="none">Not accredited</option>
               </select>
               <button class="b-delete" id="bulkDeleteBtn" onclick="bulkDelete()">Delete</button>
               <button onclick="clearVendorSel()">Clear</button>
@@ -583,9 +630,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820a"></script>
-<script src="assets/js/db.js?v=20260820a"></script>
-<script src="assets/js/ui.js?v=20260820a"></script>
+<script src="assets/js/auth.js?v=20260820b"></script>
+<script src="assets/js/db.js?v=20260820b"></script>
+<script src="assets/js/ui.js?v=20260820b"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -676,12 +723,18 @@ function setVendorView(v) {
 // Accreditation standing, as a filter/group key ('none' when blank). Uses the
 // shared window.accredKey so this page and db.js can never disagree; the
 // fallbacks keep the page working if db.js is served stale from cache.
-function _accredOf(v) { return window.accredKey ? window.accredKey(v.accreditation) : ((v.accreditation || 'none').toLowerCase()); }
-function _accredLabel(v) { return window.accredLabel ? window.accredLabel(v.accreditation) : (v.accreditation || 'Not Assessed'); }
+function _accredOf(v) {
+  if (window.accredKey) return window.accredKey(v.accreditation);
+  // Fallback only matters if db.js is served stale from cache — fold the
+  // retired 'unaccredited' value onto the single not-accredited state too.
+  const k = String(v.accreditation || '').trim().toLowerCase();
+  return (!k || /^(un|non|not)\s*-?\s*accredited?$/.test(k)) ? 'none' : k;
+}
+function _accredLabel(v) { return window.accredLabel ? window.accredLabel(v.accreditation) : (v.accreditation || 'Not Accredited'); }
 function _accredBadge(v) {
   const k = _accredOf(v);
   const m = window.accredMeta ? window.accredMeta(v.accreditation) : { label: _accredLabel(v), icon: 'ti-help-circle' };
-  const cls = ['accredited', 'unaccredited', 'problematic'].includes(k) ? k : 'none';
+  const cls = ['accredited', 'problematic'].includes(k) ? k : 'none';
   return `<span class="abadge abadge-${cls}" title="Accreditation standing"><i class="ti ${m.icon}"></i>${esc(m.label)}</span>`;
 }
 function _vendorFiltered() {
@@ -707,15 +760,7 @@ function _vendorFiltered() {
 let _pendingReq = {};   // vendor_id -> pending accreditation request
 let _vendorPage = 0;
 const _VENDOR_PAGE_SIZE = 60;
-function onVendorFilterChange() { _vendorPage = 0; renderVendorList(); }
-// KPI tile → the request queue, so the count is a way in rather than just a number.
-function showAccredRequests() {
-  const el = document.getElementById('vendor-accred-filter');
-  if (!el) return;
-  el.value = '__requested';
-  if (_vendorView === 'analytics') setVendorView('cards');
-  onVendorFilterChange();
-}
+function onVendorFilterChange() { _vendorPage = 0; _syncKpiPressed(); renderVendorList(); }
 function renderVendorList() {
   const all = _vendorFiltered();
   const total = all.length;
@@ -911,13 +956,13 @@ function _syncBulkUI() {
   }
 }
 /* Bulk-set accreditation on the current selection. `value` is a roster key, or
-   'none' to clear back to Not Assessed. Deliberately does NOT touch
+   'none' to clear back to Not Accredited. Deliberately does NOT touch
    vendors.status — accreditation and the review workflow are independent. */
 async function bulkSetAccreditation(value) {
   if (!value) return;
   const ids = [..._selectedVendors]; if (!ids.length) return;
   const clearing = value === 'none';
-  const label = clearing ? 'Not Assessed' : _accredLabel({ accreditation: value });
+  const label = clearing ? 'Not Accredited' : _accredLabel({ accreditation: value });
   if (!confirm(`Set ${ids.length} selected vendor(s) to "${label}"?`)) return;
   let notes = null;
   if (value === 'problematic') {
@@ -939,26 +984,6 @@ async function bulkSetAccreditation(value) {
   } catch (e) {
     if (prog) prog.fail((e && e.message) || 'Update failed', { title: 'Accreditation update failed' });
     else if (AppNotify) AppNotify.fromError(e, 'Could not set accreditation'); else alert(e.message);
-  }
-}
-/* One-shot cleanup: everything still Not Assessed becomes Unaccredited. Meant to
-   run AFTER the masterdata import has stamped the known vendors — it asserts a
-   business fact ("we have no accreditation on file for these"), which is why it
-   is an explicit, confirmed action rather than a column default. */
-async function markRestUnaccredited() {
-  const ids = allVendors.filter(v => _accredOf(v) === 'none').map(v => v.id);
-  if (!ids.length) { AppNotify && AppNotify.info('Every vendor already has an accreditation standing.'); return; }
-  if (!confirm(`${ids.length} vendor(s) have no accreditation recorded.\n\nMark them all "Unaccredited"?\n\nRun the accreditation-list import FIRST so the genuinely accredited vendors aren't swept up. Vendors already marked accredited or problematic are not touched.`)) return;
-  const prog = AppNotify && AppNotify.progress ? AppNotify.progress(`Marking ${ids.length} vendor(s) unaccredited…`) : null;
-  try {
-    // No accreditation_date — nobody assessed these; a date would imply otherwise.
-    await VendorDb.bulkSetAccreditation(ids, 'unaccredited');
-    await loadAll();
-    const msg = `${ids.length} vendor(s) marked Unaccredited.`;
-    if (prog) prog.done(msg, { title: 'Accreditation backfilled' }); else AppNotify && AppNotify.success(msg);
-  } catch (e) {
-    if (prog) prog.fail((e && e.message) || 'Update failed', { title: 'Backfill failed' });
-    else if (AppNotify) AppNotify.fromError(e, 'Backfill failed'); else alert(e.message);
   }
 }
 async function bulkDelete() {
@@ -990,7 +1015,18 @@ function _displayEmail(v) {
 }
 function renderCards(rows) {
   const el = document.getElementById('vendorCards');
-  if (!rows.length) { el.innerHTML = '<div class="vcard-empty">No vendors found.</div>'; return; }
+  if (!rows.length) {
+    // Say WHY it's empty and offer the way out — a bare "No vendors found."
+    // reads as a broken page when a filter is what actually emptied it.
+    const q = (document.getElementById('vendor-search').value || '').trim();
+    const f = document.getElementById('vendor-accred-filter');
+    const filtered = q || (f && f.value !== 'all');
+    el.innerHTML = `<div class="vcard-empty"><i class="ti ti-mood-empty"></i>
+      ${filtered ? 'No vendors match the current search or filter.' : 'No vendors in the directory yet.'}
+      ${filtered ? '<div><button type="button" onclick="clearVendorFilters()">Clear search &amp; filter</button></div>' : ''}
+    </div>`;
+    return;
+  }
   el.innerHTML = rows.map(v => {
     const trades = v.trade_categories || [];
     const shown = trades.slice(0, 3), moreN = trades.length - shown.length;
@@ -1018,7 +1054,7 @@ function renderCards(rows) {
       <div class="vcard-head">
         <div class="vcard-idwrap">
           ${check}
-          <div class="vcard-avatar">${esc(_initials(v.name))}</div>
+          <div class="vcard-avatar av-${['accredited','problematic'].includes(_accredOf(v)) ? _accredOf(v) : 'none'}">${esc(_initials(v.name))}</div>
           <div style="min-width:0"><div class="vcard-name">${esc(v.name)}</div>${sub ? `<div class="vcard-sub">${esc(sub)}</div>` : ''}</div>
         </div>
         <div class="vcard-status-badge" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
@@ -1036,7 +1072,7 @@ function renderCards(rows) {
 
 /* ── Import vendors from Work Packages ── */
 async function importFromWPs() {
-  if (!confirm('Scan all work packages and add any awarded or proposed vendors that aren’t already in the directory?\n\nNew vendors are added with no accreditation standing yet ("Not Assessed"). Work packages will be linked to their awarded vendor where the name matches exactly.')) return;
+  if (!confirm('Scan all work packages and add any awarded or proposed vendors that aren’t already in the directory?\n\nNew vendors are added with no accreditation standing yet ("Not Accredited"). Work packages will be linked to their awarded vendor where the name matches exactly.')) return;
   const prog = AppNotify && AppNotify.progress ? AppNotify.progress('Importing vendors from work packages… please wait.') : null;
   try {
     const r = await VendorDb.importVendorsFromWPs({ includeProposed: true, linkWPs: true }, userProfile);
@@ -1790,25 +1826,37 @@ async function mergeAllGroups() {
 }
 
 function renderKpis() {
-  document.getElementById('kpiTotal').textContent = allVendors.length;
   const byAccred = k => allVendors.filter(v => _accredOf(v) === k).length;
-  document.getElementById('kpiAccredited').textContent = byAccred('accredited');
-  document.getElementById('kpiUnaccredited').textContent = byAccred('unaccredited');
-  document.getElementById('kpiProblematic').textContent = byAccred('problematic');
-  document.getElementById('kpiUnassessed').textContent = byAccred('none');
-  document.getElementById('kpiRequests').textContent = Object.keys(_pendingReq).length;
-  updateUnassessedBadge();
+  document.getElementById('kpiTotal').textContent = allVendors.length.toLocaleString();
+  document.getElementById('kpiAccredited').textContent = byAccred('accredited').toLocaleString();
+  document.getElementById('kpiUnassessed').textContent = byAccred('none').toLocaleString();
+  document.getElementById('kpiProblematic').textContent = byAccred('problematic').toLocaleString();
+  document.getElementById('kpiRequests').textContent = Object.keys(_pendingReq).length.toLocaleString();
+  _syncKpiPressed();
 }
-// Data Tools badge for the "Mark rest Unaccredited" cleanup — mirrors
-// updateSplitBadge/updateDupBadge (count pill + the red dot on Data Tools).
-function updateUnassessedBadge() {
-  const n = allVendors.filter(v => _accredOf(v) === 'none').length;
-  const wrap = document.getElementById('unassessed-count-badge');
-  const num = document.getElementById('unassessed-count');
-  const item = document.getElementById('tools-menu-unassessed');
-  if (num) num.textContent = n;
-  if (wrap) wrap.style.display = n ? '' : 'none';
-  if (item) item.style.display = n ? '' : 'none';
+// The KPI tiles ARE the standing filter, so their pressed state has to follow
+// the <select> too — either control can change the filter.
+const _KPI_TILES = { all: 'kpi-all', accredited: 'kpi-accredited', none: 'kpi-none', problematic: 'kpi-problematic', __requested: 'kpi-requested' };
+function _syncKpiPressed() {
+  const el = document.getElementById('vendor-accred-filter');
+  const cur = el ? el.value : 'all';
+  Object.entries(_KPI_TILES).forEach(([k, id]) => {
+    const b = document.getElementById(id);
+    if (b) b.setAttribute('aria-pressed', String(k === cur));
+  });
+}
+function clearVendorFilters() {
+  const q = document.getElementById('vendor-search'); if (q) q.value = '';
+  const f = document.getElementById('vendor-accred-filter'); if (f) f.value = 'all';
+  onVendorFilterChange();
+}
+// Tile click → set the filter (and leave Analytics, which has no row list).
+function setAccredFilter(value) {
+  const el = document.getElementById('vendor-accred-filter');
+  if (!el) return;
+  el.value = value;
+  if (_vendorView === 'analytics') setVendorView('cards');
+  onVendorFilterChange();
 }
 
 /* ── Vendor Grid (Excel-style, full parity with review.html's WP grid) ─────────
@@ -1824,9 +1872,9 @@ function updateUnassessedBadge() {
 const VXL_COLS = [
   { k: 'name',             label: 'Company Name',    w: 220, type: 'text',   req: true },
   { k: 'vendor_code',      label: 'Vendor Code',     w: 110, type: 'text' },
-  // Accreditation: '' is a legitimate value here (= Not Assessed), so the opts
+  // Accreditation: '' is a legitimate value here (= Not Accredited), so the opts
   // list leads with a blank — unlike `status`, which is NOT NULL in the DB.
-  { k: 'accreditation',       label: 'Accreditation',       w: 130, type: 'select', opts: ['', 'accredited', 'unaccredited', 'problematic'] },
+  { k: 'accreditation',       label: 'Accreditation',       w: 130, type: 'select', opts: ['', 'accredited', 'problematic'] },
   { k: 'accreditation_notes', label: 'Accreditation Notes', w: 220, type: 'text' },
   { k: 'accreditation_date',  label: 'Accredited / Assessed', w: 130, type: 'date' },
   { k: 'trade_categories', label: 'Trade Categories',w: 240, type: 'trades' },
@@ -1971,7 +2019,7 @@ function _vxlSet(r, c, raw, undoBatch) {
   let val = raw == null ? '' : String(raw);
   if (col.k === 'name' && !val.trim()) return false;
   if (col.k === 'accreditation') {
-    // Blank clears back to Not Assessed. Otherwise accept a roster key, and fall
+    // Blank clears back to Not Accredited. Otherwise accept a roster key, and fall
     // back to the shared free-text mapper so a value PASTED straight out of the
     // masterdata sheet ("BLACKLISTED", "For Accreditation") lands correctly
     // instead of being rejected.
@@ -2519,10 +2567,10 @@ function renderDetailOverview() {
       <div class="accred-row">
         <div><label style="display:block;font-size:0.7143rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">Standing</label>
           <select id="dov-accreditation" onchange="_dovSyncAccredHint()" style="width:100%">
-            <option value="">Not Assessed</option>
-            ${['accredited', 'unaccredited', 'problematic'].map(k =>
+            <option value="">Not accredited</option>
+            ${['accredited', 'problematic'].map(k =>
               `<option value="${k}" ${_accredOf(v) === k ? 'selected' : ''}>${esc(_accredLabel({ accreditation: k }))}</option>`).join('')}
-            ${!['accredited', 'unaccredited', 'problematic', 'none'].includes(_accredOf(v))
+            ${!['accredited', 'problematic', 'none'].includes(_accredOf(v))
               // Preserve an off-roster legacy value rather than silently clearing it
               // on the next save (same rescue as ghOptions/fillSelectLegacy).
               ? `<option value="${esc(v.accreditation)}" selected>${esc(v.accreditation)} (legacy)</option>` : ''}

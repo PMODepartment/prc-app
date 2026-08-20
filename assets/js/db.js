@@ -1612,9 +1612,8 @@ if (typeof window !== 'undefined') { window.CanonTrade = CanonTrade; window.Cano
    `vendors.accreditation` (MIGRATION_vendor_accreditation.sql) is a plain
    text column, NOT an enum — the roster lives HERE, in one place, so the
    vocabulary can change with no DB migration (same reasoning as
-   window.GROUP_HEADS). NULL/blank = "Not Assessed" (the ACCRED_NONE
-   sentinel), deliberately not treated as 'unaccredited': most existing rows
-   were auto-derived from WP vendor names and nobody has assessed them.
+   window.GROUP_HEADS). NULL/blank = "Not Accredited" (the ACCRED_NONE
+   sentinel) — the single not-accredited state; see the roster below.
 
    ACCREDITATION IS THE ONLY VENDOR STANDING THE APP SHOWS. The older
    vendors.status review workflow (pending_review/approved/rejected/inactive)
@@ -1626,20 +1625,29 @@ if (typeof window !== 'undefined') { window.CanonTrade = CanonTrade; window.Cano
 
    Use accredLabel()/accredMeta() rather than re-inlining a `|| 'Not Assessed'`
    fallback or a colour map, or the filter/group/KPI keys stop matching. */
-const ACCREDITATIONS = ['accredited', 'unaccredited', 'problematic'];
+/* TWO standings, not three (2026-08-20). "Unaccredited" and "Not Assessed"
+   were two names for the same fact — the company is not on the accredited
+   list — and having both meant a vendor could sit in either bucket for no
+   reason anyone could explain. There is now ONE not-accredited state, and it
+   is the ABSENCE of a value (NULL), so it cannot drift: a legacy stored
+   'unaccredited' folds onto it in accredKey() rather than needing a data
+   migration, and every write path sends NULL rather than the word. */
+const ACCREDITATIONS = ['accredited', 'problematic'];
 const ACCRED_NONE = 'none';   // filter/group key for a blank accreditation
 const _ACCRED_META = {
-  accredited:   { label: 'Accredited',   color: '#065F46', bg: '#D1FAE5', darkColor: '#6EE7B7', darkBg: '#102B1F', icon: 'ti-rosette-discount-check' },
-  unaccredited: { label: 'Unaccredited', color: '#92400E', bg: '#FEF3C7', darkColor: '#FCD34D', darkBg: '#3D2E0F', icon: 'ti-alert-circle' },
-  problematic:  { label: 'Problematic',  color: '#991B1B', bg: '#FEE2E2', darkColor: '#FCA5A5', darkBg: '#3D1A19', icon: 'ti-alert-triangle' },
-  none:         { label: 'Not Assessed', color: '#555',    bg: '#F3F4F6', darkColor: 'var(--text-hint)', darkBg: 'var(--surface-2)', icon: 'ti-help-circle' },
+  accredited:   { label: 'Accredited',     color: '#065F46', bg: '#D1FAE5', darkColor: '#6EE7B7', darkBg: '#102B1F', icon: 'ti-rosette-discount-check' },
+  problematic:  { label: 'Problematic',    color: '#991B1B', bg: '#FEE2E2', darkColor: '#FCA5A5', darkBg: '#3D1A19', icon: 'ti-alert-triangle' },
+  none:         { label: 'Not Accredited', color: '#6B6A6A', bg: '#F3F4F6', darkColor: 'var(--text-hint)', darkBg: 'var(--surface-2)', icon: 'ti-circle-dashed' },
 };
-// Normalize a stored value to a roster key (case/space tolerant). An off-roster
-// legacy value is returned as-is so it still displays instead of blanking.
+// Normalize a stored value to a roster key (case/space tolerant). Legacy
+// 'unaccredited' (and its spellings) folds onto the single not-accredited
+// state; any other off-roster value is returned as-is so it still displays
+// instead of blanking.
+const _UNACCRED_RE = /^(un|non|not)\s*-?\s*accredited?$/;
 function accredKey(v) {
   const k = String(v == null ? '' : v).trim().toLowerCase();
-  if (!k) return ACCRED_NONE;
-  return ACCREDITATIONS.includes(k) ? k : k;
+  if (!k || _UNACCRED_RE.test(k)) return ACCRED_NONE;
+  return k;
 }
 function accredMeta(v) { return _ACCRED_META[accredKey(v)] || { ..._ACCRED_META.none, label: String(v) }; }
 function accredLabel(v) { return accredMeta(v).label; }
@@ -1652,9 +1660,9 @@ function accredFromText(s) {
   const t = String(s == null ? '' : s).trim().toLowerCase();
   if (!t) return null;
   if (/black\s*-?\s*list|blacklist|banned|barred|disqualif|derogat|negative|problem|on\s*hold|\bhold\b|suspend|terminat|litigat|do\s*not\s*(use|engage)|\bdnu\b|delist/.test(t)) return 'problematic';
-  if (/\bnot\s*accredit|non\s*-?\s*accredit|un\s*-?\s*accredit|de\s*-?\s*accredit|for\s*accredit|under\s*accredit|pending\s*accredit|no\s*accredit|expire|lapse|not\s*yet/.test(t)) return 'unaccredited';
+  if (/\bnot\s*accredit|non\s*-?\s*accredit|un\s*-?\s*accredit|de\s*-?\s*accredit|for\s*accredit|under\s*accredit|pending\s*accredit|no\s*accredit|expire|lapse|not\s*yet/.test(t)) return ACCRED_NONE;
   if (/accredit|approved|qualified|passed|active|compliant|\bok\b|\byes\b/.test(t)) return 'accredited';
-  if (/^(no|none|n\/a|na)$/.test(t)) return 'unaccredited';
+  if (/^(no|none|n\/a|na)$/.test(t)) return ACCRED_NONE;
   return null;
 }
 if (typeof window !== 'undefined') {
@@ -2063,7 +2071,7 @@ const VendorDb = (() => {
         decision_notes: notes || null,
       }).eq('id', requestId);
       if (error) throw error;
-      const patch = { accreditation: status === 'approved' ? 'accredited' : 'unaccredited', accreditation_date: _todayLocal() };
+      const patch = { accreditation: status === 'approved' ? 'accredited' : null, accreditation_date: _todayLocal() };
       if (notes) patch.accreditation_notes = notes;
       return updateVendor(vendorId, patch);
     },
@@ -2594,7 +2602,7 @@ const VendorDb = (() => {
     }
   }
   // Bulk-set accreditation standing. `value` is a roster key (accredited /
-  // unaccredited / problematic) or null to clear back to Not Assessed. Chunked
+  // problematic) or null to clear back to Not Accredited. Chunked
   // like bulkSetVendorStatus; deploy-safe — if the accreditation migration
   // hasn't run the whole call is refused loudly rather than silently no-oping
   // (unlike the per-row write paths, a bulk stamp that quietly does nothing
