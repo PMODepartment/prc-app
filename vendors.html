@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820k"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820k"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820k"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820l"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820l"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820l"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820k">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820l">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -192,6 +192,17 @@
     .row-item:last-child{border-bottom:none}
     .row-item-title{font-size:0.8571rem;font-weight:600}
     .row-item-sub{font-size:0.7857rem;color:#888;margin-top:2px}
+    /* Per-vendor scorecard (detail modal, above the WP list) */
+    .scorecard{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:14px}
+    @media(max-width:640px){.scorecard{grid-template-columns:repeat(2,1fr)}}
+    .sc-tile{border:1px solid var(--border-md,#e8e8e8);border-radius:9px;padding:9px 11px;background:var(--surface-2,#fafafa)}
+    .sc-lbl{font-size:0.6786rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#888}
+    .sc-val{font-size:1.15rem;font-weight:800;line-height:1.2;margin-top:2px;color:#231F20}
+    .sc-val.green{color:#2D9B6F}.sc-val.red{color:#EE3124}
+    .sc-sub{font-size:0.6786rem;color:#888;margin-top:2px;line-height:1.35}
+    body.dark-mode .sc-tile{background:var(--surface-2);border-color:var(--border)}
+    body.dark-mode .sc-val{color:var(--text-primary)}
+    body.dark-mode .sc-lbl,body.dark-mode .sc-sub{color:var(--text-hint)}
     /* Taxonomy path on a classified offering — distinguishes it at a glance
        from a legacy row still showing only its free-text trade. */
     .prod-path{color:#C42127;font-weight:600}
@@ -460,6 +471,8 @@
               <option value="problematic">Problematic</option>
               <option value="__requested">Awaiting my decision</option>
               <option value="__edited">Updated by the vendor</option>
+              <option value="__split">⚠ Looks like several companies</option>
+              <option value="__unclassified">⚠ Unclassified offerings</option>
             </select>
             <div class="view-toggle" role="group" aria-label="View mode">
               <button id="vv-cards" class="active" onclick="setVendorView('cards')" aria-label="Card view"><i class="ti ti-layout-grid"></i> Cards</button>
@@ -680,9 +693,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820k"></script>
-<script src="assets/js/db.js?v=20260820k"></script>
-<script src="assets/js/ui.js?v=20260820k"></script>
+<script src="assets/js/auth.js?v=20260820l"></script>
+<script src="assets/js/db.js?v=20260820l"></script>
+<script src="assets/js/ui.js?v=20260820l"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -714,6 +727,11 @@ function _initBulkUI() {
 }
 
 let _vendorProductText = {};  // vendorId -> lowercased "category description …" for product search
+/* Vendors holding at least one offering with no taxonomy_id — i.e. still filed
+   under the legacy free-text category only. Drives the "Unclassified offerings"
+   triage view so the taxonomy can be filled in incrementally. Empty (and the
+   view therefore shows nothing) until MIGRATION_product_taxonomy.sql runs. */
+let _vendorUnclassified = new Set();
 async function loadAll() {
   try { allVendors = await VendorDb.getVendors(); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not load vendors') : alert(e.message); allVendors = []; }
@@ -726,10 +744,12 @@ async function loadAll() {
   // Load products once so the directory search can also match a vendor's
   // products/services (one query; degrades to name+trade search if it fails).
   _vendorProductText = {};
+  _vendorUnclassified = new Set();
   try {
     (await VendorDb.getAllVendorProducts()).forEach(p => {
       const t = ((p.category || '') + ' ' + (p.description || '') + ' ' + (p.item_type || '')).toLowerCase();
       _vendorProductText[p.vendor_id] = (_vendorProductText[p.vendor_id] || '') + ' ' + t;
+      if (!p.taxonomy_id) _vendorUnclassified.add(p.vendor_id);
     });
   } catch (e) { /* search just won't match products */ }
   // Pending accreditation requests — the vendor-raised review queue. Returns []
@@ -802,6 +822,10 @@ function _vendorFiltered() {
   return allVendors.filter(v => {
     if (accredF === '__requested') { if (!_pendingReq[v.id]) return false; }
     else if (accredF === '__edited') { if (!_vendorEdited(v)) return false; }
+    // Data-quality triage views — work the backlog down from the directory
+    // itself, incrementally, instead of only inside the Split modal.
+    else if (accredF === '__split') { if (!_looksGarbled(v)) return false; }
+    else if (accredF === '__unclassified') { if (!_vendorUnclassified.has(v.id)) return false; }
     else if (accredF !== 'all' && _accredOf(v) !== accredF) return false;
     if (!q) return true;
     const hay = (v.name || '').toLowerCase()
@@ -981,7 +1005,78 @@ async function renderVendorAnalytics() {
       <div><div style="font-size:0.72rem;color:#888;text-transform:uppercase">Top 5 vendors</div><div style="font-size:1.3rem;font-weight:800">${top5.toFixed(1)}%</div><div style="font-size:0.75rem;color:#888">of awarded spend</div></div>
     </div></div>`;
 
-  el.innerHTML = kpis + conc + spendTbl + savTbl + winTbl + tradeTbl;
+  /* ── Cycle time & efficiency ──────────────────────────────────────────────
+     Award slip = actual award date − planned award date, in days.
+
+     COVERAGE IS THE POINT HERE. The WP-Monitoring imports populate
+     award_status and total_awarded but never an actual award DATE, so most
+     awarded WPs cannot be measured at all. Averaging over whatever happens to
+     have both dates and presenting it as "the" cycle time would be a fiction,
+     so every figure below states the sample it came from, and the section
+     says plainly when there is nothing to measure. Medians, not means — a
+     single mis-keyed date year would swing a mean wildly. */
+  const _day = 864e5;
+  const _pd = d => { if (!d) return null; const m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/); const x = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(d); return isNaN(x) ? null : x; };
+  const _median = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); return s.length % 2 ? s[(s.length - 1) / 2] : Math.round((s[s.length / 2 - 1] + s[s.length / 2]) / 2); };
+  const awardedWps = wps.filter(w => window.isMoneyAwarded(w));
+  const slipRows = [];                       // {w, slip}
+  awardedWps.forEach(w => {
+    const p = _pd(w.awarding_date), a = _pd(w.actual_awarding_date);
+    if (p && a) slipRows.push({ w, slip: Math.round((a - p) / _day) });
+  });
+  const delivRows = [];
+  wps.forEach(w => {
+    const p = _pd(w.target_delivery), a = _pd(w.actual_delivery);
+    if (p && a) delivRows.push({ w, slip: Math.round((a - p) / _day) });
+  });
+  const covPct = awardedWps.length ? Math.round(slipRows.length / awardedWps.length * 100) : 0;
+  let cycle;
+  if (!slipRows.length) {
+    cycle = `<div class="section-card" style="margin-bottom:14px;padding:14px 16px">
+      <div style="font-weight:800;font-size:0.95rem;margin-bottom:6px">Cycle Time &amp; Efficiency</div>
+      <div style="font-size:0.83rem;color:#888;line-height:1.5">Nothing to measure yet. Award slip needs both a <b>planned</b> and an <b>actual</b> award date, and none of the ${awardedWps.length.toLocaleString()} awarded work packages have both — the monitoring-sheet imports set the award flag and cost but not an actual award date. Enter actual award dates (WP form → Procurement Schedule) and this fills in.</div></div>`;
+  } else {
+    const med = _median(slipRows.map(r => r.slip));
+    const onTime = slipRows.filter(r => r.slip <= 0).length;
+    const dMed = delivRows.length ? _median(delivRows.map(r => r.slip)) : null;
+    // Per-trade, then per-vendor — only where the sample is big enough to mean anything.
+    const byTrade = {};
+    slipRows.forEach(r => { const t = window.CanonTrade ? window.CanonTrade(r.w.trade) : (r.w.trade || '—'); (byTrade[t] = byTrade[t] || []).push(r.slip); });
+    const tradeList = Object.entries(byTrade).map(([t, a]) => ({ name: t, n: a.length, med: _median(a), late: a.filter(x => x > 0).length }))
+      .filter(r => r.n >= 3).sort((a, b) => b.med - a.med).slice(0, 10);
+    const byVendor = {};
+    slipRows.forEach(r => { awardedOf(r.w).forEach(a => { (byVendor[a.key] = byVendor[a.key] || { name: a.name, key: a.key, s: [] }).s.push(r.slip); }); });
+    const vendList = Object.values(byVendor).map(v => ({ ...v, n: v.s.length, med: _median(v.s), late: v.s.filter(x => x > 0).length }))
+      .filter(v => v.n >= 3).sort((a, b) => a.med - b.med).slice(0, 10);
+    const slipCell = v => `<span style="color:${v > 0 ? '#EE3124' : '#2D9B6F'};font-weight:700">${v > 0 ? '+' : ''}${v}d</span>`;
+    cycle = `<div class="section-card" style="margin-bottom:14px;padding:14px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div style="font-weight:800;font-size:0.95rem">Cycle Time &amp; Efficiency</div>
+        <div style="font-size:0.78rem;color:#888">planned vs actual award date</div></div>
+      <div style="display:flex;gap:22px;flex-wrap:wrap;margin-bottom:6px">
+        <div><div style="font-size:0.72rem;color:#888;text-transform:uppercase">Median award slip</div>
+          <div style="font-size:1.3rem;font-weight:800;color:${med > 0 ? '#EE3124' : '#2D9B6F'}">${med > 0 ? '+' : ''}${med} days</div>
+          <div style="font-size:0.75rem;color:#888">${med > 0 ? 'later' : 'earlier'} than planned</div></div>
+        <div><div style="font-size:0.72rem;color:#888;text-transform:uppercase">Awarded on time</div>
+          <div style="font-size:1.3rem;font-weight:800">${Math.round(onTime / slipRows.length * 100)}%</div>
+          <div style="font-size:0.75rem;color:#888">${onTime} of ${slipRows.length}</div></div>
+        ${dMed != null ? `<div><div style="font-size:0.72rem;color:#888;text-transform:uppercase">Median delivery slip</div>
+          <div style="font-size:1.3rem;font-weight:800;color:${dMed > 0 ? '#EE3124' : '#2D9B6F'}">${dMed > 0 ? '+' : ''}${dMed} days</div>
+          <div style="font-size:0.75rem;color:#888">from ${delivRows.length} WPs</div></div>` : ''}
+      </div>
+      <div style="font-size:0.75rem;color:#888;border-top:1px solid var(--border,#eee);padding-top:7px">
+        Measured on <b>${slipRows.length}</b> of ${awardedWps.length.toLocaleString()} awarded work packages (<b>${covPct}%</b>) — the rest have no actual award date recorded.
+      </div></div>`;
+    if (tradeList.length) cycle += rank('Award Slip by Trade', 'trades with ≥3 measurable WPs, slowest first', tradeList,
+      [{ t: 'Trade', f: (r, i) => `<span style="color:#888;margin-right:6px">${i + 1}</span><strong>${esc(r.name)}</strong>` },
+       { t: 'WPs', a: 'right', f: r => r.n }, { t: 'Late', a: 'right', f: r => r.late },
+       { t: 'Median slip', a: 'right', f: r => slipCell(r.med) }]);
+    if (vendList.length) cycle += rank('Fastest Vendors to Award', 'vendors with ≥3 measurable WPs, quickest first', vendList,
+      [{ t: 'Vendor', f: nameCell }, { t: 'WPs', a: 'right', f: r => r.n }, { t: 'Late', a: 'right', f: r => r.late },
+       { t: 'Median slip', a: 'right', f: r => slipCell(r.med) }]);
+  }
+
+  el.innerHTML = kpis + conc + spendTbl + savTbl + winTbl + cycle + tradeTbl;
 }
 
 /* ── Bulk select ── */
@@ -1492,8 +1587,12 @@ function _suggestSplitPoints(name) {
   const segs = _coalesceSegments(marked.split(marker).map(s => s.trim()).filter(Boolean));
   return segs.length >= 2 ? segs : [(name || '').trim()].filter(Boolean);
 }
+/* ONE predicate for "this record looks like several companies joined together",
+   shared by the Split tool and the directory's triage view so the two can never
+   report a different backlog. */
+function _looksGarbled(v) { return _splitSegments(v.name).length >= 2; }
 function _splitCandidates() {
-  return allVendors.filter(v => _splitSegments(v.name).length >= 2 && !_splitSkipped.has(v.id));
+  return allVendors.filter(v => _looksGarbled(v) && !_splitSkipped.has(v.id));
 }
 // Vendors staff manually pulled into the Split tool via search (records with
 // no delimiter / no repeated suffix that _splitCandidates can't auto-detect).
@@ -3380,10 +3479,69 @@ async function renderDetailWps() {
       ${costCells}
     </tr>`;
   }).join('');
-  el.innerHTML = `<div style="font-size:0.82rem;color:#555;margin-bottom:8px">${linked.length} work package${linked.length === 1 ? '' : 's'} — <span style="color:#2D9B6F;font-weight:700">${nAwd} awarded</span>${nProp ? ` · <span style="color:#2563EB;font-weight:700">${nProp} proposed only</span>` : ''}.</div>
+  el.innerHTML = _scorecardHtml(linked, vendorAmt, hideCost) +
+    `<div style="font-size:0.82rem;color:#555;margin-bottom:8px">${linked.length} work package${linked.length === 1 ? '' : 's'} — <span style="color:#2D9B6F;font-weight:700">${nAwd} awarded</span>${nProp ? ` · <span style="color:#2563EB;font-weight:700">${nProp} proposed only</span>` : ''}.</div>
     <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
       <thead><tr><th style="${TH}">Role</th><th style="${TH}">WP No.</th><th style="${TH}">Project</th><th style="${TH}">Description</th><th style="${TH}">Trade</th><th style="${TH}">Status</th>${costHead}</tr></thead>
       <tbody>${body}</tbody></table></div>`;
+}
+
+/* ── Per-vendor scorecard ───────────────────────────────────────────────────
+   Computed from the SAME `linked` set renderDetailWps already resolved — no
+   extra query, and it can never disagree with the table underneath it.
+
+   Every figure states its own denominator. Award slip in particular is thin by
+   nature: the WP-Monitoring imports populate award_status and total_awarded but
+   NOT an actual award date, so most awarded WPs have no measurable slip. Rather
+   than average over whatever happens to be present and present it as fact, the
+   tile reports the sample size and reads "no data" when there is none. */
+function _scorecardHtml(linked, vendorAmt, hideCost) {
+  const awd = linked.filter(x => x.isAwd);
+  const won = awd.length, part = linked.length;
+  const winRate = part ? won / part * 100 : 0;
+
+  let spend = 0, bcb = 0;
+  awd.forEach(x => {
+    if (!window.isMoneyAwarded(x.w)) return;
+    const amt = vendorAmt(x.w);
+    spend += (amt != null ? amt : 0);
+    bcb += (x.w.approved_budget_bcb || 0);
+  });
+  const sav = bcb - spend, savPct = bcb ? sav / bcb * 100 : 0;
+
+  // Award slip = actual − planned, in days. Positive = late.
+  const day = 864e5;
+  const parse = d => { if (!d) return null; const m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/); const x = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(d); return isNaN(x) ? null : x; };
+  const slips = [];
+  awd.forEach(x => {
+    const p = parse(x.w.awarding_date), a = parse(x.w.actual_awarding_date);
+    if (p && a) slips.push(Math.round((a - p) / day));
+  });
+  let slipTxt = '—', slipSub = 'no actual award dates on file', slipCls = '';
+  if (slips.length) {
+    const s = [...slips].sort((a, b) => a - b);
+    const med = s.length % 2 ? s[(s.length - 1) / 2] : Math.round((s[s.length / 2 - 1] + s[s.length / 2]) / 2);
+    const onTime = slips.filter(d => d <= 0).length;
+    slipTxt = (med > 0 ? '+' : '') + med + 'd';
+    slipCls = med > 0 ? 'red' : 'green';
+    slipSub = `median, from ${slips.length} of ${won} awarded · ${Math.round(onTime / slips.length * 100)}% on time`;
+  }
+
+  const money = v => Fmt.moneyShort(v || 0);
+  const tile = (lbl, val, sub, cls) =>
+    `<div class="sc-tile"><div class="sc-lbl">${lbl}</div><div class="sc-val ${cls || ''}">${val}</div><div class="sc-sub">${sub}</div></div>`;
+
+  const tiles = [
+    tile('Win rate', part ? winRate.toFixed(0) + '%' : '—', `${won} won of ${part} bid on`),
+    tile('Award slip', slipTxt, slipSub, slipCls),
+  ];
+  if (!hideCost) {
+    tiles.splice(1, 0, tile('Awarded spend', money(spend), `across ${won} work package${won === 1 ? '' : 's'}`));
+    tiles.push(tile('Savings delivered', (sav >= 0 ? '+' : '−') + money(Math.abs(sav)),
+      bcb ? `${(sav >= 0 ? '+' : '')}${savPct.toFixed(1)}% vs ₱${(bcb / 1e6).toFixed(1)}M BCB` : 'no BCB on file',
+      sav >= 0 ? 'green' : 'red'));
+  }
+  return `<div class="scorecard">${tiles.join('')}</div>`;
 }
 async function renderDetailBids() {
   // Read-only per-vendor bid history (+ staff delete). Bids are LOGGED per

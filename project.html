@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820k"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820k"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820k"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260820k"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260820k"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820l"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820l"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820l"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260820l"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260820l"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260810b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260820k"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260820l"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820k"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820l"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -533,16 +533,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820k"></script>
-<script src="assets/js/ui.js?v=20260820k"></script>
-<script src="assets/js/db.js?v=20260820k"></script>
-<script src="assets/js/onboarding.js?v=20260820k"></script>
-<script src="assets/js/coachmarks.js?v=20260820k"></script>
+<script src="assets/js/auth.js?v=20260820l"></script>
+<script src="assets/js/ui.js?v=20260820l"></script>
+<script src="assets/js/db.js?v=20260820l"></script>
+<script src="assets/js/onboarding.js?v=20260820l"></script>
+<script src="assets/js/coachmarks.js?v=20260820l"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260810b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260820k"></script>
+<script src="assets/js/charts.js?v=20260820l"></script>
 <script>
 
   // Segmented toggle state — swaps a class instead of rewriting cssText.
@@ -588,6 +588,11 @@ const COLS=[
   {key:'target_delivery',  label:'Target Delivery',    w:'100px'},
   {key:'actual_delivery',  label:'Actual Delivery',    w:'100px'},
   {key:'target_installation', label:'Target Install',  w:'100px'},
+  // Pushed in by the Planners app: the day construction actually needs this package on site
+  // (earliest start of the schedule activities linked to it). Sits immediately after Target
+  // Install because that is the field it is the schedule's opinion OF — read them as a pair.
+  {key:'planners_need_by', label:'Sched. Need-by',     w:'100px'},
+  {key:'planners_need_slip', label:'Slip (d)',         w:'70px'},
   {key:'target_completion', label:'Target Completion', w:'100px'},
   {key:'approver_name',    label:'Submittals Approver', w:'130px'},
   {key:'approval_date',    label:'Date of Approval',   w:'100px'},
@@ -599,6 +604,43 @@ const COLS=[
 ];
 
 const COST_KEYS = new Set(['approved_budget_bcb','total_awarded','variance','pct_wt','dp_amount','retention_percent','retention_amount']);
+
+// ── SCHEDULE NEED-BY (from the Planners app) ─────────────────────────────────
+// The Planners Project Schedule links each activity to the work package that supplies
+// it; the earliest start among a package's linked activities is the day site work that
+// consumes it begins. Per the PMO that date is this app's TARGET INSTALLATION, so the
+// two are shown side by side with the gap between them.
+//
+// ⚠️ ADVISORY, NOT AUTHORITATIVE. `target_installation` remains procurement's own field,
+// typed and saved by a buyer in wp-form.html. Nothing here writes to it — the schedule
+// proposes a date, a buyer decides. See MIGRATION_planners_need_by.sql for why this is a
+// separate table rather than an overwrite.
+//
+// ⚠️ Attached onto the WP objects as `_need_by*` (underscore-prefixed) so it can never be
+// mistaken for a work_packages column and round-trip into an UPDATE: unmap()/saveWP build
+// their payloads from real column names, and these are not among them.
+let _needByMap = {};
+async function _loadNeedBy(pid) {
+  try { _needByMap = await WPDb.getNeedBy(pid); } catch (_) { _needByMap = {}; }
+}
+function _attachNeedBy(list) {
+  return (list || []).map(w => {
+    const e = _needByMap[String(w.wp_no ?? '').trim().toUpperCase()];
+    return e ? { ...w, _need_by: e.need_by, _need_driver: e.driver_activity_id,
+                 _need_driver_name: e.driver_activity_name, _need_linked: e.linked_activities,
+                 _need_synced: e.synced_at }
+             : w;
+  });
+}
+// Target Installation − need-by, in days. POSITIVE = procurement plans to install AFTER the
+// schedule needs it (late). Null when either date is missing — an unknown gap must read as
+// unknown, never as zero/on-time.
+function _needSlip(w) {
+  if (!w || !w._need_by || !w.target_installation) return null;
+  const a = new Date(w._need_by + 'T00:00:00'), b = new Date(String(w.target_installation).slice(0,10) + 'T00:00:00');
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.round((b - a) / 86400000);
+}
 
 // ── Export to Excel (.xlsx) ──────────────────────────────────────────────────
 // Lazy-load SheetJS only when the user actually exports (keeps the dashboard light).
@@ -637,6 +679,8 @@ function _xlsxCellVal(w, key){
     case 'target_delivery':     return dateS(w.target_delivery||w.target_completion);
     case 'actual_delivery':     return dateS(w.actual_delivery);
     case 'target_installation': return dateS(w.target_installation);
+    case 'planners_need_by':    return dateS(w._need_by);
+    case 'planners_need_slip':  return _needSlip(w) == null ? '' : _needSlip(w);
     case 'target_completion':   return dateS(w.target_completion);
     case 'approval_date':       return dateS(w.approval_date);
     default:                    return w[key]==null ? '' : w[key];
@@ -690,9 +734,9 @@ let _wpTableView = 'overview';
 const WP_TABLE_VIEWS = {
   overview:   {keys:new Set(['cost_code','wp_no','works','description','scope','proposed_vendors','procurement_status','delivery_status','award_status','remarks'])},
   financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount']), cost:true},
-  schedule:   {keys:new Set(['cost_code','wp_no','description','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion'])},
+  schedule:   {keys:new Set(['cost_code','wp_no','description','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','planners_need_by','planners_need_slip','target_completion'])},
   submittals: {keys:new Set(['cost_code','wp_no','description','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
-  all:        {keys:new Set(['cost_code','wp_no','description','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','target_completion','approver_name','approval_date','submittal_doc_type','procurement_status','delivery_status','award_status','remarks']), cost:true},
+  all:        {keys:new Set(['cost_code','wp_no','description','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','planners_need_by','planners_need_slip','target_completion','approver_name','approval_date','submittal_doc_type','procurement_status','delivery_status','award_status','remarks']), cost:true},
 };
 function getActiveCols() {
   const v = WP_TABLE_VIEWS[_wpTableView] || WP_TABLE_VIEWS.overview;
@@ -802,6 +846,24 @@ function openWPDetail(idOrObj) {
       ${row('Target Install',fmtD(w.target_installation))}
       ${row('Target Completion',fmtD(w.target_completion))}
     </div>`;
+  // What the construction schedule says about this package. Only rendered when the Planners
+  // app has actually pushed something — an empty "Schedule need-by: —" block on every package
+  // would just be noise on projects that don't use the link.
+  if (w._need_by || w._need_linked) {
+    const _slip = _needSlip(w);
+    const _slipTxt = _slip == null ? '—'
+      : _slip > 0 ? `<span style="color:#EE3124;font-weight:700">${_slip}d LATE</span> — site needs it before we install`
+      : _slip < 0 ? `<span style="color:#2D9B6F;font-weight:700">${-_slip}d float</span>`
+      : '<span style="font-weight:700">exactly on the need-by date</span>';
+    html += `<div style="margin-bottom:14px">
+      <div class="sec-label">Construction schedule (Planners app)</div>
+      ${row('Schedule need-by', w._need_by ? fmtD(w._need_by) : 'no dated activities')}
+      ${row('vs our Target Install', _slipTxt, true)}
+      ${row('Linked activities', w._need_linked != null ? String(w._need_linked) : '—')}
+      ${row('Driven by', w._need_driver ? esc(w._need_driver) + (w._need_driver_name ? ' — ' + esc(w._need_driver_name) : '') : '—', true)}
+      <div style="font-size:0.7143rem;color:#888;margin-top:6px">Read-only. Sent by the Planners schedule; it does not change our Target Installation.</div>
+    </div>`;
+  }
   if (!isViewer) {
     html += `<div style="margin-bottom:14px">
       <div class="sec-label">Financials</div>
@@ -1087,7 +1149,44 @@ window.renderSidebarProjects = function() {
 
 // Vendors live in contractor (awarded) or proposed_vendors. Split on explicit delimiters only —
 // newline / semicolon / pipe. NEVER comma or space, so "Company, Inc." and multi-word names stay intact.
-const _projVendors = w => String(w.contractor||w.proposed_vendors||'').split(/[\r\n;|]+/).map(s=>s.trim()).filter(Boolean);
+const _splitVend = s => String(s||'').split(/[\r\n;|]+/).map(x=>x.trim()).filter(Boolean);
+/* Vendor-name resolution via the vendor_id FK (Phase 2b leftover). A WP that IS
+   linked to the directory reports its CANONICAL directory name, so spelling
+   variants ("*JANGHO (LOCAL)" vs "Jangho") collapse into one filter entry.
+   Unlinked WPs keep their free text, so nothing drops out of the filter — this
+   AUGMENTS the text path rather than replacing it (only ~20% of WPs carry the
+   FK). Resolved from ONLY the ids this project's WPs reference, never the whole
+   directory. Until it lands (or if it fails) the map stays empty and the filter
+   behaves exactly as before. */
+let _vnameById = {};
+async function _loadVendorNames(wps){
+  if (typeof VendorDb === 'undefined' || !VendorDb.getVendorsByIds) return;
+  const ids = new Set();
+  (wps||[]).forEach(w => {
+    if (w.vendor_id) ids.add(w.vendor_id);
+    (Array.isArray(w.awarded_vendor_ids)?w.awarded_vendor_ids:[]).forEach(i=>i&&ids.add(i));
+    (Array.isArray(w.proposed_vendor_ids)?w.proposed_vendor_ids:[]).forEach(i=>i&&ids.add(i));
+  });
+  if (!ids.size) return;
+  try {
+    const rows = await VendorDb.getVendorsByIds([...ids]);
+    const m = {}; rows.forEach(r => { m[r.id] = r.name; });
+    _vnameById = m;
+    if (typeof _recomputeFilterOptions === 'function') _recomputeFilterOptions();
+  } catch(e) { /* keep free-text behaviour */ }
+}
+const _projVendors = w => {
+  // Awarded side first, mirroring the legacy `contractor || proposed_vendors` precedence.
+  const awIds = (Array.isArray(w.awarded_vendor_ids) && w.awarded_vendor_ids.length)
+    ? w.awarded_vendor_ids : (w.vendor_id ? [w.vendor_id] : []);
+  const awNames = awIds.map(id => _vnameById[id]).filter(Boolean);
+  if (awNames.length) return [...new Set(awNames)];
+  if (w.contractor) return _splitVend(w.contractor);
+  const prNames = (Array.isArray(w.proposed_vendor_ids)?w.proposed_vendor_ids:[])
+    .map(id => _vnameById[id]).filter(Boolean);
+  if (prNames.length) return [...new Set(prNames)];
+  return _splitVend(w.proposed_vendors);
+};
 // Cascading multiselect state for the WP-List Works/Vendor filters (Trade → Works → Vendor)
 const _msfSel = { works: new Set(), vendor: new Set() };
 // Debounce heavy re-render handlers (text search / number inputs) so they don't rebuild the
@@ -2543,6 +2642,23 @@ function _wpRenderCell(key,wp,_stickyLeft){
     case 'target_delivery': return td(fmtDate(wp.target_delivery||wp.target_completion));
     case 'actual_delivery': return td(fmtDate(wp.actual_delivery));
     case 'target_installation': return td(fmtDate(wp.target_installation));
+    // Schedule need-by + the gap to our own Target Install. Coloured on the GAP, not on the
+    // date: a need-by earlier than our install date is the actionable case (site will be
+    // waiting), and it is invisible if you only read the two dates.
+    case 'planners_need_by': {
+      if (!wp._need_by) return td('<span style="color:#bbb">—</span>', '', ' title="The Planners schedule has not linked any activity to this work package (or has not pushed need-by dates yet)."');
+      const _n = wp._need_linked || 0;
+      return td(fmtDate(wp._need_by), 'font-weight:600',
+        ` title="Earliest start of ${_n} linked schedule activit${_n===1?'y':'ies'}${wp._need_driver?' — driven by '+esc(wp._need_driver)+' '+esc(wp._need_driver_name||''):''}"`);
+    }
+    case 'planners_need_slip': {
+      const s = _needSlip(wp);
+      if (s == null) return td('<span style="color:#bbb">—</span>', 'text-align:center',
+        ` title="${wp._need_by ? 'No Target Installation set on this work package yet.' : 'No schedule need-by date for this work package.'}"`);
+      const col = s > 0 ? '#EE3124' : s < 0 ? '#2D9B6F' : '#666';
+      return td((s > 0 ? '+' : '') + s, `text-align:center;font-weight:700;color:${col}`,
+        ` title="Target Installation minus schedule need-by. ${s > 0 ? 'We install ' + s + ' day(s) AFTER site needs it.' : s < 0 ? s * -1 + ' day(s) of float.' : 'Exactly on the need-by date.'}"`);
+    }
     case 'target_completion': return td(fmtDate(wp.target_completion));
     case 'approver_name': return td(esc(wp.approver_name)||'—');
     case 'approval_date': return td(fmtDate(wp.approval_date));
@@ -3025,11 +3141,15 @@ AppAuth.requireLogin(async (user, profile) => {
   if (clAddBtn) clAddBtn.href = 'claim-form.html?project=' + projId + '&section=claim';
 
   // Load data in parallel (WPs + Claims)
-  const [meta, wps] = await Promise.all([WPDb.getProject(projId), WPDb.getAllWPs(projId)]);
-  _rawWPs = (wps||[]).map(w => ({...w, trade: normTrade(w.trade), wp_no: normWpNo(w.wp_no)}));
+  // Need-by rides along in the same parallel fetch — it must be in hand BEFORE _rawWPs is
+  // built, or the first buildTable() renders every Sched. Need-by cell as "—" and only fills
+  // in on the next re-render.
+  const [meta, wps] = await Promise.all([WPDb.getProject(projId), WPDb.getAllWPs(projId), _loadNeedBy(projId)]);
+  _rawWPs = _attachNeedBy((wps||[]).map(w => ({...w, trade: normTrade(w.trade), wp_no: normWpNo(w.wp_no)})));
   allWPs = applyBcbBaseline(_rawWPs, BcbBaseline.resolve(_rawWPs));
   _syncBcbSwitcher();
   window._wpById = Object.fromEntries(allWPs.map(w => [w.id, w]));
+  _loadVendorNames(_rawWPs);  // async, not awaited — filter starts on free text, upgrades in place
   loadClaims(); // async — loads in background
 
   if (meta) {
@@ -3138,7 +3258,8 @@ AppAuth.requireLogin(async (user, profile) => {
 
   // Re-fetch WPs and refresh view after quick-add modal saves
   window.__wpmReloadFn = async () => {
-    _rawWPs = (await WPDb.getAllWPs(projId)).map(w => ({...w, trade: normTrade(w.trade), wp_no: normWpNo(w.wp_no)}));
+    await _loadNeedBy(projId);   // re-read too: a Planners push between reloads should show up
+    _rawWPs = _attachNeedBy((await WPDb.getAllWPs(projId)).map(w => ({...w, trade: normTrade(w.trade), wp_no: normWpNo(w.wp_no)})));
     allWPs = applyBcbBaseline(_rawWPs, BcbBaseline.resolve(_rawWPs));
     _syncBcbSwitcher();
     window._wpById = Object.fromEntries(allWPs.map(w => [w.id, w]));
