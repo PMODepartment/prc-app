@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820h"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820h"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820h"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820i"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820i"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820i"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820h">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820i">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -648,9 +648,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820h"></script>
-<script src="assets/js/db.js?v=20260820h"></script>
-<script src="assets/js/ui.js?v=20260820h"></script>
+<script src="assets/js/auth.js?v=20260820i"></script>
+<script src="assets/js/db.js?v=20260820i"></script>
+<script src="assets/js/ui.js?v=20260820i"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -741,12 +741,14 @@ function setVendorView(v) {
 // Accreditation standing, as a filter/group key ('none' when blank). Uses the
 // shared window.accredKey so this page and db.js can never disagree; the
 // fallbacks keep the page working if db.js is served stale from cache.
-/* internal.vendor_edit_guard forces status='pending_review' on ANY update a
-   vendor makes to their own row, and nothing else writes that column any more
-   (staff saves never touch it; created rows are 'approved'). So it now means
-   exactly one thing: this vendor has changed their profile since staff last
-   acknowledged it. Reusing the retired column as that flag needs no migration. */
-function _vendorEdited(v) { return v.status === 'pending_review'; }
+/* TRUE vendor-self-edit signal (MIGRATION_vendor_edited_flag.sql):
+   internal.vendor_edit_guard stamps vendors.vendor_edited_at = now() ONLY on an
+   UPDATE made by the vendor's own login; staff clear it to NULL on review. We do
+   NOT fall back to status='pending_review' — that value is also the legacy
+   import/creation default, so it counted hundreds of rows no vendor ever touched
+   (the old "516"). If db.js/the column is stale (undefined), read as NOT edited —
+   under-counting is correct here, over-counting legacy rows is the bug we fixed. */
+function _vendorEdited(v) { return !!v.vendor_edited_at; }
 function _accredOf(v) {
   if (window.accredKey) return window.accredKey(v.accreditation);
   // Fallback only matters if db.js is served stale from cache — fold the
@@ -2827,7 +2829,7 @@ async function renderDetailRequest() {
   const editedBanner = _vendorEdited(v)
     ? `<div class="req-panel" style="border-color:#C4B5FD;background:#F5F3FF">
         <h4 style="color:#6D28D9"><i class="ti ti-pencil"></i> This vendor updated their own profile</h4>
-        <div style="font-size:0.8125rem;color:#555">Last change ${esc(_reqDate(v.updated_at))}${v.updated_by_name ? ' by ' + esc(v.updated_by_name) : ''}. Check the details below, then mark it reviewed to clear the flag.</div>
+        <div style="font-size:0.8125rem;color:#555">Last change ${esc(_reqDate(v.vendor_edited_at || v.updated_at))}${v.updated_by_name ? ' by ' + esc(v.updated_by_name) : ''}. Check the details below, then mark it reviewed to clear the flag.</div>
         ${_canManage ? `<div class="req-actions"><button class="btn-cancel" onclick="acknowledgeVendorEdit('${v.id}')"><i class="ti ti-check" style="margin-right:4px"></i>Mark reviewed</button></div>` : ''}
       </div>` : '';
   try { _detailDocs = await VendorDb.documents.list(v.id); } catch (e) { _detailDocs = []; }
@@ -2869,12 +2871,13 @@ function _reqDate(v) {
   const d = new Date(v);
   return isNaN(d) ? String(v).slice(0, 10) : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
-/* Clearing the flag = putting vendors.status back to 'approved'. That is the
-   ONLY thing that column is used for now (see _vendorEdited) — it is not a
-   review workflow coming back. */
+/* Clearing the flag = nulling vendors.vendor_edited_at (the authoritative
+   self-edit signal, see _vendorEdited). We also set status back to 'approved'
+   to keep the retired column coherent for anything still reading it — it is not
+   a review workflow coming back. */
 async function acknowledgeVendorEdit(id) {
   try {
-    const updated = await VendorDb.updateVendor(id, { status: 'approved' });
+    const updated = await VendorDb.updateVendor(id, { vendor_edited_at: null, status: 'approved' });
     if (activeVendor && activeVendor.id === id) activeVendor = updated || activeVendor;
     const idx = allVendors.findIndex(x => x.id === id);
     if (idx > -1) allVendors[idx] = activeVendor;

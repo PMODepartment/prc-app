@@ -1872,6 +1872,12 @@ const VendorDb = (() => {
     if (error && _isMissingCol(error, _PROFILE_RE)) {
       ({ data, error } = await run(_stripProfile(payload, error)));
     }
+    // Deploy-safe for MIGRATION_vendor_edited_flag.sql — the acknowledge path
+    // writes { vendor_edited_at: null }; drop it until the migration has run.
+    if (error && _isMissingCol(error, /vendor_edited_at/)) {
+      const d6 = { ...payload }; delete d6.vendor_edited_at;
+      ({ data, error } = await run(d6));
+    }
     if (error) throw error;
     return data;
   }
