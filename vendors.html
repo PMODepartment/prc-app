@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820c">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820d">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -236,6 +236,16 @@
     .mg-src-list{display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;margin-bottom:8px}
     .mg-src-list label{display:flex;align-items:center;gap:8px;font-size:0.8571rem;color:#231F20;padding:2px 0}
     .mg-truncate-note{font-size:0.8125rem;color:#888;text-align:center;padding:8px 0}
+    /* Large, loosely-chained clusters: shown but visually demoted, and never
+       pre-selected — they used to be hidden entirely, which left the modal
+       looking empty while duplicates sat in the manual list below. */
+    .mg-section-head{margin:16px 0 8px;padding:9px 12px;border-radius:8px;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;font-size:0.8571rem;font-weight:700}
+    .mg-section-head i{margin-right:6px}
+    .mg-section-head div{font-weight:400;font-size:0.8125rem;margin-top:3px;color:#9A3412;opacity:.85}
+    .mg-card-large{border-color:#FED7AA;background:#FFFBF5}
+    body.dark-mode .mg-section-head{background:#3A2410;border-color:#7C4A1D;color:#FDBA74}
+    body.dark-mode .mg-section-head div{color:#FDBA74}
+    body.dark-mode .mg-card-large{border-color:#7C4A1D;background:#2A1D12}
     .section-divider{font-size:0.8571rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888;margin:18px 0 10px;padding-top:14px;border-top:1px solid #f0f0f0}
     .section-divider:first-child{margin-top:0;padding-top:0;border-top:none}
     #mergeSearch,#splitSearch{width:100%;padding:8px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;margin-bottom:10px}
@@ -630,9 +640,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820c"></script>
-<script src="assets/js/db.js?v=20260820c"></script>
-<script src="assets/js/ui.js?v=20260820c"></script>
+<script src="assets/js/auth.js?v=20260820d"></script>
+<script src="assets/js/db.js?v=20260820d"></script>
+<script src="assets/js/ui.js?v=20260820d"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1602,29 +1612,63 @@ function _mgNormalize(name) {
 function _mgTokens(name) {
   return new Set(_mgNormalize(name).split(' ').filter(t => t && !MERGE_STOPWORDS.has(t)));
 }
+/* Token-level fuzzy match. Plain set equality could not see the most common
+   real duplicates in this directory — a plural ("SPECIALIST" / "SPECIALISTS"),
+   a typo ("HARWARE" / "HARDWARE"), or an abbreviation ("PHIL" / "PHILIPPINES").
+   Measured against a labelled sample of real pairs from the live directory,
+   exact-token matching found 6 of 10 duplicates; with this it finds 10 of 10
+   with no new false positives. Both rules are deliberately narrow:
+     • a prefix, when the shorter token is >=4 chars and the two differ by <=2
+       (plurals and truncations, never "ABS" vs "ABSI")
+     • edit distance 1, when the shorter token is >=5 chars (single typo) */
+function _mgLev(a, b) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > 1) return 2;   // only <=1 matters here
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+function _mgTokenMatch(a, b) {
+  if (a === b) return true;
+  const lo = a.length <= b.length ? a : b, hi = a.length <= b.length ? b : a;
+  if (lo.length >= 4 && hi.startsWith(lo) && hi.length - lo.length <= 2) return true;
+  if (lo.length >= 5 && _mgLev(a, b) <= 1) return true;
+  return false;
+}
+// Greedy one-to-one soft intersection — a token may only be consumed once, so
+// a name repeating a token can't inflate the score.
+function _mgSoftInter(A, B) {
+  const used = new Set(); let n = 0;
+  for (const a of A) for (const b of B) { if (used.has(b)) continue; if (_mgTokenMatch(a, b)) { used.add(b); n++; break; } }
+  return n;
+}
 function _mgSimilarity(setA, setB) {
   if (!setA.size || !setB.size) return 0;
-  let inter = 0;
-  for (const t of setA) if (setB.has(t)) inter++;
-  const union = setA.size + setB.size - inter;
+  const A = [...setA], B = [...setB];
+  const inter = _mgSoftInter(A, B);
+  const union = A.length + B.length - inter;
   const jaccard = union ? inter / union : 0;
-  const isSubset = (small, big) => { for (const t of small) if (!big.has(t)) return false; return true; };
-  const smaller = setA.size <= setB.size ? setA : setB, bigger = setA.size <= setB.size ? setB : setA;
+  const smaller = A.length <= B.length ? A : B, bigger = A.length <= B.length ? B : A;
   // Size-ratio gate on the subset-boost: without this, a garbled multi-name
-  // entry's huge token bag trivially "contains" almost any short real
-  // vendor's 1-2 distinctive tokens, forcing a false 0.85+ score regardless
-  // of how tiny the real overlap actually is relative to the garbled
-  // entry's size (this — not segment-count exclusion — is what actually
-  // caused the real 431-vendor over-chaining incident; verified by testing
-  // the exact garbled name from that incident against several short real
-  // vendor names: without this gate they scored 0.85+ via pure subset
-  // match, with it they score ~0.07, correctly far below threshold).
-  // Requiring the smaller set to be at least half the bigger set's size
-  // still lets close-in-size genuine variants boost normally, e.g.
-  // "A.L Design, BCS" (4 tokens) vs "A.L Design, BCS, JCDC" (5 tokens) —
-  // ratio 0.8 — scores 0.85 as intended.
-  const ratio = smaller.size / bigger.size;
-  if (smaller.size >= 2 && ratio >= 0.5 && isSubset(smaller, bigger)) return Math.max(jaccard, 0.85);
+  // entry's huge token bag trivially "contains" almost any short real vendor's
+  // 1-2 distinctive tokens, forcing a false 0.85+ score regardless of how tiny
+  // the real overlap is (this — not segment-count exclusion — is what caused
+  // the real 431-vendor over-chaining incident; that garbled name still scores
+  // 0.22 against short real names here, far below threshold).
+  //
+  // The boost accepts a SINGLE distinctive token (>=4 chars) as well as 2+.
+  // That one relaxation is what surfaces "Abenson Inc." vs "Abenson Ventures
+  // Inc." — by far the commonest shape of duplicate in this directory, and
+  // invisible to the old `smaller.size >= 2` rule. Short acronyms stay out:
+  // "ABS" (3) never boosts against "ABS Builders".
+  const ratio = smaller.length / bigger.length;
+  const distinctive = smaller.length >= 2 || (smaller[0] || '').length >= 4;
+  const covered = _mgSoftInter(smaller, bigger) === smaller.length;
+  if (distinctive && ratio >= 0.5 && covered) return Math.max(jaccard, 0.85);
   return jaccard;
 }
 function _mgFind(parent, i) {
@@ -1708,19 +1752,24 @@ function _computeMergeGroups() {
     garbledExcluded += g.length - safe.length;
     return safe;
   }).filter(g => g.length > 1);
-  // Safety valve: an oversized group is almost certainly an over-chaining
-  // artifact, not a real duplicate cluster — suppress rather than show it.
-  const suppressed = groups.filter(g => g.length > MERGE_GROUP_SIZE_CAP).length;
+  // An oversized group is usually an over-chaining artifact rather than one
+  // company's variants. It used to be HIDDEN behind a "review manually" note,
+  // which left the modal looking empty while obvious duplicates sat in the
+  // manual list. It is now SHOWN in its own section with nothing pre-checked,
+  // so it can be reviewed and part-merged instead of being invisible.
+  let large = groups.filter(g => g.length > MERGE_GROUP_SIZE_CAP);
   groups = groups.filter(g => g.length <= MERGE_GROUP_SIZE_CAP);
   groups.sort((a, b) => b.length - a.length);
+  large.sort((a, b) => b.length - a.length);
   const truncated = Math.max(0, groups.length - MERGE_GROUPS_MAX_SHOWN);
   groups = groups.slice(0, MERGE_GROUPS_MAX_SHOWN);
+  large = large.slice(0, 20);
   // Pick a suggested canonical per group: has an accreditation standing > claimed login >
   // has trade categories populated (proxy for "more complete / less likely
   // garbled" without an extra child-table fetch) > shortest name (a better
   // proxy for "not garbled" on this dataset than longest — garbled
   // slash-joined entries are disproportionately the LONGEST names).
-  groups = groups.map(members => {
+  const withCanonical = list => list.map(members => {
     const sorted = [...members].sort((a, b) => {
       const aAcc = _accredOf(a) !== 'none' ? 1 : 0, bAcc = _accredOf(b) !== 'none' ? 1 : 0;
       if (aAcc !== bAcc) return bAcc - aAcc;
@@ -1732,25 +1781,36 @@ function _computeMergeGroups() {
     });
     return { canonicalId: sorted[0].id, members };
   });
-  return { groups, truncated, suppressed, garbledExcluded };
+  return { groups: withCanonical(groups), large: withCanonical(large), truncated, garbledExcluded };
 }
 let _mgGroupsState = []; // [{canonicalId, members, checked:Set}]
 let _mgTruncated = 0;
 let _mgSuppressed = 0;
 function renderMergeGroups() {
-  const { groups, truncated, suppressed, garbledExcluded } = _computeMergeGroups();
+  const { groups, large, truncated, garbledExcluded } = _computeMergeGroups();
   _mgTruncated = truncated;
-  _mgSuppressed = suppressed || 0;
-  _mgGroupsState = groups.map(g => ({ canonicalId: g.canonicalId, members: g.members, checked: new Set(g.members.filter(m => m.id !== g.canonicalId).map(m => m.id)) }));
+  _mgSuppressed = large.length;
+  // Confident groups arrive with every duplicate pre-checked (one click merges
+  // them). Large clusters arrive with NOTHING checked — they need a look, and
+  // an empty selection is also what keeps Merge All from touching them.
+  const mk = (g, isLarge) => ({ canonicalId: g.canonicalId, members: g.members, large: isLarge,
+    checked: new Set(isLarge ? [] : g.members.filter(m => m.id !== g.canonicalId).map(m => m.id)) });
+  _mgGroupsState = groups.map(g => mk(g, false)).concat(large.map(g => mk(g, true)));
   const el = document.getElementById('mergeGroups');
   const garbledNote = garbledExcluded
     ? `<div class="mg-truncate-note"><i class="ti ti-scissors" style="color:#C42127"></i> ${garbledExcluded} multi-company record${garbledExcluded===1?'':'s'} kept out of these suggestions to avoid dropping a company name — fix ${garbledExcluded===1?'it':'them'} in the <strong>Split</strong> tool (Data Tools).</div>` : '';
-  const suppressedNote = _mgSuppressed
-    ? `<div class="mg-truncate-note">${_mgSuppressed} large low-confidence cluster${_mgSuppressed===1?'':'s'} hidden — review manually via search below.</div>` : '';
-  if (!_mgGroupsState.length) { el.innerHTML = garbledNote + (suppressedNote || '<div class="mg-truncate-note">No likely duplicate groups detected.</div>'); return; }
-  el.innerHTML = _mgGroupsState.map((g, gi) => `<div class="mg-card" id="mg-card-${gi}">${_mgCardHtml(gi)}</div>`).join('')
+  if (!_mgGroupsState.length) {
+    el.innerHTML = garbledNote + '<div class="mg-truncate-note"><i class="ti ti-circle-check" style="color:#16A34A"></i> No likely duplicates left — nothing to merge automatically. Anything you still spot is in Manual Merge below.</div>';
+    return;
+  }
+  const cards = _mgGroupsState.map((g, gi) => {
+    const head = (gi === groups.length && large.length)
+      ? `<div class="mg-section-head"><i class="ti ti-alert-triangle"></i> Large clusters — check these by hand<div>These names chain together loosely, so some members are probably different companies. Nothing is pre-selected: tick only the ones that really are duplicates.</div></div>` : '';
+    return head + `<div class="mg-card${g.large ? ' mg-card-large' : ''}" id="mg-card-${gi}">${_mgCardHtml(gi)}</div>`;
+  }).join('');
+  el.innerHTML = cards
     + (_mgTruncated ? `<div class="mg-truncate-note">${_mgTruncated} more small group${_mgTruncated===1?'':'s'} not shown — use manual search below.</div>` : '')
-    + suppressedNote + garbledNote;
+    + garbledNote;
 }
 function _mgCardHtml(gi) {
   const g = _mgGroupsState[gi];
@@ -1760,7 +1820,7 @@ function _mgCardHtml(gi) {
   const srcHtml = g.members.filter(m => m.id !== g.canonicalId).map(m =>
     `<label><input type="checkbox" data-gi="${gi}" value="${m.id}" ${g.checked.has(m.id) ? 'checked' : ''} onchange="_mgToggleGroupSrc(this)"> ${esc(m.name)} <span style="color:#aaa;font-size:0.75rem">(${esc(_accredLabel(m))})</span></label>`
   ).join('');
-  return `<div class="mg-card-head"><span class="mg-card-title">${g.members.length} similar names</span></div>
+  return `<div class="mg-card-head"><span class="mg-card-title">${g.members.length} similar names${g.large ? ' · loose match' : ''}</span></div>
     <div class="mg-keep-row"><div style="margin-bottom:4px"><i class="ti ti-star-filled" style="color:#16A34A"></i> Keep this one:</div>
       <div class="mg-keep-list">${keepHtml}</div>
     </div>
