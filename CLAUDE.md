@@ -1082,6 +1082,21 @@ Two options added to `vendors.html`'s standing filter so data-quality debt can b
 - **"⚠ Looks like several companies"** (`__split`) — the Split backlog (~424 garbled records). Detection now goes through **`_looksGarbled(v)`**, ONE predicate shared with `_splitCandidates()`, so the triage view and the Split tool can never report a different backlog.
 - **"⚠ Unclassified offerings"** (`__unclassified`) — vendors holding an offering with no `taxonomy_id`, i.e. still on the legacy free-text category only. Backed by `_vendorUnclassified`, built in the same single `getAllVendorProducts()` pass that already builds the product search text (no extra query). Empty until `MIGRATION_product_taxonomy.sql` has run.
 
+### Schedule NEED-BY from the Planners app — `MIGRATION_planners_need_by.sql` (2026-08-20)
+
+The Planners **Project Schedule** now links each activity to the work package that supplies it (`project_schedule.work_package` = our `work_packages.wp_no`). The earliest start among a package's linked activities is the day site work that consumes it begins — its **need-by** date. Per the PMO, **that date is our TARGET INSTALLATION**, so it is the field it is compared against.
+
+That number is pushed into this app so a buyer can see what construction actually requires, next to their own date.
+
+- **`planners_need_by`** — `(project_id, wp_no)` PK, plus `need_by`, `driver_activity_id`/`driver_activity_name` (WHICH activity sets the date, so a buyer can go ask about it), `linked_activities`, `schedule_data_date`, `synced_at`. Read policy mirrors `wp_select`'s project scoping, **except viewers are NOT excluded** — that exclusion exists to keep cost columns out of the REST API and this table holds only dates.
+- **⚠️ IT IS A SEPARATE TABLE, NOT A WRITE INTO `work_packages.target_installation`.** Target Installation is procurement-owned — a buyer types it and Saves it in `wp-form.html`. Another application silently overwriting it would destroy work with no audit trail and no way to tell a buyer's date from a robot's. **The schedule proposes; the buyer adopts.** Same reason the Planners app mirrors us rather than reading us live.
+- **⚠️ No write policy for `authenticated`.** The Planners `push-need-by` Edge Function owns the table via the service role. A write policy would let any signed-in user invent a need-by date and mislead a buyer into re-planning against it.
+- **⚠️ No FK to `work_packages`.** A need-by for a `wp_no` we have not created yet (or have renumbered) must still land — an orphan row is a *visible* data-quality signal, a rejected push is a silent one.
+
+**UI.** `WPDb.getNeedBy(pid)` returns a `{ WP_NO: row }` map, and **returns `{}` on any failure including "table does not exist"** — the migration may not be run yet, and that must degrade to "no dates shown" rather than breaking the WP list.
+- `project.html` — two columns in the **Schedule** and **All** views: **Sched. Need-by** and **Slip (d)** (`target_installation − need_by`; **positive = we install AFTER site needs it**, red). Coloured on the *gap*, not the date, because the gap is the actionable part and it is invisible if you only read the two dates. `null` slip renders `—`, never `0` — an unknown gap must not read as on-time. Attached onto the WP objects as underscore-prefixed `_need_*` so it can never round-trip into an UPDATE (`unmap()` builds payloads from real column names).
+- `wp-form.html` — an advisory panel under Target Installation with the need-by, the verdict, the driver activity and a **"Use this date"** button that only **fills the input**; the buyer still Saves. Hidden entirely when nothing has been pushed.
+
 ### Product taxonomy — a HYBRID Trade → Works → … tree (2026-08-20)
 
 `vendor_products` classified an offering with a free-text `category` (a trade) + `item_type` + a free-text `description`, so the catalog could not be rolled up, filtered reliably, or matched to a work package. **`MIGRATION_product_taxonomy.sql`** (run once, idempotent) adds a real tree.

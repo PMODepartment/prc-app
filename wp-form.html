@@ -1615,6 +1615,61 @@ function _wpNoNum(v){
   const m = String(v==null?'':v).replace(/^wp[-\s]*/i,'').match(/\d+(?:\.\d+)?/);
   return m ? parseFloat(m[0]) : NaN;
 }
+
+/* SCHEDULE NEED-BY (from the Planners app) --------------------------------------
+   The Planners Project Schedule links its activities to the work package that supplies
+   them; the earliest start among a package's linked activities is the day site work that
+   consumes it begins. Per the PMO that date is this form's TARGET INSTALLATION, so it is
+   shown right under that input with the gap between the two.
+
+   ⚠️ ADVISORY. "Use this date" only fills the input — it does not save, and nothing else
+   writes target_installation. The buyer stays the author of their own date; the schedule
+   just stops being invisible to them. (The alternative, letting the Planners app write
+   target_installation directly, would silently overwrite a buyer's work with no audit
+   trail and no way to tell whose date it was — see MIGRATION_planners_need_by.sql.)
+
+   ⚠️ Fails silently and hides itself: a missing table (migration not yet run), no push
+   for this project, or no link for this package must all read as "no advice available",
+   never as an error on a form the buyer is trying to save. */
+async function renderNeedBy(pid, wpNo){
+  const box = document.getElementById('f-needby-box');
+  if (!box || !pid || !wpNo) return;
+  let e = null;
+  try { e = (await WPDb.getNeedBy(pid))[String(wpNo).trim().toUpperCase()] || null; } catch(_) { e = null; }
+  if (!e || !e.need_by) { box.style.display = 'none'; box.innerHTML = ''; return; }
+
+  const inp = document.getElementById('f-target-installation');
+  const mine = inp && inp.value ? inp.value : '';
+  const fmt = d => { try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'}); } catch(_) { return d; } };
+  // Positive = we install AFTER site needs it.
+  const slip = mine ? Math.round((new Date(mine+'T00:00:00') - new Date(e.need_by+'T00:00:00'))/86400000) : null;
+  const verdict = slip == null ? '<span style="color:#888">No Target Installation set yet.</span>'
+    : slip > 0 ? `<span style="color:#EE3124;font-weight:700">Your date is ${slip} day(s) LATE</span> vs the schedule.`
+    : slip < 0 ? `<span style="color:#2D9B6F;font-weight:700">${-slip} day(s) of float</span> vs the schedule.`
+    : '<span style="color:#2D9B6F;font-weight:700">Matches the schedule exactly.</span>';
+  const n = e.linked_activities || 0;
+  const drv = e.driver_activity_id
+    ? `${_escNb(e.driver_activity_id)}${e.driver_activity_name ? ' — ' + _escNb(e.driver_activity_name) : ''}` : '';
+
+  box.style.display = '';
+  box.innerHTML =
+    `<div style="font-weight:700;color:#231F20;margin-bottom:2px">Construction schedule needs this by ${fmt(e.need_by)}</div>` +
+    `<div style="color:#666">${verdict}</div>` +
+    `<div style="color:#888;margin-top:3px">Earliest start of ${n} linked schedule activit${n===1?'y':'ies'}` +
+      (drv ? `, driven by ${drv}` : '') + '.</div>' +
+    (mine === e.need_by ? '' :
+      `<button type="button" id="f-needby-use" style="margin-top:6px;font-size:0.7857rem;font-family:inherit;font-weight:700;color:#EE3124;background:none;border:1px solid #EE3124;border-radius:4px;padding:3px 8px;cursor:pointer">Use this date</button>`) +
+    `<div style="color:#aaa;margin-top:4px;font-size:0.7143rem">From the Planners app. Filling this in still requires you to Save.</div>`;
+
+  const btn = document.getElementById('f-needby-use');
+  if (btn) btn.onclick = () => {
+    if (!inp) return;
+    inp.value = e.need_by;
+    inp.dispatchEvent(new Event('change', { bubbles: true }));   // keep any validation/dirty tracking in step
+    renderNeedBy(pid, wpNo);                                     // re-render so the verdict reflects the new value
+  };
+}
+function _escNb(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 async function _wpNoExisting(pid){
   if (_wpNoCache[pid]) return _wpNoCache[pid];
   let list = [];
@@ -1969,6 +2024,7 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-actual-delivery', existingWP.actual_delivery || '');
       fill('f-target-installation', existingWP.target_installation);
       fill('f-target-completion', existingWP.target_completion);
+      renderNeedBy(existingWP.project_id, existingWP.wp_no);   // async, not awaited — advisory panel
       // BCB0 falls back to the legacy single budget column for rows imported before baselines existed
       const _bv = existingWP.budget_bcb0 ?? existingWP.approved_budget_bcb;
       document.getElementById('f-budget').value = _bv ? parseFloat(_bv).toLocaleString('en-US') : '';
