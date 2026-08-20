@@ -2675,6 +2675,42 @@ const VendorDb = (() => {
   }
   // Bulk cascade delete via delete_vendors_cascade RPC (chunked). Falls back to
   // looping the single-id RPC if the bulk one isn't deployed yet.
+  /* What a delete would actually destroy, for the EXACT rows being deleted —
+     not directory-wide totals, which are the number people reach for and which
+     overstate the loss badly (directory-wide is every vendor's data, including
+     the ones you are keeping). Chunked `.in()` reads so a long id list can't
+     blow the PostgREST URL length. Returns zeros for a table that isn't
+     deployed rather than throwing — this is a pre-flight, not the operation.  */
+  async function getDeletionImpact(ids) {
+    const out = { wps: 0, bids: 0, rates: 0, products: 0, documents: 0, withData: 0, logins: 0 };
+    if (!ids || !ids.length) return out;
+    const sb = await getSB();
+    const CH = 150;
+    const per = new Map();                       // vendor_id -> rows touching it
+    const bump = id => { if (id) per.set(id, (per.get(id) || 0) + 1); };
+    const tally = async (table, col, key) => {
+      for (let i = 0; i < ids.length; i += CH) {
+        const chunk = ids.slice(i, i + CH);
+        const { data, error } = await sb.from(table).select(col).in(col, chunk);
+        if (error) { console.warn(`[VendorDb] impact: ${table} skipped — ${error.message}`); return; }
+        (data || []).forEach(r => { out[key]++; bump(r[col]); });
+      }
+    };
+    await tally('work_packages', 'vendor_id', 'wps');
+    await tally('vendor_bids', 'vendor_id', 'bids');
+    await tally('vendor_rates', 'vendor_id', 'rates');
+    await tally('vendor_products', 'vendor_id', 'products');
+    await tally('vendor_documents', 'vendor_id', 'documents');
+    out.withData = per.size;
+    // A vendor who has actually claimed a login is a person you are cutting off,
+    // not just a row — worth calling out separately.
+    for (let i = 0; i < ids.length; i += CH) {
+      const { data, error } = await sb.from('vendors').select('id,invite_claimed_at').in('id', ids.slice(i, i + CH));
+      if (error) break;
+      (data || []).forEach(v => { if (v.invite_claimed_at) out.logins++; });
+    }
+    return out;
+  }
   async function bulkDeleteVendors(ids) {
     if (!ids || !ids.length) return;
     const sb = await getSB();
@@ -2788,7 +2824,7 @@ const VendorDb = (() => {
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
-    bulkSetVendorStatus, bulkSetAccreditation, findExactDuplicateGroups, mergeExactDuplicates, bulkDeleteVendors,
+    bulkSetVendorStatus, bulkSetAccreditation, findExactDuplicateGroups, mergeExactDuplicates, bulkDeleteVendors, getDeletionImpact,
     backfillVendorDataFromWPs, getWorkPackagesForVendor,
   };
 })();

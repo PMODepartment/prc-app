@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820d"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820d"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820d"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820e"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820e"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820e"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820d">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820e">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -640,9 +640,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820d"></script>
-<script src="assets/js/db.js?v=20260820d"></script>
-<script src="assets/js/ui.js?v=20260820d"></script>
+<script src="assets/js/auth.js?v=20260820e"></script>
+<script src="assets/js/db.js?v=20260820e"></script>
+<script src="assets/js/ui.js?v=20260820e"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -996,11 +996,72 @@ async function bulkSetAccreditation(value) {
     else if (AppNotify) AppNotify.fromError(e, 'Could not set accreditation'); else alert(e.message);
   }
 }
+/* Download the rows about to be deleted, as CSV. A cascade delete is
+   irreversible and there is no undo anywhere in this app — a file on disk is
+   the only way back if a name turns out to have been wanted. Offered before
+   every bulk delete, never forced. */
+function _csvCell(v) {
+  const t = v == null ? '' : String(v);
+  return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
+function downloadVendorCsv(rows, filename) {
+  const cols = ['id', 'name', 'vendor_code', 'accreditation', 'accreditation_notes', 'accreditation_date',
+                'tin', 'contact_person', 'contact_position', 'contact_number', 'telephone', 'contact_email',
+                'website', 'address', 'city', 'payment_terms', 'vendor_category', 'vendor_group',
+                'trade_categories', 'invite_email', 'invite_claimed_at', 'notes', 'created_at'];
+  const body = rows.map(v => cols.map(c => _csvCell(Array.isArray(v[c]) ? v[c].join(' | ') : v[c])).join(',')).join('\n');
+  const blob = new Blob(['﻿' + cols.join(',') + '\n' + body], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
 async function bulkDelete() {
   const ids = [..._selectedVendors]; if (!ids.length) return;
-  if (!confirm(`Permanently DELETE ${ids.length} selected vendor(s) and all their records? Linked work packages are unlinked (not deleted). This cannot be undone.`)) return;
-  try { await VendorDb.bulkDeleteVendors(ids); _selectedVendors.clear(); await loadAll(); AppNotify && AppNotify.success(`Deleted ${ids.length} vendor(s).`); }
-  catch (e) { AppNotify ? AppNotify.fromError(e, 'Bulk delete failed') : alert(e.message); }
+  const rows = allVendors.filter(v => ids.includes(v.id));
+  const stamped = rows.filter(v => _accredOf(v) !== 'none');
+
+  const prog = AppNotify && AppNotify.progress ? AppNotify.progress(`Checking what ${ids.length} vendor(s) carry…`) : null;
+  let imp;
+  try { imp = await VendorDb.getDeletionImpact(ids); }
+  catch (e) { if (prog) prog.close(); AppNotify ? AppNotify.fromError(e, 'Could not check what these vendors carry') : alert(e.message); return; }
+  if (prog) prog.close();
+
+  // Numbers for THIS selection — directory-wide totals overstate the loss.
+  const lines = [
+    `${imp.wps} work package link(s) — the work packages themselves are NOT deleted, they lose their vendor`,
+    `${imp.bids} bid(s)`,
+    `${imp.rates} rate(s)`,
+    `${imp.products} product/service record(s)`,
+    `${imp.documents} uploaded document(s)`,
+  ];
+  if (imp.logins) lines.push(`${imp.logins} vendor login(s) — those people lose access to their portal`);
+
+  if (!confirm(
+    `Permanently delete ${ids.length} vendor(s)?\n\n` +
+    `${imp.withData} of them carry data. Deleting destroys:\n  • ` + lines.join('\n  • ') +
+    (stamped.length ? `\n\nWARNING: ${stamped.length} of the selected vendors HAVE an accreditation standing — normally you would keep those.` : '') +
+    `\n\nThis cannot be undone. You'll be offered a CSV backup next.`
+  )) return;
+
+  if (confirm(`Download a CSV of these ${ids.length} vendor(s) first?\n\nThere is no undo — this file is the only way to get the names back.\n\nOK = download, Cancel = skip the backup.`)) {
+    downloadVendorCsv(rows, `vendors-deleted-${new Date().toISOString().slice(0, 10)}.csv`);
+  }
+  if (!confirm(`Last check: delete ${ids.length} vendor(s) now?`)) return;
+
+  const p2 = AppNotify && AppNotify.progress ? AppNotify.progress(`Deleting ${ids.length} vendor(s)…`) : null;
+  try {
+    await VendorDb.bulkDeleteVendors(ids);
+    _selectedVendors.clear();
+    await loadAll();
+    const msg = `Deleted ${ids.length} vendor(s).`;
+    if (p2) p2.done(msg, { title: 'Vendors deleted' }); else AppNotify && AppNotify.success(msg);
+  } catch (e) {
+    if (p2) p2.fail((e && e.message) || 'Delete failed', { title: 'Bulk delete failed' });
+    else if (AppNotify) AppNotify.fromError(e, 'Bulk delete failed'); else alert(e.message);
+  }
 }
 function renderPager(total, pages) {
   const el = document.getElementById('vendorPager');
