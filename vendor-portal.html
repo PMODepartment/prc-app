@@ -96,6 +96,9 @@
     .field input.bad,.field select.bad,.field textarea.bad{border-color:#EE3124;background:#FFF7F6}
     .field-err{font-size:11.5px;color:#991B1B;margin-top:5px;display:none}
     .field-err.on{display:block}
+    .field input:disabled,.field select:disabled{background:#F4F4F4;color:#6B6A6A;cursor:not-allowed;border-color:#e9e9e9}
+    .locked-note{font-size:11px;color:#888;margin-top:5px;display:flex;gap:5px;align-items:center}
+    .locked-note::before{content:'\ea6a';font-family:'tabler-icons';font-size:12px;color:#aaa}
     /* Save bar sticks to the bottom while a change is pending, so the vendor
        can never scroll past it and lose the edit. */
     .save-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid #eee;padding:12px 0 4px;
@@ -167,6 +170,11 @@
   <div class="panel" id="panel-overview" style="display:none">
     <div class="panel-title">Company Information</div>
     <div class="draft-note" id="draftNote" style="display:none"></div>
+    <p style="font-size:12.5px;color:#888;margin:-4px 0 16px;line-height:1.6">
+      Keep your contact details, address and trades up to date here. A few fields are greyed
+      out — company name, payment terms and how Megawide classifies you are set by Megawide
+      Procurement; contact them if any of those look wrong.
+    </p>
     <div class="field"><label>Company Name</label><input id="f-name" type="text" placeholder="Company Name"></div>
     <div class="field">
       <label>Trade Categories</label>
@@ -203,7 +211,6 @@
       <div class="field"><label>Terms of Payment <span style="color:#EE3124">*</span></label><input id="f-payment-terms" type="text" placeholder="e.g. 60 Days"></div>
       <div class="field"><label>Product / Vendor Group</label><input id="f-vendor-group" type="text" placeholder="e.g. Ready Mix Concrete"></div>
     </div>
-    <div class="field"><label>Notes</label><textarea id="f-notes" placeholder="Anything else worth noting about your company"></textarea></div>
     <div class="save-bar">
       <button class="btn-primary" id="btnSaveOverview" onclick="saveOverview()">Save Company Info</button>
       <span class="save-state" id="saveState"></span>
@@ -258,8 +265,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820f"></script>
-<script src="assets/js/db.js?v=20260820f"></script>
+<script src="assets/js/auth.js?v=20260820g"></script>
+<script src="assets/js/db.js?v=20260820g"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -469,20 +476,45 @@ function renderStatus() {
   banner.innerHTML = html;
 }
 
+/* ONLY the fields a vendor owns. Company name, payment terms, vendor
+   category/group and the staff notes are Megawide's to set and are pinned
+   server-side by internal.vendor_edit_guard — sending them would be silently
+   discarded, so they are shown read-only instead (see STAFF_FIELDS).
+   TIN is fill-once: offered while blank, locked once on file, because it is
+   tied to the BIR 2303 the vendor uploaded. */
 const OVERVIEW_FIELDS = {
-  'f-name': 'name', 'f-tin': 'tin', 'f-vendor-category': 'vendor_category',
   'f-contact-person': 'contact_person', 'f-contact-position': 'contact_position',
   'f-contact-number': 'contact_number', 'f-telephone': 'telephone',
   'f-contact-email': 'contact_email', 'f-website': 'website',
   'f-address': 'address', 'f-city': 'city',
-  'f-payment-terms': 'payment_terms', 'f-vendor-group': 'vendor_group',
-  'f-notes': 'notes',
 };
+const STAFF_FIELDS = { 'f-name': 'name', 'f-payment-terms': 'payment_terms',
+                       'f-vendor-category': 'vendor_category', 'f-vendor-group': 'vendor_group' };
+const TIN_FIELD = 'f-tin';
+function tinIsLocked() { return !!(vendor && String(vendor.tin || '').trim()); }
 function renderOverviewForm() {
   Object.entries(OVERVIEW_FIELDS).forEach(([id, key]) => {
     const el = document.getElementById(id);
     if (el) el.value = vendor[key] || '';
   });
+  // Staff-owned: shown so the vendor can SEE what Megawide has on file, and
+  // locked so the form never invites an edit the server would discard.
+  Object.entries(STAFF_FIELDS).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = vendor[key] || '';
+    el.disabled = true;
+    el.title = 'Set by Megawide Procurement — contact them if this is wrong.';
+  });
+  const tin = document.getElementById(TIN_FIELD);
+  if (tin) {
+    tin.value = vendor.tin || '';
+    tin.disabled = tinIsLocked();
+    tin.title = tinIsLocked()
+      ? 'Locked once recorded, because it must match the BIR 2303 on file. Contact Megawide Procurement to change it.'
+      : '';
+  }
+  _markStaffOwnedLabels();
   selectedTrades = new Set(vendor.trade_categories || []);
   // One delegated pair of listeners rather than an attribute per input, so a
   // field added to OVERVIEW_FIELDS later is covered with no extra wiring.
@@ -559,7 +591,22 @@ function collectOverview() {
     const el = document.getElementById(id);
     if (el) f[key] = el.value.trim();
   });
+  const tin = document.getElementById(TIN_FIELD);
+  if (tin && !tinIsLocked()) f.tin = tin.value.trim();
   return f;
+}
+/* Tag every locked field with a short "Megawide sets this" note, once. */
+function _markStaffOwnedLabels() {
+  const note = (id, text) => {
+    const el = document.getElementById(id);
+    if (!el || !el.parentNode || el.parentNode.querySelector('.locked-note')) return;
+    const d = document.createElement('div');
+    d.className = 'locked-note';
+    d.textContent = text;
+    el.parentNode.appendChild(d);
+  };
+  Object.keys(STAFF_FIELDS).forEach(id => note(id, 'Set by Megawide Procurement.'));
+  if (tinIsLocked()) note(TIN_FIELD, 'Locked — must match the BIR 2303 on file.');
 }
 function saveDraft() {
   try { localStorage.setItem(draftKey(), JSON.stringify({ at: Date.now(), fields: collectOverview() })); } catch (_) {}
