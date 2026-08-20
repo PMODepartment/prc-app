@@ -24,6 +24,12 @@
     .status-approved{background:#D1FAE5;color:#065F46}
     .status-rejected{background:#FEE2E2;color:#991B1B}
     .status-inactive{background:#F3F4F6;color:#555}
+    /* Accreditation standing — the only standing the app shows now
+       (vendors.status was retired from the UI). */
+    .status-accredited{background:#D1FAE5;color:#065F46}
+    .status-unaccredited{background:#FEF3C7;color:#92400E}
+    .status-problematic{background:#FEE2E2;color:#991B1B}
+    .status-none{background:#F3F4F6;color:#555}
     .btn-logout{background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;padding:6px 14px;border-radius:8px;font-family:inherit;font-size:12px;cursor:pointer}
     .btn-logout:hover{background:rgba(255,255,255,.1)}
     .wrap{max-width:960px;margin:0 auto;padding:24px 16px 60px}
@@ -32,6 +38,29 @@
     .banner-approved{background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0}
     .banner-rejected{background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5}
     .banner-inactive{background:#F3F4F6;color:#555;border:1px solid #e5e5e5}
+    .banner-neutral{background:#F3F4F6;color:#444;border:1px solid #e5e5e5}
+    .banner b{display:block;margin-bottom:3px}
+    /* readiness checklist */
+    .ready-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+    .ready-pct{font-size:22px;font-weight:800}
+    .ready-sub{font-size:12.5px;color:#888}
+    .ready-bar{height:8px;background:#eee;border-radius:5px;overflow:hidden;margin-bottom:16px}
+    .ready-bar > div{height:100%;background:#EE3124;border-radius:5px;transition:width .25s}
+    .ready-bar.done > div{background:#16A34A}
+    .ready-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .ready-col h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888;margin:0 0 8px}
+    .ready-item{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;padding:4px 0;color:#231F20}
+    .ready-item .tick{width:16px;height:16px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;margin-top:1px}
+    .ready-item.ok .tick{background:#D1FAE5;color:#065F46}
+    .ready-item.no .tick{background:#FEE2E2;color:#991B1B}
+    .ready-item.no{color:#991B1B;font-weight:600}
+    .req-box{margin-top:18px;padding-top:16px;border-top:1px solid #f0f0f0}
+    .doc-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f5f5f5;flex-wrap:wrap}
+    .doc-row:last-child{border-bottom:none}
+    .doc-name{flex:1;min-width:150px;font-size:12.5px;font-weight:600}
+    .doc-missing{font-size:11.5px;color:#991B1B;font-weight:600}
+    .doc-have{font-size:11.5px;color:#065F46;font-weight:600}
+    @media(max-width:640px){.ready-grid{grid-template-columns:1fr}}
     .tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
     .tab-btn{padding:8px 16px;border:1px solid #e5e5e5;border-radius:8px;background:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;color:#888}
     .tab-btn.active{background:#EE3124;border-color:#EE3124;color:#fff}
@@ -89,7 +118,8 @@
   <div id="statusBanner" class="banner" style="display:none"></div>
 
   <div class="tabs">
-    <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Company Info</button>
+    <button class="tab-btn active" data-tab="accreditation" onclick="switchTab('accreditation')">Accreditation</button>
+    <button class="tab-btn" data-tab="overview" onclick="switchTab('overview')">Company Info</button>
     <button class="tab-btn" data-tab="products" onclick="switchTab('products')">Products / Services</button>
     <button class="tab-btn" data-tab="certs" onclick="switchTab('certs')">Certifications</button>
     <button class="tab-btn" data-tab="personnel" onclick="switchTab('personnel')">Personnel</button>
@@ -97,8 +127,31 @@
 
   <div class="msg" id="msgBox"></div>
 
+  <!-- ── Accreditation ── -->
+  <div class="panel" id="panel-accreditation">
+    <div class="panel-title">Accreditation readiness</div>
+    <div class="ready-head">
+      <span class="ready-pct" id="readyPct">—</span>
+      <span class="ready-sub" id="readySub">Checking what Megawide Procurement still needs from you…</span>
+    </div>
+    <div class="ready-bar" id="readyBar"><div style="width:0"></div></div>
+    <div class="ready-grid">
+      <div class="ready-col"><h4>Required information</h4><div id="readyInfo"></div></div>
+      <div class="ready-col"><h4>Required documents</h4><div id="readyDocs"></div></div>
+    </div>
+    <div class="req-box" id="requestBox"></div>
+  </div>
+
+  <div class="panel" id="panel-documents">
+    <div class="panel-title">Accreditation documents</div>
+    <p style="font-size:12.5px;color:#888;margin:-6px 0 14px;line-height:1.6">
+      Upload a clear scan or PDF of each document. Only Megawide Procurement can see these files.
+    </p>
+    <div id="docsList"></div>
+  </div>
+
   <!-- ── Company Info ── -->
-  <div class="panel" id="panel-overview">
+  <div class="panel" id="panel-overview" style="display:none">
     <div class="panel-title">Company Information</div>
     <div class="field"><label>Company Name</label><input id="f-name" type="text" placeholder="Company Name"></div>
     <div class="field">
@@ -106,12 +159,35 @@
       <div class="trade-checklist" id="tradeChips"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Contact Person</label><input id="f-contact-person" type="text"></div>
-      <div class="field"><label>Contact Number</label><input id="f-contact-number" type="text"></div>
+      <div class="field"><label>TIN <span style="color:#EE3124">*</span></label><input id="f-tin" type="text" placeholder="e.g. 006-819-950-000"></div>
+      <div class="field"><label>Vendor Category</label>
+        <select id="f-vendor-category">
+          <option value="">Select…</option>
+          <option>Supplier</option>
+          <option>Subcon</option>
+          <option>Services</option>
+        </select>
+      </div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Contact Email</label><input id="f-contact-email" type="email"></div>
-      <div class="field"><label>Address</label><input id="f-address" type="text"></div>
+      <div class="field"><label>Contact Person <span style="color:#EE3124">*</span></label><input id="f-contact-person" type="text"></div>
+      <div class="field"><label>Position <span style="color:#EE3124">*</span></label><input id="f-contact-position" type="text" placeholder="e.g. Sales Manager"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Contact Number (mobile) <span style="color:#EE3124">*</span></label><input id="f-contact-number" type="text"></div>
+      <div class="field"><label>Telephone</label><input id="f-telephone" type="text"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Contact Email <span style="color:#EE3124">*</span></label><input id="f-contact-email" type="email"></div>
+      <div class="field"><label>Website</label><input id="f-website" type="text" placeholder="https://"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Address <span style="color:#EE3124">*</span></label><input id="f-address" type="text"></div>
+      <div class="field"><label>City</label><input id="f-city" type="text"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Terms of Payment <span style="color:#EE3124">*</span></label><input id="f-payment-terms" type="text" placeholder="e.g. 60 Days"></div>
+      <div class="field"><label>Product / Vendor Group</label><input id="f-vendor-group" type="text" placeholder="e.g. Ready Mix Concrete"></div>
     </div>
     <div class="field"><label>Notes</label><textarea id="f-notes" placeholder="Anything else worth noting about your company"></textarea></div>
     <button class="btn-primary" id="btnSaveOverview" onclick="saveOverview()">Save Company Info</button>
@@ -165,12 +241,13 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260819b"></script>
-<script src="assets/js/db.js?v=20260819b"></script>
+<script src="assets/js/auth.js?v=20260820a"></script>
+<script src="assets/js/db.js?v=20260820a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
 let vendor = null, myProfile = null, selectedTrades = new Set();
+let myDocs = [], myRequests = [];
 
 AppAuth.requireLogin((user, profile) => {
   myProfile = profile;
@@ -191,37 +268,198 @@ async function loadAll() {
     msg('Could not load your vendor profile: ' + (e.message || e), 'error');
     return;
   }
-  renderStatus();
   renderOverviewForm();
   buildTradeChips();
   renderProductCategoryOptions();
-  await Promise.all([renderProducts(), renderCerts(), renderPersonnel()]);
+  await Promise.all([reloadAccreditation(), renderProducts(), renderCerts(), renderPersonnel()]);
 }
 
+/* ── Accreditation: readiness, documents, request ──────────────────────────
+   The checklist itself lives in db.js (window.accredReadiness) so this page
+   and the staff review modal can never disagree about whether a vendor is
+   ready to be assessed. */
+async function reloadAccreditation() {
+  try { myDocs = await VendorDb.documents.list(vendor.id); } catch (e) { myDocs = []; console.error(e); }
+  try { myRequests = await VendorDb.requests.forVendor(vendor.id); } catch (e) { myRequests = []; console.error(e); }
+  renderStatus();
+  renderReadiness();
+  renderDocs();
+}
+function currentRequest() { return myRequests.find(r => r.status === 'pending') || null; }
+function latestDecided() { return myRequests.find(r => r.status === 'approved' || r.status === 'declined') || null; }
+
+function renderReadiness() {
+  const rd = window.accredReadiness(vendor, myDocs);
+  document.getElementById('readyPct').textContent = rd.pct + '%';
+  document.getElementById('readySub').textContent = rd.done === rd.total
+    ? 'Everything Megawide Procurement asks for is on file.'
+    : `${rd.total - rd.done} item(s) still needed — ${rd.done} of ${rd.total} complete.`;
+  const bar = document.getElementById('readyBar');
+  bar.classList.toggle('done', rd.done === rd.total);
+  bar.firstElementChild.style.width = rd.pct + '%';
+  const item = i => `<div class="ready-item ${i.ok ? 'ok' : 'no'}"><span class="tick">${i.ok ? '✓' : '!'}</span><span>${esc(i.label)}</span></div>`;
+  document.getElementById('readyInfo').innerHTML = rd.items.filter(i => i.group === 'info').map(item).join('');
+  document.getElementById('readyDocs').innerHTML = rd.items.filter(i => i.group === 'docs').map(item).join('');
+  renderRequestBox(rd);
+}
+
+function renderRequestBox(rd) {
+  const box = document.getElementById('requestBox');
+  const pending = currentRequest();
+  if (pending) {
+    box.innerHTML = `<div class="banner banner-pending" style="margin-bottom:12px">
+        <b>Accreditation requested — awaiting review</b>
+        Submitted ${esc(fmtDate(pending.submitted_at))}. Megawide Procurement will assess your submission; you can keep updating your profile while you wait.
+      </div>
+      <button class="btn-ghost" onclick="withdrawRequest('${pending.id}')">Withdraw request</button>`;
+    return;
+  }
+  const ready = rd.done === rd.total;
+  const decided = latestDecided();
+  const declined = decided && decided.status === 'declined'
+    ? `<div class="banner banner-rejected" style="margin-bottom:12px"><b>Your last request was not approved</b>${decided.decision_notes ? esc(decided.decision_notes) : 'Contact Megawide Procurement for details.'} You can fix the points above and submit again.</div>`
+    : '';
+  const blocked = ready ? '' :
+    `<div style="font-size:12.5px;color:#991B1B;margin-bottom:10px">Still needed before you can request: <b>${esc(rd.missing.join(', '))}</b></div>`;
+  box.innerHTML = `${declined}${blocked}
+    <button class="btn-primary" id="btnRequest" ${ready ? '' : 'disabled'} onclick="submitRequest()">
+      ${decided ? 'Request accreditation again' : 'Request accreditation'}
+    </button>
+    <span style="font-size:12px;color:#888;margin-left:10px">Sends your profile and documents to Megawide Procurement for assessment.</span>`;
+}
+
+async function submitRequest() {
+  const rd = window.accredReadiness(vendor, myDocs);
+  if (rd.done !== rd.total) { msg('Please complete the highlighted items first.', 'error'); return; }
+  const note = prompt('Anything you would like Megawide Procurement to know? (optional)', '');
+  if (note === null) return;
+  const btn = document.getElementById('btnRequest');
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  try {
+    await VendorDb.requests.create(vendor.id, { kind: latestDecided() ? 'renewal' : 'new', message: note.trim() || null });
+    await reloadAccreditation();
+    msg('Accreditation requested. Megawide Procurement will review your submission.', 'success');
+  } catch (e) {
+    // The partial unique index is the backstop against a double-submit.
+    const dup = /duplicate key|unique/i.test(e.message || '');
+    msg(dup ? 'You already have a request awaiting review.' : 'Could not submit your request: ' + (e.message || e), 'error');
+    await reloadAccreditation();
+  }
+}
+async function withdrawRequest(id) {
+  if (!confirm('Withdraw your accreditation request? You can submit again later.')) return;
+  try { await VendorDb.requests.withdraw(id); await reloadAccreditation(); msg('Request withdrawn.', 'success'); }
+  catch (e) { msg('Could not withdraw: ' + (e.message || e), 'error'); }
+}
+
+function renderDocs() {
+  const types = (window.ACCRED_DOC_TYPES || []).filter(d => d.required);
+  const extra = myDocs.filter(d => !types.some(t => t.key === d.doc_type));
+  const rowFor = (key, label, required) => {
+    const have = myDocs.filter(d => d.doc_type === key && d.file_path);
+    const uploaded = have.map(d => `<button class="file-badge" onclick="viewDoc('${d.id}')">${esc(d.file_name || 'View file')}</button>
+        <button class="row-item-del" title="Remove" onclick="removeDoc('${d.id}')">&times;</button>`).join(' ');
+    return `<div class="doc-row">
+      <span class="doc-name">${esc(label)}${required ? ' <span style="color:#EE3124">*</span>' : ''}</span>
+      ${have.length ? `<span class="doc-have">On file</span> ${uploaded}`
+                    : `<span class="doc-missing">Not uploaded</span>
+                       <input type="file" accept=".pdf,.jpg,.jpeg,.png" onchange="uploadDoc('${key}', this)" style="flex:1;min-width:170px;font-size:12px">`}
+    </div>`;
+  };
+  document.getElementById('docsList').innerHTML =
+    types.map(t => rowFor(t.key, t.label, true)).join('') +
+    extra.map(d => rowFor(d.doc_type, window.accredDocLabel(d.doc_type), false)).join('') +
+    `<div class="doc-row">
+      <span class="doc-name" style="color:#888;font-weight:500">Other supporting document</span>
+      <input type="file" accept=".pdf,.jpg,.jpeg,.png" onchange="uploadDoc('other', this)" style="flex:1;min-width:170px;font-size:12px">
+    </div>`;
+}
+async function uploadDoc(docType, input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 15 * 1024 * 1024) { msg('That file is larger than 15 MB — please upload a smaller scan.', 'error'); input.value = ''; return; }
+  input.disabled = true;
+  try {
+    const path = await VendorDb.uploadVendorDoc(vendor.id, docType, file);
+    await VendorDb.documents.add(vendor.id, { doc_type: docType, file_path: path, file_name: file.name });
+    // Touching the parent row is what tells staff the profile moved (the same
+    // reason the products/certs/personnel editors call updateVendor).
+    try { vendor = await VendorDb.updateVendor(vendor.id, {}); } catch (_) {}
+    await reloadAccreditation();
+    msg('Document uploaded.', 'success');
+  } catch (e) { msg('Upload failed: ' + (e.message || e), 'error'); }
+  input.disabled = false;
+}
+async function removeDoc(id) {
+  const d = myDocs.find(x => x.id === id);
+  if (!d || !confirm('Remove this document?')) return;
+  try {
+    await VendorDb.documents.remove(id);
+    if (d.file_path) { try { await VendorDb.deleteCertFile(d.file_path); } catch (_) {} }
+    await reloadAccreditation();
+  } catch (e) { msg('Could not remove: ' + (e.message || e), 'error'); }
+}
+async function viewDoc(id) {
+  const d = myDocs.find(x => x.id === id);
+  if (!d || !d.file_path) return;
+  try { const url = await VendorDb.getCertFileUrl(d.file_path); if (url) window.open(url, '_blank'); }
+  catch (e) { msg('Could not open the file: ' + (e.message || e), 'error'); }
+}
+function fmtDate(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  return isNaN(d) ? String(v).slice(0, 10) : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+/* The pill and banner report the ACCREDITATION standing and the state of any
+   accreditation request — vendors.status (pending_review/approved/…) was
+   retired from the app's UI, so showing it here would be the only place it
+   still surfaced, and it would contradict the standing shown everywhere else. */
 function renderStatus() {
   const pill = document.getElementById('statusPill');
   const banner = document.getElementById('statusBanner');
-  const s = vendor.status;
-  pill.textContent = s.replace('_',' ');
-  pill.className = 'status-pill status-' + s;
-  const copy = {
-    pending_review: 'Your profile is awaiting review by Megawide Procurement. It will not appear in the vendor directory until approved. You can keep editing while you wait.',
-    approved: 'Your profile is approved and visible in the Megawide vendor directory. Any further edit will send it back for review before it goes live again.',
-    rejected: 'Your submission was not approved. Please review your information and resubmit, or contact Megawide Procurement for details.',
-    inactive: 'Your vendor account is currently marked inactive by Megawide Procurement.',
-  };
+  const key = window.accredKey ? window.accredKey(vendor.accreditation) : (vendor.accreditation || 'none');
+  const label = window.accredLabel ? window.accredLabel(vendor.accreditation) : 'Not Assessed';
+  pill.textContent = label;
+  pill.className = 'status-pill status-' + (['accredited','unaccredited','problematic'].includes(key) ? key : 'none');
+
+  const pending = currentRequest();
+  let cls = 'neutral', html;
+  if (key === 'accredited') {
+    cls = 'approved';
+    html = '<b>You are an accredited Megawide vendor.</b>Keep your company information, documents and certifications up to date — procurement works from what is on file here.';
+  } else if (key === 'problematic') {
+    cls = 'rejected';
+    html = '<b>Your account is flagged for review by Megawide Procurement.</b>' +
+      (vendor.accreditation_notes ? esc(vendor.accreditation_notes) : 'Please contact Megawide Procurement.');
+  } else if (pending) {
+    cls = 'pending';
+    html = '<b>Accreditation requested — awaiting review.</b>Submitted ' + esc(fmtDate(pending.submitted_at)) + '. You can keep updating your profile while it is being assessed.';
+  } else if (key === 'unaccredited') {
+    cls = 'pending';
+    html = '<b>You are not accredited yet.</b>Complete the checklist on the Accreditation tab, then request accreditation.';
+  } else {
+    html = '<b>Welcome.</b>Complete your company information and upload the required documents on the Accreditation tab, then request accreditation.';
+  }
   banner.style.display = 'block';
-  banner.className = 'banner banner-' + s;
-  banner.textContent = copy[s] || '';
+  banner.className = 'banner banner-' + cls;
+  banner.innerHTML = html;
 }
 
+const OVERVIEW_FIELDS = {
+  'f-name': 'name', 'f-tin': 'tin', 'f-vendor-category': 'vendor_category',
+  'f-contact-person': 'contact_person', 'f-contact-position': 'contact_position',
+  'f-contact-number': 'contact_number', 'f-telephone': 'telephone',
+  'f-contact-email': 'contact_email', 'f-website': 'website',
+  'f-address': 'address', 'f-city': 'city',
+  'f-payment-terms': 'payment_terms', 'f-vendor-group': 'vendor_group',
+  'f-notes': 'notes',
+};
 function renderOverviewForm() {
-  document.getElementById('f-name').value = vendor.name || '';
-  document.getElementById('f-contact-person').value = vendor.contact_person || '';
-  document.getElementById('f-contact-number').value = vendor.contact_number || '';
-  document.getElementById('f-contact-email').value = vendor.contact_email || '';
-  document.getElementById('f-address').value = vendor.address || '';
-  document.getElementById('f-notes').value = vendor.notes || '';
+  Object.entries(OVERVIEW_FIELDS).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = vendor[key] || '';
+  });
   selectedTrades = new Set(vendor.trade_categories || []);
 }
 
@@ -243,19 +481,15 @@ function renderProductCategoryOptions() {
 async function saveOverview() {
   const btn = document.getElementById('btnSaveOverview');
   btn.disabled = true; btn.textContent = 'Saving…';
-  const fields = {
-    name: document.getElementById('f-name').value.trim(),
-    contact_person: document.getElementById('f-contact-person').value.trim(),
-    contact_number: document.getElementById('f-contact-number').value.trim(),
-    contact_email: document.getElementById('f-contact-email').value.trim(),
-    address: document.getElementById('f-address').value.trim(),
-    notes: document.getElementById('f-notes').value.trim(),
-    trade_categories: [...selectedTrades],
-  };
+  const fields = { trade_categories: [...selectedTrades] };
+  Object.entries(OVERVIEW_FIELDS).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) fields[key] = el.value.trim();
+  });
   try {
     vendor = await VendorDb.updateVendor(vendor.id, fields);
-    renderStatus();
-    msg('Company info saved. It will be reviewed by Megawide Procurement before it goes live.', 'success');
+    await reloadAccreditation();   // the checklist moves as fields are filled in
+    msg('Company info saved.', 'success');
   } catch (e) {
     msg('Save failed: ' + (e.message || e), 'error');
   }
@@ -264,9 +498,12 @@ async function saveOverview() {
 
 /* ── Tabs ── */
 function switchTab(t) {
-  ['overview','products','certs','personnel'].forEach(k => {
-    document.getElementById('panel-' + k).style.display = k === t ? 'block' : 'none';
-  });
+  // 'accreditation' owns two stacked panels (readiness + documents).
+  const panels = { accreditation: ['accreditation', 'documents'], overview: ['overview'], products: ['products'], certs: ['certs'], personnel: ['personnel'] };
+  Object.entries(panels).forEach(([tab, ids]) => ids.forEach(id => {
+    const el = document.getElementById('panel-' + id);
+    if (el) el.style.display = tab === t ? 'block' : 'none';
+  }));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
 }
 

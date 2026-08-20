@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260819b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260819b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260819b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260819b">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820a">
   <style>
     .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
     @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
@@ -101,6 +101,19 @@
     .abadge-unaccredited{background:#FEF3C7;color:#92400E}
     .abadge-problematic{background:#FEE2E2;color:#991B1B}
     .abadge-none{background:#F3F4F6;color:#555}
+    .abadge-request{background:#DBEAFE;color:#1D4ED8}
+    /* Accreditation-request review block inside the vendor detail modal */
+    .req-panel{border:1.5px solid #93C5FD;background:#EFF6FF;border-radius:10px;padding:12px 14px;margin-bottom:14px}
+    .req-panel h4{margin:0 0 6px;font-size:0.9286rem;color:#1D4ED8}
+    .req-msg{font-size:0.8125rem;color:#444;background:var(--surface,#fff);border-radius:8px;padding:8px 10px;margin:8px 0}
+    .req-check{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin:10px 0}
+    .req-check span{font-size:0.7857rem;display:flex;gap:6px;align-items:baseline}
+    .req-check span.no{color:#991B1B;font-weight:600}
+    .req-check span.ok{color:#065F46}
+    .req-docs{margin:8px 0;font-size:0.8125rem}
+    .req-docs a{color:#1D4ED8;font-weight:600;cursor:pointer;text-decoration:underline}
+    .req-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    @media(max-width:640px){.req-check{grid-template-columns:1fr}}
     /* A problematic vendor is a risk flag, not just a label — give its card a
        red left edge so it is spottable while scanning the grid of cards. */
     .vcard.vcard-problematic{border-left:3px solid #EE3124}
@@ -259,6 +272,9 @@
     body.dark-mode .abadge-accredited{background:#102B1F;color:#6EE7B7}
     body.dark-mode .abadge-unaccredited{background:#3D2E0F;color:#FCD34D}
     body.dark-mode .abadge-problematic{background:#3D1A19;color:#FCA5A5}
+    body.dark-mode .abadge-request{background:#16243D;color:#93C5FD}
+    body.dark-mode .req-panel{background:#16243D;border-color:#1E3A5F}
+    body.dark-mode .req-panel h4{color:#93C5FD}
     body.dark-mode .abadge-none{background:var(--surface-2);color:var(--text-hint)}
     body.dark-mode .accred-fieldset{border-color:var(--border-md)}
 
@@ -348,6 +364,7 @@
             <div class="kpi-card"><div class="kpi-value" id="kpiUnaccredited" style="color:#92400E">—</div><div class="kpi-label">Unaccredited</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiProblematic" style="color:#991B1B">—</div><div class="kpi-label">Problematic</div></div>
             <div class="kpi-card"><div class="kpi-value" id="kpiUnassessed" style="color:#6B7280">—</div><div class="kpi-label">Not Assessed</div></div>
+            <div class="kpi-card" id="kpiRequestsCard" onclick="showAccredRequests()" style="cursor:pointer" title="Show vendors waiting for an accreditation decision"><div class="kpi-value" id="kpiRequests" style="color:#1D4ED8">—</div><div class="kpi-label">Requests to review</div></div>
           </div>
           <div class="vendor-toolbar" style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
             <div class="vendor-toolbar-filters" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1 1 320px;min-width:0">
@@ -362,6 +379,7 @@
               <option value="unaccredited">Unaccredited</option>
               <option value="problematic">Problematic</option>
               <option value="none">Not Assessed</option>
+              <option value="__requested">Awaiting my decision</option>
             </select>
             <div class="view-toggle" role="group" aria-label="View mode">
               <button id="vv-cards" class="active" onclick="setVendorView('cards')" aria-label="Card view"><i class="ti ti-layout-grid"></i> Cards</button>
@@ -373,7 +391,6 @@
             <div class="tools-menu-wrap" id="toolsMenuWrap" style="position:relative;flex-shrink:0">
               <button class="btn-cancel" id="btn-tools-menu" onclick="toggleToolsMenu()"><i class="ti ti-tool" style="margin-right:4px"></i>Data Tools <i class="ti ti-chevron-down" style="margin-left:2px;font-size:0.75em"></i></button>
               <div class="tools-menu" id="toolsMenu" style="display:none">
-                <button onclick="closeToolsMenu();location.href='import-vendors.html'"><i class="ti ti-file-spreadsheet"></i><span>Import Vendor Masterlist</span><small>Load the accredited / non-accredited / problematic masterdata workbook</small></button>
                 <button onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs</span><small>Scan work packages for vendors not yet in the directory</small></button>
                 <button onclick="closeToolsMenu();backfillFromWPs()"><i class="ti ti-refresh-dot"></i><span>Backfill Trade/Bid Data</span><small>Fill in trades, products, bid history and rates from WPs</small></button>
                 <button id="tools-menu-unassessed" onclick="closeToolsMenu();markRestUnaccredited()"><i class="ti ti-help-circle"></i><span>Mark rest Unaccredited <span class="tools-menu-badge" id="unassessed-count-badge" style="display:none"><span id="unassessed-count">0</span></span></span><small>Set every Not-Assessed vendor to Unaccredited — run AFTER importing the accreditation list</small></button>
@@ -566,9 +583,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260819b"></script>
-<script src="assets/js/db.js?v=20260819b"></script>
-<script src="assets/js/ui.js?v=20260819b"></script>
+<script src="assets/js/auth.js?v=20260820a"></script>
+<script src="assets/js/db.js?v=20260820a"></script>
+<script src="assets/js/ui.js?v=20260820a"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -618,6 +635,11 @@ async function loadAll() {
       _vendorProductText[p.vendor_id] = (_vendorProductText[p.vendor_id] || '') + ' ' + t;
     });
   } catch (e) { /* search just won't match products */ }
+  // Pending accreditation requests — the vendor-raised review queue. Returns []
+  // (not an error) until MIGRATION_vendor_accreditation_requests.sql has run.
+  _pendingReq = {};
+  try { (await VendorDb.requests.pending()).forEach(r => { _pendingReq[r.vendor_id] = r; }); }
+  catch (e) { console.error('[vendors] could not load accreditation requests', e); }
   document.getElementById('loading').style.display = 'none';
   document.getElementById('main-content').style.display = '';
   renderKpis();
@@ -667,10 +689,14 @@ function _vendorFiltered() {
   const accredEl = document.getElementById('vendor-accred-filter');
   const accredF = accredEl ? accredEl.value : 'all';
   return allVendors.filter(v => {
-    if (accredF !== 'all' && _accredOf(v) !== accredF) return false;
+    if (accredF === '__requested') { if (!_pendingReq[v.id]) return false; }
+    else if (accredF !== 'all' && _accredOf(v) !== accredF) return false;
     if (!q) return true;
     const hay = (v.name || '').toLowerCase()
       + ' ' + (v.vendor_code || '').toLowerCase()
+      + ' ' + (v.tin || '').toLowerCase()
+      + ' ' + (v.vendor_category || '').toLowerCase()
+      + ' ' + (v.vendor_group || '').toLowerCase()
       + ' ' + (v.trade_categories || []).join(' ').toLowerCase()
       + ' ' + _accredLabel(v).toLowerCase()
       + ' ' + (v.accreditation_notes || '').toLowerCase()
@@ -678,9 +704,18 @@ function _vendorFiltered() {
     return hay.includes(q);
   });
 }
+let _pendingReq = {};   // vendor_id -> pending accreditation request
 let _vendorPage = 0;
 const _VENDOR_PAGE_SIZE = 60;
 function onVendorFilterChange() { _vendorPage = 0; renderVendorList(); }
+// KPI tile → the request queue, so the count is a way in rather than just a number.
+function showAccredRequests() {
+  const el = document.getElementById('vendor-accred-filter');
+  if (!el) return;
+  el.value = '__requested';
+  if (_vendorView === 'analytics') setVendorView('cards');
+  onVendorFilterChange();
+}
 function renderVendorList() {
   const all = _vendorFiltered();
   const total = all.length;
@@ -988,6 +1023,7 @@ function renderCards(rows) {
         </div>
         <div class="vcard-status-badge" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
           ${_accredBadge(v)}
+          ${_pendingReq[v.id] ? '<span class="abadge abadge-request" title="This vendor has requested accreditation"><i class="ti ti-clock-hour-4"></i>Requested</span>' : ''}
         </div>
       </div>
       ${tradesHtml}
@@ -1760,6 +1796,7 @@ function renderKpis() {
   document.getElementById('kpiUnaccredited').textContent = byAccred('unaccredited');
   document.getElementById('kpiProblematic').textContent = byAccred('problematic');
   document.getElementById('kpiUnassessed').textContent = byAccred('none');
+  document.getElementById('kpiRequests').textContent = Object.keys(_pendingReq).length;
   updateUnassessedBadge();
 }
 // Data Tools badge for the "Mark rest Unaccredited" cleanup — mirrors
@@ -1793,10 +1830,18 @@ const VXL_COLS = [
   { k: 'accreditation_notes', label: 'Accreditation Notes', w: 220, type: 'text' },
   { k: 'accreditation_date',  label: 'Accredited / Assessed', w: 130, type: 'date' },
   { k: 'trade_categories', label: 'Trade Categories',w: 240, type: 'trades' },
+  { k: 'tin',              label: 'TIN',             w: 140, type: 'text' },
+  { k: 'vendor_category',  label: 'Vendor Category', w: 130, type: 'select', opts: ['', 'Supplier', 'Subcon', 'Services'] },
+  { k: 'vendor_group',     label: 'Vendor Group',    w: 170, type: 'text' },
+  { k: 'payment_terms',    label: 'Terms of Payment',w: 130, type: 'text' },
   { k: 'contact_person',   label: 'Contact Person',  w: 160, type: 'text' },
+  { k: 'contact_position', label: 'Position',        w: 140, type: 'text' },
   { k: 'contact_number',   label: 'Contact Number',  w: 140, type: 'text' },
+  { k: 'telephone',        label: 'Telephone',       w: 140, type: 'text' },
   { k: 'contact_email',    label: 'Contact Email',   w: 200, type: 'text' },
+  { k: 'website',          label: 'Website',         w: 180, type: 'text' },
   { k: 'address',          label: 'Address',         w: 220, type: 'text' },
+  { k: 'city',             label: 'City',            w: 120, type: 'text' },
   { k: 'notes',            label: 'Notes',           w: 220, type: 'text' },
 ];
 let _vxlRows = [];               // current page of vendors, in grid row order
@@ -1938,6 +1983,13 @@ function _vxlSet(r, c, raw, undoBatch) {
       if (!mapped) return false;
       val = mapped;
     }
+  }
+  if (col.k === 'vendor_category') {
+    // Soft roster — case-normalize a recognized value, but let an off-list one
+    // through rather than rejecting the edit (same rescue as the detail form's
+    // "(legacy)" option); blank clears it.
+    const hit = col.opts.find(o => o && o.toLowerCase() === val.trim().toLowerCase());
+    val = hit || val.trim();
   }
   if (col.k === 'accreditation_date') {
     const norm = _accredParseDate(val);
@@ -2458,6 +2510,7 @@ function renderDetailOverview() {
   const v = activeVendor;
   detailTrades = new Set(v.trade_categories || []);
   document.getElementById('dtab-overview').innerHTML = `
+    <div id="dov-request"></div>
     <div class="field"><label>Company Name</label><input id="dov-name" type="text" value="${esc(v.name)}"></div>
     <div class="field"><label>Vendor Code</label><input id="dov-vendor-code" type="text" value="${esc(v.vendor_code)}" placeholder="e.g. V-01250" style="max-width:180px">
       <div style="font-size:0.72rem;color:#999;margin-top:4px">SAP/ERP identifier from the PO system — matches the same vendor across purchase orders. Leave blank if unknown.</div></div>
@@ -2482,10 +2535,23 @@ function renderDetailOverview() {
       <div style="font-size:0.72rem;color:#999;margin-top:6px">Accreditation is separate from the review status above — it records whether the company is cleared to be engaged. Vendors cannot set this themselves.</div>
     </fieldset>
     <div class="field"><label>Trade Categories</label><div class="trade-checklist" id="dovTradeChips"></div></div>
+    <div class="field"><label>TIN</label><input id="dov-tin" type="text" value="${esc(v.tin)}" placeholder="e.g. 006-819-950-000" style="max-width:220px"></div>
+    <div class="field"><label>Vendor Category</label>
+      <select id="dov-vendor-category" style="max-width:220px">
+        ${['', 'Supplier', 'Subcon', 'Services'].map(o => `<option value="${esc(o)}" ${(v.vendor_category || '') === o ? 'selected' : ''}>${o || '— none —'}</option>`).join('')}
+        ${v.vendor_category && !['Supplier', 'Subcon', 'Services'].includes(v.vendor_category)
+          ? `<option value="${esc(v.vendor_category)}" selected>${esc(v.vendor_category)} (legacy)</option>` : ''}
+      </select></div>
+    <div class="field"><label>Product / Vendor Group</label><input id="dov-vendor-group" type="text" value="${esc(v.vendor_group)}" placeholder="e.g. Ready Mix Concrete"></div>
     <div class="field"><label>Contact Person</label><input id="dov-contact-person" type="text" value="${esc(v.contact_person)}"></div>
+    <div class="field"><label>Position</label><input id="dov-contact-position" type="text" value="${esc(v.contact_position)}" placeholder="e.g. Sales Manager"></div>
     <div class="field"><label>Contact Number</label><input id="dov-contact-number" type="text" value="${esc(v.contact_number)}"></div>
+    <div class="field"><label>Telephone</label><input id="dov-telephone" type="text" value="${esc(v.telephone)}"></div>
     <div class="field"><label>Contact Email</label><input id="dov-contact-email" type="email" value="${esc(v.contact_email)}"></div>
+    <div class="field"><label>Website</label><input id="dov-website" type="text" value="${esc(v.website)}" placeholder="https://"></div>
     <div class="field"><label>Address</label><input id="dov-address" type="text" value="${esc(v.address)}"></div>
+    <div class="field"><label>City</label><input id="dov-city" type="text" value="${esc(v.city)}"></div>
+    <div class="field"><label>Terms of Payment</label><input id="dov-payment-terms" type="text" value="${esc(v.payment_terms)}" placeholder="e.g. 60 Days" style="max-width:220px"></div>
     <div class="field"><label>Notes</label><textarea id="dov-notes">${esc(v.notes)}</textarea></div>
     <div class="field"><label>Login &amp; Self-Service Access</label>
       <div style="font-size:0.8125rem;color:#666;margin-bottom:8px">${v.invite_claimed_at
@@ -2505,10 +2571,98 @@ function renderDetailOverview() {
   // Read-only roles (viewer / viewer_budget) get the profile as plain text — RLS rejects
   // their writes anyway, so showing live inputs + a Save button only produces errors.
   _dovSyncAccredHint();
+  renderDetailRequest();
   buildDetailTradeChips();
   // AFTER buildDetailTradeChips — it injects the 10 trade checkboxes into the container,
   // so locking before it ran left them clickable for read-only roles.
   if (!_canManage) _lockDetailInputs('dtab-overview');
+}
+/* ── Accreditation request review ──────────────────────────────────────────
+   Rendered at the top of the vendor's Overview section whenever that vendor
+   has raised a request (or, when they haven't, as a readiness read-out so a
+   reviewer can still see what is on file). The checklist comes from
+   window.accredReadiness in db.js — the SAME function the vendor portal uses
+   to decide what to ask them for, so the two can never disagree. */
+let _detailDocs = [];
+async function renderDetailRequest() {
+  const box = document.getElementById('dov-request');
+  if (!box) return;
+  const v = activeVendor;
+  const req = _pendingReq[v.id];
+  try { _detailDocs = await VendorDb.documents.list(v.id); } catch (e) { _detailDocs = []; }
+  // The modal can be reopened on another vendor while this await is in flight.
+  if (!activeVendor || activeVendor.id !== v.id) return;
+  const rd = window.accredReadiness ? window.accredReadiness(v, _detailDocs) : null;
+  // Only surface the readiness read-out where it means something: a live
+  // request, documents already on file, or a vendor who actually has a login
+  // and is self-servicing. Otherwise every WP-derived legacy record — none of
+  // which anyone has asked to accredit — would carry a big "incomplete" panel.
+  if (!req && !_detailDocs.length && !v.invite_claimed_at) { box.innerHTML = ''; return; }
+
+  const checks = rd ? `<div class="req-check">${rd.items.map(i =>
+    `<span class="${i.ok ? 'ok' : 'no'}">${i.ok ? '✓' : '✗'} ${esc(i.label)}</span>`).join('')}</div>` : '';
+  const docs = _detailDocs.length
+    ? `<div class="req-docs"><b>Documents on file:</b> ${_detailDocs.map(d =>
+        `<a onclick="viewVendorDoc('${d.id}')">${esc(window.accredDocLabel ? window.accredDocLabel(d.doc_type) : d.doc_type)}</a>`).join(' · ')}</div>`
+    : '<div class="req-docs" style="color:#991B1B"><b>No accreditation documents uploaded.</b></div>';
+
+  if (!req) {
+    box.innerHTML = `<div class="req-panel" style="border-color:var(--border-md,#e5e5e5);background:var(--surface-2,#fafafa)">
+      <h4 style="color:inherit">Accreditation readiness — ${rd ? rd.done + ' of ' + rd.total + ' complete' : '—'}</h4>
+      <div style="font-size:0.8125rem;color:#666">This vendor has not requested accreditation. ${rd && rd.missing.length ? 'Still missing: <b>' + esc(rd.missing.join(', ')) + '</b>.' : ''}</div>
+      ${checks}${docs}</div>`;
+    return;
+  }
+  box.innerHTML = `<div class="req-panel">
+    <h4><i class="ti ti-clock-hour-4"></i> Accreditation requested ${esc(_reqDate(req.submitted_at))}</h4>
+    ${req.message ? `<div class="req-msg">${esc(req.message)}</div>` : ''}
+    ${rd && rd.missing.length ? `<div style="font-size:0.8125rem;color:#991B1B;font-weight:600">Incomplete — still missing: ${esc(rd.missing.join(', '))}</div>` : ''}
+    ${checks}${docs}
+    ${_canManage ? `<div class="req-actions">
+      <button class="btn-primary" onclick="decideRequest('${req.id}','approved')"><i class="ti ti-rosette-discount-check" style="margin-right:4px"></i>Approve — mark Accredited</button>
+      <button class="btn-cancel" onclick="decideRequest('${req.id}','declined')">Decline</button>
+    </div>` : ''}</div>`;
+}
+function _reqDate(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  return isNaN(d) ? String(v).slice(0, 10) : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+async function viewVendorDoc(id) {
+  const d = _detailDocs.find(x => x.id === id);
+  if (!d || !d.file_path) { AppNotify && AppNotify.warn('No file attached to that entry.'); return; }
+  try { const url = await VendorDb.getCertFileUrl(d.file_path); if (url) window.open(url, '_blank'); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not open the document') : alert(e.message); }
+}
+/* Deciding writes BOTH the request row and the vendor's accreditation —
+   VendorDb.requests.decide does the pair, so a decision can never leave the
+   queue and the standing out of step. */
+async function decideRequest(requestId, decision) {
+  const v = activeVendor;
+  const approving = decision === 'approved';
+  let notes = prompt(approving
+    ? 'Accreditation note (optional) — e.g. the accreditation reference.'
+    : 'Why is this request being declined? The vendor sees this on their portal.', '');
+  if (notes === null) return;
+  notes = notes.trim();
+  if (!approving && !notes) { AppNotify && AppNotify.warn('Please give a reason — the vendor sees it and needs to know what to fix.'); return; }
+  if (!confirm(approving
+    ? `Approve accreditation for "${v.name}"? They will be marked Accredited.`
+    : `Decline the accreditation request for "${v.name}"?`)) return;
+  try {
+    const updated = await VendorDb.requests.decide(requestId, v.id, decision, notes || null);
+    delete _pendingReq[v.id];
+    activeVendor = updated || activeVendor;
+    const idx = allVendors.findIndex(x => x.id === activeVendor.id);
+    if (idx > -1) allVendors[idx] = activeVendor;
+    document.getElementById('detailSub').innerHTML = _accredBadge(activeVendor);
+    renderDetailOverview();
+    renderKpis();
+    renderVendorList();
+    AppNotify && AppNotify.success(approving ? `${v.name} is now accredited.` : 'Request declined.');
+  } catch (e) {
+    AppNotify ? AppNotify.fromError(e, 'Could not record the decision') : alert(e.message);
+  }
 }
 // Nudge staff to say WHY when they flag a vendor problematic — the reason is what
 // makes the flag actionable for the next officer (and it shows on the card).
@@ -2561,10 +2715,18 @@ async function saveDetailOverview() {
   const fields = {
     name: document.getElementById('dov-name').value.trim(),
     vendor_code: document.getElementById('dov-vendor-code').value.trim() || null,
+    tin: document.getElementById('dov-tin').value.trim(),
+    vendor_category: document.getElementById('dov-vendor-category').value.trim(),
+    vendor_group: document.getElementById('dov-vendor-group').value.trim(),
     contact_person: document.getElementById('dov-contact-person').value.trim(),
+    contact_position: document.getElementById('dov-contact-position').value.trim(),
     contact_number: document.getElementById('dov-contact-number').value.trim(),
+    telephone: document.getElementById('dov-telephone').value.trim(),
     contact_email: document.getElementById('dov-contact-email').value.trim(),
+    website: document.getElementById('dov-website').value.trim(),
     address: document.getElementById('dov-address').value.trim(),
+    city: document.getElementById('dov-city').value.trim(),
+    payment_terms: document.getElementById('dov-payment-terms').value.trim(),
     notes: document.getElementById('dov-notes').value.trim(),
     trade_categories: [...detailTrades],
     // Nullable — send NULL, not '', for a cleared standing/date (see vxlSave).

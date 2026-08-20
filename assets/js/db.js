@@ -1666,6 +1666,60 @@ if (typeof window !== 'undefined') {
   window.accredFromText = accredFromText;
 }
 
+/* ── Accreditation readiness ────────────────────────────────────────────────
+   The checklist below is the procurement team's OWN accreditation
+   requirement list, taken verbatim from the "KC Steps" sheet of the
+   EPC. PROC. Vendor Masterdata workbook:
+
+     Required documents:   BIR 2303 · Company Profile & Business Permits ·
+                           Scanned copy of an invoice
+     Required information: Terms of Payment · Contact Person · Position ·
+                           Contact Number · Email Address
+
+   TIN and address are included too — the masterdata/SAP encoding step that
+   follows accreditation cannot be done without them.
+
+   ONE definition, shared by the vendor portal (which shows the vendor what
+   is still missing and gates the Request button) and the staff detail modal
+   (which shows the reviewer the same list). Keep it here, not duplicated in
+   either page, or the two will disagree about whether a vendor is ready. */
+const ACCRED_DOC_TYPES = [
+  { key: 'bir_2303',        label: 'BIR 2303 (Certificate of Registration)', required: true },
+  { key: 'company_profile', label: 'Company Profile',                        required: true },
+  { key: 'business_permit', label: 'Business Permit',                        required: true },
+  { key: 'sample_invoice',  label: 'Scanned copy of an Invoice',             required: true },
+  { key: 'other',           label: 'Other supporting document',              required: false },
+];
+function accredDocLabel(k) {
+  const d = ACCRED_DOC_TYPES.find(x => x.key === k);
+  return d ? d.label : (k || 'Document');
+}
+function accredReadiness(vendor, docs) {
+  const v = vendor || {};
+  const have = new Set((docs || []).filter(d => d && d.file_path).map(d => d.doc_type));
+  const txt = k => !!(v[k] && String(v[k]).trim());
+  const items = [
+    { key: 'name',             label: 'Company name',        ok: txt('name'),            group: 'info' },
+    { key: 'tin',              label: 'TIN',                 ok: txt('tin'),             group: 'info' },
+    { key: 'address',          label: 'Address',             ok: txt('address'),         group: 'info' },
+    { key: 'contact_person',   label: 'Contact person',      ok: txt('contact_person'),  group: 'info' },
+    { key: 'contact_position', label: 'Position',            ok: txt('contact_position'),group: 'info' },
+    { key: 'contact_number',   label: 'Contact number',      ok: txt('contact_number'),  group: 'info' },
+    { key: 'contact_email',    label: 'Email address',       ok: txt('contact_email'),   group: 'info' },
+    { key: 'payment_terms',    label: 'Terms of payment',    ok: txt('payment_terms'),   group: 'info' },
+    { key: 'trade_categories', label: 'Trade categories',    ok: (v.trade_categories || []).length > 0, group: 'info' },
+  ].concat(ACCRED_DOC_TYPES.filter(d => d.required).map(d => (
+    { key: d.key, label: d.label, ok: have.has(d.key), group: 'docs' }
+  )));
+  const done = items.filter(i => i.ok).length;
+  return { items, done, total: items.length, pct: Math.round(done / items.length * 100), missing: items.filter(i => !i.ok).map(i => i.label) };
+}
+if (typeof window !== 'undefined') {
+  window.ACCRED_DOC_TYPES = ACCRED_DOC_TYPES;
+  window.accredDocLabel = accredDocLabel;
+  window.accredReadiness = accredReadiness;
+}
+
 const VendorDb = (() => {
   function _stamp() {
     const p = (typeof window !== 'undefined' && window.__profile) || {};
@@ -1719,6 +1773,10 @@ const VendorDb = (() => {
       const d4 = _stripAccred(payload, error);
       ({ data, error } = await sb.from('vendors').insert(d4).select().single());
     }
+    if (error && _isMissingCol(error, _PROFILE_RE)) {
+      const d5 = _stripProfile(payload, error);
+      ({ data, error } = await sb.from('vendors').insert(d5).select().single());
+    }
     if (error) throw error;
     return data;
   }
@@ -1737,6 +1795,23 @@ const VendorDb = (() => {
     console.warn('[VendorDb] Dropped ' + cols.join(', ') + ' — NOT saved. If MIGRATION_vendor_accreditation.sql has already run, this guard is wrong, not the schema. Postgres said: ' + m);
     return out;
   }
+  /* Deploy-safe strip for MIGRATION_vendor_accreditation_requests.sql's extra
+     vendor profile columns (tin / contact_position / telephone / city /
+     website / payment_terms / vendor_category / vendor_group). Strips
+     PRECISELY the column the error names — same precision rule as
+     _stripAccred; a coarse strip-them-all guard is what silently discarded
+     columns the DB really had (Known Issues #28b). */
+  const _PROFILE_COLS = ['tin', 'contact_position', 'telephone', 'city', 'website', 'payment_terms', 'vendor_category', 'vendor_group'];
+  const _PROFILE_RE = /tin|contact_position|telephone|city|website|payment_terms|vendor_category|vendor_group/;
+  function _stripProfile(payload, error) {
+    const m = (error && ((error.message || '') + (error.details || ''))) || '';
+    const named = _PROFILE_COLS.filter(c => new RegExp('\\b' + c + '\\b').test(m));
+    const cols = named.length ? named : _PROFILE_COLS;
+    const out = { ...payload };
+    cols.forEach(c => delete out[c]);
+    console.warn('[VendorDb] Dropped ' + cols.join(', ') + ' — NOT saved. If MIGRATION_vendor_accreditation_requests.sql has already run, this guard is wrong, not the schema. Postgres said: ' + m);
+    return out;
+  }
   async function updateVendor(id, fields) {
     const sb = await getSB();
     const payload = { ...fields, ...(_stamp()) };
@@ -1752,6 +1827,10 @@ const VendorDb = (() => {
     if (error && _isMissingCol(error, /accreditation/)) {
       const d4 = _stripAccred(payload, error);
       ({ data, error } = await sb.from('vendors').update(d4).eq('id', id).select().single());
+    }
+    if (error && _isMissingCol(error, _PROFILE_RE)) {
+      const d5 = _stripProfile(payload, error);
+      ({ data, error } = await sb.from('vendors').update(d5).eq('id', id).select().single());
     }
     if (error) throw error;
     return data;
@@ -1893,6 +1972,113 @@ const VendorDb = (() => {
     if (!path) return;
     const sb = await getSB();
     await sb.storage.from('vendor-certs').remove([path]);
+  }
+
+  // ── Accreditation documents + requests ───────────────────────────────
+  //  MIGRATION_vendor_accreditation_requests.sql. Both tables are optional at
+  //  runtime: a missing table is reported as an empty list rather than thrown,
+  //  so the portal and the staff modal still render on an un-migrated
+  //  environment (the "request" button then explains why it is disabled).
+  function _isMissingTable(error, name) {
+    if (!error) return false;
+    const m = (error.message || '') + (error.details || '');
+    return error.code === '42P01' || (new RegExp(name, 'i').test(m) && /does not exist|schema cache|relation/i.test(m));
+  }
+
+  const vendorDocuments = {
+    async list(vendorId) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_documents').select('*').eq('vendor_id', vendorId).order('uploaded_at', { ascending: false });
+      if (error) { if (_isMissingTable(error, 'vendor_documents')) return []; throw error; }
+      return data || [];
+    },
+    async add(vendorId, fields) {
+      const sb = await getSB();
+      const p = (typeof window !== 'undefined' && window.__profile) || {};
+      const payload = { vendor_id: vendorId, ...fields, uploaded_at: new Date().toISOString(), uploaded_by: p.id || null, uploaded_by_name: p.name || p.email || null };
+      const { data, error } = await sb.from('vendor_documents').insert(payload).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async update(id, fields) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_documents').update(fields).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async remove(id) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_documents').delete().eq('id', id);
+      if (error) throw error;
+    },
+  };
+
+  // Documents share the private 'vendor-certs' bucket with certifications. Its
+  // Storage policies key off the FIRST path segment being the vendor id, so
+  // the '<vendorId>/' prefix here is load-bearing — do not reorder it.
+  async function uploadVendorDoc(vendorId, docType, file) {
+    const sb = await getSB();
+    const safeName = String(file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${vendorId}/doc_${docType}_${Date.now()}_${safeName}`;
+    const { error } = await sb.storage.from('vendor-certs').upload(path, file, { upsert: false });
+    if (error) throw error;
+    return path;
+  }
+
+  const accreditationRequests = {
+    // Every request for one vendor, newest first.
+    async forVendor(vendorId) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_accreditation_requests').select('*').eq('vendor_id', vendorId).order('submitted_at', { ascending: false });
+      if (error) { if (_isMissingTable(error, 'vendor_accreditation_requests')) return []; throw error; }
+      return data || [];
+    },
+    // The staff review queue. Returns [] (not an error) pre-migration.
+    async pending() {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_accreditation_requests').select('*').eq('status', 'pending').order('submitted_at');
+      if (error) { if (_isMissingTable(error, 'vendor_accreditation_requests')) return []; throw error; }
+      return data || [];
+    },
+    async create(vendorId, fields) {
+      const sb = await getSB();
+      const p = (typeof window !== 'undefined' && window.__profile) || {};
+      const payload = { vendor_id: vendorId, kind: 'new', ...fields, status: 'pending', submitted_at: new Date().toISOString(), submitted_by: p.id || null };
+      const { data, error } = await sb.from('vendor_accreditation_requests').insert(payload).select().single();
+      if (error) throw error;
+      return data;
+    },
+    // Staff decision. `status` is 'approved' or 'declined'. Approving is what
+    // stamps the vendor's accreditation itself — the request row only records
+    // that the decision was made, so both writes belong together here rather
+    // than being left to each caller to remember.
+    async decide(requestId, vendorId, status, notes) {
+      const sb = await getSB();
+      const p = (typeof window !== 'undefined' && window.__profile) || {};
+      const { error } = await sb.from('vendor_accreditation_requests').update({
+        status,
+        decided_at: new Date().toISOString(),
+        decided_by: p.id || null,
+        decided_by_name: p.name || p.email || null,
+        decision_notes: notes || null,
+      }).eq('id', requestId);
+      if (error) throw error;
+      const patch = { accreditation: status === 'approved' ? 'accredited' : 'unaccredited', accreditation_date: _todayLocal() };
+      if (notes) patch.accreditation_notes = notes;
+      return updateVendor(vendorId, patch);
+    },
+    async withdraw(requestId) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_accreditation_requests').update({ status: 'withdrawn' }).eq('id', requestId);
+      if (error) throw error;
+    },
+  };
+
+  // Local-parts date, never toISOString() on a bare date — that is UTC and
+  // lands a day earlier in UTC+8 (the sCurve bug).
+  function _todayLocal() {
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
   // ── Vendor bids (Phase 2b — per-WP competitive bidding) ──────────────
@@ -2539,6 +2725,7 @@ const VendorDb = (() => {
     products, certifications, personnel,
     getVendorRates, addVendorRate, deleteVendorRate, upsertRate,
     uploadCertFile, getCertFileUrl, deleteCertFile,
+    documents: vendorDocuments, uploadVendorDoc, requests: accreditationRequests,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
