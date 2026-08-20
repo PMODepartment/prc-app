@@ -93,6 +93,19 @@
     .msg.error{background:#FEE2E2;color:#991B1B;display:block}
     .msg.success{background:#D1FAE5;color:#065F46;display:block}
     .empty{font-size:12.5px;color:#aaa;padding:8px 0}
+    .field input.bad,.field select.bad,.field textarea.bad{border-color:#EE3124;background:#FFF7F6}
+    .field-err{font-size:11.5px;color:#991B1B;margin-top:5px;display:none}
+    .field-err.on{display:block}
+    /* Save bar sticks to the bottom while a change is pending, so the vendor
+       can never scroll past it and lose the edit. */
+    .save-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid #eee;padding:12px 0 4px;
+              margin-top:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .save-state{font-size:12px;color:#888}
+    .save-state.dirty{color:#92400E;font-weight:600}
+    .draft-note{font-size:12px;background:#FEF3C7;border:1px solid #FDE68A;color:#92400E;
+                border-radius:8px;padding:9px 12px;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .draft-note button{border:1px solid #92400E;background:transparent;color:#92400E;border-radius:6px;
+                       padding:4px 10px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer}
     .primary-badge{font-size:10px;background:#EE3124;color:#fff;padding:1px 6px;border-radius:8px;margin-left:6px}
     @media(max-width:640px){.field-row{grid-template-columns:1fr}}
   </style>
@@ -153,6 +166,7 @@
   <!-- ── Company Info ── -->
   <div class="panel" id="panel-overview" style="display:none">
     <div class="panel-title">Company Information</div>
+    <div class="draft-note" id="draftNote" style="display:none"></div>
     <div class="field"><label>Company Name</label><input id="f-name" type="text" placeholder="Company Name"></div>
     <div class="field">
       <label>Trade Categories</label>
@@ -190,7 +204,10 @@
       <div class="field"><label>Product / Vendor Group</label><input id="f-vendor-group" type="text" placeholder="e.g. Ready Mix Concrete"></div>
     </div>
     <div class="field"><label>Notes</label><textarea id="f-notes" placeholder="Anything else worth noting about your company"></textarea></div>
-    <button class="btn-primary" id="btnSaveOverview" onclick="saveOverview()">Save Company Info</button>
+    <div class="save-bar">
+      <button class="btn-primary" id="btnSaveOverview" onclick="saveOverview()">Save Company Info</button>
+      <span class="save-state" id="saveState"></span>
+    </div>
   </div>
 
   <!-- ── Products ── -->
@@ -241,13 +258,15 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820e"></script>
-<script src="assets/js/db.js?v=20260820e"></script>
+<script src="assets/js/auth.js?v=20260820f"></script>
+<script src="assets/js/db.js?v=20260820f"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
 let vendor = null, myProfile = null, selectedTrades = new Set();
 let myDocs = [], myRequests = [];
+let formDirty = false, formLoaded = false, draftTimer = null;
+const draftKey = () => 'wpm_vendorprofile_' + (vendor ? vendor.id : 'x');
 
 AppAuth.requireLogin((user, profile) => {
   myProfile = profile;
@@ -272,6 +291,13 @@ async function loadAll() {
   buildTradeChips();
   renderProductCategoryOptions();
   await Promise.all([reloadAccreditation(), renderProducts(), renderCerts(), renderPersonnel()]);
+  // Only now do keystrokes count as edits — several render paths above write
+  // into the form, and treating those as a change would arm the unload prompt
+  // before the vendor has touched anything.
+  formLoaded = true;
+  formDirty = false;
+  syncSaveState();
+  maybeOfferDraft();
 }
 
 /* ── Accreditation: readiness, documents, request ──────────────────────────
@@ -458,6 +484,15 @@ function renderOverviewForm() {
     if (el) el.value = vendor[key] || '';
   });
   selectedTrades = new Set(vendor.trade_categories || []);
+  // One delegated pair of listeners rather than an attribute per input, so a
+  // field added to OVERVIEW_FIELDS later is covered with no extra wiring.
+  const panel = document.getElementById('panel-overview');
+  if (panel && !panel.dataset.wired) {
+    panel.addEventListener('input', markDirty);
+    panel.addEventListener('change', markDirty);
+    panel.dataset.wired = '1';
+  }
+  syncSaveState();
 }
 
 function buildTradeChips() {
@@ -467,6 +502,7 @@ function buildTradeChips() {
 function toggleTrade(el) {
   const t = el.dataset.t;
   if (el.checked) selectedTrades.add(t); else selectedTrades.delete(t);
+  markDirty();
 }
 function esc(v) { return window.esc ? window.esc(v) : String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -476,21 +512,133 @@ function renderProductCategoryOptions() {
 }
 
 async function saveOverview() {
+  if (!validateOverview()) { msg('Please fix the highlighted field.', 'error'); return; }
   const btn = document.getElementById('btnSaveOverview');
   btn.disabled = true; btn.textContent = 'Saving…';
-  const fields = { trade_categories: [...selectedTrades] };
-  Object.entries(OVERVIEW_FIELDS).forEach(([id, key]) => {
-    const el = document.getElementById(id);
-    if (el) fields[key] = el.value.trim();
-  });
+  clearTimeout(draftTimer);
   try {
-    vendor = await VendorDb.updateVendor(vendor.id, fields);
+    vendor = await VendorDb.updateVendor(vendor.id, collectOverview());
+    formDirty = false;
+    clearDraft();
+    discardDraft();
     await reloadAccreditation();   // the checklist moves as fields are filled in
-    msg('Company info saved.', 'success');
+    syncSaveState();
+    msg('Company info saved. Megawide Procurement can see the update.', 'success');
   } catch (e) {
-    msg('Save failed: ' + (e.message || e), 'error');
+    // The draft is still on disk, so a failed save cannot lose the typing.
+    saveDraft();
+    msg('Save failed — your changes are kept on this device, try again. (' + (e.message || e) + ')', 'error');
   }
   btn.disabled = false; btn.textContent = 'Save Company Info';
+}
+
+/* ── Unsaved-change protection ──────────────────────────────────────────────
+   A vendor filling in TIN, address, payment terms and contacts is several
+   minutes of typing. Previously nothing was held: a stray back-navigation, a
+   closed tab or a phone timing out lost the lot silently. Now every keystroke
+   marks the form dirty (sticky save bar + a beforeunload prompt) and, 1.2s
+   after typing stops, snapshots the fields to localStorage — offered back on
+   the next visit. Mirrors the WP form's own draft mechanism. */
+function markDirty() {
+  if (!formLoaded) return;      // the initial fill must not look like an edit
+  formDirty = true;
+  syncSaveState();
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(saveDraft, 1200);
+}
+function syncSaveState() {
+  const el = document.getElementById('saveState');
+  if (!el) return;
+  if (formDirty) { el.textContent = 'Unsaved changes'; el.className = 'save-state dirty'; }
+  else if (vendor && vendor.updated_at) { el.textContent = 'Last saved ' + fmtDateTime(vendor.updated_at); el.className = 'save-state'; }
+  else { el.textContent = ''; el.className = 'save-state'; }
+}
+function collectOverview() {
+  const f = { trade_categories: [...selectedTrades] };
+  Object.entries(OVERVIEW_FIELDS).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) f[key] = el.value.trim();
+  });
+  return f;
+}
+function saveDraft() {
+  try { localStorage.setItem(draftKey(), JSON.stringify({ at: Date.now(), fields: collectOverview() })); } catch (_) {}
+}
+function clearDraft() { try { localStorage.removeItem(draftKey()); } catch (_) {} }
+function maybeOfferDraft() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch (_) {}
+  const note = document.getElementById('draftNote');
+  if (!d || !d.fields || !note) return;
+  // Nothing to offer if the draft matches what is already saved.
+  const cur = JSON.stringify(collectOverview()), was = JSON.stringify(d.fields);
+  if (cur === was) { clearDraft(); return; }
+  note.style.display = 'flex';
+  note.innerHTML = `<span>You have unsaved changes from ${esc(fmtDateTime(d.at))}.</span>
+    <button onclick="restoreDraft()">Restore them</button>
+    <button onclick="discardDraft()">Discard</button>`;
+}
+function restoreDraft() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch (_) {}
+  if (!d || !d.fields) return;
+  Object.entries(OVERVIEW_FIELDS).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el && d.fields[key] != null) el.value = d.fields[key];
+  });
+  if (Array.isArray(d.fields.trade_categories)) { selectedTrades = new Set(d.fields.trade_categories); buildTradeChips(); }
+  document.getElementById('draftNote').style.display = 'none';
+  formDirty = true; syncSaveState();
+  msg('Draft restored — remember to save.', 'success');
+}
+function discardDraft() {
+  clearDraft();
+  document.getElementById('draftNote').style.display = 'none';
+}
+function fmtDateTime(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  return isNaN(d) ? String(v) : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+window.addEventListener('beforeunload', e => { if (formDirty) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ── Validation ───────────────────────────────────────────────────────────
+   Checked at save time and reported AT the offending field, which is then
+   scrolled to and focused — the same shape as wp-form.html's showErr, rather
+   than a single toast that does not say which box is wrong. */
+function fieldError(id, text) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add('bad');
+  let err = document.getElementById('err-' + id);
+  if (!err) {
+    err = document.createElement('div');
+    err.id = 'err-' + id; err.className = 'field-err';
+    el.parentNode.appendChild(err);
+  }
+  err.textContent = text; err.classList.add('on');
+}
+function clearFieldErrors() {
+  document.querySelectorAll('.field .bad').forEach(el => el.classList.remove('bad'));
+  document.querySelectorAll('.field-err.on').forEach(el => el.classList.remove('on'));
+}
+function validateOverview() {
+  clearFieldErrors();
+  const val = id => (document.getElementById(id) || {}).value ? document.getElementById(id).value.trim() : '';
+  const bad = [];
+  if (!val('f-name')) { fieldError('f-name', 'Your company name is required.'); bad.push('f-name'); }
+  const email = val('f-contact-email');
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { fieldError('f-contact-email', 'That does not look like an email address.'); bad.push('f-contact-email'); }
+  const site = val('f-website');
+  if (site && !/^https?:\/\/\S+$/i.test(site) && !/^[\w-]+(\.[\w-]+)+/.test(site)) { fieldError('f-website', 'Use a full address, e.g. https://example.com'); bad.push('f-website'); }
+  const tin = val('f-tin');
+  if (tin && !/\d/.test(tin)) { fieldError('f-tin', 'A TIN should contain digits.'); bad.push('f-tin'); }
+  if (bad.length) {
+    const first = document.getElementById(bad[0]);
+    if (first) { first.scrollIntoView({ behavior: 'smooth', block: 'center' }); try { first.focus(); } catch (_) {} }
+    return false;
+  }
+  return true;
 }
 
 /* ── Tabs ── */

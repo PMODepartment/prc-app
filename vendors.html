@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820e"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820e"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820e"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820f"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820f"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820f"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820e">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820f">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -27,8 +27,8 @@
     /* KPI tiles ARE the standing filter — they were unlabelled counters that
        you had to know were clickable. Now they read (and behave) as a chip
        row: icon + count + label, with a live pressed state. */
-    .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
-    @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+    .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
+    @media(max-width:1200px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
     @media(max-width:560px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
     .kpi-card{background:#fff;border:1.5px solid #f0f0f0;border-radius:11px;padding:12px 14px;text-align:left;font-family:inherit;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s;display:flex;flex-direction:column;gap:2px}
     .kpi-card:hover{border-color:#EE3124;transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.06)}
@@ -137,6 +137,7 @@
     .abadge-problematic{background:#FEE2E2;color:#991B1B}
     .abadge-none{background:#F3F4F6;color:#555}
     .abadge-request{background:#DBEAFE;color:#1D4ED8}
+    .abadge-edited{background:#EDE9FE;color:#6D28D9}
     /* Accreditation-request review block inside the vendor detail modal */
     .req-panel{border:1.5px solid #93C5FD;background:#EFF6FF;border-radius:10px;padding:12px 14px;margin-bottom:14px}
     .req-panel h4{margin:0 0 6px;font-size:0.9286rem;color:#1D4ED8}
@@ -318,6 +319,7 @@
     body.dark-mode .abadge-unaccredited{background:#3D2E0F;color:#FCD34D}
     body.dark-mode .abadge-problematic{background:#3D1A19;color:#FCA5A5}
     body.dark-mode .abadge-request{background:#16243D;color:#93C5FD}
+    body.dark-mode .abadge-edited{background:#241A3D;color:#C4B5FD}
     body.dark-mode .req-panel{background:#16243D;border-color:#1E3A5F}
     body.dark-mode .req-panel h4{color:#93C5FD}
     body.dark-mode .abadge-none{background:var(--surface-2);color:var(--text-hint)}
@@ -425,6 +427,9 @@
             <button type="button" class="kpi-card" id="kpi-requested" aria-pressed="false" onclick="setAccredFilter('__requested')" title="Vendors waiting for an accreditation decision">
               <div class="kpi-top"><i class="ti ti-clock-hour-4" style="color:#1D4ED8"></i><span class="kpi-value" id="kpiRequests" style="color:#1D4ED8">—</span></div>
               <span class="kpi-label">Requests to review</span></button>
+            <button type="button" class="kpi-card" id="kpi-edited" aria-pressed="false" onclick="setAccredFilter('__edited')" title="Vendors who have changed their own profile since it was last acknowledged">
+              <div class="kpi-top"><i class="ti ti-pencil" style="color:#7C3AED"></i><span class="kpi-value" id="kpiEdited" style="color:#7C3AED">—</span></div>
+              <span class="kpi-label">Vendor edits</span></button>
           </div>
           <div class="vendor-toolbar" style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
             <div class="vendor-toolbar-filters" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1 1 320px;min-width:0">
@@ -439,6 +444,7 @@
               <option value="none">Not accredited</option>
               <option value="problematic">Problematic</option>
               <option value="__requested">Awaiting my decision</option>
+              <option value="__edited">Updated by the vendor</option>
             </select>
             <div class="view-toggle" role="group" aria-label="View mode">
               <button id="vv-cards" class="active" onclick="setVendorView('cards')" aria-label="Card view"><i class="ti ti-layout-grid"></i> Cards</button>
@@ -472,6 +478,8 @@
                 <option value="problematic">Problematic</option>
                 <option value="none">Not accredited</option>
               </select>
+              <button onclick="bulkPrepareInvites()" title="Use each vendor's contact email as their invite address so they can register">Enable self-service</button>
+              <button onclick="exportInviteList()" title="Download name + email + registration link for the selected vendors">Invite list (CSV)</button>
               <button class="b-delete" id="bulkDeleteBtn" onclick="bulkDelete()">Delete</button>
               <button onclick="clearVendorSel()">Clear</button>
             </div>
@@ -640,9 +648,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820e"></script>
-<script src="assets/js/db.js?v=20260820e"></script>
-<script src="assets/js/ui.js?v=20260820e"></script>
+<script src="assets/js/auth.js?v=20260820f"></script>
+<script src="assets/js/db.js?v=20260820f"></script>
+<script src="assets/js/ui.js?v=20260820f"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -733,6 +741,12 @@ function setVendorView(v) {
 // Accreditation standing, as a filter/group key ('none' when blank). Uses the
 // shared window.accredKey so this page and db.js can never disagree; the
 // fallbacks keep the page working if db.js is served stale from cache.
+/* internal.vendor_edit_guard forces status='pending_review' on ANY update a
+   vendor makes to their own row, and nothing else writes that column any more
+   (staff saves never touch it; created rows are 'approved'). So it now means
+   exactly one thing: this vendor has changed their profile since staff last
+   acknowledged it. Reusing the retired column as that flag needs no migration. */
+function _vendorEdited(v) { return v.status === 'pending_review'; }
 function _accredOf(v) {
   if (window.accredKey) return window.accredKey(v.accreditation);
   // Fallback only matters if db.js is served stale from cache — fold the
@@ -753,6 +767,7 @@ function _vendorFiltered() {
   const accredF = accredEl ? accredEl.value : 'all';
   return allVendors.filter(v => {
     if (accredF === '__requested') { if (!_pendingReq[v.id]) return false; }
+    else if (accredF === '__edited') { if (!_vendorEdited(v)) return false; }
     else if (accredF !== 'all' && _accredOf(v) !== accredF) return false;
     if (!q) return true;
     const hay = (v.name || '').toLowerCase()
@@ -996,6 +1011,53 @@ async function bulkSetAccreditation(value) {
     else if (AppNotify) AppNotify.fromError(e, 'Could not set accreditation'); else alert(e.message);
   }
 }
+/* A vendor can only register with the address sitting in vendors.invite_email
+   (RLS matches it against their sign-in email). Everything the imports created
+   carries a synthesized placeholder, so self-service is unreachable until a
+   real address is promoted — which is what this does, in bulk. */
+async function bulkPrepareInvites() {
+  const ids = [..._selectedVendors]; if (!ids.length) return;
+  if (!confirm(`Enable self-service for ${ids.length} selected vendor(s)?\n\nEach one's contact email becomes their registration address. Vendors with no email, an already-claimed login, or an address another vendor is using are skipped and reported.\n\nNo email is sent — use "Invite list (CSV)" afterwards to send the links.`)) return;
+  const prog = AppNotify && AppNotify.progress ? AppNotify.progress(`Preparing invites for ${ids.length} vendor(s)…`) : null;
+  try {
+    const r = await VendorDb.prepareInvites(ids);
+    await loadAll();
+    const skips = [
+      r.noEmail ? `${r.noEmail} no contact email` : '',
+      r.duplicate ? `${r.duplicate} email already used by another vendor` : '',
+      r.alreadySet ? `${r.alreadySet} already set` : '',
+      r.alreadyClaimed ? `${r.alreadyClaimed} already registered` : '',
+      r.failed ? `${r.failed} failed` : '',
+    ].filter(Boolean).join(', ');
+    const msg = `${r.set} vendor(s) can now register${skips ? ` — skipped: ${skips}` : ''}.`;
+    if (prog) prog.done(msg, { title: 'Self-service enabled' }); else AppNotify && AppNotify.success(msg);
+  } catch (e) {
+    if (prog) prog.fail((e && e.message) || 'Failed', { title: 'Could not prepare invites' });
+    else if (AppNotify) AppNotify.fromError(e, 'Could not prepare invites'); else alert(e.message);
+  }
+}
+/* The app has no mail transport, so the practical way to send hundreds of
+   invites is a CSV to mail-merge from. Only rows that can actually be claimed
+   are included — a placeholder address or a claimed login would just bounce. */
+function exportInviteList() {
+  const ids = new Set(_selectedVendors);
+  const rows = allVendors.filter(v => ids.has(v.id) && !v.invite_claimed_at && !_placeholderEmail(v.invite_email));
+  const skipped = ids.size - rows.length;
+  if (!rows.length) {
+    AppNotify && AppNotify.warn('None of the selected vendors have a usable invite email yet — run "Enable self-service" first.');
+    return;
+  }
+  const head = ['company', 'email', 'registration_link', 'accreditation'];
+  const body = rows.map(v => [v.name, v.invite_email, _vendorInviteLink(v.id), _accredLabel(v)].map(_csvCell).join(',')).join('\n');
+  const blob = new Blob(['﻿' + head.join(',') + '\n' + body], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `vendor-invites-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  AppNotify && AppNotify.success(`${rows.length} invite(s) exported${skipped ? ` — ${skipped} skipped (no usable email, or already registered)` : ''}.`);
+}
+
 /* Download the rows about to be deleted, as CSV. A cascade delete is
    irreversible and there is no undo anywhere in this app — a file on disk is
    the only way back if a name turns out to have been wanted. Offered before
@@ -1131,6 +1193,7 @@ function renderCards(rows) {
         <div class="vcard-status-badge" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
           ${_accredBadge(v)}
           ${_pendingReq[v.id] ? '<span class="abadge abadge-request" title="This vendor has requested accreditation"><i class="ti ti-clock-hour-4"></i>Requested</span>' : ''}
+          ${_vendorEdited(v) ? '<span class="abadge abadge-edited" title="This vendor has updated their own profile since it was last acknowledged"><i class="ti ti-pencil"></i>Vendor edit</span>' : ''}
         </div>
       </div>
       ${tradesHtml}
@@ -1953,11 +2016,12 @@ function renderKpis() {
   document.getElementById('kpiUnassessed').textContent = byAccred('none').toLocaleString();
   document.getElementById('kpiProblematic').textContent = byAccred('problematic').toLocaleString();
   document.getElementById('kpiRequests').textContent = Object.keys(_pendingReq).length.toLocaleString();
+  document.getElementById('kpiEdited').textContent = allVendors.filter(_vendorEdited).length.toLocaleString();
   _syncKpiPressed();
 }
 // The KPI tiles ARE the standing filter, so their pressed state has to follow
 // the <select> too — either control can change the filter.
-const _KPI_TILES = { all: 'kpi-all', accredited: 'kpi-accredited', none: 'kpi-none', problematic: 'kpi-problematic', __requested: 'kpi-requested' };
+const _KPI_TILES = { all: 'kpi-all', accredited: 'kpi-accredited', none: 'kpi-none', problematic: 'kpi-problematic', __requested: 'kpi-requested', __edited: 'kpi-edited' };
 function _syncKpiPressed() {
   const el = document.getElementById('vendor-accred-filter');
   const cur = el ? el.value : 'all';
@@ -2758,6 +2822,12 @@ async function renderDetailRequest() {
   if (!box) return;
   const v = activeVendor;
   const req = _pendingReq[v.id];
+  const editedBanner = _vendorEdited(v)
+    ? `<div class="req-panel" style="border-color:#C4B5FD;background:#F5F3FF">
+        <h4 style="color:#6D28D9"><i class="ti ti-pencil"></i> This vendor updated their own profile</h4>
+        <div style="font-size:0.8125rem;color:#555">Last change ${esc(_reqDate(v.updated_at))}${v.updated_by_name ? ' by ' + esc(v.updated_by_name) : ''}. Check the details below, then mark it reviewed to clear the flag.</div>
+        ${_canManage ? `<div class="req-actions"><button class="btn-cancel" onclick="acknowledgeVendorEdit('${v.id}')"><i class="ti ti-check" style="margin-right:4px"></i>Mark reviewed</button></div>` : ''}
+      </div>` : '';
   try { _detailDocs = await VendorDb.documents.list(v.id); } catch (e) { _detailDocs = []; }
   // The modal can be reopened on another vendor while this await is in flight.
   if (!activeVendor || activeVendor.id !== v.id) return;
@@ -2766,7 +2836,7 @@ async function renderDetailRequest() {
   // request, documents already on file, or a vendor who actually has a login
   // and is self-servicing. Otherwise every WP-derived legacy record — none of
   // which anyone has asked to accredit — would carry a big "incomplete" panel.
-  if (!req && !_detailDocs.length && !v.invite_claimed_at) { box.innerHTML = ''; return; }
+  if (!req && !_detailDocs.length && !v.invite_claimed_at) { box.innerHTML = editedBanner; return; }
 
   const checks = rd ? `<div class="req-check">${rd.items.map(i =>
     `<span class="${i.ok ? 'ok' : 'no'}">${i.ok ? '✓' : '✗'} ${esc(i.label)}</span>`).join('')}</div>` : '';
@@ -2776,13 +2846,13 @@ async function renderDetailRequest() {
     : '<div class="req-docs" style="color:#991B1B"><b>No accreditation documents uploaded.</b></div>';
 
   if (!req) {
-    box.innerHTML = `<div class="req-panel" style="border-color:var(--border-md,#e5e5e5);background:var(--surface-2,#fafafa)">
+    box.innerHTML = editedBanner + `<div class="req-panel" style="border-color:var(--border-md,#e5e5e5);background:var(--surface-2,#fafafa)">
       <h4 style="color:inherit">Accreditation readiness — ${rd ? rd.done + ' of ' + rd.total + ' complete' : '—'}</h4>
       <div style="font-size:0.8125rem;color:#666">This vendor has not requested accreditation. ${rd && rd.missing.length ? 'Still missing: <b>' + esc(rd.missing.join(', ')) + '</b>.' : ''}</div>
       ${checks}${docs}</div>`;
     return;
   }
-  box.innerHTML = `<div class="req-panel">
+  box.innerHTML = editedBanner + `<div class="req-panel">
     <h4><i class="ti ti-clock-hour-4"></i> Accreditation requested ${esc(_reqDate(req.submitted_at))}</h4>
     ${req.message ? `<div class="req-msg">${esc(req.message)}</div>` : ''}
     ${rd && rd.missing.length ? `<div style="font-size:0.8125rem;color:#991B1B;font-weight:600">Incomplete — still missing: ${esc(rd.missing.join(', '))}</div>` : ''}
@@ -2796,6 +2866,21 @@ function _reqDate(v) {
   if (!v) return '';
   const d = new Date(v);
   return isNaN(d) ? String(v).slice(0, 10) : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+/* Clearing the flag = putting vendors.status back to 'approved'. That is the
+   ONLY thing that column is used for now (see _vendorEdited) — it is not a
+   review workflow coming back. */
+async function acknowledgeVendorEdit(id) {
+  try {
+    const updated = await VendorDb.updateVendor(id, { status: 'approved' });
+    if (activeVendor && activeVendor.id === id) activeVendor = updated || activeVendor;
+    const idx = allVendors.findIndex(x => x.id === id);
+    if (idx > -1) allVendors[idx] = activeVendor;
+    renderDetailOverview();
+    renderKpis();
+    renderVendorList();
+    AppNotify && AppNotify.success('Marked as reviewed.');
+  } catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not clear the flag') : alert(e.message); }
 }
 async function viewVendorDoc(id) {
   const d = _detailDocs.find(x => x.id === id);
