@@ -222,7 +222,7 @@
     <div class="panel-title">Products / Services Offered</div>
     <div id="productsList"></div>
     <div class="add-form">
-      <select id="np-category"><option value="">Category…</option></select>
+      <div id="np-taxonomy" style="flex:1 1 100%"></div>
       <select id="np-type"><option value="Materials">Materials</option><option value="Labor">Labor</option><option value="Service">Service</option></select>
       <input id="np-description" placeholder="Description (e.g. Ready-Mix Concrete)">
       <input id="np-unit" placeholder="Unit (e.g. cu.m.)">
@@ -265,8 +265,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820j"></script>
-<script src="assets/js/db.js?v=20260820j"></script>
+<script src="assets/js/auth.js?v=20260820k"></script>
+<script src="assets/js/db.js?v=20260820k"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -296,7 +296,7 @@ async function loadAll() {
   }
   renderOverviewForm();
   buildTradeChips();
-  renderProductCategoryOptions();
+  await renderProductCategoryOptions();   // async — mounts the taxonomy picker
   await Promise.all([reloadAccreditation(), renderProducts(), renderCerts(), renderPersonnel()]);
   // Only now do keystrokes count as edits — several render paths above write
   // into the form, and treating those as a change would arm the unload prompt
@@ -538,9 +538,14 @@ function toggleTrade(el) {
 }
 function esc(v) { return window.esc ? window.esc(v) : String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-function renderProductCategoryOptions() {
-  const sel = document.getElementById('np-category');
-  sel.innerHTML = '<option value="">Category…</option>' + TRADES.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+/* The offering category is now a taxonomy-tree picker (Trade → Works → …)
+   rather than a flat trade dropdown, so a vendor can say exactly what they
+   supply and the app can match them to a work package. */
+let _npPicker = null;
+async function renderProductCategoryOptions() {
+  const box = document.getElementById('np-taxonomy');
+  if (!box || !window.TaxonomyPicker) return;
+  _npPicker = await TaxonomyPicker.mount(box, { placeholder: 'Choose what you supply…' });
 }
 
 async function saveOverview() {
@@ -701,25 +706,37 @@ function switchTab(t) {
 /* ── Products ── */
 async function renderProducts() {
   const list = await VendorDb.products.list(vendor.id);
+  const tax = await VendorDb.getTaxonomy();
   const el = document.getElementById('productsList');
+  // Show the precise taxonomy path when classified; otherwise fall back to the
+  // legacy free-text trade so older rows still read sensibly.
+  const sub = p => {
+    const path = p.taxonomy_id ? VendorDb.taxonomyPathLabel(tax, p.taxonomy_id) : '';
+    return path ? `<span style="color:#C42127;font-weight:600">${esc(path)}</span>` : esc(p.category || 'Uncategorized');
+  };
   el.innerHTML = list.length ? list.map(p => `
     <div class="row-item">
       <div class="row-item-body">
         <div class="row-item-title">${esc(p.description)}${p.unit ? ' <span style="color:#aaa;font-weight:400">('+esc(p.unit)+')</span>' : ''}</div>
-        <div class="row-item-sub">${esc(p.category || 'Uncategorized')}${p.item_type ? ' · ' + esc(p.item_type) : ''}</div>
+        <div class="row-item-sub">${sub(p)}${p.item_type ? ' · ' + esc(p.item_type) : ''}</div>
       </div>
       <button class="row-item-del" onclick="removeProduct('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button>
     </div>`).join('') : '<div class="empty">No products/services added yet.</div>';
 }
 async function addProduct() {
-  const category = document.getElementById('np-category').value;
   const item_type = document.getElementById('np-type').value;
   const description = document.getElementById('np-description').value.trim();
   const unit = document.getElementById('np-unit').value.trim();
+  const taxonomy_id = _npPicker ? _npPicker.value() : null;
   if (!description) { msg('Enter a description first.', 'error'); return; }
+  // Keep the legacy free-text `category` (the trade) in step with the picked node.
+  const tax = await VendorDb.getTaxonomy();
+  const node = taxonomy_id ? tax.find(n => n.id === taxonomy_id) : null;
+  const category = node ? (node.trade || (tax.find(x => x.id === (node.path || [])[0]) || {}).name || '') : '';
   try {
-    await VendorDb.products.add(vendor.id, { category, item_type, description, unit });
+    await VendorDb.products.add(vendor.id, { category, item_type, description, unit, taxonomy_id });
     document.getElementById('np-description').value = ''; document.getElementById('np-unit').value = '';
+    if (_npPicker) _npPicker.set(null);
     await renderProducts();
     await flagEdited();
   } catch (e) { msg('Could not add: ' + (e.message || e), 'error'); }

@@ -1919,27 +1919,42 @@ const VendorDb = (() => {
     };
   }
   const _productsBase = _child('vendor_products');
+  /* Deploy-safe optional columns on vendor_products:
+       item_type   — MIGRATION_vendor_product_type.sql
+       taxonomy_id — MIGRATION_product_taxonomy.sql
+     Strips PRECISELY the column the error names (never both at once) and warns,
+     per the _stripBuyback lesson (Known Issues #28b): a coarse strip-them-all
+     guard silently discards a column the DB really does have. */
+  const _PRODUCT_OPT = [
+    { col: 'item_type',   re: /item_type/,   mig: 'MIGRATION_vendor_product_type.sql' },
+    { col: 'taxonomy_id', re: /taxonomy_id/, mig: 'MIGRATION_product_taxonomy.sql' },
+  ];
+  function _stripProductOpt(fields, e) {
+    for (const o of _PRODUCT_OPT) {
+      if (fields && o.col in fields && _isMissingCol(e, o.re)) {
+        const f2 = { ...fields }; delete f2[o.col];
+        console.warn('[VendorDb] Dropped ' + o.col + ' — NOT saved. If ' + o.mig +
+          ' has already run, this guard is wrong, not the schema. Postgres said: ' + (e && e.message));
+        return f2;
+      }
+    }
+    return null;
+  }
   const products = {
     ..._productsBase,
-    // Deploy-safe: drop item_type and retry if that column's migration
-    // (MIGRATION_vendor_product_type.sql) hasn't run yet.
     async add(vendorId, fields) {
       try { return await _productsBase.add(vendorId, fields); }
       catch (e) {
-        if (fields && 'item_type' in fields && _isMissingCol(e, /item_type/)) {
-          const f2 = { ...fields }; delete f2.item_type;
-          return _productsBase.add(vendorId, f2);
-        }
+        const f2 = _stripProductOpt(fields, e);
+        if (f2) return products.add(vendorId, f2);   // recurse: both columns may be absent
         throw e;
       }
     },
     async update(id, fields) {
       try { return await _productsBase.update(id, fields); }
       catch (e) {
-        if (fields && 'item_type' in fields && _isMissingCol(e, /item_type/)) {
-          const f2 = { ...fields }; delete f2.item_type;
-          return _productsBase.update(id, f2);
-        }
+        const f2 = _stripProductOpt(fields, e);
+        if (f2) return products.update(id, f2);
         throw e;
       }
     },
@@ -2896,9 +2911,133 @@ const VendorDb = (() => {
     return [...byId.values()];
   }
 
+  /* ── Product taxonomy (MIGRATION_product_taxonomy.sql) ──────────────────
+     Hybrid tree: L1 = Trade, L2 = Works (both `canonical`, mirroring the WP
+     form's TRADE_WORKS ladder so vendor offerings and work packages share one
+     vocabulary); L3+ are free staff-managed sub-nodes of any depth.
+
+     Every read degrades to [] when the table is absent, so both the directory
+     and the vendor portal still render before the migration is run. */
+  let _taxCache = null;
+  function _isMissingTable(e) {
+    const m = ((e && (e.message || '')) + (e && e.details || '')).toLowerCase();
+    return /product_taxonomy/.test(m) &&
+           (/does not exist|schema cache|could not find/.test(m) || e?.code === '42P01' || e?.code === 'PGRST205');
+  }
+  async function getTaxonomy(force) {
+    if (_taxCache && !force) return _taxCache;
+    try {
+      const sb = await getSB();
+      const rows = await _pagedSelect(() =>
+        sb.from('product_taxonomy').select('*').order('depth').order('sort_order').order('name'));
+      _taxCache = rows || [];
+    } catch (e) {
+      if (!_isMissingTable(e)) console.warn('[Taxonomy] load failed:', e && e.message);
+      _taxCache = [];
+    }
+    return _taxCache;
+  }
+  function _taxBust() { _taxCache = null; }
+  /* Nest a flat node list into { ...node, children: [] } roots. Sorted by
+     sort_order then name at every level (canonical order first, so the trades
+     come out in TRADE_ORDER rather than alphabetically). */
+  function buildTaxonomyTree(nodes) {
+    const byId = new Map(), roots = [];
+    (nodes || []).forEach(n => byId.set(n.id, { ...n, children: [] }));
+    byId.forEach(n => {
+      const p = n.parent_id && byId.get(n.parent_id);
+      (p ? p.children : roots).push(n);
+    });
+    const sort = a => { a.sort((x, y) => (x.sort_order - y.sort_order) || x.name.localeCompare(y.name)); a.forEach(n => sort(n.children)); };
+    sort(roots);
+    return roots;
+  }
+  /* "Structural Works › Rebar › Deformed Bars" for any node, from the flat list. */
+  function taxonomyPathLabel(nodes, id, sep) {
+    const byId = new Map((nodes || []).map(n => [n.id, n]));
+    const n = byId.get(id);
+    if (!n) return '';
+    return (n.path || []).map(pid => (byId.get(pid) || {}).name).filter(Boolean).join(sep || ' › ');
+  }
+  async function createTaxonomyNode(fields, profile) {
+    const sb = await getSB();
+    const payload = { ...fields, created_by: profile?.id || null, ...(_stamp()) };
+    let { data, error } = await sb.from('product_taxonomy').insert(payload).select().single();
+    if (error && _isMissingCol(error, /created_by|updated_by|updated_by_name|updated_at/)) {
+      const d2 = { ...payload }; delete d2.created_by; delete d2.updated_by; delete d2.updated_by_name; delete d2.updated_at;
+      ({ data, error } = await sb.from('product_taxonomy').insert(d2).select().single());
+    }
+    if (error) throw error;
+    _taxBust();
+    return data;
+  }
+  async function updateTaxonomyNode(id, fields) {
+    const sb = await getSB();
+    const run = p => sb.from('product_taxonomy').update(p).eq('id', id).select().single();
+    let { data, error } = await run({ ...fields, ...(_stamp()) });
+    if (error && _isMissingCol(error, /updated_by|updated_by_name|updated_at/)) {
+      ({ data, error } = await run({ ...fields }));
+    }
+    if (error) throw error;
+    _taxBust();
+    return data;
+  }
+  /* Deleting a node cascades to its sub-nodes (FK on delete cascade) but NEVER
+     to a vendor's offering — vendor_products.taxonomy_id is ON DELETE SET NULL,
+     so those rows just fall back to unclassified. */
+  async function deleteTaxonomyNode(id) {
+    const sb = await getSB();
+    const { error } = await sb.from('product_taxonomy').delete().eq('id', id);
+    if (error) throw error;
+    _taxBust();
+  }
+  /* Resolve a work package's (trade, works) to its canonical node — the Works
+     node when it matches, else the Trade node. Case/space tolerant, and the
+     trade is canonicalised first so a raw WP trade variant still resolves. */
+  async function taxonomyNodeForWP(trade, works) {
+    const nodes = await getTaxonomy();
+    if (!nodes.length) return null;
+    const norm = s => String(s == null ? '' : s).trim().replace(/\s+/g, ' ').toLowerCase();
+    const t = norm(window.CanonTrade ? window.CanonTrade(trade) : trade);
+    if (!t) return null;
+    const root = nodes.find(n => !n.parent_id && norm(n.name) === t);
+    if (!root) return null;
+    const w = norm(works);
+    if (w) {
+      const child = nodes.find(n => n.parent_id === root.id && norm(n.name) === w);
+      if (child) return child;
+    }
+    return root;
+  }
+  /* Vendors who supply a given WP: every vendor with an offering AT or UNDER
+     that (trade, works) node. Returns [{vendor, node, products[]}] sorted
+     accredited-first, then by name — an officer wants the usable ones on top. */
+  async function findVendorsForWP(trade, works) {
+    const node = await taxonomyNodeForWP(trade, works);
+    if (!node) return [];
+    const nodes = await getTaxonomy();
+    const under = new Set(nodes.filter(n => (n.path || []).includes(node.id)).map(n => n.id));
+    let prods = [];
+    try { prods = await getAllVendorProducts(); } catch (e) { return []; }
+    const hits = new Map();
+    prods.forEach(p => {
+      if (!p.taxonomy_id || !under.has(p.taxonomy_id)) return;
+      if (!hits.has(p.vendor_id)) hits.set(p.vendor_id, []);
+      hits.get(p.vendor_id).push(p);
+    });
+    if (!hits.size) return [];
+    const vendors = await getVendorsByIds([...hits.keys()]);
+    const rank = v => (accredKey(v.accreditation) === 'accredited' ? 0 : accredKey(v.accreditation) === 'problematic' ? 2 : 1);
+    return vendors
+      .map(v => ({ vendor: v, node, products: hits.get(v.id) || [] }))
+      .sort((a, b) => (rank(a.vendor) - rank(b.vendor)) || a.vendor.name.localeCompare(b.vendor.name));
+  }
+
   return {
     getVendors, getVendor, createVendor, updateVendor, approveVendor, rejectVendor, setVendorStatus, deleteVendor,
     products, certifications, personnel,
+    getTaxonomy, buildTaxonomyTree, taxonomyPathLabel, createTaxonomyNode, updateTaxonomyNode, deleteTaxonomyNode,
+    taxonomyNodeForWP, findVendorsForWP,
     getVendorRates, addVendorRate, deleteVendorRate, upsertRate,
     uploadCertFile, getCertFileUrl, deleteCertFile,
     documents: vendorDocuments, uploadVendorDoc, requests: accreditationRequests,
@@ -2910,3 +3049,232 @@ const VendorDb = (() => {
   };
 })();
 window.VendorDb = VendorDb;
+
+/* ══ TaxonomyPicker ═══════════════════════════════════════════════════════
+   A searchable, cascading tree picker for a product_taxonomy node.
+
+   Lives in db.js, NOT ui.js, because vendor-portal.html loads only auth.js +
+   db.js — and this control is needed on BOTH that page and vendors.html.
+   There is precedent for shared render helpers here (renderUserBar,
+   buildRankTable).
+
+   Self-contained in the established style (own injected CSS, theme-aware via
+   the standard surface/text/border CSS custom properties, one delegated
+   document listener). NOTE: never write a CSS var glob like --text-star-slash
+   inside a block comment here — the slash closes the comment (the same trap
+   that broke vendor-guide.js).
+
+     const p = await TaxonomyPicker.mount(el, { value, onChange, placeholder });
+     p.value()        -> selected node id or null
+     p.set(id)        -> select programmatically
+     p.refresh()      -> re-read the tree (after the manager edits it)
+
+   Degrades to a plain disabled note when the taxonomy table is absent, so both
+   pages still work before MIGRATION_product_taxonomy.sql is run. */
+window.TaxonomyPicker = (function () {
+  let _seq = 0;
+  const _open = new Set();          // instances with an open popover
+
+  function injectCss() {
+    if (document.getElementById('taxpicker-css')) return;
+    const s = document.createElement('style');
+    s.id = 'taxpicker-css';
+    s.textContent = `
+.txp{position:relative;display:block}
+.txp-btn{width:100%;display:flex;align-items:center;gap:7px;padding:8px 11px;border:1.5px solid var(--border-md,#e5e5e5);
+  border-radius:8px;background:var(--surface,#fff);color:var(--text-primary,#231F20);font-family:inherit;font-size:0.8571rem;
+  cursor:pointer;text-align:left;transition:border-color .15s}
+.txp-btn:hover{border-color:var(--mw-red,#EE3124)}
+.txp-btn[disabled]{cursor:not-allowed;opacity:.6}
+.txp-btn .txp-lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.txp-btn .txp-lbl.txp-empty{color:var(--text-hint,#6E6C6C)}
+.txp-btn .txp-x{color:var(--text-hint,#6E6C6C);font-size:1.1rem;line-height:1;padding:0 2px}
+.txp-btn .txp-x:hover{color:var(--mw-red,#EE3124)}
+.txp-pop{position:absolute;z-index:600;left:0;right:0;top:calc(100% + 4px);background:var(--surface,#fff);
+  border:1.5px solid var(--mw-red,#EE3124);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.16);display:none;overflow:hidden}
+.txp-pop.open{display:block}
+.txp-search{width:100%;border:none;border-bottom:1px solid var(--border,rgba(0,0,0,.08));padding:9px 11px;
+  font-family:inherit;font-size:0.8571rem;outline:none;background:transparent;color:var(--text-primary,#231F20)}
+.txp-list{max-height:260px;overflow-y:auto;padding:4px 0}
+.txp-row{display:flex;align-items:center;gap:4px;padding:5px 9px;cursor:pointer;font-size:0.8571rem;color:var(--text-primary,#231F20)}
+.txp-row:hover{background:var(--mw-red-light,#FDECEA)}
+.txp-row.sel{background:var(--mw-red-light,#FDECEA);font-weight:700}
+.txp-tw{width:16px;flex-shrink:0;text-align:center;color:var(--text-hint,#6E6C6C);font-size:0.75rem}
+.txp-tw:hover{color:var(--mw-red,#EE3124)}
+.txp-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.txp-canon{font-size:0.6786rem;color:var(--text-hint,#6E6C6C);text-transform:uppercase;letter-spacing:.04em;flex-shrink:0}
+.txp-none{padding:12px;font-size:0.7857rem;color:var(--text-hint,#6E6C6C);text-align:center}
+`;
+    document.head.appendChild(s);
+  }
+
+  function esc(s) { return window.esc ? window.esc(s) : String(s == null ? '' : s); }
+
+  async function mount(container, opts) {
+    opts = opts || {};
+    injectCss();
+    const el = typeof container === 'string' ? document.getElementById(container) : container;
+    if (!el) return null;
+    const uid = 'txp' + (++_seq);
+    let nodes = [];
+    try { nodes = await VendorDb.getTaxonomy(); } catch (e) { nodes = []; }
+
+    let value = opts.value || null;
+    let query = '';
+    const expanded = new Set();
+
+    const byId = () => new Map(nodes.map(n => [n.id, n]));
+    const kids = pid => nodes.filter(n => (n.parent_id || null) === pid)
+      .sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
+
+    function expandTo(id) {
+      const m = byId(), n = m.get(id);
+      if (!n) return;
+      (n.path || []).forEach(p => { if (p !== id) expanded.add(p); });
+    }
+    if (value) expandTo(value);
+
+    function label() {
+      if (!nodes.length) return null;
+      if (!value) return null;
+      return VendorDb.taxonomyPathLabel(nodes, value);
+    }
+
+    /* Search shows every matching node PLUS its ancestors, so a deep hit is
+       still readable in context instead of appearing as a bare leaf. */
+    function visibleSet() {
+      if (!query) return null;
+      const q = query.toLowerCase(), m = byId(), keep = new Set();
+      nodes.forEach(n => {
+        if (n.name.toLowerCase().includes(q)) {
+          keep.add(n.id);
+          (n.path || []).forEach(p => keep.add(p));
+        }
+      });
+      return keep;
+    }
+
+    function rowsHtml() {
+      if (!nodes.length) {
+        return '<div class="txp-none">No product categories yet.<br>Run MIGRATION_product_taxonomy.sql, then add them under Data Tools.</div>';
+      }
+      const keep = visibleSet();
+      const out = [];
+      (function walk(pid, depth) {
+        kids(pid).forEach(n => {
+          if (keep && !keep.has(n.id)) return;
+          const kidCount = kids(n.id).length;
+          const isOpen = keep ? true : expanded.has(n.id);
+          const tw = kidCount ? (isOpen ? '&#9662;' : '&#9656;') : '&nbsp;';
+          out.push(
+            `<div class="txp-row${n.id === value ? ' sel' : ''}" data-id="${n.id}" style="padding-left:${9 + depth * 15}px">` +
+            `<span class="txp-tw" data-tw="${n.id}">${tw}</span>` +
+            `<span class="txp-nm">${esc(n.name)}</span>` +
+            (n.depth <= 2 ? `<span class="txp-canon">${n.depth === 1 ? 'trade' : 'works'}</span>` : '') +
+            `</div>`);
+          if (kidCount && isOpen) walk(n.id, depth + 1);
+        });
+      })(null, 0);
+      if (!out.length) out.push('<div class="txp-none">No category matches that search.</div>');
+      return out.join('');
+    }
+
+    function render() {
+      const lbl = label();
+      el.innerHTML =
+        `<div class="txp" id="${uid}">` +
+        `<button type="button" class="txp-btn" data-role="btn"${nodes.length ? '' : ' disabled'}>` +
+        `<i class="ti ti-category"></i>` +
+        `<span class="txp-lbl${lbl ? '' : ' txp-empty'}">${lbl ? esc(lbl) : esc(opts.placeholder || 'Choose a product category…')}</span>` +
+        (lbl ? '<span class="txp-x" data-role="clear" title="Clear">&times;</span>' : '<i class="ti ti-chevron-down" style="opacity:.5"></i>') +
+        `</button>` +
+        `<div class="txp-pop" data-role="pop">` +
+        `<input class="txp-search" data-role="search" placeholder="Search categories…" autocomplete="off" value="${esc(query)}"/>` +
+        `<div class="txp-list" data-role="list">${rowsHtml()}</div>` +
+        `</div></div>`;
+      wire();
+    }
+
+    function popEl() { return el.querySelector('[data-role="pop"]'); }
+    function close() { const p = popEl(); if (p) p.classList.remove('open'); _open.delete(api); }
+
+    function wire() {
+      const btn = el.querySelector('[data-role="btn"]');
+      const pop = popEl();
+      btn.addEventListener('mousedown', e => {
+        if (e.target.closest('[data-role="clear"]')) {
+          e.preventDefault(); e.stopPropagation();
+          value = null; render();
+          if (opts.onChange) opts.onChange(null, null);
+          return;
+        }
+        e.preventDefault();
+        const willOpen = !pop.classList.contains('open');
+        _open.forEach(o => { if (o !== api) o._close(); });
+        pop.classList.toggle('open', willOpen);
+        if (willOpen) {
+          _open.add(api);
+          const s = el.querySelector('[data-role="search"]');
+          if (s) setTimeout(() => s.focus(), 0);
+        } else { _open.delete(api); }
+      });
+      const search = el.querySelector('[data-role="search"]');
+      if (search) {
+        search.addEventListener('input', () => {
+          query = search.value.trim();
+          el.querySelector('[data-role="list"]').innerHTML = rowsHtml();
+        });
+        // Typing must not bubble to a parent form/keyboard handler.
+        search.addEventListener('keydown', e => {
+          e.stopPropagation();
+          if (e.key === 'Escape') { e.preventDefault(); close(); }
+        });
+      }
+      const list = el.querySelector('[data-role="list"]');
+      if (list) {
+        list.addEventListener('mousedown', e => {
+          e.preventDefault();
+          const tw = e.target.closest('[data-tw]');
+          if (tw) {   // twisty toggles, never selects
+            const id = tw.dataset.tw;
+            if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+            list.innerHTML = rowsHtml();
+            return;
+          }
+          const row = e.target.closest('.txp-row');
+          if (!row) return;
+          value = row.dataset.id;
+          expandTo(value);
+          query = '';
+          render();
+          close();
+          if (opts.onChange) {
+            const n = byId().get(value) || null;
+            opts.onChange(value, n);
+          }
+        });
+      }
+    }
+
+    const api = {
+      value: () => value,
+      set(v) { value = v || null; if (value) expandTo(value); render(); },
+      async refresh() { try { nodes = await VendorDb.getTaxonomy(true); } catch (e) {} render(); },
+      _close: close,
+      destroy() { _open.delete(api); el.innerHTML = ''; },
+    };
+    render();
+    return api;
+  }
+
+  // One document listener for every instance.
+  if (typeof document !== 'undefined') {
+    document.addEventListener('mousedown', e => {
+      if (!_open.size) return;
+      if (e.target.closest('.txp')) return;
+      [..._open].forEach(o => o._close());
+    });
+  }
+
+  return { mount };
+})();

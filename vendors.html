@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820j"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820j"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820j"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820k"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820k"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820k"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820j">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820k">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -192,6 +192,21 @@
     .row-item:last-child{border-bottom:none}
     .row-item-title{font-size:0.8571rem;font-weight:600}
     .row-item-sub{font-size:0.7857rem;color:#888;margin-top:2px}
+    /* Taxonomy path on a classified offering — distinguishes it at a glance
+       from a legacy row still showing only its free-text trade. */
+    .prod-path{color:#C42127;font-weight:600}
+    body.dark-mode .prod-path{color:#FF7A6E}
+    /* Product-category manager (Data Tools → Manage Product Categories) */
+    .tx-tree{max-height:52vh;overflow:auto;border:1px solid var(--border-md,#e5e5e5);border-radius:8px;padding:6px 0}
+    .tx-row{display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:0.8571rem}
+    .tx-row:hover{background:var(--mw-red-light,#FDECEA)}
+    .tx-row .tx-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tx-tag{font-size:0.6786rem;text-transform:uppercase;letter-spacing:.04em;color:#888;flex-shrink:0}
+    .tx-act{background:none;border:none;cursor:pointer;color:#888;padding:2px 4px;font-size:0.9rem}
+    .tx-act:hover{color:#EE3124}
+    .tx-act[disabled]{opacity:.25;cursor:not-allowed}
+    body.dark-mode .tx-tree{border-color:var(--border)}
+    body.dark-mode .tx-tag,body.dark-mode .tx-act{color:var(--text-hint)}
     .empty{font-size:0.8571rem;color:#aaa;padding:8px 0}
     .file-badge{font-size:0.7857rem;color:#2563EB;text-decoration:underline;cursor:pointer}
     .add-form{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed #e5e5e5}
@@ -462,6 +477,7 @@
                 <button onclick="closeToolsMenu();openMergeModal()"><i class="ti ti-arrows-join"></i><span>Merge Duplicates</span><small>Combine records that are the same company under different names</small></button>
                 <button id="tools-menu-dupes" onclick="closeToolsMenu();openDupModal()"><i class="ti ti-copy-off"></i><span>Remove Exact Duplicates <span class="tools-menu-badge" id="dup-count-badge" style="display:none"><span id="dup-count">0</span></span></span><small>Fold byte-identical vendor names into one record (keeps children, links and trades)</small></button>
                 <button id="tools-menu-split" onclick="closeToolsMenu();openSplitModal()"><i class="ti ti-cut"></i><span>Needs Splitting <span class="tools-menu-badge" id="split-count-badge" style="display:none"><span id="split-count">0</span></span></span><small>Records that look like several companies joined together</small></button>
+                <button onclick="closeToolsMenu();openTaxonomyModal()"><i class="ti ti-category"></i><span>Manage Product Categories</span><small>The Trade → Works → … tree vendors classify their offerings against</small></button>
               </div>
             </div>
             <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Add Vendor</button>
@@ -594,6 +610,22 @@
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="taxonomyModal" style="display:none">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div><div class="modal-title">Product Categories</div><div class="modal-subtitle">The tree vendors classify their offerings against. <b>Trade</b> and <b>Works</b> are locked — they mirror the work-package form so a WP can be matched to vendors who supply it. Add your own sub-categories beneath them to any depth.</div></div>
+      <button class="modal-close" onclick="closeTaxonomyModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="taxonomyModalBody">
+      <div id="tx-tree" class="tx-tree"><div class="empty">Loading…</div></div>
+      <div style="margin-top:10px;font-size:0.7857rem;color:#888">
+        Deleting a category also deletes its sub-categories. Vendor offerings filed under it are <b>never</b> deleted — they simply become unclassified.
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn-cancel" onclick="closeTaxonomyModal()">Done</button></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="splitModal" style="display:none">
   <div class="modal" style="max-width:700px">
     <div class="modal-header">
@@ -648,9 +680,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820j"></script>
-<script src="assets/js/db.js?v=20260820j"></script>
-<script src="assets/js/ui.js?v=20260820j"></script>
+<script src="assets/js/auth.js?v=20260820k"></script>
+<script src="assets/js/db.js?v=20260820k"></script>
+<script src="assets/js/ui.js?v=20260820k"></script>
 <script src="assets/js/vendor-guide.js?v=20260810x"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1501,6 +1533,88 @@ function _toolsMenuOutsideClick(e) {
   if (!document.getElementById('toolsMenuWrap').contains(e.target)) closeToolsMenu();
 }
 let _splitSegs = {}; // vendorId -> [segment strings]
+/* ── Product-category manager ───────────────────────────────────────────────
+   Canonical nodes (depth ≤ 2 — Trade and Works) are LOCKED: they mirror
+   wp-form.html's TRADE_WORKS, and renaming or deleting one silently breaks
+   WP→vendor matching. You can always add free sub-nodes underneath them. */
+let _txNodes = [];
+const _txOpen = new Set();
+async function openTaxonomyModal() {
+  document.getElementById('taxonomyModal').style.display = 'flex';
+  _syncModalScrollLock();
+  await _txReload();
+}
+function closeTaxonomyModal() {
+  document.getElementById('taxonomyModal').style.display = 'none';
+  _syncModalScrollLock();
+  // The add-form picker may now be stale (a category was added/renamed).
+  if (_dnpPicker) _dnpPicker.refresh();
+}
+async function _txReload() {
+  try { _txNodes = await VendorDb.getTaxonomy(true); }
+  catch (e) { _txNodes = []; }
+  _txRender();
+}
+function _txKids(pid) {
+  return _txNodes.filter(n => (n.parent_id || null) === pid)
+    .sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
+}
+function _txRender() {
+  const box = document.getElementById('tx-tree');
+  if (!box) return;
+  if (!_txNodes.length) {
+    box.innerHTML = '<div class="empty" style="padding:14px">No categories yet — run <b>MIGRATION_product_taxonomy.sql</b> to seed the Trade → Works tree.</div>';
+    return;
+  }
+  const out = [];
+  (function walk(pid, depth) {
+    _txKids(pid).forEach(n => {
+      const kids = _txKids(n.id);
+      const isOpen = _txOpen.has(n.id);
+      const locked = n.depth <= 2;
+      out.push(
+        `<div class="tx-row" style="padding-left:${10 + depth * 16}px">` +
+        `<span class="txp-tw" style="cursor:${kids.length ? 'pointer' : 'default'}" ${kids.length ? `onclick="_txToggle('${n.id}')"` : ''}>${kids.length ? (isOpen ? '&#9662;' : '&#9656;') : '&nbsp;'}</span>` +
+        `<span class="tx-nm">${esc(n.name)}</span>` +
+        (locked ? `<span class="tx-tag">${n.depth === 1 ? 'trade' : 'works'} · locked</span>` : '') +
+        `<button class="tx-act" title="Add a sub-category" onclick="_txAdd('${n.id}')"><i class="ti ti-plus"></i></button>` +
+        `<button class="tx-act" title="${locked ? 'Canonical categories cannot be renamed' : 'Rename'}" ${locked ? 'disabled' : `onclick="_txRename('${n.id}')"`}><i class="ti ti-pencil"></i></button>` +
+        `<button class="tx-act" title="${locked ? 'Canonical categories cannot be deleted' : 'Delete'}" ${locked ? 'disabled' : `onclick="_txDelete('${n.id}')"`}><i class="ti ti-trash"></i></button>` +
+        `</div>`);
+      if (kids.length && isOpen) walk(n.id, depth + 1);
+    });
+  })(null, 0);
+  box.innerHTML = out.join('');
+}
+function _txToggle(id) { if (_txOpen.has(id)) _txOpen.delete(id); else _txOpen.add(id); _txRender(); }
+async function _txAdd(parentId) {
+  const name = (prompt('New sub-category name:') || '').trim();
+  if (!name) return;
+  const dup = _txKids(parentId).some(k => k.name.toLowerCase() === name.toLowerCase());
+  if (dup) { AppNotify && AppNotify.warn('A sub-category called "' + name + '" already exists here.'); return; }
+  try {
+    await VendorDb.createTaxonomyNode({ parent_id: parentId, name }, userProfile);
+    _txOpen.add(parentId);
+    await _txReload();
+    AppNotify && AppNotify.success('Added "' + name + '".');
+  } catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not add that category') : alert(e.message); }
+}
+async function _txRename(id) {
+  const n = _txNodes.find(x => x.id === id); if (!n) return;
+  const name = (prompt('Rename category:', n.name) || '').trim();
+  if (!name || name === n.name) return;
+  try { await VendorDb.updateTaxonomyNode(id, { name }); await _txReload(); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not rename') : alert(e.message); }
+}
+async function _txDelete(id) {
+  const n = _txNodes.find(x => x.id === id); if (!n) return;
+  const kids = _txNodes.filter(x => (x.path || []).includes(id) && x.id !== id).length;
+  if (!confirm('Delete "' + n.name + '"' + (kids ? ' and its ' + kids + ' sub-categor' + (kids === 1 ? 'y' : 'ies') : '') +
+    '?\n\nVendor offerings filed under it are NOT deleted — they become unclassified.')) return;
+  try { await VendorDb.deleteTaxonomyNode(id); await _txReload(); AppNotify && AppNotify.success('Deleted.'); }
+  catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not delete') : alert(e.message); }
+}
+
 function openSplitModal() {
   _splitSegs = {};
   _splitManual = new Set();
@@ -3016,29 +3130,50 @@ async function saveDetailOverview() {
     btn.disabled = false; btn.textContent = 'Save Changes';
   }
 }
+/* Taxonomy picker instance for the staff product add-form. Re-mounted on every
+   renderDetailProducts() because that render replaces the whole tab's HTML. */
+let _dnpPicker = null;
 async function renderDetailProducts() {
   const list = await VendorDb.products.list(activeVendor.id);
+  const tax = await VendorDb.getTaxonomy();
+  // Prefer the precise taxonomy path; fall back to the legacy free-text
+  // category for rows that were never classified.
+  const sub = p => {
+    const path = p.taxonomy_id ? VendorDb.taxonomyPathLabel(tax, p.taxonomy_id) : '';
+    return path ? `<span class="prod-path">${esc(path)}</span>` : esc(p.category || 'Uncategorized');
+  };
   const rows = list.length ? list.map(p =>
-    `<div class="row-item"><div style="flex:1;min-width:0"><div class="row-item-title">${esc(p.description)}${p.unit?' ('+esc(p.unit)+')':''}</div><div class="row-item-sub">${esc(p.category||'Uncategorized')}${p.item_type?' · '+esc(p.item_type):''}</div></div>
+    `<div class="row-item"><div style="flex:1;min-width:0"><div class="row-item-title">${esc(p.description)}${p.unit?' ('+esc(p.unit)+')':''}</div><div class="row-item-sub">${sub(p)}${p.item_type?' · '+esc(p.item_type):''}</div></div>
     <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailProduct('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button></div>`
   ).join('') : '<div class="empty">No products/services on file.</div>';
   document.getElementById('dtab-products').innerHTML = rows + (!_canManage ? '' : `
     <div class="add-form">
-      <select id="dnp-category"><option value="">Category…</option>${TRADES.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select>
+      <div id="dnp-taxonomy" style="flex:1 1 100%"></div>
       <select id="dnp-type"><option value="Materials">Materials</option><option value="Labor">Labor</option><option value="Service">Service</option></select>
       <input id="dnp-description" placeholder="Description (e.g. Ready-Mix Concrete)">
       <input id="dnp-unit" placeholder="Unit (e.g. cu.m.)">
       <button class="btn-primary" onclick="addDetailProduct()">Add</button>
     </div>`);
+  _dnpPicker = null;
+  if (_canManage && window.TaxonomyPicker) {
+    _dnpPicker = await TaxonomyPicker.mount(document.getElementById('dnp-taxonomy'), {
+      placeholder: 'Choose a product category…',
+    });
+  }
   if (!_canManage) _stripRowDeletes('dtab-products');
 }
 async function addDetailProduct() {
-  const category = document.getElementById('dnp-category').value;
   const item_type = document.getElementById('dnp-type').value;
   const description = document.getElementById('dnp-description').value.trim();
   const unit = document.getElementById('dnp-unit').value.trim();
+  const taxonomy_id = _dnpPicker ? _dnpPicker.value() : null;
   if (!description) { AppNotify && AppNotify.warn('Enter a description first.'); return; }
-  try { await VendorDb.products.add(activeVendor.id, { category, item_type, description, unit }); await renderDetailProducts(); }
+  // Keep the legacy free-text `category` (the trade) in step with the picked
+  // node so anything still reading that column stays correct.
+  const tax = await VendorDb.getTaxonomy();
+  const node = taxonomy_id ? tax.find(n => n.id === taxonomy_id) : null;
+  const category = node ? (node.trade || (tax.find(x => x.id === (node.path || [])[0]) || {}).name || '') : '';
+  try { await VendorDb.products.add(activeVendor.id, { category, item_type, description, unit, taxonomy_id }); await renderDetailProducts(); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not add') : alert(e.message); }
 }
 async function removeDetailProduct(id) {
