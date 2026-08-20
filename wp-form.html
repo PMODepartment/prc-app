@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820i"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820i"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820i"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260820i"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820j"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820j"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820j"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260820j"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820i"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820j"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -62,10 +62,21 @@
     .vc-wrap{position:relative}
     .vc-pop{position:absolute;z-index:400;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1.5px solid #5B9DEA;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:220px;overflow-y:auto;display:none}
     .vc-pop.open{display:block}
-    .vc-opt{padding:9px 12px;font-size:0.8929rem;cursor:pointer;border-bottom:1px solid #f8f8f8}
+    .vc-opt{padding:9px 12px;font-size:0.8929rem;cursor:pointer;border-bottom:1px solid #f8f8f8;display:flex;align-items:center;gap:6px}
     .vc-opt:last-child{border-bottom:none}
     .vc-opt:hover,.vc-opt.active{background:#FDECEA}
     .vc-opt .vc-status{font-size:0.7143rem;color:#aaa;font-weight:400;margin-left:6px;text-transform:uppercase}
+    /* Accreditation badge in vendor pickers + a warning marker on a problematic chip. */
+    .vc-acc{display:inline-flex;align-items:center;gap:3px;font-size:0.6786rem;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:auto;white-space:nowrap}
+    .vc-acc i{font-size:0.9em}
+    .vc-acc-ok{background:#D1FAE5;color:#065F46}
+    .vc-acc-bad{background:#FEE2E2;color:#991B1B}
+    .vc-acc-none{background:#F3F4F6;color:#6B6A6A}
+    body.dark-mode .vc-acc-ok{background:#102B1F;color:#6EE7B7}
+    body.dark-mode .vc-acc-bad{background:#3D1A19;color:#FCA5A5}
+    body.dark-mode .vc-acc-none{background:var(--surface-2);color:var(--text-hint)}
+    .pv-chip-warn{color:#991B1B;font-weight:800;margin:0 3px}
+    body.dark-mode .pv-chip-warn{color:#FCA5A5}
     .vc-empty{padding:10px 12px;font-size:0.7857rem;color:#999}
     .vc-add{padding:10px 12px;font-size:0.8571rem;cursor:pointer;color:#C42127;font-weight:600;border-top:1px solid #f0f0f0}
     .vc-add:hover{background:#FDECEA}
@@ -756,10 +767,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820i"></script>
-<script src="assets/js/ui.js?v=20260820i"></script>
-<script src="assets/js/db.js?v=20260820i"></script>
-<script src="assets/js/coachmarks.js?v=20260820i"></script>
+<script src="assets/js/auth.js?v=20260820j"></script>
+<script src="assets/js/ui.js?v=20260820j"></script>
+<script src="assets/js/db.js?v=20260820j"></script>
+<script src="assets/js/coachmarks.js?v=20260820j"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -999,6 +1010,18 @@
     if (vid) vid.value = (_avChips.find(x => x.id) || {}).id || '';
     _avSyncCost();
   }
+  /* Accreditation guardrail helpers — shared by both vendor pickers. A
+     PROBLEMATIC awarded vendor is confirm-gated at save (see submitForm);
+     the badge just surfaces the standing wherever a vendor is chosen. */
+  function _accKey(v) { return window.accredKey ? window.accredKey(v && v.accreditation) : ((v && v.accreditation) || 'none'); }
+  function _accIsProblem(v) { return _accKey(v) === 'problematic'; }
+  function _accBadge(v) {
+    if (!window.accredMeta) return '';
+    const k = _accKey(v), m = window.accredMeta(v && v.accreditation);
+    const cls = k === 'accredited' ? 'vc-acc-ok' : k === 'problematic' ? 'vc-acc-bad' : 'vc-acc-none';
+    const lbl = esc ? esc(m.label) : m.label;
+    return `<span class="vc-acc ${cls}"><i class="ti ${m.icon}"></i>${lbl}</span>`;
+  }
   function _avRenderChips() {
     const wrap = document.getElementById('av-chips');
     if (!wrap) return;
@@ -1008,8 +1031,9 @@
         const nm = esc ? esc(c.name) : c.name;
         const legacy = !c.id;
         const amt = (c.amount != null && !isNaN(c.amount)) ? c.amount : '';
+        const warn = _accIsProblem(c) ? '<span class="pv-chip-warn" title="Flagged problematic in the vendor directory">&#9888;</span>' : '';
         return `<div class="av-row">
-          <span class="pv-chip${legacy ? ' pv-chip-legacy' : ''}" style="margin:0">${nm}${legacy ? '<span class="pv-chip-legacy-tag">unlinked</span>' : ''}</span>
+          <span class="pv-chip${legacy ? ' pv-chip-legacy' : ''}" style="margin:0">${warn}${nm}${legacy ? '<span class="pv-chip-legacy-tag">unlinked</span>' : ''}</span>
           <input type="number" class="av-amt" min="0" step="0.01" placeholder="Awarded amount (₱)" data-av-amt="${i}" value="${amt}"/>
           <span class="pv-chip-x av-row-x" data-av-remove="${i}" title="Remove">&times;</span>
         </div>`;
@@ -1018,7 +1042,8 @@
       wrap.innerHTML = _avChips.map((c, i) => {
         const nm = esc ? esc(c.name) : c.name;
         const legacy = !c.id;
-        return `<span class="pv-chip${legacy ? ' pv-chip-legacy' : ''}">${nm}${legacy ? '<span class="pv-chip-legacy-tag">unlinked</span>' : ''}<span class="pv-chip-x" data-av-remove="${i}">&times;</span></span>`;
+        const warn = _accIsProblem(c) ? '<span class="pv-chip-warn" title="Flagged problematic in the vendor directory">&#9888;</span>' : '';
+        return `<span class="pv-chip${legacy ? ' pv-chip-legacy' : ''}">${warn}${nm}${legacy ? '<span class="pv-chip-legacy-tag">unlinked</span>' : ''}<span class="pv-chip-x" data-av-remove="${i}">&times;</span></span>`;
       }).join('');
     }
   }
@@ -1034,7 +1059,7 @@
       const costEl = document.getElementById('f-contract');
       _avChips[0].amount = costEl ? _avParse(costEl.value) : _avChips[0].amount;
     }
-    _avChips.push({ id: chip.id || null, name, amount: (chip.amount != null ? chip.amount : null) });
+    _avChips.push({ id: chip.id || null, name, amount: (chip.amount != null ? chip.amount : null), accreditation: chip.accreditation != null ? chip.accreditation : null });
     _avRenderChips();
     _avSyncHidden();
     markDirty();
@@ -1059,7 +1084,7 @@
     if (!list.length) {
       html += '<div class="vc-empty">No matching approved vendors</div>';
     } else {
-      html += list.map((v, i) => `<div class="vc-opt" data-i="${i}">${esc ? esc(v.name) : v.name}<span class="vc-status">approved</span></div>`).join('');
+      html += list.map((v, i) => `<div class="vc-opt" data-i="${i}">${esc ? esc(v.name) : v.name}${_accBadge(v)}</div>`).join('');
     }
     const q = (query || '').trim();
     if (q && !list.some(v => v.name.toLowerCase() === q.toLowerCase()) && !_avChips.some(c => c.name.toLowerCase() === q.toLowerCase())) {
@@ -1071,7 +1096,7 @@
   async function _avAddNew(name) {
     try {
       const created = await VendorDb.quickCreateVendor(name, userProfile);
-      _avAdd({ id: created.id, name: created.name });
+      _avAdd({ id: created.id, name: created.name, accreditation: created.accreditation });
       const inp = document.getElementById('av-input');
       if (inp) inp.value = '';
       document.getElementById('av-pop').classList.remove('open');
@@ -1102,7 +1127,7 @@
       if (opt) {
         e.preventDefault();
         const v = _avResults[parseInt(opt.dataset.i, 10)];
-        if (v) { _avAdd({ id: v.id, name: v.name }); inp.value = ''; pop.classList.remove('open'); }
+        if (v) { _avAdd({ id: v.id, name: v.name, accreditation: v.accreditation }); inp.value = ''; pop.classList.remove('open'); }
       }
     });
     const chips = document.getElementById('av-chips');
@@ -1139,10 +1164,10 @@
     if (ids.length) {
       try {
         const rows = await VendorDb.getVendorsByIds(ids);
-        const byId = {}; rows.forEach(r => byId[r.id] = r.name);
+        const byId = {}; rows.forEach(r => byId[r.id] = r);
         // preserve id↔amount alignment against the ORIGINAL (unfiltered) index
         const orig = Array.isArray(wp.awarded_vendor_ids) ? wp.awarded_vendor_ids : [];
-        orig.forEach((id, i) => { if (id && byId[id]) _avChips.push({ id, name: byId[id], amount: (amts[i] != null ? amts[i] : null) }); });
+        orig.forEach((id, i) => { if (id && byId[id]) _avChips.push({ id, name: byId[id].name, amount: (amts[i] != null ? amts[i] : null), accreditation: byId[id].accreditation }); });
       } catch (e) { /* directory lookup failed — chips just stay empty */ }
     }
     // Also fold in any legacy contractor names not already represented by an id
@@ -1215,7 +1240,7 @@
     if (!list.length) {
       html += '<div class="vc-empty">No matching approved vendors</div>';
     } else {
-      html += list.map((v, i) => `<div class="vc-opt" data-i="${i}">${esc ? esc(v.name) : v.name}<span class="vc-status">approved</span></div>`).join('');
+      html += list.map((v, i) => `<div class="vc-opt" data-i="${i}">${esc ? esc(v.name) : v.name}${_accBadge(v)}</div>`).join('');
     }
     const q = (query || '').trim();
     if (q && !list.some(v => v.name.toLowerCase() === q.toLowerCase()) && !_pvChips.some(c => c.name.toLowerCase() === q.toLowerCase())) {
@@ -2115,6 +2140,18 @@ AppAuth.requireLogin(async (user, profile) => {
       const m = String(actualAward).match(/(\d{4})-(\d{2})-(\d{2})/);
       const ad = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(actualAward);
       if (!isNaN(ad) && ad > today0) return showErr('Actual Awarding Date is in the future — use today or an earlier date (a WP can only be awarded once it has happened).', 'f-actual-awarding-date');
+    }
+
+    /* Accreditation guardrail — awarding to a vendor flagged PROBLEMATIC in the
+       directory needs explicit sign-off. Only linked chips (real vendor rows)
+       carry a standing; legacy free-text names can't be judged. */
+    const _problemVendors = _avChips.filter(c => c.id && _accIsProblem(c));
+    if (_problemVendors.length) {
+      const nm = _problemVendors.map(c => c.name).join(', ');
+      if (!confirm('⚠ Accreditation warning\n\n' + nm + (_problemVendors.length > 1 ? ' are' : ' is') +
+        ' flagged PROBLEMATIC in the vendor directory. Awarding a work package to a problematic vendor is discouraged.\n\nProceed with the save anyway?')) {
+        return;
+      }
     }
 
     const data = {

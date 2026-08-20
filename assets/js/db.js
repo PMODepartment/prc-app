@@ -2235,7 +2235,7 @@ const VendorDb = (() => {
   // Awarded Vendor combobox) ───────────────────────────────────────────
   async function searchApprovedVendors(query) {
     const sb = await getSB();
-    let q = sb.from('vendors').select('id,name,status').order('name').limit(20);
+    let q = sb.from('vendors').select('id,name,status,accreditation').order('name').limit(20);
     if (query && query.trim()) q = q.ilike('name', `%${query.trim()}%`);
     const { data, error } = await q;
     if (error) throw error;
@@ -2247,7 +2247,7 @@ const VendorDb = (() => {
   async function getVendorsByIds(ids) {
     if (!ids || !ids.length) return [];
     const sb = await getSB();
-    const { data, error } = await sb.from('vendors').select('id,name,status').in('id', ids);
+    const { data, error } = await sb.from('vendors').select('id,name,status,accreditation').in('id', ids);
     if (error) throw error;
     return data || [];
   }

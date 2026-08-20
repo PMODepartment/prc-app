@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820i"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820i"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820i"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260820i"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260820i"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820j"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820j"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820j"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260820j"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260820j"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260810b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260820i"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260820j"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820i"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820j"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -533,16 +533,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820i"></script>
-<script src="assets/js/ui.js?v=20260820i"></script>
-<script src="assets/js/db.js?v=20260820i"></script>
-<script src="assets/js/onboarding.js?v=20260820i"></script>
-<script src="assets/js/coachmarks.js?v=20260820i"></script>
+<script src="assets/js/auth.js?v=20260820j"></script>
+<script src="assets/js/ui.js?v=20260820j"></script>
+<script src="assets/js/db.js?v=20260820j"></script>
+<script src="assets/js/onboarding.js?v=20260820j"></script>
+<script src="assets/js/coachmarks.js?v=20260820j"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260810b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260820i"></script>
+<script src="assets/js/charts.js?v=20260820j"></script>
 <script>
 
   // Segmented toggle state — swaps a class instead of rewriting cssText.
@@ -1242,6 +1242,17 @@ window.updateWpStatus = async function(id, field, value, sel){
 let _stVendorId = null;
 let _stVcResults = [];
 let _stVcDebounce = null;
+/* Accreditation guardrail (mirrors wp-form.html's _accBadge/_accIsProblem).
+   _stVendorAccred holds the PICKED vendor's standing so stAwardConfirm can
+   confirm-gate an award to a problematic vendor. */
+let _stVendorAccred = null;
+function _stAccKey(v){ return window.accredKey ? window.accredKey(v && v.accreditation) : ((v && v.accreditation) || 'none'); }
+function _stAccBadge(v){
+  if(!window.accredMeta) return '';
+  const k = _stAccKey(v), m = window.accredMeta(v && v.accreditation);
+  const cls = k==='accredited' ? 'vc-acc-ok' : k==='problematic' ? 'vc-acc-bad' : 'vc-acc-none';
+  return `<span class="vc-acc ${cls}"><i class="ti ${m.icon}"></i>${window.esc?esc(m.label):m.label}</span>`;
+}
 function _stVcRender(list, query){
   const pop = document.getElementById('st-vc-pop');
   if(!pop) return;
@@ -1250,7 +1261,7 @@ function _stVcRender(list, query){
   if(!list.length){
     html += '<div class="vc-empty">No matching approved vendors</div>';
   } else {
-    html += list.map((v,i) => `<div class="vc-opt" data-i="${i}">${window.esc?esc(v.name):v.name}<span class="vc-status">approved</span></div>`).join('');
+    html += list.map((v,i) => `<div class="vc-opt" data-i="${i}">${window.esc?esc(v.name):v.name}${_stAccBadge(v)}</div>`).join('');
   }
   if(query && query.trim() && !list.some(v=>v.name.toLowerCase()===query.trim().toLowerCase())){
     html += `<div class="vc-add" id="st-vc-add-new">+ Add "${window.esc?esc(query.trim()):query.trim()}" as a new vendor</div>`;
@@ -1260,6 +1271,7 @@ function _stVcRender(list, query){
 }
 function _stVcSelect(v){
   _stVendorId = v.id;
+  _stVendorAccred = (v && v.accreditation) || null;
   const inp = document.getElementById('st-award-vendor');
   if(inp) inp.value = v.name;
   document.getElementById('st-award-vendor-id').value = v.id;
@@ -1288,7 +1300,7 @@ function _stInitVendorCombo(){
   };
   inp.addEventListener('focus', () => search(inp.value));
   inp.addEventListener('input', () => {
-    if(_stVendorId){ _stVendorId = null; document.getElementById('st-award-vendor-id').value = ''; }
+    if(_stVendorId){ _stVendorId = null; _stVendorAccred = null; document.getElementById('st-award-vendor-id').value = ''; }
     search(inp.value);
   });
   pop.addEventListener('mousedown', (e) => {
@@ -1313,7 +1325,17 @@ function _stOpenAwardModal(id, sel, prev, extra){
   costEl.value = (w.total_awarded||0) > 0 ? w.total_awarded : '';
   venEl.value = w.contractor || '';
   _stVendorId = w.vendor_id || null;
+  _stVendorAccred = null;
   document.getElementById('st-award-vendor-id').value = _stVendorId || '';
+  // Resolve the pre-seeded vendor's standing so the guardrail applies even when
+  // the officer never re-picks from the combobox (fire-and-forget: a directory
+  // lookup failure must not block the award modal).
+  if (_stVendorId && typeof VendorDb !== 'undefined' && VendorDb.getVendorsByIds) {
+    const _seedId = _stVendorId;
+    VendorDb.getVendorsByIds([_seedId])
+      .then(rows => { if (_stVendorId === _seedId && rows && rows[0]) _stVendorAccred = rows[0].accreditation || null; })
+      .catch(() => {});
+  }
   _stInitVendorCombo();
   document.getElementById('st-award-actual').value = (w.actual_awarding_date ? String(w.actual_awarding_date).slice(0,10) : '');
   document.getElementById('st-award-pocount').value = (w.po_jo_count!=null ? w.po_jo_count : '');
@@ -1343,6 +1365,12 @@ window.stAwardConfirm = async function(){
   const _cnt = parseInt(poCount)||0;
   const _lst = poNums.split(/[\s,;]+/).map(s=>s.trim()).filter(Boolean);
   if((_cnt||_lst.length) && _cnt!==_lst.length){ err.textContent=`No. of PO/JO (${_cnt}) must match the PO/JO Numbers listed (${_lst.length}).`; err.style.display='block'; return; }
+  /* Accreditation guardrail — awarding to a vendor flagged PROBLEMATIC needs
+     explicit sign-off (same rule as wp-form.html's submitForm). Only a LINKED
+     vendor carries a standing; a free-text name can't be judged. */
+  if(_stVendorId && _stAccKey({accreditation:_stVendorAccred})==='problematic'){
+    if(!confirm('⚠ Accreditation warning\n\n' + vendor + ' is flagged PROBLEMATIC in the vendor directory. Awarding a work package to a problematic vendor is discouraged.\n\nProceed with the award anyway?')) return;
+  }
   const { id, sel, prev, extra } = _stAwardCtx;
   const fields = Object.assign({ award_status:'Awarded', awarded_cost:cost, contractor:vendor,
     vendor_id: _stVendorId||null,
@@ -3813,6 +3841,16 @@ AppAuth.requireLogin(async (user, profile) => {
   .vc-opt { padding:8px 11px; font-size:0.9286rem; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
   .vc-opt:hover { background:#FEECEA; }
   .vc-opt .vc-status { font-size:0.7143rem; color:#888; }
+  /* Accreditation badge in the Status-Tracker award-modal vendor picker. */
+  .vc-acc { display:inline-flex; align-items:center; gap:3px; font-size:0.6786rem; font-weight:700;
+    padding:1px 7px; border-radius:999px; white-space:nowrap; flex-shrink:0; }
+  .vc-acc i { font-size:0.9em; }
+  .vc-acc-ok { background:#D1FAE5; color:#065F46; }
+  .vc-acc-bad { background:#FEE2E2; color:#991B1B; }
+  .vc-acc-none { background:#F3F4F6; color:#6B6A6A; }
+  body.dark-mode .vc-acc-ok { background:#102B1F; color:#6EE7B7; }
+  body.dark-mode .vc-acc-bad { background:#3D1A19; color:#FCA5A5; }
+  body.dark-mode .vc-acc-none { background:var(--surface-2); color:var(--text-hint); }
   .vc-add { padding:8px 11px; font-size:0.8571rem; color:#5B9DEA; cursor:pointer; font-weight:600; border-top:1px solid #f0f0f0; }
   .vc-add:hover { background:#EEF4FD; }
   .vc-empty { padding:10px 11px; font-size:0.8571rem; color:#999; }
