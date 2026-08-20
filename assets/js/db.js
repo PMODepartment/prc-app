@@ -2515,7 +2515,54 @@ const VendorDb = (() => {
   // Merge duplicate vendors into a canonical one via the merge_vendors RPC
   // (MIGRATION_vendor_merge.sql). Throws a readable error if the migration
   // hasn't been run yet.
+  /* merge_vendors DELETES the source rows, so anything held ONLY by a source is
+     gone. It reassigns child rows, WP links and trade categories server-side —
+     but it predates accreditation, and it does not know about vendor_code/TIN
+     either. A duplicate pair is very often "the row the masterdata stamped" +
+     "the row the WP import created", and whichever way the canonical pick
+     falls, folding them must not lose the standing. Worst case: silently
+     dropping a PROBLEMATIC flag.
+
+     So the strongest standing is carried onto the target FIRST, and blank
+     identity fields are filled from the sources. This sits inside
+     mergeVendors() rather than in a caller because every path — the exact-
+     duplicate cleanup, the fuzzy Merge tool, Merge All, and Split's fold of the
+     garbled original — goes through here. */
+  const _STANDING_RANK = { problematic: 3, accredited: 2, none: 0 };
+  const _MERGE_FILL = ['vendor_code', 'tin', 'contact_person', 'contact_position', 'contact_number',
+                       'telephone', 'contact_email', 'website', 'address', 'city', 'payment_terms',
+                       'vendor_category', 'vendor_group'];
+  async function _preserveOnMerge(targetId, sourceIds) {
+    const sb = await getSB();
+    const ids = [targetId].concat(sourceIds || []);
+    const { data, error } = await sb.from('vendors').select('*').in('id', ids);
+    // Never block a merge on this — it is a safety net, not the operation.
+    if (error || !data || !data.length) { if (error) console.warn('[VendorDb] merge preserve skipped:', error.message); return; }
+    const target = data.find(v => v.id === targetId);
+    const sources = data.filter(v => v.id !== targetId);
+    if (!target || !sources.length) return;
+    const rank = v => _STANDING_RANK[accredKey(v.accreditation)] ?? 1;   // off-roster ranks above none
+    const patch = {};
+    // Strongest standing wins — a blacklist flag must survive the merge even
+    // when the accredited row is the one being kept.
+    const best = sources.reduce((a, b) => (rank(b) > rank(a) ? b : a), sources[0]);
+    if (rank(best) > rank(target)) {
+      patch.accreditation = best.accreditation;
+      if (best.accreditation_notes) patch.accreditation_notes = best.accreditation_notes;
+      if (best.accreditation_date) patch.accreditation_date = best.accreditation_date;
+    }
+    // Fill only what the target is missing — never overwrite curated data.
+    _MERGE_FILL.forEach(k => {
+      if (target[k] && String(target[k]).trim()) return;
+      const from = sources.find(v => v[k] && String(v[k]).trim());
+      if (from) patch[k] = from[k];
+    });
+    if (!Object.keys(patch).length) return;
+    try { await updateVendor(targetId, patch); }
+    catch (e) { console.warn('[VendorDb] could not carry data onto the merge target:', e.message); }
+  }
   async function mergeVendors(targetId, sourceIds) {
+    await _preserveOnMerge(targetId, sourceIds);
     const sb = await getSB();
     const { error } = await sb.rpc('merge_vendors', { p_target: targetId, p_sources: sourceIds });
     if (error) throw error;
@@ -2545,11 +2592,15 @@ const VendorDb = (() => {
       if (!byNorm.has(k)) byNorm.set(k, []);
       byNorm.get(k).push(v);
     });
+    // Accreditation outranks everything: that row is the one a human (or the
+    // masterdata seed) actually stamped, and keeping it means the merge has
+    // nothing to carry over. `status` was dropped from the score — it is no
+    // longer a user-facing concept and every legacy row shares one value.
     const score = v => (
-      (v.status === 'approved'      ? 16 : 0) +
-      (v.invite_claimed_at          ? 8  : 0) +
+      (accredKey(v.accreditation) !== ACCRED_NONE ? 32 : 0) +
+      (v.invite_claimed_at               ? 8 : 0) +
       ((v.trade_categories || []).length ? 4 : 0) +
-      (act.has(v.id)                ? 2  : 0)
+      (act.has(v.id)                     ? 2 : 0)
     );
     const groups = [];
     byNorm.forEach((rows, k) => {
