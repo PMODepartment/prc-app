@@ -930,6 +930,56 @@ async function renderVendorAnalytics() {
   const byId = {}, byName = {};
   allVendors.forEach(v => { byId[v.id] = v; byName[nm(v.name)] = v; });
 
+  // Unambiguous CORE-NAME resolution (2026-08-21). A WP's free-text vendor name
+  // is very often the SAME company under a different spelling — a dropped
+  // period ("… Services Inc" vs "… Inc."), or a short form ("Phelps Dodge" for
+  // "Phelps Dodge Philippines Energy Products Corporation"). Exact-name matching
+  // alone left 242 such keys reading "(not in directory)", carrying 43% of the
+  // portfolio's awarded spend against phantom vendors instead of the real ones.
+  // Uses the SAME VendorMatch.coreMatch rule as the vendor-detail WP list, but
+  // with a HARD SAFETY RULE for money attribution: a name is only resolved when
+  // it matches EXACTLY ONE directory vendor. Two or more candidates is a
+  // genuine ambiguity, and mis-crediting spend between distinct companies is
+  // worse than leaving the row unresolved — so it stays "(not in directory)".
+  // Memoized by normalized name.
+  // A TOKEN INDEX culls the candidates before the real test. Scanning all 2,412
+  // vendor cores per name took ~5s (2,412 x ~500 names, each compiling a regex
+  // inside wordContains). Culling is SAFE because every branch of coreMatch
+  // implies the two cores share at least one token: equality shares all, and a
+  // whole-word run means one core's tokens are a subset of the other's. So a
+  // vendor sharing no token can never match, and dropping it cannot change
+  // either the match or the ambiguity count.
+  const _coreTok = new Map();   // token -> [{v, c}, ...]
+  if (window.VendorMatch) allVendors.forEach(v => {
+    const c = window.VendorMatch.core(v.name);
+    if (!c) return;
+    const e = { v, c };
+    new Set(c.split(' ')).forEach(t => { if (t) { const a = _coreTok.get(t); a ? a.push(e) : _coreTok.set(t, [e]); } });
+  });
+  const _coreCache = new Map();
+  const byCore = raw => {
+    const k = nm(raw);
+    if (!k) return null;
+    if (_coreCache.has(k)) return _coreCache.get(k);
+    let hit = null;
+    if (window.VendorMatch) {
+      const c = window.VendorMatch.core(raw);
+      // 5+ chars: below that a core is too collision-prone to trust (the same
+      // floor the accreditation seed's core matching uses).
+      if (c && c.length >= 5) {
+        const cand = new Set();
+        new Set(c.split(' ')).forEach(t => { const a = _coreTok.get(t); if (a) a.forEach(e => cand.add(e)); });
+        let found = null, n = 0;
+        for (const e of cand) {
+          if (window.VendorMatch.coreMatch(e.c, raw)) { found = e.v; if (++n > 1) break; }
+        }
+        if (n === 1) hit = found;
+      }
+    }
+    _coreCache.set(k, hit);
+    return hit;
+  };
+
   // Aggregate per vendor: awarded spend/bcb/#WPs (wins) + participation
   // (proposed or awarded). Key = directory vendor id when resolvable, else the
   // normalized free-text name (so un-imported contractors still tally).
@@ -958,7 +1008,7 @@ async function renderVendorAnalytics() {
     // No precise link — fall back to the vendor_id FK, then the free-text contractor
     // names (slash-aware), resolved by name.
     if (w.vendor_id && byId[w.vendor_id]) add(w.vendor_id, byId[w.vendor_id].name, null);
-    splitAw(w.contractor).forEach(n => { const v = byName[nm(n)]; add(v ? v.id : nm(n), v ? v.name : n.trim(), null); });
+    splitAw(w.contractor).forEach(n => { const v = byName[nm(n)] || byCore(n); add(v ? v.id : nm(n), v ? v.name : n.trim(), null); });
     return out;
   };
   let awardedWpTotal = 0;
@@ -966,7 +1016,7 @@ async function renderVendorAnalytics() {
     const awarded = awardedOf(w);
     const parts = new Set();
     if (Array.isArray(w.proposed_vendor_ids)) w.proposed_vendor_ids.forEach(id => { if (byId[id]) parts.add(id); });
-    splitV(w.proposed_vendors).forEach(n => { const v = byName[nm(n)]; parts.add(v ? v.id : nm(n)); });
+    splitV(w.proposed_vendors).forEach(n => { const v = byName[nm(n)] || byCore(n); parts.add(v ? v.id : nm(n)); });
     awarded.forEach(a => parts.add(a.key));
     parts.forEach(pk => { if (pk) ensure(pk, byId[pk] ? byId[pk].name : pk).participated++; });
     if (window.isMoneyAwarded(w) && awarded.length) {
