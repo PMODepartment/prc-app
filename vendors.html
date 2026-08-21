@@ -2171,7 +2171,17 @@ function _mgTokenMatch(a, b) {
   if (a === b) return true;
   const lo = a.length <= b.length ? a : b, hi = a.length <= b.length ? b : a;
   if (lo.length >= 4 && hi.startsWith(lo) && hi.length - lo.length <= 2) return true;
-  if (lo.length >= 5 && _mgLev(a, b) <= 1) return true;
+  // Edit-distance-1 is scoped to a DIFFERENT-length pair only — a true
+  // insertion/deletion typo ("HARWARE"/"HARDWARE", "HAFELE"/"HAFFELE"), never
+  // a same-length SUBSTITUTION. A single-letter substitution between two
+  // equal-length words is far likelier to land on a genuinely different word
+  // than a dropped/added letter is — caught live 2026-08-21: "TRADE" and
+  // "TRANE" (the HVAC brand) are both 5 chars, one substitution apart, and
+  // this rule grouped Trane with five unrelated trading companies before the
+  // length-difference guard was added. Neither documented real duplicate this
+  // rule was built for needs same-length matching (both are length 7 vs 8 and
+  // 6 vs 7) — do not relax this back to allow same-length pairs.
+  if (lo.length >= 5 && a.length !== b.length && _mgLev(a, b) <= 1) return true;
   return false;
 }
 // Greedy one-to-one soft intersection — a token may only be consumed once, so
