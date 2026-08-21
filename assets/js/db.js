@@ -1689,6 +1689,50 @@ function accredFromText(s) {
   if (/^(no|none|n\/a|na)$/.test(t)) return ACCRED_NONE;
   return null;
 }
+/* ── Accreditation validity / renewal ───────────────────────────────────────
+   An accreditation is not forever. ACCRED_VALID_MONTHS is the house policy for
+   how long one stands before it must be renewed; accreditation_date is when it
+   was granted. Changing that constant re-dates every vendor at once, which is
+   why it lives here and not inlined at a call site.
+
+   Only an ACCREDITED vendor can expire — a problematic or not-accredited one
+   has nothing to lapse. A vendor with no accreditation_date on file is
+   'unknown': we cannot claim it is current, and we must not claim it is
+   expired either, so it is reported separately rather than folded into either.
+
+   accredStanding(v) -> { key, state, days, date }
+     state: 'ok' | 'due' | 'expired' | 'unknown' | 'n/a'
+     days : days until expiry (negative = overdue), null when not computable. */
+const ACCRED_VALID_MONTHS = 12;
+const ACCRED_DUE_DAYS = 60;          // warn this far ahead of expiry
+function _accredDate(v) {
+  const raw = v && v.accreditation_date;
+  if (!raw) return null;
+  const m = String(raw).match(/(\d{4})-(\d{2})-(\d{2})/);
+  // Build from LOCAL parts — new Date('2026-06-30') is UTC midnight, which is
+  // the previous day in UTC+8 (the sCurve bug).
+  const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(raw);
+  return isNaN(d) ? null : d;
+}
+function accredStanding(v) {
+  const key = accredKey(v && v.accreditation);
+  if (key !== 'accredited') return { key, state: 'n/a', days: null, date: null };
+  const d = _accredDate(v);
+  if (!d) return { key, state: 'unknown', days: null, date: null };
+  const exp = new Date(d.getFullYear(), d.getMonth() + ACCRED_VALID_MONTHS, d.getDate());
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = Math.round((exp - today) / 864e5);
+  return { key, state: days < 0 ? 'expired' : days <= ACCRED_DUE_DAYS ? 'due' : 'ok', days, date: exp };
+}
+const _ACCRED_STATE_META = {
+  ok:      { label: 'Current',        color: '#065F46' },
+  due:     { label: 'Renewal due',    color: '#B45309' },
+  expired: { label: 'Expired',        color: '#991B1B' },
+  unknown: { label: 'No date on file', color: '#6B6A6A' },
+  'n/a':   { label: '',               color: '#6B6A6A' },
+};
+function accredStandingMeta(state) { return _ACCRED_STATE_META[state] || _ACCRED_STATE_META['n/a']; }
+
 if (typeof window !== 'undefined') {
   window.ACCREDITATIONS = ACCREDITATIONS;
   window.ACCRED_NONE = ACCRED_NONE;
@@ -1696,6 +1740,10 @@ if (typeof window !== 'undefined') {
   window.accredMeta = accredMeta;
   window.accredLabel = accredLabel;
   window.accredFromText = accredFromText;
+  window.ACCRED_VALID_MONTHS = ACCRED_VALID_MONTHS;
+  window.ACCRED_DUE_DAYS = ACCRED_DUE_DAYS;
+  window.accredStanding = accredStanding;
+  window.accredStandingMeta = accredStandingMeta;
 }
 
 /* ── Accreditation readiness ────────────────────────────────────────────────

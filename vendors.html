@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820l"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820l"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820l"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820m"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820m"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820m"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820l">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820m">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -471,6 +471,8 @@
               <option value="problematic">Problematic</option>
               <option value="__requested">Awaiting my decision</option>
               <option value="__edited">Updated by the vendor</option>
+              <option value="__expiring">⏱ Accreditation renewal due</option>
+              <option value="__expired">⏱ Accreditation expired</option>
               <option value="__split">⚠ Looks like several companies</option>
               <option value="__unclassified">⚠ Unclassified offerings</option>
             </select>
@@ -623,6 +625,20 @@
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="reclassifyModal" style="display:none">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div><div class="modal-title">Change Product Category</div><div class="modal-subtitle">Re-file this offering under a different category. The offering itself, and its description, are unchanged.</div></div>
+      <button class="modal-close" onclick="closeReclassifyModal()">&times;</button>
+    </div>
+    <div class="modal-body"><div id="recl-picker"></div></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeReclassifyModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveReclassify()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="taxonomyModal" style="display:none">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
@@ -693,10 +709,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820l"></script>
-<script src="assets/js/db.js?v=20260820l"></script>
-<script src="assets/js/ui.js?v=20260820l"></script>
-<script src="assets/js/vendor-guide.js?v=20260810x"></script>
+<script src="assets/js/auth.js?v=20260820m"></script>
+<script src="assets/js/db.js?v=20260820m"></script>
+<script src="assets/js/ui.js?v=20260820m"></script>
+<script src="assets/js/vendor-guide.js?v=20260820a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -813,7 +829,24 @@ function _accredBadge(v) {
   const k = _accredOf(v);
   const m = window.accredMeta ? window.accredMeta(v.accreditation) : { label: _accredLabel(v), icon: 'ti-help-circle' };
   const cls = ['accredited', 'problematic'].includes(k) ? k : 'none';
-  return `<span class="abadge abadge-${cls}" title="Accreditation standing"><i class="ti ${m.icon}"></i>${esc(m.label)}</span>`;
+  const base = `<span class="abadge abadge-${cls}" title="Accreditation standing"><i class="ti ${m.icon}"></i>${esc(m.label)}</span>`;
+  // Renewal state rides alongside the standing — an expired accreditation that
+  // still reads a plain green "Accredited" is exactly the thing to avoid.
+  return base + _renewBadge(v);
+}
+/* Renewal chip. Rendered ONLY when there is something to act on: a lapse
+   ('expired'), an approaching one ('due'), or an accredited vendor with no
+   date on file ('unknown' — we can't claim it is current). A comfortably
+   current accreditation adds no chip, so the list stays quiet. */
+function _renewBadge(v) {
+  const st = _standing(v);
+  if (st.state === 'ok' || st.state === 'n/a') return '';
+  const meta = window.accredStandingMeta ? window.accredStandingMeta(st.state) : { label: st.state };
+  const cls = st.state === 'expired' ? 'abadge-problematic' : st.state === 'due' ? 'abadge-unaccredited' : 'abadge-none';
+  const txt = st.state === 'due' ? `Renew in ${st.days}d`
+            : st.state === 'expired' ? `Expired ${Math.abs(st.days)}d ago`
+            : 'No accreditation date';
+  return ` <span class="abadge ${cls}" title="${esc(meta.label)} — accreditations stand for ${window.ACCRED_VALID_MONTHS || 12} months from the accreditation date"><i class="ti ti-clock-hour-4"></i>${esc(txt)}</span>`;
 }
 function _vendorFiltered() {
   const q = (document.getElementById('vendor-search').value || '').toLowerCase().trim();
@@ -824,6 +857,8 @@ function _vendorFiltered() {
     else if (accredF === '__edited') { if (!_vendorEdited(v)) return false; }
     // Data-quality triage views — work the backlog down from the directory
     // itself, incrementally, instead of only inside the Split modal.
+    else if (accredF === '__expiring') { if (_standing(v).state !== 'due') return false; }
+    else if (accredF === '__expired') { if (_standing(v).state !== 'expired') return false; }
     else if (accredF === '__split') { if (!_looksGarbled(v)) return false; }
     else if (accredF === '__unclassified') { if (!_vendorUnclassified.has(v.id)) return false; }
     else if (accredF !== 'all' && _accredOf(v) !== accredF) return false;
@@ -835,6 +870,7 @@ function _vendorFiltered() {
       + ' ' + (v.vendor_group || '').toLowerCase()
       + ' ' + (v.trade_categories || []).join(' ').toLowerCase()
       + ' ' + _accredLabel(v).toLowerCase()
+      + ' ' + _standing(v).state
       + ' ' + (v.accreditation_notes || '').toLowerCase()
       + ' ' + (_vendorProductText[v.id] || '');
     return hay.includes(q);
@@ -1076,7 +1112,78 @@ async function renderVendorAnalytics() {
        { t: 'Median slip', a: 'right', f: r => slipCell(r.med) }]);
   }
 
-  el.innerHTML = kpis + conc + spendTbl + savTbl + winTbl + cycle + tradeTbl;
+  /* ── Accreditation risk ───────────────────────────────────────────────────
+     Where the money is actually going, by the standing of the vendor it went
+     to. This is the question the accreditation data exists to answer, and it
+     is the one figure that can justify chasing the Not-Assessed backlog. */
+  const riskOrder = [
+    { k: 'accredited',  lbl: 'Accredited',     col: '#2D9B6F' },
+    { k: 'none',        lbl: 'Not accredited', col: '#6B6A6A' },
+    { k: 'problematic', lbl: 'Problematic',    col: '#EE3124' },
+  ];
+  const riskAgg = {};
+  awarded.forEach(r => {
+    const v = byId[r.key];
+    // A vendor we cannot resolve to a directory row has no standing to report;
+    // bucket it separately rather than silently counting it as not-accredited.
+    const k = v ? _accredOf(v) : '__unknown';
+    (riskAgg[k] = riskAgg[k] || { spend: 0, n: 0 });
+    riskAgg[k].spend += r.spend; riskAgg[k].n++;
+  });
+  const riskRows = riskOrder.map(o => ({ ...o, ...(riskAgg[o.k] || { spend: 0, n: 0 }) }))
+    .concat(riskAgg.__unknown ? [{ k: '__unknown', lbl: 'Not in directory', col: '#B45309', ...riskAgg.__unknown }] : []);
+  const riskTotal = riskRows.reduce((a, r) => a + r.spend, 0);
+  const probSpend = (riskAgg.problematic || {}).spend || 0;
+  const risk = `<div class="section-card" style="margin-bottom:14px;padding:14px 16px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <div style="font-weight:800;font-size:0.95rem">Accreditation Risk</div>
+      <div style="font-size:0.78rem;color:#888">awarded spend by vendor standing</div></div>
+    ${riskTotal ? `<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;margin-bottom:10px">
+      ${riskRows.filter(r => r.spend > 0).map(r => `<div title="${esc(r.lbl)}: ${money(r.spend)}" style="width:${(r.spend / riskTotal * 100).toFixed(2)}%;background:${r.col}"></div>`).join('')}
+    </div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap">
+      ${riskRows.map(r => `<div><div style="font-size:0.72rem;color:#888;text-transform:uppercase"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${r.col};margin-right:5px"></span>${esc(r.lbl)}</div>
+        <div style="font-size:1.05rem;font-weight:800">${riskTotal ? (r.spend / riskTotal * 100).toFixed(1) : '0.0'}%</div>
+        <div style="font-size:0.73rem;color:#888">${money(r.spend)} · ${r.n} vendor${r.n === 1 ? '' : 's'}</div></div>`).join('')}
+    </div>
+    ${probSpend > 0 ? `<div style="margin-top:9px;font-size:0.78rem;color:#991B1B;font-weight:600"><i class="ti ti-alert-triangle"></i> ${money(probSpend)} of awarded spend sits with vendors flagged problematic.</div>` : ''}`
+    : '<div style="color:#888;font-size:0.85rem">No awarded spend to analyse yet.</div>'}</div>`;
+
+  /* ── Spend & coverage by product category ────────────────────────────────
+     Rolls the taxonomy up to its TOP level (trade). Deeper nodes roll into
+     their L1 ancestor via path[0], which is why the materialized path exists.
+     Silent no-op until MIGRATION_product_taxonomy.sql has been run. */
+  let taxTbl = '';
+  try {
+    const tax = await VendorDb.getTaxonomy();
+    if (tax.length) {
+      const prods = await VendorDb.getAllVendorProducts();
+      const nodeById = new Map(tax.map(n => [n.id, n]));
+      const rootName = id => { const n = nodeById.get(id); if (!n) return null; const r = nodeById.get((n.path || [])[0]); return r ? r.name : n.name; };
+      const cat = {};
+      prods.forEach(pr => {
+        if (!pr.taxonomy_id) return;
+        const rn = rootName(pr.taxonomy_id); if (!rn) return;
+        (cat[rn] = cat[rn] || { name: rn, vendors: new Set(), offerings: 0 });
+        cat[rn].vendors.add(pr.vendor_id); cat[rn].offerings++;
+      });
+      const spendByVendor = {}; awarded.forEach(r => { spendByVendor[r.key] = r.spend; });
+      const catRows = Object.values(cat).map(c => ({
+        name: c.name, nVend: c.vendors.size, offerings: c.offerings,
+        spend: [...c.vendors].reduce((a, id) => a + (spendByVendor[id] || 0), 0),
+      })).sort((a, b) => b.spend - a.spend || b.nVend - a.nVend);
+      const unclass = prods.filter(pr => !pr.taxonomy_id).length;
+      if (catRows.length) {
+        taxTbl = rank('Vendors by Product Category', `top-level trade · ${unclass} offering${unclass === 1 ? '' : 's'} still unclassified`, catRows,
+          [{ t: 'Category', f: (r, i) => `<span style="color:#888;margin-right:6px">${i + 1}</span><strong>${esc(r.name)}</strong>` },
+           { t: 'Vendors', a: 'right', f: r => r.nVend },
+           { t: 'Offerings', a: 'right', f: r => r.offerings },
+           { t: 'Awarded spend', a: 'right', f: r => money(r.spend) }]);
+      }
+    }
+  } catch (e) { /* taxonomy not deployed — section simply omitted */ }
+
+  el.innerHTML = kpis + conc + risk + spendTbl + savTbl + winTbl + cycle + taxTbl + tradeTbl;
 }
 
 /* ── Bulk select ── */
@@ -1590,6 +1697,9 @@ function _suggestSplitPoints(name) {
 /* ONE predicate for "this record looks like several companies joined together",
    shared by the Split tool and the directory's triage view so the two can never
    report a different backlog. */
+/* Accreditation validity, via the shared db.js policy. Falls back to a
+   never-expires stub only if db.js is served stale from cache. */
+function _standing(v) { return window.accredStanding ? window.accredStanding(v) : { key: '', state: 'n/a', days: null }; }
 function _looksGarbled(v) { return _splitSegments(v.name).length >= 2; }
 function _splitCandidates() {
   return allVendors.filter(v => _looksGarbled(v) && !_splitSkipped.has(v.id));
@@ -1632,6 +1742,42 @@ function _toolsMenuOutsideClick(e) {
   if (!document.getElementById('toolsMenuWrap').contains(e.target)) closeToolsMenu();
 }
 let _splitSegs = {}; // vendorId -> [segment strings]
+/* ── Reclassify an existing offering ────────────────────────────────────────
+   Previously the only way to change an offering's category was to delete and
+   re-add it, which threw away the row (and its id). This edits taxonomy_id in
+   place, and keeps the legacy free-text `category` in step with the new node's
+   trade so anything still reading that column stays correct. */
+let _reclPicker = null, _reclId = null;
+async function reclassifyProduct(id) {
+  _reclId = id;
+  document.getElementById('reclassifyModal').style.display = 'flex';
+  _syncModalScrollLock();
+  const box = document.getElementById('recl-picker');
+  box.innerHTML = '';
+  const cur = (await VendorDb.products.list(activeVendor.id)).find(x => x.id === id);
+  _reclPicker = await TaxonomyPicker.mount(box, {
+    value: cur ? cur.taxonomy_id : null,
+    placeholder: 'Choose a product category…',
+  });
+}
+function closeReclassifyModal() {
+  document.getElementById('reclassifyModal').style.display = 'none';
+  _syncModalScrollLock(); _reclId = null; _reclPicker = null;
+}
+async function saveReclassify() {
+  if (!_reclId) return;
+  const taxonomy_id = _reclPicker ? _reclPicker.value() : null;
+  const tax = await VendorDb.getTaxonomy();
+  const node = taxonomy_id ? tax.find(n => n.id === taxonomy_id) : null;
+  const category = node ? (node.trade || (tax.find(x => x.id === (node.path || [])[0]) || {}).name || '') : '';
+  try {
+    await VendorDb.products.update(_reclId, { taxonomy_id, category });
+    closeReclassifyModal();
+    await renderDetailProducts();
+    AppNotify && AppNotify.success('Category updated.');
+  } catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not update the category') : alert(e.message); }
+}
+
 /* ── Product-category manager ───────────────────────────────────────────────
    Canonical nodes (depth ≤ 2 — Trade and Works) are LOCKED: they mirror
    wp-form.html's TRADE_WORKS, and renaming or deleting one silently breaks
@@ -3243,6 +3389,7 @@ async function renderDetailProducts() {
   };
   const rows = list.length ? list.map(p =>
     `<div class="row-item"><div style="flex:1;min-width:0"><div class="row-item-title">${esc(p.description)}${p.unit?' ('+esc(p.unit)+')':''}</div><div class="row-item-sub">${sub(p)}${p.item_type?' · '+esc(p.item_type):''}</div></div>
+    <button class="row-item-del" style="background:none;border:none;color:#888;cursor:pointer" onclick="reclassifyProduct('${p.id}')" title="Change category"><i class="ti ti-category"></i></button>
     <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailProduct('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button></div>`
   ).join('') : '<div class="empty">No products/services on file.</div>';
   document.getElementById('dtab-products').innerHTML = rows + (!_canManage ? '' : `

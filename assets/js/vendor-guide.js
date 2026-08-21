@@ -9,21 +9,27 @@
 (function () {
   var SLIDES = [
     { icon: 'ti-building-store', title: 'Vendor Management', body:
-      'A central directory of every vendor, subcontractor and supplier — their <b>trades</b>, <b>products &amp; services</b>, <b>certifications</b>, <b>personnel</b>, <b>bid history</b> and <b>reference rates</b>. It plugs into Work Packages: the Awarded Vendor and Proposed Vendors on a WP link here.' },
+      'A central directory of every vendor, subcontractor and supplier — their <b>accreditation standing</b>, <b>trades</b>, <b>products &amp; services</b>, <b>certifications</b>, <b>personnel</b>, <b>bid history</b> and <b>reference rates</b>. It plugs into Work Packages: the Awarded Vendor and Proposed Vendors on a WP link here.' },
     { icon: 'ti-layout-grid', title: 'Finding vendors', body:
-      '<ul><li><b>Cards / Table</b> toggle — cards for browsing, table for a dense view.</li><li><b>Search</b> matches company name, trade, <i>and</i> product/service.</li><li><b>Status</b> filter + <b>pagination</b> (60 per page) keep large lists fast.</li><li>Click any vendor to open its full profile.</li></ul>' },
-    { icon: 'ti-checkbox', title: 'Approving vendors', body:
-      'Vendors are <b>Pending review</b>, <b>Approved</b>, <b>Rejected</b> or <b>Inactive</b>. Only <b>Approved</b> vendors are selectable on Work Packages. Approve/Reject right on a pending card, or open the profile to review first.' },
+      '<ul><li><b>Cards / Grid / Analytics</b> — cards to browse, grid to bulk-edit like a spreadsheet, analytics for spend and performance.</li><li><b>Search</b> matches company name, trade, <i>and</i> product/service.</li><li>The <b>KPI tiles are the filter</b> — click Accredited, Not accredited, Problematic or Requests to review.</li><li>Click any vendor to open its full profile.</li></ul>' },
+    { icon: 'ti-rosette-discount-check', title: 'Accreditation', body:
+      'Accreditation is the standing that matters — <b>Accredited</b>, <b>Problematic</b>, or not accredited (no value). It is <i>separate</i> from any old approval flag, and it is staff-owned: a vendor can never set it about themselves.<br><br>An accreditation stands for <b>12 months</b> from its accreditation date. The directory flags <b>Renewal due</b> and <b>Expired</b> so a lapsed vendor never quietly reads as current.' },
+    { icon: 'ti-alert-triangle', title: 'Problematic vendors', body:
+      'A vendor flagged <b>Problematic</b> (e.g. blacklisted) shows a red card border with the reason, a warning badge in every vendor picker, and — critically — <b>awarding a work package to one asks you to confirm first</b>. The flag follows the vendor everywhere, so it can’t be missed at the point of award.' },
+    { icon: 'ti-clock-hour-4', title: 'Accreditation requests', body:
+      'A vendor with a portal login can submit their documents (BIR 2303, company profile, business permit, sample invoice) and <b>request accreditation</b>. Those land in <b>Requests to review</b>. Open the vendor and you get their message, the same readiness checklist they saw, their uploaded files, and <b>Approve</b> / <b>Decline</b>. Declining requires a reason — the vendor sees it.' },
+    { icon: 'ti-category', title: 'Product categories', body:
+      'Offerings are filed against a shared tree: <b>Trade → Works</b> (locked, and identical to the Work Package form, which is what lets the app match vendors to a WP) then <b>your own sub-categories to any depth</b> — e.g. Structural Works › Rebar › Deformed Bars › 16mm.<br><br>Add sub-categories under <b>Data Tools → Manage Product Categories</b>. On a work package, <b>Suggest vendors</b> uses this to list who supplies that trade/works, accredited first.' },
     { icon: 'ti-user-plus', title: 'Adding vendors', body:
-      '<ul><li><b>Add Vendor</b> — create a vendor you’ve vetted (goes live approved immediately).</li><li>Give any vendor an <b>invite link</b> (in their profile’s Overview) so they can log in and maintain their own products, certs and personnel via the vendor portal.</li></ul>' },
+      '<ul><li><b>Add Vendor</b> — create a vendor you’ve vetted.</li><li><b>Enable self-service</b> (bulk bar) promotes a vendor’s real contact email to an invite email, then <b>Invite list (CSV)</b> gives you a mail-merge of registration links so they can maintain their own profile.</li></ul>' },
     { icon: 'ti-tool', title: 'Data Tools', body:
-      '<ul><li><b>Import from WPs</b> — pull vendor names out of existing work packages.</li><li><b>Backfill Trade/Bid Data</b> — fill trades, products, bids &amp; rates from awarded WPs.</li><li><b>Merge</b> — combine duplicate records (typos / different names for one company).</li><li><b>Needs Splitting</b> — break apart garbled multi-name imports.</li></ul>' },
+      '<ul><li><b>Import from WPs</b> / <b>Backfill Trade/Bid Data</b> — build the directory from existing work packages.</li><li><b>Merge</b> and <b>Remove Exact Duplicates</b> — combine records for one company.</li><li><b>Needs Splitting</b> — break apart garbled multi-name imports.</li><li><b>Manage Product Categories</b> — curate the offering tree.</li></ul>' },
     { icon: 'ti-list-check', title: 'Bulk actions', body:
-      'Tick the checkbox on cards or rows to select vendors — the selection survives paging and filtering. Use <b>Select all matching</b> to grab a whole filtered set, then <b>Approve</b>, <b>Reject</b> or <b>Delete</b> in one go. Ideal for triaging a big imported list. (Delete is admin-only.)' },
+      'Tick the checkbox on cards or grid rows to select vendors — the selection survives paging and filtering. Use <b>Select all matching</b> to grab a whole filtered set, then set accreditation, enable self-service, export an invite list, or delete. Delete is admin-only and shows you exactly what would be lost, with a CSV backup first.' },
     { icon: 'ti-id-badge-2', title: 'Inside a vendor profile', body:
-      'One scrolling page with a jump-nav: <b>Overview</b> (contact + trades + invite link), <b>Products &amp; Services</b> (each tagged Materials / Labor / Service), <b>Certifications</b> (with file uploads), <b>Personnel</b>, <b>Rates</b>, and <b>Bid History</b>. Staff can edit every section on the vendor’s behalf.' },
+      'One scrolling page with a jump-nav: <b>Overview</b> (contact, accreditation, invite link), <b>Work Packages</b> — which opens with a <b>scorecard</b>: win rate, awarded spend, award slip and savings delivered — plus <b>Products &amp; Services</b>, <b>Certifications</b>, <b>Personnel</b>, <b>Rates</b> and <b>Bid History</b>. Staff can edit every section on the vendor’s behalf.' },
     { icon: 'ti-circle-check', title: 'You’re set', body:
-      'That’s the tour. Reopen it any time from the <b>?</b> button in the top bar. Start by searching a vendor or reviewing the pending list.' },
+      'That’s the tour. Reopen it any time from the <b>?</b> button in the top bar. Start by reviewing <b>Requests to review</b>, or search for a vendor.' },
   ];
 
   var idx = 0, built = false, root = null;

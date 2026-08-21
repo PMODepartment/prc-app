@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820l"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260820l"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820l"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260820l"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260820m"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260820m"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260820m"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260820m"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820l"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260820m"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -75,6 +75,22 @@
     body.dark-mode .vc-acc-ok{background:#102B1F;color:#6EE7B7}
     body.dark-mode .vc-acc-bad{background:#3D1A19;color:#FCA5A5}
     body.dark-mode .vc-acc-none{background:var(--surface-2);color:var(--text-hint)}
+    /* "Suggest vendors" — matches this WP's Trade/Works against the product taxonomy */
+    .sv-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1.5px solid var(--border-md,#e5e5e5);
+      border-radius:8px;background:var(--surface,#fff);color:var(--text-primary,#231F20);font-family:inherit;
+      font-size:0.7857rem;font-weight:600;cursor:pointer}
+    .sv-btn:hover{border-color:var(--mw-red,#EE3124);background:var(--mw-red-light,#FDECEA)}
+    .sv-btn[disabled]{opacity:.55;cursor:not-allowed}
+    .sv-results{margin-top:8px;border:1.5px solid var(--border-md,#e5e5e5);border-radius:9px;overflow:hidden}
+    .sv-head{padding:7px 11px;background:var(--surface-2,#fafafa);font-size:0.7143rem;color:var(--text-hint,#6E6C6C);
+      display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .sv-row{display:flex;align-items:center;gap:8px;padding:7px 11px;border-top:1px solid var(--border,#eee);font-size:0.8214rem}
+    .sv-row .sv-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .sv-add{border:none;background:var(--mw-red,#EE3124);color:#fff;border-radius:6px;padding:3px 9px;
+      font-family:inherit;font-size:0.7143rem;font-weight:700;cursor:pointer;flex-shrink:0}
+    .sv-add[disabled]{background:#bbb;cursor:default}
+    .sv-empty{padding:10px 11px;font-size:0.7857rem;color:var(--text-hint,#6E6C6C)}
+    body.dark-mode .sv-head{background:var(--surface-2)}
     .pv-chip-warn{color:#991B1B;font-weight:800;margin:0 3px}
     body.dark-mode .pv-chip-warn{color:#FCA5A5}
     .vc-empty{padding:10px 12px;font-size:0.7857rem;color:#999}
@@ -385,6 +401,11 @@
                 <input type="hidden" id="f-proposed-vendors"/>
                 <div id="pv-pop" class="vc-pop"></div>
                 <span class="hint">Search the vendor directory or type a new name — several vendors can be proposed per WP.</span>
+                <div style="margin-top:7px">
+                  <button type="button" class="sv-btn" id="sv-btn" onclick="suggestVendorsForWP()">
+                    <i class="ti ti-wand"></i> Suggest vendors for this Trade / Works</button>
+                </div>
+                <div id="sv-results" class="sv-results" style="display:none"></div>
               </div>
               <div class="form-group">
                 <label>No. of PO / JO <span style="cursor:help;color:#bbb;font-weight:400;font-size:0.7857rem" title="Must equal the number of PO/JO numbers you list in the next field.">&#9432;</span></label>
@@ -772,10 +793,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260820l"></script>
-<script src="assets/js/ui.js?v=20260820l"></script>
-<script src="assets/js/db.js?v=20260820l"></script>
-<script src="assets/js/coachmarks.js?v=20260820l"></script>
+<script src="assets/js/auth.js?v=20260820m"></script>
+<script src="assets/js/ui.js?v=20260820m"></script>
+<script src="assets/js/db.js?v=20260820m"></script>
+<script src="assets/js/coachmarks.js?v=20260820m"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -1237,6 +1258,60 @@
     _pvSyncHidden();
     markDirty();
   }
+  /* ── Suggest vendors for this work package ────────────────────────────────
+     Uses the product taxonomy: find the node for this WP's Trade → Works, then
+     every vendor with an offering AT or UNDER it (VendorDb.findVendorsForWP,
+     which sorts accredited-first). Read-only until the user clicks Add, and it
+     never touches the awarded side — these are PROPOSED candidates.
+     Silently unavailable until MIGRATION_product_taxonomy.sql has been run. */
+  let _svHits = [];
+  async function suggestVendorsForWP() {
+    const box = document.getElementById('sv-results');
+    const btn = document.getElementById('sv-btn');
+    const trade = getVal('f-trade'), works = getVal('f-works');
+    if (!trade) { showErr('Pick a Trade first — the suggestion is based on Trade → Works.', 'f-trade'); return; }
+    box.style.display = 'block';
+    box.innerHTML = '<div class="sv-empty">Searching the vendor directory…</div>';
+    btn.disabled = true;
+    try {
+      _svHits = await VendorDb.findVendorsForWP(trade, works);
+    } catch (e) { _svHits = []; }
+    btn.disabled = false;
+    if (!_svHits.length) {
+      box.innerHTML = '<div class="sv-empty">No vendor has an offering filed under <b>' +
+        (esc ? esc(works || trade) : (works || trade)) + '</b> yet. Vendors classify what they supply in the vendor portal, ' +
+        'and staff can file it for them from Vendor Management → the vendor’s Products &amp; Services.</div>';
+      return;
+    }
+    const scope = works ? (trade + ' › ' + works) : trade;
+    box.innerHTML =
+      '<div class="sv-head"><span>' + _svHits.length + ' vendor' + (_svHits.length === 1 ? '' : 's') +
+        ' supply <b>' + (esc ? esc(scope) : scope) + '</b> — accredited first</span>' +
+        '<span style="cursor:pointer" data-sv-close="1" title="Hide">&times;</span></div>' +
+      _svHits.map((h, i) => {
+        const already = _pvChips.some(c => c.id === h.vendor.id);
+        return '<div class="sv-row">' +
+          '<span class="sv-nm">' + (esc ? esc(h.vendor.name) : h.vendor.name) + '</span>' +
+          _accBadge(h.vendor) +
+          '<button type="button" class="sv-add" data-sv="' + i + '"' + (already ? ' disabled' : '') + '>' +
+            (already ? 'Added' : 'Add') + '</button></div>';
+      }).join('');
+  }
+  window.suggestVendorsForWP = suggestVendorsForWP;
+  // Delegated so the buttons survive re-render of the results list.
+  document.addEventListener('click', e => {
+    if (e.target.closest && e.target.closest('[data-sv-close]')) {
+      const r = document.getElementById('sv-results'); if (r) r.style.display = 'none';
+      return;
+    }
+    const b = e.target.closest && e.target.closest('[data-sv]');
+    if (!b || b.disabled) return;
+    const h = _svHits[parseInt(b.dataset.sv, 10)];
+    if (!h) return;
+    _pvAdd({ id: h.vendor.id, name: h.vendor.name, accreditation: h.vendor.accreditation });
+    b.disabled = true; b.textContent = 'Added';
+  });
+
   function _pvRenderResults(list, query) {
     const pop = document.getElementById('pv-pop');
     if (!pop) return;
