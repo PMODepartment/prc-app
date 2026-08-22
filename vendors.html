@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260822a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260822a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260822a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260822b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260822b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260822b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260822a">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260822b">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -709,9 +709,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260822a"></script>
-<script src="assets/js/db.js?v=20260822a"></script>
-<script src="assets/js/ui.js?v=20260822a"></script>
+<script src="assets/js/auth.js?v=20260822b"></script>
+<script src="assets/js/db.js?v=20260822b"></script>
+<script src="assets/js/ui.js?v=20260822b"></script>
 <script src="assets/js/vendor-guide.js?v=20260820a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1054,6 +1054,20 @@ async function renderVendorAnalytics() {
     tile('Portfolio Savings', (totalSav >= 0 ? '+' : '-') + money(Math.abs(totalSav)), totalSav >= 0 ? 'green' : 'red', (totalSav >= 0 ? '+' : '') + totalSavPct.toFixed(1) + '%'),
   ].join('')}</div>`;
 
+  /* Say how big the residual "(not in directory)" set is, instead of leaving it
+     as a per-row footnote. Core-name resolution above recovers the spelling
+     variants; what is left are companies that genuinely have no vendor record —
+     they appear as the awarded contractor on a WP and nowhere else. Counting
+     their spend here is deliberate (it must not vanish), but after the
+     not-accredited purge this went from an edge case to a large slice, and a
+     reader needs the size of it to judge the rest of the page. */
+  const orphans = awarded.filter(r => !byId[r.key]);
+  const orphanSpend = orphans.reduce((n, r) => n + r.spend, 0);
+  const orphanNote = orphans.length ? `<div style="font-size:0.8125rem;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:11px 14px;margin-bottom:16px;line-height:1.6">
+      <b><i class="ti ti-alert-triangle" style="margin-right:5px"></i>${orphans.length.toLocaleString()} of these ${awarded.length.toLocaleString()} vendors have no directory record</b> — ${money(orphanSpend)} of awarded spend, ${totalSpend ? Math.round(orphanSpend / totalSpend * 100) : 0}% of the total.
+      <div style="margin-top:4px">This view is built from work packages, not the directory: a WP's awarded vendor is resolved by id, then by name, then by unambiguous core name — anything left over is counted under the contractor text on the WP so no spend goes missing. These companies are usually absent from the accreditation masterlist. <b>Data Tools → Import from WPs</b> creates records for them, with no accreditation standing.</div>
+    </div>` : '';
+
   const TH = 'padding:8px 10px;border-bottom:2px solid var(--border-md,#ddd);font-size:0.68rem;text-transform:uppercase;color:#888;white-space:nowrap;text-align:left';
   const TD = 'padding:7px 10px;border-bottom:1px solid var(--border,#eee);font-size:0.8rem';
   const openR = r => (byId[r.key]) ? `onclick="openDetailModal('${r.key}')" style="cursor:pointer" onmouseover="this.style.background='var(--mw-red-light,#FDECEA)'" onmouseout="this.style.background=''"` : '';
@@ -1233,7 +1247,7 @@ async function renderVendorAnalytics() {
     }
   } catch (e) { /* taxonomy not deployed — section simply omitted */ }
 
-  el.innerHTML = kpis + conc + risk + spendTbl + savTbl + winTbl + cycle + taxTbl + tradeTbl;
+  el.innerHTML = kpis + orphanNote + conc + risk + spendTbl + savTbl + winTbl + cycle + taxTbl + tradeTbl;
 }
 
 /* ── Bulk select ── */
