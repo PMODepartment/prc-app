@@ -497,7 +497,9 @@ window.fmtSavingsBuyback = function (hm) {
   const color = raw >= 0 ? '#2D9B6F' : '#EE3124';
   const sign = raw >= 0 ? '+' : '-';
   const hasBB = bb > 0.5; // ignore rounding dust
-  const bbMoneyNote = hasBB ? ` <span style="font-size:0.6em;font-weight:600;color:#888">(+${Fmt.moneyShort(bb)} Buyback)</span>` : '';
+  // Own line (display:block) — the KPI value is white-space:nowrap;overflow:hidden,
+  // so an inline annotation gets clipped mid-word on narrow cards.
+  const bbMoneyNote = hasBB ? `<span style="display:block;font-size:0.5em;font-weight:600;color:#888;line-height:1.4;overflow:hidden;text-overflow:ellipsis">+${Fmt.moneyShort(bb)} Buyback</span>` : '';
   const bbPctNote = hasBB ? ` <span style="font-weight:600;color:#888">(+${bbPct.toFixed(1)}% Buyback)</span>` : '';
   return {
     val: sign + Fmt.moneyShort(Math.abs(raw)) + bbMoneyNote,
