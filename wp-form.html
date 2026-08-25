@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260825a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825a"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260825a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260825b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825b"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260825b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825a"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825b"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -619,9 +619,9 @@
               <div class="form-group full" id="foc-group">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">
                   <input type="checkbox" id="f-free-of-charge" onchange="onFreeOfChargeChange()" style="width:16px;height:16px;cursor:pointer"/>
-                  <span>Awarded free of charge (₱0 cost) <span style="cursor:help;color:#bbb;font-weight:400;font-size:0.7857rem" title="This work package WAS awarded, but at zero cost — the vendor provides the scope free of charge. Check this instead of leaving the Awarded Cost blank: the dashboard will count it as a real award whose full budget is realized savings, rather than treating it as a cost still pending entry. The Awarded Vendor is still required — somebody is providing this free and we record who.">&#9432;</span></span>
+                  <span>No-Cost Award <span style="cursor:help;color:#bbb;font-weight:400;font-size:0.7857rem" title="This work package WAS awarded, but at ₱0 — the vendor provides the scope free. Check this instead of leaving the Awarded Cost blank: the dashboard will count it as a real award whose full budget is realized savings, rather than treating it as a cost still pending entry. The Awarded Vendor is still required — somebody is providing this free and we record who.">&#9432;</span></span>
                 </label>
-                <span class="hint">A real award at ₱0 — its full budget shows as savings. Awarded Vendor is still required.</span>
+                <span class="hint">Awarded at ₱0 — the vendor provides this free. Its full budget shows as savings; Awarded Vendor is still required.</span>
               </div>
               <div class="form-group full" id="buyback-group">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">
@@ -800,10 +800,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260825a"></script>
-<script src="assets/js/ui.js?v=20260825a"></script>
-<script src="assets/js/db.js?v=20260825a"></script>
-<script src="assets/js/coachmarks.js?v=20260825a"></script>
+<script src="assets/js/auth.js?v=20260825b"></script>
+<script src="assets/js/ui.js?v=20260825b"></script>
+<script src="assets/js/db.js?v=20260825b"></script>
+<script src="assets/js/coachmarks.js?v=20260825b"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -1463,7 +1463,7 @@
     markDirty();
   }
 
-  /* ── Awarded free of charge ─────────────────────────────────────────
+  /* ── No-Cost Award (DB column: free_of_charge) ─────────────────────────────────────────
      A real award at PHP 0: the vendor provides the scope free. Zeroes + locks the Awarded
      Cost (there is nothing to type) but deliberately LEAVES the Awarded Vendor editable and
      required — somebody is providing this free and we record who. Buyback is hidden, since
@@ -2288,7 +2288,7 @@ AppAuth.requireLogin(async (user, profile) => {
     const notToBeAwarded = document.getElementById('f-not-to-be-awarded').checked;
     // Buyback: the depreciation % is REQUIRED once the box is ticked (it's what the
     // buyback value — and therefore the savings — is computed from).
-    // Free of charge: a real award at PHP 0. NTBA wins if somehow both are set (no award at all
+    // No-Cost Award (free_of_charge): a real award at PHP 0. NTBA wins if somehow both are set (no award at all
     // beats an award at zero), and it rules out a buyback — nothing to recover from PHP 0.
     const freeOfCharge = document.getElementById('f-free-of-charge').checked && !notToBeAwarded;
     const isBuyback = document.getElementById('f-buyback').checked && !notToBeAwarded && !freeOfCharge;
@@ -2310,10 +2310,10 @@ AppAuth.requireLogin(async (user, profile) => {
       }
     }
     if (getVal('f-award-status') === 'Awarded' && !notToBeAwarded) {
-      // Free of charge waives the COST requirement (PHP 0 is the real figure) but never the
+      // A No-Cost Award waives the COST requirement (PHP 0 is the real figure) but never the
       // VENDOR one — that is the whole point of recording a free award.
       if (!freeOfCharge && !getNum('f-contract'))
-                                     return showErr('This WP is marked Awarded — enter the Awarded Cost (Net), set Award Status back to "Not Yet Awarded", or check "Awarded free of charge" / "Not to be Awarded".', 'f-contract');
+                                     return showErr('This WP is marked Awarded — enter the Awarded Cost (Net), set Award Status back to "Not Yet Awarded", or check "No-Cost Award" / "Not to be Awarded".', 'f-contract');
       if (!getVal('f-contractor'))   return showErr('This WP is marked Awarded — add at least one Awarded Vendor, set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'av-input');
       // Co-award: every awarded vendor needs its own negotiated amount (they sum to the Awarded Cost).
       if (_avIsMulti() && !freeOfCharge) {
