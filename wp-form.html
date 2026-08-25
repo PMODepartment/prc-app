@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260822b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260822b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260822b"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260822b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260825a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260825a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260822b"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825a"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -616,6 +616,13 @@
                 </label>
                 <span class="hint">Its full budget shows as savings — it will never receive a real Awarded Cost.</span>
               </div>
+              <div class="form-group full" id="foc-group">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">
+                  <input type="checkbox" id="f-free-of-charge" onchange="onFreeOfChargeChange()" style="width:16px;height:16px;cursor:pointer"/>
+                  <span>Awarded free of charge (₱0 cost) <span style="cursor:help;color:#bbb;font-weight:400;font-size:0.7857rem" title="This work package WAS awarded, but at zero cost — the vendor provides the scope free of charge. Check this instead of leaving the Awarded Cost blank: the dashboard will count it as a real award whose full budget is realized savings, rather than treating it as a cost still pending entry. The Awarded Vendor is still required — somebody is providing this free and we record who.">&#9432;</span></span>
+                </label>
+                <span class="hint">A real award at ₱0 — its full budget shows as savings. Awarded Vendor is still required.</span>
+              </div>
               <div class="form-group full" id="buyback-group">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">
                   <input type="checkbox" id="f-buyback" onchange="onBuybackChange()" style="width:16px;height:16px;cursor:pointer"/>
@@ -793,10 +800,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260822b"></script>
-<script src="assets/js/ui.js?v=20260822b"></script>
-<script src="assets/js/db.js?v=20260822b"></script>
-<script src="assets/js/coachmarks.js?v=20260822b"></script>
+<script src="assets/js/auth.js?v=20260825a"></script>
+<script src="assets/js/ui.js?v=20260825a"></script>
+<script src="assets/js/db.js?v=20260825a"></script>
+<script src="assets/js/coachmarks.js?v=20260825a"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -1434,6 +1441,12 @@
       if (bb) { bb.checked = false; bb.disabled = true; onBuybackChange(); }
       const bbg = document.getElementById('buyback-group');
       if (bbg) bbg.style.display = 'none';
+      // Free-of-charge is an AWARD at PHP 0; NTBA means there is no award at all. Showing
+      // both would put two contradictory money treatments on screen at once.
+      const foc = document.getElementById('f-free-of-charge');
+      if (foc) { foc.checked = false; foc.disabled = true; }
+      const focg = document.getElementById('foc-group');
+      if (focg) focg.style.display = 'none';
     } else {
       if (cost) { cost.disabled = false; }
       if (avInput) { avInput.disabled = false; avInput.placeholder = 'Search or type a vendor name…'; }
@@ -1441,7 +1454,47 @@
       if (bb) bb.disabled = false;
       const bbg = document.getElementById('buyback-group');
       if (bbg) bbg.style.display = '';
+      const foc = document.getElementById('f-free-of-charge');
+      if (foc) foc.disabled = false;
+      const focg = document.getElementById('foc-group');
+      if (focg) focg.style.display = '';
     }
+    if (!ntba) onFreeOfChargeChange();   // re-apply whatever free-of-charge wants of the cost field
+    markDirty();
+  }
+
+  /* ── Awarded free of charge ─────────────────────────────────────────
+     A real award at PHP 0: the vendor provides the scope free. Zeroes + locks the Awarded
+     Cost (there is nothing to type) but deliberately LEAVES the Awarded Vendor editable and
+     required — somebody is providing this free and we record who. Buyback is hidden, since
+     there is nothing to recover from a PHP 0 award. Mirrors window.isMoneyAwarded /
+     effectiveAwardedCost in db.js. */
+  function onFreeOfChargeChange() {
+    const foc  = document.getElementById('f-free-of-charge');
+    const on   = !!(foc && foc.checked && !foc.disabled);
+    const cost = document.getElementById('f-contract');
+    if (on) {
+      if (cost) { cost.value = '0'; cost.disabled = true; }
+      const bb = document.getElementById('f-buyback');
+      if (bb) { bb.checked = false; bb.disabled = true; onBuybackChange(); }
+      const bbg = document.getElementById('buyback-group');
+      if (bbg) bbg.style.display = 'none';
+    } else {
+      const ntba = document.getElementById('f-not-to-be-awarded');
+      const ntbaOn = !!(ntba && ntba.checked);
+      // Only re-enable — never rewrite the value. A non-free WP can legitimately load with a
+      // stored 0 (an importer default on a row whose cost was never entered); blanking that
+      // silently on open would edit data the user never touched. Validation still catches it.
+      if (cost && !ntbaOn) cost.disabled = false;
+      if (!ntbaOn) {
+        const bb = document.getElementById('f-buyback');
+        if (bb) bb.disabled = false;
+        const bbg = document.getElementById('buyback-group');
+        if (bbg) bbg.style.display = '';
+      }
+    }
+    if (typeof updateVariance === 'function') updateVariance();
+    if (typeof _updateBcbDeltas === 'function') _updateBcbDeltas();
     markDirty();
   }
 
@@ -2141,6 +2194,7 @@ AppAuth.requireLogin(async (user, profile) => {
       fillSelectLegacy('f-delivery-status', existingWP.delivery_status);
       _avLoadFromWP(existingWP);
       document.getElementById('f-not-to-be-awarded').checked = !!existingWP.not_to_be_awarded;
+      document.getElementById('f-free-of-charge').checked = !!existingWP.free_of_charge;
       onNotToBeAwardedChange();   // re-apply the disabled/cleared Awarded Cost+Vendor state
       fill('f-remarks', existingWP.remarks);
       if (existingWP.charging_type) {
@@ -2234,7 +2288,10 @@ AppAuth.requireLogin(async (user, profile) => {
     const notToBeAwarded = document.getElementById('f-not-to-be-awarded').checked;
     // Buyback: the depreciation % is REQUIRED once the box is ticked (it's what the
     // buyback value — and therefore the savings — is computed from).
-    const isBuyback = document.getElementById('f-buyback').checked && !notToBeAwarded;
+    // Free of charge: a real award at PHP 0. NTBA wins if somehow both are set (no award at all
+    // beats an award at zero), and it rules out a buyback — nothing to recover from PHP 0.
+    const freeOfCharge = document.getElementById('f-free-of-charge').checked && !notToBeAwarded;
+    const isBuyback = document.getElementById('f-buyback').checked && !notToBeAwarded && !freeOfCharge;
     // Exactly ONE of the two is stored, whichever mode the user chose, so they can't drift.
     let buybackDep = null, buybackAmt = null;
     if (isBuyback) {
@@ -2253,10 +2310,13 @@ AppAuth.requireLogin(async (user, profile) => {
       }
     }
     if (getVal('f-award-status') === 'Awarded' && !notToBeAwarded) {
-      if (!getNum('f-contract'))     return showErr('This WP is marked Awarded — enter the Awarded Cost (Net), set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'f-contract');
+      // Free of charge waives the COST requirement (PHP 0 is the real figure) but never the
+      // VENDOR one — that is the whole point of recording a free award.
+      if (!freeOfCharge && !getNum('f-contract'))
+                                     return showErr('This WP is marked Awarded — enter the Awarded Cost (Net), set Award Status back to "Not Yet Awarded", or check "Awarded free of charge" / "Not to be Awarded".', 'f-contract');
       if (!getVal('f-contractor'))   return showErr('This WP is marked Awarded — add at least one Awarded Vendor, set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'av-input');
       // Co-award: every awarded vendor needs its own negotiated amount (they sum to the Awarded Cost).
-      if (_avIsMulti()) {
+      if (_avIsMulti() && !freeOfCharge) {
         const missing = _avChips.filter(c => c.id && (c.amount == null || isNaN(c.amount) || c.amount <= 0));
         if (missing.length) return showErr('Enter each awarded vendor\'s amount — the Awarded Cost is their sum. Missing: ' + missing.map(c => c.name).join(', '), 'av-input');
       }
@@ -2335,6 +2395,7 @@ AppAuth.requireLogin(async (user, profile) => {
       awarded_cost:             getNum('f-contract'),
       award_status:             getVal('f-award-status'),
       not_to_be_awarded:        notToBeAwarded,
+      free_of_charge:           freeOfCharge,
       buyback:                  isBuyback,
       buyback_depreciation_percent: isBuyback ? buybackDep : null,
       buyback_amount:           isBuyback ? buybackAmt : null,

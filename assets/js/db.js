@@ -72,6 +72,7 @@ const WPDb = (() => {
     if (_isMissingProposedVendorIdsCol(error)) d = _stripProposedVendorIds(d);
     if (_isMissingAwardedVendorIdsCol(error)) d = _stripAwardedVendorIds(d);
     if (_isMissingBuybackCol(error)) d = _stripBuyback(d, error);
+    if (_isMissingFreeOfChargeCol(error)) d = _stripFreeOfCharge(d);
     _warnDropped('write retry', obj, d, error);
     return d;
   }
@@ -132,6 +133,15 @@ const WPDb = (() => {
     if (!named) delete d.buyback;   // the base column itself is missing -> drop the whole set
     return d;
   }
+  // Same deploy-order guard for work_packages.free_of_charge (MIGRATION_wp_free_of_charge.sql):
+  // every WP write retries without it if that migration hasn't run yet. Precise match --
+  // the substring appears in no other column name, so it can't cross-trigger.
+  function _isMissingFreeOfChargeCol(error) {
+    if (!error) return false;
+    const m = (error.message || '') + (error.details || '');
+    return /free_of_charge/.test(m) && /column|does not exist|schema cache/i.test(m);
+  }
+  function _stripFreeOfCharge(obj) { const d = {...obj}; delete d.free_of_charge; return d; }
   // A retry can strip a patch down to nothing (e.g. the grid staged ONLY a buyback edit on a
   // DB that lacks those columns). PostgREST treats an empty update body as 0 rows, so .single()
   // then throws an opaque "Cannot coerce the result to a single JSON object". Nothing is
@@ -213,7 +223,7 @@ const WPDb = (() => {
   async function submitWP(d,p) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null};
     let {data,error}=await sb.from('work_packages').insert({...base,..._auditStamp()}).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error) || _isMissingFreeOfChargeCol(error)))
       ({data,error}=await sb.from('work_packages').insert(_stripOptional(base,error)).select().single());
     if(error && _isMissingBcbCol(error))
       ({data,error}=await sb.from('work_packages').insert(_warn2(base,_stripBcb(_stripAudit(base)),error)).select().single());
@@ -226,7 +236,7 @@ const WPDb = (() => {
   async function updateWP(id,d) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review'};
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error) || _isMissingFreeOfChargeCol(error)))
       ({data,error}=await _retryUpdate(sb,id,_stripOptional(base,error)));
     if(error && _isMissingBcbCol(error))
       ({data,error}=await _retryUpdate(sb,id,_stripBcb(_stripAudit(base))));
@@ -239,7 +249,7 @@ const WPDb = (() => {
   async function updateWPDirect(id,d) {
     const sb=await getSB(); const base=unmap(d);
     let {data,error}=await sb.from('work_packages').update({...base,..._auditStamp()}).eq('id',id).select().single();
-    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error)))
+    if(error && (_isMissingAuditCol(error) || _isMissingBcbCol(error) || _isMissingVendorCol(error) || _isMissingProposedVendorIdsCol(error) || _isMissingAwardedVendorIdsCol(error) || _isMissingBuybackCol(error) || _isMissingFreeOfChargeCol(error)))
       ({data,error}=await _retryUpdate(sb,id,_stripOptional(base,error)));
     if(error && _isMissingBcbCol(error))
       ({data,error}=await _retryUpdate(sb,id,_stripBcb(_stripAudit(base))));
@@ -377,8 +387,21 @@ window.isResolved = function (w) {
 // everywhere the app decides whether a WP's money counts and what its effective
 // awarded cost is — never re-inline `award_status==='Awarded' && total_awarded>0`,
 // or a not_to_be_awarded WP will disagree between tabs/charts again.
+//
+// FREE OF CHARGE: `free_of_charge` (MIGRATION_wp_free_of_charge.sql) is the third way
+// in. Some WPs are genuinely awarded at PHP 0 because the vendor provides the scope
+// free -- a real, closed award whose entire BCB is realized savings. Unlike
+// not_to_be_awarded this flag does NOT stand alone: it describes an AWARD, so it only
+// counts once award_status is actually 'Awarded'. It deliberately does NOT relax the
+// `total_awarded > 0` test for everyone else -- "awarded at zero" and "awarded, cost
+// not encoded yet" are indistinguishable from the numbers alone (on AVR101, WP 35 and
+// WP 45 already store awarded_cost = 0 with no vendor, from an importer default), so
+// only an explicit tick can tell them apart. See Known Issue #17 / #28c.
 window.isMoneyAwarded = function (w) {
-  return !!w && (!!w.not_to_be_awarded || (w.award_status === 'Awarded' && (w.total_awarded || 0) > 0));
+  if (!w) return false;
+  if (w.not_to_be_awarded) return true;
+  if (w.award_status !== 'Awarded') return false;
+  return !!w.free_of_charge || (w.total_awarded || 0) > 0;
 };
 // A not-resolved WP with no Planned Award Date is silently excluded from every
 // "Cumulative Planned" line (period charts, S-Curve) but IS counted in "Forecast"
@@ -417,7 +440,8 @@ window.buybackExactAmount = function (w) {
   return Math.max(0, Math.min(v, (w.total_awarded || 0)));
 };
 window.buybackValue = function (w) {
-  if (!w || !w.buyback || w.not_to_be_awarded) return 0;   // NTBA is already booked at an effective PHP 0
+  // NTBA and free-of-charge are already booked at an effective PHP 0 -- nothing to recover.
+  if (!w || !w.buyback || w.not_to_be_awarded || w.free_of_charge) return 0;
   const exact = window.buybackExactAmount(w);
   if (exact !== null) return exact;
   const f = window.buybackDepFraction(w);
@@ -425,7 +449,9 @@ window.buybackValue = function (w) {
   return ((w.total_awarded || 0)) * (1 - f);
 };
 window.effectiveAwardedCost = function (w) {
-  if (w && w.not_to_be_awarded) return 0;
+  // Both flags mean "this award costs us nothing": NTBA was pulled from the pipeline,
+  // free_of_charge was awarded at PHP 0. Either way the full BCB lands in savings.
+  if (w && (w.not_to_be_awarded || w.free_of_charge)) return 0;
   const cost = (w && w.total_awarded) || 0;
   if (!w || !w.buyback) return cost;
   const bv = window.buybackValue(w);

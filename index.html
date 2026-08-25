@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260822b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260822b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260822b"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260822b"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260822b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260825a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825a"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260825a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260825a"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260810b"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260822b"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260825a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260822b"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825a"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -697,16 +697,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260822b"></script>
-<script src="assets/js/db.js?v=20260822b"></script>
-<script src="assets/js/ui.js?v=20260822b"></script>
-<script src="assets/js/onboarding.js?v=20260822b"></script>
-<script src="assets/js/coachmarks.js?v=20260822b"></script>
+<script src="assets/js/auth.js?v=20260825a"></script>
+<script src="assets/js/db.js?v=20260825a"></script>
+<script src="assets/js/ui.js?v=20260825a"></script>
+<script src="assets/js/onboarding.js?v=20260825a"></script>
+<script src="assets/js/coachmarks.js?v=20260825a"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260810b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260822b"></script>
+<script src="assets/js/charts.js?v=20260825a"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -1221,6 +1221,7 @@
           <div class="sec-label">Financials</div>
           ${row('Procurement Budget',fmtM(bud))}
           ${row('Awarded',fmtM(awd))}
+          ${w.free_of_charge?row('Free of Charge','<span style="color:#2D9B6F;font-weight:600">Yes — vendor provides this free (₱0)</span>',true):''}
           ${w.buyback?row('Buyback', bbExact!=null ? 'Exact amount' : (bbDep!=null?(bbDep*100).toFixed(bbDep*100%1?2:0)+'% depreciated':'Yes')):''}
           ${bbVal?row('Buyback Value',`<span style="color:#2D9B6F;font-weight:600">${fmtM(bbVal)}</span>`,true):''}
           ${w.buyback&&awd?row('Effective Cost',fmtM(bbEff)):''}
@@ -1793,8 +1794,11 @@
       //    (one requires award_status==='Awarded', the other requires NOT resolved), so a row is
       //    always exactly one kind, but they share one table/filter/sort now instead of two.
       const gapsAll = [
-        ...wps.filter(w => w.award_status === 'Awarded' && !w.not_to_be_awarded && (!((w.total_awarded || 0) > 0) || !(w.contractor && String(w.contractor).trim())))
-          .map(w => ({ w, noCost: !((w.total_awarded || 0) > 0), noVendor: !(w.contractor && String(w.contractor).trim()), noPlanDate: false, bcb: w.approved_budget_bcb || 0 })),
+        // free_of_charge is NOT a missing cost -- PHP 0 is the real, deliberate figure. Its
+        // VENDOR is still required though, so such a row can still appear here for that.
+        ...wps.filter(w => w.award_status === 'Awarded' && !w.not_to_be_awarded
+                        && ((!((w.total_awarded || 0) > 0) && !w.free_of_charge) || !(w.contractor && String(w.contractor).trim())))
+          .map(w => ({ w, noCost: !((w.total_awarded || 0) > 0) && !w.free_of_charge, noVendor: !(w.contractor && String(w.contractor).trim()), noPlanDate: false, bcb: w.approved_budget_bcb || 0 })),
         ...wps.filter(w => !window.isResolved(w) && !w.awarding_date)
           .map(w => ({ w, noCost: false, noVendor: false, noPlanDate: true, bcb: w.approved_budget_bcb || 0 })),
       ];
@@ -3149,7 +3153,18 @@
       // Cost Overview KPI cards — 4 cards (matches the per-project Overview): BCB, Actual Award,
       // Balance to Award (amount + WP qty), Savings/Loss (₱ + %).
       const card = (lbl,val,cls,full,sub,subColor) => `<div class="metric-card"><div class="metric-label"${window.kpiLabelAttrs?window.kpiLabelAttrs(lbl):''}>${lbl}</div><div class="metric-value ${cls}"${full?` title="${full}"`:''}>${val}</div>${sub?`<div class="metric-sub" style="font-size:1rem;font-weight:700;margin-top:4px;color:${subColor||'#888'}">${sub}</div>`:''}</div>`;
-      const balanceAmt = ctc;                                       // budget remaining to award (= totalBudget − budgetAwarded)
+      // BALANCE TO AWARD is summed DIRECTLY over the WPs still in the backlog -- deliberately
+      // NOT `totalBudget - budgetAwarded` (which is what `ctc` is). Those two differ by the BCB
+      // of any WP that is Awarded but carries no cost: such a row is resolved, so it is absent
+      // from the Backlog table, yet subtraction leaves its budget sitting in the "remaining"
+      // figure. On AVR101 that read PHP 9.37M against a backlog of one PHP 1.00M WP, because six
+      // awarded WPs had no cost entered (PHP 8.37M). Summing the backlog keeps this card's amount
+      // and its "N WPs remaining" sub-line describing the SAME rows, on every project.
+      // `ctc`/`eac` are intentionally left on the subtraction basis -- an unpriced WP still has to
+      // be budgeted for, so Estimate at Completion must keep counting it. The data gap itself is
+      // surfaced by Action Center -> Data Gaps, not by this card.
+      const balanceAmt = filtWPs.filter(w => !window.isResolved(w))
+                                .reduce((s,w) => s + (w.approved_budget_bcb || 0), 0);
       const balanceQty = Math.max(0, filtWPs.length - awardedCount);// WPs not yet awarded
       const sv = window.fmtSavingsBuyback(hm);
       const costEl = document.getElementById('metrics-cost');
