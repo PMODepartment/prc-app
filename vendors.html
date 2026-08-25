@@ -688,6 +688,7 @@
       <nav class="detail-jump" id="detailJump">
         <a href="#dsec-overview">Overview</a>
         <a href="#dsec-wps">Work Packages</a>
+        <a href="#dsec-sched">Schedule</a>
         <a href="#dsec-products">Products</a>
         <a href="#dsec-certs">Certifications</a>
         <a href="#dsec-personnel">Personnel</a>
@@ -697,6 +698,7 @@
       <div class="detail-scroll" id="detailScroll">
         <section class="detail-section" id="dsec-overview"><h3 class="detail-section-title">Overview</h3><div id="dtab-overview"></div></section>
         <section class="detail-section" id="dsec-wps"><h3 class="detail-section-title">Work Packages</h3><div id="dtab-wps"></div></section>
+        <section class="detail-section" id="dsec-sched"><h3 class="detail-section-title">Schedule Performance</h3><div id="dtab-sched"></div></section>
         <section class="detail-section" id="dsec-products"><h3 class="detail-section-title">Products &amp; Services</h3><div id="dtab-products"></div></section>
         <section class="detail-section" id="dsec-certs"><h3 class="detail-section-title">Certifications</h3><div id="dtab-certs"></div></section>
         <section class="detail-section" id="dsec-personnel"><h3 class="detail-section-title">Personnel</h3><div id="dtab-personnel"></div></section>
@@ -3106,7 +3108,7 @@ async function openDetailModal(id) {
   document.getElementById('detailModal').style.display = 'flex';
   _syncModalScrollLock();
   document.getElementById('detailModalBody').scrollTop = 0;
-  await Promise.all([renderDetailWps(), renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates(), renderDetailBids()]);
+  await Promise.all([renderDetailWps(), renderDetailSched(), renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates(), renderDetailBids()]);
   renderDetailOverview();
   _wireDetailScrollSpy();
 }
@@ -3705,6 +3707,108 @@ async function renderDetailWps() {
     <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
       <thead><tr><th style="${TH}">Role</th><th style="${TH}">WP No.</th><th style="${TH}">Project</th><th style="${TH}">Description</th><th style="${TH}">Trade</th><th style="${TH}">Status</th>${costHead}</tr></thead>
       <tbody>${body}</tbody></table></div>`;
+}
+
+/* ── Schedule Performance ───────────────────────────────────────────────────
+   How this vendor is tracking against the CONSTRUCTION PROGRAMME, pushed in by
+   the Planners app (push-vendor-perf -> planners_vendor_performance).
+
+   WARNING: A SNAPSHOT, NOT LIVE. The schedule lives in the Planners database and
+   this app cannot read it, so every figure is as-of `pushed_at` / `data_date` and
+   both are printed. A vendor's SPI without its date is how a stale number ends up
+   quoted in a negotiation.
+
+   WARNING: NOTHING HERE IS AUTHORITATIVE FOR THE VENDOR. It reports what the
+   programme says; the buyer judges. No control on this screen writes back.
+   ─────────────────────────────────────────────────────────────────────────── */
+async function renderDetailSched() {
+  const el = document.getElementById('dtab-sched');
+  if (!el || !activeVendor) return;
+  el.innerHTML = '<div style="color:#888;font-size:0.82rem">Loading…</div>';
+
+  const rows = await VendorDb.getVendorSchedulePerf(activeVendor.id);
+  if (!rows.length) {
+    el.innerHTML = `<div style="color:#888;font-size:0.82rem;line-height:1.6">
+      No schedule performance yet for this vendor.
+      <div style="margin-top:6px;font-size:0.78rem">This is pushed in from the Planners app. It appears once
+      that app's vendor migrations are run, <code>sync-wpm</code> has been re-run (so the award link exists),
+      and <code>push-vendor-perf</code> has been invoked for the project.</div></div>`;
+    return;
+  }
+
+  // Resolve project names the SAME way renderDetailWps does (_projName is
+  // memoised in _projNameCache), so the two sections cannot disagree — and so a
+  // missing project falls back to its id rather than to blank.
+  const pmap = {};
+  for (const pid of [...new Set(rows.map(r => r.project_id).filter(Boolean))]) pmap[pid] = await _projName(pid);
+  const pct = (v) => (v == null ? '—' : (Number(v) * 100).toFixed(1) + '%');
+  const STAT = {
+    on_track:      { lbl: 'On track',     col: '#2D9B6F' },
+    watch:         { lbl: 'Watch',        col: '#B7791F' },
+    problem:       { lbl: 'Problem',      col: '#C0392B' }
+  };
+  const TREND = { improving: '&#9650; improving', deteriorating: '&#9660; deteriorating', flat: '&#9644; flat' };
+
+  // Most recently pushed first (the accessor already orders that way).
+  const cards = rows.map(r => {
+    const st = STAT[r.status] || { lbl: r.status || '—', col: '#888' };
+    // WARNING: the snapshot age is computed and SHOWN, not hidden. A figure from
+    // last month reads very differently from one pushed this morning.
+    const ageDays = r.pushed_at
+      ? Math.max(0, Math.round((Date.now() - new Date(r.pushed_at).getTime()) / 86400000))
+      : null;
+    const stale = ageDays != null && ageDays > 14;
+
+    const tiles = [
+      ['Complete',   pct(r.pct_complete), 'duration-weighted'],
+      ['Programme',  pct(r.planned_pct),  'where it should be'],
+      ['SPI',        r.spi == null ? '—' : Number(r.spi).toFixed(2),
+                     r.spi == null ? 'nothing planned yet' : 'actual &divide; planned'],
+      ['Slip',       (r.slip_days == null ? '—' : Number(r.slip_days).toFixed(0) + 'd'),
+                     `${r.n_slipped || 0} of ${r.n_finished || 0} finished late`]
+    ].map(([l, v, sub]) =>
+      `<div class="sc-tile"><div class="sc-lbl">${esc(l)}</div>
+        <div class="sc-val">${v}</div><div class="sc-sub">${sub}</div></div>`).join('');
+
+    const notes = [];
+    if (r.co_awarded)
+      // WARNING: say this out loud. Co-awarded packages are attributed to the
+      // PRIMARY vendor only (or a shared package double-counts the project), so a
+      // low package count needs explaining rather than doubting.
+      notes.push(`${r.co_awarded} further package${r.co_awarded === 1 ? '' : 's'} where this vendor is a
+                  <strong>co-awardee only</strong> — excluded above, because counting a shared package for
+                  both parties would double-count the project.`);
+    if (r.needby_checked)
+      notes.push(`Need-by adherence: <strong>${r.needby_late || 0} of ${r.needby_checked}</strong> package${r.needby_checked === 1 ? '' : 's'}
+                  where the schedule needs it before our Target Installation.
+                  <em>Planned</em> adherence — there is no actual-delivery date to compare against.`);
+
+    return `<div style="border:1px solid var(--border-md,#e8e8e8);border-radius:10px;padding:12px 14px;margin-bottom:12px">
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <strong style="font-size:0.9286rem">${esc(pmap[r.project_id] || r.project_id || '—')}</strong>
+        <span style="font-weight:700;color:${st.col}">${esc(st.lbl)}</span>
+        <span style="color:#888;font-size:0.8rem">${TREND[r.trend] || ''}</span>
+        <span style="margin-left:auto;color:${stale ? '#C0392B' : '#888'};font-size:0.76rem">
+          as of ${esc(String(r.data_date || '').slice(0, 10) || '—')}
+          &middot; pushed ${ageDays == null ? '—' : (ageDays === 0 ? 'today' : ageDays + 'd ago')}
+          ${stale ? ' &mdash; <strong>stale</strong>' : ''}
+        </span>
+      </div>
+      <div class="scorecard">${tiles}</div>
+      <div style="color:#666;font-size:0.78rem;line-height:1.6">
+        ${r.n_packages || 0} package${r.n_packages === 1 ? '' : 's'} &middot;
+        ${r.n_activities || 0} scheduled activit${r.n_activities === 1 ? 'y' : 'ies'}
+        ${notes.length ? '<ul style="margin:7px 0 0;padding-left:18px">' + notes.map(n => `<li>${n}</li>`).join('') + '</ul>' : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = cards +
+    `<div style="color:#888;font-size:0.76rem;line-height:1.6;margin-top:2px">
+      Pushed in from the Planners app's Project Schedule. <strong>A snapshot, not live</strong> — the
+      schedule lives in that database. Duration-weighted, not cost-weighted, because procurement cost is
+      deliberately kept off schedule rows. Nothing here is editable from this screen.
+    </div>`;
 }
 
 /* ── Per-vendor scorecard ───────────────────────────────────────────────────

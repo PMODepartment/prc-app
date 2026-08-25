@@ -3133,6 +3133,29 @@ const VendorDb = (() => {
       .sort((a, b) => (rank(a.vendor) - rank(b.vendor)) || a.vendor.name.localeCompare(b.vendor.name));
   }
 
+
+  /* ── Schedule performance pushed in by the Planners app ────────────────────
+     Reads `planners_vendor_performance`, written ONLY by the Planners
+     `push-vendor-perf` Edge Function with this project's service key.
+
+     WARNING: EVERY ROW IS A SNAPSHOT, as fresh as the last push — the schedule
+     lives in the Planners database and this app cannot read it. Callers MUST
+     surface `pushed_at`; a vendor's SPI without a date invites someone to quote
+     a stale figure in a negotiation.
+
+     WARNING: returns [] rather than throwing when the table is absent, so a WPM
+     deploy that runs ahead of MIGRATION_planners_vendor_performance.sql degrades
+     to "no data yet" instead of breaking Vendor Management. */
+  async function getVendorSchedulePerf(vendorId) {
+    try {
+      const sb = await getSB();
+      let q = sb.from('planners_vendor_performance').select('*');
+      if (vendorId) q = q.eq('vendor_id', vendorId);
+      const { data, error } = await q.order('pushed_at', { ascending: false });
+      if (error) return [];
+      return data || [];
+    } catch (e) { return []; }
+  }
   return {
     getVendors, getVendor, createVendor, updateVendor, approveVendor, rejectVendor, setVendorStatus, deleteVendor,
     products, certifications, personnel,
@@ -3146,6 +3169,7 @@ const VendorDb = (() => {
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
     bulkSetVendorStatus, bulkSetAccreditation, findExactDuplicateGroups, mergeExactDuplicates, bulkDeleteVendors, getDeletionImpact, prepareInvites,
     backfillVendorDataFromWPs, getWorkPackagesForVendor,
+    getVendorSchedulePerf,
   };
 })();
 window.VendorDb = VendorDb;
