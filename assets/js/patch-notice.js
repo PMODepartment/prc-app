@@ -1,17 +1,28 @@
 /* ============================================================================
- * Patch Notice — one-off "What's New" announcement, Aug 4 – Aug 10 2026 update
+ * Patch Notice — one-off "What's New" announcement, Aug 11 – Aug 25 2026 update
  * ----------------------------------------------------------------------------
  * TEMPORARY component. Auto-shows once to contributor-tier accounts
  * (specialist / manager / user) AND admin / super_admin — never viewer/
- * viewer_budget, never vendor (vendor logins never load this page at all) —
- * to call out the new Vendor Management Dashboard and the Megawide PRC
- * rebrand from this update.
+ * viewer_budget, never vendor (vendor logins never load this page at all).
  *
- * Hard-expires 2026-08-19 00:00 — both maybeAutoOpen() and open() refuse to
+ * This round is deliberately NARROW: co-awarded vendors, No-Cost Awards,
+ * per-trade subtotals / Balance to Award, and the buyback exact-amount mode.
+ *
+ * DELIBERATELY NOT ANNOUNCED YET (2026-08-25, user's call) -- both are built and
+ * live, they are just not being put in front of officers in this round:
+ *   - Vendor Management (accreditation standing, the at-award guardrail, the
+ *     directory itself). That app still needs work.
+ *   - The Planners need-by dates (WP-form advisory panel + WP List columns).
+ * When either is ready to announce, add it back as an item here.
+ *
+ * Hard-expires 2026-09-03 00:00 — both maybeAutoOpen() and open() refuse to
  * render past that instant, so no leftover code path (a stale localStorage
  * miss, a manual call, a slow tab) can show this late. Once that date has
  * passed this file and its <script> include on index.html/project.html can
  * simply be deleted — see CLAUDE.md.
+ *
+ * SEEN_PREFIX is bumped every round, so a user who dismissed the previous
+ * notice still sees this one.
  *
  * Self-contained: injects its own styles, no dependencies beyond Tabler
  * icons (already loaded) + the CSS variables in dashboard.css, so it follows
@@ -19,12 +30,13 @@
  *
  * Public API (window.PatchNotice):
  *   PatchNotice.maybeAutoOpen(userId, role) — open once per contributor user
+ *   PatchNotice.open()                      — on demand (profile menu item)
  * ========================================================================== */
 (function () {
   'use strict';
 
-  var SEEN_PREFIX = 'wpm_patch_202608b_seen_';
-  var EXPIRES = new Date('2026-08-19T00:00:00');   // hard cutoff (exclusive)
+  var SEEN_PREFIX = 'wpm_patch_202608c_seen_';
+  var EXPIRES = new Date('2026-09-03T00:00:00');   // hard cutoff (exclusive)
 
   function isContributor(role) {
     return role === 'specialist' || role === 'manager' || role === 'user' ||
@@ -104,37 +116,44 @@
         '<div class="pn-top">' +
           '<div class="pn-badge" aria-hidden="true"><i class="ti ti-sparkles"></i></div>' +
           '<div class="pn-top-text">' +
-            '<div class="pn-eyebrow"><span>Product update</span><span class="pn-dot"></span><span class="pn-range">Aug 4 &ndash; Aug 10</span></div>' +
+            '<div class="pn-eyebrow"><span>Product update</span><span class="pn-dot"></span><span class="pn-range">Aug 11 &ndash; Aug 25</span></div>' +
             '<h2 id="pn-title">What&#39;s new in your dashboard</h2>' +
-            '<p class="pn-lede">A few changes worth knowing about before you start work this week.</p>' +
+            '<p class="pn-lede">Two new ways to record an award, plus a few smaller changes worth knowing.</p>' +
           '</div>' +
         '</div>' +
         '<div class="pn-body">' +
           '<div class="pn-feature">' +
-            '<div class="pn-feature-icon" aria-hidden="true"><i class="ti ti-rotate-2"></i></div>' +
+            '<div class="pn-feature-icon" aria-hidden="true"><i class="ti ti-users-group"></i></div>' +
             '<div style="min-width:0">' +
-              '<p class="pn-feature-title">Buyback work packages <span class="pn-new">New</span></p>' +
-              '<p class="pn-feature-copy">For WPs where the vendor takes the item back at the end of use, the recovered value now counts toward savings &mdash; enter it as a <b>depreciation %</b> or an <b>exact amount</b> in the WP Form or the review grid.</p>' +
+              '<p class="pn-feature-title">Co-awarded vendors <span class="pn-new">New</span></p>' +
+              '<p class="pn-feature-copy">A work package can now be awarded to <b>more than one vendor</b>. Add each one as a chip in Awarded Vendor and enter their own negotiated amount &mdash; the <b>Awarded Cost becomes the auto-sum</b> and locks. A single vendor behaves exactly as before.</p>' +
             '</div>' +
           '</div>' +
-          '<p class="pn-section-label">Also this week</p>' +
+          '<div class="pn-feature">' +
+            '<div class="pn-feature-icon" aria-hidden="true"><i class="ti ti-discount-check"></i></div>' +
+            '<div style="min-width:0">' +
+              '<p class="pn-feature-title">No-Cost Award <span class="pn-new">New</span></p>' +
+              '<p class="pn-feature-copy">For a WP awarded at <b>&#8369;0</b> because the vendor provides it free, tick <b>No-Cost Award</b> instead of leaving the cost blank &mdash; its full budget then counts as savings rather than looking like a cost you still owe. Awarded Vendor is still required.</p>' +
+            '</div>' +
+          '</div>' +
+          '<p class="pn-section-label">Also in this update</p>' +
           '<div class="pn-item">' +
-            '<div class="pn-item-icon" aria-hidden="true"><i class="ti ti-timeline"></i></div>' +
+            '<div class="pn-item-icon" aria-hidden="true"><i class="ti ti-sum"></i></div>' +
             '<div>' +
-              '<p class="pn-item-title">BCB0 / BCB1 / BCB2 budget baselines</p>' +
-              '<p class="pn-item-copy">Track re-baselined budgets over time &mdash; a WP can show a saving against BCB0 and a loss against BCB1. Switch baselines from the dropdown on the Overview tab.</p>' +
+              '<p class="pn-item-title">Per-trade subtotals, and a truer Balance to Award</p>' +
+              '<p class="pn-item-copy">Trade group headers in the WP List now show that trade&#39;s Budget and Awarded totals, following whatever filters you have on. <b>Balance to Award</b> on the Overview now also matches the Backlog table exactly.</p>' +
             '</div>' +
           '</div>' +
           '<div class="pn-item">' +
-            '<div class="pn-item-icon" aria-hidden="true"><i class="ti ti-tag"></i></div>' +
+            '<div class="pn-item-icon" aria-hidden="true"><i class="ti ti-rotate-2"></i></div>' +
             '<div>' +
-              '<p class="pn-item-title">Group Head tagging + filter</p>' +
-              '<p class="pn-item-copy">Projects can now be tagged with a Group Head. On the Portfolio Overview, filter, sort, or group the whole dashboard by Group Head from the project-selection dropdown.</p>' +
+              '<p class="pn-item-title">Buyback: enter an exact amount</p>' +
+              '<p class="pn-item-copy">Buyback now takes either a <b>depreciation %</b> or the <b>exact recovered amount</b>, whichever you actually have. The recovery is also called out separately in Savings / Loss instead of being folded in silently.</p>' +
             '</div>' +
           '</div>' +
         '</div>' +
         '<div class="pn-foot">' +
-          '<span class="pn-foot-note">Shown once &mdash; you won&#39;t see this again after you dismiss it.</span>' +
+          '<span class="pn-foot-note">Shown once &mdash; reopen any time from <b>What&#39;s New</b> in your profile menu.</span>' +
           '<button class="pn-btn">Got it</button>' +
         '</div>' +
       '</div>';

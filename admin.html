@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260825b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260825c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825b">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825c">
   <style>
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
     .modal{background:#fff;border-radius:12px;width:100%;max-width:420px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden}
@@ -31,6 +31,11 @@
     .project-checkbox-item:hover{border-color:#EE3124}
     .project-checkbox-item input[type="checkbox"]{width:16px;height:16px;accent-color:#EE3124;cursor:pointer}
     .project-checkbox-item label{font-size:1rem;font-weight:500;color:#231F20;cursor:pointer}
+    /* Select all / None for the project-assignment list -- quiet secondary buttons so they
+       read as tools, not as the modal's primary action (which is Save Changes). */
+    .proj-bulk-btn{padding:4px 10px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:6px;font-size:0.8571rem;font-weight:600;font-family:inherit;cursor:pointer;transition:border-color .15s,color .15s}
+    .proj-bulk-btn:hover{border-color:#EE3124;color:#EE3124}
+    .proj-bulk-count{font-size:0.7857rem;color:#888;font-weight:600;margin-left:auto}
     .role-select{width:100%;padding:10px 12px;border:1px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:'Montserrat',sans-serif;color:#231F20;background:#fff}
     .btn-approve{flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;font-family:inherit;cursor:pointer}
     .btn-approve:hover{background:#C42127}
@@ -129,7 +134,7 @@
       <div class="sidebar-section-label">Admin</div>
       <a class="nav-item active" href="admin.html"><i class="ti ti-users"></i>User Management</a>
       <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Portfolio Overview</a>
-      <a class="nav-item" href="vendors.html"><i class="ti ti-building-store"></i>Vendor Management</a>
+      <a class="nav-item" id="nav-vendors" href="vendors.html"><i class="ti ti-building-store"></i>Vendor Management</a>
     </div>
     <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
@@ -376,9 +381,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260825b"></script>
-<script src="assets/js/db.js?v=20260825b"></script>
-<script src="assets/js/ui.js?v=20260825b"></script>
+<script src="assets/js/auth.js?v=20260825c"></script>
+<script src="assets/js/db.js?v=20260825c"></script>
+<script src="assets/js/ui.js?v=20260825c"></script>
 <script>
   let currentTab = 'all';
   let allUsers = [], allProjects = [], allAdmins = [];
@@ -999,6 +1004,11 @@
         <input type="text" placeholder="Search projects\u2026" oninput="filterProjectCheckboxes(this.value,'${containerId}')"
           style="width:100%;padding:6px 10px 6px 28px;border:1px solid #e5e5e5;border-radius:7px;font-size:0.8571rem;font-family:inherit;outline:none">
       </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap">
+        <button type="button" class="proj-bulk-btn" onclick="projChecksSetAll('${containerId}',true)">Select all</button>
+        <button type="button" class="proj-bulk-btn" onclick="projChecksSetAll('${containerId}',false)">None</button>
+        <span id="${containerId}-count" class="proj-bulk-count"></span>
+      </div>
       <div id="${containerId}-list" style="display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto">
         ${allProjects.map(p=>`
           <div class="project-checkbox-item" onclick="this.querySelector('input').click()">
@@ -1006,7 +1016,40 @@
             <label for="p_${containerId}_${p.id}" onclick="event.preventDefault()">${esc(p.name||p.id)} <span style="font-size:0.7143rem;color:#bbb">${esc(p.id)}</span></label>
           </div>`).join('')}
       </div>`;
+    // ONE delegated listener rather than an onchange attribute per row -- this list can run
+    // to 100+ projects. Re-attached on every build because innerHTML replaces the children.
+    const _l = document.getElementById(containerId + '-list');
+    if (_l) _l.addEventListener('change', () => projChecksSyncCount(containerId));
+    projChecksSyncCount(containerId);
   }
+
+  // Select all / None act on the VISIBLE (search-filtered) rows, not the whole list. With an
+  // empty search that is every project -- the "this user gets everything" case, which is why
+  // this was added. With a search term it means "all AVR projects", which is the behaviour you
+  // want and the only one that stays predictable once there are 100 projects.
+  window.projChecksSetAll = function(containerId, checked) {
+    const list = document.getElementById(containerId + '-list');
+    if (!list) return;
+    list.querySelectorAll('.project-checkbox-item').forEach(item => {
+      if (item.style.display === 'none') return;          // filtered out -> leave untouched
+      const cb = item.querySelector('input[type=checkbox]');
+      if (cb) cb.checked = checked;
+    });
+    projChecksSyncCount(containerId);
+  };
+
+  // "N of M selected" (plus a "K shown" note while a search is narrowing what the buttons
+  // would touch), so an admin can see the assignment took without scrolling the list.
+  window.projChecksSyncCount = function(containerId) {
+    const list = document.getElementById(containerId + '-list');
+    const out = document.getElementById(containerId + '-count');
+    if (!list || !out) return;
+    const items = [...list.querySelectorAll('.project-checkbox-item')];
+    const shown = items.filter(i => i.style.display !== 'none');
+    const sel = items.filter(i => i.querySelector('input[type=checkbox]') && i.querySelector('input[type=checkbox]').checked).length;
+    out.textContent = sel + ' of ' + items.length + ' selected'
+      + (shown.length !== items.length ? ' · ' + shown.length + ' shown' : '');
+  };
 
   window.filterProjectCheckboxes = function(q, containerId) {
     const list = document.getElementById(containerId+'-list');
@@ -1015,6 +1058,7 @@
       const label = item.querySelector('label');
       item.style.display = label && label.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
     });
+    projChecksSyncCount(containerId);   // the "K shown" note tracks the search
   };
 
   window.rejectUser = async function(userId) {

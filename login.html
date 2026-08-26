@@ -15,31 +15,28 @@
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;font-family:'Montserrat',sans-serif;background:#fff}
 
-    /* ── Two-column layout (desktop) ── */
-    .page{display:flex;min-height:100vh}
+    /* ── Centered single-column layout ──────────────────────────────────────
+       Matches the sibling Megawide apps' sign-in (Planners Dashboard, Engineering
+       App): the mark and app title stack above one centered card, rather than the
+       old brand-panel-on-the-left split. Every step container (login / dashboard
+       chooser / project picker) still lives inside .form-inner, so the multi-step
+       JS is untouched -- only the frame around it changed. */
+    .page{display:flex;flex-direction:column;align-items:center;justify-content:center;
+      min-height:100vh;padding:40px 20px}
 
-    /* ── Brand panel ── */
-    .brand{
-      flex:0 0 380px;background:#231F20;
-      display:flex;flex-direction:column;justify-content:space-between;
-      padding:40px 36px;position:relative;overflow:hidden
-    }
-    .brand::before{
-      content:'';position:absolute;bottom:-80px;left:-80px;
-      width:280px;height:280px;border-radius:50%;
-      background:#EE3124;opacity:.15;pointer-events:none
-    }
-    .brand-logo{width:100%;height:auto;display:block;background:transparent}
-    .brand-text h1{font-size:26px;font-weight:700;color:#fff;line-height:1.25;margin-bottom:8px}
-    .brand-text h1 span{color:#EE3124}
-    .brand-text p{font-size:12px;color:rgba(255,255,255,.4)}
+    /* ── Brand header (above the card) ── */
+    .brand{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:26px}
+    .brand-logo{width:72px;height:auto;display:block;background:transparent}
+    .brand-text h1{font-size:30px;font-weight:800;color:#EE3124;line-height:1.15;margin-top:16px;letter-spacing:-.4px}
+    .brand-text p{font-size:13px;color:#888;margin-top:6px}
 
-    /* ── Form panel ── */
+    /* ── The card ── */
     .form-wrap{
-      flex:1;display:flex;flex-direction:column;justify-content:center;
-      padding:40px 44px;background:#fff;overflow-y:auto;min-height:100vh
+      width:100%;max-width:480px;background:#fff;
+      border:1px solid #ececec;border-radius:14px;
+      padding:30px 32px;box-shadow:0 4px 24px rgba(0,0,0,.06)
     }
-    .form-inner{max-width:400px;width:100%;margin:0 auto}
+    .form-inner{width:100%}
     .form-title{font-size:22px;font-weight:700;color:#231F20;margin-bottom:4px}
     .form-sub{font-size:13px;color:#999;margin-bottom:24px}
     .field{margin-bottom:14px}
@@ -54,13 +51,13 @@
     .btn-microsoft:disabled{opacity:.6;cursor:default}
     .sso-divider{display:flex;align-items:center;gap:10px;margin:18px 0;color:#bbb;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
     .sso-divider::before,.sso-divider::after{content:'';flex:1;height:1px;background:#e8e8e8}
-    html.dark-mode .btn-microsoft{background:#2B2C2B;color:#DCDBDB;border-color:rgba(255,255,255,.2)}
-    html.dark-mode .btn-microsoft:hover{background:#333433}
+    html.dark-mode .btn-microsoft{background:#fff;color:#5E5E5E;border-color:#8C8C8C}
+    html.dark-mode .btn-microsoft:hover{background:#f0f0f0}
     html.dark-mode .sso-divider{color:#777}
     html.dark-mode .sso-divider::before,html.dark-mode .sso-divider::after{background:rgba(255,255,255,.12)}
     .msg{font-size:13px;padding:10px 14px;border-radius:8px;margin-bottom:14px;line-height:1.5;display:none;border:1px solid #FFD0D0;background:#FEE2E2;color:#991B1B}
     .msg.show{display:block}
-    .form-links{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:13px;color:#999}
+    .form-links{display:flex;flex-direction:column;align-items:center;gap:9px;margin-top:18px;font-size:13px;color:#999;text-align:center}
     .form-links a{color:#EE3124;text-decoration:none;font-weight:600}
 
     /* ── Project picker ── */
@@ -140,20 +137,16 @@
 
     /* ── Mobile layout ── */
     @media(max-width:640px){
-      .page{flex-direction:column}
-      /* Compact brand: horizontal row with logo + title */
-      .brand{
-        flex:0 0 auto;padding:14px 18px;min-height:auto;
-        flex-direction:row;align-items:center;gap:14px
-      }
-      .brand::before{display:none}
-      .brand-logo{height:44px;width:auto;flex-shrink:0}
-      .brand-text h1{font-size:14px;margin-top:0;line-height:1.3}
-      .brand-text p{font-size:10px;margin-top:2px}
+      .page{padding:26px 14px 36px;justify-content:flex-start}
+      .brand{margin-bottom:20px}
+      .brand-logo{width:56px}
+      .brand-text h1{font-size:23px;margin-top:12px}
+      .brand-text p{font-size:12px}
+      /* Full-bleed card on a phone: a boxed card inside a narrow viewport just
+         wastes horizontal space. */
       .form-wrap{
-        padding:24px 20px 36px;
-        flex:1;min-height:auto;
-        justify-content:flex-start
+        padding:22px 18px 26px;border:none;border-radius:0;box-shadow:none;
+        background:transparent;max-width:100%
       }
       .form-inner{max-width:100%}
       .form-title{font-size:19px}
@@ -161,9 +154,9 @@
       /* Tap target sizes */
       .field input{padding:13px 14px;font-size:16px}
       .btn-primary{padding:14px;font-size:15px;min-height:50px}
+      .btn-microsoft{padding:13px;font-size:15px;min-height:50px}
       .project-item{padding:12px}
-      /* Stack Register / Forgot password on separate lines — no clutter */
-      .form-links{flex-direction:column;align-items:flex-start;gap:12px;margin-top:18px}
+      .form-links{gap:11px;margin-top:16px}
     }
 
     /* ── Theme toggle button ── */
@@ -172,7 +165,9 @@
 
     /* ── Dark mode (html.dark-mode set by anti-flash script before render) ── */
     html.dark-mode,html.dark-mode body{background:#1C1C1C}
-    html.dark-mode .form-wrap{background:#161616}
+    html.dark-mode .form-wrap{background:#242424;border-color:rgba(255,255,255,.09);box-shadow:0 4px 24px rgba(0,0,0,.35)}
+    html.dark-mode .brand-text p{color:#9B9999}
+    @media(max-width:640px){html.dark-mode .form-wrap{background:transparent;box-shadow:none}}
     html.dark-mode .form-title,html.dark-mode .picker-footer a,html.dark-mode .form-links a{color:#F0EFEF}
     html.dark-mode .form-links a,html.dark-mode .picker-footer a{color:#EE3124}
     html.dark-mode .form-sub,html.dark-mode .form-links,html.dark-mode .picker-footer{color:#9B9999}
@@ -222,11 +217,11 @@
 <button class="login-theme-toggle" id="loginThemeToggle" onclick="toggleLoginTheme()" aria-label="Toggle dark mode" title="Switch to dark mode"></button>
 <div class="page">
 
-  <!-- ── Brand Panel ── -->
+  <!-- ── Brand header ── -->
   <div class="brand">
-    <img class="brand-logo" src="assets/img/megawide-logo.png" alt="Megawide Construction">
+    <img class="brand-logo" src="assets/img/megawide-mark.png" alt="Megawide Construction">
     <div class="brand-text">
-      <h1>PRC Procurement<br><span>Work Package</span><br>Dashboard</h1>
+      <h1>Procurement Dashboard</h1>
       <p>Megawide Construction Corporation</p>
     </div>
   </div>
@@ -237,14 +232,7 @@
 
       <!-- STEP 1: Login -->
       <div class="login-form" id="loginForm">
-        <div class="form-title">Welcome back</div>
-        <div class="form-sub">Sign in to your account</div>
         <div class="msg" id="msgBox"></div>
-        <button class="btn-microsoft" id="btnMicrosoft">
-          <svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
-          Sign in with Microsoft
-        </button>
-        <div class="sso-divider">or with email</div>
         <div class="field">
           <label>Email</label>
           <input type="email" id="email" placeholder="yourname@megawide.com.ph" autocomplete="email" inputmode="email">
@@ -254,9 +242,14 @@
           <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
         </div>
         <button class="btn-primary" id="btnSignIn">Sign In</button>
+        <div class="sso-divider">or</div>
+        <button class="btn-microsoft" id="btnMicrosoft">
+          <svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+          Sign in with Microsoft
+        </button>
         <div class="form-links">
-          <span>Don't have an account? <a href="register.html">Register</a></span>
           <a href="forgot-password.html">Forgot password?</a>
+          <span>Don't have an account? <a href="register.html">Register</a></span>
         </div>
         <div style="text-align:center;margin-top:16px;padding-top:14px;border-top:1px solid #eee">
           <a href="onboarding.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#EE3124;text-decoration:none;font-weight:600">
@@ -416,6 +409,12 @@ async function ensureProfile(user) {
 // self-service portal, never WPM project data).
 function showDashboardChooser(profile) {
   if (profile.role === 'vendor') { window.location.href = 'vendor-portal.html'; return; }
+  // Vendor Management is CONTRIBUTORS ONLY for now (2026-08-25) -- read-only roles are kept
+  // out while that app is still being worked on. With only one dashboard left to choose from
+  // there is nothing to choose, so skip the chooser entirely rather than show a single card.
+  // Must match the sidebar-link + vendors.html guards; if one of the three drifts, a viewer
+  // either sees a dead end or gets bounced after clicking.
+  if (['viewer', 'viewer_budget'].includes(profile.role)) { showProjectPicker(profile); return; }
   window._chooserProfile = profile;
   document.getElementById('loginForm').classList.add('hidden');
   document.getElementById('dashboardChooser').classList.add('visible');
