@@ -338,6 +338,13 @@
                 </select>
               </div>
               <div class="form-group">
+                <label>Contract Package</label>
+                <select id="f-planners-package" onchange="markDirty&&markDirty()">
+                  <option value="">— Not assigned —</option>
+                </select>
+                <div id="f-planners-package-hint" style="font-size:0.75rem;color:#888;margin-top:3px"></div>
+              </div>
+              <div class="form-group">
                 <label>Type</label>
                 <select id="f-type" onchange="markDirty&&markDirty()"><option value=""></option></select>
               </div>
@@ -1759,6 +1766,39 @@ function _wpNoNum(v){
    ⚠️ Fails silently and hides itself: a missing table (migration not yet run), no push
    for this project, or no link for this package must all read as "no advice available",
    never as an error on a form the buyer is trying to save. */
+// ---- Contract package (mirrored from the Planners app) ---------------------------
+// Which contract lot is this work package bought for? Planners defines the lots off
+// the contract documents; the buyer files the WP under one here.
+//
+// ⚠️ The list is REFERENCE DATA this app cannot edit. If it is empty the project has
+// no packages yet, or nobody has pressed "Share with Procurement & Engineering" in the
+// Planners Dashboard — both are stated, because a silently empty picker reads as a bug.
+// ⚠️ A stored package that is no longer in the mirror keeps its own option rather than
+// vanishing: without it the select would read back as "" and the next Save would
+// silently unfile the WP.
+async function renderPackagePicker(pid, current) {
+  const sel = document.getElementById('f-planners-package');
+  const hint = document.getElementById('f-planners-package-hint');
+  if (!sel) return;
+  let pkgs = [];
+  try { pkgs = await WPDb.getPlannerPackages(pid); } catch (_) { pkgs = [] };
+  const cur = current || '';
+  let html = '<option value="">— Not assigned —</option>';
+  let seen = false;
+  pkgs.forEach(k => {
+    if (String(k.planners_package_id) === String(cur)) seen = true;
+    html += `<option value="${_escNb(k.planners_package_id)}"${String(k.planners_package_id) === String(cur) ? ' selected' : ''}>` +
+      `${_escNb((k.code ? k.code + ' — ' : '') + k.name)}${k.status === 'archived' ? ' (archived)' : ''}</option>`;
+  });
+  if (cur && !seen) html += `<option value="${_escNb(cur)}" selected>⚠ Package no longer in Planners</option>`;
+  sel.innerHTML = html;
+  if (hint) {
+    hint.textContent = pkgs.length
+      ? ''
+      : 'No contract packages shared for this project yet — a planner presses “Share with Procurement & Engineering” on the Planners Dashboard.';
+  }
+}
+
 async function renderNeedBy(pid, wpNo){
   const box = document.getElementById('f-needby-box');
   if (!box || !pid || !wpNo) return;
@@ -2062,6 +2102,10 @@ AppAuth.requireLogin(async (user, profile) => {
       projSel.innerHTML += `<option value="${p.id}">${p.id} — ${p.name}</option>`;
     });
     if (projId) projSel.value = projId;
+    // The package list is per project, so it follows the project selector — on a new
+    // WP the buyer may change the project after the form has loaded.
+    renderPackagePicker(projSel.value, '');
+    projSel.addEventListener('change', () => renderPackagePicker(projSel.value, ''));
 
     // WP No. auto-numbering (new WP only) — suggest on load + whenever the project changes
     if (!editId) {
@@ -2153,6 +2197,7 @@ AppAuth.requireLogin(async (user, profile) => {
       fill('f-target-installation', existingWP.target_installation);
       fill('f-target-completion', existingWP.target_completion);
       renderNeedBy(existingWP.project_id, existingWP.wp_no);   // async, not awaited — advisory panel
+      renderPackagePicker(existingWP.project_id, existingWP.planners_package_id || '');
       // BCB0 falls back to the legacy single budget column for rows imported before baselines existed
       const _bv = existingWP.budget_bcb0 ?? existingWP.approved_budget_bcb;
       document.getElementById('f-budget').value = _bv ? parseFloat(_bv).toLocaleString('en-US') : '';
@@ -2352,6 +2397,9 @@ AppAuth.requireLogin(async (user, profile) => {
 
     const data = {
       cost_code:                getVal('f-cost-code'),
+      // ⚠️ null, not '' — the column is a uuid and an empty string is a cast error,
+      //    which would fail the whole save on any WP left unassigned.
+      planners_package_id:      getVal('f-planners-package') || null,
       wp_no:                    getVal('f-wp-no'),
       description:              getVal('f-description'),
       detailed_description:     getVal('f-detailed-description') || null,

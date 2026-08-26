@@ -1696,22 +1696,36 @@ GitHub Pages auto-deploys on push to main (~1â€“2 min).
   - **Top 5 rank tables**: do NOT add a blanket `body.dark-mode .rank-side { color }` rule â€” it kills the inline Savings(green `#2D9B6F`)/Overbudget(red `#EE3124`) accent colors. Let the inline-color attribute selectors recolor only neutral cells; accents are left untouched.
   - **Public-page dark mode (self-contained)**: `login.html`, `register.html`, `pending.html`, `forgot-password.html` don't load `ui.js`/`dashboard.css`, so each has its OWN inline dark mode (identical pattern): inline anti-flash `<script>` in `<head>` adds `dark-mode` to `<html>` from `wpm_theme_last` (or system pref if unset); CSS rules prefixed `html.dark-mode` (set early enough to avoid a white flash on `.form-wrap`/`.card`); a fixed top-right `.login-theme-toggle` (sun/moon inline SVG) calls `toggleLoginTheme()` which persists `wpm_theme_last`. Shares the `wpm_theme_last` key with the dashboard so the theme carries across the whole auth flow â†’ dashboard. Gotcha: `forgot-password.html`'s logo has an inline `filter:invert(1) brightness(0)` (black logo for the white card) â€” dark mode overrides it with `html.dark-mode .logo-wrap img{filter:none!important}` so the white logo shows. These are inline (no `?v=` needed; HTML revalidates via ETag).
 
+### 2026-08-26 — Work packages can be filed under a Planners CONTRACT package
+A project is bought as several contract packages — "Package 1 — Tower 1 and General Requirements",
+"Package 2 — Towers 2-7". The Planners app owns them (they come off the contract documents); this app
+now files work packages under them, so spend, awards and deliveries can be read per contract lot the
+way the schedule and the billing already are.
 
+⚠️ **This app and the Planners app are SEPARATE Supabase projects** (`cayjeqeleenizbdzrums` vs
+`bgupuqnkqhixpuctyder`) and share no tables, so the packages cannot be read across the wire. They are
+**mirrored** in — the same shape `planners_need_by` already uses, and the mirror image of the Planners
+app's own `wpm_work_packages` mirror of this one.
 
+- `MIGRATION_planners_packages.sql` — the `planners_packages` mirror + `work_packages.planners_package_id`.
+- ⚠️ **Writes are service-role only.** No policy grants insert/update/delete to authenticated or anon:
+  a contract package invented in a browser could end up cited in a purchase order nobody agreed to.
+  The Planners `push-packages` Edge Function owns the table.
+- ⚠️ **No foreign key.** The mirror refreshes delete-then-insert per project, so a FK would either
+  block the refresh or cascade real buyer data away. A package that disappears upstream leaves the id
+  in place and the form reads it as **“⚠ Package no longer in Planners”** rather than silently
+  clearing it — without that option the select would read back as `""` and the next Save would unfile
+  the WP.
+- ⚠️ **`planners_package_id` is owned by THIS app.** Buyers set it; the push only refreshes the list to
+  choose from. NULL = not yet assigned, and there is no back-fill — defaulting existing WPs to any lot
+  would misreport every package total on day one.
+- `WPDb.getPlannerPackages(pid)` returns `[]` on ANY failure including "table does not exist", exactly
+  like `getNeedBy`: an un-run migration must degrade to "no packages offered", never break the WP form.
+- **wp-form.html** gains a *Contract Package* select in Identity & Classification. It follows the
+  project selector (packages are per project) and says plainly when the list is empty: nobody has
+  pressed **Share with Procurement & Engineering** on the Planners Dashboard yet.
+- ⚠️ Saved as `null`, never `''` — the column is a uuid and an empty string is a cast error that would
+  fail the whole save on any unassigned WP.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+⚠️ **Not run and not clicked through**: the migration must be run in this project, and the Planners
+side must deploy `push-packages` and press Share before the picker has anything in it.

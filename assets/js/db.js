@@ -213,6 +213,32 @@ const WPDb = (() => {
       return out;
     } catch (_) { return {}; }
   }
+  // ---- Contract packages, mirrored from the Planners app --------------------------
+  // A project is bought as several contract packages ("Package 1 — Tower 1 and General
+  // Requirements", "Package 2 — Towers 2-7"). Planners owns them; this app files work
+  // packages under them so spend and awards can be read per contract lot.
+  //
+  // ⚠️ Read-only here by design, exactly like getNeedBy. `planners_packages` has no
+  // write policy for authenticated users — the Planners `push-packages` Edge Function
+  // owns it via the service role. A contract package invented in a browser could end up
+  // cited in a purchase order nobody agreed to.
+  //
+  // ⚠️ Returns [] on ANY failure, including "table does not exist": the migration may
+  // not be run yet, and a missing package list must degrade to "no packages offered"
+  // rather than break the WP form.
+  async function getPlannerPackages(pid) {
+    try {
+      const sb = await getSB();
+      const rows = await _pagedSelect(() => {
+        let q = sb.from('planners_packages')
+          .select('planners_package_id,code,name,status,sort_order,contract_amount,project_id');
+        if (pid) q = q.eq('project_id', pid);
+        return q.order('sort_order');
+      });
+      return rows || [];
+    } catch (_) { return []; }
+  }
+
   async function getApprovedWPsForProjects(ids) { if(!ids||!ids.length) return []; const sb=await getSB(); const rel=await _wpRel(); const rows=await _pagedSelect(()=>sb.from(rel).select('*').eq('review_status','approved').in('project_id',ids).order('wp_no')); return rows.map(mapWP); }
   async function getPendingWPs() { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('review_status','pending_review').order('created_at',{ascending:false}); return (data||[]).map(mapWP); }
   async function getAllWPsForAdmin() { const sb=await getSB(); const rows=await _pagedSelect(()=>sb.from('work_packages').select('*').order('created_at',{ascending:false})); return rows.map(mapWP); }
@@ -333,7 +359,7 @@ const WPDb = (() => {
   }
   async function deleteProject(id) { const sb=await getSB(); await sb.from('work_packages').delete().eq('project_id',id); const {error}=await sb.from('projects').delete().eq('id',id); if(error) throw error; }
   async function seedWP(d) { return submitWP(d,null); }
-  return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getNeedBy,getAllApprovedWPs,getApprovedWPsForProjects,getPendingWPs,getAllWPsForAdmin,getAllWPsForProjects,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,deleteWP,getAllUsers,getUsersForAdmin,getAdminUsers,getManagerUsers,updateUser,updateLastLogin,deleteUser,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
+  return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getNeedBy,getPlannerPackages,getAllApprovedWPs,getApprovedWPsForProjects,getPendingWPs,getAllWPsForAdmin,getAllWPsForProjects,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,deleteWP,getAllUsers,getUsersForAdmin,getAdminUsers,getManagerUsers,updateUser,updateLastLogin,deleteUser,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
 })();
 
 /* ── Stats ─────────────────────────────────────────────────────────── */
