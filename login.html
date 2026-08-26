@@ -409,12 +409,12 @@ async function ensureProfile(user) {
 // self-service portal, never WPM project data).
 function showDashboardChooser(profile) {
   if (profile.role === 'vendor') { window.location.href = 'vendor-portal.html'; return; }
-  // Vendor Management is CONTRIBUTORS ONLY for now (2026-08-25) -- read-only roles are kept
-  // out while that app is still being worked on. With only one dashboard left to choose from
-  // there is nothing to choose, so skip the chooser entirely rather than show a single card.
-  // Must match the sidebar-link + vendors.html guards; if one of the three drifts, a viewer
-  // either sees a dead end or gets bounced after clicking.
-  if (['viewer', 'viewer_budget'].includes(profile.role)) { showProjectPicker(profile); return; }
+  // Vendor Management is withheld from the stripped-down `viewer` role only (viewer_budget
+  // gets it read-only). With one dashboard left to choose from there is nothing to choose,
+  // so skip the chooser rather than show a single card. Must match the sidebar-link +
+  // vendors.html guards; if one of the three drifts, a viewer either sees a dead end or
+  // gets bounced after clicking.
+  if (profile.role === 'viewer') { showProjectPicker(profile); return; }
   window._chooserProfile = profile;
   document.getElementById('loginForm').classList.add('hidden');
   document.getElementById('dashboardChooser').classList.add('visible');
@@ -507,7 +507,10 @@ async function showProjectPicker(profile) {
   // single project already go direct (below); admins/specialists/multi-project users keep the picker.
   // (Vendor-role routing happens one step earlier, in showDashboardChooser — this function is only
   // ever reached via the "Work Package Management" card, which a vendor login never sees.)
-  if (profile.role === 'viewer' || profile.role === 'viewer_budget') { window.location.href = 'index.html'; return; }
+  // The stripped-down `viewer` skips the picker -- the portfolio is the whole of their value.
+  // viewer_budget does NOT skip: it gets the full contributor UI, so opening a specific
+  // project is as useful to them as to anyone else.
+  if (profile.role === 'viewer') { window.location.href = 'index.html'; return; }
 
   document.getElementById('dashboardChooser').classList.remove('visible');
   document.getElementById('projectPicker').classList.add('visible');

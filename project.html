@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260825c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825c"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260825c"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260825c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260825d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825d"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260825d"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260825d"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260825a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260825c"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260825d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825d"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -533,16 +533,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260825c"></script>
-<script src="assets/js/ui.js?v=20260825c"></script>
-<script src="assets/js/db.js?v=20260825c"></script>
-<script src="assets/js/onboarding.js?v=20260825c"></script>
-<script src="assets/js/coachmarks.js?v=20260825c"></script>
+<script src="assets/js/auth.js?v=20260825d"></script>
+<script src="assets/js/ui.js?v=20260825d"></script>
+<script src="assets/js/db.js?v=20260825d"></script>
+<script src="assets/js/onboarding.js?v=20260825d"></script>
+<script src="assets/js/coachmarks.js?v=20260825d"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260825a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260825c"></script>
+<script src="assets/js/charts.js?v=20260825d"></script>
 <script>
 
   // Segmented toggle state — swaps a class instead of rewriting cssText.
@@ -901,7 +901,7 @@ function openWPDetail(idOrObj) {
     </div>`;
   }
   if (!isViewer) html += `<div id="wp-bid-mount"></div>`;  // Log Bid section (money — hidden from plain viewer); mounted after innerHTML below
-  if (!window.__isViewer && !window.__archived) {  // edit/delete: hide from BOTH viewer and read-only viewer_budget
+  if (!window.__readOnly && !window.__archived) {  // edit/delete: hidden for BOTH read-only roles
     const safeNo = String(w.wp_no||'').replace(/['"\\<>]/g,'');  // strip chars that could break the JS-string OR the HTML onclick attr
     html += `<div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0">
       <a href="wp-form.html?id=${w.id}&project=${esc(w.project_id)}" style="flex:1;text-align:center;padding:10px;background:#EE3124;color:#fff;border-radius:8px;font-size:0.8571rem;font-weight:600;text-decoration:none"><i class="ti ti-edit" style="font-size:0.9286rem;vertical-align:middle"></i> Edit</a>
@@ -913,7 +913,7 @@ function openWPDetail(idOrObj) {
   document.getElementById('wp-detail-modal-body').innerHTML = html;
   document.getElementById('wp-detail-modal').style.display = 'flex';
   if (!isViewer && window.BidWidget) {
-    BidWidget.mount('wp-bid-mount', { wpId: w.id, projectId: w.project_id, canEdit: !!(window.__canEdit && !window.__isViewer && !window.__archived) });
+    BidWidget.mount('wp-bid-mount', { wpId: w.id, projectId: w.project_id, canEdit: !!(window.__canEdit && !window.__readOnly && !window.__archived) });
   }
 }
 function closeWPDetailModal() {
@@ -1224,7 +1224,7 @@ function _stSelect(id, field, opts, cur){
 // One-time "NEW" hint on the Status Tracker (dismissed per user via localStorage).
 function _stNewKey(){ return 'wpm_st_seen_' + ((window.__profile&&window.__profile.id)||'anon'); }
 function _stMaybeShowNew(){
-  if(window.__isViewer||window.__demo) return;
+  if(window.__readOnly||window.__demo) return;
   let seen=false; try{ seen=!!localStorage.getItem(_stNewKey()); }catch(_){}
   const badge=document.getElementById('st-new-badge'), co=document.getElementById('st-new-callout');
   if(badge) badge.style.display = seen?'none':'inline-block';
@@ -1237,7 +1237,7 @@ window.dismissStNew=function(){
   if(co) co.style.display='none';
 };
 function renderStatusTracker(){ if(!document.getElementById('status-tracker-thead')) return;
-  if(window.__isViewer) return;
+  if(window.__readOnly) return;
   const thead=document.getElementById('status-tracker-thead'), tbody=document.getElementById('status-tracker-tbody');
   if(!thead||!tbody) return;
   _stMaybeShowNew();
@@ -2582,7 +2582,7 @@ function renderPwaPeriodTable(rows){
 // Friendly empty state for the WP List: a brand-new project (no WPs at all) gets an Add/Import CTA;
 // a filtered-to-empty list gets a "no matches" hint. Rendered into the table body and mobile cards.
 function _wpEmptyState(){
-  const canEdit = !window.__isViewer && !window.__archived;
+  const canEdit = !window.__readOnly && !window.__archived;
   const noWps = !allWPs || allWPs.length === 0;
   if(noWps){
     const cta = canEdit
@@ -2675,10 +2675,10 @@ function _wpRenderCell(key,wp,_stickyLeft){
     case 'approver_name': return td(esc(wp.approver_name)||'—');
     case 'approval_date': return td(fmtDate(wp.approval_date));
     case 'submittal_doc_type': return td(wp.submittal_doc_type||'—');
-    case 'procurement_status': return (!window.__isViewer && !window.__archived)
+    case 'procurement_status': return (!window.__readOnly && !window.__archived)
       ? td(_stSelect(wp.id,'procurement_status',ST_PROC_OPTS,wp.procurement_status), 'min-width:120px')
       : td(esc(wp.procurement_status)||'—', 'font-size:0.7857rem;color:#555');
-    case 'delivery_status': return (!window.__isViewer && !window.__archived)
+    case 'delivery_status': return (!window.__readOnly && !window.__archived)
       ? td(_stSelect(wp.id,'delivery_status',ST_DELIV_OPTS,wp.delivery_status), 'min-width:150px')
       : td(esc(wp.delivery_status)||'—', 'font-size:0.7857rem;color:#555');
     case 'award_status': return td(_stAwardBadge(wp.id, wp.award_status, wp.not_to_be_awarded), 'overflow:hidden');
@@ -2760,7 +2760,7 @@ function buildTable(){
       const tdR=rColspan>0?`<td colspan="${rColspan}" style="background:#f8f8f8;padding:7px 12px;text-align:left;vertical-align:middle">${cnt}</td>`:'';
       html+=`<tr class="trade-group-header" data-trade="${item.trade.replace(/"/g,'&quot;')}" onclick="toggleTradeGroup(this.dataset.trade)" style="cursor:pointer;background:#f8f8f8;border-top:2px solid #e5e5e5">${tdS}${tdR}</tr>`;
     } else {
-      const editLink=(window.__isViewer||window.__archived)?'':`<a href="wp-form.html?id=${item.wp.id}&project=${item.wp.project_id}" style="font-size:0.7857rem;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
+      const editLink=(window.__readOnly||window.__archived)?'':`<a href="wp-form.html?id=${item.wp.id}&project=${item.wp.project_id}" style="font-size:0.7857rem;color:#EE3124;font-weight:600;text-decoration:none;white-space:nowrap">Edit</a>`;
       html+=`<tr data-trade-row="${item.trade.replace(/"/g,'&quot;')}">${cols.map(c=>_wpRenderCell(c.key,item.wp,_stickyLeft)).join('')}<td>${editLink}</td></tr>`;
     }
   });
@@ -3052,15 +3052,23 @@ AppAuth.requireLogin(async (user, profile) => {
   userProfile = profile;
   _wpLoadFreeze();
   window.__wpmRole = profile.role;
-  window.__isViewer = (profile.role === 'viewer' || profile.role === 'viewer_budget');
-  // Vendor Management is CONTRIBUTORS ONLY for now (2026-08-25) -- read-only roles are
-  // kept out while that app is still being worked on. vendors.html enforces the same
-  // rule server-side of the link, so a direct URL bounces too.
+  // THREE separate flags -- do not conflate them (see CLAUDE.md):
+  //   __readOnly  = cannot edit anything            (viewer + viewer_budget)
+  //   __isViewer  = ALSO gets the stripped-down single-page layout, most panels removed
+  //                 (plain `viewer` ONLY -- viewer_budget gets the full contributor UI)
+  //   __hideBudget = cost data hidden               (plain `viewer` only)
+  window.__readOnly   = AppAuth.isReadOnly(profile);
+  window.__isViewer   = AppAuth.isViewer(profile);
+  window.__hideBudget = AppAuth.hidesBudget(profile);
+  // Vendor Management is withheld from the stripped-down `viewer` only; viewer_budget gets
+  // it read-only, like every other contributor feature.
   if (window.__isViewer) { const _nv = document.getElementById('nav-vendors'); if (_nv) _nv.style.display = 'none'; }
-  window.__hideBudget = profile.role === 'viewer';
+  if (window.__readOnly) {
+    document.body.classList.add('read-only');
+    const st=document.getElementById('status-tracker'); if(st) st.style.display='none';    // inline editing
+  }
   if (window.__isViewer) {
     document.body.classList.add('viewer-mode');
-    const st=document.getElementById('status-tracker'); if(st) st.style.display='none';    // viewers can't edit
   }
   if (window.__hideBudget) {
     document.body.classList.add('budget-hidden');
@@ -3120,11 +3128,11 @@ AppAuth.requireLogin(async (user, profile) => {
   document.getElementById('sidebar-workpkgs').style.display='block';
   const addLink = document.getElementById('add-wp-link');
   if(addLink) {
-    if (window.__isViewer) addLink.style.display = 'none';
+    if (window.__readOnly) addLink.style.display = 'none';
     else addLink.href = 'wp-form.html?project=' + projId;
   }
-  // Review WPs link — visible to all non-viewer roles
-  if (!window.__isViewer) {
+  // Review WPs / Excel import — edit surfaces, so read-only roles don't get them
+  if (!window.__readOnly) {
     const reviewLink = document.getElementById('review-wps-link');
     if (reviewLink) { reviewLink.href = 'review.html?project=' + projId; reviewLink.style.display = 'flex'; }
     const xlLink = document.getElementById('nav-excel-import');
@@ -3220,7 +3228,7 @@ AppAuth.requireLogin(async (user, profile) => {
 
   // First-run checklist: opening a project completes step 1. Skip on the read-only demo/archived
   // projects (you can't add/edit there, so the checklist steps don't apply).
-  if (window.GettingStarted && !window.__isViewer && !window.__archived) {
+  if (window.GettingStarted && !window.__readOnly && !window.__archived) {
     GettingStarted.markStep('pickProject');
     GettingStarted.render('gs-checklist', { projectId: projId });
   }
@@ -3881,7 +3889,7 @@ AppAuth.requireLogin(async (user, profile) => {
   .wpc-actions button { flex:1;font-size:0.7857rem;font-weight:600;color:#555;background:#f5f5f5;border:none;border-radius:6px;padding:7px 6px;cursor:pointer;font-family:inherit; }
   .wpc-actions a { font-size:0.7857rem;font-weight:600;color:#EE3124;border:1.5px solid #EE3124;border-radius:6px;padding:6px 12px;text-decoration:none;white-space:nowrap; }
   /* Viewer mode — hide editing tools (read-only for both viewer & viewer_budget) */
-  body.viewer-mode #sidebar-tools { display:none !important; }
+  body.read-only #sidebar-tools { display:none !important; }   /* Import/template = edit tools */
   /* Budget-hidden mode (role='viewer' only) — hide all cost data */
   body.budget-hidden #metrics-cost-group { display:none !important; }
   body.budget-hidden #btn-export,
@@ -3902,7 +3910,7 @@ AppAuth.requireLogin(async (user, profile) => {
   body.budget-hidden #backlog-table td:nth-child(6) { display:none !important; }
   /* ── Viewer simplification — lighter, read-only-focused UI ── */
   /* The "set status inline" hint is meaningless to viewers (they can't edit) */
-  body.viewer-mode #wplist-edit-hint { display:none !important; }
+  body.read-only #wplist-edit-hint { display:none !important; } /* nothing to edit inline */
   /* Single-page layout: drop the main Overview/Backlog/WP List tab bar — all three views
      are shown stacked as collapsible sections (see _viewerSinglePage) under a red section
      header (click to collapse/expand; default expanded) */

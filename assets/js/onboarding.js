@@ -529,7 +529,9 @@
     _last = { containerId: containerId, opts: opts };
     var el = document.getElementById(containerId);
     if (!el) return;
-    if (window.__isViewer || dismissed()) { el.innerHTML = ''; el.style.display = 'none'; return; }
+    // Read-only roles have no actions to complete, so the checklist is meaningless for them
+    // (window.__readOnly covers viewer AND viewer_budget; __isViewer is layout-only now).
+    if (window.__readOnly || window.__isViewer || dismissed()) { el.innerHTML = ''; el.style.display = 'none'; return; }
     injectCss();
     var prog = getProg();
     var done = STEPS.filter(function (s) { return prog[s.key]; }).length;
@@ -557,7 +559,7 @@
   }
 
   function markStep(key) {
-    if (window.__isViewer) return;
+    if (window.__readOnly || window.__isViewer) return;
     var prog = getProg();
     if (prog[key]) return;         // already done — no-op
     prog[key] = true;

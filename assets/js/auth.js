@@ -38,15 +38,28 @@ const AppAuth = (() => {
   // EDIT scope (P1): only super_admin/admin can edit ANY project; specialist/manager/user
   // can edit only their ASSIGNED projects. Mirrors the server-side wp_insert/wp_update RLS.
   // DEMO is read-only for everyone (handled separately via window.__demo/__archived).
-  function canEditProject(profile, projectId) { if (projectId === 'DEMO') return false; if (['super_admin','admin'].includes(profile?.role)) return true; return (profile?.projects||[]).includes(projectId); }
+  function canEditProject(profile, projectId) {
+    if (projectId === 'DEMO') return false;
+    // Read-only roles can never edit, however their projects are assigned. Without this a
+    // viewer_budget assigned to a project would get edit affordances the server then refuses.
+    if (isReadOnly(profile)) return false;
+    if (['super_admin','admin'].includes(profile?.role)) return true;
+    return (profile?.projects||[]).includes(projectId);
+  }
   function isAdmin(p) { return ['admin','super_admin'].includes(p?.role); }
   function isSuperAdmin(p) { return p?.role === 'super_admin'; }
-  function isViewer(p) { return p?.role === 'viewer' || p?.role === 'viewer_budget'; }
+  // isReadOnly  = cannot change anything (viewer + viewer_budget).
+  // isViewer     = ALSO gets the stripped-down single-page layout with most panels removed.
+  //                That is plain `viewer` ONLY -- viewer_budget gets the full contributor UI
+  //                (tabs, every panel, Vendor Management) and is merely unable to edit.
+  // hidesBudget  = cost data hidden (plain `viewer` only).
+  function isReadOnly(p) { return p?.role === 'viewer' || p?.role === 'viewer_budget'; }
+  function isViewer(p) { return p?.role === 'viewer'; }
   function hidesBudget(p) { return p?.role === 'viewer'; }
   function isSpecialist(p) { return p?.role === 'specialist'; }
   function isManager(p) { return p?.role === 'manager'; }
   // Roles whose WP submissions auto-approve (skip pending_review). `user` was added — regular users
   // now add/edit/delete WPs freely without manager/approver sign-off. Only `viewer` is read-only.
   function isAutoApprove(p) { return ['super_admin','admin','specialist','manager','user'].includes(p?.role); }
-  return { requireLogin, requireAdmin, logout, getPermittedProjects, canAccessProject, canEditProject, isAdmin, isSuperAdmin, isViewer, isSpecialist, isManager, isAutoApprove, hidesBudget };
+  return { requireLogin, requireAdmin, logout, getPermittedProjects, canAccessProject, canEditProject, isAdmin, isSuperAdmin, isViewer, isReadOnly, isSpecialist, isManager, isAutoApprove, hidesBudget };
 })();

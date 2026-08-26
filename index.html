@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260825c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825c"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260825c"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260825c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260825d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825d"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260825d"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260825d"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260825a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260825c"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260825d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825d"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -697,16 +697,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260825c"></script>
-<script src="assets/js/db.js?v=20260825c"></script>
-<script src="assets/js/ui.js?v=20260825c"></script>
-<script src="assets/js/onboarding.js?v=20260825c"></script>
-<script src="assets/js/coachmarks.js?v=20260825c"></script>
+<script src="assets/js/auth.js?v=20260825d"></script>
+<script src="assets/js/db.js?v=20260825d"></script>
+<script src="assets/js/ui.js?v=20260825d"></script>
+<script src="assets/js/onboarding.js?v=20260825d"></script>
+<script src="assets/js/coachmarks.js?v=20260825d"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260825a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260825c"></script>
+<script src="assets/js/charts.js?v=20260825d"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -790,12 +790,21 @@
 
   AppAuth.requireLogin(async (user, profile) => {
     window.__wpmRole = profile.role;
-    window.__isViewer = (profile.role === 'viewer' || profile.role === 'viewer_budget');
-    // Vendor Management is CONTRIBUTORS ONLY for now (2026-08-25) -- read-only roles are
-    // kept out while that app is still being worked on. vendors.html enforces the same
-    // rule server-side of the link, so a direct URL bounces too.
+    // THREE separate flags -- do not conflate them (see CLAUDE.md):
+    //   __readOnly  = cannot edit anything            (viewer + viewer_budget)
+    //   __isViewer  = ALSO gets the stripped-down single-page layout, most panels removed
+    //                 (plain `viewer` ONLY -- viewer_budget gets the full contributor UI)
+    //   __hideBudget = cost data hidden               (plain `viewer` only)
+    // When gating a control, ask which of the three it really is: an EDIT affordance is
+    // __readOnly, a LAYOUT/feature simplification is __isViewer, a ₱ figure is __hideBudget.
+    window.__readOnly  = AppAuth.isReadOnly(profile);
+    window.__isViewer  = AppAuth.isViewer(profile);
+    window.__hideBudget = AppAuth.hidesBudget(profile);
+    // Vendor Management is withheld from the stripped-down `viewer` only; viewer_budget gets
+    // it read-only, like every other contributor feature. vendors.html enforces the same rule,
+    // so a direct URL matches the link.
     if (window.__isViewer) { const _nv = document.getElementById('nav-vendors'); if (_nv) _nv.style.display = 'none'; }
-    window.__hideBudget = profile.role === 'viewer';
+    if (window.__readOnly) document.body.classList.add('read-only');
     if (window.__isViewer) {
       document.body.classList.add('viewer-mode');
     }
@@ -1271,7 +1280,7 @@
         </div>`;
       }
       if (!isViewer) html += `<div id="wp-bid-mount"></div>`;  // Log Bid section (money — hidden from plain viewer); mounted after innerHTML below
-      if (!window.__isViewer) {  // edit/delete: hide from BOTH viewer and read-only viewer_budget
+      if (!window.__readOnly) {  // edit/delete: hidden for BOTH read-only roles
         const safeNo = String(w.wp_no||'').replace(/['"\\<>]/g,'');  // strip chars that could break the JS-string OR the HTML onclick attr
         html += `<div style="display:flex;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0">
           <a href="wp-form.html?id=${w.id}&project=${esc(w.project_id)}" style="flex:1;text-align:center;padding:10px;background:#EE3124;color:#fff;border-radius:8px;font-size:0.8571rem;font-weight:600;text-decoration:none"><i class="ti ti-edit" style="font-size:0.9286rem;vertical-align:middle"></i> Edit</a>
@@ -1284,7 +1293,7 @@
       const m = document.getElementById('wp-detail-modal');
       m.style.display = 'flex';
       if (!isViewer && window.BidWidget) {
-        BidWidget.mount('wp-bid-mount', { wpId: w.id, projectId: w.project_id, canEdit: !!(AppAuth.canEditProject(window.__profile, w.project_id) && !window.__isViewer) });
+        BidWidget.mount('wp-bid-mount', { wpId: w.id, projectId: w.project_id, canEdit: !!(AppAuth.canEditProject(window.__profile, w.project_id) && !window.__readOnly) });
       }
     };
     window.closeWPDetailModal = function() {

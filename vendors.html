@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260825c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260825d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825c">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825d">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -711,9 +711,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260825c"></script>
-<script src="assets/js/db.js?v=20260825c"></script>
-<script src="assets/js/ui.js?v=20260825c"></script>
+<script src="assets/js/auth.js?v=20260825d"></script>
+<script src="assets/js/db.js?v=20260825d"></script>
+<script src="assets/js/ui.js?v=20260825d"></script>
 <script src="assets/js/vendor-guide.js?v=20260820a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -727,12 +727,11 @@ let _pageIds = [];
 AppAuth.requireLogin((user, profile) => {
   userProfile = profile;
   if (profile.role === 'vendor') { window.location.href = 'vendor-portal.html'; return; }
-  // CONTRIBUTORS ONLY (2026-08-25, user's call while this app is still being worked on):
-  // read-only roles have no business in the vendor directory yet. Hiding the sidebar link
-  // is not enough on its own -- a direct URL would still load the page -- so bounce them
-  // here too. Widen this list (and the sidebar links on index/project/admin.html) when
-  // Vendor Management is ready for a broader audience.
-  if (['viewer', 'viewer_budget'].includes(profile.role)) { window.location.href = 'index.html'; return; }
+  // Withheld from the stripped-down `viewer` role only. viewer_budget DOES get the vendor
+  // directory -- read-only, like every other contributor feature (_canManage below already
+  // locks every write for it). Hiding the sidebar link is not enough on its own, since a
+  // direct URL would still load the page, so the same rule is enforced here.
+  if (profile.role === 'viewer') { window.location.href = 'index.html'; return; }
   _canManage = !['viewer', 'viewer_budget'].includes(profile.role);   // write roles only
   _canBulkDelete = AppAuth.isAdmin(profile);                            // delete is admin-only (matches RLS)
   if (profile.role === 'viewer') { const b = document.getElementById('vv-analytics'); if (b) b.style.display = 'none'; } // Analytics shows spend
