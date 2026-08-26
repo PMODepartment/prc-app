@@ -203,6 +203,24 @@
     body.dark-mode .sc-tile{background:var(--surface-2);border-color:var(--border)}
     body.dark-mode .sc-val{color:var(--text-primary)}
     body.dark-mode .sc-lbl,body.dark-mode .sc-sub{color:var(--text-hint)}
+    /* Vendor S-Curve + Monthly Accomplishment (Schedule Performance, planners_vendor_performance.months).
+       Inline SVG, not Chart.js — vendors.html doesn't load Chart.js/charts.js anywhere else, and pulling
+       the whole chart stack in for one section isn't worth it. Self-contained like the rest of this file. */
+    .scurve-wrap{border:1px solid var(--border-md,#e8e8e8);border-radius:9px;padding:10px 12px 6px;background:var(--surface-2,#fafafa);margin-bottom:10px}
+    .scurve-svg{width:100%;height:auto;display:block}
+    .scurve-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:0.7143rem;color:#888;margin-top:2px;padding-bottom:6px}
+    .scurve-legend span{display:inline-flex;align-items:center;gap:5px}
+    .scurve-legend i{width:14px;height:0;border-top:2.5px solid;display:inline-block}
+    .scurve-legend i.dashed{border-top-style:dashed}
+    .accomp-table{width:100%;border-collapse:collapse;font-size:0.7857rem}
+    .accomp-table th{text-align:right;font-size:0.6786rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#888;padding:5px 8px;border-bottom:2px solid var(--border-md,#e5e5e5);white-space:nowrap}
+    .accomp-table th:first-child,.accomp-table td:first-child{text-align:left}
+    .accomp-table td{text-align:right;padding:4px 8px;border-bottom:1px solid var(--border,#f0f0f0);white-space:nowrap}
+    .accomp-table tr:last-child td{font-weight:700;border-bottom:none}
+    .accomp-pos{color:#2D9B6F}.accomp-neg{color:#EE3124}
+    body.dark-mode .scurve-wrap{background:var(--surface-2);border-color:var(--border)}
+    body.dark-mode .accomp-table th{color:var(--text-hint);border-color:var(--border-md)}
+    body.dark-mode .accomp-table td{color:var(--text-primary);border-color:var(--border)}
     /* Taxonomy path on a classified offering — distinguishes it at a glance
        from a legacy row still showing only its free-text trade. */
     .prod-path{color:#C42127;font-weight:600}
@@ -3726,6 +3744,84 @@ async function renderDetailWps() {
    WARNING: NOTHING HERE IS AUTHORITATIVE FOR THE VENDOR. It reports what the
    programme says; the buyer judges. No control on this screen writes back.
    ─────────────────────────────────────────────────────────────────────────── */
+/* ── S-Curve — cumulative Planned % vs Actual %, from `months` (planners_vendor_
+   performance.months = [{key,pd,pc,ad,ac}], duration-weighted, 0..1 fractions).
+   Plain inline SVG — vendors.html loads neither Chart.js nor charts.js, and this
+   is the only chart on the page, so pulling that stack in isn't worth it.
+   Degrades to nothing (not an empty box) when there's no curve to draw. */
+function _scurveSvg(months, statusColor) {
+  const m = Array.isArray(months) ? months.filter(x => x && typeof x === 'object') : [];
+  if (!m.length) return '';
+  const W = 600, H = 190, padL = 34, padR = 10, padT = 10, padB = 24;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const n = m.length;
+  const x = i => padL + (n === 1 ? plotW / 2 : (plotW * i) / (n - 1));
+  // Cumulative values are already 0..1 fractions from the source — clamp defensively,
+  // since this is a snapshot from another app's database, not our own writes.
+  const clamp = v => Math.max(0, Math.min(1, Number(v) || 0));
+  const y = frac => padT + plotH - clamp(frac) * plotH;
+  const path = key => m.map((row, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(row[key]).toFixed(1)}`).join(' ');
+  const pPath = path('pc'), aPath = path('ac');
+  const gridLines = [0, 25, 50, 75, 100].map(pct => {
+    const gy = (padT + plotH - (pct / 100) * plotH).toFixed(1);
+    return `<line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" stroke="var(--border,#e5e5e5)" stroke-width="1"/>
+      <text x="${padL - 6}" y="${Number(gy) + 3}" text-anchor="end" font-size="9" fill="#888">${pct}%</text>`;
+  }).join('');
+  // Thin the x-axis labels so a long programme doesn't overlap them — same
+  // declutter intent as _dlTidy in charts.js, just simpler (no bar values to skip).
+  const labelEvery = Math.max(1, Math.ceil(n / 8));
+  const xLabels = m.map((row, i) => (i % labelEvery !== 0 && i !== n - 1) ? '' :
+    `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#888">${esc(String(row.key || '').slice(0, 7))}</text>`).join('');
+  const lastI = n - 1;
+  const aCol = statusColor || '#EE3124';
+  return `<div class="scurve-wrap">
+    <svg class="scurve-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="S-curve: planned vs actual completion">
+      ${gridLines}${xLabels}
+      <path d="${pPath}" fill="none" stroke="#888" stroke-width="2" stroke-dasharray="5,4"/>
+      <path d="${aPath}" fill="none" stroke="${aCol}" stroke-width="2.5"/>
+      <circle cx="${x(lastI).toFixed(1)}" cy="${y(m[lastI].ac).toFixed(1)}" r="3.5" fill="${aCol}">
+        <title>${esc(String(m[lastI].key || ''))}: ${(clamp(m[lastI].ac) * 100).toFixed(1)}% actual</title>
+      </circle>
+      <circle cx="${x(lastI).toFixed(1)}" cy="${y(m[lastI].pc).toFixed(1)}" r="3" fill="#888">
+        <title>${esc(String(m[lastI].key || ''))}: ${(clamp(m[lastI].pc) * 100).toFixed(1)}% planned</title>
+      </circle>
+    </svg>
+    <div class="scurve-legend">
+      <span><i class="dashed" style="border-color:#888"></i>Planned (cumulative)</span>
+      <span><i style="border-color:${aCol}"></i>Actual (cumulative)</span>
+    </div>
+  </div>`;
+}
+
+/* ── Monthly Accomplishment — the period-by-period breakdown behind the S-curve,
+   the number a buyer actually reads off against the vendor's own monthly billing/
+   accomplishment report. Same `months` rows; pd/ad are per-period, pc/ac cumulative. */
+function _accompTable(months) {
+  const m = Array.isArray(months) ? months.filter(x => x && typeof x === 'object') : [];
+  if (!m.length) return '';
+  const pct = v => (v == null ? '—' : (Number(v) * 100).toFixed(1) + '%');
+  const rows = m.map(row => {
+    const pc = Number(row.pc) || 0, ac = Number(row.ac) || 0;
+    const delta = ac - pc;
+    const deltaCls = delta > 0.0005 ? 'accomp-pos' : delta < -0.0005 ? 'accomp-neg' : '';
+    const deltaTxt = row.pc == null || row.ac == null ? '—' : (delta >= 0 ? '+' : '') + (delta * 100).toFixed(1) + 'pp';
+    return `<tr>
+      <td>${esc(String(row.key || '—'))}</td>
+      <td>${pct(row.pd)}</td>
+      <td>${pct(row.ad)}</td>
+      <td>${pct(row.pc)}</td>
+      <td>${pct(row.ac)}</td>
+      <td class="${deltaCls}">${deltaTxt}</td>
+    </tr>`;
+  }).join('');
+  return `<div style="overflow-x:auto;margin-bottom:10px">
+    <table class="accomp-table">
+      <thead><tr><th>Period</th><th>Planned</th><th>Actual</th><th>Cum. Planned</th><th>Cum. Actual</th><th>Variance</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
 async function renderDetailSched() {
   const el = document.getElementById('dtab-sched');
   if (!el || !activeVendor) return;
@@ -3800,6 +3896,8 @@ async function renderDetailSched() {
         </span>
       </div>
       <div class="scorecard">${tiles}</div>
+      ${_scurveSvg(r.months, st.col)}
+      ${_accompTable(r.months)}
       <div style="color:#666;font-size:0.78rem;line-height:1.6">
         ${r.n_packages || 0} package${r.n_packages === 1 ? '' : 's'} &middot;
         ${r.n_activities || 0} scheduled activit${r.n_activities === 1 ? 'y' : 'ies'}
