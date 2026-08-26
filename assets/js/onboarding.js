@@ -401,7 +401,7 @@
   function closeGuideMenu() {
     var m = document.getElementById('btn-guide-menu');
     var b = document.getElementById('btn-guide');
-    if (m) m.classList.remove('show');
+    if (m) { m.classList.remove('show'); m.style.display = 'none'; }
     if (b) b.setAttribute('aria-expanded', 'false');
     document.removeEventListener('mousedown', onGuideMenuOutsideClick);
   }
@@ -427,6 +427,7 @@
       document.getElementById('gm-guide').onclick = function () { closeGuideMenu(); open(); };
       var wn = document.getElementById('gm-whatsnew');
       if (wn) wn.onclick = function () { closeGuideMenu(); window.PatchNotice.open(); };
+      m.style.display = '';        // drop the inline seed so the .show rule applies
       m.classList.add('show');
       b.setAttribute('aria-expanded', 'true');
       setTimeout(function () { document.addEventListener('mousedown', onGuideMenuOutsideClick); }, 0);
@@ -437,6 +438,13 @@
   function injectButton() {
     var tr = document.querySelector('.topbar-right');
     if (!tr || document.getElementById('btn-guide')) return;
+    // The stylesheet MUST exist before the button and its menu are in the DOM. injectCss()
+    // used to run only inside open(), so until the tour had been opened once there were no
+    // rules for .btn-guide or .btn-guide-menu: the button rendered as a bare default button
+    // and the menu -- with no `display:none` -- laid out as ordinary flow content, printing
+    // "Dashboard Guide  What's New" inline across the topbar. Opening the guide injected the
+    // CSS, which is why it appeared to fix itself. Idempotent, so calling it here is free.
+    injectCss();
     var wrap = document.createElement('div');
     wrap.style.cssText = 'position:relative;flex-shrink:0';
     var b = document.createElement('button');
@@ -451,6 +459,7 @@
     var menu = document.createElement('div');
     menu.className = 'btn-guide-menu';
     menu.id = 'btn-guide-menu';
+    menu.style.display = 'none';   // never lay out as flow content, CSS or no CSS
     wrap.appendChild(b);
     wrap.appendChild(menu);
     var ub = document.getElementById('user-bar');
