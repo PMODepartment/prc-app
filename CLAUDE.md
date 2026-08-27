@@ -1729,3 +1729,59 @@ app's own `wpm_work_packages` mirror of this one.
 
 ⚠️ **Not run and not clicked through**: the migration must be run in this project, and the Planners
 side must deploy `push-packages` and press Share before the picker has anything in it.
+
+### 2026-08-27 — Package rollup on the project dashboard (Option A)
+
+The decision on packaged projects (Avesta = Package 1 / Package 2) is **Option A: keep the
+existing per-package project rows (AVR101, AVR102) and map each to its Planners contract
+package.** Collapsing them into one `AVR` project row was studied and rejected for now —
+`work_packages` is unique on `(project_id, wp_no)` and both packages number from 1, so a
+merge collides on nearly every row; `users.projects[]` + `internal.get_my_projects()` have no
+package-level granularity, so a buyer scoped to AVR102 would silently gain AVR101; and
+`project_id` is a text FK in six tables and mirrored by two other apps. The true
+`Project → Package` shape is the target for **new** packaged projects only, where there is no
+numbering history to break.
+
+**What shipped: a Contract Package scope switcher + a Package column, `project.html` only.**
+
+- **`#ov-pkg-switch` sits in `#view-tabs-row` beside the Charging Scope switcher** and follows
+  the identical pattern (see that entry): it lives outside the per-view containers, so its
+  visibility is driven manually by `_syncOvChargingVisibility()` — which now sizes BOTH bars
+  off one shared `visible` flag — rather than by the tab show/hide loop.
+- **`ovWPs()` composes BOTH scopes (package AND charging).** Because `ovWPs()` is the single
+  upstream base for Overview, Backlog and WP List, filtering there re-scopes every KPI,
+  battery, chart and table on all three tabs at once — no per-consumer change was needed.
+- **`_applyScopeChange()` was extracted out of `setOvCharging`** and is now called by both
+  switchers. Keep it that way: a scope change that refreshed the Overview but not the Backlog
+  would show two different totals for the same project on adjacent tabs.
+- **⚠️ The buttons are built from the WORK PACKAGES, not straight from the mirror**
+  (`_syncPkgSwitcher`). A package Planners pushed but nothing is filed under would render a
+  button that always yields an empty dashboard; a WP filed under a package since deleted
+  upstream still needs a bucket. Driving off the data keeps the switch honest both ways.
+- **⚠️ NULL is a normal state and gets its OWN visible bucket** (`PKG_UNASSIGNED`), ordered
+  **last** — it is a gap to close, not a lot. The migration deliberately does not back-fill,
+  so most existing WPs are unassigned; hiding them would misreport every total.
+- **⚠️ An id that resolves to no package renders as `⚠ Not in Planners`, never blank.** The
+  mirror is refreshed delete-then-insert with no FK, so an upstream deletion leaves a live id
+  behind; reading it as `—` would look like the WP was never filed.
+- **A stale scope resets to `all`** when its bucket disappears on reload — otherwise every tab
+  silently renders zero rows with no way back.
+- `_pkgHasSplit` hides the whole switcher unless the project actually divides into **more than
+  one** bucket, so an unpackaged project never grows a switch with one dead button.
+- **WP List gained a `Package` column** (`COLS`, in the **Overview** and **All** views) plus a
+  value in the export/sort switch, so the filing is readable and not merely filterable.
+- Packages load in the same parallel fetch as need-by (`_loadPackages`) and are re-read on
+  reload, so a Planners push between reloads shows up. `getPlannerPackages` already returns
+  `[]` on ANY failure incl. "table does not exist", so **this is safe to ship before
+  `MIGRATION_planners_packages.sql` is run** — the switcher simply never appears.
+- **No shared-asset change** (`db.js`'s `getPlannerPackages` already existed), so **no `?v=`
+  bump**. `index.html` was NOT touched — the portfolio has no package dimension yet; ask
+  before mirroring this there.
+- **Verified with a Node harness against the extracted shipped source** (24 assertions): two-
+  package scoping, unassigned bucket ordered last, unpackaged/single-bucket projects showing
+  no switcher, orphan ids getting a bucket and a warning label, stale-scope reset, package×
+  charging AND-composition, `sort_order` respected, and an empty pushed package producing no
+  dead button.
+- **Still blocked on ops, not code:** `MIGRATION_planners_packages.sql` has not been run in
+  this Supabase project, and Planners has not deployed `push-packages` / pressed **Share with
+  Procurement & Engineering**. Until both happen the switcher is correctly invisible.

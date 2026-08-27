@@ -247,6 +247,16 @@
               <span class="tbadge" id="claims-tab-badge" style="display:none;background:#D97706">0</span>
             </button>
           </div>
+          <!-- Contract Package scope switcher — same row, same rules as Charging Scope below.
+               Buttons are built at data load by _syncPkgSwitcher() from the mirrored
+               planners_packages list, so they differ per project. Hidden entirely unless the
+               project actually splits into more than one bucket (see _pkgHasSplit) — an
+               unpackaged project must not grow a switch with one dead button. -->
+          <div id="ov-pkg-switch" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0">
+            <span class="ov-ch-label" style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;white-space:nowrap">Package</span>
+            <div id="ov-pkg-btns" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+            <span id="ov-pkg-count" style="font-size:0.7143rem;color:#999;white-space:nowrap"></span>
+          </div>
           <!-- Charging scope switcher — Overview / Backlog / WP List (Combined / Main Contract /
                Change Order). On mobile the label + count are hidden (.ov-ch-label / #ov-ch-count,
                see dashboard.css ≤767px block) so only the 3 buttons show, per user request. -->
@@ -562,6 +572,7 @@ const COLS=[
   {key:'wp_no',            label:'WP No.',             w:'90px',  sticky:true},
   {key:'works',            label:'Works',              w:'130px', sticky:true},
   {key:'trade',            label:'Trade',              w:'110px'},
+  {key:'planners_package',  label:'Package',            w:'110px'},
   {key:'type_of_works',    label:'Type',               w:'80px'},
   {key:'scope',            label:'Scope',              w:'140px'},
   {key:'description',      label:'Work Package Description', w:'200px'},
@@ -642,6 +653,43 @@ function _needSlip(w) {
   return Math.round((b - a) / 86400000);
 }
 
+// ── CONTRACT PACKAGES (mirrored from the Planners app) ────────────────────────
+// A project is bought as several contract packages — "Package 1 — Tower 1 and General
+// Requirements", "Package 2 — Towers 2-7". Planners owns them; a buyer files each work
+// package under one in wp-form.html (work_packages.planners_package_id). This block reads
+// the mirror so the dashboard can roll spend/awards/backlog up per contract lot.
+//
+// ⚠️ NULL is a NORMAL state, not an error. Most existing work packages predate contract
+// packages and the migration deliberately does not back-fill, so unassigned WPs get their
+// own visible bucket rather than being hidden or lumped into the first package.
+let _pkgs = [], _pkgById = {};
+const PKG_UNASSIGNED = '__none';   // sentinel: WPs with no planners_package_id
+async function _loadPackages(pid) {
+  // getPlannerPackages already returns [] on ANY failure incl. "table does not exist"
+  // (the migration may not be run yet) — a missing package list must degrade to "this
+  // project isn't packaged", never break the dashboard.
+  try { _pkgs = await WPDb.getPlannerPackages(pid) || []; } catch (_) { _pkgs = []; }
+  _pkgById = Object.fromEntries(_pkgs.map(p => [String(p.planners_package_id), p]));
+}
+// The package key a WP rolls up under. Blank/absent → the Unassigned bucket.
+function _pkgKeyOf(w) {
+  const id = w && w.planners_package_id;
+  return id ? String(id) : PKG_UNASSIGNED;
+}
+// Short label for a package key — used on the switcher buttons and the WP List column.
+// ⚠️ A key that resolves to no package is shown as a WARNING, never silently blanked: the
+// mirror is refreshed delete-then-insert with no FK, so a package removed upstream leaves
+// a live id behind. Reading it as "—" would look like the WP was never filed.
+function _pkgLabel(key, long) {
+  if (!key || key === PKG_UNASSIGNED) return 'Unassigned';
+  const p = _pkgById[String(key)];
+  if (!p) return '⚠ Not in Planners';
+  const code = p.code || '';
+  const name = p.name || '';
+  if (!long) return code || name || 'Package';
+  return code && name ? code + ' — ' + name : (code || name || 'Package');
+}
+
 // ── Export to Excel (.xlsx) ──────────────────────────────────────────────────
 // Lazy-load SheetJS only when the user actually exports (keeps the dashboard light).
 // Same CDN + version as the Excel importer; cdn.jsdelivr.net is allow-listed in the CSP.
@@ -679,6 +727,7 @@ function _xlsxCellVal(w, key){
     case 'target_delivery':     return dateS(w.target_delivery||w.target_completion);
     case 'actual_delivery':     return dateS(w.actual_delivery);
     case 'target_installation': return dateS(w.target_installation);
+    case 'planners_package':    return _pkgLabel(_pkgKeyOf(w));
     case 'planners_need_by':    return dateS(w._need_by);
     case 'planners_need_slip':  return _needSlip(w) == null ? '' : _needSlip(w);
     case 'target_completion':   return dateS(w.target_completion);
@@ -732,11 +781,11 @@ window.wpToggleFreeze = function(key){
 
 let _wpTableView = 'overview';
 const WP_TABLE_VIEWS = {
-  overview:   {keys:new Set(['cost_code','wp_no','works','description','scope','proposed_vendors','procurement_status','delivery_status','award_status','remarks'])},
+  overview:   {keys:new Set(['cost_code','wp_no','works','description','planners_package','scope','proposed_vendors','procurement_status','delivery_status','award_status','remarks'])},
   financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','award_status']), cost:true},
   schedule:   {keys:new Set(['cost_code','wp_no','description','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','planners_need_by','planners_need_slip','target_completion','award_status'])},
   submittals: {keys:new Set(['cost_code','wp_no','description','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
-  all:        {keys:new Set(['cost_code','wp_no','description','works','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','planners_need_by','planners_need_slip','target_completion','approver_name','approval_date','submittal_doc_type','procurement_status','delivery_status','award_status','remarks']), cost:true},
+  all:        {keys:new Set(['cost_code','wp_no','description','works','planners_package','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','planners_need_by','planners_need_slip','target_completion','approver_name','approval_date','submittal_doc_type','procurement_status','delivery_status','award_status','remarks']), cost:true},
 };
 function getActiveCols() {
   const v = WP_TABLE_VIEWS[_wpTableView] || WP_TABLE_VIEWS.overview;
@@ -1655,31 +1704,45 @@ window.setBcbBaseline = function(level){
 // scope (same AND-combination as Trade/Works/Vendor), it is not replaced by this switcher.
 let _ovCharging = 'all';
 let _ovHasCO = false;
+let _ovPkg = 'all';          // 'all' | a planners_package_id | PKG_UNASSIGNED
+let _pkgHasSplit = false;    // does this project actually divide into >1 bucket?
 function _syncOvChargingVisibility(){
   // Viewers get the single-page stacked layout (no #view-tabs, currentView pinned to 'table'
   // for the WP-List filter handlers) — every section is always on-screen there, so treat that
   // as "a scoped tab is visible" rather than hiding the switch permanently for them.
   const bar = document.getElementById('ov-charging-switch');
   const onScopedTab = currentView==='overview' || currentView==='backlog' || currentView==='table';
-  if(bar) bar.style.display = (_ovHasCO && (onScopedTab || window.__isViewer)) ? 'flex' : 'none';
+  const visible = onScopedTab || window.__isViewer;
+  if(bar) bar.style.display = (_ovHasCO && visible) ? 'flex' : 'none';
+  // The package switcher follows the exact same tab rule, and is additionally hidden on any
+  // project that does not actually split (unpackaged, or every WP in one bucket).
+  const pbar = document.getElementById('ov-pkg-switch');
+  if(pbar) pbar.style.display = (_pkgHasSplit && visible) ? 'flex' : 'none';
 }
 function _isCO(w){ return /change\s*order/i.test(w.charging_type||''); }
 function ovWPs(){
-  const all = (typeof allWPs !== 'undefined' && allWPs) ? allWPs : [];
+  let all = (typeof allWPs !== 'undefined' && allWPs) ? allWPs : [];
+  // Contract package scope is applied FIRST and stacks with charging scope (AND, not OR) —
+  // ovWPs() is the single upstream base for the Overview, Backlog and WP List, so filtering
+  // here re-scopes every KPI, chart, battery and table on all three tabs at once.
+  if(_ovPkg !== 'all') all = all.filter(w => _pkgKeyOf(w) === _ovPkg);
   if(_ovCharging==='main') return all.filter(w=>!_isCO(w));
   if(_ovCharging==='co')   return all.filter(_isCO);
   return all;
 }
-function setOvCharging(mode){
-  _ovCharging = mode;
-  ['all','main','co'].forEach(m=>{
-    const b = document.getElementById('ov-ch-'+m);
-    if(b) b.classList.toggle('active', m===mode);
-  });
+// Shared by BOTH scope switchers (charging + package): re-render whatever the user is
+// looking at against the new scope. Extracted from setOvCharging so the two can never
+// drift — a scope change that refreshed the Overview but not the Backlog would show two
+// different totals for the same project on adjacent tabs.
+function _applyScopeChange(){
   const wps = ovWPs();
-  const cnt = document.getElementById('ov-ch-count');
-  if(cnt) cnt.textContent = wps.length + ' WP' + (wps.length===1?'':'s')
-    + (mode==='all' ? '' : ' of ' + ((typeof allWPs!=='undefined'&&allWPs)?allWPs.length:0));
+  const total = (typeof allWPs!=='undefined'&&allWPs) ? allWPs.length : 0;
+  const scoped = _ovCharging!=='all' || _ovPkg!=='all';
+  const suffix = (scoped ? ' of ' + total : '');
+  const chC = document.getElementById('ov-ch-count');
+  if(chC) chC.textContent = wps.length + ' WP' + (wps.length===1?'':'s') + suffix;
+  const pkC = document.getElementById('ov-pkg-count');
+  if(pkC) pkC.textContent = wps.length + ' WP' + (wps.length===1?'':'s') + suffix;
   buildMetrics(wps);
   // Backlog is lazily rendered and caches its last render across tab switches (_rendered.backlog)
   // — reset that flag so it recomputes against the new scope next time it's opened, same pattern
@@ -1697,6 +1760,14 @@ function setOvCharging(mode){
     if (typeof renderPwaAnalysis === 'function') renderPwaAnalysis();
   }
 }
+function setOvCharging(mode){
+  _ovCharging = mode;
+  ['all','main','co'].forEach(m=>{
+    const b = document.getElementById('ov-ch-'+m);
+    if(b) b.classList.toggle('active', m===mode);
+  });
+  _applyScopeChange();
+}
 // Called after every data load/reload: re-applies the current scope and hides the
 // switcher entirely on projects that have no Change Orders (nothing to split).
 function _syncOvCharging(){
@@ -1705,6 +1776,48 @@ function _syncOvCharging(){
   _syncOvChargingVisibility();
   if(!_ovHasCO) _ovCharging = 'all';
   setOvCharging(_ovCharging);
+}
+
+// ── Contract Package scope ────────────────────────────────────────────────────
+function setOvPackage(key){
+  _ovPkg = key;
+  const box = document.getElementById('ov-pkg-btns');
+  if(box) Array.from(box.children).forEach(b =>
+    b.classList.toggle('active', b.dataset.pkg === String(key)));
+  _applyScopeChange();
+}
+// Rebuilds the switcher buttons from the packages actually PRESENT on this project's work
+// packages, in the Planners sort order.
+//
+// ⚠️ Buttons come from the WPs, not straight from the mirror. A package Planners has pushed
+// but nothing has been filed under yet would render a button that always yields an empty
+// dashboard; and a WP filed under a package since deleted upstream still needs a bucket to
+// live in. Driving off the data keeps the switch honest in both directions.
+function _syncPkgSwitcher(){
+  const all = (typeof allWPs!=='undefined'&&allWPs)?allWPs:[];
+  const keys = new Set(all.map(_pkgKeyOf));
+  // Order: the Planners sort order for known packages, then any orphaned ids, then
+  // Unassigned last — it is a gap to close, not a lot, so it never leads the list.
+  const known = _pkgs.map(p=>String(p.planners_package_id)).filter(k=>keys.has(k));
+  const orphan = [...keys].filter(k => k!==PKG_UNASSIGNED && !_pkgById[k]).sort();
+  const ordered = known.concat(orphan);
+  if (keys.has(PKG_UNASSIGNED)) ordered.push(PKG_UNASSIGNED);
+
+  // Only worth a switch if there is more than one bucket to switch between.
+  _pkgHasSplit = ordered.length > 1;
+  if(!_pkgHasSplit) _ovPkg = 'all';
+  // A scope pointing at a bucket that no longer exists (reload after a re-file) must reset,
+  // or every tab silently renders zero rows with no way back.
+  if(_ovPkg !== 'all' && !keys.has(_ovPkg)) _ovPkg = 'all';
+
+  const box = document.getElementById('ov-pkg-btns');
+  if(box){
+    const n = k => all.filter(w=>_pkgKeyOf(w)===k).length;
+    box.innerHTML = `<button data-pkg="all" onclick="setOvPackage('all')" class="ov-ch-btn">All Packages</button>`
+      + ordered.map(k => `<button data-pkg="${esc(k)}" onclick="setOvPackage('${esc(k)}')" class="ov-ch-btn" title="${esc(_pkgLabel(k,true))} · ${n(k)} WP${n(k)===1?'':'s'}">${esc(_pkgLabel(k))}</button>`).join('');
+  }
+  _syncOvChargingVisibility();
+  setOvPackage(_ovPkg);
 }
 
 function buildMetrics(wps){
@@ -2629,6 +2742,16 @@ function _wpRenderCell(key,wp,_stickyLeft){
     case 'works':       return td(esc(wp.works)||'—', 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap', ` title="${esc(wp.works)}"`);
     case 'description': return td(`<span class="td-name">${esc(wp.description)||'—'}</span>`, 'max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', ` title="${esc(wp.description)}"`);
     case 'trade':       return td(esc(wp.trade)||'—');
+    // Contract package. Unassigned is muted rather than blank — NULL is the normal state for
+    // every WP that predates packaging, so it must read as "not filed yet", not as no column.
+    case 'planners_package': {
+      const k = _pkgKeyOf(wp), lbl = _pkgLabel(k), full = _pkgLabel(k, true);
+      if (k === PKG_UNASSIGNED) return td('<span style="color:#bbb">Unassigned</span>', '', ' title="Not yet filed under a contract package."');
+      const warn = !_pkgById[k];
+      return td(`<span style="${warn?'color:#D97706':'font-weight:600'}">${esc(lbl)}</span>`,
+        'overflow:hidden;text-overflow:ellipsis;white-space:nowrap',
+        ` title="${esc(warn ? full + ' — this package is no longer in the Planners list.' : full)}"`);
+    }
     case 'type_of_works': return td(esc(wp.type_of_works)||'—');
     case 'scope':{const s=wp.scope||'';const sh=s.length>55?s.slice(0,55)+'…':s;return td(`${sh||'—'}${s.length>55?`<button onclick='openWPDetail("${wp.id}")' style="margin-left:4px;font-size:0.7143rem;color:#EE3124;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;font-weight:700;white-space:nowrap">more</button>`:''}${!s?`<button onclick='openWPDetail("${wp.id}")' title="View details" style="font-size:0.7143rem;color:#aaa;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">ℹ</button>`:''}`, 'font-size:0.7143rem;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px');}
     case 'proposed_vendors': return td(esc(wp.proposed_vendors)||'—', 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px', ` title="${esc(wp.proposed_vendors)}"`);
@@ -3168,7 +3291,7 @@ AppAuth.requireLogin(async (user, profile) => {
   // Need-by rides along in the same parallel fetch — it must be in hand BEFORE _rawWPs is
   // built, or the first buildTable() renders every Sched. Need-by cell as "—" and only fills
   // in on the next re-render.
-  const [meta, wps] = await Promise.all([WPDb.getProject(projId), WPDb.getAllWPs(projId), _loadNeedBy(projId)]);
+  const [meta, wps] = await Promise.all([WPDb.getProject(projId), WPDb.getAllWPs(projId), _loadNeedBy(projId), _loadPackages(projId)]);
   _rawWPs = _attachNeedBy((wps||[]).map(w => ({...w, trade: normTrade(w.trade), wp_no: normWpNo(w.wp_no)})));
   allWPs = applyBcbBaseline(_rawWPs, BcbBaseline.resolve(_rawWPs));
   _syncBcbSwitcher();
@@ -3235,6 +3358,7 @@ AppAuth.requireLogin(async (user, profile) => {
   // Temporary: contributor-only "What's New" notice, safe to remove after 2026-08-07
   if (window.PatchNotice) PatchNotice.maybeAutoOpen(userProfile.id, userProfile.role);
 
+  _syncPkgSwitcher();   // package buttons first, so the scope is settled before the render
   _syncOvCharging();
 
   // Opt-in forecast diagnostic (?diag=1) — reconciles chart rows vs Helping Sheet
@@ -3283,10 +3407,12 @@ AppAuth.requireLogin(async (user, profile) => {
   // Re-fetch WPs and refresh view after quick-add modal saves
   window.__wpmReloadFn = async () => {
     await _loadNeedBy(projId);   // re-read too: a Planners push between reloads should show up
+    await _loadPackages(projId);  // ditto — packages can be pushed/renamed between reloads
     _rawWPs = _attachNeedBy((await WPDb.getAllWPs(projId)).map(w => ({...w, trade: normTrade(w.trade), wp_no: normWpNo(w.wp_no)})));
     allWPs = applyBcbBaseline(_rawWPs, BcbBaseline.resolve(_rawWPs));
     _syncBcbSwitcher();
     window._wpById = Object.fromEntries(allWPs.map(w => [w.id, w]));
+    _syncPkgSwitcher();   // package buttons first, so the scope is settled before the render
     _syncOvCharging();
     Object.keys(_rendered).forEach(k=>_rendered[k]=false);
     switchView(currentView);
