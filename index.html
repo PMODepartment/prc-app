@@ -12,19 +12,19 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825e"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260825e"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825e"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260825e"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260825e"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825f"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260825f"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825f"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260825f"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260825f"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="assets/js/patch-notice.js?v=20260825a"/>
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260825e"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260825f"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825e"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825f"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -715,16 +715,16 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260825e"></script>
-<script src="assets/js/db.js?v=20260825e"></script>
-<script src="assets/js/ui.js?v=20260825e"></script>
-<script src="assets/js/onboarding.js?v=20260825e"></script>
-<script src="assets/js/coachmarks.js?v=20260825e"></script>
+<script src="assets/js/auth.js?v=20260825f"></script>
+<script src="assets/js/db.js?v=20260825f"></script>
+<script src="assets/js/ui.js?v=20260825f"></script>
+<script src="assets/js/onboarding.js?v=20260825f"></script>
+<script src="assets/js/coachmarks.js?v=20260825f"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="assets/js/patch-notice.js?v=20260825a"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260825e"></script>
+<script src="assets/js/charts.js?v=20260825f"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -3279,19 +3279,24 @@
       // Cost Overview KPI cards — 4 cards (matches the per-project Overview): BCB, Actual Award,
       // Balance to Award (amount + WP qty), Savings/Loss (₱ + %).
       const card = (lbl,val,cls,full,sub,subColor) => `<div class="metric-card"><div class="metric-label"${window.kpiLabelAttrs?window.kpiLabelAttrs(lbl):''}>${lbl}</div><div class="metric-value ${cls}"${full?` title="${full}"`:''}>${val}</div>${sub?`<div class="metric-sub" style="font-size:1rem;font-weight:700;margin-top:4px;color:${subColor||'#888'}">${sub}</div>`:''}</div>`;
-      // BALANCE TO AWARD is summed DIRECTLY over the WPs still in the backlog -- deliberately
-      // NOT `totalBudget - budgetAwarded` (which is what `ctc` is). Those two differ by the BCB
-      // of any WP that is Awarded but carries no cost: such a row is resolved, so it is absent
-      // from the Backlog table, yet subtraction leaves its budget sitting in the "remaining"
-      // figure. On AVR101 that read PHP 9.37M against a backlog of one PHP 1.00M WP, because six
-      // awarded WPs had no cost entered (PHP 8.37M). Summing the backlog keeps this card's amount
-      // and its "N WPs remaining" sub-line describing the SAME rows, on every project.
-      // `ctc`/`eac` are intentionally left on the subtraction basis -- an unpriced WP still has to
-      // be budgeted for, so Estimate at Completion must keep counting it. The data gap itself is
-      // surfaced by Action Center -> Data Gaps, not by this card.
-      const balanceAmt = filtWPs.filter(w => !window.isResolved(w))
-                                .reduce((s,w) => s + (w.approved_budget_bcb || 0), 0);
-      const balanceQty = Math.max(0, filtWPs.length - awardedCount);// WPs not yet awarded
+      // BALANCE TO AWARD must keep the Cost Overview cards RECONCILING:
+      //     Procurement BCB - Actual Award - Balance to Award = Savings / Loss
+      // That identity only holds when Balance is `totalBudget - budgetAwarded` (i.e. `ctc`),
+      // because Savings is `budgetAwarded - awardedCost` and the totalBudget terms cancel.
+      //
+      // 2026-08-25: this was briefly changed to sum the BACKLOG's BCB instead, so the amount
+      // would match the Backlog table's row count. That BROKE the identity -- the two bases
+      // differ by the BCB of every WP that is Awarded but carries no cost (portfolio-wide about
+      // PHP 88M), so the four cards stopped adding up. Reverted.
+      //
+      // The original mismatch it was trying to fix is instead fixed on the QUANTITY side: the
+      // sub-line now counts WPs whose money is NOT yet committed (!isMoneyAwarded) rather than
+      // rows in the backlog (!isResolved), so the amount and the count describe the SAME set.
+      // That count is deliberately >= the Backlog table's row count; the difference is exactly
+      // the awarded-but-unpriced WPs, which is a data gap worth seeing (Action Center -> Data
+      // Gaps lists them). DO NOT change one of these two lines without the other.
+      const balanceAmt = ctc;                                       // = totalBudget - budgetAwarded
+      const balanceQty = filtWPs.filter(w => !window.isMoneyAwarded(w)).length;  // uncommitted money
       const sv = window.fmtSavingsBuyback(hm);
       const costEl = document.getElementById('metrics-cost');
       if(costEl) costEl.innerHTML = [
