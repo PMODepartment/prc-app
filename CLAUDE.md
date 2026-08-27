@@ -1775,13 +1775,48 @@ numbering history to break.
   `[]` on ANY failure incl. "table does not exist", so **this is safe to ship before
   `MIGRATION_planners_packages.sql` is run** — the switcher simply never appears.
 - **No shared-asset change** (`db.js`'s `getPlannerPackages` already existed), so **no `?v=`
-  bump**. `index.html` was NOT touched — the portfolio has no package dimension yet; ask
-  before mirroring this there.
+  bump**.
 - **Verified with a Node harness against the extracted shipped source** (24 assertions): two-
   package scoping, unassigned bucket ordered last, unpackaged/single-bucket projects showing
   no switcher, orphan ids getting a bucket and a warning label, stale-scope reset, package×
   charging AND-composition, `sort_order` respected, and an empty pushed package producing no
   dead button.
-- **Still blocked on ops, not code:** `MIGRATION_planners_packages.sql` has not been run in
-  this Supabase project, and Planners has not deployed `push-packages` / pressed **Share with
-  Procurement & Engineering**. Until both happen the switcher is correctly invisible.
+- **`MIGRATION_planners_packages.sql` HAS now been run** (2026-08-27). Still pending on the
+  Planners side: deploying `push-packages` and pressing **Share with Procurement &
+  Engineering**. Until that happens the mirror is empty and the switcher stays invisible.
+
+#### Portfolio Overview (`index.html`) — the same rollup, one level up (2026-08-27)
+
+- **⚠️ A `<select>` (`#idx-pkg-sel`), NOT the per-project button row.** Packages belong to a
+  project, so across ~21 portfolio projects the list runs to dozens of entries AND the same
+  `PKG1` recurs once per project with nothing to tell them apart. Options are therefore
+  **grouped in `<optgroup>`s by the owning project**, and `_pkgLabel(key, true)` prefixes the
+  project id (`AVR101 · PKG1`) wherever the long form is used. Lives in `#filter-tabs-bar`
+  beside `#idx-bcb-switch`, the other portfolio-wide switch.
+- **Applied at the ONE chokepoint: `filtWPs` inside `renderAll()`** — the portfolio's
+  equivalent of `ovWPs()`. Every KPI, battery, chart, Action Center table, backlog row and
+  WP-List row reads that set, so one filter line re-scopes the whole page.
+- **⚠️ `_syncIdxPkgOptions()` runs BEFORE `filtWPs` is filtered**, because it is what resets a
+  stale `_idxPkg`. Reversing the order renders an empty portfolio for one paint.
+- **Options are built from the WPs in the CURRENT PROJECT SELECTION, not from the mirror** —
+  a package whose project is deselected is not scopeable, and one nothing is filed under
+  would be an option that always yields an empty dashboard.
+- **Packages load in ONE call for the whole portfolio** (`getPlannerPackages()` with no pid —
+  it only filters when given one). A per-project fetch here would be exactly the N+1 this
+  dashboard exists to avoid. Loaded in a fire-and-forget IIFE that re-renders **only if it
+  found something**, so an unpackaged portfolio pays nothing.
+- **`_idxPkgSig` guards the rebuild:** `renderAll()` fires on every project pill / BCB switch
+  / search keystroke, and rewriting `sel.innerHTML` each time is needless churn that would
+  drop focus if the user had the select open.
+- Same three invariants as the project page: **Unassigned is its own option, ordered last**;
+  an id with no package reads **`⚠ Not in Planners`** under a "No longer in Planners"
+  optgroup, never blank; and the control **hides entirely below two buckets**.
+- **WP List gained a `pkg` column** (`_WPC`, in the **Overview** and **All** views).
+- Dark mode needs no new rule — the select's authored `background:#fff` / `color:#444` are
+  both covered by `dashboard.css`'s inline-style attribute selectors, and **`sel.style` is
+  never mutated from JS**, so it cannot hit the reserialised-inline-style trap.
+- **Verified with a Node harness against the extracted shipped source** (24 assertions):
+  cross-project disambiguation, scoping, options following the project selection, stale-scope
+  reset when a project is deselected, control hidden below two buckets, Unassigned ordered
+  last, orphan ids, empty pushed packages omitted, in-scope counts, and HTML escaping of the
+  project id and package code.

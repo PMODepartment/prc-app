@@ -143,6 +143,16 @@
             <span style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888">BCB</span>
             <div id="idx-bcb-btns" style="display:flex;gap:4px"></div>
           </div>
+          <!-- Contract Package scope (mirrors project.html's switcher, see CLAUDE.md).
+               Hidden unless the CURRENT project selection actually splits into more than one
+               package bucket. A <select> rather than the per-project button row: packages
+               belong to a project, so across the portfolio the list runs long and the same
+               "Package 1" recurs per project — optgroups carry the project that owns it. -->
+          <div id="idx-pkg-switch" style="display:none;align-items:center;gap:6px;flex-shrink:0;margin-right:4px">
+            <span style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888">Package</span>
+            <select id="idx-pkg-sel" onchange="setIdxPackage(this.value)"
+                    style="padding:7px 10px;border:1px solid #e5e5e5;border-radius:8px;background:#fff;font-family:inherit;font-size:0.8571rem;color:#444;max-width:230px"></select>
+          </div>
           <div id="proj-filter-wrap" style="position:relative;user-select:none;flex-shrink:0">
             <button id="proj-filter-btn" onclick="toggleProjFilter()" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid #e5e5e5;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;font-size:0.9286rem;color:#444;box-shadow:0 1px 3px rgba(0,0,0,.06);white-space:nowrap">
               <i class="ti ti-filter" style="font-size:1rem;color:#888"></i>
@@ -952,6 +962,70 @@
     // Project filter state — archived projects start UNSELECTED (excluded from the portfolio view by default)
     let _activeIds = new Set(permitted.filter(p => p.status !== 'archived').map(p => p.id));
 
+    // ── CONTRACT PACKAGE SCOPE ───────────────────────────────────────────────
+    // Same rollup as project.html, one level up. `_idxPkg` is 'all', a planners_package_id,
+    // or the PKG_UNASSIGNED sentinel; renderAll() applies it to filtWPs, which is the single
+    // set every KPI, chart, battery and table on this page reads.
+    const PKG_UNASSIGNED = '__none';
+    let _idxPkg = 'all', _idxPkgs = [], _idxPkgById = {}, _idxPkgSig = '';
+    // Loaded for the WHOLE portfolio in one call (no pid), not per project — a per-project
+    // fetch here would be the N+1 this dashboard exists to avoid.
+    // Returns [] on ANY failure incl. "table does not exist", so this degrades to "no
+    // packages" rather than breaking the portfolio.
+    (async () => {
+      try { _idxPkgs = await WPDb.getPlannerPackages() || []; } catch (_) { _idxPkgs = []; }
+      _idxPkgById = Object.fromEntries(_idxPkgs.map(p => [String(p.planners_package_id), p]));
+      // The list arrives after first paint; re-sync the control and re-render only if it
+      // actually found something, so an unpackaged portfolio pays nothing for this.
+      if (_idxPkgs.length) { _syncIdxPkgOptions(); renderAll(); }
+    })();
+    function _pkgKeyOf(w) { const id = w && w.planners_package_id; return id ? String(id) : PKG_UNASSIGNED; }
+    // ⚠️ An id that resolves to no package is a WARNING, never a blank: the mirror refreshes
+    // delete-then-insert with no FK, so an upstream deletion leaves a live id behind.
+    function _pkgLabel(key, withProject) {
+      if (!key || key === PKG_UNASSIGNED) return 'Unassigned';
+      const p = _idxPkgById[String(key)];
+      if (!p) return '⚠ Not in Planners';
+      const base = p.code || p.name || 'Package';
+      return withProject && p.project_id ? p.project_id + ' · ' + base : base;
+    }
+    window.setIdxPackage = function (key) { _idxPkg = key; renderAll(); };
+    // Options are built from the work packages IN THE CURRENT PROJECT SELECTION, not straight
+    // from the mirror: a package nothing is filed under would be an option that always yields
+    // an empty dashboard, and a package whose project is deselected is not scopeable anyway.
+    function _syncIdxPkgOptions() {
+      const wrap = document.getElementById('idx-pkg-switch'), sel = document.getElementById('idx-pkg-sel');
+      if (!wrap || !sel) return;
+      const inScope = _allWPs.filter(w => _activeIds.has(w.project_id));
+      const keys = new Set(inScope.map(_pkgKeyOf));
+      // Hide the control entirely unless there is more than one bucket to switch between.
+      if (keys.size < 2) { wrap.style.display = 'none'; _idxPkg = 'all'; sel.value = 'all'; return; }
+      // A scope whose bucket left the selection must reset, or every tab silently renders
+      // zero rows with no way back.
+      if (_idxPkg !== 'all' && !keys.has(_idxPkg)) _idxPkg = 'all';
+      const n = k => inScope.filter(w => _pkgKeyOf(w) === k).length;
+      // Group by owning project, in the Planners sort order within each; Unassigned last —
+      // it is a gap to close, not a lot.
+      const byProj = {};
+      _idxPkgs.forEach(p => { const k = String(p.planners_package_id); if (!keys.has(k)) return;
+        (byProj[p.project_id || '—'] = byProj[p.project_id || '—'] || []).push(k); });
+      const orphans = [...keys].filter(k => k !== PKG_UNASSIGNED && !_idxPkgById[k]).sort();
+      let html = `<option value="all">All packages</option>`;
+      Object.keys(byProj).sort().forEach(pid => {
+        html += `<optgroup label="${esc(pid)}">` + byProj[pid].map(k =>
+          `<option value="${esc(k)}">${esc(_pkgLabel(k))} (${n(k)})</option>`).join('') + `</optgroup>`;
+      });
+      if (orphans.length) html += `<optgroup label="No longer in Planners">` + orphans.map(k =>
+        `<option value="${esc(k)}">${esc(_pkgLabel(k))} (${n(k)})</option>`).join('') + `</optgroup>`;
+      if (keys.has(PKG_UNASSIGNED)) html += `<option value="${PKG_UNASSIGNED}">Unassigned (${n(PKG_UNASSIGNED)})</option>`;
+      // renderAll() calls this on EVERY render (project pill, BCB switch, search…). Rebuilding
+      // innerHTML each time is needless DOM churn and would drop focus if the user had the
+      // select open, so only rewrite when the option set actually changed.
+      if (html !== _idxPkgSig) { sel.innerHTML = html; _idxPkgSig = html; }
+      sel.value = _idxPkg;
+      wrap.style.display = 'flex';
+    }
+
     function renderProjectCard(p, s, extraStyle='') {
       const budgetM = s.totalBudget ? '₱'+(s.totalBudget/1e6).toFixed(1)+'M' : '—';
       const contractM = s.totalContract ? '₱'+(s.totalContract/1e6).toFixed(1)+'M' : '—';
@@ -994,6 +1068,7 @@
       project:    {h:'Project',             w:90, sticky:true},
       cost_code:  {h:'Cost Code',           w:90, sticky:true},
       trade:      {h:'Trade',               w:115},
+      pkg:        {h:'Package',             w:110},
       works:      {h:'Works',               w:110},
       type_ow:    {h:'Type',                w:75},
       scope:      {h:'Scope',               w:110},
@@ -1031,11 +1106,11 @@
       remarks:    {h:'Remarks',             w:130},
     };
     const _WP_VIEWS = {
-      overview:   {label:'Overview',   keys:['cost_code','wp_no','works','scope','description','vendors','proc_status','status','remarks']},
+      overview:   {label:'Overview',   keys:['cost_code','wp_no','works','pkg','scope','description','vendors','proc_status','status','remarks']},
       financial:  {label:'Award',      keys:['cost_code','wp_no','description','budget','awarded','variance','pct_wt','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt','status'], cost:true},
       schedule:   {label:'Schedule',   keys:['cost_code','wp_no','description','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp','status']},
       submittals: {label:'Submittals', keys:['cost_code','wp_no','description','vendors','po_count','po_numbers','approver','appr_date','submittal','status']},
-      all:        {label:'All',        keys:['cost_code','wp_no','description','works','type_ow','scope','vendors','po_count','po_numbers','budget','awarded','variance','pct_wt','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp','approver','appr_date','submittal','proc_status','status','remarks'], cost:true},
+      all:        {label:'All',        keys:['cost_code','wp_no','description','works','pkg','type_ow','scope','vendors','po_count','po_numbers','budget','awarded','variance','pct_wt','surety','perf_bond','warranty','pay_terms','dp_pct','dp_terms','dp_amount','dp_release','ret_pct','ret_amt','lead_time','tgt_award','act_award','tgt_deliv','act_deliv','tgt_inst','tgt_comp','approver','appr_date','submittal','proc_status','status','remarks'], cost:true},
     };
     // Sort state for WP List table
     let _wpMonSortCol = null, _wpMonSortDir = 1;
@@ -2925,6 +3000,14 @@
           case 'project':    return `<td style="${sl}font-weight:600;color:#444">${esc(w.project_id)||'—'}</td>`;
           case 'cost_code':  return `<td style="${sl}"><span class="td-code">${esc(w.cost_code)||'—'}</span></td>`;
           case 'trade':      return `<td>${esc(w.trade)||'—'}</td>`;
+          // Contract package. Unassigned is muted rather than blank — NULL is the normal
+          // state for every WP predating packaging, so it must read "not filed yet".
+          case 'pkg': {
+            const _k = _pkgKeyOf(w);
+            if (_k === PKG_UNASSIGNED) return `<td><span style="color:#bbb">Unassigned</span></td>`;
+            const _warn = !_idxPkgById[_k], _lbl = _pkgLabel(_k), _full = _pkgLabel(_k, true);
+            return `<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(_warn ? _full + ' — this package is no longer in the Planners list.' : _full)}"><span style="${_warn?'color:#D97706':'font-weight:600'}">${esc(_lbl)}</span></td>`;
+          }
           case 'works':      return `<td style="${sl}overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(w.works)}">${esc(w.works)||'—'}</td>`;
           case 'type_ow':    return `<td>${esc(w.type_of_works)||'—'}</td>`;
           case 'scope': {
@@ -3150,7 +3233,15 @@
       _syncIdxBcb();
       const sel = [..._activeIds];
       const filt = permitted.filter(p => sel.includes(p.id));
-      const filtWPs = _allWPs.filter(w => sel.includes(w.project_id));
+      // Contract package scope is applied HERE, on the one set the whole page reads, so a
+      // package pick re-scopes every KPI, battery, chart, backlog row and WP-List row at
+      // once — the same reason project.html filters inside ovWPs().
+      // ⚠️ _syncIdxPkgOptions() runs FIRST: it can reset a stale _idxPkg (bucket no longer in
+      // the project selection) and must do so before that value is used to filter, or this
+      // render produces an empty portfolio.
+      _syncIdxPkgOptions();
+      let filtWPs = _allWPs.filter(w => sel.includes(w.project_id));
+      if (_idxPkg !== 'all') filtWPs = filtWPs.filter(w => _pkgKeyOf(w) === _idxPkg);
       const allStats = filt.map(p => computeStats(filtWPs.filter(w => w.project_id === p.id)));
 
       // Cache for lazy tab rendering
