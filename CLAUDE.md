@@ -1820,3 +1820,62 @@ numbering history to break.
   reset when a project is deselected, control hidden below two buckets, Unassigned ordered
   last, orphan ids, empty pushed packages omitted, in-scope counts, and HTML escaping of the
   project id and package code.
+
+### 2026-08-27 — DIRECTION CHANGE: consolidate packages in the PORTFOLIO, don't re-level the schema
+
+**The registry / rename programme is NOT being built.** After studying it (Planning as registrar,
+`projects` → `packages` in both consumer apps, coordinated two-app cutover — see the plan artifact),
+the decision is to **keep AVR101 and AVR102 as separate projects** and consolidate them for reporting
+in the Portfolio Overview instead. Stages 3 and 4 of that plan are dead; stages 1 and 2 are optional
+and unbuilt.
+
+**⚠️ Know what this does and does not solve.** It answers "show me Avesta as one thing in my
+portfolio" — cheaply, with no schema change. It does NOT make Planning, Procurement and Engineering
+agree on what a project is; that problem is untouched and the `wpm_project_id` 1:1 key is still
+wrong-cardinality. The two compose: a portfolio rollup is a strict subset of the registry plan, so
+nothing built here is wasted if the cross-app problem is taken up later.
+
+**⚠️ Findings from that study worth keeping even though the plan was shelved:** Planning's `projects`
+are ALSO package-level (ids `AVR101`, `BAU101`, `OPW101`…; there is no `AVR` row anywhere and no
+`AVR102`), so its `packages` table subdivides AVR101 rather than containing it — all three apps sit
+at the same level. And PRC's `projects` table genuinely holds packages; that is still true, it is
+simply being lived with.
+
+#### What shipped (`index.html` only)
+
+- **One grouping control, not two.** The `#proj-gh-group` checkbox ("Group by Group Head", checked by
+  default) was replaced by **`#proj-group-by`**, a `<select>`: `Group Head` (default — identical to
+  the old checked state) / `Parent project` / `None`. Two competing checkboxes would have been
+  ambiguous when both were on. `_groupMode()` is the new reader; **`_ghGroup()` survives as
+  `_groupMode()==='gh'`** so the existing call sites needed no restructuring, and it defaults to
+  `'gh'` when the control is missing, exactly matching the old checked-by-default behaviour.
+- **`_progKey(r)` = `r.p.program || leading letters of the project id`** (`AVR101`/`AVR102` → `AVR`).
+  The prefix is not a guess — it is the convention every project id in this portfolio already
+  follows, and it needs **zero data entry** to start working. A `projects.program` column can override
+  it per project if one is ever added; the code already reads it, so adding the column later requires
+  no client change. A unique prefix simply forms a group of one.
+- **`_progLabel(key, rows)` labels a group by the words its members' names actually SHARE** — AVR101
+  "Avida Residences Tower 1…" + AVR102 "Avida Residences Towers 2-7" → **"Avida Residences"**. Falls
+  back to the bare code when the shared prefix is under 3 chars, which is the honest answer for an
+  accidental prefix collision (two unrelated `XYZ` projects read as `XYZ`, never as one's name).
+  **⚠️ Deliberately NO blocklist of trailing unit nouns** (Building/Tower/Phase): `LCR102`/`LCR352`
+  therefore label as "4PH Lancaster Building", which is slightly long but true. Stripping such words
+  would truncate a project genuinely named "Lancaster Building" — a worse failure than a long label.
+- **`_progTotals` / `_progSummary` give the group header COMBINED figures** — packages, WPs, awarded
+  (%), BCB — which is the actual point of consolidating. **⚠️ The award rate is recomputed from the
+  summed counts, never averaged from the members' own rates**: a 2-WP package at 100% and a 200-WP
+  package at 10% is not 55%. Money is dropped when `window.__hideBudget`, like every other ₱ here.
+- **`_ghHeadCells(label, count, nCols)` was generalised to `_groupHeadRow(label, summary, nCols)`** —
+  it hardcoded "N projects", which a parent-project group cannot use. Both the Cards divider and the
+  Table header row now take a ready-made summary string. Old name fully removed (0 references).
+- Sorting keeps a parent's rows contiguous when grouping by parent, the same way it already did for
+  Group Head; the chosen `#proj-sort` orders within each group.
+- **`project.html` and the schema are untouched**, and no shared asset changed, so **no `?v=` bump**.
+- **Verified with a Node harness against the extracted shipped source (20 assertions)**: key
+  derivation for real portfolio codes, shared-name labelling, prefix-collision fallback, summed
+  totals, the recomputed-not-averaged rate, the cost-hidden viewer path, the `program` override, and
+  a zero-WP project not producing `NaN`.
+
+> The earlier per-WP **Contract Package switcher** on both dashboards (2026-08-27, `planners_package_id`)
+> is untouched and still valid — under this direction it breaks a single project down by the packages
+> Planning pushes for it, which is a different axis from consolidating sibling projects here.

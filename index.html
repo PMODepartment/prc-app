@@ -289,9 +289,17 @@
                 <option value="rate">Sort: Award rate</option>
                 <option value="budget" class="gh-budget-opt">Sort: Budget</option>
               </select>
-              <label style="display:flex;align-items:center;gap:5px;font-size:0.8571rem;color:#888;cursor:pointer;white-space:nowrap">
-                <input type="checkbox" id="proj-gh-group" checked onchange="onProjGhChange()" style="cursor:pointer"> Group by Group Head
-              </label>
+              <!-- ONE grouping control, not two competing checkboxes. "Parent project"
+                   consolidates the packages of one project (AVR101 + AVR102 = Avesta) into a
+                   single group with combined totals; the projects themselves stay separate
+                   rows, this is a reporting rollup and not a data change. Default is Group
+                   Head, which is what the old #proj-gh-group checkbox did when checked. -->
+              <select id="proj-group-by" onchange="onProjGhChange()" title="Group projects"
+                      style="padding:6px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:0.8571rem;font-family:inherit;background:var(--surface,#fff);color:#444;cursor:pointer">
+                <option value="gh" selected>Group: Group Head</option>
+                <option value="prog">Group: Parent project</option>
+                <option value="none">Group: None</option>
+              </select>
             </span>
           </div>
           <div class="project-cards" id="project-cards"></div>
@@ -3528,13 +3536,64 @@
       budget:  (a,b)=> ((b.budget||0)-(a.budget||0)) || a.id.localeCompare(b.id),
     };
     const _ghSort  = () => document.getElementById('proj-sort')?.value || 'id';
-    const _ghGroup = () => !!document.getElementById('proj-gh-group')?.checked;
+    // 'gh' | 'prog' | 'none'. Defaults to 'gh' so a missing control behaves exactly like the
+    // old checked-by-default #proj-gh-group checkbox this replaced.
+    const _groupMode = () => document.getElementById('proj-group-by')?.value || 'gh';
+    const _ghGroup   = () => _groupMode() === 'gh';
+    const _progGroup = () => _groupMode() === 'prog';
+
+    // ── PARENT PROJECT (consolidating packages) ──────────────────────────────
+    // AVR101 "Tower 1 and General Requirements" and AVR102 "Towers 2-7" are two contract
+    // packages of one project, Avesta Residences. They stay SEPARATE project rows — this is
+    // a reporting rollup, not a data change — and the portfolio consolidates them on demand.
+    //
+    // The key is the leading letters of the project code (AVR101, AVR102 -> AVR), overridable
+    // per project by a `program` field if one is ever added. The code prefix is not a guess:
+    // it is the convention every project id in this portfolio already follows, and it needs no
+    // data entry to start working. A project whose prefix is unique simply forms a group of one.
+    const _progKey = r => String((r.p && r.p.program) || String(r.id).match(/^[A-Za-z]+/)?.[0] || r.id).toUpperCase();
+
+    // Label a group by the words its members' names actually share — AVR101 "Avida Residences
+    // Tower 1" + AVR102 "Avida Residences Towers 2-7" reads as "Avida Residences" rather than
+    // the bare code. Falls back to the code when the names share too little to be meaningful,
+    // which is the honest answer for an accidental prefix collision.
+    function _progLabel(key, rows) {
+      const names = rows.filter(r => _progKey(r) === key).map(r => (r.name || '').trim()).filter(Boolean);
+      if (!names.length) return key;
+      if (names.length === 1) return names[0];
+      const parts = names.map(n => n.split(/\s+/));
+      let i = 0;
+      while (i < parts[0].length && parts.every(w => w[i] && w[i].toLowerCase() === parts[0][i].toLowerCase())) i++;
+      const common = parts[0].slice(0, i).join(' ').replace(/[\s\-–—,:]+$/, '');
+      return common.length >= 3 ? common : key;
+    }
+
+    // Combined figures for a group — the actual point of consolidating.
+    // ⚠️ Award rate is recomputed from the summed counts, never averaged from the members'
+    // own rates: a 2-WP package at 100% and a 200-WP package at 10% is not 55%.
+    function _progTotals(key, rows) {
+      const m = rows.filter(r => _progKey(r) === key);
+      const wps = m.reduce((t, r) => t + (r.wps || 0), 0);
+      const awd = m.reduce((t, r) => t + (r.awarded || 0), 0);
+      const bud = m.reduce((t, r) => t + (r.budget || 0), 0);
+      return { n: m.length, wps, awd, bud, rate: wps ? Math.round(awd / wps * 100) : 0 };
+    }
+
+    // The group header's summary line, shared by the cards divider and the table header row.
+    // Money is dropped for cost-hidden viewers (__hideBudget), matching every other ₱ on this page.
+    function _progSummary(key, rows) {
+      const t = _progTotals(key, rows);
+      const bits = [`${t.n} package${t.n === 1 ? '' : 's'}`, `${t.wps} WP${t.wps === 1 ? '' : 's'}`,
+                    `${t.awd} awarded (${t.rate}%)`];
+      if (!window.__hideBudget && t.bud) bits.push('₱' + (t.bud / 1e6).toFixed(1) + 'M BCB');
+      return bits.join(' · ');
+    }
     const _projSearchVal = () => (document.getElementById('proj-table-search')?.value||'').toLowerCase();
     const _projStatusVal = () => document.getElementById('proj-table-status')?.value||'all';
 
     // Rows for the CURRENT project selection (_tableData, already scoped by _activeIds /
     // the #pf-gh project-filter picker), search/status-filtered, sorted per #proj-sort /
-    // grouped per #proj-gh-group. Search + status now live in the shared toolbar (2026-08-07,
+    // grouped per #proj-group-by. Search + status now live in the shared toolbar (2026-08-07,
     // moved beside Sort) so they apply to BOTH Cards and Table — same "ONE filter+sort pass"
     // pipeline as the rest of this block. renderProjectCards()'s own active-vs-archived split
     // still works unchanged: filtering to status='archived' just leaves its "active" bucket
@@ -3556,7 +3615,11 @@
       // When grouping, always order by Group Head FIRST so a group's rows stay contiguous;
       // the chosen sort then orders within each group.
       const cmp = _GH_SORTS[_ghSort()] || _GH_SORTS.id;
-      rows.sort(_ghGroup() ? (a,b)=> ghLabel(a.gh).localeCompare(ghLabel(b.gh)) || cmp(a,b) : cmp);
+      const mode = _groupMode();
+      rows.sort(
+        mode === 'gh'   ? (a,b)=> ghLabel(a.gh).localeCompare(ghLabel(b.gh)) || cmp(a,b) :
+        mode === 'prog' ? (a,b)=> _progKey(a).localeCompare(_progKey(b))     || cmp(a,b) :
+                          cmp);
       return rows;
     }
 
@@ -3570,10 +3633,12 @@
     // tag") — red is reserved for the project-code pill elsewhere in this app; a full-red label
     // here read as louder than intended. Uses a light tinted chip with a red LEFT BORDER accent
     // instead — same restrained treatment as the app's other section/group headers.
-    function _ghHeadCells(label, count, nCols) {
+    // Takes a ready-made summary string rather than a count, so a Group Head row can say
+    // "4 projects" and a parent-project row can carry combined WPs / awarded / BCB.
+    function _groupHeadRow(label, summary, nCols) {
       return `<tr class="gh-group-row"><td colspan="${nCols}" style="background:#f0f0f0;padding:6px 10px">
         <span style="font-size:0.7143rem;font-weight:700;color:#231F20;background:var(--mw-red-light,#FDECEA);border-left:3px solid var(--mw-red);padding:2px 8px;border-radius:4px">${esc(label)}</span>
-        <span style="font-size:0.7143rem;color:#888;margin-left:8px">${count} project${count===1?'':'s'}</span>
+        <span style="font-size:0.7143rem;color:#888;margin-left:8px">${esc(summary)}</span>
       </td></tr>`;
     }
 
@@ -3597,6 +3662,23 @@
         cardsEl.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:36px 24px;color:#aaa">
           <div style="font-size:0.9286rem;font-weight:600;color:#888">No projects for this Group Head</div>
         </div>`;
+      } else if (_progGroup()) {
+        // Consolidated by parent project: one divider per project carrying the COMBINED
+        // figures for its packages, then that project's package cards beneath it.
+        let html = '', last = null;
+        active.forEach(r => {
+          const k = _progKey(r);
+          if (k !== last) {
+            last = k;
+            html += `<div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;margin:10px 0 2px;flex-wrap:wrap">
+              <span style="font-size:0.7143rem;font-weight:700;color:#231F20;background:var(--mw-red-light,#FDECEA);border-left:3px solid var(--mw-red);padding:2px 8px;border-radius:4px">${esc(_progLabel(k, active))}</span>
+              <span style="font-size:0.7143rem;color:#888">${esc(_progSummary(k, active))}</span>
+              <span style="flex:1;height:1px;background:var(--border,#eee);min-width:20px"></span>
+            </div>`;
+          }
+          html += renderProjectCard(r.p, r.s);
+        });
+        cardsEl.innerHTML = html;
       } else if (_ghGroup()) {
         // Grouped: a full-width divider per Group Head, then that head's cards.
         // .project-cards is a CSS grid, so the divider spans it with grid-column:1/-1.
@@ -3644,13 +3726,20 @@
       if (!tbody) return;
       const N_COLS = 10;
       if (!rows.length) { tbody.innerHTML=`<tr><td colspan="${N_COLS}" style="text-align:center;padding:24px;color:#aaa">No projects match</td></tr>`; return; }
-      const grouped = _ghGroup();
-      let lastGh = null;
+      const mode = _groupMode();
+      let lastKey = null;
       tbody.innerHTML = rows.map(r=>{
         let head = '';
-        if (grouped && ghLabel(r.gh) !== lastGh) {
-          lastGh = ghLabel(r.gh);
-          head = _ghHeadCells(lastGh, rows.filter(x=>ghLabel(x.gh)===lastGh).length, N_COLS);
+        if (mode === 'prog') {
+          const k = _progKey(r);
+          if (k !== lastKey) { lastKey = k; head = _groupHeadRow(_progLabel(k, rows), _progSummary(k, rows), N_COLS); }
+        } else if (mode === 'gh') {
+          const g = ghLabel(r.gh);
+          if (g !== lastKey) {
+            lastKey = g;
+            const n = rows.filter(x=>ghLabel(x.gh)===g).length;
+            head = _groupHeadRow(g, n + ' project' + (n===1?'':'s'), N_COLS);
+          }
         }
         return head + _projTableRow(r);
       }).join('');
