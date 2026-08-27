@@ -414,20 +414,30 @@ window.isResolved = function (w) {
 // awarded cost is — never re-inline `award_status==='Awarded' && total_awarded>0`,
 // or a not_to_be_awarded WP will disagree between tabs/charts again.
 //
-// FREE OF CHARGE: `free_of_charge` (MIGRATION_wp_free_of_charge.sql) is the third way
-// in. Some WPs are genuinely awarded at PHP 0 because the vendor provides the scope
-// free -- a real, closed award whose entire BCB is realized savings. Unlike
-// not_to_be_awarded this flag does NOT stand alone: it describes an AWARD, so it only
-// counts once award_status is actually 'Awarded'. It deliberately does NOT relax the
-// `total_awarded > 0` test for everyone else -- "awarded at zero" and "awarded, cost
-// not encoded yet" are indistinguishable from the numbers alone (on AVR101, WP 35 and
-// WP 45 already store awarded_cost = 0 with no vendor, from an importer default), so
-// only an explicit tick can tell them apart. See Known Issue #17 / #28c.
+// ⚠️ AN AWARDED WP COUNTS, WHATEVER ITS COST -- INCLUDING PHP 0 (2026-08-25, PMO ruling).
+// This function used to additionally require `total_awarded > 0`, so an Awarded WP with a
+// zero/blank cost fell out of BOTH sides of the money ledger (the old Known Issue #17).
+// That was withdrawn because the threshold had no defensible position: a WP awarded at
+// PHP 0.01 was treated as a real award booking almost its whole BCB as savings, while the
+// very same WP at PHP 0.00 was treated as missing data and dropped. Per the PMO, an award
+// is an award and a zero cost is a real cost -- so its full BCB is realized savings.
+//
+// Consequences, all intended:
+//   * `Balance to Award` (totalBudget - budgetAwarded) now equals the BACKLOG's budget
+//     exactly, so the card's label is finally true and its WP count matches the Backlog
+//     table (AVR101: PHP 1.00M / 1 WP, was PHP 9.37M / 7).
+//   * Portfolio savings rose PHP 84.33M across 65 previously-excluded WPs.
+//   * This is now IDENTICAL to isResolved(), so it delegates rather than restating the
+//     rule -- two copies would silently drift. Both names are kept because call sites
+//     read very differently ("is this in the backlog?" vs "does its money count?").
+//   * `free_of_charge` no longer changes the money (a plain 0 now behaves the same). The
+//     flag is retained: it records INTENT ("deliberately free" vs "cost not keyed yet")
+//     and still waives the Awarded-Cost requirement in the WP form and the review grid.
+// The cost of this ruling: an awarded WP whose cost merely hasn't been entered now books
+// its BCB as savings. 55 of those 65 WPs also have no vendor recorded -- Action Center ->
+// Data Gaps still lists them, which is where that gets caught.
 window.isMoneyAwarded = function (w) {
-  if (!w) return false;
-  if (w.not_to_be_awarded) return true;
-  if (w.award_status !== 'Awarded') return false;
-  return !!w.free_of_charge || (w.total_awarded || 0) > 0;
+  return window.isResolved(w);
 };
 // A not-resolved WP with no Planned Award Date is silently excluded from every
 // "Cumulative Planned" line (period charts, S-Curve) but IS counted in "Forecast"
