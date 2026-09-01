@@ -170,6 +170,31 @@
     #xl-colmenu .xl-cm-opts{display:flex;flex-direction:column;gap:3px;max-height:260px;overflow-y:auto}
     #xl-colmenu .xl-cm-opt{text-align:left;padding:6px 9px;border:1px solid var(--border-md);border-radius:6px;background:var(--surface);color:var(--text-primary);cursor:pointer;font-family:inherit;font-size:0.8571rem}
     #xl-colmenu .xl-cm-opt:hover{border-color:#EE3124;background:rgba(238,49,36,.08)}
+
+    /* Vendor picker popover — the editor for the two `type:'vendors'` columns
+       (Awarded Vendor, Proposed Vendors). Multi-select: searches the vendor
+       directory, holds any number of vendors as chips. */
+    #xl-vendor-pop{position:fixed;z-index:60;width:360px;max-width:94vw;background:var(--surface);border:1.5px solid var(--border-md);border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.26);padding:10px;font-size:0.8571rem;box-sizing:border-box}
+    #xl-vendor-pop .xl-vp-h{font-size:0.7857rem;font-weight:700;color:var(--text-secondary);margin-bottom:7px;line-height:1.35}
+    #xl-vendor-pop .xl-vp-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px;max-height:96px;overflow-y:auto}
+    #xl-vendor-pop .xl-vp-chip{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:3px 5px 3px 8px;border-radius:20px;background:var(--mw-red-light,#FDECEA);border:1px solid #F5B8B3;color:var(--text-primary);font-size:0.7857rem;line-height:1.3}
+    #xl-vendor-pop .xl-vp-chip.unlinked{background:var(--surface-2);border:1px dashed var(--border-md)}
+    #xl-vendor-pop .xl-vp-chip-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px}
+    #xl-vendor-pop .xl-vp-chip-x{border:none;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:1rem;line-height:1;padding:0 2px;font-family:inherit}
+    #xl-vendor-pop .xl-vp-chip-x:hover{color:#EE3124}
+    #xl-vendor-pop .xl-vp-none{font-size:0.7857rem;color:var(--text-hint);margin-bottom:7px}
+    #xl-vendor-pop .xl-vp-search{width:100%;box-sizing:border-box;padding:6px 8px;border:1.5px solid var(--border-md);border-radius:7px;background:var(--surface);color:var(--text-primary);font-family:inherit;font-size:0.8571rem;outline:none}
+    #xl-vendor-pop .xl-vp-search:focus{border-color:#EE3124}
+    #xl-vendor-pop .xl-vp-list{margin-top:6px;max-height:214px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+    #xl-vendor-pop .xl-vp-opt{display:flex;align-items:center;gap:7px;text-align:left;padding:6px 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text-primary);cursor:pointer;font-family:inherit;font-size:0.8571rem;width:100%}
+    #xl-vendor-pop .xl-vp-opt:hover,#xl-vendor-pop .xl-vp-opt.sel{border-color:#EE3124;background:rgba(238,49,36,.08)}
+    #xl-vendor-pop .xl-vp-opt-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #xl-vendor-pop .xl-vp-add{color:#EE3124;font-weight:600}
+    #xl-vendor-pop .xl-vp-msg{padding:7px 4px;font-size:0.7857rem;color:var(--text-hint)}
+    #xl-vendor-pop .xl-vp-foot{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+    #xl-vendor-pop .xl-vp-hint{flex:1;min-width:0;font-size:0.7143rem;color:var(--text-hint);line-height:1.35}
+    #xl-vendor-pop .xl-vp-done{flex-shrink:0;padding:5px 13px;border:none;border-radius:7px;background:#EE3124;color:#fff;font-family:inherit;font-size:0.8571rem;font-weight:600;cursor:pointer}
+    .xl-vp-acc{flex-shrink:0;font-size:0.6429rem;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:2px 6px;border-radius:10px}
     #xl-colmenu .xl-cm-clear{color:#EE3124;margin-top:4px}
     #xl-colmenu .xl-cm-row{display:flex;gap:6px;margin-bottom:4px}
     #xl-colmenu .xl-cm-in{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border-md);border-radius:6px;background:var(--surface);color:var(--text-primary);font-family:inherit;font-size:0.8571rem;outline:none}
@@ -602,6 +627,7 @@
       }
     }
     renderAll();
+    _xlLoadVendorNames();   // resolve linked vendor ids to names for the grid (non-blocking)
   }
 
   window.changeProject = function(val) {
@@ -775,6 +801,89 @@
   let _xlUsers = [];
   async function _xlLoadUsers(){ try { _xlUsers = (await WPDb.getAllUsers()) || []; } catch(_){ _xlUsers = []; } }
 
+  /* ── Vendor directory (the two `type:'vendors'` columns) ────────────────────
+     The grid never loads the whole ~1,600-row directory. It keeps a lazily-grown
+     cache of the vendors it has actually seen — the ids referenced by the loaded
+     WPs (resolved once, on load) plus whatever a search turns up — and uses it for
+     three things: showing a name for a linked id, pre-filling the picker's chips,
+     and re-linking ids when a vendor NAME arrives through the text paths (paste,
+     fill-down, the header ▾ set-all), which never carry an id of their own. */
+  let _xlVendorName   = Object.create(null);   // vendorId -> name
+  let _xlVendorAccred = Object.create(null);   // vendorId -> accreditation
+  let _xlVendorByName = Object.create(null);   // normalized name -> id, or false when AMBIGUOUS
+  function _xlVendorNorm(s){ return String(s==null?'':s).trim().toLowerCase().replace(/\s+/g,' '); }
+  // Split a stored vendor-names value. Newline / semicolon / pipe only — NEVER comma or
+  // space, or "Company, Inc." would shred into two vendors (the app-wide rule).
+  function _xlVendorSplit(v){
+    return String(v==null?'':v).split(/[\r\n;|]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+  }
+  function _xlVendorCacheAdd(v){
+    if (!v || !v.id || !v.name) return;
+    _xlVendorName[v.id] = v.name;
+    if (v.accreditation !== undefined) _xlVendorAccred[v.id] = v.accreditation;
+    const n = _xlVendorNorm(v.name);
+    // Two different vendors sharing a normalized name is a genuine ambiguity — mark it
+    // false so the text→id relink refuses to guess (same rule as the vendor analytics).
+    if (!(n in _xlVendorByName)) _xlVendorByName[n] = v.id;
+    else if (_xlVendorByName[n] !== v.id) _xlVendorByName[n] = false;
+  }
+  // Resolve every vendor id the loaded WPs reference, so a linked cell shows a real
+  // name instead of a bare uuid. Chunked — a long .in() list blows the PostgREST URL.
+  async function _xlLoadVendorNames(){
+    if (typeof VendorDb === 'undefined' || !VendorDb.getVendorsByIds) return;
+    const want = [];
+    (allWPs||[]).forEach(function(w){
+      [w.awarded_vendor_ids, w.proposed_vendor_ids].forEach(function(a){
+        if (Array.isArray(a)) a.forEach(function(id){ if (id && !(id in _xlVendorName) && want.indexOf(id)<0) want.push(id); });
+      });
+      if (w.vendor_id && !(w.vendor_id in _xlVendorName) && want.indexOf(w.vendor_id)<0) want.push(w.vendor_id);
+    });
+    if (!want.length) return;
+    let got = 0;
+    for (let i=0;i<want.length;i+=150){
+      try { (await VendorDb.getVendorsByIds(want.slice(i,i+150))).forEach(function(v){ _xlVendorCacheAdd(v); got++; }); }
+      catch(_){ /* names are a display nicety — never break the grid over them */ }
+    }
+    // Don't yank the popover out from under the user just because this background
+    // name resolution happened to finish while it was open.
+    if (got && _reviewView === 'grid' && !_xlVpState) renderGrid();
+  }
+  // A row's vendors for one column, as picker chips. Ids are authoritative when present
+  // (that's how the WP form writes them, names in the same order); any name beyond the id
+  // list is kept as an UNLINKED chip rather than silently dropped.
+  function _xlVendorChips(w, col){
+    const ids   = xlVal(w, col.idsKey);
+    const names = _xlVendorSplit(xlVal(w, col.k));
+    const amts  = col.amtsKey ? xlVal(w, col.amtsKey) : null;
+    const out = [];
+    if (Array.isArray(ids) && ids.length){
+      ids.forEach(function(id, i){
+        if (!id) return;
+        out.push({ id:id,
+                   name: _xlVendorName[id] || names[i] || ('vendor ' + String(id).slice(0,8)),
+                   amount: Array.isArray(amts) ? (amts[i]==null?null:amts[i]) : null });
+      });
+      names.slice(out.length).forEach(function(n){ out.push({ id:null, name:n, amount:null }); });
+    } else {
+      names.forEach(function(n){
+        const hit = _xlVendorByName[_xlVendorNorm(n)];
+        out.push({ id: hit || null, name:n, amount:null });
+      });
+      // A legacy single-vendor row may carry vendor_id without the array column.
+      if (out.length===1 && !out[0].id && col.primaryKey && w[col.primaryKey]) out[0].id = w[col.primaryKey];
+    }
+    return out;
+  }
+  function _xlAccBadge(v){
+    if (typeof window.accredMeta !== 'function') return '';
+    const m = window.accredMeta(v) || {};
+    if (!m.label) return '';
+    return '<span class="xl-vp-acc" style="background:' + esc(m.bg||'#eee') + ';color:' + esc(m.fg||'#333') + '">' + esc(m.label) + '</span>';
+  }
+  function _xlAccIsProblem(v){
+    return typeof window.accredKey === 'function' && window.accredKey(v) === 'problematic';
+  }
+
   // Column groups mirror the 8 sections of wp-form.html, in the same order.
   // `keep:true` columns survive their group being collapsed (they're the frozen keys).
   const XL_GROUPS = [
@@ -811,7 +920,9 @@
     { g:'identity', k:'type_of_service',     label:'Type of Service',      w:120, type:'text'  },
     { g:'identity', k:'type_of_procurement', label:'Type of Procurement',  w:130, type:'text'  },
     { g:'identity', k:'type_of_contract',    label:'Type of Contract',     w:130, type:'text'  },
-    { g:'identity', k:'proposed_vendors',    label:'Proposed Vendors',     w:160, type:'text'  },
+    // Multi-vendor picker over the vendor directory. `idsKey` is the uuid[] column kept
+    // in step with the free-text names — see _xlOpenVendorPop / _xlRelinkVendorIds.
+    { g:'identity', k:'proposed_vendors',    label:'Proposed Vendors',     w:190, type:'vendors', idsKey:'proposed_vendor_ids' },
     { g:'identity', k:'po_jo_count',         label:'No. PO/JO',            w:80,  type:'num'   },
     { g:'identity', k:'po_jo_numbers',       label:'PO/JO Numbers',        w:140, type:'text'  },
     /* ── Approval Matrix ───────────────────────────────────────────────── */
@@ -846,7 +957,12 @@
     { g:'budget',   k:'total_awarded',       label:'Total Awarded',        w:120, type:'money', ro:true },
     { g:'budget',   k:'_variance',           label:'Variance',             w:120, type:'money', ro:true },
     { g:'budget',   k:'award_status',        label:'Award Status',         w:110, type:'text',  ro:true },
-    { g:'budget',   k:'contractor',          label:'Awarded Vendor',       w:150, type:'text',  reqIfAwarded:true },
+    // Co-awards are supported: several vendors, names newline-joined into `contractor`,
+    // ids into awarded_vendor_ids, `vendor_id` = the first/primary one (back-compat).
+    // amtsKey is index-aligned with idsKey; per-vendor amounts are AUTHORED in the WP
+    // form — the grid only preserves the ones already on file (Known Issues: the two
+    // arrays must never drift apart).
+    { g:'budget',   k:'contractor',          label:'Awarded Vendor',       w:190, type:'vendors', idsKey:'awarded_vendor_ids', amtsKey:'awarded_vendor_amounts', primaryKey:'vendor_id', reqIfAwarded:true },
     // Ops decided this WP will NEVER go through a formal award (handled outside PRC —
     // petty cash, direct arrangement, scope removed). Waives the Awarded Cost/Vendor
     // requirement below and tells the dashboard's money math to count this WP's full
@@ -1188,6 +1304,9 @@
     if (col.type==='pct'){ const n=xlNum(v); return n==null?'':String(+(n*100).toFixed(4)); }
     if (col.type==='money'){ const n=xlNum(v); return n==null?'':n.toLocaleString('en-US',{maximumFractionDigits:2}); }
     if (col.type==='date'){ const d=String(v).match(/\d{4}-\d{2}-\d{2}/); return d?d[0]:String(v); }
+    // Stored newline-joined; shown (and COPIED as TSV) on one line — a newline in a cell
+    // would break the tab/newline TSV grid. ' ; ' round-trips through xlCoerce.
+    if (col.type==='vendors') return _xlVendorSplit(v).join(' ; ');
     if (col.type==='datetime'){ try{ return new Date(v).toLocaleString('en-US',{month:'short',day:'2-digit',year:'numeric',hour:'numeric',minute:'2-digit'}); }catch(_){ return String(v); } }
     return String(v);
   }
@@ -1201,6 +1320,8 @@
       return /^(yes|true|y|1)$/i.test(s);
     }
     if (s==='') return null;
+    // Any of the app's vendor delimiters in, newline-joined out (what the DB holds).
+    if (col.type==='vendors'){ const l=_xlVendorSplit(s); return l.length? l.join('\n') : null; }
     if (col.type==='pct'){ const n=xlNum(s.replace('%','')); return n==null?null:n/100; }
     if (col.type==='money'||col.type==='num') return xlNum(s);
     if (col.type==='date'){
@@ -1351,6 +1472,15 @@
       const w = _gridRows[r]; if (!w) continue;
       const o = {};
       cols.forEach(function(c){ const v = xlVal(w, c.k); if (v !== undefined && v !== null && v !== '') o[c.k] = v; });
+      // Vendors are global, not per-project, so their ids stay valid in the target project —
+      // carry the linkage across instead of pasting names that arrive unlinked.
+      cols.filter(function(c){ return c.type === 'vendors'; }).forEach(function(c){
+        [c.idsKey, c.amtsKey, c.primaryKey].forEach(function(k){
+          if (!k) return;
+          const v = xlVal(w, k);
+          if (v !== undefined && v !== null && !(Array.isArray(v) && !v.length)) o[k] = v;
+        });
+      });
       rows.push(o);
     }
     return { source:(currentProjId!=='ALL'?currentProjId:'the consolidated grid'), rows:rows, cols:cols };
@@ -1449,6 +1579,17 @@
         if (col.ro || col.ph || col.k.charAt(0) === '_' || col.k === 'project_id') return;   // never write generated/derived
         const cv = xlCoerce(v, col, o);                                 // reverse xlFmt: strip commas, %÷100, parse dates; o.trade (if already pasted) resolves dynOpts
         if (cv !== null && cv !== '' && cv !== undefined) o[col.k] = cv;
+        // A TSV carries names, never ids — resolve the ones the name cache knows
+        // unambiguously so a pasted WP keeps its vendor linkage where it safely can.
+        if (col.type === 'vendors' && col.idsKey && cv){
+          const ids = _xlVendorSplit(cv)
+            .map(function(n){ return _xlVendorByName[_xlVendorNorm(n)]; })
+            .filter(Boolean);
+          if (ids.length){
+            o[col.idsKey] = ids;
+            if (col.primaryKey) o[col.primaryKey] = ids[0];
+          }
+        }
       });
       return o;
     });
@@ -1471,6 +1612,16 @@
       if (col.ro || col.ph || col.k.charAt(0) === '_') return;      // never write generated/derived
       const v = xlVal(w, col.k);
       if (v !== undefined) out[col.k] = v;
+      // A vendors column also owns the uuid[] / amount[] / primary-id columns, which have
+      // no cell of their own — without this a grid-added WP would save the vendor NAMES
+      // and silently drop the directory linkage.
+      if (col.type === 'vendors'){
+        [col.idsKey, col.amtsKey, col.primaryKey].forEach(function(k){
+          if (!k) return;
+          const sv = xlVal(w, k);
+          if (sv !== undefined) out[k] = sv;
+        });
+      }
     });
     out.project_id  = w.project_id;
     out.award_status = xlVal(w, 'award_status') || 'Not Yet Awarded';
@@ -1577,8 +1728,8 @@
     renderGrid();
   };
   function _xlTradeKey(w){ return (xlVal(w,'trade')||'').toString().trim() || '(No trade)'; }
-  function _xlGroupKeyOf(w){ return w.__new ? ' new' : _xlTradeKey(w); }
-  function _xlGroupLabel(k){ return k === ' new' ? 'New work packages' : k; }
+  function _xlGroupKeyOf(w){ return w.__new ? '\u0000new' : _xlTradeKey(w); }
+  function _xlGroupLabel(k){ return k === '\u0000new' ? 'New work packages' : k; }
   function _xlNum(v){ const n = parseFloat(String(v==null?'':v).replace(/,/g,'')); return isFinite(n) ? n : 0; }
   function _xlMoney(n){
     if (!n) return '';
@@ -1614,6 +1765,10 @@
   }
 
   window.renderGrid = function(){
+    // The vendor popover holds an (r,c) coordinate and a live <td>; a re-render
+    // invalidates both, so never let it outlive one — a pick could otherwise land
+    // on a different work package. Its edits are already staged per pick.
+    if (_xlVpState) _xlCloseVendorPop();
     // The "Show" review_status filter (All/Approved/Pending/Rejected) was removed 2026-08-06 —
     // the approval workflow is retired, so it was almost always "All" anyway; the legacy-strip
     // above already surfaces + fixes any pre-auto-approve rows without a filter dropdown.
@@ -1924,6 +2079,85 @@
     return { r:rr, c:cc };
   }
 
+  // Two values equal for staging purposes. Arrays compare element-wise so the
+  // vendor id/amount arrays don't register as a change on every re-pick.
+  function _xlSameVal(a, b){
+    const A = Array.isArray(a), B = Array.isArray(b);
+    if (A || B){
+      if (!A || !B){ const arr = A ? a : b; return arr.length === 0 && (A ? b : a) == null; }
+      return a.length === b.length && a.every(function(v,i){
+        return String(v==null?'':v) === String(b[i]==null?'':b[i]); });
+    }
+    return (a==null?'':String(a)) === (b==null?'':String(b));
+  }
+  // Stage a value against a raw FIELD KEY rather than a grid coordinate — used for the
+  // side-columns the vendor picker writes (the uuid[] / amount[] arrays and vendor_id),
+  // which have no cell of their own. Same undo contract as _xlSet; a value back at the
+  // stored one drops the override instead of staging a pointless write.
+  function _xlStage(w, k, val, undoBatch){
+    if (_xlSameVal(xlVal(w, k), val)) return false;
+    const had = !!(_gridEdits[w.id] && Object.prototype.hasOwnProperty.call(_gridEdits[w.id], k));
+    const back = !w.__new && _xlSameVal(w[k], val);
+    if (back && !had) return false;                       // nothing staged, nothing to undo
+    if (undoBatch) undoBatch.push({ id:w.id, k:k, had:had, prev: had ? _gridEdits[w.id][k] : undefined });
+    if (!_gridEdits[w.id]) _gridEdits[w.id] = {};
+    if (back) delete _gridEdits[w.id][k];
+    else _gridEdits[w.id][k] = val;
+    return true;
+  }
+
+  /* Commit a vendor picker's chips to one `type:'vendors'` cell.
+     Writes the human record (names, newline-joined — every chip, linked or not) AND the
+     precise id array (linked chips only). The amount array is rebuilt over the SAME
+     linked list so the two can never drift out of index alignment; an amount already on
+     file for a vendor that stays in the list is preserved, a newly added vendor gets
+     null (the analytics then even-splits, which is the honest reading — per-vendor
+     negotiated amounts are authored in the WP form, not here). */
+  function _xlSetVendorChips(r, c, chips, undoBatch){
+    const w = _gridRows[r], col = VC[c];
+    if (!w || !col || !_xlEditable(w, col)) return false;
+    const names = chips.map(function(x){ return String(x.name||'').trim(); }).filter(Boolean);
+    _xlStage(w, col.k, names.length ? names.join('\n') : null, undoBatch);
+    if (col.idsKey){
+      const linked = chips.filter(function(x){ return !!x.id; });
+      _xlStage(w, col.idsKey, linked.map(function(x){ return x.id; }), undoBatch);
+      if (col.amtsKey){
+        const amts = linked.map(function(x){ return x.amount==null ? null : x.amount; });
+        _xlStage(w, col.amtsKey, amts.some(function(v){ return v!=null; }) ? amts : null, undoBatch);
+      }
+      if (col.primaryKey) _xlStage(w, col.primaryKey, linked.length ? linked[0].id : null, undoBatch);
+    }
+    _xlRefreshRow(r);
+    return true;
+  }
+
+  /* A vendor NAME arriving through a text path (typed paste, Ctrl+D fill, the header ▾
+     set-all) carries no id, so the stored ids would go stale and keep pointing at the
+     vendor that USED to be there — which the dashboards and vendor analytics read as
+     authoritative. Re-derive them from the name cache instead: an exact normalized-name
+     match links, anything else (unknown, or a name two vendors share) is left unlinked.
+     Never a fuzzy match — mis-linking would mis-attribute award money to another company. */
+  function _xlRelinkVendorIds(w, col, textVal, undoBatch){
+    if (!col.idsKey) return;
+    const prevIds = xlVal(w, col.idsKey);
+    const prevAmt = col.amtsKey ? xlVal(w, col.amtsKey) : null;
+    const keep = Object.create(null);
+    if (Array.isArray(prevIds)) prevIds.forEach(function(id, i){
+      if (id) keep[id] = Array.isArray(prevAmt) ? prevAmt[i] : null;
+    });
+    const linked = [];
+    _xlVendorSplit(textVal).forEach(function(n){
+      const hit = _xlVendorByName[_xlVendorNorm(n)];        // false = ambiguous → don't guess
+      if (hit) linked.push({ id:hit, amount: (hit in keep) ? keep[hit] : null });
+    });
+    _xlStage(w, col.idsKey, linked.map(function(x){ return x.id; }), undoBatch);
+    if (col.amtsKey){
+      const amts = linked.map(function(x){ return x.amount==null ? null : x.amount; });
+      _xlStage(w, col.amtsKey, amts.some(function(v){ return v!=null; }) ? amts : null, undoBatch);
+    }
+    if (col.primaryKey) _xlStage(w, col.primaryKey, linked.length ? linked[0].id : null, undoBatch);
+  }
+
   // Stage one cell edit (with undo entry). Returns false when the cell is locked.
   function _xlSet(r, c, raw, undoBatch){
     const w = _gridRows[r], col = VC[c];
@@ -1947,6 +2181,9 @@
         else _gridEdits[w.id].award_status = aw;
       }
     }
+    // A vendors column reached through a text path (paste / fill / set-all) has no ids
+    // with it — re-derive them from the name cache so they can't point at the old vendor.
+    if (col.type === 'vendors') _xlRelinkVendorIds(w, col, val, undoBatch);
     // `approved_budget_bcb` is the CURRENT baseline = the newest non-blank of BCB0/1/2.
     // It has no column of its own (it's derived), but every dashboard/chart/export reads
     // it, so recompute and stage it whenever any baseline changes — same rule as the WP
@@ -1976,12 +2213,235 @@
     _xlUpdateBar();
   }
 
+  /* ── Vendor picker (the editor for a `type:'vendors'` cell) ─────────────────
+     A multi-select popover rather than an inline input: a WP can be awarded to, or
+     have proposed, any number of vendors, and the directory is far too large to sit
+     in a <datalist>. Searches VendorDb, holds the picks as chips, and can create a
+     vendor that isn't in the directory yet (the same quickCreateVendor path the WP
+     form uses). Every add/remove stages immediately, but the whole session is ONE
+     undo batch, so a single Ctrl+Z takes back the entire vendor edit. */
+  let _xlVpState = null;        // { r, c, chips, batch, timer, results, sel, loading }
+
+  function _xlCloseVendorPop(){
+    const st = _xlVpState;
+    _xlVpState = null;
+    document.removeEventListener('mousedown', _xlVpOutside, true);
+    const pop = document.getElementById('xl-vendor-pop');
+    if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
+    if (st){
+      if (st.batch.length) _xlUndo.push(st.batch);
+      _xlEditing = false;
+      _xlSyncFill();
+      const wrap = document.getElementById('xl-wrap'); if (wrap) wrap.focus();
+      _xlUpdateBar();
+    }
+  }
+  function _xlVpOutside(e){
+    const pop = document.getElementById('xl-vendor-pop');
+    if (pop && !pop.contains(e.target)) _xlCloseVendorPop();
+  }
+
+  function _xlOpenVendorPop(r, c, td, seed){
+    _xlCloseVendorPop();
+    const w = _gridRows[r], col = VC[c];
+    if (!w || !col) return;
+    _xlEditing = true;
+    _xlSyncFill();                                   // hide the fill handle while open
+    _xlVpState = { r:r, c:c, chips:_xlVendorChips(w, col), batch:[], timer:null, results:[], sel:0 };
+
+    const pop = document.createElement('div');
+    pop.id = 'xl-vendor-pop';
+    pop.innerHTML =
+      '<div class="xl-vp-h">' + esc(col.label) + ' &mdash; ' + esc(w.project_id) +
+        ' WP ' + esc(String(xlVal(w,'wp_no')||'?')) + '</div>' +
+      '<div class="xl-vp-chips" id="xl-vp-chips"></div>' +
+      '<input class="xl-vp-search" id="xl-vp-search" type="text" autocomplete="off" ' +
+        'placeholder="Search vendors&hellip; add as many as you need">' +
+      '<div class="xl-vp-list" id="xl-vp-list"></div>' +
+      '<div class="xl-vp-foot"><span class="xl-vp-hint">' +
+        (col.amtsKey ? 'Per-vendor awarded amounts are set in the WP form.'
+                     : 'Enter picks the highlighted vendor.') +
+      '</span><button type="button" class="xl-vp-done" id="xl-vp-done">Done</button></div>';
+    document.body.appendChild(pop);
+
+    // Anchor under the cell, clamped into the viewport.
+    const tr = td.getBoundingClientRect(), pr = pop.getBoundingClientRect();
+    let left = tr.left, top = tr.bottom + 4;
+    if (left + pr.width  > window.innerWidth  - 8) left = Math.max(8, window.innerWidth  - pr.width  - 8);
+    if (top  + pr.height > window.innerHeight - 8) top  = Math.max(8, tr.top - pr.height - 4);
+    pop.style.left = left + 'px';
+    pop.style.top  = top  + 'px';
+
+    _xlVpRenderChips();
+    const inp = document.getElementById('xl-vp-search');
+    if (seed) inp.value = seed;
+    inp.focus();
+    _xlVpSearch(true);                               // empty query lists the first vendors
+    _xlVpWire(pop, inp);
+    setTimeout(function(){ document.addEventListener('mousedown', _xlVpOutside, true); }, 0);
+  }
+
+  // Event wiring — delegated, so the chip/result lists can be re-rendered freely.
+  function _xlVpWire(pop, inp){
+    document.getElementById('xl-vp-done').addEventListener('click', _xlCloseVendorPop);
+    document.getElementById('xl-vp-chips').addEventListener('click', function(e){
+      const b = e.target.closest('[data-vp-rm]'); if (!b) return;
+      _xlVpRemove(+b.getAttribute('data-vp-rm'));
+    });
+    document.getElementById('xl-vp-list').addEventListener('click', function(e){
+      const b = e.target.closest('[data-vp-pick]'); if (!b) return;
+      const i = b.getAttribute('data-vp-pick');
+      if (i === 'new') _xlVpAddNew(); else _xlVpPick(+i);
+    });
+    inp.addEventListener('input', function(){ _xlVpSearch(); });
+    inp.addEventListener('keydown', function(e){
+      const st = _xlVpState; if (!st) return;
+      if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); _xlCloseVendorPop(); return; }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+        e.preventDefault(); e.stopPropagation();
+        const n = st.results.length; if (!n) return;
+        st.sel = (st.sel + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+        _xlVpRenderList();
+        return;
+      }
+      if (e.key === 'Enter'){
+        e.preventDefault(); e.stopPropagation();
+        if (st.results[st.sel]) _xlVpPick(st.sel);
+        else if (inp.value.trim()) _xlVpAddNew();
+        return;
+      }
+      // The grid's own keydown handler owns arrows/Tab/Ctrl+C/V/Z — while this popover is
+      // open it must not see any of them, or typing a vendor name would navigate the grid.
+      e.stopPropagation();
+    });
+    pop.addEventListener('keydown', function(e){ e.stopPropagation(); });
+  }
+
+  function _xlVpRenderChips(){
+    const st = _xlVpState, el = document.getElementById('xl-vp-chips');
+    if (!st || !el) return;
+    const col = VC[st.c];
+    if (!st.chips.length){ el.innerHTML = '<span class="xl-vp-none">No vendors yet.</span>'; return; }
+    el.innerHTML = st.chips.map(function(ch, i){
+      // An unlinked chip is a legacy free-text name with no directory record behind it —
+      // dashed so it reads as "not linked" instead of looking like a real pick.
+      const warn = (col.amtsKey && ch.id && _xlAccIsProblem(_xlVendorAccred[ch.id]))
+        ? '<span title="Flagged problematic in the vendor directory">&#9888;</span> ' : '';
+      // The name is ellipsis-clamped, so carry the full one as a tooltip; an unlinked chip
+      // spends that tooltip explaining itself instead (the name is the part that is wrong).
+      const tip = ch.id ? ch.name
+        : ch.name + ' — not linked to a vendor record; pick it from the search to link it';
+      return '<span class="xl-vp-chip' + (ch.id ? '' : ' unlinked') + '">' + warn +
+        '<span class="xl-vp-chip-nm" title="' + esc(tip) + '">' + esc(ch.name) + '</span>' +
+        '<button type="button" class="xl-vp-chip-x" data-vp-rm="' + i + '" aria-label="Remove ' +
+        esc(ch.name) + '">&times;</button></span>';
+    }).join('');
+  }
+
+  function _xlVpRenderList(){
+    const st = _xlVpState, el = document.getElementById('xl-vp-list');
+    if (!st || !el) return;
+    const q = (document.getElementById('xl-vp-search')||{}).value || '';
+    const rows = st.results.map(function(v, i){
+      return '<button type="button" class="xl-vp-opt' + (i === st.sel ? ' sel' : '') +
+        '" data-vp-pick="' + i + '"><span class="xl-vp-opt-nm">' + esc(v.name) + '</span>' +
+        _xlAccBadge(v.accreditation) + '</button>';
+    });
+    // Offer a create only when nothing already matches the typed name exactly.
+    const t = _xlVendorNorm(q);
+    if (t && !st.results.some(function(v){ return _xlVendorNorm(v.name) === t; })
+          && !st.chips.some(function(ch){ return _xlVendorNorm(ch.name) === t; })){
+      rows.push('<button type="button" class="xl-vp-opt xl-vp-add" data-vp-pick="new">' +
+        '<i class="ti ti-plus"></i> Add &ldquo;' + esc(q.trim()) + '&rdquo; as a new vendor</button>');
+    }
+    el.innerHTML = rows.length ? rows.join('')
+      : '<div class="xl-vp-msg">' + (st.loading ? 'Searching&hellip;' : 'No vendors found.') + '</div>';
+  }
+
+  // Debounced directory search. Every result is cached, which is also what lets a name
+  // pasted into the cell later resolve back to its id (see _xlRelinkVendorIds).
+  function _xlVpSearch(now){
+    const st = _xlVpState; if (!st) return;
+    if (st.timer) clearTimeout(st.timer);
+    const run = async function(){
+      const cur = _xlVpState; if (!cur) return;
+      const q = (document.getElementById('xl-vp-search')||{}).value || '';
+      cur.loading = true; _xlVpRenderList();
+      let list = null;
+      try {
+        if (typeof VendorDb !== 'undefined' && VendorDb.searchApprovedVendors)
+          list = (await VendorDb.searchApprovedVendors(q)) || [];
+      } catch(err){
+        if (_xlVpState !== cur) return;
+        cur.loading = false; cur.results = []; cur.sel = 0;
+        const el = document.getElementById('xl-vp-list');
+        if (el) el.innerHTML = '<div class="xl-vp-msg">Could not reach the vendor directory. ' +
+          'Type the name and use &ldquo;Add as a new vendor&rdquo;, or try again.</div>';
+        return;
+      }
+      if (_xlVpState !== cur) return;                    // popover closed or re-opened meanwhile
+      (list||[]).forEach(function(v){ _xlVendorCacheAdd(v); });
+      cur.loading = false;
+      cur.results = (list||[]).filter(function(v){
+        return !cur.chips.some(function(ch){ return ch.id === v.id; }); });
+      cur.sel = 0;
+      _xlVpRenderList();
+    };
+    if (now) run(); else st.timer = setTimeout(run, 250);
+  }
+
+  function _xlVpCommit(){
+    const st = _xlVpState; if (!st) return;
+    _xlSetVendorChips(st.r, st.c, st.chips, st.batch);
+    _xlVpRenderChips();
+  }
+  function _xlVpPick(i){
+    const st = _xlVpState; if (!st) return;
+    const v = st.results[i]; if (!v) return;
+    if (!st.chips.some(function(ch){
+          return ch.id === v.id || _xlVendorNorm(ch.name) === _xlVendorNorm(v.name); }))
+      st.chips.push({ id:v.id, name:v.name, amount:null });
+    _xlVpCommit();
+    const inp = document.getElementById('xl-vp-search');
+    if (inp){ inp.value = ''; inp.focus(); }
+    _xlVpSearch(true);
+  }
+  function _xlVpRemove(i){
+    const st = _xlVpState; if (!st) return;
+    st.chips.splice(i, 1);
+    _xlVpCommit();
+    _xlVpSearch(true);                                   // removed vendor becomes pickable again
+  }
+  async function _xlVpAddNew(){
+    const st = _xlVpState; if (!st) return;
+    const inp = document.getElementById('xl-vp-search');
+    const name = (inp && inp.value.trim()) || '';
+    if (!name) return;
+    const el = document.getElementById('xl-vp-list');
+    if (el) el.innerHTML = '<div class="xl-vp-msg">Adding &ldquo;' + esc(name) + '&rdquo;&hellip;</div>';
+    try {
+      const created = await VendorDb.quickCreateVendor(name, adminProfile);
+      _xlVendorCacheAdd(created);
+      if (_xlVpState !== st) return;
+      st.chips.push({ id:created.id, name:created.name, amount:null });
+      _xlVpCommit();
+      if (inp){ inp.value = ''; inp.focus(); }
+      _xlVpSearch(true);
+      xlToast('Added “' + created.name + '” to the vendor directory.');
+    } catch(err){
+      AppNotify.fromError(err, 'Could not add that vendor');
+      if (_xlVpState === st) _xlVpSearch(true);
+    }
+  }
   /* ── Cell editor ────────────────────────────────────────────────────────── */
   function _xlBeginEdit(seed){
     if (_xlEditing) return;
     const r = _xlSel.r, c = _xlSel.c, w = _gridRows[r], col = VC[c];
     if (!w || !col || !_xlEditable(w, col)) return;
     const td = _xlTd(r,c); if(!td) return;
+    // Awarded Vendor / Proposed Vendors are multi-select against the vendor directory,
+    // so they open a searchable popover instead of an inline input.
+    if (col.type === 'vendors'){ _xlOpenVendorPop(r, c, td, seed); return; }
     _xlEditing = true;
     _xlSyncFill();                       // hide the fill handle while the editor is open
     const cur = xlVal(w, col.k);
@@ -2209,6 +2669,10 @@
         return '<button class="xl-cm-opt" data-v="'+esc(o)+'" onclick="_xlColApply(\''+esc(k)+'\',this.getAttribute(\'data-v\'))">'+esc(o)+'</button>'; }).join('')
         + '<button class="xl-cm-opt xl-cm-clear" data-v="" onclick="_xlColApply(\''+esc(k)+'\',\'\')">— Clear —</button></div>';
     } else {
+      if (col.type === 'vendors')
+        inner += '<div class="xl-cm-h" style="margin-top:-3px">Type the vendor exactly as the '
+          + 'directory spells it and it will be linked; anything else is kept as plain text. '
+          + 'Use the cell picker to choose from the directory.</div>';
       inner += '<div class="xl-cm-row"><input id="xl-cm-in" class="xl-cm-in" placeholder="Value for every row" '
         + 'onkeydown="if(event.key===\'Enter\')_xlColApplyInput(\''+esc(k)+'\')">'
         + '<button class="xl-cm-apply" onclick="_xlColApplyInput(\''+esc(k)+'\')">Apply</button></div>'
@@ -2226,10 +2690,24 @@
     if (!confirm('Set this value on all '+_gridRows.length+' rows in view? (You can Ctrl+Z to undo, and nothing saves until you press Save changes.)')) return;
     _xlSetColumn(k, v);
   };
-  window._xlColApplyInput = function(k){
+  window._xlColApplyInput = async function(k){
     const inp = document.getElementById('xl-cm-in'); const v = inp ? inp.value : '';
+    // A vendors column links by exact name off the cache — warm it for the typed name first,
+    // or a set-all would leave every row's vendor unlinked purely because nobody had
+    // searched for it yet this session.
+    const col = VC.find(function(x){ return x.k===k; });
+    if (col && col.type === 'vendors' && v && v.trim()) await _xlWarmVendorName(v);
     _xlColApply(k, v);
   };
+  // Look a vendor name up in the directory once, to populate the name→id cache.
+  async function _xlWarmVendorName(text){
+    const names = _xlVendorSplit(text).filter(function(n){ return !(_xlVendorNorm(n) in _xlVendorByName); });
+    if (!names.length || typeof VendorDb === 'undefined' || !VendorDb.searchApprovedVendors) return;
+    for (const n of names){
+      try { (await VendorDb.searchApprovedVendors(n)).forEach(function(v){ _xlVendorCacheAdd(v); }); }
+      catch(_){ /* linking is best-effort; the name still saves as text */ }
+    }
+  }
   // Dismiss the column menu on any outside click.
   document.addEventListener('mousedown', function(e){
     const m = document.getElementById('xl-colmenu');

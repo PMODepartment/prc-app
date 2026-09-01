@@ -964,6 +964,83 @@ Two related complaints: (1) the Vendor Management **Analytics** tab listed vendo
 
 **Real pre-existing bug found and fixed in the same pass:** the `.view-tab` active-highlight toggle (`switchTab()`) matched buttons to `ALL_TABS` **by DOM position** (`ALL_TABS[i] === tab`) — but the `#view-tabs` bar has a **"Cycle Time" button with no corresponding `ALL_TABS` entry** (that feature isn't built yet, per the Vendor Analytics roadmap), so every button from "Cycle Time" onward was ALREADY silently mis-highlighting before this change (clicking Backlog, for instance, was testing `ALL_TABS[3]==='backlog'` against whatever button actually sat at DOM index 3). Removing the Action Center button would have shifted every subsequent button up one more slot and made this worse. Fixed at the root instead of patched around: the toggle now extracts the tab key straight from each button's own `onclick="switchTab('key')"` attribute via regex and matches on that — **DOM position no longer matters at all**, so any future button add/remove/reorder in `#view-tabs` can't misalign the highlight again. `ALL_TABS` itself is untouched (still needed for the tab-content show/hide + `_rendered` reset loops, both already string-keyed and unaffected by this). **The "Cycle Time" button was later REMOVED entirely (2026-08-11, `index.html`)** — it was an unwired placeholder (no `ALL_TABS` entry, no `#tab-cycle` content div, no handler) for a never-built feature; deleting it is safe precisely because of the regex-based highlight matching above. The comment in `switchTab()` that referenced it as the example was updated to cite Action Center instead.
 
+### All Work Packages grid — Awarded Vendor + Proposed Vendors are searchable multi-vendor pickers (`review.html`, 2026-09-01)
+
+Both vendor fields in the Excel grid were plain `type:'text'` cells, so an officer typed a vendor name
+by hand — no directory search, and nothing linked the row to a `vendors` record. They are now
+**`type:'vendors'`**, a new column type whose editor is a **searchable multi-select popover over the
+vendor directory**, matching what `wp-form.html`'s Awarded Vendor / Proposed Vendors chip comboboxes
+already do. Both support **any number of vendors** (a WP can be co-awarded, and proposed vendors are
+plural by nature).
+
+- **Column defs** carry the side-columns they own, so nothing is hardcoded per field:
+  `proposed_vendors` → `{type:'vendors', idsKey:'proposed_vendor_ids'}`; `contractor` →
+  `{type:'vendors', idsKey:'awarded_vendor_ids', amtsKey:'awarded_vendor_amounts',
+  primaryKey:'vendor_id', reqIfAwarded:true}`. Both widened to 190px.
+- **Editor** — `_xlBeginEdit` dispatches `type:'vendors'` to **`_xlOpenVendorPop`** before the normal
+  input/select branch (after the `_xlEditable` scope check, so a locked row still can't be edited).
+  Chips for the current picks, a debounced `VendorDb.searchApprovedVendors`, **accreditation badges**
+  on every result plus a **⚠ on a problematic awarded chip** (same guardrail as the WP form), and an
+  inline **"Add … as a new vendor"** (`quickCreateVendor`) for a vendor not in the directory yet.
+  ↑/↓ + Enter pick, Esc / outside-click / Done close. Typing a character on a selected cell opens the
+  popover with that character seeded, like every other editor here.
+- **⚠️ Every add/remove stages IMMEDIATELY, but the whole popover session is ONE undo batch** —
+  a single Ctrl+Z takes back the entire vendor edit rather than one chip at a time.
+- **⚠️ THE INVARIANT: `awarded_vendor_ids` and `awarded_vendor_amounts` are INDEX-ALIGNED and are
+  always rebuilt TOGETHER** (`_xlSetVendorChips`), over the **linked** chips only — an unlinked
+  free-text chip goes into the names but never into the arrays, or the two would desync and every
+  later vendor's money would be reattributed. An amount already on file for a vendor that STAYS in
+  the list is preserved (matched by id, so it survives a reorder); a newly added vendor gets `null`,
+  which the analytics reads as an even split. **Per-vendor negotiated amounts are AUTHORED in the WP
+  form** — the grid deliberately doesn't collect them in a cell, and the popover footer says so.
+- **⚠️ A vendor NAME arriving through a text path carries no id, so the stored ids would keep pointing
+  at the vendor that USED to be there** — which the dashboards and vendor analytics treat as
+  authoritative. **`_xlRelinkVendorIds`** (called from `_xlSet` for any `type:'vendors'` column)
+  re-derives them from the name cache on every paste / Ctrl+D fill / header-▾ set-all. **Exact
+  normalized-name match only, and a name two vendors share resolves to `false` and links to NOTHING**
+  — the same refuse-to-guess rule the vendor analytics uses, because a wrong link mis-credits award
+  money to another company. Never make this fuzzy.
+- **`_xlVendorName` / `_xlVendorByName` / `_xlVendorAccred`** are a lazily-grown cache, never the whole
+  ~1,600-row directory: `_xlLoadVendorNames()` resolves (chunked 150, `getVendorsByIds`) just the ids
+  the loaded WPs reference so a linked cell shows a real name, and every search result is cached too,
+  which is what later lets a pasted name resolve back to its id. `_xlWarmVendorName` looks a name up
+  once before a header-▾ set-all, or a bulk apply would leave every row unlinked purely because nobody
+  had searched for that vendor yet this session.
+- **`xlFmt` renders a vendors cell on ONE line (`' ; '`-joined) and `xlCoerce` splits it back to
+  newline-joined** — a newline inside a cell would break the tab/newline TSV that Ctrl+C / Ctrl+V and
+  Excel interop are built on. **Splitting is newline/semicolon/pipe only, NEVER comma or space**, so
+  `"XYZ Builders, Inc."` stays one vendor (the app-wide rule).
+- **The linkage now survives the save and the cross-project copy**: `_xlDraftPayload` writes the
+  side-columns for a grid-added WP (they have no cell, so without this a new row saved the NAMES and
+  silently dropped the ids); `_xlSerializeRows` carries them through Copy WPs → Paste WPs (a vendor is
+  global, so its id stays valid in the target project); the whole-WP TSV paste resolves what the cache
+  knows. `gridSave` needed no change — it already sends `_gridEdits[id]` wholesale, and `db.js` has the
+  deploy-safe strip-and-retry guards for all three columns.
+- **⚠️ The popover holds an (r,c) coordinate and a live `<td>`, so it must never outlive a re-render** —
+  a pick could otherwise land on a different work package. `renderGrid()` closes it on entry, and
+  `_xlLoadVendorNames` skips its re-render while one is open.
+- **New generic helpers worth reusing**: **`_xlStage(w, k, val, undoBatch)`** stages against a raw
+  FIELD KEY rather than a grid coordinate (for columns with no cell), and **`_xlSameVal`** compares
+  arrays element-wise so re-picking the same vendors stages nothing and raises no dirty flag. Both
+  keep `_xlSet`'s contract: a value back at the stored one deletes the override instead of writing a
+  no-op, and no empty edit record is created (which would send a blank patch).
+- **`review.html` contained TWO literal NUL bytes** (the draft-group ``'\u0000new'`` sentinel written as a
+  raw byte rather than an escape), which made the whole file register as **binary** to `grep`/diff — the
+  same trap CLAUDE.md already records for `vendors.html`'s `_splitOnSuffixRuns`. Both are now the
+  plain-text six-character escape sequence `\u0000`. **Write the escape in source; never paste the control character.**
+- **Verified**: 75 assertions in a Node harness against the **verbatim extracted** shipped functions
+  (splitting incl. the comma rule, the xlFmt/xlCoerce TSV round-trip, cache ambiguity, chip reads for
+  ids-authoritative / legacy-text / legacy-`vendor_id` / unresolvable-id rows, the amount-alignment
+  cases above, clearing, no-op re-picks, proposed-vs-awarded differences, all three relink outcomes,
+  and a locked cell) — plus the popover rendered against the real `dashboard.css` in a throwaway
+  repo-root `_preview_*` harness (deleted before commit): 360px wide, no overflow, correct in light AND
+  dark (`--surface`/`--text-*` resolve; the unlinked chip stays dashed). **Not yet exercised against a
+  live authenticated session** — the search/quick-create round-trip needs the user's own login; flag
+  anything that misbehaves on first real use.
+- **`review.html`-only change, so no shared `?v=` bump** (same precedent as the `vendors.html`-scoped
+  work). **Not done, flag if wanted**: the grid still collects no per-vendor awarded amounts, and
+  `index.html` / `project.html`'s WP-detail panels are untouched.
+
 ### Vendor Grid — Excel-style editing, full parity with `review.html`'s WP grid (`vendors.html`, 2026-08-14)
 
 The vendor directory's view toggle is **Cards | Grid | Analytics** — the plain **Table** view was removed the same day, per explicit request, once Grid existed: it was a strict subset of what Grid does (same rows, same fields, no editing) so keeping both was pure repetition. `renderTable()`, `#vendorTableWrap`, the `#vv-table` button, and the now-dead `.v-table`/`.table-wrapper`/`.vth-check` CSS were deleted outright rather than hidden; `quickApprove`/`quickReject` (the row-level buttons Table used to expose) survive unchanged since Cards already renders them for `pending_review` vendors, and the Grid's Status cell can set `approved`/`rejected` directly.
