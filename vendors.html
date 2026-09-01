@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260825g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260825g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260825g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260901a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260901a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260901a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260825g">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260901a">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -404,7 +404,15 @@
     .vxl-trade-pop label{display:flex;align-items:center;gap:6px;font-size:0.8214rem;padding:4px 4px;cursor:pointer;border-radius:6px;color:var(--text-primary)}
     .vxl-trade-pop label:hover{background:var(--mw-red-light)}
     .vxl-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;flex-wrap:wrap}
-  </style>
+  
+/* Archived child rows — a vendor pressed "Remove" in their portal. Kept
+   visible to staff so the archive is a real safety net, not a quieter delete. */
+.arch-block{margin-top:14px;border-top:1px dashed var(--border-md,#ddd);padding-top:10px}
+.arch-head{font-size:0.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-hint,#6E6C6C);margin-bottom:6px}
+.arch-row{opacity:.62}
+.arch-row .row-item-title{text-decoration:line-through}
+body.dark-mode .arch-block{border-top-color:var(--border-md)}
+</style>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png"/>
@@ -729,9 +737,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260825g"></script>
-<script src="assets/js/db.js?v=20260825g"></script>
-<script src="assets/js/ui.js?v=20260825g"></script>
+<script src="assets/js/auth.js?v=20260901a"></script>
+<script src="assets/js/db.js?v=20260901a"></script>
+<script src="assets/js/ui.js?v=20260901a"></script>
 <script src="assets/js/vendor-guide.js?v=20260820a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -3478,7 +3486,9 @@ async function saveDetailOverview() {
    renderDetailProducts() because that render replaces the whole tab's HTML. */
 let _dnpPicker = null;
 async function renderDetailProducts() {
-  const list = await VendorDb.products.list(activeVendor.id);
+  const _all = await VendorDb.products.list(activeVendor.id, { includeArchived: true });
+  const list = _all.filter(x => !x.archived_at);
+  const _arch = _all.filter(x => x.archived_at);
   const tax = await VendorDb.getTaxonomy();
   // Prefer the precise taxonomy path; fall back to the legacy free-text
   // category for rows that were never classified.
@@ -3491,7 +3501,9 @@ async function renderDetailProducts() {
     <button class="row-item-del" style="background:none;border:none;color:#888;cursor:pointer" onclick="reclassifyProduct('${p.id}')" title="Change category"><i class="ti ti-category"></i></button>
     <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailProduct('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button></div>`
   ).join('') : '<div class="empty">No products/services on file.</div>';
-  document.getElementById('dtab-products').innerHTML = rows + (!_canManage ? '' : `
+  document.getElementById('dtab-products').innerHTML = rows
+    + _archivedBlock(_arch, 'restoreDetailProduct', r => (r.description || '') + (r.unit ? ' (' + r.unit + ')' : ''))
+    + (!_canManage ? '' : `
     <div class="add-form">
       <div id="dnp-taxonomy" style="flex:1 1 100%"></div>
       <select id="dnp-type"><option value="Materials">Materials</option><option value="Labor">Labor</option><option value="Service">Service</option></select>
@@ -3527,7 +3539,9 @@ async function removeDetailProduct(id) {
   await renderDetailProducts();
 }
 async function renderDetailCerts() {
-  const list = await VendorDb.certifications.list(activeVendor.id);
+  const _all = await VendorDb.certifications.list(activeVendor.id, { includeArchived: true });
+  const list = _all.filter(x => !x.archived_at);
+  const _arch = _all.filter(x => x.archived_at);
   const rows = list.length ? list.map(c => {
     const exp = c.expiry_date ? new Date(c.expiry_date) : null;
     const expired = exp && exp < new Date();
@@ -3536,7 +3550,9 @@ async function renderDetailCerts() {
       ${c.file_path ? ' · <span class="file-badge" onclick="viewCertFileStaff(\''+c.file_path.replace(/'/g,"\\'")+'\')">View file</span>' : ''}</div></div>
       <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailCert('${c.id}','${(c.file_path||'').replace(/'/g,"\\'")}')" title="Remove"><i class="ti ti-trash"></i></button></div>`;
   }).join('') : '<div class="empty">No certifications on file.</div>';
-  document.getElementById('dtab-certs').innerHTML = rows + (!_canManage ? '' : `
+  document.getElementById('dtab-certs').innerHTML = rows
+    + _archivedBlock(_arch, 'restoreDetailCert', r => r.cert_name || '')
+    + (!_canManage ? '' : `
     <div class="add-form" style="flex-direction:column;align-items:stretch">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <input id="dnc-name" placeholder="Certification Name (e.g. PCAB License)">
@@ -3580,13 +3596,17 @@ async function viewCertFileStaff(path) {
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not open file') : alert(e.message); }
 }
 async function renderDetailPersonnel() {
-  const list = await VendorDb.personnel.list(activeVendor.id);
+  const _all = await VendorDb.personnel.list(activeVendor.id, { includeArchived: true });
+  const list = _all.filter(x => !x.archived_at);
+  const _arch = _all.filter(x => x.archived_at);
   const rows = list.length ? list.map(p =>
     `<div class="row-item"><div style="flex:1;min-width:0"><div class="row-item-title">${esc(p.name)}${p.is_primary?' <span style="color:#EE3124;font-size:0.7rem;font-weight:700">PRIMARY</span>':''}</div>
     <div class="row-item-sub">${esc(p.role_title||'')}${p.contact_number?' · '+esc(p.contact_number):''}${p.email?' · '+esc(p.email):''}</div></div>
     <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailPersonnel('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button></div>`
   ).join('') : '<div class="empty">No personnel on file.</div>';
-  document.getElementById('dtab-personnel').innerHTML = rows + (!_canManage ? '' : `
+  document.getElementById('dtab-personnel').innerHTML = rows
+    + _archivedBlock(_arch, 'restoreDetailPersonnel', r => r.name || '')
+    + (!_canManage ? '' : `
     <div class="add-form">
       <input id="dnp2-name" placeholder="Name">
       <input id="dnp2-role" placeholder="Role (e.g. Sales Rep)">
@@ -4087,6 +4107,45 @@ function updateDupBadge() {
   if (wrap && n) wrap.classList.add('has-alert');
 }
 
+</script>
+<script>
+// ── Archived child rows (MIGRATION_vendor_child_soft_delete.sql) ───────────
+// A vendor login can no longer DELETE its own products/certs/personnel/docs —
+// "Remove" in the portal archives instead. Staff must therefore be able to SEE
+// and RESTORE those rows, or the archive would just be a silent delete.
+function _archWhen(r) {
+  if (!r.archived_at) return '';
+  try { return new Date(r.archived_at).toLocaleDateString(); } catch (_) { return ''; }
+}
+function _archivedBlock(rows, restoreFn, label) {
+  if (!rows || !rows.length) return '';
+  var Q = String.fromCharCode(39);   // avoids quote-escaping inside the inline handler
+  return '<div class="arch-block"><div class="arch-head"><i class="ti ti-archive"></i> '
+    + 'Removed by vendor (' + rows.length + ') — kept so you can restore</div>'
+    + rows.map(function (r) {
+        return '<div class="row-item arch-row"><div style="flex:1;min-width:0">'
+          + '<div class="row-item-title">' + esc(label(r)) + '</div>'
+          + '<div class="row-item-sub">Removed ' + esc(_archWhen(r))
+          + (r.archived_by_name ? ' by ' + esc(r.archived_by_name) : '') + '</div></div>'
+          + (_canManage ? '<button class="row-item-del" style="background:none;border:none;color:#2D9B6F;cursor:pointer" '
+              + 'onclick="' + restoreFn + '(' + Q + r.id + Q + ')" title="Restore"><i class="ti ti-arrow-back-up"></i></button>' : '')
+          + '</div>';
+      }).join('')
+    + '</div>';
+}
+async function _restoreChild(api, id, rerender) {
+  try {
+    await api.restore(id);
+    await rerender();
+    if (window.AppNotify) AppNotify.success('Restored.');
+  } catch (e) {
+    if (window.AppNotify) AppNotify.fromError(e, 'Could not restore');
+    else alert('Could not restore: ' + (e.message || e));
+  }
+}
+function restoreDetailProduct(id)   { return _restoreChild(VendorDb.products, id, renderDetailProducts); }
+function restoreDetailCert(id)      { return _restoreChild(VendorDb.certifications, id, renderDetailCerts); }
+function restoreDetailPersonnel(id) { return _restoreChild(VendorDb.personnel, id, renderDetailPersonnel); }
 </script>
 </body>
 </html>

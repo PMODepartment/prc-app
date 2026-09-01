@@ -329,8 +329,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260825g"></script>
-<script src="assets/js/db.js?v=20260825g"></script>
+<script src="assets/js/auth.js?v=20260901a"></script>
+<script src="assets/js/db.js?v=20260901a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -489,10 +489,12 @@ async function uploadDoc(docType, input) {
 }
 async function removeDoc(id) {
   const d = myDocs.find(x => x.id === id);
-  if (!d || !confirm('Remove this document?')) return;
+  if (!d || !confirm('Remove this document from your profile?\n\nIt stops being shown to you, but Megawide Procurement keeps a copy and can restore it.')) return;
   try {
-    await VendorDb.documents.remove(id);
-    if (d.file_path) { try { await VendorDb.deleteCertFile(d.file_path); } catch (_) {} }
+    // Archive, never delete — and deliberately do NOT remove the stored file.
+    // This is the BIR 2303 / permit an accreditation may have been granted on;
+    // deleting it would leave a restored row pointing at a missing file.
+    await VendorDb.documents.archive(id);
     await reloadAccreditation();
   } catch (e) { msg('Could not remove: ' + (e.message || e), 'error'); }
 }
@@ -849,10 +851,12 @@ async function reclassifyOwnProduct(id) {
   };
 }
 async function removeProduct(id) {
-  if (!confirm('Remove this product/service?')) return;
-  await VendorDb.products.remove(id);
-  await renderProducts();
-  await flagEdited();
+  if (!confirm('Remove this product/service from your profile?\n\nMegawide Procurement can restore it if this was a mistake.')) return;
+  try {
+    await VendorDb.products.archive(id);
+    await renderProducts();
+    await flagEdited();
+  } catch (e) { msg('Could not remove: ' + (e.message || e), 'error'); }
 }
 
 /* ── Certifications ── */
@@ -869,7 +873,7 @@ async function renderCerts() {
         <div class="row-item-sub">${esc(c.issuing_body||'')}${c.expiry_date ? ' · Expires ' + esc(c.expiry_date) + (expired ? ' <span style="color:#EE3124;font-weight:700">EXPIRED</span>' : '') : ''}
           ${c.file_path ? ' · <span class="file-badge" onclick="viewCertFile(\''+c.file_path.replace(/'/g,"\\'")+'\')">View file</span>' : ''}</div>
       </div>
-      <button class="row-item-del" onclick="removeCert('${c.id}','${(c.file_path||'').replace(/'/g,"\\'")}')" title="Remove"><i class="ti ti-trash"></i></button>
+      <button class="row-item-del" onclick="removeCert('${c.id}')" title="Remove"><i class="ti ti-trash"></i></button>
     </div>`;
   }).join('');
 }
@@ -893,12 +897,14 @@ async function addCert() {
     await flagEdited();
   } catch (e) { msg('Could not add: ' + (e.message || e), 'error'); }
 }
-async function removeCert(id, filePath) {
-  if (!confirm('Remove this certification?')) return;
-  await VendorDb.certifications.remove(id);
-  if (filePath) await VendorDb.deleteCertFile(filePath);
-  await renderCerts();
-  await flagEdited();
+async function removeCert(id) {
+  if (!confirm('Remove this certification from your profile?\n\nMegawide Procurement can restore it if this was a mistake.')) return;
+  try {
+    // The uploaded file is deliberately RETAINED so a restore still resolves.
+    await VendorDb.certifications.archive(id);
+    await renderCerts();
+    await flagEdited();
+  } catch (e) { msg('Could not remove: ' + (e.message || e), 'error'); }
 }
 async function viewCertFile(path) {
   try {
@@ -936,10 +942,12 @@ async function addPersonnel() {
   } catch (e) { msg('Could not add: ' + (e.message || e), 'error'); }
 }
 async function removePersonnel(id) {
-  if (!confirm('Remove this contact?')) return;
-  await VendorDb.personnel.remove(id);
-  await renderPersonnel();
-  await flagEdited();
+  if (!confirm('Remove this contact from your profile?\n\nMegawide Procurement can restore it if this was a mistake.')) return;
+  try {
+    await VendorDb.personnel.archive(id);
+    await renderPersonnel();
+    await flagEdited();
+  } catch (e) { msg('Could not remove: ' + (e.message || e), 'error'); }
 }
 
 // Any child-table edit (product/cert/personnel add or remove) should also

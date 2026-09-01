@@ -2027,12 +2027,43 @@ const VendorDb = (() => {
   }
 
   // ── Child tables (products / certifications / personnel) ────────────
-  function _child(table) {
+  //
+  // ⚠️ ARCHIVE, DON'T DELETE. MIGRATION_vendor_child_soft_delete.sql takes
+  // DELETE away from the vendor role on all four child tables, so a vendor
+  // login can no longer destroy its own offerings, certifications, personnel or
+  // accreditation documents — tables that carry no audit trail and that this
+  // app has no undo for. "Remove" in vendor-portal.html therefore stamps
+  // archived_at, and staff can restore it from vendors.html.
+  //
+  // `remove()` is retained as a REAL hard DELETE, and RLS now allows it for
+  // STAFF ONLY. Never call it as an archive fallback.
+  const _ARCH_MIG = 'MIGRATION_vendor_child_soft_delete.sql';
+  function _isMissingArchived(e) { return _isMissingCol(e, /archived_at/); }
+  function _archiveUnavailable() {
+    return new Error('Cannot archive — ' + _ARCH_MIG + ' has not been run on this ' +
+      'database yet. Nothing was changed. Ask an administrator to run it.');
+  }
+
+  function _child(table, orderCol) {
+    const ORD = orderCol || 'created_at';
     return {
-      async list(vendorId) {
+      // opts.includeArchived — staff views pass this to see archived rows too.
+      // The vendor portal never does, so an archived row reads as gone to them.
+      async list(vendorId, opts) {
         const sb = await getSB();
-        const { data, error } = await sb.from(table).select('*').eq('vendor_id', vendorId).order('created_at');
-        if (error) throw error;
+        let q = sb.from(table).select('*').eq('vendor_id', vendorId);
+        if (!(opts && opts.includeArchived)) q = q.is('archived_at', null);
+        const { data, error } = await q.order(ORD);
+        if (error) {
+          // Pre-migration the column doesn't exist — nothing can have been
+          // archived, so the unfiltered list IS the live list. Safe to degrade.
+          if (_isMissingArchived(error)) {
+            const r2 = await sb.from(table).select('*').eq('vendor_id', vendorId).order(ORD);
+            if (r2.error) throw r2.error;
+            return r2.data || [];
+          }
+          throw error;
+        }
         return data || [];
       },
       async add(vendorId, fields) {
@@ -2047,6 +2078,24 @@ const VendorDb = (() => {
         if (error) throw error;
         return data;
       },
+      // archived_by / archived_by_name are stamped SERVER-SIDE by
+      // internal.stamp_archived(), so the client never sends them and the
+      // attribution cannot be forged.
+      async archive(id) {
+        const sb = await getSB();
+        const { error } = await sb.from(table).update({ archived_at: new Date().toISOString() }).eq('id', id);
+        // ⚠️ NEVER fall back to remove() here. If the column is absent the right
+        // outcome is a loud failure, not silently performing the destructive act
+        // this change exists to prevent — same reasoning as bulkSetAccreditation,
+        // where a quiet no-op would report success having changed nothing.
+        if (error) { if (_isMissingArchived(error)) throw _archiveUnavailable(); throw error; }
+      },
+      async restore(id) {
+        const sb = await getSB();
+        const { error } = await sb.from(table).update({ archived_at: null }).eq('id', id);
+        if (error) { if (_isMissingArchived(error)) throw _archiveUnavailable(); throw error; }
+      },
+      // Hard DELETE. Staff only — RLS rejects this for a vendor login.
       async remove(id) {
         const sb = await getSB();
         const { error } = await sb.from(table).delete().eq('id', id);
@@ -2182,12 +2231,17 @@ const VendorDb = (() => {
     return error.code === '42P01' || (new RegExp(name, 'i').test(m) && /does not exist|schema cache|relation/i.test(m));
   }
 
+  // Accreditation documents. Same archive-not-delete rule as the other three
+  // child tables — these hold the BIR 2303 / business permit an accreditation
+  // was granted on, so a vendor destroying them is the worst case of the four.
+  const _docsBase = _child('vendor_documents', 'uploaded_at');
   const vendorDocuments = {
-    async list(vendorId) {
-      const sb = await getSB();
-      const { data, error } = await sb.from('vendor_documents').select('*').eq('vendor_id', vendorId).order('uploaded_at', { ascending: false });
-      if (error) { if (_isMissingTable(error, 'vendor_documents')) return []; throw error; }
-      return data || [];
+    ..._docsBase,
+    async list(vendorId, opts) {
+      // The whole table is optional (MIGRATION_vendor_accreditation_requests.sql),
+      // so an absent table degrades to [] rather than breaking the portal.
+      try { return await _docsBase.list(vendorId, opts); }
+      catch (e) { if (_isMissingTable(e, 'vendor_documents')) return []; throw e; }
     },
     async add(vendorId, fields) {
       const sb = await getSB();
@@ -2196,17 +2250,6 @@ const VendorDb = (() => {
       const { data, error } = await sb.from('vendor_documents').insert(payload).select().single();
       if (error) throw error;
       return data;
-    },
-    async update(id, fields) {
-      const sb = await getSB();
-      const { data, error } = await sb.from('vendor_documents').update(fields).eq('id', id).select().single();
-      if (error) throw error;
-      return data;
-    },
-    async remove(id) {
-      const sb = await getSB();
-      const { error } = await sb.from('vendor_documents').delete().eq('id', id);
-      if (error) throw error;
     },
   };
 
