@@ -1193,6 +1193,10 @@ So exactly one of these was true in any given database, decided purely by run or
 **`MIGRATION_vendor_edit_guard_consolidated.sql` is the UNION of (3) + (4) + (5) and is now the
 only place the function is defined.** Run it once, **after** every other vendor migration.
 
+**RUN against production 2026-09-01 — its section-6 verification returned `true` on all 14
+columns** (trigger installed + enabled, every branch's pin/stamp present, `prosecdef`). So the
+definition now live IS the consolidated one, and both silent failure modes above are closed.
+
 - **⚠️ Do NOT re-run migrations 1–5 after it.** Each would `create or replace` the body back to
   its own narrower version and reintroduce the regression above. Their *other* statements are
   still current — it is only their guard block that is superseded. This is the whole reason the
@@ -1228,12 +1232,26 @@ SQL statements parse, both PL/pgSQL bodies are accepted, the embedded queries an
 a **mechanical superset check across all five source migrations: 17 fields written, exactly the
 union, nothing extra, no prior pin or stamp uncovered.**
 
-**⚠️ NOT executed against a live Postgres** — this environment has no Postgres, Docker or pg
-driver, so unlike `MIGRATION_vendor_field_ownership.sql` / `_self_view.sql` (both of which were run
-against a real PG 16) this one is parser-validated only. A parser cannot prove a referenced column
-exists or that the trigger behaves; **watch the section-6 output on the first run**, and note that
-PL/pgSQL defers *expressions* to runtime (a body containing `new.a := ;` still "parses" — one of
-6 planted cases the check provably misses).
+**⚠️ THE DEFINITION IS VERIFIED; THE BEHAVIOUR IS NOT.** It was authored with no Postgres,
+Docker or pg driver available, so unlike `MIGRATION_vendor_field_ownership.sql` / `_self_view.sql`
+(both run against a real PG 16, each with a live vendor-vs-staff update test) it was
+parser-validated only, and section 6 — like the `prosrc like '%…%'` diagnostic — is still a **text
+check on the function body**: same class of evidence as reading the file, just automated. It proves
+the consolidation landed. It does **not** prove the trigger fires and actually pins the values.
+Closing that needs a caller whose `auth.uid()` resolves to a `users` row with `role='vendor'`,
+which cannot be faked from the SQL Editor (`auth.uid()` is NULL there, so the guard correctly
+skips, and `public.users.id` is FK'd to `auth.users`) — so the real test is the end-to-end portal
+flow, which **has never been exercised** (see the invite note below). Also note PL/pgSQL defers
+*expressions* to runtime: a body containing `new.a := ;` still "parses", one of 6 planted bad
+bodies the parser check provably misses.
+
+**Was the pre-consolidation gap ever exploitable?** Only through a vendor's own login, and the
+diagnostic that would have said which body was live is now moot (the consolidation overwrote it).
+The answerable question is whether such a login ever existed:
+`select count(*) from users where role = 'vendor';` and
+`select count(*) from vendors where invite_claimed_at is not null;` — if both are 0, no vendor has
+ever authenticated, so nothing could have been overwritten regardless of which branch was in
+force.
 
 **Two notes on `pglast` for whoever validates SQL next:** its `parse_plpgsql` is broken in v8.4
 (the JSON serializer emits unbalanced braces, so even a trivial function fails to *decode*) — use
