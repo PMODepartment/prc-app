@@ -1071,7 +1071,7 @@ The directory now records each vendor's **accreditation standing**, seeded from 
 - **A SEPARATE COLUMN FROM `vendors.status`, deliberately.** `status` is the directory *review workflow* (pending_review/approved/rejected/inactive — "has staff reviewed this record?"); accreditation is a *business fact about the company*. Overloading `status` would have made them mutually exclusive, and a **problematic vendor specifically needs an `approved` record so officers can SEE the flag**. The two are rendered as two independent badge tracks (`.badge-*` for status, the new `.abadge-*` for accreditation).
 - **NULL = "Not Assessed", NOT defaulted to `unaccredited`.** The ~1,600 existing rows were auto-derived from WP vendor names; stamping them all unaccredited would assert an unchecked business fact *and* hide the vendors that still need assessing. NULL keeps the gap visible as a **"Not Assessed" KPI tile** + a Data Tools badge. Closing that gap is an explicit, confirmed action (**Data Tools → "Mark rest Unaccredited"**, `markRestUnaccredited()`), never a column default.
 - **Roster lives in ONE place: `window.ACCREDITATIONS` in `db.js`** (`['accredited','unaccredited','problematic']`), plain `text` not an enum — same reasoning as `window.GROUP_HEADS`. Companion helpers, all in `db.js`: **`accredKey(v)`** (normalizes to a roster key; blank → the `window.ACCRED_NONE` sentinel `'none'`; an off-roster legacy value is returned as-is so it still displays), **`accredMeta(v)`** (label + light/dark colours + Tabler icon), **`accredLabel(v)`**, and **`accredFromText(s)`** — maps free sheet text onto a roster key. **`accredFromText` tests the NEGATIVE patterns before the positive ones**, so `"NOT ACCREDITED"` / `"Non-Accredited"` can't match the `/accredit/` rule; it returns `null` on no match so an unrecognized cell is *reported*, never guessed. **Use these rather than re-inlining a `|| 'Not Assessed'` fallback or a colour map**, or the filter/KPI/group keys stop matching.
-- **Staff-owned, enforced SERVER-SIDE.** RLS lets a vendor update their own `vendors` row (that is what `vendor-portal.html` is for) and **RLS cannot restrict WHICH columns an update touches** — so without a guard a vendor could `PATCH` themselves accredited via the REST API. The migration therefore recreates **`internal.vendor_edit_guard()`** to pin `accreditation`, `accreditation_notes`, `accreditation_date` **and `vendor_code`** to their previous values whenever the caller's role is `vendor` (on top of the existing status/invite pinning). **Verified against a real Postgres 16**: a vendor's attempt to set itself `accredited` and null out the reason left `problematic` / `'bad conduct'` / `V-00042` untouched and forced `status='pending_review'`; the same update from an `admin` applied normally. **If you add another staff-owned column to `vendors`, pin it in that trigger.**
+- **Staff-owned, enforced SERVER-SIDE.** RLS lets a vendor update their own `vendors` row (that is what `vendor-portal.html` is for) and **RLS cannot restrict WHICH columns an update touches** — so without a guard a vendor could `PATCH` themselves accredited via the REST API. The migration therefore recreates **`internal.vendor_edit_guard()`** to pin `accreditation`, `accreditation_notes`, `accreditation_date` **and `vendor_code`** to their previous values whenever the caller's role is `vendor` (on top of the existing status/invite pinning). **Verified against a real Postgres 16**: a vendor's attempt to set itself `accredited` and null out the reason left `problematic` / `'bad conduct'` / `V-00042` untouched and forced `status='pending_review'`; the same update from an `admin` applied normally. **If you add another staff-owned column to `vendors`, pin it in that trigger.** **The canonical body now lives in `MIGRATION_vendor_edit_guard_consolidated.sql` — edit THAT file, and do not re-run this one afterwards (it would replace the guard with its own narrower version). See the consolidation section below.**
 - **`db.js` deploy-safe guard**: `_stripAccred(payload, error)` on both `createVendor` and `updateVendor`. It strips **precisely the column the error names** (falling back to all three only when the base `accreditation` column is missing) and `console.warn`s what was dropped — the coarse strip-them-all shape is exactly what made `_stripBuyback` silently discard columns the DB really had (Known Issues #28b). **`VendorDb.bulkSetAccreditation(ids, value, extra)`** (chunked 200/batch, like `bulkSetVendorStatus`) deliberately **throws loudly** on a missing column instead of retrying without it — a bulk stamp that quietly does nothing would report "1,600 vendors updated" when nothing changed.
 - **UI (`vendors.html`)**: 4 new KPI tiles (Accredited / Unaccredited / Problematic / Not Assessed); an **Accreditation filter** `<select>` beside the status filter; the search predicate also matches the standing label + notes (so typing "problematic" finds them); an accreditation badge on every card **and** in the detail-modal header; a **red left border on a problematic vendor's card** plus its reason inline (`accreditation_notes`) — an officer must not have to open the profile to learn why; an **Accreditation fieldset** in the detail Overview (standing + date + notes, with an off-roster legacy-value rescue and a prompt to record *why* when problematic); three grid columns (`accreditation` as a select whose opts lead with `''` since blank is legitimate here, unlike NOT-NULL `status`; notes; date); and a **bulk "Set accreditation…"** dropdown in the selection bar (prompts for a reason when setting problematic, and Cancel abandons the whole action).
 - **Grid plumbing worth knowing**: `_vxlSet` normalizes a typed/pasted accreditation cell through `accredFromText`, so a value pasted straight out of the masterdata (`"BLACKLISTED"`, `"For Accreditation"`) lands correctly instead of being rejected; a new `type:'date'` editor uses `<input type="date">` and its `el.select()` call is wrapped in try/catch (**`select()` exists on a date input but throws `InvalidStateError` in Chromium**, which would break the editor on open); and `vxlSave`/`saveDetailOverview` send **`null`, not `''`**, for a cleared standing/date (`''` fails the `date` column's cast). Shared **`_accredParseDate(v)`** normalizes a Date / ISO / Postgres timestamp / `MM/DD/YYYY` / `DD-Mon-YYYY` / Excel serial to `YYYY-MM-DD` **from LOCAL parts** — never `new Date('2026-06-30').toISOString()`, which is UTC midnight and lands a day earlier in UTC+8 (the `sCurve` bug).
@@ -1161,11 +1161,85 @@ Same shape as `wp_view_public` for the `viewer` role: `vendors_select` stops app
 
 **Still vendor-owned, deliberately:** `contact_person`, `contact_position`, `contact_number`, `telephone`, `contact_email`, `website`, `address`, `city`, `trade_categories` — how to reach them and what they do, which is the point of self-service.
 
-- **The trigger is the enforcement; the UI is presentation.** RLS decides which ROWS a caller may touch and **cannot restrict which COLUMNS an UPDATE writes**, and a vendor legitimately needs UPDATE on their own row — so a vendor could PATCH any column straight at the REST API whatever the portal renders. **Add any new staff-owned `vendors` column to `internal.vendor_edit_guard`.**
+- **The trigger is the enforcement; the UI is presentation.** RLS decides which ROWS a caller may touch and **cannot restrict which COLUMNS an UPDATE writes**, and a vendor legitimately needs UPDATE on their own row — so a vendor could PATCH any column straight at the REST API whatever the portal renders. **Add any new staff-owned `vendors` column to `internal.vendor_edit_guard`.** **The canonical body now lives in `MIGRATION_vendor_edit_guard_consolidated.sql` — edit THAT file, and do not re-run this one afterwards (it would replace the guard with its own narrower version). See the consolidation section below.**
 - **Verified against Postgres 16, not assumed**: a vendor updating every field at once had `name`, `payment_terms`, `vendor_category`, `vendor_group`, `notes`, `tin`, `vendor_code`, `accreditation`, `accreditation_notes` and `invite_email` all held at their previous values while `contact_person` and `address` applied and `status` flipped to `pending_review`; a blank TIN was settable by the vendor and then frozen against a second change; and the identical staff update applied in full.
 - **Portal matches the server**: `OVERVIEW_FIELDS` now lists only vendor-owned keys (a locked field is never in the save payload), `STAFF_FIELDS` renders name/terms/category/group **visible but disabled** with a "Set by Megawide Procurement" note — a form that invites an edit the server discards is worse than one that doesn't offer it. Unit-tested against the shipped source, including that whitespace-only counts as a blank TIN.
 
 **KNOWN GAP, deliberately not fixed here:** this stops vendors WRITING those columns, not READING them. `vendors_select` lets a vendor read their own row in full, so `vendors.notes` and `accreditation_notes` remain visible to that vendor through the API even though the portal no longer shows notes. Closing it needs a column-free view for the `vendor` role — the same shape as `wp_view_public` for viewers — plus rerouting `VendorDb.getVendor`. **Until then, treat `vendors.notes` as "staff-only to write, readable by that vendor"**; the staff form now says so.
+
+### ⚠️ `internal.vendor_edit_guard()` has ONE canonical definition — `MIGRATION_vendor_edit_guard_consolidated.sql` (2026-09-01)
+
+**Five separate migrations `create or replace`d this trigger, and the last two branched from
+DIFFERENT ancestors without being supersets of each other — so whichever ran last silently
+disabled part of the other.** Found while tracing how a vendor updates their own record; not
+reported by anything, because both failure modes are silent.
+
+| # | migration | what its body added |
+|---|---|---|
+| 1 | `MIGRATION_vendor_management.sql` | `status` + invite pins |
+| 2 | `MIGRATION_vendor_accreditation.sql` | + `accreditation*`, `vendor_code` |
+| 3 | `MIGRATION_vendor_field_ownership.sql` | + `name` / `payment_terms` / `vendor_category` / `vendor_group` / `notes`, fill-once `tin` |
+| 4 | `MIGRATION_vendor_edited_flag.sql` | branched off **(2)**: + `vendor_edited_at`, **without (3)'s pins** |
+| 5 | `MIGRATION_vendor_self_view.sql` | branched off **(3)**: + server-side `updated_by` stamp, **without (4)'s `vendor_edited_at`** |
+
+So exactly one of these was true in any given database, decided purely by run order:
+
+- **(4) last** → a vendor could overwrite **their own company name, payment terms, vendor
+  category/group, and staff's private `notes`** — the precise lockdown (3) exists to enforce. The
+  write just succeeded.
+- **(5) last** → **`vendor_edited_at` was never stamped**, so a vendor's edit raised no "Vendor
+  edits" tile/chip in `vendors.html` and reached nobody. The vendor saw a successful save.
+
+**`MIGRATION_vendor_edit_guard_consolidated.sql` is the UNION of (3) + (4) + (5) and is now the
+only place the function is defined.** Run it once, **after** every other vendor migration.
+
+- **⚠️ Do NOT re-run migrations 1–5 after it.** Each would `create or replace` the body back to
+  its own narrower version and reintroduce the regression above. Their *other* statements are
+  still current — it is only their guard block that is superseded. This is the whole reason the
+  consolidation exists rather than a sixth patch.
+- **⚠️ When you add a staff-owned column to `vendors`, pin it in section 3 of that file.** RLS
+  decides which ROWS a caller may touch and **cannot** restrict which COLUMNS an UPDATE writes,
+  and a vendor legitimately holds UPDATE on their own row — so an unpinned column can be
+  PATCHed straight at the REST API whatever `vendor-portal.html` renders. The trigger is the
+  enforcement; the portal's disabled inputs are presentation. Keep it in step with the portal's
+  `STAFF_FIELDS` / `OVERVIEW_FIELDS` and with `vendor_self_view`'s column list.
+- **It adds `vendor_edited_at` itself** (`add column if not exists`, identical DDL to (4)'s).
+  A plpgsql trigger resolves `new.<column>` at **runtime**, so a missing column doesn't fail the
+  migration — it fails on *every vendor save*. Deliberately **not** back-filled: NULL means "no
+  un-acknowledged self-edit", and back-filling would light the tile for ~1,600 rows no vendor has
+  ever touched (the same false count that made the first version of that tile read 516 instead of 0).
+- **A pre-flight `do` block raises and names the owning migration for any other pinned column
+  that's missing**, rather than creating it — several carry an index/CHECK/comment belonging to
+  their own migration, and a bare column created here would diverge from it.
+- **Ends with a verification `SELECT`** whose every column must read `t` (trigger installed and
+  enabled, each branch's pin/stamp present, `prosecdef`). Use it to tell what's actually live —
+  which is also how to diagnose a database where an older migration has been re-run on top.
+- **Section 6's `is distinct from 'vendor'` early-return is load-bearing:** a null `auth.uid()`
+  (service role, SQL Editor, cron) finds no `users` row, so `caller_role` is NULL and staff/system
+  updates pass through untouched. Only a vendor's own login is constrained.
+- The sibling `trg_vendors_updated` (`update_updated_at()`) also fires BEFORE UPDATE on `vendors`
+  and sorts **after** `trg_vendor_edit_guard` by name, so it re-sets `updated_at` to the same
+  `now()`. Harmless — it touches nothing else.
+
+**Verified with libpg_query (the real PostgreSQL parser) via `pglast`, not by inspection:** the 8
+SQL statements parse, both PL/pgSQL bodies are accepted, the embedded queries and all 17
+`new.x := <expr>` right-hand sides parse as SQL, no temp tables / session state (the
+`SEED_vendor_accreditation.sql` SQL-Editor lesson), re-runnable, and — the point of the exercise —
+a **mechanical superset check across all five source migrations: 17 fields written, exactly the
+union, nothing extra, no prior pin or stamp uncovered.**
+
+**⚠️ NOT executed against a live Postgres** — this environment has no Postgres, Docker or pg
+driver, so unlike `MIGRATION_vendor_field_ownership.sql` / `_self_view.sql` (both of which were run
+against a real PG 16) this one is parser-validated only. A parser cannot prove a referenced column
+exists or that the trigger behaves; **watch the section-6 output on the first run**, and note that
+PL/pgSQL defers *expressions* to runtime (a body containing `new.a := ;` still "parses" — one of
+6 planted cases the check provably misses).
+
+**Two notes on `pglast` for whoever validates SQL next:** its `parse_plpgsql` is broken in v8.4
+(the JSON serializer emits unbalanced braces, so even a trivial function fails to *decode*) — use
+`pglast.parser.parse_plpgsql_json` and treat "returned without raising" as acceptance, which was
+proven to discriminate on 5 of 6 planted bad bodies. And split statements with
+`pglast.parser.split`, never a regex on `;` — that cuts straight through a `$$` body.
 
 ### Accreditation renewal, risk analytics, WP vendor suggestions, portal dark mode (2026-08-20)
 
