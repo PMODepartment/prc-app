@@ -1476,10 +1476,52 @@ idempotent and refuses an already-decided claim, and that `create_vendor_from_cl
 existing name and delegates rather than duplicating the grant logic. Inline JS on all three pages
 passes `node --check`; the registration page was rendered and checked at desktop and 375px mobile.
 
-**⚠️ NOT RUN YET, and NOT exercised end-to-end** — no vendor has ever logged in, so this whole path
-is unproven against a real user. **Do a deliberate run with one throwaway registration before
-printing the QR anywhere.** The QR library's CDN load could not be verified offline; the fallback
-covers it but confirm on first use.
+**✅ THE MIGRATION HAS BEEN RUN — verified live against production 2026-09-01.** All four RPCs
+exist and correctly refuse the anon key with `42501 permission denied`
+(`submit_vendor_claim`, `approve_vendor_claim`, `create_vendor_from_claim`,
+`reject_vendor_claim`), and `vendor_claims` exists and reads empty. **This line previously said
+"NOT RUN YET" — that was stale.** Probe it the same way rather than trusting this note: a plain
+`POST /rest/v1/rpc/<fn>` with the anon key returns `42501` when the function exists and
+`PGRST202` when it does not. Note a no-argument POST also returns `PGRST202` even for a function
+that DOES exist (PostgREST resolves overloads by argument NAMES), so send the real named args.
+
+**⚠️ STILL NOT EXERCISED END-TO-END** — `users where role='vendor'` and `vendor_claims` are both
+**0**, so no claimant has ever been through it. **Do a deliberate run with one throwaway
+registration before printing the QR anywhere.** A written test script covering both populations
+(a company already in the directory, and a genuinely new supplier) plus the decline, re-submit
+and duplicate guards, with verification SQL and cleanup, was produced 2026-09-01 — along with
+`preflight_vendor_claims.sql`, whose §6 answers the question that actually decides whether
+broad QR distribution is viable: **what share of accredited vendors can uniquely self-identify**
+under the RPC's own tier order, versus how many staff would have to link by hand.
+
+**Verified without an account (2026-09-01):** the live page renders; the
+"No — we are a new supplier" toggle hides the Vendor Code field and swaps the guidance note, and
+"Yes" restores both; `?code=V-00042` prefills the code and forces the existing-supplier mode; and
+a blank submit raises the email/password/company field errors **before** any `signUp` call (no
+session was created). Anon reads of `vendors` return empty, so the matcher genuinely has to run
+inside the definer function — which is what the anti-enumeration design rests on.
+
+**⚠️ The first thing that will break is email confirmation.** The page calls `signUp` and then
+immediately calls `submit_vendor_claim`, which raises if `auth.uid()` is null — so if email
+confirmation is ever switched ON in Supabase Auth, `signUp` returns no session and every
+registration dies with *"You must be signed in to submit a claim."* Confirmation is recorded as
+disabled, but nothing has ever depended on it until now. While it is off, fake addresses work and
+no real inbox is needed.
+
+The QR library's CDN load could not be verified offline; the fallback covers it but confirm on
+first use.
+
+**Two low-severity findings from tracing the flow (2026-09-01), not fixed:**
+- **`reject_vendor_claim` silently no-ops on an already-decided or non-existent claim.** Its
+  update is `where id = p_claim and status = 'pending'` with no row-count check, so it returns
+  cleanly having changed nothing and `vendors.html` still toasts "Registration declined."
+  `approve_vendor_claim` raises `42710 This claim has already been decided` in the same
+  situation — the two disagree about the same case. Only reachable from a stale queue, but it
+  tells a reviewer an action happened when it didn't.
+- **A declined-only claimant cannot be cleaned up from the app.** They hold an `auth.users` row
+  but never get a `public.users` profile, so they appear in no admin list and `admin_delete_user`
+  can't reach them — only the Supabase dashboard can. Not a lockout (the register page signs them
+  in when `signUp` reports the address as taken), just hygiene.
 
 **Still open:** no email anywhere (a claimant must revisit the link to see their status); the
 `?code=` QR is per-vendor but nothing generates them in bulk for a PO mail-merge; and

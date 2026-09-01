@@ -2235,12 +2235,6 @@ const VendorDb = (() => {
   // child tables — these hold the BIR 2303 / business permit an accreditation
   // was granted on, so a vendor destroying them is the worst case of the four.
   const _docsBase = _child('vendor_documents', 'uploaded_at');
-  // ── Self-registration claims ───────────────────────────────────
-  // A vendor claims access from ONE public URL instead of a per-vendor invite
-  // link (migrations/2026-09-01_vendor_self_registration.sql). Every write goes
-  // through a SECURITY DEFINER RPC — vendor_claims has a SELECT policy and
-  // nothing else — so a claimant can neither edit their own match result nor
-  // approve themselves.
   // ── Change history / restore ──────────────────────────────────
   // migrations/2026-09-01_vendor_history_restore.sql keeps a full before/after
   // snapshot of every change to the five vendor tables.
@@ -2281,6 +2275,12 @@ const VendorDb = (() => {
     },
   };
 
+  // ── Self-registration claims ───────────────────────────────────
+  // A vendor claims access from ONE public URL instead of a per-vendor invite
+  // link (migrations/2026-09-01_vendor_self_registration.sql). Every write goes
+  // through a SECURITY DEFINER RPC — vendor_claims has a SELECT policy and
+  // nothing else — so a claimant can neither edit their own match result nor
+  // approve themselves.
   const vendorClaims = {
     // Staff review queue, newest last. Returns [] pre-migration so vendors.html
     // still renders.
