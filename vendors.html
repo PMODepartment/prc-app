@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260901a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260901a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260901a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260901b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260901b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260901b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260901a">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260901b">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -412,6 +412,8 @@
 .arch-row{opacity:.62}
 .arch-row .row-item-title{text-decoration:line-through}
 .row-audit{display:block;margin-top:2px;font-size:0.68rem;color:var(--text-hint,#6E6C6C)}
+.doc-lock-badge{display:inline-flex;align-items:center;gap:3px;font-size:0.68rem;font-weight:700;color:var(--text-hint,#6E6C6C);cursor:help}
+.doc-unlock{font-size:0.68rem;color:var(--mw-red,#EE3124);cursor:pointer;text-decoration:underline}
 body.dark-mode .arch-block{border-top-color:var(--border-md)}
 </style>
   <link rel="manifest" href="manifest.webmanifest"/>
@@ -738,9 +740,9 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260901a"></script>
-<script src="assets/js/db.js?v=20260901a"></script>
-<script src="assets/js/ui.js?v=20260901a"></script>
+<script src="assets/js/auth.js?v=20260901b"></script>
+<script src="assets/js/db.js?v=20260901b"></script>
+<script src="assets/js/ui.js?v=20260901b"></script>
 <script src="assets/js/vendor-guide.js?v=20260820a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -3313,7 +3315,7 @@ async function renderDetailRequest() {
     `<span class="${i.ok ? 'ok' : 'no'}">${i.ok ? '✓' : '✗'} ${esc(i.label)}</span>`).join('')}</div>` : '';
   const docs = _detailDocs.length
     ? `<div class="req-docs"><b>Documents on file:</b> ${_detailDocs.map(d =>
-        `<a onclick="viewVendorDoc('${d.id}')">${esc(window.accredDocLabel ? window.accredDocLabel(d.doc_type) : d.doc_type)}</a>`).join(' · ')}</div>`
+        `<a onclick="viewVendorDoc('${d.id}')">${esc(window.accredDocLabel ? window.accredDocLabel(d.doc_type) : d.doc_type)}</a>${_docLockMarker(d)}`).join(' · ')}</div>`
     : '<div class="req-docs" style="color:#991B1B"><b>No accreditation documents uploaded.</b></div>';
 
   if (!req) {
@@ -4139,6 +4141,32 @@ function _auditLine(r) {
   var verb = r.updated_by_name ? 'Last edited' : 'Added';
   return '<span class="row-audit">' + verb + (who ? ' by ' + esc(who) : '')
        + (d ? ' · ' + esc(d) : '') + '</span>';
+}
+// Documents an approved accreditation rests on are frozen server-side
+// (migrations/2026-09-01_vendor_doc_lock.sql): a vendor login gets 42501 if it
+// tries to change or archive one. Staff pass through the guard, so the unlock
+// is the escape hatch for a document locked in error.
+function _docLockMarker(d) {
+  if (!d || !d.locked_at) return '';
+  var when = _fmtAuditDate(d.locked_at);
+  var tip = 'Locked as evidence for an approved accreditation'
+          + (d.locked_by_name ? ' by ' + d.locked_by_name : '')
+          + (when ? ' on ' + when : '')
+          + '. The vendor cannot change or remove it.';
+  return ' <span class="doc-lock-badge" title="' + esc(tip) + '"><i class="ti ti-lock"></i></span>'
+       + (_canManage ? ' <a class="doc-unlock" onclick="unlockVendorDoc(' + Q2 + d.id + Q2 + ')">unlock</a>' : '');
+}
+var Q2 = String.fromCharCode(39);
+async function unlockVendorDoc(id) {
+  if (!confirm('Unlock this document?\n\nThe vendor will be able to change or remove it again. Only do this if it was locked in error.')) return;
+  try {
+    await VendorDb.documents.setLocked(id, false);
+    await renderDetailRequest();
+    if (window.AppNotify) AppNotify.success('Document unlocked.');
+  } catch (e) {
+    if (window.AppNotify) AppNotify.fromError(e, 'Could not unlock');
+    else alert('Could not unlock: ' + (e.message || e));
+  }
 }
 function _archivedBlock(rows, restoreFn, label) {
   if (!rows || !rows.length) return '';

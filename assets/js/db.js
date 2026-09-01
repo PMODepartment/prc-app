@@ -2251,6 +2251,29 @@ const VendorDb = (() => {
       if (error) throw error;
       return data;
     },
+    // Staff only in practice: internal.vendor_doc_lock_guard lets every
+    // non-vendor role through and raises 42501 for a vendor. The lock is
+    // normally applied automatically when an accreditation is approved
+    // (migrations/2026-09-01_vendor_doc_lock.sql); this is the manual escape
+    // hatch for a document locked in error.
+    async setLocked(id, locked) {
+      const sb = await getSB();
+      const p = (typeof window !== 'undefined' && window.__profile) || {};
+      const patch = locked
+        ? { locked_at: new Date().toISOString(), locked_by: p.id || null, locked_by_name: p.name || p.email || null }
+        : { locked_at: null, locked_by: null, locked_by_name: null, locked_request_id: null };
+      const { error } = await sb.from('vendor_documents').update(patch).eq('id', id);
+      if (error) {
+        // Loud, never a silent no-op: reporting success having changed nothing
+        // would be worse than failing (the bulkSetAccreditation precedent).
+        if (_isMissingCol(error, /locked_at/)) {
+          throw new Error('Cannot change the document lock — ' +
+            'migrations/2026-09-01_vendor_doc_lock.sql has not been run on this database yet. ' +
+            'Nothing was changed.');
+        }
+        throw error;
+      }
+    },
   };
 
   // Documents share the private 'vendor-certs' bucket with certifications. Its

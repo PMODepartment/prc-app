@@ -66,7 +66,8 @@ scratch, run them in exactly this order.
 | 36 | `2026-08-26_planners_packages.sql` | mirror table pushed by the Planners app |
 | 37 | `2026-09-01_vendor_child_soft_delete.sql` | takes DELETE from the vendor role; adds `archived_at` |
 | 38 | `2026-09-01_vendor_child_audit_trail.sql` | **must follow #37** — supersedes its `stamp_archived()` trigger. Sorts BEFORE it alphabetically (“audit” < “soft”), so this is the second place filename order is wrong |
-| 39 | `2026-09-01_vendor_edit_guard_consolidated.sql` | **⚠️ MUST BE LAST — see below** |
+| 39 | `2026-09-01_vendor_doc_lock.sql` | **after #37 and #38** — freezes the documents an approved accreditation rests on; back-fills already-accredited vendors |
+| 40 | `2026-09-01_vendor_edit_guard_consolidated.sql` | **⚠️ MUST BE LAST — see below** |
 
 ---
 

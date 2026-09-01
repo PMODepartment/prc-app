@@ -165,7 +165,10 @@
     .portal-theme-toggle{background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;
       width:32px;height:32px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
     .portal-theme-toggle:hover{background:rgba(255,255,255,.1)}
-  </style>
+  .doc-locked{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;
+  color:#6E6C6C;background:#F1F1F1;border:1px solid #E0E0E0;border-radius:4px;padding:2px 7px;cursor:help}
+html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a}
+</style>
   <script>
     /* Anti-flash: apply the saved (or system) theme to <html> before first paint. */
     (function(){ try {
@@ -329,8 +332,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260901a"></script>
-<script src="assets/js/db.js?v=20260901a"></script>
+<script src="assets/js/auth.js?v=20260901b"></script>
+<script src="assets/js/db.js?v=20260901b"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -452,10 +455,16 @@ async function withdrawRequest(id) {
 function renderDocs() {
   const types = (window.ACCRED_DOC_TYPES || []).filter(d => d.required);
   const extra = myDocs.filter(d => !types.some(t => t.key === d.doc_type));
+  // A document an approved accreditation rests on is frozen server-side by
+  // internal.vendor_doc_lock_guard, which raises 42501 for a vendor login.
+  // Offering a Remove button the database will reject would only produce a
+  // confusing error, so show WHY it cannot be removed instead.
   const rowFor = (key, label, required) => {
     const have = myDocs.filter(d => d.doc_type === key && d.file_path);
     const uploaded = have.map(d => `<button class="file-badge" onclick="viewDoc('${d.id}')">${esc(d.file_name || 'View file')}</button>
-        <button class="row-item-del" title="Remove" onclick="removeDoc('${d.id}')">&times;</button>`).join(' ');
+        ${d.locked_at
+          ? `<span class="doc-locked" title="Part of your approved accreditation — upload a replacement instead of changing this one."><i class="ti ti-lock"></i> Locked</span>`
+          : `<button class="row-item-del" title="Remove" onclick="removeDoc('${d.id}')">&times;</button>`}`).join(' ');
     return `<div class="doc-row">
       <span class="doc-name">${esc(label)}${required ? ' <span style="color:#EE3124">*</span>' : ''}</span>
       ${have.length ? `<span class="doc-have">On file</span> ${uploaded}`
@@ -496,7 +505,7 @@ async function removeDoc(id) {
     // deleting it would leave a restored row pointing at a missing file.
     await VendorDb.documents.archive(id);
     await reloadAccreditation();
-  } catch (e) { msg('Could not remove: ' + (e.message || e), 'error'); }
+  } catch (e) { msg('Could not remove: ' + (e.message || e) + (e && e.hint ? ' ' + e.hint : ''), 'error'); }
 }
 async function viewDoc(id) {
   const d = myDocs.find(x => x.id === id);
