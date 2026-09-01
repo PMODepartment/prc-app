@@ -1245,13 +1245,21 @@ flow, which **has never been exercised** (see the invite note below). Also note 
 *expressions* to runtime: a body containing `new.a := ;` still "parses", one of 6 planted bad
 bodies the parser check provably misses.
 
-**Was the pre-consolidation gap ever exploitable?** Only through a vendor's own login, and the
-diagnostic that would have said which body was live is now moot (the consolidation overwrote it).
-The answerable question is whether such a login ever existed:
-`select count(*) from users where role = 'vendor';` and
-`select count(*) from vendors where invite_claimed_at is not null;` — if both are 0, no vendor has
-ever authenticated, so nothing could have been overwritten regardless of which branch was in
-force.
+**Was the pre-consolidation gap ever exploitable? NO — checked against production 2026-09-01:
+`users where role='vendor'` = **0** and `vendors where invite_claimed_at is not null` = **0**.**
+No vendor has ever authenticated, so nothing could have been overwritten regardless of which
+branch had been in force, and there is nothing to remediate. (Which body was live before the
+consolidation is now unanswerable — it overwrote the evidence — but with zero vendor logins the
+question is moot.)
+
+**⚠️ THE SAME TWO ZEROS MEAN THE WHOLE VENDOR SELF-SERVICE PATH IS UNEXERCISED.** Invite →
+`vendor-register.html` claim → `vendor-portal.html` save → the guard firing → staff seeing the
+**Vendor edits** tile: none of it has ever run with a real vendor. Everything about it is
+verified by construction only — RLS policy reading, parser checks, staff-side simulation. The
+first real vendor is therefore also the first test of `users_insert_vendor` (whose
+chicken-and-egg RLS bug needed `MIGRATION_vendor_invite_rls_fix.sql` to fix at all), of the
+`vendor_self_view` read/write path, and of this guard's actual behaviour. **Do a deliberate
+end-to-end run with one throwaway vendor before cascading invites to real ones.**
 
 **Two notes on `pglast` for whoever validates SQL next:** its `parse_plpgsql` is broken in v8.4
 (the JSON serializer emits unbalanced braces, so even a trivial function fails to *decode*) — use
