@@ -11,15 +11,15 @@
 -- other, so whichever one happened to run last silently disabled part of the
 -- other:
 --
---   1. MIGRATION_vendor_management.sql       status + invite pins
---   2. MIGRATION_vendor_accreditation.sql    + accreditation* + vendor_code
---   3. MIGRATION_vendor_field_ownership.sql  + name / payment_terms /
+--   1. migrations/2026-08-10_vendor_management.sql       status + invite pins
+--   2. migrations/2026-08-19_vendor_accreditation.sql    + accreditation* + vendor_code
+--   3. migrations/2026-08-20_vendor_field_ownership.sql  + name / payment_terms /
 --                                              vendor_category / vendor_group /
 --                                              notes + fill-once TIN
---   4. MIGRATION_vendor_edited_flag.sql      branched from (2):
+--   4. migrations/2026-08-20_vendor_edited_flag.sql      branched from (2):
 --                                              + vendor_edited_at stamp,
 --                                              WITHOUT (3)'s pins
---   5. MIGRATION_vendor_self_view.sql        branched from (3):
+--   5. migrations/2026-08-20_vendor_self_view.sql        branched from (3):
 --                                              + server-side updated_by stamp,
 --                                              WITHOUT (4)'s vendor_edited_at
 --
@@ -59,12 +59,12 @@
 -- correctly whether you run the file whole or one statement at a time.
 --
 -- This file owns ONLY the trigger. `vendor_self_view` itself stays owned by
--- MIGRATION_vendor_self_view.sql and is not touched here.
+-- migrations/2026-08-20_vendor_self_view.sql and is not touched here.
 -- ============================================================================
 
 
 -- ── 1. the flag column this guard stamps ────────────────────────────────────
--- Normally added by MIGRATION_vendor_edited_flag.sql. Added here too because a
+-- Normally added by migrations/2026-08-20_vendor_edited_flag.sql. Added here too because a
 -- plpgsql trigger resolves `new.<column>` at RUNTIME: if the column is absent,
 -- the guard does not fail now — it fails on EVERY vendor save, which is the
 -- worst possible time to find out. Identical DDL to that migration's (nullable
@@ -94,22 +94,22 @@ begin
   select string_agg(format('    %s  (owned by %s)', req.col, req.mig), E'\n' order by req.col)
     into missing
   from (values
-    ('status',              'MIGRATION_vendor_management.sql'),
-    ('invite_email',        'MIGRATION_vendor_management.sql'),
-    ('invite_claimed_at',   'MIGRATION_vendor_management.sql'),
-    ('name',                'MIGRATION_vendor_management.sql'),
-    ('notes',               'MIGRATION_vendor_management.sql'),
-    ('updated_at',          'MIGRATION_vendor_management.sql'),
-    ('updated_by',          'MIGRATION_vendor_management.sql'),
-    ('updated_by_name',     'MIGRATION_vendor_management.sql'),
-    ('accreditation',       'MIGRATION_vendor_accreditation.sql'),
-    ('accreditation_notes', 'MIGRATION_vendor_accreditation.sql'),
-    ('accreditation_date',  'MIGRATION_vendor_accreditation.sql'),
-    ('vendor_code',         'MIGRATION_vendor_code.sql'),
-    ('tin',                 'MIGRATION_vendor_accreditation_requests.sql'),
-    ('payment_terms',       'MIGRATION_vendor_accreditation_requests.sql'),
-    ('vendor_category',     'MIGRATION_vendor_accreditation_requests.sql'),
-    ('vendor_group',        'MIGRATION_vendor_accreditation_requests.sql')
+    ('status',              'migrations/2026-08-10_vendor_management.sql'),
+    ('invite_email',        'migrations/2026-08-10_vendor_management.sql'),
+    ('invite_claimed_at',   'migrations/2026-08-10_vendor_management.sql'),
+    ('name',                'migrations/2026-08-10_vendor_management.sql'),
+    ('notes',               'migrations/2026-08-10_vendor_management.sql'),
+    ('updated_at',          'migrations/2026-08-10_vendor_management.sql'),
+    ('updated_by',          'migrations/2026-08-10_vendor_management.sql'),
+    ('updated_by_name',     'migrations/2026-08-10_vendor_management.sql'),
+    ('accreditation',       'migrations/2026-08-19_vendor_accreditation.sql'),
+    ('accreditation_notes', 'migrations/2026-08-19_vendor_accreditation.sql'),
+    ('accreditation_date',  'migrations/2026-08-19_vendor_accreditation.sql'),
+    ('vendor_code',         'migrations/2026-08-13_vendor_code.sql'),
+    ('tin',                 'migrations/2026-08-20_vendor_accreditation_requests.sql'),
+    ('payment_terms',       'migrations/2026-08-20_vendor_accreditation_requests.sql'),
+    ('vendor_category',     'migrations/2026-08-20_vendor_accreditation_requests.sql'),
+    ('vendor_group',        'migrations/2026-08-20_vendor_accreditation_requests.sql')
   ) as req(col, mig)
   where not exists (
     select 1 from information_schema.columns
@@ -221,8 +221,8 @@ create trigger trg_vendor_edit_guard
 
 -- ── 5. the accepted SECURITY DEFINER exception ─────────────────────────────
 comment on function internal.vendor_edit_guard() is
-  'CANONICAL definition — MIGRATION_vendor_edit_guard_consolidated.sql. '
-  'Supersedes the guard blocks in MIGRATION_vendor_management.sql, '
+  'CANONICAL definition — migrations/2026-09-01_vendor_edit_guard_consolidated.sql. '
+  'Supersedes the guard blocks in migrations/2026-08-10_vendor_management.sql, '
   '_accreditation, _field_ownership, _edited_flag and _self_view; re-running '
   'any of those would regress this body. INTENTIONAL SECURITY DEFINER: it must '
   'read public.users to learn the caller''s role, which RLS would otherwise '

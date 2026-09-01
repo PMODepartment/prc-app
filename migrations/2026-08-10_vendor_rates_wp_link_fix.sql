@@ -1,5 +1,5 @@
--- MIGRATION_vendor_rates_wp_link_fix.sql
--- Run once in Supabase SQL Editor. Requires MIGRATION_vendor_rates_wp_link.sql
+-- migrations/2026-08-10_vendor_rates_wp_link_fix.sql
+-- Run once in Supabase SQL Editor. Requires migrations/2026-08-10_vendor_rates_wp_link.sql
 -- to already have been run. Idempotent / safe to re-run.
 --
 -- Fixes: VendorDb.upsertRate() (assets/js/db.js) calls
@@ -8,7 +8,7 @@
 --   ON CONFLICT (vendor_id, wp_id)
 -- with NO WHERE predicate. Postgres requires the ON CONFLICT target to
 -- exactly match an existing constraint/index — a PARTIAL unique index
--- (MIGRATION_vendor_rates_wp_link.sql's `vendor_rates_wp_uidx ... WHERE
+-- (migrations/2026-08-10_vendor_rates_wp_link.sql's `vendor_rates_wp_uidx ... WHERE
 -- wp_id IS NOT NULL`) does NOT satisfy a non-partial arbiter, so every
 -- backfill upsert failed with:
 --   "there is no unique or exclusion constraint matching the ON CONFLICT

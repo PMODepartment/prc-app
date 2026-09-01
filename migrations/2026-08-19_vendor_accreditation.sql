@@ -46,7 +46,7 @@ comment on column vendors.accreditation is
 -- their own row via the REST API and self-accredit: RLS lets them update their
 -- own vendors row (that is the whole point of vendor-portal.html) and RLS
 -- cannot restrict WHICH columns an update touches. The rest of the function is
--- unchanged from MIGRATION_vendor_management.sql.
+-- unchanged from migrations/2026-08-10_vendor_management.sql.
 create or replace function internal.vendor_edit_guard()
 returns trigger language plpgsql security definer
 set search_path = public as $$

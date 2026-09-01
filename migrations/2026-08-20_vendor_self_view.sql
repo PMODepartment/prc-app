@@ -1,9 +1,9 @@
 -- ============================================================================
 --  Stop a vendor READING the staff-only columns of their own row.
 --
---  Run ONCE in the Supabase SQL Editor, AFTER MIGRATION_vendor_field_ownership.sql.
---  Idempotent. Requires MIGRATION_vendor_management.sql (internal.get_my_*) and
---  MIGRATION_vendor_accreditation_requests.sql (the profile columns).
+--  Run ONCE in the Supabase SQL Editor, AFTER migrations/2026-08-20_vendor_field_ownership.sql.
+--  Idempotent. Requires migrations/2026-08-10_vendor_management.sql (internal.get_my_*) and
+--  migrations/2026-08-20_vendor_accreditation_requests.sql (the profile columns).
 --
 --  THE PROBLEM
 --    vendor_field_ownership stopped a vendor WRITING notes / accreditation_notes.

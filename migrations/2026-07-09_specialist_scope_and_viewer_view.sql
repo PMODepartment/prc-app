@@ -1,7 +1,7 @@
 -- ============================================================================
 -- P1 (specialist edit-scope) + S4 (viewer cost masking)  —  WPM Dashboard
 -- ----------------------------------------------------------------------------
--- Run once in the Supabase SQL Editor (production), AFTER MIGRATION_rls_hardening.sql.
+-- Run once in the Supabase SQL Editor (production), AFTER migrations/2026-07-08_rls_hardening.sql.
 -- Idempotent — safe to re-run.
 --
 -- P1: Specialists may VIEW all projects but EDIT only their assigned ones.
@@ -73,7 +73,7 @@ begin
 end $$;
 
 -- ── S4: block viewers from the base table (they read via the view instead) ──
--- Keep the DEMO read-exception (from MIGRATION_rls_hardening) intact.
+-- Keep the DEMO read-exception (from migrations/2026-07-08_rls_hardening.sql) intact.
 drop policy if exists "wp_select" on public.work_packages;
 create policy "wp_select" on public.work_packages
   for select to authenticated

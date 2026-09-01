@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- MIGRATION_vendor_edited_flag.sql   (run once, idempotent)
+-- migrations/2026-08-20_vendor_edited_flag.sql   (run once, idempotent)
 -- ════════════════════════════════════════════════════════════════════════════
 -- Give the "Vendor edits" KPI tile a TRUE signal.
 --
@@ -26,7 +26,7 @@ comment on column vendors.vendor_edited_at is
   'Set by internal.vendor_edit_guard to now() ONLY when the vendor edits their own row. NULL = no un-acknowledged self-edit (staff clears it on review). Authoritative source for the "Vendor edits" KPI — do NOT infer edits from status=''pending_review'', which is also the legacy creation default.';
 
 -- ── Recreate the guard to stamp vendor_edited_at on a vendor self-edit ───────
--- Body is unchanged from MIGRATION_vendor_accreditation.sql except for the one
+-- Body is unchanged from migrations/2026-08-19_vendor_accreditation.sql except for the one
 -- new stamp line. Still pins status + invite + all staff-owned columns so a
 -- vendor cannot PATCH those about themselves via the REST API.
 create or replace function internal.vendor_edit_guard()

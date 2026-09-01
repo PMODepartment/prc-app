@@ -2,7 +2,7 @@
 -- Vendor Management Dashboard — Phase 2b  —  Megawide WPM Dashboard
 -- ----------------------------------------------------------------------------
 -- Run once in the Supabase SQL Editor (production). Idempotent — safe to
--- re-run. Requires MIGRATION_vendor_management.sql (Phase 2a) to already be
+-- re-run. Requires migrations/2026-08-10_vendor_management.sql (Phase 2a) to already be
 -- applied (vendors table, internal.get_my_vendor_id(), internal.get_my_role(),
 -- internal.get_my_status()).
 --

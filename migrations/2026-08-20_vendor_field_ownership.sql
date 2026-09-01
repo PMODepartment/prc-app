@@ -2,8 +2,8 @@
 --  Lock the staff-owned columns on public.vendors against vendor self-edits.
 --
 --  Run ONCE in the Supabase SQL Editor. Idempotent (create or replace).
---  Requires: MIGRATION_vendor_management.sql, MIGRATION_vendor_accreditation.sql,
---            MIGRATION_vendor_accreditation_requests.sql (the profile columns).
+--  Requires: migrations/2026-08-10_vendor_management.sql, migrations/2026-08-19_vendor_accreditation.sql,
+--            migrations/2026-08-20_vendor_accreditation_requests.sql (the profile columns).
 --
 --  WHY A TRIGGER AND NOT RLS
 --    A vendor legitimately needs UPDATE on their own vendors row — that is what

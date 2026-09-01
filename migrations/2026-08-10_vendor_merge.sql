@@ -38,7 +38,7 @@ begin
   update vendor_certifications set vendor_id = p_target where vendor_id = any(p_sources);
   update vendor_personnel      set vendor_id = p_target where vendor_id = any(p_sources);
 
-  -- vendor_rates gained UNIQUE(vendor_id, wp_id) in MIGRATION_vendor_rates_wp_link_fix.sql,
+  -- vendor_rates gained UNIQUE(vendor_id, wp_id) in migrations/2026-08-10_vendor_rates_wp_link_fix.sql,
   -- AFTER this function was first written — a plain reassign therefore aborts the whole merge
   -- with 23505 whenever the target already has a rate for the same WP (hit in production
   -- while cleaning up import duplicates). Same treatment as vendor_bids below: drop the

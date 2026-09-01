@@ -8,9 +8,9 @@
 --
 -- WHY
 -- ---
--- MIGRATION_vendor_management.sql creates the child-table write policy as
+-- migrations/2026-08-10_vendor_management.sql creates the child-table write policy as
 -- `for all`, which in Postgres RLS covers SELECT, INSERT, UPDATE **and DELETE**.
--- MIGRATION_vendor_accreditation_requests.sql copies the same shape for
+-- migrations/2026-08-20_vendor_accreditation_requests.sql copies the same shape for
 -- vendor_documents. So any vendor login can HARD-DELETE every row under its own
 -- vendor_id — every offering, every certification, every personnel record, and
 -- every uploaded accreditation document (BIR 2303, business permit, the sample

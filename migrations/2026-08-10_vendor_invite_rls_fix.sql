@@ -3,7 +3,7 @@
 -- ----------------------------------------------------------------------------
 -- Run once in the Supabase SQL Editor (production). Idempotent — safe to re-run.
 -- Fixes a bug found during live end-to-end testing of Phase 2a
--- (MIGRATION_vendor_management.sql): a brand-new vendor could never actually
+-- (migrations/2026-08-10_vendor_management.sql): a brand-new vendor could never actually
 -- complete registration.
 --
 -- Root cause: the "users_insert_vendor" policy's WITH CHECK included
@@ -20,7 +20,7 @@
 --
 -- Fix: move the invite-validity check into a SECURITY DEFINER function
 -- (bypasses RLS, same pattern as admin_delete_user in
--- MIGRATION_admin_delete_user.sql), and reference that function from the
+-- migrations/2026-07-09_admin_delete_user.sql), and reference that function from the
 -- policy instead of a raw subquery.
 -- ============================================================================
 

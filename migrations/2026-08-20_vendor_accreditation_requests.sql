@@ -6,8 +6,8 @@
 -- self-contained (no temp tables, no state carried between statements) —
 -- the SQL Editor does not run a script as a single transaction.
 --
--- Requires: MIGRATION_vendor_management.sql (vendors + internal.get_my_*)
---           MIGRATION_vendor_accreditation.sql (vendors.accreditation)
+-- Requires: migrations/2026-08-10_vendor_management.sql (vendors + internal.get_my_*)
+--           migrations/2026-08-19_vendor_accreditation.sql (vendors.accreditation)
 --
 -- WHY THIS EXISTS
 --   vendors.status (pending_review/approved/…) was retired from the staff UI
@@ -203,7 +203,7 @@ create trigger vendor_request_guard_trg
   for each row execute function internal.vendor_request_guard();
 
 -- ── 4. Keep the vendor-owned profile columns vendor-editable ────────────────
--- internal.vendor_edit_guard (MIGRATION_vendor_accreditation.sql) pins the
+-- internal.vendor_edit_guard (migrations/2026-08-19_vendor_accreditation.sql) pins the
 -- STAFF-owned columns on a vendor self-edit — accreditation*, vendor_code,
 -- status, invite_*. The new columns in section 1 are supplied BY the vendor,
 -- so they are deliberately NOT pinned and need no change to that trigger.

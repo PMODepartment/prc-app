@@ -38,7 +38,7 @@ const WPDb = (() => {
   }
   function _stripAudit(obj) { const d = {...obj}; delete d.updated_at; delete d.updated_by; delete d.updated_by_name; return d; }
   // Same deploy-order guard for the BCB baseline columns: they only exist once
-  // MIGRATION_bcb_baselines.sql has been run, so every write retries without them.
+  // migrations/2026-07-23_bcb_baselines.sql has been run, so every write retries without them.
   function _isMissingBcbCol(error) {
     if (!error) return false;
     const m = (error.message || '') + (error.details || '');
@@ -76,7 +76,7 @@ const WPDb = (() => {
     _warnDropped('write retry', obj, d, error);
     return d;
   }
-  // Same deploy-order guard again for projects.group_head (MIGRATION_project_group_head.sql):
+  // Same deploy-order guard again for projects.group_head (migrations/2026-08-06_project_group_head.sql):
   // every project write retries without the column if the DB hasn't been migrated yet.
   function _isMissingGroupHeadCol(error) {
     if (!error) return false;
@@ -84,7 +84,7 @@ const WPDb = (() => {
     return /group_head/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
   function _stripGroupHead(obj) { const d = {...obj}; delete d.group_head; return d; }
-  // Same deploy-order guard for work_packages.vendor_id (MIGRATION_vendor_phase2b.sql):
+  // Same deploy-order guard for work_packages.vendor_id (migrations/2026-08-10_vendor_phase2b.sql):
   // every WP write retries without it if that migration hasn't run yet.
   function _isMissingVendorCol(error) {
     if (!error) return false;
@@ -94,7 +94,7 @@ const WPDb = (() => {
     return /vendor_id\b/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
   function _stripVendor(obj) { const d = {...obj}; delete d.vendor_id; return d; }
-  // Same deploy-order guard for work_packages.proposed_vendor_ids (MIGRATION_wp_proposed_vendor_ids.sql):
+  // Same deploy-order guard for work_packages.proposed_vendor_ids (migrations/2026-08-10_wp_proposed_vendor_ids.sql):
   // every WP write retries without it if that migration hasn't run yet. Precise match on the full
   // column name so this can never cross-trigger with _isMissingVendorCol above (or vice versa).
   function _isMissingProposedVendorIdsCol(error) {
@@ -103,7 +103,7 @@ const WPDb = (() => {
     return /proposed_vendor_ids/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
   function _stripProposedVendorIds(obj) { const d = {...obj}; delete d.proposed_vendor_ids; return d; }
-  // Same deploy-order guard for the awarded-vendor columns (MIGRATION_wp_awarded_vendor_ids.sql:
+  // Same deploy-order guard for the awarded-vendor columns (migrations/2026-08-11_wp_awarded_vendor_ids.sql:
   // awarded_vendor_ids + awarded_vendor_amounts). Every WP write retries without them if that
   // migration hasn't run yet. Precise column-name match so it can't cross-trigger with
   // _isMissingVendorCol (vendor_id\b) or _isMissingProposedVendorIdsCol.
@@ -113,7 +113,7 @@ const WPDb = (() => {
     return /awarded_vendor_(ids|amounts)/.test(m) && /column|does not exist|schema cache/i.test(m);
   }
   function _stripAwardedVendorIds(obj) { const d = {...obj}; delete d.awarded_vendor_ids; delete d.awarded_vendor_amounts; return d; }
-  // Same deploy-order guard for the buyback columns (MIGRATION_wp_buyback.sql:
+  // Same deploy-order guard for the buyback columns (migrations/2026-08-11_wp_buyback.sql:
   // buyback + buyback_depreciation_percent). Every WP write retries without them if
   // that migration hasn't run yet.
   function _isMissingBuybackCol(error) {
@@ -133,7 +133,7 @@ const WPDb = (() => {
     if (!named) delete d.buyback;   // the base column itself is missing -> drop the whole set
     return d;
   }
-  // Same deploy-order guard for work_packages.free_of_charge (MIGRATION_wp_free_of_charge.sql):
+  // Same deploy-order guard for work_packages.free_of_charge (migrations/2026-08-25_wp_free_of_charge.sql):
   // every WP write retries without it if that migration hasn't run yet. Precise match --
   // the substring appears in no other column name, so it can't cross-trigger.
   function _isMissingFreeOfChargeCol(error) {
@@ -189,7 +189,7 @@ const WPDb = (() => {
   async function getApprovedWPs(pid) { const sb=await getSB(); const rel=await _wpRel(); const rows=await _pagedSelect(()=>{ let q=sb.from(rel).select('*').eq('review_status','approved'); if(pid) q=q.eq('project_id',pid); return q.order('wp_no'); }); return rows.map(mapWP); }
   async function getAllWPs(pid) { const sb=await getSB(); const rel=await _wpRel(); const rows=await _pagedSelect(()=>{ let q=sb.from(rel).select('*'); if(pid) q=q.eq('project_id',pid); return q.order('wp_no'); }); return rows.map(mapWP); }
   async function getAllApprovedWPs() { return getApprovedWPs(null); }
-  // SCHEDULE NEED-BY dates pushed in by the Planners app (MIGRATION_planners_need_by.sql).
+  // SCHEDULE NEED-BY dates pushed in by the Planners app (migrations/2026-08-20_planners_need_by.sql).
   // Keyed by wp_no, returned as a { WP_NO: row } map because every caller looks a package's
   // date up rather than iterating the list.
   //
@@ -332,7 +332,7 @@ const WPDb = (() => {
   }
   // COMPLETE user removal (admin "Remove user"). Purges BOTH the public.users profile row
   // AND the auth.users record via the public.admin_delete_user() SECURITY DEFINER RPC
-  // (MIGRATION_admin_delete_user.sql) — the auth schema isn't writable by the client, so the
+  // (migrations/2026-07-09_admin_delete_user.sql) — the auth schema isn't writable by the client, so the
   // server-side function does the auth purge after re-checking the caller is an admin. This
   // frees the email for re-registration (Planning-App parity). Falls back to a profile-only
   // delete if the RPC doesn't exist yet (safe to deploy before the migration runs) — without
@@ -695,7 +695,7 @@ window.esc = function (v) {
 
 /* ── Group Heads ────────────────────────────────────────────────────
    SINGLE SOURCE OF TRUTH for the Group Head roster. Stored per project in
-   projects.group_head (MIGRATION_project_group_head.sql) as free text, so
+   projects.group_head (migrations/2026-08-06_project_group_head.sql) as free text, so
    changing this list needs no DB migration — an existing project tagged with a
    name later removed from the roster still displays, and _ghOptions() below
    re-adds it as a "(legacy)" option so an edit doesn't silently clear it
@@ -1641,7 +1641,7 @@ window.WPCsv = (function(){
    (name + invite_email) → vendor claims it via vendor-register.html →
    edits their own contact/products/certs/personnel via vendor-portal.html
    (any post-approval edit is forced back to 'pending_review' server-side
-   by the vendor_edit_guard trigger — see MIGRATION_vendor_management.sql).
+   by the vendor_edit_guard trigger — see migrations/2026-08-10_vendor_management.sql).
    vendor_rates is staff-only. Phase 2b adds work_packages.vendor_id +
    vendor_bids on top of this — not present yet. */
 /* ── Canonical trade normalizer (shared) ────────────────────────────
@@ -1697,7 +1697,7 @@ function CanonTrades(arr){
 if (typeof window !== 'undefined') { window.CanonTrade = CanonTrade; window.CanonTrades = CanonTrades; }
 
 /* ── Vendor accreditation (shared roster + helpers) ──────────────────
-   `vendors.accreditation` (MIGRATION_vendor_accreditation.sql) is a plain
+   `vendors.accreditation` (migrations/2026-08-19_vendor_accreditation.sql) is a plain
    text column, NOT an enum — the roster lives HERE, in one place, so the
    vocabulary can change with no DB migration (same reasoning as
    window.GROUP_HEADS). NULL/blank = "Not Accredited" (the ACCRED_NONE
@@ -1891,7 +1891,7 @@ const VendorDb = (() => {
 
   /* Which relation a READ of a vendor row goes through — the twin of WPDb's
      _wpRel(). A `vendor` login is denied SELECT on `vendors` itself
-     (MIGRATION_vendor_self_view.sql) because RLS cannot hide COLUMNS, so their
+     (migrations/2026-08-20_vendor_self_view.sql) because RLS cannot hide COLUMNS, so their
      reads go through vendor_self_view, which omits the staff-only ones. The
      probe is memoized and falls back to the base table if the view isn't
      deployed yet, so this is safe to ship before the migration runs. */
@@ -1943,7 +1943,7 @@ const VendorDb = (() => {
     if (error) throw error;
     return data;
   }
-  // Deploy-safe strip for MIGRATION_vendor_accreditation.sql. Strips PRECISELY
+  // Deploy-safe strip for migrations/2026-08-19_vendor_accreditation.sql. Strips PRECISELY
   // the column the error names (falling back to all three only when the base
   // `accreditation` column itself is missing) — a coarse strip-them-all guard
   // silently discarded a column the DB really did have when only the newest
@@ -1955,10 +1955,10 @@ const VendorDb = (() => {
       : /accreditation_date/.test(m) ? ['accreditation_date']
       : ['accreditation', 'accreditation_notes', 'accreditation_date'];
     cols.forEach(c => delete out[c]);
-    console.warn('[VendorDb] Dropped ' + cols.join(', ') + ' — NOT saved. If MIGRATION_vendor_accreditation.sql has already run, this guard is wrong, not the schema. Postgres said: ' + m);
+    console.warn('[VendorDb] Dropped ' + cols.join(', ') + ' — NOT saved. If migrations/2026-08-19_vendor_accreditation.sql has already run, this guard is wrong, not the schema. Postgres said: ' + m);
     return out;
   }
-  /* Deploy-safe strip for MIGRATION_vendor_accreditation_requests.sql's extra
+  /* Deploy-safe strip for migrations/2026-08-20_vendor_accreditation_requests.sql's extra
      vendor profile columns (tin / contact_position / telephone / city /
      website / payment_terms / vendor_category / vendor_group). Strips
      PRECISELY the column the error names — same precision rule as
@@ -1972,7 +1972,7 @@ const VendorDb = (() => {
     const cols = named.length ? named : _PROFILE_COLS;
     const out = { ...payload };
     cols.forEach(c => delete out[c]);
-    console.warn('[VendorDb] Dropped ' + cols.join(', ') + ' — NOT saved. If MIGRATION_vendor_accreditation_requests.sql has already run, this guard is wrong, not the schema. Postgres said: ' + m);
+    console.warn('[VendorDb] Dropped ' + cols.join(', ') + ' — NOT saved. If migrations/2026-08-20_vendor_accreditation_requests.sql has already run, this guard is wrong, not the schema. Postgres said: ' + m);
     return out;
   }
   async function updateVendor(id, fields) {
@@ -2008,7 +2008,7 @@ const VendorDb = (() => {
     if (error && _isMissingCol(error, _PROFILE_RE)) {
       ({ data, error } = await run(_stripProfile(payload, error)));
     }
-    // Deploy-safe for MIGRATION_vendor_edited_flag.sql — the acknowledge path
+    // Deploy-safe for migrations/2026-08-20_vendor_edited_flag.sql — the acknowledge path
     // writes { vendor_edited_at: null }; drop it until the migration has run.
     if (error && _isMissingCol(error, /vendor_edited_at/)) {
       const d6 = { ...payload }; delete d6.vendor_edited_at;
@@ -2028,7 +2028,7 @@ const VendorDb = (() => {
 
   // ── Child tables (products / certifications / personnel) ────────────
   //
-  // ⚠️ ARCHIVE, DON'T DELETE. MIGRATION_vendor_child_soft_delete.sql takes
+  // ⚠️ ARCHIVE, DON'T DELETE. migrations/2026-09-01_vendor_child_soft_delete.sql takes
   // DELETE away from the vendor role on all four child tables, so a vendor
   // login can no longer destroy its own offerings, certifications, personnel or
   // accreditation documents — tables that carry no audit trail and that this
@@ -2037,7 +2037,7 @@ const VendorDb = (() => {
   //
   // `remove()` is retained as a REAL hard DELETE, and RLS now allows it for
   // STAFF ONLY. Never call it as an archive fallback.
-  const _ARCH_MIG = 'MIGRATION_vendor_child_soft_delete.sql';
+  const _ARCH_MIG = 'migrations/2026-09-01_vendor_child_soft_delete.sql';
   function _isMissingArchived(e) { return _isMissingCol(e, /archived_at/); }
   function _archiveUnavailable() {
     return new Error('Cannot archive — ' + _ARCH_MIG + ' has not been run on this ' +
@@ -2105,14 +2105,14 @@ const VendorDb = (() => {
   }
   const _productsBase = _child('vendor_products');
   /* Deploy-safe optional columns on vendor_products:
-       item_type   — MIGRATION_vendor_product_type.sql
-       taxonomy_id — MIGRATION_product_taxonomy.sql
+       item_type   — migrations/2026-08-10_vendor_product_type.sql
+       taxonomy_id — migrations/2026-08-20_product_taxonomy.sql
      Strips PRECISELY the column the error names (never both at once) and warns,
      per the _stripBuyback lesson (Known Issues #28b): a coarse strip-them-all
      guard silently discards a column the DB really does have. */
   const _PRODUCT_OPT = [
-    { col: 'item_type',   re: /item_type/,   mig: 'MIGRATION_vendor_product_type.sql' },
-    { col: 'taxonomy_id', re: /taxonomy_id/, mig: 'MIGRATION_product_taxonomy.sql' },
+    { col: 'item_type',   re: /item_type/,   mig: 'migrations/2026-08-10_vendor_product_type.sql' },
+    { col: 'taxonomy_id', re: /taxonomy_id/, mig: 'migrations/2026-08-20_product_taxonomy.sql' },
   ];
   function _stripProductOpt(fields, e) {
     for (const o of _PRODUCT_OPT) {
@@ -2165,7 +2165,7 @@ const VendorDb = (() => {
     const { error } = await sb.from('vendor_rates').delete().eq('id', id);
     if (error) throw error;
   }
-  // Upsert a rate row tied to a source WP (MIGRATION_vendor_rates_wp_link.sql
+  // Upsert a rate row tied to a source WP (migrations/2026-08-10_vendor_rates_wp_link.sql
   // adds vendor_rates.wp_id + a partial unique index on (vendor_id,wp_id)
   // where wp_id is not null) — re-running the backfill updates the existing
   // row instead of duplicating it. Deploy-order-safe: if wp_id doesn't exist
@@ -2188,7 +2188,7 @@ const VendorDb = (() => {
       .select().single();
     // Fall back to a plain insert when wp_id is missing (pre-link migration) OR
     // when the (vendor_id,wp_id) unique CONSTRAINT isn't there yet — the partial
-    // deploy state where MIGRATION_vendor_rates_wp_link ran but not the _fix
+    // deploy state where migrations/2026-08-10_vendor_rates_wp_link.sql ran but not the _fix
     // (the ON CONFLICT error text names no column, so _isMissingWpIdCol misses it).
     if (error && (_isMissingWpIdCol(error) || /on conflict|unique or exclusion constraint/i.test((error.message || '') + (error.details || '')))) {
       const d2 = { ...payload }; delete d2.wp_id;
@@ -2221,7 +2221,7 @@ const VendorDb = (() => {
   }
 
   // ── Accreditation documents + requests ───────────────────────────────
-  //  MIGRATION_vendor_accreditation_requests.sql. Both tables are optional at
+  //  migrations/2026-08-20_vendor_accreditation_requests.sql. Both tables are optional at
   //  runtime: a missing table is reported as an empty list rather than thrown,
   //  so the portal and the staff modal still render on an un-migrated
   //  environment (the "request" button then explains why it is disabled).
@@ -2238,7 +2238,7 @@ const VendorDb = (() => {
   const vendorDocuments = {
     ..._docsBase,
     async list(vendorId, opts) {
-      // The whole table is optional (MIGRATION_vendor_accreditation_requests.sql),
+      // The whole table is optional (migrations/2026-08-20_vendor_accreditation_requests.sql),
       // so an absent table degrades to [] rather than breaking the portal.
       try { return await _docsBase.list(vendorId, opts); }
       catch (e) { if (_isMissingTable(e, 'vendor_documents')) return []; throw e; }
@@ -2322,7 +2322,7 @@ const VendorDb = (() => {
   }
 
   // ── Vendor bids (Phase 2b — per-WP competitive bidding) ──────────────
-  // vendor_bids only exists once MIGRATION_vendor_phase2b.sql has run; every
+  // vendor_bids only exists once migrations/2026-08-10_vendor_phase2b.sql has run; every
   // write here is deploy-order-safe the same way the rest of this file is —
   // a missing-table/column error is swallowed (logged, not thrown) so an
   // award save on an un-migrated environment doesn't fail the WP save it's
@@ -2738,14 +2738,14 @@ const VendorDb = (() => {
   async function getAllVendorProducts() {
     const sb = await getSB();
     // select('*') so item_type flows through when present but the query still
-    // works before MIGRATION_vendor_product_type.sql runs. Paginated — products
+    // works before migrations/2026-08-10_vendor_product_type.sql runs. Paginated — products
     // across ~1000 vendors easily exceed the 1000-row default cap.
     try { return await _pagedSelect(() => sb.from('vendor_products').select('*')); }
     catch (e) { return []; }
   }
 
   // Merge duplicate vendors into a canonical one via the merge_vendors RPC
-  // (MIGRATION_vendor_merge.sql). Throws a readable error if the migration
+  // (migrations/2026-08-10_vendor_merge.sql). Throws a readable error if the migration
   // hasn't been run yet.
   /* merge_vendors DELETES the source rows, so anything held ONLY by a source is
      gone. It reassigns child rows, WP links and trade categories server-side —
@@ -2899,7 +2899,7 @@ const VendorDb = (() => {
       const { error } = await sb.from('vendors').update(patch).in('id', ids.slice(i, i + CH));
       if (error) {
         if (_isMissingCol(error, /accreditation/)) {
-          throw new Error('The accreditation columns are not in the database yet — run MIGRATION_vendor_accreditation.sql in the Supabase SQL editor first.');
+          throw new Error('The accreditation columns are not in the database yet — run migrations/2026-08-19_vendor_accreditation.sql in the Supabase SQL editor first.');
         }
         throw error;
       }
@@ -3090,7 +3090,7 @@ const VendorDb = (() => {
     return [...byId.values()];
   }
 
-  /* ── Product taxonomy (MIGRATION_product_taxonomy.sql) ──────────────────
+  /* ── Product taxonomy (migrations/2026-08-20_product_taxonomy.sql) ──────────────────
      Hybrid tree: L1 = Trade, L2 = Works (both `canonical`, mirroring the WP
      form's TRADE_WORKS ladder so vendor offerings and work packages share one
      vocabulary); L3+ are free staff-managed sub-nodes of any depth.
@@ -3223,7 +3223,7 @@ const VendorDb = (() => {
      a stale figure in a negotiation.
 
      WARNING: returns [] rather than throwing when the table is absent, so a WPM
-     deploy that runs ahead of MIGRATION_planners_vendor_performance.sql degrades
+     deploy that runs ahead of migrations/2026-08-25_planners_vendor_performance.sql degrades
      to "no data yet" instead of breaking Vendor Management. */
   async function getVendorSchedulePerf(vendorId) {
     try {
@@ -3273,7 +3273,7 @@ window.VendorDb = VendorDb;
      p.refresh()      -> re-read the tree (after the manager edits it)
 
    Degrades to a plain disabled note when the taxonomy table is absent, so both
-   pages still work before MIGRATION_product_taxonomy.sql is run. */
+   pages still work before migrations/2026-08-20_product_taxonomy.sql is run. */
 window.TaxonomyPicker = (function () {
   let _seq = 0;
   const _open = new Set();          // instances with an open popover
@@ -3359,7 +3359,7 @@ window.TaxonomyPicker = (function () {
 
     function rowsHtml() {
       if (!nodes.length) {
-        return '<div class="txp-none">No product categories yet.<br>Run MIGRATION_product_taxonomy.sql, then add them under Data Tools.</div>';
+        return '<div class="txp-none">No product categories yet.<br>Run migrations/2026-08-20_product_taxonomy.sql, then add them under Data Tools.</div>';
       }
       const keep = visibleSet();
       const out = [];

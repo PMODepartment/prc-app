@@ -671,7 +671,7 @@ function scopeConfirmText(){
   return bits.length ? bits.join('\n') : '';
 }
 
-// The BCB baseline columns only exist after MIGRATION_bcb_baselines.sql has been run.
+// The BCB baseline columns only exist after migrations/2026-07-23_bcb_baselines.sql has been run.
 // Detect that specific failure so the import can fall back instead of dying mid-way.
 function _bcbColMissing(error){
   if(!error) return false;
@@ -729,7 +729,7 @@ async function doImport(){
     let pr=await probeColumns(pid, sample);
     if(!pr.ok && _bcbColMissing(pr.error)){
       log('BCB baseline columns not in the database yet — importing budgets without the per-baseline split.','warnt');
-      log('  Run MIGRATION_bcb_baselines.sql in Supabase to enable the BCB0/BCB1/BCB2 switcher.','warnt');
+      log('  Run migrations/2026-07-23_bcb_baselines.sql in Supabase to enable the BCB0/BCB1/BCB2 switcher.','warnt');
       _parsed=_parsed.map(_stripBcbCols);
       sample=_stripBcbCols(sample);
       pr=await probeColumns(pid, sample);

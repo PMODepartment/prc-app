@@ -779,7 +779,7 @@ let _vendorProductText = {};  // vendorId -> lowercased "category description �
 /* Vendors holding at least one offering with no taxonomy_id — i.e. still filed
    under the legacy free-text category only. Drives the "Unclassified offerings"
    triage view so the taxonomy can be filled in incrementally. Empty (and the
-   view therefore shows nothing) until MIGRATION_product_taxonomy.sql runs. */
+   view therefore shows nothing) until migrations/2026-08-20_product_taxonomy.sql runs. */
 let _vendorUnclassified = new Set();
 async function loadAll() {
   try { allVendors = await VendorDb.getVendors(); }
@@ -802,7 +802,7 @@ async function loadAll() {
     });
   } catch (e) { /* search just won't match products */ }
   // Pending accreditation requests — the vendor-raised review queue. Returns []
-  // (not an error) until MIGRATION_vendor_accreditation_requests.sql has run.
+  // (not an error) until migrations/2026-08-20_vendor_accreditation_requests.sql has run.
   _pendingReq = {};
   try { (await VendorDb.requests.pending()).forEach(r => { _pendingReq[r.vendor_id] = r; }); }
   catch (e) { console.error('[vendors] could not load accreditation requests', e); }
@@ -842,7 +842,7 @@ function setVendorView(v) {
 // Accreditation standing, as a filter/group key ('none' when blank). Uses the
 // shared window.accredKey so this page and db.js can never disagree; the
 // fallbacks keep the page working if db.js is served stale from cache.
-/* TRUE vendor-self-edit signal (MIGRATION_vendor_edited_flag.sql):
+/* TRUE vendor-self-edit signal (migrations/2026-08-20_vendor_edited_flag.sql):
    internal.vendor_edit_guard stamps vendors.vendor_edited_at = now() ONLY on an
    UPDATE made by the vendor's own login; staff clear it to NULL on review. We do
    NOT fall back to status='pending_review' — that value is also the legacy
@@ -1249,7 +1249,7 @@ async function renderVendorAnalytics() {
   /* ── Spend & coverage by product category ────────────────────────────────
      Rolls the taxonomy up to its TOP level (trade). Deeper nodes roll into
      their L1 ancestor via path[0], which is why the materialized path exists.
-     Silent no-op until MIGRATION_product_taxonomy.sql has been run. */
+     Silent no-op until migrations/2026-08-20_product_taxonomy.sql has been run. */
   let taxTbl = '';
   try {
     const tax = await VendorDb.getTaxonomy();
@@ -1905,7 +1905,7 @@ function _txRender() {
   const box = document.getElementById('tx-tree');
   if (!box) return;
   if (!_txNodes.length) {
-    box.innerHTML = '<div class="empty" style="padding:14px">No categories yet — run <b>MIGRATION_product_taxonomy.sql</b> to seed the Trade → Works tree.</div>';
+    box.innerHTML = '<div class="empty" style="padding:14px">No categories yet — run <b>migrations/2026-08-20_product_taxonomy.sql</b> to seed the Trade → Works tree.</div>';
     return;
   }
   const out = [];
@@ -4109,7 +4109,7 @@ function updateDupBadge() {
 
 </script>
 <script>
-// ── Archived child rows (MIGRATION_vendor_child_soft_delete.sql) ───────────
+// ── Archived child rows (migrations/2026-09-01_vendor_child_soft_delete.sql) ───────────
 // A vendor login can no longer DELETE its own products/certs/personnel/docs —
 // "Remove" in the portal archives instead. Staff must therefore be able to SEE
 // and RESTORE those rows, or the archive would just be a silent delete.

@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- MIGRATION_product_taxonomy.sql   (run once, idempotent, re-runnable)
+-- migrations/2026-08-20_product_taxonomy.sql   (run once, idempotent, re-runnable)
 -- ════════════════════════════════════════════════════════════════════════════
 -- A HYBRID product taxonomy for vendor offerings.
 --

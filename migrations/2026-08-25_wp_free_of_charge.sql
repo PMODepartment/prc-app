@@ -1,4 +1,4 @@
--- MIGRATION_wp_free_of_charge.sql
+-- migrations/2026-08-25_wp_free_of_charge.sql
 -- Run once in the Supabase SQL Editor. Idempotent, additive, safe to re-run.
 --
 -- FREE-OF-CHARGE AWARDS
@@ -18,7 +18,7 @@
 -- rows whose cost simply was never entered. Inferring "0 = free" would instantly
 -- book those as realized savings. The flag has to be something a person ticks.
 --
--- SEMANTICS (mirrors not_to_be_awarded's money treatment -- see MIGRATION_not_to_be_awarded.sql):
+-- SEMANTICS (mirrors not_to_be_awarded's money treatment -- see migrations/2026-08-03_not_to_be_awarded.sql):
 --   award_status = 'Awarded' AND free_of_charge  ->  counts as money-awarded,
 --                                                   effective awarded cost = PHP 0,
 --                                                   full BCB counts as savings.
@@ -53,7 +53,7 @@ begin
      and not exists (select 1 from information_schema.columns
                      where table_schema = 'public' and table_name = 'wp_view_public'
                        and column_name = 'free_of_charge') then
-    raise notice 'ACTION REQUIRED: add free_of_charge to wp_view_public''s select list (canonical definition lives in MIGRATION_wp_audit_trail.sql), otherwise the viewer role computes a different awarded set than every other role.';
+    raise notice 'ACTION REQUIRED: add free_of_charge to wp_view_public''s select list (canonical definition lives in migrations/2026-07-23_wp_audit_trail.sql), otherwise the viewer role computes a different awarded set than every other role.';
   end if;
 end $$;
 
