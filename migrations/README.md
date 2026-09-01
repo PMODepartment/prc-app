@@ -12,10 +12,12 @@ migration.
 
 ## ⚠️ Filename order is NOT run order
 
-Sorting the folder gets you *close*, but it is wrong in at least one place: eight
+Sorting the folder gets you *close*, but it is wrong in at least two places: eight
 files share `2026-08-10`, and alphabetically `vendor_invite_rls_fix` sorts **before**
 `vendor_management` — yet it depends on the tables that file creates. A date prefix
-cannot encode within-day sequence.
+cannot encode within-day sequence. The same trap catches
+`2026-09-01_vendor_child_audit_trail.sql`, which must run AFTER
+`2026-09-01_vendor_child_soft_delete.sql` but sorts before it.
 
 **The ordered list below is authoritative.** If you are rebuilding a database from
 scratch, run them in exactly this order.
@@ -63,7 +65,8 @@ scratch, run them in exactly this order.
 | 35 | `2026-08-25_wp_free_of_charge.sql` | |
 | 36 | `2026-08-26_planners_packages.sql` | mirror table pushed by the Planners app |
 | 37 | `2026-09-01_vendor_child_soft_delete.sql` | takes DELETE from the vendor role; adds `archived_at` |
-| 38 | `2026-09-01_vendor_edit_guard_consolidated.sql` | **⚠️ MUST BE LAST — see below** |
+| 38 | `2026-09-01_vendor_child_audit_trail.sql` | **must follow #37** — supersedes its `stamp_archived()` trigger. Sorts BEFORE it alphabetically (“audit” < “soft”), so this is the second place filename order is wrong |
+| 39 | `2026-09-01_vendor_edit_guard_consolidated.sql` | **⚠️ MUST BE LAST — see below** |
 
 ---
 

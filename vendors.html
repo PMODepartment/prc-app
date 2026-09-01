@@ -411,6 +411,7 @@
 .arch-head{font-size:0.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-hint,#6E6C6C);margin-bottom:6px}
 .arch-row{opacity:.62}
 .arch-row .row-item-title{text-decoration:line-through}
+.row-audit{display:block;margin-top:2px;font-size:0.68rem;color:var(--text-hint,#6E6C6C)}
 body.dark-mode .arch-block{border-top-color:var(--border-md)}
 </style>
   <link rel="manifest" href="manifest.webmanifest"/>
@@ -3497,7 +3498,7 @@ async function renderDetailProducts() {
     return path ? `<span class="prod-path">${esc(path)}</span>` : esc(p.category || 'Uncategorized');
   };
   const rows = list.length ? list.map(p =>
-    `<div class="row-item"><div style="flex:1;min-width:0"><div class="row-item-title">${esc(p.description)}${p.unit?' ('+esc(p.unit)+')':''}</div><div class="row-item-sub">${sub(p)}${p.item_type?' · '+esc(p.item_type):''}</div></div>
+    `<div class="row-item"><div style="flex:1;min-width:0"><div class="row-item-title">${esc(p.description)}${p.unit?' ('+esc(p.unit)+')':''}</div><div class="row-item-sub">${sub(p)}${p.item_type?' · '+esc(p.item_type):''}${_auditLine(p)}</div></div>
     <button class="row-item-del" style="background:none;border:none;color:#888;cursor:pointer" onclick="reclassifyProduct('${p.id}')" title="Change category"><i class="ti ti-category"></i></button>
     <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailProduct('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button></div>`
   ).join('') : '<div class="empty">No products/services on file.</div>';
@@ -3547,7 +3548,7 @@ async function renderDetailCerts() {
     const expired = exp && exp < new Date();
     return `<div class="row-item"><div style="flex:1;min-width:0"><div class="row-item-title">${esc(c.cert_name)}${c.cert_number?' #'+esc(c.cert_number):''}</div>
       <div class="row-item-sub">${esc(c.issuing_body||'')}${c.expiry_date?' · Expires '+esc(c.expiry_date)+(expired?' <span style="color:#EE3124;font-weight:700">EXPIRED</span>':''):''}
-      ${c.file_path ? ' · <span class="file-badge" onclick="viewCertFileStaff(\''+c.file_path.replace(/'/g,"\\'")+'\')">View file</span>' : ''}</div></div>
+      ${c.file_path ? ' · <span class="file-badge" onclick="viewCertFileStaff(\''+c.file_path.replace(/'/g,"\\'")+'\')">View file</span>' : ''}${_auditLine(c)}</div></div>
       <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailCert('${c.id}','${(c.file_path||'').replace(/'/g,"\\'")}')" title="Remove"><i class="ti ti-trash"></i></button></div>`;
   }).join('') : '<div class="empty">No certifications on file.</div>';
   document.getElementById('dtab-certs').innerHTML = rows
@@ -3601,7 +3602,7 @@ async function renderDetailPersonnel() {
   const _arch = _all.filter(x => x.archived_at);
   const rows = list.length ? list.map(p =>
     `<div class="row-item"><div style="flex:1;min-width:0"><div class="row-item-title">${esc(p.name)}${p.is_primary?' <span style="color:#EE3124;font-size:0.7rem;font-weight:700">PRIMARY</span>':''}</div>
-    <div class="row-item-sub">${esc(p.role_title||'')}${p.contact_number?' · '+esc(p.contact_number):''}${p.email?' · '+esc(p.email):''}</div></div>
+    <div class="row-item-sub">${esc(p.role_title||'')}${p.contact_number?' · '+esc(p.contact_number):''}${p.email?' · '+esc(p.email):''}${_auditLine(p)}</div></div>
     <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailPersonnel('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button></div>`
   ).join('') : '<div class="empty">No personnel on file.</div>';
   document.getElementById('dtab-personnel').innerHTML = rows
@@ -4113,9 +4114,31 @@ function updateDupBadge() {
 // A vendor login can no longer DELETE its own products/certs/personnel/docs —
 // "Remove" in the portal archives instead. Staff must therefore be able to SEE
 // and RESTORE those rows, or the archive would just be a silent delete.
-function _archWhen(r) {
-  if (!r.archived_at) return '';
-  try { return new Date(r.archived_at).toLocaleDateString(); } catch (_) { return ''; }
+function _fmtAuditDate(v) {
+  if (!v) return '';
+  try {
+    var d = new Date(v);
+    // isNaN(getTime()) is the check that matters: new Date('rubbish') does not
+    // throw, it returns an Invalid Date that prints as the literal string
+    // "Invalid Date". A try/catch alone would happily render that to the user.
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+  } catch (_) { return ''; }
+}
+function _archWhen(r) { return _fmtAuditDate(r && r.archived_at); }
+// Who last touched a child row (2026-09-01_vendor_child_audit_trail.sql). A
+// vendor keeps UPDATE and can overwrite its own rows, which authorization
+// cannot prevent — editing their profile is the point of the portal — so the
+// answer is being able to see WHAT changed and WHO changed it. Renders nothing
+// pre-migration, or for rows written before it (NULL actor = honestly unknown).
+function _auditLine(r) {
+  if (!r) return '';
+  var who = r.updated_by_name || r.created_by_name;
+  var when = r.updated_at || r.created_at;
+  if (!who && !when) return '';
+  var d = _fmtAuditDate(when);
+  var verb = r.updated_by_name ? 'Last edited' : 'Added';
+  return '<span class="row-audit">' + verb + (who ? ' by ' + esc(who) : '')
+       + (d ? ' · ' + esc(d) : '') + '</span>';
 }
 function _archivedBlock(rows, restoreFn, label) {
   if (!rows || !rows.length) return '';

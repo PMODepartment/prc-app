@@ -1543,6 +1543,62 @@ row’s contents with rubbish — soft-delete does not cover that, the **audit t
 the next step** (`updated_at`/`updated_by` on the child tables). Staff hard-delete also remains
 un-undoable.
 
+### Vendor child data — audit trail (2026-09-01)
+
+**`migrations/2026-09-01_vendor_child_audit_trail.sql`** (run once, **after** the soft-delete
+migration — it sorts BEFORE it alphabetically, so this is the second place filename order is not
+run order; see `migrations/README.md`). Step 3, the follow-on the archive change explicitly left
+open.
+
+**WHY:** soft-delete stopped a vendor DESTROYING its own child rows, but a vendor keeps UPDATE and
+can overwrite any row with rubbish. **Authorization cannot fix that** — editing their own profile
+is the entire point of the portal — so the answer is not another restriction but being able to see
+WHAT changed and WHO changed it. `vendor_products` / `vendor_certifications` / `vendor_personnel`
+carried **only `created_at`**: no `updated_at`, no actor on any operation, so "what did this
+account do?" was unanswerable. `vendors` itself has had `created_by`/`updated_by`/`updated_by_name`
+since Phase 2a; this brings its four child tables to the same standard.
+
+- Adds `created_by` / `created_by_name` / `updated_at` / `updated_by` / `updated_by_name` to all
+  four child tables, stamped **SERVER-SIDE from `auth.uid()`** so the actor cannot be forged — same
+  reasoning as `internal.vendor_edit_guard`. `created_*` is **immutable on UPDATE** (a client that
+  sends its own value is overruled), and `archived_by` is preserved on a plain update rather than
+  cleared.
+- **⚠️ A NEW FUNCTION NAME (`internal.stamp_child_audit`), NOT a `create or replace` of
+  `stamp_archived`.** Replacing it in place would set up the exact trap that hit
+  `vendor_edit_guard` five times: re-running the soft-delete migration afterwards would silently
+  revert this file's stamping. With a distinct name, a stray re-run merely re-adds that migration's
+  own narrower trigger alongside this one — both stamp `archived_by` identically, so the result is
+  **redundant but harmless, never silent loss.** The migration drops `trg_stamp_archived` and
+  `internal.stamp_archived()` itself.
+- **Nothing is back-filled.** A NULL actor honestly means "changed before this migration, or by a
+  service-role / SQL-editor process where `auth.uid()` is NULL". Inventing an actor would be worse
+  than admitting we do not know. `vendor_documents.uploaded_by` (client-set, predates this) is left
+  alone so nothing reading it breaks — but **prefer `created_by`, which is server-stamped and
+  therefore unforgeable.**
+- **`vendors.html` surfaces it**: a muted `.row-audit` line on every product / certification /
+  personnel row — `Last edited by X · date`, or `Added by X · date` when never edited. A stored
+  audit trail nobody can see is not one. `db.js` needed **no change** — `list()` already does
+  `select('*')`, and the stamping is entirely server-side.
+- **⚠️ `_fmtAuditDate()` range-checks the timestamp, and that is load-bearing.** `new Date('rubbish')`
+  does **not** throw — it returns an Invalid Date whose `toLocaleDateString()` is the literal string
+  `"Invalid Date"`, so a `try/catch` alone renders that straight to the user. **Caught by the test,
+  not by review** — the first cut of both this and `_archWhen` had the bug. Any new date formatter
+  here must use `isNaN(d.getTime())`, not just a try/catch.
+
+**Verified:** migration parses under `pglast` (6 statements, the PL/pgSQL body, all 17 trigger
+assignments as SQL) with text assertions that it supersedes `stamp_archived`, keeps `created_by`
+immutable and preserves `archived_by`; every inline `<script>` passes `node --check`; and 15
+assertions against the **verbatim extracted shipped `_auditLine`/`_archWhen`/`_fmtAuditDate`** —
+pre-migration rows rendering nothing, add-vs-edit wording, actor-name escaping (a vendor controls
+their own display name), and the Invalid-Date case above.
+
+**⚠️ NOT RUN YET** — run it in Supabase; its section 4 verification `SELECT` must read true on all
+six columns. `vendors.html`-only client change, so **no shared `?v=` bump** (db.js untouched).
+
+**Still open:** staff hard-delete remains un-undoable, and the audit trail records WHO and WHEN but
+not the OLD VALUE — a full before/after history would need a separate `*_history` table, which was
+not built.
+
 ### Masterlist re-import — `SEED_vendor_masterlist.sql` (2026-08-20)
 
 The chosen cleanup is **delete every Not-Accredited vendor, then re-import the whole masterlist**, so the directory becomes the masterlist. The import is a **one-time SQL seed**, not an app feature — the user's position on that is settled (see the importer note above). **NEITHER the seed NOR its generator is committed** — both are git-ignored, for the same reason as the accreditation seeds: the `.sql` embeds ~2,400 real vendor names, TINs, contacts and addresses, and **GitHub Pages serves this whole repo publicly**. Regenerate locally with `gen_master_seed.py <workbook.xlsx>`; the generator itself is data-free but is ignored too, per the existing convention.
