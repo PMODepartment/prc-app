@@ -96,8 +96,8 @@ WPDb.updateLastLogin(userId)
 
 ### Supabase Settings
 - **Email confirmation disabled** â€” users go straight to `pending` for admin approval
-- **Free tier cold start:** Pauses after 7 days inactivity â†’ 5â€“30s delay. Use UptimeRobot (ping every 3â€“4 days) to prevent.
-- **Email rate limit:** ~3 auth emails/hour on free tier. Use custom SMTP (Resend/Brevo) for reliability.
+- **Plan: PRO** — org `PMODepartment`, billing account `pmodepartment2@megawide.com.ph`, moved off Free 2026-08-10 for Storage. **Pro projects do NOT pause for inactivity**, so the free-tier "pauses after 7 days → 5–30s cold start" behaviour no longer applies. `.github/workflows/keep-alive.yml` and the UptimeRobot ping are therefore redundant — left in place only as insurance against a future downgrade.
+- **Outbound email is the ONE thing this stack cannot do at volume — on ANY plan.** Supabase’s **built-in** sender is rate-limited and documented as development-only on **every** tier, Pro included; Pro raises the configurable auth rate limit but does not make the shared sender production-grade. This has never bitten because the app sends email in exactly ONE place — `resetPasswordForEmail` in `forgot-password.html`. Both signup paths (`register.html`, `vendor-register.html`) call `signUp` with email confirmation disabled and send **nothing**. **Any feature that emails vendors at scale needs custom SMTP** — see the Resend note below and “Vendor self-service at scale” under Vendor Management.
 - **Password-reset flow** (Auth â†’ URL Configuration): the **Redirect URLs allow-list must contain `https://pmodepartment.github.io/prc-app/**`** (wildcard). It was previously **empty**, so Supabase ignored `resetPasswordForEmail`'s `redirectTo` and fell back to the **Site URL** (`/prc-app/` = the portfolio, which needs login and has no reset form) â€” the reset link "went nowhere useful." With the wildcard added, the email link lands on **`reset-password.html`**, which handles the recovery token. If you add other post-auth redirect targets, they must match this allow-list (or add them).
 - **Custom SMTP (Resend)**: configured then **reverted** (toggled OFF 2026-07 at user request) â€” back on the built-in email service. The Resend config (domain `megawide.com.ph` pending verification, `supabase-smtp` API key, sender/host/username) remains **saved** in Supabase; re-enabling is just the "Enable custom SMTP" toggle. DNS records to verify the domain live in the handoff Artifact. This is independent of the reset-link fix above.
 - **Sign in with Microsoft (2026-08, `login.html`)** â€” a "Sign in with Microsoft" button (`#btnMicrosoft`) calls `sb.auth.signInWithOAuth({provider:'azure', ...})`, redirecting the whole page to Microsoft and back. **Requires manual setup, not yet done (as of this writing):** (1) an **Entra ID (Azure AD) app registration** in the Megawide tenant â€” Single tenant account type (this is what actually restricts sign-in to `@megawide.com.ph`, not app code), redirect URI `https://<supabase-project-ref>.supabase.co/auth/v1/callback`, a client secret, and **admin consent granted** for the `User.Read` delegated permission; (2) in Supabase **Authentication â†’ Providers â†’ Azure**, enable it and paste the Application (client) ID, client secret, and Tenant ID. Until both are done the button will error (provider not enabled). **First-time sign-in bootstrap:** a brand-new Microsoft identity has an `auth.users` row but no `public.users` profile yet â€” `ensureProfile(user)` in `login.html` inserts one (`name`/`email` from the Microsoft identity, `role:'user'`, `status:'pending'`) exactly like `register.html`'s self-registration insert, so they land on `pending.html` and go through the **same admin-approval queue as everyone else** (no auto-approve, by design/user request) â€” an admin still has to approve and assign role/projects/manager. The same `ensureProfile()` runs in the auto-restore-session check at page load, so it also covers a returning Microsoft user whose profile row hasn't been created yet. Relies on Supabase's automatic identity-linking for a verified email matching an existing `auth.users` row (so an existing email/password account with the same `@megawide.com.ph` address doesn't get duplicated) â€” verify this is enabled in the project's Auth settings when configuring the provider.
@@ -1383,6 +1383,62 @@ Accreditation was **data-only**: the standing existed in the directory but nothi
 
 **Still not done**: no email is sent by the app at any point — invites and decisions are copy/paste or mail-merge; `vendor-portal.html` remains light-only (it never loads `ui.js`, so `AppTheme` is undefined there); and the products/certifications/personnel editors still save immediately per row rather than sharing the draft mechanism.
 
+### Vendor self-service at scale — DESIGNED, NOT BUILT (2026-09-01)
+
+The per-vendor invite does not scale: 2,412 vendors × one `vendor-register.html?vendor=<id>`
+link each, every one needing an email address on file and individual coordination. Combined
+with the fact that **no vendor has ever registered** (`users where role='vendor'` = 0), the
+whole self-service path is effectively unreachable. This records the direction chosen, so the
+next session does not re-derive it.
+
+**⚠️ THE FINDING: the `?vendor=<id>` parameter is redundant.** `internal.vendor_invite_valid`
+(`MIGRATION_vendor_invite_rls_fix.sql`) requires `v.id = vid AND lower(v.invite_email) =
+lower(claim_email)` — and `lower(invite_email)` carries a **unique index**, so the email alone
+already pins down exactly one row. Someone with the link but not the email cannot register;
+someone with the email does not need the link. The link is a second factor that proves nothing,
+and it is the entire reason every vendor needs individual handling.
+
+**⚠️ HARD CONSTRAINT (user, 2026-09-01): no new subscriptions.** Supabase is **Pro** (see
+Supabase Settings) and Microsoft 365 is licensed; nothing else may be added. That rules out
+**OTP / magic-link as a critical-path dependency** — Supabase Auth includes it, but it *sends
+email*, and the built-in sender is development-only on every tier. Design so that the app sends
+**zero** email.
+
+**The direction: identity-proof + the existing staff queue, instead of email verification.**
+One public URL (no parameter), printed on every PO/JO and in procurement's signature. The
+vendor proves who they are with data only the real vendor holds — **Vendor Code** (`V-00XXX`,
+on every PO they have received, on 321 directory rows), **TIN** (~1,347 rows after the
+masterlist seed), or a **recent PO number** (18,171 in the Conso PO List). Server matches via a
+plain Postgres `SECURITY DEFINER` RPC — same pattern as `vendor_invite_valid`, **no Edge
+Function**, so no new dependency class. Unmatched claims fall to a request-access queue, the
+shape `vendor_accreditation_requests` already uses. This is a *stronger* proof than an inbox:
+the on-file address is usually a shared `info@` a former employee may still read.
+
+- **⚠️ IT FORCES AN RLS CHANGE.** `vendor-register.html` inserts `status:'approved'` and
+  `users_insert_vendor` **requires** `status = 'approved'` — vendor registration is
+  auto-approved today, gated only by the invite-email match. A public URL must land the account
+  as **`pending` with no data access** until staff approve it. That is a policy change, not an
+  add-on.
+- **⚠️ NEVER auto-match on a free-mail domain.** Domain matching is needed (the address on file
+  is usually `info@`/`sales@`, not the person registering), but a meaningful share of SME
+  vendors here carry `@gmail.com`/`@yahoo.com` — domain-matching those hands one vendor another
+  vendor's profile. Hard-blocklist free-mail into the request queue. A corporate domain owned by
+  several vendor rows shows candidates for the vendor to pick and staff to confirm.
+- Blast/reminder email goes out by **Outlook mail merge on the existing M365 licence**, from the
+  CSV `exportInviteList()` already produces — not from the app. Zero incremental cost, no SMTP
+  config, no IT ticket.
+- **Do not chase all 2,412.** The directory holds ~1,624 vendors but only ~324 have WP links;
+  most of the tail is dormant SAP payables history. Target by awarded spend / active WPs.
+- The carrot is **accreditation renewal** (`accredStanding()`, already built) — self-service is
+  otherwise unpaid data entry for Megawide's benefit.
+- Blast radius of a wrong match is small by construction: `vendor_edit_guard` pins name,
+  accreditation, payment terms and notes, and `vendor_self_view` hides staff notes entirely.
+
+**Measure before building** (needs an authenticated session — not done): vendors with a real
+`contact_email`; how many are free-mail; how many corporate domains map to >1 vendor row; and
+all three restricted to vendors with an award in the last 24 months. Those numbers decide
+whether domain matching is the main path or a minor one.
+
 ### Masterlist re-import — `SEED_vendor_masterlist.sql` (2026-08-20)
 
 The chosen cleanup is **delete every Not-Accredited vendor, then re-import the whole masterlist**, so the directory becomes the masterlist. The import is a **one-time SQL seed**, not an app feature — the user's position on that is settled (see the importer note above). **NEITHER the seed NOR its generator is committed** — both are git-ignored, for the same reason as the accreditation seeds: the `.sql` embeds ~2,400 real vendor names, TINs, contacts and addresses, and **GitHub Pages serves this whole repo publicly**. Regenerate locally with `gen_master_seed.py <workbook.xlsx>`; the generator itself is data-free but is ignored too, per the existing convention.
@@ -1574,7 +1630,7 @@ Standalone pages (login, register, pending, forgot-password) without sticky tabs
 
 **Tooltips — `data-tip`, not bare `title` (2026-07-23).** `title` never appears on touch, isn't keyboard reachable and is announced inconsistently. The `Tooltip` IIFE at the end of `ui.js` shows a real popover for any element with **`data-tip`** on click/tap, or Enter/Space when focused; Esc, blur, outside-click, scroll and resize all dismiss it. `kpiLabelAttrs()` now emits `data-tip` + `title` (desktop hover fallback) + `aria-label` + `tabindex=0` + `class="has-tip"`, and `.has-tip` gets a dotted underline so users can SEE that help exists. Styles: `.app-tip`, `.has-tip` in `dashboard.css`.
 
-**Skeleton loading (2026-07-23).** The Supabase free tier cold-starts for 5–30s, during which every page showed only a spinner and read as broken. `#loading` on `index.html`/`project.html` now renders a skeleton of the real layout (4 KPI cards → chart block → table lines) and `review.html` a table-shaped one, each with `role="status" aria-live="polite" aria-busy="true"` and the spinner reduced to a small inline marker beside the text. Classes `.skel`, `.skel-card`, `.skel-line`, `.skel-grid`, `.skel-label` in `dashboard.css`; the shimmer is disabled under `prefers-reduced-motion`.
+**Skeleton loading (2026-07-23).** Written while the project was on the free tier, whose 5–30s cold start left every page showing only a spinner and reading as broken. **The project is on Pro now and no longer cold-starts**, but the skeleton is kept — it still covers a slow network or a large WP fetch. `#loading` on `index.html`/`project.html` now renders a skeleton of the real layout (4 KPI cards → chart block → table lines) and `review.html` a table-shaped one, each with `role="status" aria-live="polite" aria-busy="true"` and the spinner reduced to a small inline marker beside the text. Classes `.skel`, `.skel-card`, `.skel-line`, `.skel-grid`, `.skel-label` in `dashboard.css`; the shimmer is disabled under `prefers-reduced-motion`.
 
 **Accessibility baseline (2026-07-23 UI audit)****Accessibility baseline (2026-07-23 UI audit)** — added at the end of `dashboard.css` under "ACCESSIBILITY & POLISH PASS":
 - **Keyboard focus.** The app had **54 `outline:none` declarations and zero focus styles** — completely unusable by keyboard. A `:focus-visible` ring (2px `--mw-red`, offset 2px) now applies to every interactive element; it needs **`!important`** to beat the inline `outline:none`s (verified: an element with inline `outline:none` computes `solid` once the rule applies). The **dark sidebar gets a white ring** instead (red on `--mw-black` is too low-contrast). `:focus-visible` means mouse users see no change.
@@ -1675,7 +1731,7 @@ Full audit of `index.html` + `project.html`, verified live against production as
 5. **Role caching**: `window.__wpmRole` set once at login. Role/project changes require the user to log out and back in.
 6. **Chart.js leaks**: always `chartInstance.destroy()` before re-rendering.
 7. **Trade name consistency â€” 10 canonical trades only**: `normTrade(t)` in `index.html` and `project.html` (identical) collapses EVERY trade string into one of exactly 10: General Requirements, Site Works, Structural Works, Architectural Works, Mechanical Works, **Electrical and Auxiliary Works**, Plumbing Works, Fire Protection Works, Allied Services, Site Development Works. **Electrical Works and Auxiliary Works are combined into a single bucket named "Electrical and Auxiliary Works"** (per user request â€” the combined label keeps Auxiliary visible in the trade name): `electrical works` â†’ Electrical and Auxiliary Works; `auxiliary works` â†’ Electrical and Auxiliary Works; the combined `electrical and auxiliary works` / `electrical & auxiliary works` â†’ Electrical and Auxiliary Works. Other variants: OPW101 granular arch sub-trades â†’ Architectural (incl. **`Landscapes and Amenities` / `Laminates and Plastic Finishes`** — a `/landscap|amenit/` keyword rule sits **before** the architectural rule so Landscapes doesn't remain its own non-canonical trade); **`Structural Materials and Consumables` / `Structural Steel` â†’ Structural** (via `/structural/`); Structural Labor And Services â†’ Structural; Housekeeping & Sanitation / Drawing / Security Services â†’ General Requirements; Other Allied Services â†’ Allied Services. **NON-PO/JO items are NOT trades:** OPW101's monitoring sheet has a `NON-PO/JO` section (design/consultancy, bonds, permits, insurances, project details) below the last WP — those rows have **no WP No.** so they were never imported as WPs, and the Excel importer now **`break`s the parse loop at the `NON-PO/JO` header** (`/non[\s\-]?(po|jo)/i`) so nothing beneath it can ever be imported even if a future sheet stray-numbers a row there. Keyword-regex fallback: both `/electr/` AND `/auxiliary/` â†’ Electrical and Auxiliary Works. Applied at data load time. `IDX_TRADE_ORDER`/`TRADE_ORDER` list the same 10 (drives chart colour order; the combined label sits in the Electrical slot, "Auxiliary Works" removed). Keep the explicit map + keyword fallback in sync across both files. **`project.html`'s INITIAL data-load path skipped `normTrade` (fixed 2026-07-30):** `_rawWPs` was built with `trade: w.trade` (raw) on first load — only `__wpmReloadFn` (used after quick-add saves) applied `normTrade`. Raw variants like `General Requirement` (singular) or `Other Allied Services` never matched `TRADE_ORDER`'s canonical strings, so `TRADE_ORDER.indexOf` returned -1 → those groups fell back to sort index 999 and landed at the end of the WP List (alphabetically among themselves) instead of their intended TRADE_ORDER position. Both `_rawWPs` assignments now normalize identically.
-8. **Supabase cold start**: free tier pauses after 7 days â†’ 5â€“30s delay (and a long-paused project can be deleted). Mitigated by a **GitHub Action keep-alive** (`.github/workflows/keep-alive.yml`, every 3 days — needs repo secrets `SUPABASE_URL` + `SUPABASE_ANON_KEY`) plus an optional external UptimeRobot ping.
+8. **Supabase cold start — NO LONGER APPLIES (Pro since 2026-08-10).** Free-tier projects pause after 7 days → 5–30s delay (and a long-paused project can be deleted); **Pro projects do not pause.** Don’t cite cold start as the explanation for a slow load any more — look for a real cause. The **GitHub Action keep-alive** (`.github/workflows/keep-alive.yml`, every 3 days — needs repo secrets `SUPABASE_URL` + `SUPABASE_ANON_KEY`) plus an optional external UptimeRobot ping.
 9. **Dead-code cleanup (2026-07)**: the stale **root-level duplicate** scripts/styles (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`, `dashboard-mobile-fixes.css`, `auth-guard.js`, `firebase-auth-shim.js`, `supabase-config.js`) and the unused **`assets/js/firebase-config.js`** (stale Firebase backend) were **deleted** — no page referenced them. The **duplicate `saveProject` in db.js** was also removed (one definition remains). Canonical assets live in `assets/js/` + `assets/css/`.
 10. **dp_percent**: stored as decimal (0.20 = 20%). Form input accepts percentage (user types "20"), divided by 100 before storing; edit mode multiplies by 100 to display.
 11. **Sticky columns require `table-layout:fixed` + colgroup**: Both `index.html` (`renderWPMonTable`) and `project.html` (`buildTable`) use `<table style="table-layout:fixed">` + a `<colgroup>` rebuilt on every render with explicit pixel widths matching the column defs. Without this, the browser auto-sizes columns narrower than the hardcoded sticky `left` offsets â€” causing sticky cells to physically overlap adjacent columns. Always keep colgroup in sync: `cg.innerHTML = cols.map(c => \`<col style="width:${c.w}px;min-width:${c.w}px">\`).join('')`.
