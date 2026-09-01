@@ -45,7 +45,21 @@
     .msg.success{background:#D1FAE5;color:#065F46;display:block}
     .form-footer{text-align:center;margin-top:18px;font-size:13px;color:#999}
     .form-footer a{color:#EE3124;text-decoration:none;font-weight:600}
-    .invite-banner{background:#FDECEA;border:1px solid #F5B8B3;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:#C42127}
+    .step{display:none}
+    .step.on{display:block}
+    .note{font-size:12px;line-height:1.6;color:#666;background:#FDECEA;border:1px solid #F5B8B3;border-left:3px solid #EE3124;border-radius:6px;padding:12px 14px;margin-bottom:22px}
+    .note b{color:#231F20}
+    .status-card{border:1.5px solid #e8e8e8;border-radius:10px;padding:22px;margin-bottom:18px}
+    .status-card h3{font-size:16px;font-weight:700;color:#231F20;margin-bottom:8px}
+    .status-card p{font-size:13px;color:#666;line-height:1.6}
+    .pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:10px}
+    .pill-pending{background:#FEF3C7;color:#92400E}
+    .pill-rejected{background:#FDECEA;color:#9B1B1B}
+    .seg2{display:flex;gap:8px}
+    .seg2-btn{flex:1;padding:10px 12px;border:1.5px solid #e8e8e8;background:#fff;border-radius:8px;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:600;color:#888;cursor:pointer;line-height:1.35}
+    .seg2-btn.active{border-color:#EE3124;background:#FDECEA;color:#C42127}
+    .row2{display:flex;gap:12px}
+    .row2 .field{flex:1;min-width:0}
     @media(max-width:760px){
       .page{flex-direction:column}
       .brand{width:100%;flex:none;min-height:auto;padding:14px 18px;flex-direction:row;align-items:center;gap:14px}
@@ -55,13 +69,10 @@
       .brand-text p{font-size:10px}
       .form-wrap{padding:24px 20px 36px}
       .field input{font-size:16px}
+      .row2{flex-direction:column;gap:0}
+      .seg2{flex-direction:column}
     }
   </style>
-  <link rel="manifest" href="manifest.webmanifest"/>
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="mobile-web-app-capable" content="yes"/>
 </head>
 <body>
 <div class="page">
@@ -74,39 +85,107 @@
   </div>
 
   <div class="form-wrap" id="formWrap">
-    <div class="form-title">Complete your vendor account</div>
-    <div class="form-sub">This link was sent to you by Megawide Procurement. Set a password to activate your login, then fill in your company profile.</div>
-
     <div class="msg" id="msgBox"></div>
 
-    <div class="field">
-      <label>Company / Contact Email</label>
-      <input type="email" id="email" placeholder="you@company.com" autocomplete="email">
-      <div class="field-hint" id="emailHint">Must match the email this invite was sent to.</div>
-      <div class="field-error" id="errEmail">Please enter a valid email address.</div>
-    </div>
+    <!-- STEP 1 — register + claim -->
+    <div class="step on" id="stepForm">
+      <div class="form-title">Register your company</div>
+      <div class="form-sub">Create your login and tell us who you are. Megawide Procurement will check your details and activate your access.</div>
 
-    <div class="field">
-      <label>Password</label>
-      <div class="pw-wrap">
-        <input type="password" id="password" placeholder="At least 8 characters" autocomplete="new-password">
-        <button class="pw-toggle" type="button" onclick="togglePw('password',this)" tabindex="-1">👁</button>
+      <div class="field">
+        <label>Have you supplied Megawide before?</label>
+        <div class="seg2">
+          <button type="button" class="seg2-btn active" id="segExisting" onclick="setIsNew(false)">Yes &mdash; we already supply Megawide</button>
+          <button type="button" class="seg2-btn" id="segNew" onclick="setIsNew(true)">No &mdash; we are a new supplier</button>
+        </div>
       </div>
-      <div class="field-error" id="errPassword">Password must be at least 8 characters.</div>
-    </div>
 
-    <div class="field">
-      <label>Confirm Password</label>
-      <div class="pw-wrap">
-        <input type="password" id="confirmPassword" placeholder="Repeat your password" autocomplete="new-password">
-        <button class="pw-toggle" type="button" onclick="togglePw('confirmPassword',this)" tabindex="-1">👁</button>
+      <div class="note" id="noteExisting">
+        <b>Have these ready.</b> Your <b>Vendor Code</b> (printed on every Purchase Order we send you,
+        e.g.&nbsp;V-00042) and your <b>TIN</b>. They are how we confirm you are the company you say you
+        are, so please include them if you can.
       </div>
-      <div class="field-error" id="errConfirm">Passwords do not match.</div>
+      <div class="note" id="noteNew" style="display:none">
+        <b>No Vendor Code yet? That is expected.</b> A code is only issued once you have worked with us,
+        so leave it out. Give us your registered company name and <b>TIN</b> and Megawide Procurement
+        will set up your vendor record.
+      </div>
+
+      <div id="authFields">
+        <div class="field">
+          <label>Your Work Email</label>
+          <input type="email" id="email" placeholder="you@company.com" autocomplete="email">
+          <div class="field-error" id="errEmail">Please enter a valid email address.</div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="password" placeholder="At least 8 characters" autocomplete="new-password">
+              <button class="pw-toggle" type="button" onclick="togglePw('password',this)" tabindex="-1">&#128065;</button>
+            </div>
+            <div class="field-error" id="errPassword">Password must be at least 8 characters.</div>
+          </div>
+          <div class="field">
+            <label>Confirm Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="confirmPassword" placeholder="Repeat your password" autocomplete="new-password">
+              <button class="pw-toggle" type="button" onclick="togglePw('confirmPassword',this)" tabindex="-1">&#128065;</button>
+            </div>
+            <div class="field-error" id="errConfirm">Passwords do not match.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Registered Company Name</label>
+        <input type="text" id="company" placeholder="As it appears on your BIR 2303" autocomplete="organization">
+        <div class="field-error" id="errCompany">Please enter your company name.</div>
+      </div>
+      <div class="field">
+        <label>Your Name</label>
+        <input type="text" id="contactName" placeholder="Who we should address" autocomplete="name">
+      </div>
+      <div class="row2">
+        <div class="field" id="codeField">
+          <label>Vendor Code</label>
+          <input type="text" id="vendorCode" placeholder="e.g. V-00042">
+          <div class="field-hint">On your Purchase Orders.</div>
+        </div>
+        <div class="field">
+          <label>TIN</label>
+          <input type="text" id="tin" placeholder="e.g. 000-313-856-000">
+          <div class="field-hint">Digits, with or without dashes.</div>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btnSubmit">Submit Registration</button>
+      <div class="form-footer">Already activated? <a href="login.html">Sign in</a></div>
     </div>
 
-    <button class="btn-primary" id="btnRegister">Activate Account</button>
+    <!-- STEP 2 — submitted -->
+    <div class="step" id="stepDone">
+      <div class="form-title">Request received</div>
+      <div class="form-sub">Thank you. Megawide Procurement will review your details and activate your access.</div>
+      <div class="status-card">
+        <div class="pill pill-pending">Pending review</div>
+        <h3>What happens next</h3>
+        <p>A member of the procurement team checks the details you submitted against our vendor records.
+        Once approved you can sign in with the email and password you just set, and manage your own company
+        profile, products, certifications and accreditation documents.</p>
+      </div>
+      <p class="field-hint">You can close this page. Come back to this same link any time to check your status.</p>
+      <div class="form-footer"><a href="login.html">Go to sign in</a></div>
+    </div>
 
-    <div class="form-footer">Already activated? <a href="login.html">Sign in</a></div>
+    <!-- STEP 3 — returning claimant -->
+    <div class="step" id="stepStatus">
+      <div class="form-title">Your registration</div>
+      <div class="form-sub" id="statusSub"></div>
+      <div class="status-card" id="statusCard"></div>
+      <button class="btn-primary" id="btnRetry" style="display:none">Submit new details</button>
+      <div class="form-footer"><a href="#" id="signOutLink">Sign out</a></div>
+    </div>
   </div>
 </div>
 
@@ -117,90 +196,182 @@ const sb = window.supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw'
 );
 
+// A QR printed on a Purchase Order can carry ?code=<vendor code> to save typing.
+// NOTE it is ONLY a prefill: the claim is still matched server-side against the
+// TIN/company and still reviewed by staff, so photographing someone else's PO
+// grants no access. Named `code` rather than `v` so it can never be confused
+// with the app-wide `?v=` cache-buster.
 const params = new URLSearchParams(window.location.search);
-const vendorId = params.get('vendor');
+const preCode = params.get('code');
+if (preCode) document.getElementById('vendorCode').value = preCode;
 
-if (!vendorId) {
-  document.getElementById('formWrap').innerHTML =
-    '<div class="form-title">Invalid invite link</div>' +
-    '<div class="form-sub">This link is missing the vendor invite reference. Ask Megawide Procurement to resend your invite.</div>';
-} else {
-  // Pre-fill nothing (RLS blocks anonymous reads of the vendors table by design —
-  // the invite is validated server-side by users_insert_vendor on submit, not here).
-  document.getElementById('emailHint').textContent = 'Enter the exact email address your invite was sent to.';
-}
-
-window.togglePw = function(id, btn) {
-  const input = document.getElementById(id);
-  const isHidden = input.type === 'password';
-  input.type = isHidden ? 'text' : 'password';
-  btn.textContent = isHidden ? '🙈' : '👁';
+// A company that has never worked with Megawide has no Vendor Code and no
+// directory row, so "no match" is the CORRECT outcome for them. Asking up front
+// keeps that from reading as a failure, and tells the reviewer which of the two
+// populations they are looking at.
+// NOTE the server still runs the matcher either way: a company that believes it
+// is new is often already in the directory (2,400 rows came from work packages
+// and the SAP masterlist), and catching that is what prevents a duplicate.
+let isNewVendor = false;
+window.setIsNew = function (v) {
+  isNewVendor = !!v;
+  document.getElementById('segExisting').classList.toggle('active', !v);
+  document.getElementById('segNew').classList.toggle('active', !!v);
+  document.getElementById('codeField').style.display = v ? 'none' : '';
+  document.getElementById('noteExisting').style.display = v ? 'none' : '';
+  document.getElementById('noteNew').style.display = v ? '' : 'none';
+  if (v) document.getElementById('vendorCode').value = '';
 };
+if (preCode) setIsNew(false);
 
-function showErr(id, show) {
-  document.getElementById(id).classList.toggle('visible', show);
-  const mapping = { errEmail:'email', errPassword:'password', errConfirm:'confirmPassword' };
-  const inp = document.getElementById(mapping[id]);
-  if (inp) inp.classList.toggle('error-field', show);
+function esc(v) {
+  return v == null ? '' : String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
-function clearAllErrors() {
-  ['errEmail','errPassword','errConfirm'].forEach(id => showErr(id, false));
-  const box = document.getElementById('msgBox');
-  box.className = 'msg'; box.textContent = '';
-}
-
-document.getElementById('btnRegister').addEventListener('click', handleRegister);
-
-async function handleRegister() {
-  if (!vendorId) return;
-  clearAllErrors();
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  const confirm = document.getElementById('confirmPassword').value;
-  const btn = document.getElementById('btnRegister');
-
-  let hasError = false;
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showErr('errEmail', true); hasError = true; }
-  if (password.length < 8) { showErr('errPassword', true); hasError = true; }
-  if (password !== confirm) { showErr('errConfirm', true); hasError = true; }
-  if (hasError) return;
-
-  btn.textContent = 'Activating…';
-  btn.disabled = true;
-  const box = document.getElementById('msgBox');
-
-  const { data, error } = await sb.auth.signUp({ email, password });
-  if (error) {
-    box.textContent = error.message.includes('already registered')
-      ? 'This email already has a login. Try signing in instead.'
-      : error.message;
-    box.className = 'msg error';
-    btn.textContent = 'Activate Account'; btn.disabled = false;
-    return;
-  }
-
-  // Insert the vendor-role profile. RLS (users_insert_vendor) verifies this
-  // email matches the invite on the referenced vendor row and that it hasn't
-  // already been claimed — if either check fails, this insert is rejected.
-  const { error: profileError } = await sb.from('users').insert({
-    id: data.user.id,
-    name: email.split('@')[0],
-    email,
-    role: 'vendor',
-    status: 'approved',
-    vendor_id: vendorId,
+function show(id) {
+  ['stepForm', 'stepDone', 'stepStatus'].forEach(function (x) {
+    document.getElementById(x).classList.toggle('on', x === id);
   });
+}
+function msg(t, k) {
+  const b = document.getElementById('msgBox');
+  b.textContent = t || '';
+  b.className = 'msg' + (t ? ' ' + k : '');
+}
+window.togglePw = function (id, btn) {
+  const i = document.getElementById(id);
+  const hidden = i.type === 'password';
+  i.type = hidden ? 'text' : 'password';
+  btn.innerHTML = hidden ? '&#128584;' : '&#128065;';
+};
+function fieldErr(id, on) {
+  const e = document.getElementById(id);
+  if (e) e.classList.toggle('visible', on);
+}
+function clearErrs() {
+  ['errEmail', 'errPassword', 'errConfirm', 'errCompany'].forEach(function (i) { fieldErr(i, false); });
+  msg('');
+}
 
-  if (profileError) {
-    box.textContent = 'This invite link is invalid, already used, or the email does not match the invite. Contact Megawide Procurement for a new link.';
-    box.className = 'msg error';
-    btn.textContent = 'Activate Account'; btn.disabled = false;
-    // Roll back the orphaned auth account isn't possible client-side; the account
-    // simply stays unusable (no profile → AppAuth.requireLogin signs it out).
+let signedIn = false;
+
+(async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { show('stepForm'); return; }
+  signedIn = true;
+  await routeSignedIn();
+})();
+
+async function routeSignedIn() {
+  // RLS scopes this to the caller's own claim (auth_user_id = auth.uid()), so
+  // no filter is needed here and none would add safety.
+  const { data, error } = await sb.from('vendor_claims')
+    .select('*').order('created_at', { ascending: false }).limit(1);
+  if (error) { msg('Could not load your registration: ' + error.message, 'error'); show('stepForm'); return; }
+  const claim = data && data[0];
+  if (!claim) {
+    // Signed in but never claimed — only the identity half is still needed.
+    document.getElementById('authFields').style.display = 'none';
+    show('stepForm');
     return;
   }
+  if (claim.status === 'approved') { window.location.href = 'vendor-portal.html'; return; }
+  renderStatus(claim);
+  show('stepStatus');
+}
 
-  window.location.href = 'vendor-portal.html';
+function renderStatus(c) {
+  const card = document.getElementById('statusCard');
+  const sub = document.getElementById('statusSub');
+  const retry = document.getElementById('btnRetry');
+  let when = '';
+  try { const d = new Date(c.created_at); if (!isNaN(d.getTime())) when = d.toLocaleDateString(); } catch (_) {}
+  if (c.status === 'pending') {
+    sub.textContent = 'We have your details and are reviewing them.';
+    card.innerHTML = '<div class="pill pill-pending">Pending review</div>'
+      + '<h3>' + esc(c.claimed_company) + '</h3>'
+      + '<p>' + (when ? 'Submitted ' + esc(when) + '. ' : '')
+      + 'Once approved you can sign in and manage your company profile.</p>';
+    retry.style.display = 'none';
+  } else {
+    sub.textContent = 'We could not activate this registration.';
+    card.innerHTML = '<div class="pill pill-rejected">Not approved</div>'
+      + '<h3>' + esc(c.claimed_company) + '</h3>'
+      + '<p>' + (c.decision_notes ? esc(c.decision_notes)
+        : 'Megawide Procurement did not approve this registration. Check your details and try again.')
+      + '</p>';
+    retry.style.display = '';
+  }
+}
+
+document.getElementById('btnRetry').addEventListener('click', function () {
+  document.getElementById('authFields').style.display = 'none';
+  show('stepForm');
+});
+document.getElementById('signOutLink').addEventListener('click', async function (e) {
+  e.preventDefault();
+  await sb.auth.signOut();
+  window.location.reload();
+});
+document.getElementById('btnSubmit').addEventListener('click', submit);
+
+async function submit() {
+  clearErrs();
+  const btn = document.getElementById('btnSubmit');
+  const needAuth = !signedIn;
+  const email = document.getElementById('email').value.trim();
+  const pw = document.getElementById('password').value;
+  const pw2 = document.getElementById('confirmPassword').value;
+  const company = document.getElementById('company').value.trim();
+  const contact = document.getElementById('contactName').value.trim();
+  const code = document.getElementById('vendorCode').value.trim();
+  const tin = document.getElementById('tin').value.trim();
+
+  let bad = false;
+  if (needAuth) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { fieldErr('errEmail', true); bad = true; }
+    if (pw.length < 8) { fieldErr('errPassword', true); bad = true; }
+    if (pw !== pw2) { fieldErr('errConfirm', true); bad = true; }
+  }
+  if (!company) { fieldErr('errCompany', true); bad = true; }
+  if (bad) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+  try {
+    if (needAuth) {
+      const { error } = await sb.auth.signUp({ email: email, password: pw });
+      if (error) {
+        // Someone coming back with the same credentials should just continue
+        // rather than be told to start over.
+        if (/already registered|already exists/i.test(error.message || '')) {
+          const si = await sb.auth.signInWithPassword({ email: email, password: pw });
+          if (si.error) {
+            throw new Error('That email already has a login. Sign in with its password, or use a different email.');
+          }
+        } else { throw error; }
+      }
+      signedIn = true;
+    }
+    // Returns only a claim id. The server deliberately does NOT report whether
+    // or to whom it matched — that would let anyone brute-force TINs to
+    // discover Megawide's vendors. Never surface a match result here.
+    const r = await sb.rpc('submit_vendor_claim', {
+      p_company: company,
+      p_contact_name: contact || null,
+      p_vendor_code: code || null,
+      p_tin: tin || null,
+      p_is_new: isNewVendor
+    });
+    if (r.error) throw r.error;
+    show('stepDone');
+    msg('');
+  } catch (e) {
+    msg((e && e.message) || String(e), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit Registration';
+  }
 }
 </script>
 </body>

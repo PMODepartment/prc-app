@@ -1409,71 +1409,81 @@ Accreditation was **data-only**: the standing existed in the directory but nothi
 
 **Still not done**: no email is sent by the app at any point — invites and decisions are copy/paste or mail-merge; `vendor-portal.html` remains light-only (it never loads `ui.js`, so `AppTheme` is undefined there); and the products/certifications/personnel editors still save immediately per row rather than sharing the draft mechanism.
 
-### Vendor self-service at scale — DESIGNED, NOT BUILT (2026-09-01)
+### Vendor self-service at scale — BUILT (2026-09-01)
 
-The per-vendor invite does not scale: 2,412 vendors × one `vendor-register.html?vendor=<id>`
-link each, every one needing an email address on file and individual coordination. Combined
-with the fact that **no vendor has ever registered** (`users where role='vendor'` = 0), the
-whole self-service path is effectively unreachable. This records the direction chosen, so the
-next session does not re-derive it.
+**`migrations/2026-09-01_vendor_self_registration.sql`** (run once, **after** the three hardening
+migrations). Replaces the per-vendor invite link with **one public URL**.
 
-**⚠️ THE FINDING: the `?vendor=<id>` parameter is redundant.** `internal.vendor_invite_valid`
-(`migrations/2026-08-10_vendor_invite_rls_fix.sql`) requires `v.id = vid AND lower(v.invite_email) =
-lower(claim_email)` — and `lower(invite_email)` carries a **unique index**, so the email alone
-already pins down exactly one row. Someone with the link but not the email cannot register;
-someone with the email does not need the link. The link is a second factor that proves nothing,
-and it is the entire reason every vendor needs individual handling.
+**The finding that drove it: the `?vendor=<id>` parameter was redundant.** `internal.vendor_invite_valid`
+required `v.id = vid AND lower(v.invite_email) = lower(claim_email)` — and `lower(invite_email)`
+carries a UNIQUE index, so the email alone already pinned exactly one row. The link proved nothing
+the email did not, and it was the entire reason all 2,412 vendors needed individual coordination.
+Nobody ever completed that flow (0 rows in `users where role='vendor'`).
 
-**⚠️ HARD CONSTRAINT (user, 2026-09-01): no new subscriptions.** Supabase is **Pro** (see
-Supabase Settings) and Microsoft 365 is licensed; nothing else may be added. That rules out
-**OTP / magic-link as a critical-path dependency** — Supabase Auth includes it, but it *sends
-email*, and the built-in sender is development-only on every tier. Design so that the app sends
-**zero** email.
+- **`vendor_claims` is deliberately NOT a `public.users` row.** `users_insert` pins `role='user'` and
+  `status='pending'`, so a claimant inserting there would land in **admin.html's INTERNAL STAFF
+  approval queue** — a different queue, different reviewers, different purpose. It also means an
+  un-approved claimant has **no profile at all**, so `AppAuth.requireLogin` signs them out of every
+  app page. The `users` row is created on approval, by RPC, because no staff role can create one
+  under `users_insert`.
+- **⚠️ `vendor_claims` has a SELECT policy and NOTHING else.** Every write goes through a
+  `SECURITY DEFINER` RPC, so a claimant can neither edit their own match result nor approve
+  themselves. The own-claim branch is `auth_user_id = auth.uid()` and **must not** be expressed via
+  `internal.get_my_role()` — a claimant has no `users` row, so that helper returns NULL for exactly
+  the people the branch is for.
+- **⚠️ ANTI-ENUMERATION: `submit_vendor_claim` returns ONLY a claim id — the same answer whether
+  or not it matched.** Returning the matched company, or even a boolean, would make it an oracle:
+  anyone could brute-force TINs to discover which companies Megawide works with. The match is
+  recorded for staff to read, never handed back. Because the answer carries no information,
+  unlimited retries gain nothing, which is why there is no attempt counter. **Never "helpfully"
+  surface a match on the registration page.**
+- **Four match tiers, each requiring a UNIQUE hit** — vendor code + TIN (high), code, TIN, then
+  exact normalized company name (medium). **No fuzzy/core-name matching**, unlike the vendor-detail
+  WP list: the directory holds real duplicates and garbled multi-company rows, so a fuzzy hit would
+  hand one company's profile to another. Ambiguity records `ambiguous` and matches nothing.
+- **⚠️ A NEW SUPPLIER HAS NO VENDOR CODE — that is the normal case, not a failure.** A company that
+  has never worked with Megawide has no code and no directory row, so "no match" is the correct
+  outcome. The form asks up front (**"Have you supplied Megawide before?"**, storing
+  `is_new_vendor`) and hides the Vendor Code field for them, and
+  **`create_vendor_from_claim(claim, name)`** creates the vendor record then delegates to
+  `approve_vendor_claim` so there is only ONE path that grants access. **It REFUSES if the
+  normalized name already exists** — the directory has ~2,400 rows derived from work packages and
+  the SAP masterlist, so "I am new" is often wrong, and creating a second record is exactly the
+  duplication Merge/Split exist to clean up. **The matcher runs even when they say they are new**,
+  for the same reason.
+- **The QR is a CONVENIENCE, NOT A CREDENTIAL.** Data Tools → **Registration QR Code** renders the
+  public URL (SVG, print/download), and a vendor's detail modal can render a per-vendor one carrying
+  **`?code=<vendor_code>`** — which only PREFILLS the form. The claim is still matched server-side
+  and still reviewed, so photographing someone else's PO grants nothing. **The parameter is `code`,
+  not `v`, so it can never be confused with the app-wide `?v=` cache-buster.** The QR library is
+  lazy-loaded from jsdelivr (already CSP-allowed) and **degrades to a copyable link** if it fails.
+- **Staff queue:** Data Tools → **Vendor Registrations**, with a badge. Each card shows what was
+  typed, the match + confidence, a directory search, and Decline / Create new vendor / Approve.
+  Declining asks for a reason, which **the claimant sees** on the registration page.
+- **Fixed two pre-existing bugs in the Data Tools alert dot** while wiring the badge:
+  `updateSplitBadge` TOGGLED it, so zero splits cleared the dot even with duplicates waiting; and
+  `updateDupBadge` added the class to `#toolsMenuWrap`, which the CSS (`#btn-tools-menu.has-alert`)
+  never matches — **that dot had never appeared at all.** All three now call one `_syncToolsAlert()`.
+- **No email is sent by any of this.** Supabase's built-in sender is development-only on every plan
+  including Pro, and the standing constraint is no new subscriptions. Identity proof plus staff
+  review replaces inbox verification — arguably stronger, since the address on file is usually a
+  shared `info@` a departed employee may still read.
 
-**The direction: identity-proof + the existing staff queue, instead of email verification.**
-One public URL (no parameter), printed on every PO/JO and in procurement's signature. The
-vendor proves who they are with data only the real vendor holds — **Vendor Code** (`V-00XXX`,
-on every PO they have received), **TIN**, or a **recent PO number** (18,171 in the Conso PO
-List).
+**Verified:** migration parses under `pglast` (27 statements, 7 functions) with assertions that every
+tier requires a unique hit, that no fuzzy matching is present, that the submit RPC leaks no match
+result, that both decision RPCs use a staff allow-list and reject a NULL role, that approval is
+idempotent and refuses an already-decided claim, and that `create_vendor_from_claim` refuses an
+existing name and delegates rather than duplicating the grant logic. Inline JS on all three pages
+passes `node --check`; the registration page was rendered and checked at desktop and 375px mobile.
 
-- **⚠️ COVERAGE OF BOTH IDENTITY FIELDS IS UNMEASURED — measure before building on them.**
-  Nothing in this file records how many directory rows actually carry a `tin`, and the
-  `vendor_code` figures that ARE recorded are stale in opposite directions: **321** was the
-  pre-re-import Conso-PO-List backfill, while the masterlist re-import later mapped `BP Code →
-  vendor_code` for a directory rebuilt around **2,376 companies carrying a V- code**, so true
-  coverage is probably far higher. **Do not quote 321, and do not confuse the TIN count with
-  1,347 — that figure is `contact_email`, not `tin`.** A vendor row with no TIN on file has
-  nothing to match against, so the auto-approve rate is capped by TIN coverage; if it is low the
-  policy is theoretical and staff work a queue regardless. Server matches via a
-plain Postgres `SECURITY DEFINER` RPC — same pattern as `vendor_invite_valid`, **no Edge
-Function**, so no new dependency class. Unmatched claims fall to a request-access queue, the
-shape `vendor_accreditation_requests` already uses. This is a *stronger* proof than an inbox:
-the on-file address is usually a shared `info@` a former employee may still read.
+**⚠️ NOT RUN YET, and NOT exercised end-to-end** — no vendor has ever logged in, so this whole path
+is unproven against a real user. **Do a deliberate run with one throwaway registration before
+printing the QR anywhere.** The QR library's CDN load could not be verified offline; the fallback
+covers it but confirm on first use.
 
-- **⚠️ IT FORCES AN RLS CHANGE.** `vendor-register.html` inserts `status:'approved'` and
-  `users_insert_vendor` **requires** `status = 'approved'` — vendor registration is
-  auto-approved today, gated only by the invite-email match. A public URL must land the account
-  as **`pending` with no data access** until staff approve it. That is a policy change, not an
-  add-on.
-- **⚠️ NEVER auto-match on a free-mail domain.** Domain matching is needed (the address on file
-  is usually `info@`/`sales@`, not the person registering), but a meaningful share of SME
-  vendors here carry `@gmail.com`/`@yahoo.com` — domain-matching those hands one vendor another
-  vendor's profile. Hard-blocklist free-mail into the request queue. A corporate domain owned by
-  several vendor rows shows candidates for the vendor to pick and staff to confirm.
-- Blast/reminder email goes out by **Outlook mail merge on the existing M365 licence**, from the
-  CSV `exportInviteList()` already produces — not from the app. Zero incremental cost, no SMTP
-  config, no IT ticket.
-- **Do not chase all 2,412.** The directory holds ~1,624 vendors but only ~324 have WP links;
-  most of the tail is dormant SAP payables history. Target by awarded spend / active WPs.
-- The carrot is **accreditation renewal** (`accredStanding()`, already built) — self-service is
-  otherwise unpaid data entry for Megawide's benefit.
-- Blast radius of a wrong match is small by construction: `vendor_edit_guard` pins name,
-  accreditation, payment terms and notes, and `vendor_self_view` hides staff notes entirely.
-
-**Measure before building** (needs an authenticated session — not done): vendors with a real
-`contact_email`; how many are free-mail; how many corporate domains map to >1 vendor row; and
-all three restricted to vendors with an award in the last 24 months. Those numbers decide
-whether domain matching is the main path or a minor one.
+**Still open:** no email anywhere (a claimant must revisit the link to see their status); the
+`?code=` QR is per-vendor but nothing generates them in bulk for a PO mail-merge; and
+`users.vendor_id` is 1:1, so several people at one company each need their own approved claim.
 
 ### Vendor child data — archive, not delete (2026-09-01)
 
@@ -1881,7 +1891,7 @@ Public pages (login, register, pending, forgot-password) load UMD bundle inline 
 
 Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net, cdnjs.cloudflare.com; `dns-prefetch` for Supabase URL; `preload as="script"` for all body scripts.
 
-**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260901b` (`20260901b` = accreditation evidence is frozen — `db.js` gained `VendorDb.documents.setLocked`, see “Vendor documents — freeze approved evidence”; pairs with `migrations/2026-09-01_vendor_doc_lock.sql`; `20260901a` = `20260901a` = vendor child tables lost DELETE for the vendor role and gained archive/restore — `db.js` `_child()` rewritten, see “Vendor child data — archive, not delete”; pairs with `migrations/2026-09-01_vendor_child_soft_delete.sql`; `20260825g` = `20260825g` = the PMO ruling that an awarded WP counts whatever its cost, including ₱0 — `isMoneyAwarded` now delegates to `isResolved` (Known Issues #43); `20260825f` = Balance to Award reverted to `ctc` so the Cost Overview cards reconcile again, with the WP count moved onto the same basis (Known Issues #36); `20260825e` = the topbar help menu rendering unstyled before its CSS existed (Known Issues #42); `20260825d` = the read-only/layout role split — `viewer_budget` now gets the FULL contributor UI, read-only (see Known Issues #41); `20260825c` = Vendor Management gated to contributors, Select all/None on the admin project-assignment list, the sign-in page restyled to match the Planners/Engineering apps, and the Portfolio no longer caching an empty WP fetch — see Known Issues #37; `patch-notice.js` independently at `20260825a`; `20260825b` = renamed the visible label to **No-Cost Award** (DB column stays `free_of_charge`); `20260825a` = free-of-charge awards (`free_of_charge`, new `isMoneyAwarded`/`effectiveAwardedCost` branches + deploy guard in `db.js`) and Balance to Award summed over the backlog — see Known Issues #28c and #36; `20260822b` = the Analytics banner counting vendors with no directory record (vendors.html only, but bumped with the set); `20260822a` = sidebar project-search text colour fix + the Savings/Loss buyback annotation moved onto its own line — see Known Issues #35; `20260820m` = accreditation renewal/expiry (`accredStanding` in db.js), accreditation-risk + product-category analytics, WP-form "Suggest vendors", offering reclassify, and vendor-portal dark mode; `vendor-guide.js` independently at `20260820a`; `20260820l` = vendor performance analytics (scorecard + cycle time), the WP-List vendor filter resolving through the `vendor_id` FK (`db.js` unchanged for this, but bumped with the set), and the directory triage views; `20260820k` = the hybrid product taxonomy — `db.js` gained the taxonomy API (`getTaxonomy`/`buildTaxonomyTree`/`taxonomyPathLabel`/`taxonomyNodeForWP`/`findVendorsForWP`) and the shared `window.TaxonomyPicker`; pairs with `migrations/2026-08-20_product_taxonomy.sql`; `20260820j` = accreditation guardrails — `db.js` `searchApprovedVendors`/`getVendorsByIds` now select `accreditation` to feed the picker badges + the problematic-award confirm gate; `20260820i` = the true vendor-edit flag — `db.js` `updateVendor` gained the `vendor_edited_at` deploy-safe strip; pairs with `migrations/2026-08-20_vendor_edited_flag.sql` and the `vendors.html` `_vendorEdited` rewrite; `20260820h` = `vendor_self_view` — vendors read AND write through a column-free view (`_vendorRel()` in db.js); `20260820g` = vendor field-ownership lockdown (`migrations/2026-08-20_vendor_field_ownership.sql`, portal STAFF_FIELDS); `20260820f` = vendor self-service round 2 — `VendorDb.prepareInvites`, the vendor-edit flag, and the portal's draft/validation pass; `20260820e` = bulk-delete impact pre-flight (`VendorDb.getDeletionImpact`) + CSV backup; `20260820d` = fuzzy-token merge suggestions + large clusters shown instead of hidden (vendors.html only, but bumped with the set); `20260820c` = merges preserve accreditation (`_preserveOnMerge` inside `mergeVendors`, standing-led canonical score); `20260820b` = one not-accredited state (`ACCREDITATIONS` is now two keys, `accredKey` folds legacy `'unaccredited'` onto `'none'`) + the vendor-directory UI pass; `20260820a` = vendor self-service + accreditation requests — `db.js` gained `VendorDb.documents`/`VendorDb.requests`, `window.accredReadiness`/`ACCRED_DOC_TYPES`, and the `_stripProfile` deploy guard; `20260819b` = retiring the `vendors.status` tagging — `db.js` `createVendor`/`quickCreateVendor` now write `status:'approved'` and `searchApprovedVendors` no longer filters on it; `20260819a` = the vendor-accreditation feature: `db.js` gained the `ACCREDITATIONS` roster + `accredKey`/`accredMeta`/`accredLabel`/`accredFromText` helpers, `bulkSetAccreditation`, and the `_stripAccred` deploy guard on `createVendor`/`updateVendor`; `20260812k` = folding the "Missing Planned Award Date" section into Data Gaps; `k`'s predecessor `j` = folding the "Missing Planned Award Date" section into Data Gaps; `j` = the Action Center sortable/collapsible-table rework + `db.js`'s `fmtSavingsBuyback`/buyback-not-auto-folded change; `i` = the missing-planned-date chart footnote; `h` = the onboarding.js fixed-height-slides + "?" help-menu fix; `g` was the `db.js` `renderUserBar()` "What's New" dropdown item; `f` was the buyback work: `h` added the exact-amount mode + `buybackExactAmount`, `i` added the granular `_stripBuyback`/`_retryUpdate` deploy guards; `g` was the shared `db.js` buyback money helpers — `buybackValue`/`buybackDepFraction`/`effectiveAwardedCost` + the `_isMissingBuybackCol` deploy guard; previously `20260811f`/`e` for the `_pagedSelect` 1000-row-cap fix + `ui.js` `AppNotify.progress`, and `20260811c` for the per-vendor-amount co-award work — `awarded_vendor_ids`/`awarded_vendor_amounts` guards + per-vendor `reconcileBidsOnAward`/backfill + `_splitAwarded`; `vendor-guide.js` carries an independent version; the prose here has drifted before — always trust a `grep -oh "v=20260[0-9]*[a-z]*"` over the real files, not this line). (`onboarding.js` + `coachmarks.js` now share this SAME version string too, not an independent one — the earlier note about a separate `20260730a` was stale; verify with a repo-wide grep before assuming otherwise.) **The shared `auth.js`/`db.js`/`ui.js`/`dashboard.css` includes now ALSO carry `?v=` on the other app pages (`admin.html`, `review.html`, `wp-form.html`, `my-wps.html`, `claim-form.html`, `project-selector.html`)** — previously they were unversioned and served stale `db.js` for ~10 min after a deploy (a real bug: e.g. admin.html not getting a new `db.js` write-path). When you bump the version, update it on ALL these pages too (a repo-wide `sed 's/?v=OLD/?v=NEW/g'` over the `*.html` set is simplest). `charts.js` is still only on index/project.
+**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260901c` (`20260901c` = vendor self-registration — `db.js` gained `VendorDb.claims`, see “Vendor self-service at scale”; pairs with `migrations/2026-09-01_vendor_self_registration.sql`; `20260901b` = `20260901b` = accreditation evidence is frozen — `db.js` gained `VendorDb.documents.setLocked`, see “Vendor documents — freeze approved evidence”; pairs with `migrations/2026-09-01_vendor_doc_lock.sql`; `20260901a` = `20260901a` = vendor child tables lost DELETE for the vendor role and gained archive/restore — `db.js` `_child()` rewritten, see “Vendor child data — archive, not delete”; pairs with `migrations/2026-09-01_vendor_child_soft_delete.sql`; `20260825g` = `20260825g` = the PMO ruling that an awarded WP counts whatever its cost, including ₱0 — `isMoneyAwarded` now delegates to `isResolved` (Known Issues #43); `20260825f` = Balance to Award reverted to `ctc` so the Cost Overview cards reconcile again, with the WP count moved onto the same basis (Known Issues #36); `20260825e` = the topbar help menu rendering unstyled before its CSS existed (Known Issues #42); `20260825d` = the read-only/layout role split — `viewer_budget` now gets the FULL contributor UI, read-only (see Known Issues #41); `20260825c` = Vendor Management gated to contributors, Select all/None on the admin project-assignment list, the sign-in page restyled to match the Planners/Engineering apps, and the Portfolio no longer caching an empty WP fetch — see Known Issues #37; `patch-notice.js` independently at `20260825a`; `20260825b` = renamed the visible label to **No-Cost Award** (DB column stays `free_of_charge`); `20260825a` = free-of-charge awards (`free_of_charge`, new `isMoneyAwarded`/`effectiveAwardedCost` branches + deploy guard in `db.js`) and Balance to Award summed over the backlog — see Known Issues #28c and #36; `20260822b` = the Analytics banner counting vendors with no directory record (vendors.html only, but bumped with the set); `20260822a` = sidebar project-search text colour fix + the Savings/Loss buyback annotation moved onto its own line — see Known Issues #35; `20260820m` = accreditation renewal/expiry (`accredStanding` in db.js), accreditation-risk + product-category analytics, WP-form "Suggest vendors", offering reclassify, and vendor-portal dark mode; `vendor-guide.js` independently at `20260820a`; `20260820l` = vendor performance analytics (scorecard + cycle time), the WP-List vendor filter resolving through the `vendor_id` FK (`db.js` unchanged for this, but bumped with the set), and the directory triage views; `20260820k` = the hybrid product taxonomy — `db.js` gained the taxonomy API (`getTaxonomy`/`buildTaxonomyTree`/`taxonomyPathLabel`/`taxonomyNodeForWP`/`findVendorsForWP`) and the shared `window.TaxonomyPicker`; pairs with `migrations/2026-08-20_product_taxonomy.sql`; `20260820j` = accreditation guardrails — `db.js` `searchApprovedVendors`/`getVendorsByIds` now select `accreditation` to feed the picker badges + the problematic-award confirm gate; `20260820i` = the true vendor-edit flag — `db.js` `updateVendor` gained the `vendor_edited_at` deploy-safe strip; pairs with `migrations/2026-08-20_vendor_edited_flag.sql` and the `vendors.html` `_vendorEdited` rewrite; `20260820h` = `vendor_self_view` — vendors read AND write through a column-free view (`_vendorRel()` in db.js); `20260820g` = vendor field-ownership lockdown (`migrations/2026-08-20_vendor_field_ownership.sql`, portal STAFF_FIELDS); `20260820f` = vendor self-service round 2 — `VendorDb.prepareInvites`, the vendor-edit flag, and the portal's draft/validation pass; `20260820e` = bulk-delete impact pre-flight (`VendorDb.getDeletionImpact`) + CSV backup; `20260820d` = fuzzy-token merge suggestions + large clusters shown instead of hidden (vendors.html only, but bumped with the set); `20260820c` = merges preserve accreditation (`_preserveOnMerge` inside `mergeVendors`, standing-led canonical score); `20260820b` = one not-accredited state (`ACCREDITATIONS` is now two keys, `accredKey` folds legacy `'unaccredited'` onto `'none'`) + the vendor-directory UI pass; `20260820a` = vendor self-service + accreditation requests — `db.js` gained `VendorDb.documents`/`VendorDb.requests`, `window.accredReadiness`/`ACCRED_DOC_TYPES`, and the `_stripProfile` deploy guard; `20260819b` = retiring the `vendors.status` tagging — `db.js` `createVendor`/`quickCreateVendor` now write `status:'approved'` and `searchApprovedVendors` no longer filters on it; `20260819a` = the vendor-accreditation feature: `db.js` gained the `ACCREDITATIONS` roster + `accredKey`/`accredMeta`/`accredLabel`/`accredFromText` helpers, `bulkSetAccreditation`, and the `_stripAccred` deploy guard on `createVendor`/`updateVendor`; `20260812k` = folding the "Missing Planned Award Date" section into Data Gaps; `k`'s predecessor `j` = folding the "Missing Planned Award Date" section into Data Gaps; `j` = the Action Center sortable/collapsible-table rework + `db.js`'s `fmtSavingsBuyback`/buyback-not-auto-folded change; `i` = the missing-planned-date chart footnote; `h` = the onboarding.js fixed-height-slides + "?" help-menu fix; `g` was the `db.js` `renderUserBar()` "What's New" dropdown item; `f` was the buyback work: `h` added the exact-amount mode + `buybackExactAmount`, `i` added the granular `_stripBuyback`/`_retryUpdate` deploy guards; `g` was the shared `db.js` buyback money helpers — `buybackValue`/`buybackDepFraction`/`effectiveAwardedCost` + the `_isMissingBuybackCol` deploy guard; previously `20260811f`/`e` for the `_pagedSelect` 1000-row-cap fix + `ui.js` `AppNotify.progress`, and `20260811c` for the per-vendor-amount co-award work — `awarded_vendor_ids`/`awarded_vendor_amounts` guards + per-vendor `reconcileBidsOnAward`/backfill + `_splitAwarded`; `vendor-guide.js` carries an independent version; the prose here has drifted before — always trust a `grep -oh "v=20260[0-9]*[a-z]*"` over the real files, not this line). (`onboarding.js` + `coachmarks.js` now share this SAME version string too, not an independent one — the earlier note about a separate `20260730a` was stale; verify with a repo-wide grep before assuming otherwise.) **The shared `auth.js`/`db.js`/`ui.js`/`dashboard.css` includes now ALSO carry `?v=` on the other app pages (`admin.html`, `review.html`, `wp-form.html`, `my-wps.html`, `claim-form.html`, `project-selector.html`)** — previously they were unversioned and served stale `db.js` for ~10 min after a deploy (a real bug: e.g. admin.html not getting a new `db.js` write-path). When you bump the version, update it on ALL these pages too (a repo-wide `sed 's/?v=OLD/?v=NEW/g'` over the `*.html` set is simplest). `charts.js` is still only on index/project.
 
 ---
 

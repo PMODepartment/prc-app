@@ -2235,6 +2235,73 @@ const VendorDb = (() => {
   // child tables — these hold the BIR 2303 / business permit an accreditation
   // was granted on, so a vendor destroying them is the worst case of the four.
   const _docsBase = _child('vendor_documents', 'uploaded_at');
+  // ── Self-registration claims ───────────────────────────────────
+  // A vendor claims access from ONE public URL instead of a per-vendor invite
+  // link (migrations/2026-09-01_vendor_self_registration.sql). Every write goes
+  // through a SECURITY DEFINER RPC — vendor_claims has a SELECT policy and
+  // nothing else — so a claimant can neither edit their own match result nor
+  // approve themselves.
+  const vendorClaims = {
+    // Staff review queue, newest last. Returns [] pre-migration so vendors.html
+    // still renders.
+    async pending() {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_claims').select('*')
+        .eq('status', 'pending').order('created_at');
+      if (error) { if (_isMissingTable(error, 'vendor_claims')) return []; throw error; }
+      return data || [];
+    },
+    async forVendor(vendorId) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_claims').select('*')
+        .eq('vendor_id', vendorId).order('created_at', { ascending: false });
+      if (error) { if (_isMissingTable(error, 'vendor_claims')) return []; throw error; }
+      return data || [];
+    },
+    // The claimant's own row. RLS scopes this to auth_user_id = auth.uid().
+    async mine() {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_claims').select('*')
+        .order('created_at', { ascending: false }).limit(1);
+      if (error) { if (_isMissingTable(error, 'vendor_claims')) return null; throw error; }
+      return (data && data[0]) || null;
+    },
+    // ⚠️ Returns only a claim id. The RPC deliberately does NOT report whether
+    // or to whom it matched — that would make it an oracle for enumerating
+    // vendors and confirming TINs. Do not "helpfully" surface a match here.
+    async submit(company, contactName, vendorCode, tin, isNew) {
+      const sb = await getSB();
+      const { data, error } = await sb.rpc('submit_vendor_claim', {
+        p_company: company, p_contact_name: contactName || null,
+        p_vendor_code: vendorCode || null, p_tin: tin || null,
+        p_is_new: !!isNew });
+      if (error) throw error;
+      return data;
+    },
+    // For a company that is genuinely not in the directory yet: creates the
+    // vendors row, then delegates to the same approval path. Throws 23505 if
+    // the name already exists — link to that record instead of duplicating it.
+    async approveAsNew(claimId, name, notes) {
+      const sb = await getSB();
+      const { data, error } = await sb.rpc('create_vendor_from_claim', {
+        p_claim: claimId, p_name: name || null, p_notes: notes || null });
+      if (error) throw error;
+      return data;
+    },
+    async approve(claimId, vendorId, notes) {
+      const sb = await getSB();
+      const { error } = await sb.rpc('approve_vendor_claim', {
+        p_claim: claimId, p_vendor: vendorId, p_notes: notes || null });
+      if (error) throw error;
+    },
+    async reject(claimId, notes) {
+      const sb = await getSB();
+      const { error } = await sb.rpc('reject_vendor_claim', {
+        p_claim: claimId, p_notes: notes || null });
+      if (error) throw error;
+    },
+  };
+
   const vendorDocuments = {
     ..._docsBase,
     async list(vendorId, opts) {
@@ -3265,7 +3332,7 @@ const VendorDb = (() => {
     taxonomyNodeForWP, findVendorsForWP,
     getVendorRates, addVendorRate, deleteVendorRate, upsertRate,
     uploadCertFile, getCertFileUrl, deleteCertFile,
-    documents: vendorDocuments, uploadVendorDoc, requests: accreditationRequests,
+    documents: vendorDocuments, uploadVendorDoc, requests: accreditationRequests, claims: vendorClaims,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,

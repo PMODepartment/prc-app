@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260901b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260901b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260901b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260901c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260901c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260901c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260901b">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260901c">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -415,6 +415,30 @@
 .doc-lock-badge{display:inline-flex;align-items:center;gap:3px;font-size:0.68rem;font-weight:700;color:var(--text-hint,#6E6C6C);cursor:help}
 .doc-unlock{font-size:0.68rem;color:var(--mw-red,#EE3124);cursor:pointer;text-decoration:underline}
 body.dark-mode .arch-block{border-top-color:var(--border-md)}
+    .claim-card{border:1.5px solid var(--border-md,#e5e5e5);border-radius:10px;padding:16px;margin-bottom:14px;background:var(--surface,#fff)}
+    .claim-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+    .claim-conf{font-size:0.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:20px;cursor:help}
+    .claim-when{font-size:0.72rem;color:var(--text-hint,#6E6C6C);margin-left:auto}
+    .claim-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 16px;margin-bottom:12px}
+    .claim-kv{font-size:0.78rem;min-width:0}
+    .claim-kv span{display:block;font-size:0.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--text-hint,#6E6C6C)}
+    .claim-kv b{color:var(--text-primary,#231F20);word-break:break-word}
+    .claim-match{border-top:1px dashed var(--border,#eee);padding-top:12px}
+    .claim-match label{display:block;font-size:0.66rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-hint,#6E6C6C);margin-bottom:5px}
+    .claim-input{width:100%;padding:8px 11px;border:1.5px solid var(--border-md,#e5e5e5);border-radius:7px;font-family:inherit;font-size:0.82rem;background:var(--surface,#fff);color:var(--text-primary,#231F20)}
+    .claim-results{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+    .claim-hit{text-align:left;background:none;border:none;padding:6px 9px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:0.8rem;color:var(--text-primary,#231F20)}
+    .claim-hit:hover{background:var(--mw-red-light,#FDECEA)}
+    .claim-hit small{color:var(--text-hint,#6E6C6C);font-family:monospace}
+    .claim-hit-none{font-size:0.76rem;color:var(--text-hint,#6E6C6C);padding:6px 9px}
+    .claim-picked{font-size:0.76rem;color:var(--text-hint,#6E6C6C);margin-top:6px}
+    .claim-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+    .qr-box{display:flex;justify-content:center;padding:18px;background:#fff;border:1.5px solid var(--border-md,#e5e5e5);border-radius:10px}
+    .qr-box svg{width:230px;height:230px}
+    .qr-url{margin-top:12px;font-family:monospace;font-size:0.72rem;word-break:break-all;color:var(--text-hint,#6E6C6C);text-align:center}
+    .qr-actions{display:flex;justify-content:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+    .qr-note{margin-top:12px;font-size:0.74rem;line-height:1.55;color:var(--text-hint,#6E6C6C);text-align:center}
+    .qr-fallback{font-size:0.8rem;color:#9B1B1B;line-height:1.6;text-align:center}
 </style>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -515,6 +539,8 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
             <div class="tools-menu-wrap" id="toolsMenuWrap" style="position:relative;flex-shrink:0">
               <button class="btn-cancel" id="btn-tools-menu" onclick="toggleToolsMenu()"><i class="ti ti-tool" style="margin-right:4px"></i>Data Tools <i class="ti ti-chevron-down" style="margin-left:2px;font-size:0.75em"></i></button>
               <div class="tools-menu" id="toolsMenu" style="display:none">
+                <button id="tools-menu-claims" onclick="closeToolsMenu();openClaimsModal()"><i class="ti ti-user-check"></i><span>Vendor Registrations <span class="tools-menu-badge" id="claim-count-badge" style="display:none"><span id="claim-count">0</span></span></span><small>People who registered from the public link and need access approved</small></button>
+                <button onclick="closeToolsMenu();openQrModal()"><i class="ti ti-qrcode"></i><span>Registration QR Code</span><small>Print on POs and notices so vendors can register by scanning</small></button>
                 <button onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs</span><small>Scan work packages for vendors not yet in the directory</small></button>
                 <button onclick="closeToolsMenu();backfillFromWPs()"><i class="ti ti-refresh-dot"></i><span>Backfill Trade/Bid Data</span><small>Fill in trades, products, bid history and rates from WPs</small></button>
                 <button onclick="closeToolsMenu();normalizeVendorTrades()"><i class="ti ti-tags"></i><span>Normalize Trades</span><small>Collapse trade variants (e.g. "GENERAL REQUIREMENT" → "General Requirements") to the 10 standard trades</small></button>
@@ -740,9 +766,9 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260901b"></script>
-<script src="assets/js/db.js?v=20260901b"></script>
-<script src="assets/js/ui.js?v=20260901b"></script>
+<script src="assets/js/auth.js?v=20260901c"></script>
+<script src="assets/js/db.js?v=20260901c"></script>
+<script src="assets/js/ui.js?v=20260901c"></script>
 <script src="assets/js/vendor-guide.js?v=20260820a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -814,7 +840,7 @@ async function loadAll() {
   renderKpis();
   renderVendorList();
   buildInviteChips();
-  updateSplitBadge();
+  updateSplitBadge(); updateClaimsBadge();
   updateDupBadge();
 }
 
@@ -1820,13 +1846,26 @@ function _splitRows() {
   });
   return [...byId.values()];
 }
+// ONE writer for the Data Tools alert dot. Three updaters used to fight over
+// it: updateSplitBadge TOGGLED it, so zero splits cleared the dot even when
+// duplicates or registrations were waiting; and updateDupBadge added the class
+// to #toolsMenuWrap, which the CSS (#btn-tools-menu.has-alert) never matches —
+// so that dot had never appeared at all. Each updater now just writes its own
+// count into the DOM and calls this.
+function _syncToolsAlert() {
+  const total = ['split-count', 'dup-count', 'claim-count'].reduce(function (a, id) {
+    const e = document.getElementById(id);
+    return a + (e ? (parseInt(e.textContent, 10) || 0) : 0);
+  }, 0);
+  const btn = document.getElementById('btn-tools-menu');
+  if (btn) btn.classList.toggle('has-alert', total > 0);
+}
 function updateSplitBadge() {
   const n = _splitCandidates().length;
   document.getElementById('split-count').textContent = n;
   const badge = document.getElementById('split-count-badge');
   if (badge) badge.style.display = n ? '' : 'none';
-  const toolsBtn = document.getElementById('btn-tools-menu');
-  if (toolsBtn) toolsBtn.classList.toggle('has-alert', n > 0);
+  _syncToolsAlert();
 }
 function toggleToolsMenu() {
   const menu = document.getElementById('toolsMenu');
@@ -4106,8 +4145,7 @@ function updateDupBadge() {
   const badge = document.getElementById('dup-count-badge');
   const cnt = document.getElementById('dup-count');
   if (badge && cnt) { cnt.textContent = n; badge.style.display = n ? '' : 'none'; }
-  const wrap = document.getElementById('toolsMenuWrap');
-  if (wrap && n) wrap.classList.add('has-alert');
+  _syncToolsAlert();
 }
 
 </script>
@@ -4198,5 +4236,318 @@ function restoreDetailProduct(id)   { return _restoreChild(VendorDb.products, id
 function restoreDetailCert(id)      { return _restoreChild(VendorDb.certifications, id, renderDetailCerts); }
 function restoreDetailPersonnel(id) { return _restoreChild(VendorDb.personnel, id, renderDetailPersonnel); }
 </script>
+<!-- ── Vendor self-registration queue ─────────────────────────────────────── -->
+<div class="modal-overlay" id="claimsModal" style="display:none">
+  <div class="modal" style="max-width:820px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Vendor Registrations</div>
+        <div class="modal-subtitle">People who registered from the public link and are waiting to be given access to their company's profile. Check the details they submitted against the vendor record, then approve or decline.</div>
+      </div>
+      <button class="modal-close" onclick="closeClaimsModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="claimsModalBody"></div>
+  </div>
+</div>
+
+<!-- ── Registration QR ────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="qrModal" style="display:none">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="qrTitle">Registration QR Code</div>
+        <div class="modal-subtitle" id="qrSubtitle">Print this on Purchase Orders, RFQs and notices. A vendor scans it, registers, and lands in the queue — no invite link to send.</div>
+      </div>
+      <button class="modal-close" onclick="closeQrModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="qrBox" class="qr-box"></div>
+      <div class="qr-url" id="qrUrl"></div>
+      <div class="qr-actions">
+        <button class="btn-cancel" onclick="copyQrUrl()"><i class="ti ti-copy"></i> Copy link</button>
+        <button class="btn-cancel" onclick="downloadQr()"><i class="ti ti-download"></i> Download SVG</button>
+        <button class="btn-cancel" onclick="printQr()"><i class="ti ti-printer"></i> Print</button>
+      </div>
+      <p class="qr-note" id="qrNote"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══ Vendor self-registration — staff queue ════════════════════════════════
+   migrations/2026-09-01_vendor_self_registration.sql replaced the per-vendor
+   invite link with ONE public URL. A claimant proves who they are with data
+   only the real vendor holds (Vendor Code / TIN / company name), the server
+   matches it, and the claim lands here for a person to confirm.
+
+   ⚠️ The claimant is NEVER told whether they matched — that would let anyone
+   brute-force TINs to discover Megawide's vendors. The match result exists for
+   THIS screen only.                                                        */
+let _claims = [];
+
+function _claimVendorName(id) {
+  if (!id) return null;
+  const v = (allVendors || []).find(x => x.id === id);
+  return v ? v.name : null;
+}
+function _confBadge(c) {
+  const conf = c.match_confidence || 'none';
+  const map = {
+    high:   { bg: '#D1FAE5', fg: '#065F46', txt: 'Strong match' },
+    medium: { bg: '#FEF3C7', fg: '#92400E', txt: 'Partial match' },
+    none:   { bg: '#FDECEA', fg: '#9B1B1B', txt: 'No match' }
+  };
+  const m = map[conf] || map.none;
+  const how = {
+    code_and_tin: 'Vendor Code and TIN both matched the same record',
+    code: 'Vendor Code matched', tin: 'TIN matched',
+    name: 'Company name matched exactly',
+    ambiguous: 'What they entered matched more than one vendor — pick the right one',
+    none: 'Nothing they entered matched a vendor record'
+  }[c.match_method || 'none'] || '';
+  return '<span class="claim-conf" style="background:' + m.bg + ';color:' + m.fg + '" title="'
+    + esc(how) + '">' + m.txt + '</span>';
+}
+
+async function openClaimsModal() {
+  document.getElementById('claimsModal').style.display = 'flex';
+  _syncModalScrollLock();
+  document.getElementById('claimsModalBody').innerHTML = '<div class="empty">Loading…</div>';
+  try { _claims = await VendorDb.claims.pending(); }
+  catch (e) { _claims = []; }
+  renderClaims();
+}
+function closeClaimsModal() {
+  document.getElementById('claimsModal').style.display = 'none';
+  _syncModalScrollLock();
+}
+
+function renderClaims() {
+  const box = document.getElementById('claimsModalBody');
+  if (!_claims.length) {
+    box.innerHTML = '<div class="empty"><i class="ti ti-inbox" style="font-size:1.6rem;display:block;margin-bottom:6px"></i>'
+      + 'No registrations waiting. When a vendor registers from the public link they will appear here.</div>';
+    return;
+  }
+  box.innerHTML = _claims.map(function (c, i) {
+    const matched = _claimVendorName(c.vendor_id);
+    const rows = [
+      ['Company as entered', c.claimed_company],
+      ['Contact', c.claimed_contact_name],
+      ['Email', c.email],
+      ['Vendor Code', c.claimed_vendor_code],
+      ['TIN', c.claimed_tin]
+    ].filter(function (r) { return r[1]; })
+     .map(function (r) { return '<div class="claim-kv"><span>' + esc(r[0]) + '</span><b>' + esc(r[1]) + '</b></div>'; })
+     .join('');
+    return '<div class="claim-card">'
+      + '<div class="claim-head">' + _confBadge(c)
+      + (c.is_new_vendor ? '<span class="claim-conf" style="background:#EFF6FF;color:#1E40AF" '
+          + 'title="They told us they have never supplied Megawide, so having no Vendor Code is expected.">'
+          + 'Says new supplier</span>' : '')
+      + '<span class="claim-when">' + esc(_fmtAuditDate(c.created_at)) + '</span></div>'
+      + '<div class="claim-grid">' + rows + '</div>'
+      + '<div class="claim-match">'
+      + '<label>Give this person access to</label>'
+      + '<input type="text" id="claim-search-' + i + '" class="claim-input" placeholder="Search the directory…" '
+      + 'value="' + esc(matched || '') + '" oninput="_claimSearch(' + i + ')" autocomplete="off">'
+      + '<div class="claim-results" id="claim-results-' + i + '"></div>'
+      + '<div class="claim-picked" id="claim-picked-' + i + '">'
+      + (matched
+          ? 'Matched automatically: <b>' + esc(matched) + '</b>'
+          : (c.is_new_vendor
+              ? 'No match, which is expected for a new supplier. Search first in case we already hold them — otherwise create a record.'
+              : 'No automatic match — search for the right vendor, or create one if we have never dealt with them.'))
+      + '</div></div>'
+      + (_canManage ? '<div class="claim-actions">'
+          + '<button class="btn-cancel" onclick="rejectClaim(' + i + ')">Decline</button>'
+          + '<button class="btn-cancel" onclick="approveAsNewClaim(' + i + ')" '
+          + 'title="Only if we have never dealt with this company. Refused if the name already exists.">'
+          + '<i class="ti ti-building-plus"></i> Create new vendor</button>'
+          + '<button class="btn-primary" onclick="approveClaim(' + i + ')">Approve access</button>'
+          + '</div>' : '')
+      + '</div>';
+  }).join('');
+  _claims.forEach(function (c, i) { _claimPick[i] = c.vendor_id || null; });
+}
+
+const _claimPick = {};
+
+function _claimSearch(i) {
+  const q = (document.getElementById('claim-search-' + i).value || '').trim().toLowerCase();
+  const box = document.getElementById('claim-results-' + i);
+  if (q.length < 2) { box.innerHTML = ''; return; }
+  const hits = (allVendors || []).filter(function (v) {
+    return String(v.name || '').toLowerCase().indexOf(q) >= 0
+        || String(v.vendor_code || '').toLowerCase().indexOf(q) >= 0;
+  }).slice(0, 8);
+  box.innerHTML = hits.length
+    ? hits.map(function (v) {
+        return '<button class="claim-hit" onclick="_claimChoose(' + i + ',' + Q2 + v.id + Q2 + ')">'
+          + esc(v.name) + (v.vendor_code ? ' <small>' + esc(v.vendor_code) + '</small>' : '') + '</button>';
+      }).join('')
+    : '<div class="claim-hit-none">No vendor matches that.</div>';
+}
+function _claimChoose(i, vid) {
+  const v = (allVendors || []).find(function (x) { return x.id === vid; });
+  if (!v) return;
+  _claimPick[i] = vid;
+  document.getElementById('claim-search-' + i).value = v.name;
+  document.getElementById('claim-results-' + i).innerHTML = '';
+  document.getElementById('claim-picked-' + i).innerHTML = 'Selected: <b>' + esc(v.name) + '</b>';
+}
+
+async function approveClaim(i) {
+  const c = _claims[i];
+  const vid = _claimPick[i];
+  if (!vid) { alert('Search for and select the vendor this person belongs to first.'); return; }
+  const vname = _claimVendorName(vid) || '';
+  if (!confirm('Give ' + c.email + ' access to ' + vname + '?')) return;
+  try {
+    await VendorDb.claims.approve(c.id, vid, null);
+    if (window.AppNotify) AppNotify.success('Access granted to ' + vname + '.');
+    await loadAll();
+    _claims = await VendorDb.claims.pending();
+    renderClaims();
+    updateClaimsBadge();
+  } catch (e) {
+    if (window.AppNotify) AppNotify.fromError(e, 'Could not approve');
+    else alert('Could not approve: ' + (e.message || e));
+  }
+}
+// For a company genuinely not in the directory yet. The RPC REFUSES if the name
+// already exists, which is the guardrail that stops a self-registration adding a
+// duplicate of a record we already hold — so surface that message rather than
+// treating it as a plain failure.
+async function approveAsNewClaim(i) {
+  const c = _claims[i];
+  const name = prompt('Create a NEW vendor record with this name?', c.claimed_company || '');
+  if (name === null) return;
+  const nm = String(name).trim();
+  if (!nm) { alert('A company name is required.'); return; }
+  try {
+    await VendorDb.claims.approveAsNew(c.id, nm, null);
+    if (window.AppNotify) AppNotify.success('Created ' + nm + ' and granted access.');
+    await loadAll();
+    _claims = await VendorDb.claims.pending();
+    renderClaims();
+    updateClaimsBadge();
+  } catch (e) {
+    const m = (e && e.message) || String(e);
+    if (/already in the directory/i.test(m)) {
+      alert(m + '  Search for that vendor in the box above and use "Approve access" instead.');
+    } else if (window.AppNotify) { AppNotify.fromError(e, 'Could not create the vendor'); }
+    else { alert('Could not create: ' + m); }
+  }
+}
+async function rejectClaim(i) {
+  const c = _claims[i];
+  // The reason is shown to the claimant on the registration page, so it is
+  // worth asking for rather than declining silently.
+  const why = prompt('Why is this being declined? The person will see this message.', '');
+  if (why === null) return;
+  try {
+    await VendorDb.claims.reject(c.id, why || null);
+    if (window.AppNotify) AppNotify.success('Registration declined.');
+    _claims = await VendorDb.claims.pending();
+    renderClaims();
+    updateClaimsBadge();
+  } catch (e) {
+    if (window.AppNotify) AppNotify.fromError(e, 'Could not decline');
+    else alert('Could not decline: ' + (e.message || e));
+  }
+}
+
+async function updateClaimsBadge() {
+  let n = 0;
+  try { n = (await VendorDb.claims.pending()).length; } catch (e) { n = 0; }
+  const b = document.getElementById('claim-count-badge');
+  const c = document.getElementById('claim-count');
+  if (c) c.textContent = n;
+  if (b) b.style.display = n ? '' : 'none';
+  _syncToolsAlert();
+}
+
+/* ══ Registration QR ══════════════════════════════════════════════════════
+   ⚠️ THE QR IS A CONVENIENCE, NOT A CREDENTIAL. A per-vendor code only
+   PREFILLS the form; the claim is still matched server-side and still
+   reviewed, so photographing someone else's Purchase Order grants nothing. */
+let _qrSvg = '', _qrUrlStr = '', _qrLabel = '';
+
+function _registerBaseUrl() {
+  return window.location.origin + window.location.pathname.replace('vendors.html', '') + 'vendor-register.html';
+}
+function _loadQrLib() {
+  if (window.qrcode) return Promise.resolve();
+  return new Promise(function (res, rej) {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
+    s.onload = res;
+    s.onerror = function () { rej(new Error('qr-lib')); };
+    document.head.appendChild(s);
+  });
+}
+async function openQrModal(vendorCode, label) {
+  _qrUrlStr = _registerBaseUrl() + (vendorCode ? '?code=' + encodeURIComponent(vendorCode) : '');
+  _qrLabel = label || '';
+  document.getElementById('qrModal').style.display = 'flex';
+  _syncModalScrollLock();
+  document.getElementById('qrTitle').textContent = label ? 'Registration QR — ' + label : 'Registration QR Code';
+  document.getElementById('qrSubtitle').textContent = label
+    ? 'Prefills this vendor’s code. Print it on their Purchase Orders so they can register by scanning.'
+    : 'Print this on Purchase Orders, RFQs and notices. A vendor scans it, registers, and lands in the queue — no invite link to send.';
+  document.getElementById('qrUrl').textContent = _qrUrlStr;
+  document.getElementById('qrNote').textContent = vendorCode
+    ? 'The code only prefills the form. The registration is still checked against the TIN and company name, and still reviewed here — so this QR is not a password.'
+    : 'One code for every vendor. Nothing about it identifies a company, so it is safe to print anywhere.';
+  const box = document.getElementById('qrBox');
+  box.innerHTML = '<div class="empty">Generating…</div>';
+  try {
+    await _loadQrLib();
+    const qr = window.qrcode(0, 'M');
+    qr.addData(_qrUrlStr);
+    qr.make();
+    _qrSvg = qr.createSvgTag({ cellSize: 6, margin: 4, scalable: true });
+    box.innerHTML = _qrSvg;
+  } catch (e) {
+    // Degrade to something usable rather than a broken modal.
+    _qrSvg = '';
+    box.innerHTML = '<div class="qr-fallback">Could not load the QR generator (no internet, or the CDN is blocked).'
+      + ' The link below still works — copy it, or paste it into any QR generator.</div>';
+  }
+}
+function closeQrModal() {
+  document.getElementById('qrModal').style.display = 'none';
+  _syncModalScrollLock();
+}
+function copyQrUrl() {
+  navigator.clipboard.writeText(_qrUrlStr).then(function () {
+    if (window.AppNotify) AppNotify.success('Registration link copied.');
+  });
+}
+function downloadQr() {
+  if (!_qrSvg) { alert('The QR image could not be generated. Copy the link instead.'); return; }
+  const blob = new Blob([_qrSvg], { type: 'image/svg+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'megawide-vendor-registration' + (_qrLabel ? '-' + _qrLabel.replace(/[^A-Za-z0-9]+/g, '-') : '') + '.svg';
+  document.body.appendChild(a); a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+function printQr() {
+  if (!_qrSvg) { alert('The QR image could not be generated. Copy the link instead.'); return; }
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.write('<title>Vendor Registration QR</title>'
+    + '<div style="font-family:sans-serif;text-align:center;padding:40px">'
+    + '<h2 style="margin:0 0 4px">Register as a Megawide vendor</h2>'
+    + '<p style="color:#555;margin:0 0 18px">Scan to manage your company profile, products and accreditation.</p>'
+    + _qrSvg + '<p style="font-size:12px;color:#777;margin-top:14px">' + esc(_qrUrlStr) + '</p></div>');
+  w.document.close();
+  w.focus();
+  w.print();
+}
+</script>
+
 </body>
 </html>
