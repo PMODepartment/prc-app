@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260901c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260901c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260901c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260901d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260901d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260901d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260901c">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260901d">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -438,6 +438,23 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
     .qr-url{margin-top:12px;font-family:monospace;font-size:0.72rem;word-break:break-all;color:var(--text-hint,#6E6C6C);text-align:center}
     .qr-actions{display:flex;justify-content:center;gap:8px;margin-top:14px;flex-wrap:wrap}
     .qr-note{margin-top:12px;font-size:0.74rem;line-height:1.55;color:var(--text-hint,#6E6C6C);text-align:center}
+    .hist-row{border:1px solid var(--border,#eee);border-radius:8px;padding:11px 13px;margin-bottom:9px}
+    .hist-head{font-size:0.8rem;color:var(--text-primary,#231F20);margin-bottom:7px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+    .hist-when{margin-left:auto;font-size:0.72rem;color:var(--text-hint,#6E6C6C)}
+    .hist-diff{display:grid;grid-template-columns:130px 1fr 1fr;gap:8px;font-size:0.76rem;padding:2px 0;align-items:baseline}
+    .hist-diff span{color:var(--text-hint,#6E6C6C);font-weight:600;word-break:break-word}
+    .hist-diff del{color:#9B1B1B;text-decoration:line-through;word-break:break-word}
+    .hist-diff ins{color:#065F46;text-decoration:none;word-break:break-word}
+    .hist-more{font-size:0.74rem;color:var(--text-hint,#6E6C6C);padding:2px 0}
+    .hist-actions{margin-top:8px;display:flex;justify-content:flex-end}
+    .hist-rollback{margin-top:16px;border-top:1px dashed var(--border-md,#ddd);padding-top:14px}
+    .hist-rollback label{display:block;font-size:0.66rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-hint,#6E6C6C);margin-bottom:6px}
+    .hist-rollback-row{display:flex;gap:8px;flex-wrap:wrap}
+    .hist-note{font-size:0.74rem;line-height:1.55;color:var(--text-hint,#6E6C6C);margin-top:9px}
+    .hist-preview{border:1px solid var(--border-md,#ddd);border-radius:8px;padding:11px 13px;margin-top:10px;font-size:0.8rem}
+    .hist-preview ul{margin:7px 0 9px 17px;padding:0}
+    .hist-preview li{font-size:0.76rem;color:var(--text-hint,#6E6C6C);margin-bottom:2px}
+    @media(max-width:560px){.hist-diff{grid-template-columns:1fr}}
     .qr-fallback{font-size:0.8rem;color:#9B1B1B;line-height:1.6;text-align:center}
 </style>
   <link rel="manifest" href="manifest.webmanifest"/>
@@ -749,6 +766,7 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
         <a href="#dsec-personnel">Personnel</a>
         <a href="#dsec-rates">Rates</a>
         <a href="#dsec-bids">Bid History</a>
+        <a href="#dsec-history">Change History</a>
       </nav>
       <div class="detail-scroll" id="detailScroll">
         <section class="detail-section" id="dsec-overview"><h3 class="detail-section-title">Overview</h3><div id="dtab-overview"></div></section>
@@ -759,6 +777,7 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
         <section class="detail-section" id="dsec-personnel"><h3 class="detail-section-title">Personnel</h3><div id="dtab-personnel"></div></section>
         <section class="detail-section" id="dsec-rates"><h3 class="detail-section-title">Reference Rates</h3><div id="dtab-rates"></div></section>
         <section class="detail-section" id="dsec-bids"><h3 class="detail-section-title">Bid History</h3><div id="dtab-bids"></div></section>
+        <section class="detail-section" id="dsec-history"><h3 class="detail-section-title">Change History</h3><div id="dtab-history"></div></section>
       </div>
     </div>
     <div class="modal-footer" id="detailFooter"></div>
@@ -766,9 +785,9 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260901c"></script>
-<script src="assets/js/db.js?v=20260901c"></script>
-<script src="assets/js/ui.js?v=20260901c"></script>
+<script src="assets/js/auth.js?v=20260901d"></script>
+<script src="assets/js/db.js?v=20260901d"></script>
+<script src="assets/js/ui.js?v=20260901d"></script>
 <script src="assets/js/vendor-guide.js?v=20260820a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -3181,7 +3200,7 @@ async function openDetailModal(id) {
   document.getElementById('detailModal').style.display = 'flex';
   _syncModalScrollLock();
   document.getElementById('detailModalBody').scrollTop = 0;
-  await Promise.all([renderDetailWps(), renderDetailSched(), renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates(), renderDetailBids()]);
+  await Promise.all([renderDetailWps(), renderDetailSched(), renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates(), renderDetailBids(), renderDetailHistory()]);
   renderDetailOverview();
   _wireDetailScrollSpy();
 }
@@ -4546,6 +4565,184 @@ function printQr() {
   w.document.close();
   w.focus();
   w.print();
+}
+</script>
+
+<script>
+/* ══ Vendor change history / restore ══════════════════════════════════════
+   migrations/2026-09-01_vendor_history_restore.sql logs a full before/after
+   snapshot of every change to the five vendor tables, so an overwrite — the
+   one destructive thing a vendor login can still legitimately do to its own
+   data — can be undone.
+
+   ⚠️ These snapshots contain staff-only columns (vendors.notes,
+   accreditation_notes). The table is staff-read-only server-side; never render
+   any of it in vendor-portal.html.                                          */
+
+const _HIST_TABLES = {
+  vendors: 'Company profile',
+  vendor_products: 'Product / service',
+  vendor_certifications: 'Certification',
+  vendor_personnel: 'Personnel',
+  vendor_documents: 'Document'
+};
+// Columns that change on every write and say nothing about intent. Showing them
+// would bury the one field a person actually edited.
+const _HIST_NOISE = new Set([
+  'updated_at', 'updated_by', 'updated_by_name',
+  'created_at', 'created_by', 'created_by_name',
+  'archived_by', 'archived_by_name', 'locked_by', 'locked_by_name',
+  'vendor_edited_at', 'uploaded_at', 'uploaded_by', 'uploaded_by_name'
+]);
+
+function _histChangedFields(h) {
+  const a = h.old_data || {}, b = h.new_data || {};
+  const keys = new Set(Object.keys(a).concat(Object.keys(b)));
+  const out = [];
+  keys.forEach(function (k) {
+    if (_HIST_NOISE.has(k)) return;
+    if (JSON.stringify(a[k] === undefined ? null : a[k]) !== JSON.stringify(b[k] === undefined ? null : b[k])) out.push(k);
+  });
+  return out;
+}
+function _histVal(v) {
+  if (v === null || v === undefined || v === '') return '(empty)';
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '(empty)';
+  if (typeof v === 'object') return JSON.stringify(v);
+  const s = String(v);
+  return s.length > 90 ? s.slice(0, 90) + '…' : s;
+}
+function _histOpLabel(h) {
+  if (h.op === 'INSERT') return 'Added';
+  if (h.op === 'DELETE') return 'Deleted';
+  // Archiving and restoring are UPDATEs, but calling them "changed" hides what
+  // actually happened.
+  const wasArch = h.old_data && h.old_data.archived_at;
+  const nowArch = h.new_data && h.new_data.archived_at;
+  if (!wasArch && nowArch) return 'Removed';
+  if (wasArch && !nowArch) return 'Restored';
+  return 'Changed';
+}
+
+let _histRows = [];
+
+async function renderDetailHistory() {
+  const box = document.getElementById('dtab-history');
+  if (!box || !activeVendor) return;
+  box.innerHTML = '<div class="empty">Loading…</div>';
+  try { _histRows = await VendorDb.history.forVendor(activeVendor.id, 60); }
+  catch (e) { _histRows = []; }
+
+  const rollback = (_canManage && AppAuth.isAdmin && AppAuth.isAdmin(userProfile))
+    ? '<div class="hist-rollback">'
+      + '<label>Roll this vendor back to how it was at</label>'
+      + '<div class="hist-rollback-row">'
+      + '<input type="datetime-local" id="histWhen" class="claim-input" style="max-width:230px">'
+      + '<button class="btn-cancel" onclick="previewVendorRollback()">Preview</button>'
+      + '</div>'
+      + '<div id="histPreview"></div>'
+      + '<p class="hist-note">Everything this vendor owns is put back the way it was at that moment. '
+      + 'Rows that did not exist then are archived, never deleted. You will see exactly what changes before anything happens.</p>'
+      + '</div>'
+    : '';
+
+  if (!_histRows.length) {
+    box.innerHTML = '<div class="empty">No changes recorded yet. History starts from the day the '
+      + 'migration was run — edits made before that were not captured.</div>' + rollback;
+    return;
+  }
+
+  box.innerHTML = _histRows.map(function (h, i) {
+    const fields = _histChangedFields(h);
+    const op = _histOpLabel(h);
+    const detail = fields.length
+      ? fields.slice(0, 6).map(function (k) {
+          return '<div class="hist-diff"><span>' + esc(k) + '</span>'
+            + '<del>' + esc(_histVal(h.old_data ? h.old_data[k] : null)) + '</del>'
+            + '<ins>' + esc(_histVal(h.new_data ? h.new_data[k] : null)) + '</ins></div>';
+        }).join('') + (fields.length > 6 ? '<div class="hist-more">+' + (fields.length - 6) + ' more</div>' : '')
+      : '<div class="hist-more">No content fields changed.</div>';
+    // An INSERT entry has no earlier state, so there is nothing to restore to —
+    // the server refuses it, and offering the button would just produce an error.
+    const canRestore = _canManage && h.old_data;
+    return '<div class="hist-row">'
+      + '<div class="hist-head">'
+      + '<b>' + esc(op) + '</b> · ' + esc(_HIST_TABLES[h.table_name] || h.table_name)
+      + '<span class="hist-when">' + esc(_fmtAuditDate(h.changed_at))
+      + (h.changed_by_name ? ' · ' + esc(h.changed_by_name) : ' · system') + '</span>'
+      + '</div>' + detail
+      + (canRestore ? '<div class="hist-actions"><button class="btn-cancel" onclick="restoreHistoryRow(' + i + ')">'
+          + '<i class="ti ti-arrow-back-up"></i> Put this back</button></div>' : '')
+      + '</div>';
+  }).join('') + rollback;
+}
+
+async function restoreHistoryRow(i) {
+  const h = _histRows[i];
+  if (!h) return;
+  if (!confirm('Put this ' + (_HIST_TABLES[h.table_name] || h.table_name).toLowerCase()
+    + ' back to how it was before this change? The current values are kept in the history, so this is reversible too.')) return;
+  try {
+    await VendorDb.history.restoreRow(h.id);
+    if (window.AppNotify) AppNotify.success('Restored.');
+    await loadAll();
+    await openDetailModal(activeVendor.id);
+  } catch (e) {
+    if (window.AppNotify) AppNotify.fromError(e, 'Could not restore');
+    else alert('Could not restore: ' + (e.message || e));
+  }
+}
+
+function _histWhenIso() {
+  const el = document.getElementById('histWhen');
+  if (!el || !el.value) return null;
+  // datetime-local has no timezone; the user means their own clock, and
+  // toISOString converts from local, which is what we want.
+  const d = new Date(el.value);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+async function previewVendorRollback() {
+  const iso = _histWhenIso();
+  const box = document.getElementById('histPreview');
+  if (!iso) { box.innerHTML = '<div class="hist-more">Pick a date and time first.</div>'; return; }
+  box.innerHTML = '<div class="hist-more">Checking…</div>';
+  try {
+    const rows = await VendorDb.history.preview(activeVendor.id, iso);
+    if (!rows.length) {
+      box.innerHTML = '<div class="hist-more">Nothing has changed since then — there is nothing to put back.</div>';
+      return;
+    }
+    const restores = rows.filter(function (r) { return r.action === 'restore'; }).length;
+    const archives = rows.filter(function (r) { return r.action === 'archive'; }).length;
+    box.innerHTML = '<div class="hist-preview">'
+      + '<b>' + rows.length + ' row(s) would change</b> — ' + restores + ' put back, ' + archives + ' archived.'
+      + '<ul>' + rows.slice(0, 12).map(function (r) {
+          return '<li>' + (r.action === 'archive' ? 'Archive' : 'Restore') + ' · '
+            + esc(_HIST_TABLES[r.table_name] || r.table_name) + ' · ' + esc(r.label || '') + '</li>';
+        }).join('') + '</ul>'
+      + (rows.length > 12 ? '<div class="hist-more">+' + (rows.length - 12) + ' more</div>' : '')
+      + '<button class="btn-primary" onclick="applyVendorRollback()">Restore ' + rows.length + ' row(s)</button>'
+      + '</div>';
+  } catch (e) {
+    box.innerHTML = '<div class="hist-more" style="color:#9B1B1B">' + esc((e && e.message) || String(e)) + '</div>';
+  }
+}
+
+async function applyVendorRollback() {
+  const iso = _histWhenIso();
+  if (!iso) return;
+  if (!confirm('Roll ' + (activeVendor.name || 'this vendor') + ' back to ' + new Date(iso).toLocaleString()
+    + '? Every change made since then is undone. This is itself recorded in the history, so it can be undone again.')) return;
+  try {
+    const n = await VendorDb.history.restoreTo(activeVendor.id, iso);
+    if (window.AppNotify) AppNotify.success('Restored ' + n + ' row(s).');
+    await loadAll();
+    await openDetailModal(activeVendor.id);
+  } catch (e) {
+    if (window.AppNotify) AppNotify.fromError(e, 'Could not roll back');
+    else alert('Could not roll back: ' + (e.message || e));
+  }
 }
 </script>
 

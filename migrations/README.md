@@ -68,7 +68,8 @@ scratch, run them in exactly this order.
 | 38 | `2026-09-01_vendor_child_audit_trail.sql` | **must follow #37** — supersedes its `stamp_archived()` trigger. Sorts BEFORE it alphabetically (“audit” < “soft”), so this is the second place filename order is wrong |
 | 39 | `2026-09-01_vendor_doc_lock.sql` | **after #37 and #38** — freezes the documents an approved accreditation rests on; back-fills already-accredited vendors |
 | 40 | `2026-09-01_vendor_self_registration.sql` | **after #37–#39** — one public registration URL, the claim queue, and the RPCs that grant access. Opens registration up, so the three hardening migrations above are what make it safe |
-| 41 | `2026-09-01_vendor_edit_guard_consolidated.sql` | **⚠️ MUST BE LAST — see below** |
+| 41 | `2026-09-01_vendor_history_restore.sql` | **after #37–#39** — full before/after snapshots of every vendor change, plus per-row and point-in-time restore |
+| 42 | `2026-09-01_vendor_edit_guard_consolidated.sql` | **⚠️ MUST BE LAST — see below** |
 
 ---
 
@@ -85,8 +86,8 @@ or #33 afterwards** — each would replace the function body with its own narrow
 version and reintroduce the regression. Their *other* statements are still current;
 it is only their guard block that is superseded.
 
-(#40 sorts after it alphabetically but never touches the guard, so their order is
-immaterial — what matters is that it follows the five that DO define the guard.)
+(#40 and #41 sort after it alphabetically but neither touches the guard, so their
+order relative to it is immaterial — what matters is that it follows the five that DO define the guard.)
 
 Its section 6 is a verification `SELECT` whose every column must read `t`. That is
 also how you diagnose a database where an older migration has been re-run on top.

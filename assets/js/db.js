@@ -2241,6 +2241,46 @@ const VendorDb = (() => {
   // through a SECURITY DEFINER RPC — vendor_claims has a SELECT policy and
   // nothing else — so a claimant can neither edit their own match result nor
   // approve themselves.
+  // ── Change history / restore ──────────────────────────────────
+  // migrations/2026-09-01_vendor_history_restore.sql keeps a full before/after
+  // snapshot of every change to the five vendor tables.
+  //
+  // ⚠️ A snapshot of a `vendors` row contains `notes` and `accreditation_notes`
+  // — the staff-only columns vendor_self_view hides. The table is readable by
+  // staff write-roles ONLY. Never surface any of this in vendor-portal.html.
+  const vendorHistory = {
+    async forVendor(vendorId, limit) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_history').select('*')
+        .eq('vendor_id', vendorId).order('changed_at', { ascending: false })
+        .limit(limit || 60);
+      if (error) { if (_isMissingTable(error, 'vendor_history')) return []; throw error; }
+      return data || [];
+    },
+    async restoreRow(historyId) {
+      const sb = await getSB();
+      const { error } = await sb.rpc('restore_vendor_row', { p_history_id: historyId });
+      if (error) throw error;
+    },
+    // Always call this and show the result before restoreTo(). A blind bulk
+    // revert is exactly the irreversible action this whole area exists to avoid.
+    async preview(vendorId, whenIso) {
+      const sb = await getSB();
+      const { data, error } = await sb.rpc('preview_vendor_restore',
+        { p_vendor: vendorId, p_when: whenIso });
+      if (error) throw error;
+      return data || [];
+    },
+    // Admin only, server-enforced.
+    async restoreTo(vendorId, whenIso) {
+      const sb = await getSB();
+      const { data, error } = await sb.rpc('restore_vendor_to',
+        { p_vendor: vendorId, p_when: whenIso });
+      if (error) throw error;
+      return data;
+    },
+  };
+
   const vendorClaims = {
     // Staff review queue, newest last. Returns [] pre-migration so vendors.html
     // still renders.
@@ -3332,7 +3372,7 @@ const VendorDb = (() => {
     taxonomyNodeForWP, findVendorsForWP,
     getVendorRates, addVendorRate, deleteVendorRate, upsertRate,
     uploadCertFile, getCertFileUrl, deleteCertFile,
-    documents: vendorDocuments, uploadVendorDoc, requests: accreditationRequests, claims: vendorClaims,
+    documents: vendorDocuments, uploadVendorDoc, requests: accreditationRequests, claims: vendorClaims, history: vendorHistory,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
