@@ -1407,8 +1407,18 @@ email*, and the built-in sender is development-only on every tier. Design so tha
 **The direction: identity-proof + the existing staff queue, instead of email verification.**
 One public URL (no parameter), printed on every PO/JO and in procurement's signature. The
 vendor proves who they are with data only the real vendor holds — **Vendor Code** (`V-00XXX`,
-on every PO they have received, on 321 directory rows), **TIN** (~1,347 rows after the
-masterlist seed), or a **recent PO number** (18,171 in the Conso PO List). Server matches via a
+on every PO they have received), **TIN**, or a **recent PO number** (18,171 in the Conso PO
+List).
+
+- **⚠️ COVERAGE OF BOTH IDENTITY FIELDS IS UNMEASURED — measure before building on them.**
+  Nothing in this file records how many directory rows actually carry a `tin`, and the
+  `vendor_code` figures that ARE recorded are stale in opposite directions: **321** was the
+  pre-re-import Conso-PO-List backfill, while the masterlist re-import later mapped `BP Code →
+  vendor_code` for a directory rebuilt around **2,376 companies carrying a V- code**, so true
+  coverage is probably far higher. **Do not quote 321, and do not confuse the TIN count with
+  1,347 — that figure is `contact_email`, not `tin`.** A vendor row with no TIN on file has
+  nothing to match against, so the auto-approve rate is capped by TIN coverage; if it is low the
+  policy is theoretical and staff work a queue regardless. Server matches via a
 plain Postgres `SECURITY DEFINER` RPC — same pattern as `vendor_invite_valid`, **no Edge
 Function**, so no new dependency class. Unmatched claims fall to a request-access queue, the
 shape `vendor_accreditation_requests` already uses. This is a *stronger* proof than an inbox:
