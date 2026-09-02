@@ -1873,9 +1873,15 @@ cards and empty state were rendered against the REAL portal CSS in a throwaway h
 and read back with `get_page_text` — the blank region in the screenshot was a static-snapshot
 artifact, not a layout fault.
 
-**Still open in this phase**: `vendors.html` does not yet show the new catalogue fields to staff —
-they save and round-trip, but the staff detail modal still renders the old category/description/type
-line. The **bid board is deliberately not started** (see the design note above); it needs the
+**Staff side (2026-09-02, same day):** `vendors.html`'s detail modal now mirrors the portal — the
+same grouped card grid (`.sp-*`), the same grouped editor (`.itm-*`, copied into this file since
+those classes lived only in the portal), photos via signed URLs, a spec-sheet link, and an initials
+avatar on personnel rows. **Staff get the FULL field set**, not a subset: the old four-field
+add-form could only set type/description/unit/category, so a staff member filling a profile in for
+a vendor could not record a lead time. `reclassifyProduct()` was removed as dead code — the editor
+covers the category, and nothing called it any more.
+
+**The bid board is deliberately not started** (see the design note above); it needs the
 invitation-vs-open decision first.
 
 ### Masterlist re-import — `SEED_vendor_masterlist.sql` (2026-08-20)
