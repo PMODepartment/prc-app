@@ -1774,6 +1774,35 @@ attribute.
 **Still open:** staff hard-delete remains un-undoable, and the audit trail records who/when but not
 the OLD VALUE — a full before/after history would need a separate `*_history` table.
 
+### Vendor detail modal — Save moved to the persistent footer (2026-09-01)
+
+**Reported as "there is no save changes."** The detail modal is ONE LONG SCROLL (Overview → Work
+Packages → Schedule → Products → Certifications → Personnel → Rates → Bid History → Change
+History) with a jump-nav, and `Save Changes` sat at the END OF THE FIRST SECTION. From anywhere
+below it — Change History, say — there was no Save on screen at all, and the modal footer offered
+only Close / Split / Delete. A TIN was typed, `Close` was pressed, and the edit was silently lost.
+
+- **The button moved into `renderDetailFooter()`**, which is `flex-shrink:0` and therefore always
+  visible — the same shape as the Planning app's Edit Activity dialog, which is what the user asked
+  to follow. It keeps the id **`btnSaveDetailOverview`**, so `saveDetailOverview()` needed no change.
+- **`margin-left:auto` pins Save alone on the right**, which also puts the entire toolbar between it
+  and **Delete** — a deliberate misclick guard now that a destructive and a primary action share one
+  row. `.modal-footer` gained `flex-wrap:wrap` so four buttons cannot overflow a narrow modal.
+- **Unsaved-change tracking**: `_detailDirty` + `_wireDetailDirty()` (ONE delegated listener on
+  `#dtab-overview`, which survives the `innerHTML` rewrites its children go through, guarded by a
+  `dataset.dirtyWired` flag so repeated renders cannot stack duplicates). A dirty form gives the
+  button a red halo and a bullet (`.has-changes`, mirroring `review.html`'s grid Save), and
+  **`closeDetailModal()` now confirms before discarding** — without autosave, closing is exactly
+  where work gets lost.
+- **⚠️ NOT AUTOSAVE, deliberately, even though the Planning app has it.** Every vendor save now
+  writes a full before/after snapshot into `vendor_history`, so an autosave tick per keystroke would
+  bury the audit trail under noise; and a VENDOR's own save flips them back to `pending_review`
+  each time, so autosave would spam the staff review flag. Explicit save is correct here.
+- The flag clears on open and on a successful save (`renderDetailOverview()` resets it, and the
+  success path already calls that). The two `btn` references in `saveDetailOverview()` were made
+  null-safe since the button is now conditionally rendered elsewhere.
+- `vendors.html`-only change, so **no shared `?v=` bump** (`db.js` untouched).
+
 ### Masterlist re-import — `SEED_vendor_masterlist.sql` (2026-08-20)
 
 The chosen cleanup is **delete every Not-Accredited vendor, then re-import the whole masterlist**, so the directory becomes the masterlist. The import is a **one-time SQL seed**, not an app feature — the user's position on that is settled (see the importer note above). **NEITHER the seed NOR its generator is committed** — both are git-ignored, for the same reason as the accreditation seeds: the `.sql` embeds ~2,400 real vendor names, TINs, contacts and addresses, and **GitHub Pages serves this whole repo publicly**. Regenerate locally with `gen_master_seed.py <workbook.xlsx>`; the generator itself is data-free but is ignored too, per the existing convention.

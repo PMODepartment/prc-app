@@ -166,7 +166,7 @@
     body.modal-open{overflow:hidden}
     .modal-header{padding:20px 20px 0;flex-shrink:0;display:flex;justify-content:space-between;align-items:flex-start}
     .modal-body{padding:16px 20px;overflow-y:auto;flex:1}
-    .modal-footer{padding:12px 20px 20px;flex-shrink:0;border-top:1px solid #f0f0f0;display:flex;gap:10px}
+    .modal-footer{padding:12px 20px 20px;flex-shrink:0;border-top:1px solid #f0f0f0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
     .modal-title{font-size:1.1429rem;font-weight:600;color:#231F20;margin:0 0 4px}
     .modal-subtitle{font-size:0.9286rem;color:#888;margin:0 0 16px}
     .modal-close{background:none;border:none;font-size:20px;color:#999;cursor:pointer;line-height:1}
@@ -414,6 +414,8 @@
 .row-audit{display:block;margin-top:2px;font-size:0.68rem;color:var(--text-hint,#6E6C6C)}
 .doc-lock-badge{display:inline-flex;align-items:center;gap:3px;font-size:0.68rem;font-weight:700;color:var(--text-hint,#6E6C6C);cursor:help}
 .doc-unlock{font-size:0.68rem;color:var(--mw-red,#EE3124);cursor:pointer;text-decoration:underline}
+    #btnSaveDetailOverview.has-changes{box-shadow:0 0 0 3px rgba(238,49,36,.28)}
+    #btnSaveDetailOverview.has-changes::after{content:' 2'}
 body.dark-mode .arch-block{border-top-color:var(--border-md)}
     .claim-card{border:1.5px solid var(--border-md,#e5e5e5);border-radius:10px;padding:16px;margin-bottom:14px;background:var(--surface,#fff)}
     .claim-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
@@ -3074,7 +3076,7 @@ document.addEventListener('paste', _vxlPaste);
 async function vxlSave() {
   if (!_vxlDirty() || !_canManage) return;
   const btn = document.getElementById('vxl-save-btn');
-  btn.disabled = true; btn.textContent = 'Saving…';
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   const ids = Object.keys(_vxlEdits);
   let ok = 0, fail = 0;
   for (const id of ids) {
@@ -3204,7 +3206,31 @@ async function openDetailModal(id) {
   renderDetailOverview();
   _wireDetailScrollSpy();
 }
+// Unsaved-change tracking for the Overview form. Without autosave, closing the
+// modal is the moment work gets lost — which is exactly what happened with the
+// buried button (a TIN was typed, Close was pressed, nothing saved).
+let _detailDirty = false;
+function _markDetailDirty() {
+  if (_detailDirty) return;
+  _detailDirty = true;
+  _syncDetailSaveBtn();
+}
+function _syncDetailSaveBtn() {
+  const b = document.getElementById('btnSaveDetailOverview');
+  if (b) b.classList.toggle('has-changes', _detailDirty);
+}
+// One delegated listener on the container, which survives the innerHTML rewrites
+// its children go through. Guarded so repeated renders cannot stack duplicates.
+function _wireDetailDirty() {
+  const box = document.getElementById('dtab-overview');
+  if (!box || box.dataset.dirtyWired) return;
+  box.dataset.dirtyWired = '1';
+  box.addEventListener('input', _markDetailDirty);
+  box.addEventListener('change', _markDetailDirty);
+}
 function closeDetailModal() {
+  if (_detailDirty && !confirm('You have unsaved changes to this vendor. Close without saving?')) return;
+  _detailDirty = false;
   document.getElementById('detailModal').style.display = 'none';
   _syncModalScrollLock();
   activeVendor = null;
@@ -3233,8 +3259,15 @@ function renderDetailFooter() {
   const v = activeVendor;
   let btns = '<button class="btn-cancel" onclick="closeDetailModal()">Close</button>';
   if (_canManage) btns += ` <button class="action-btn" style="padding:10px 16px" onclick="splitVendorFromDetail('${v.id}')" title="Open the Split tool for this vendor — for a record that is several companies in one name"><i class="ti ti-cut"></i> Split</button>`;
-  btns += ` <button class="action-btn btn-reject-row" style="padding:10px 16px;margin-left:auto" onclick="deleteVendorFromDetail('${v.id}')" title="Permanently delete this vendor and all its records"><i class="ti ti-trash"></i> Delete</button>`;
+  btns += ` <button class="action-btn btn-reject-row" style="padding:10px 16px" onclick="deleteVendorFromDetail('${v.id}')" title="Permanently delete this vendor and all its records"><i class="ti ti-trash"></i> Delete</button>`;
+  // Save is the primary action and sits alone on the right — margin-left:auto
+  // also puts the whole toolbar between it and Delete, so a misclick on the
+  // destructive button is much less likely.
+  if (_canManage) {
+    btns += ` <button class="btn-primary" id="btnSaveDetailOverview" style="margin-left:auto" onclick="saveDetailOverview()">Save Changes</button>`;
+  }
   el.innerHTML = btns;
+  _syncDetailSaveBtn();
 }
 // Jump from a vendor's profile straight into the Split tool with that vendor
 // pulled in (and split points suggested if its name is a single segment).
@@ -3331,10 +3364,25 @@ function renderDetailOverview() {
       </div>
       <div style="font-size:0.72rem;color:#999;margin-top:6px">The vendor must register using the Invite Email above; the link works once, until the account is claimed.</div>`}
     </div>
-    ${_canManage ? '<button class="btn-primary" id="btnSaveDetailOverview" onclick="saveDetailOverview()">Save Changes</button>' : ''}`;
+    `;
+  // NOTE the Save button deliberately does NOT live here any more. This modal is
+  // one long scroll (Overview → Work Packages → … → Change History) with a jump
+  // nav, so a button at the end of the FIRST section is invisible from every
+  // other one — staff reported "there is no save changes" while sitting in
+  // Change History. It is now in the modal footer, which is flex-shrink:0 and
+  // therefore always on screen, matching the Planning app's Edit Activity.
+  //
+  // NOT autosave, also deliberately: every save writes a full before/after
+  // snapshot into vendor_history, so an autosave tick per keystroke would bury
+  // the audit trail we just built — and a vendor's own save flips them back to
+  // pending_review each time.
+  
   // Read-only roles (viewer / viewer_budget) get the profile as plain text — RLS rejects
   // their writes anyway, so showing live inputs + a Save button only produces errors.
   _dovSyncAccredHint();
+  _detailDirty = false;
+  _wireDetailDirty();
+  _syncDetailSaveBtn();
   renderDetailRequest();
   buildDetailTradeChips();
   // AFTER buildDetailTradeChips — it injects the 10 trade checkboxes into the container,
@@ -3540,7 +3588,7 @@ async function saveDetailOverview() {
     renderDetailOverview();
   } catch (e) {
     AppNotify ? AppNotify.fromError(e, 'Save failed') : alert(e.message);
-    btn.disabled = false; btn.textContent = 'Save Changes';
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
   }
 }
 /* Taxonomy picker instance for the staff product add-form. Re-mounted on every
@@ -4416,6 +4464,30 @@ function _claimChoose(i, vid) {
   document.getElementById('claim-picked-' + i).innerHTML = 'Selected: <b>' + esc(v.name) + '</b>';
 }
 
+/* Re-read the queue and repaint. The three decision handlers all need this, on
+   success AND when they discover the card was stale. */
+async function _claimResync() {
+  _claims = await VendorDb.claims.pending();
+  renderClaims();
+  updateClaimsBadge();
+}
+/* Someone else already decided this claim (or it no longer exists). That is not
+   a failure to apologise for — it is a stale card, and the useful response is to
+   say so plainly and refresh, NOT to show "Could not decline" with the real
+   reason buried behind AppNotify.fromError's "Show details" disclosure.
+   Matches the errors reject_/approve_vendor_claim raise (42710 / P0002). */
+function _claimStale(e) {
+  return /already been decided|claim not found/i.test((e && e.message) || '');
+}
+async function _claimHandledStale(e) {
+  if (!_claimStale(e)) return false;
+  if (window.AppNotify) {
+    AppNotify.warn('That registration had already been decided by someone else — queue refreshed.');
+  }
+  await _claimResync();
+  return true;
+}
+
 async function approveClaim(i) {
   const c = _claims[i];
   const vid = _claimPick[i];
@@ -4426,10 +4498,9 @@ async function approveClaim(i) {
     await VendorDb.claims.approve(c.id, vid, null);
     if (window.AppNotify) AppNotify.success('Access granted to ' + vname + '.');
     await loadAll();
-    _claims = await VendorDb.claims.pending();
-    renderClaims();
-    updateClaimsBadge();
+    await _claimResync();
   } catch (e) {
+    if (await _claimHandledStale(e)) return;
     if (window.AppNotify) AppNotify.fromError(e, 'Could not approve');
     else alert('Could not approve: ' + (e.message || e));
   }
@@ -4448,10 +4519,9 @@ async function approveAsNewClaim(i) {
     await VendorDb.claims.approveAsNew(c.id, nm, null);
     if (window.AppNotify) AppNotify.success('Created ' + nm + ' and granted access.');
     await loadAll();
-    _claims = await VendorDb.claims.pending();
-    renderClaims();
-    updateClaimsBadge();
+    await _claimResync();
   } catch (e) {
+    if (await _claimHandledStale(e)) return;
     const m = (e && e.message) || String(e);
     if (/already in the directory/i.test(m)) {
       alert(m + '  Search for that vendor in the box above and use "Approve access" instead.');
@@ -4466,12 +4536,14 @@ async function rejectClaim(i) {
   const why = prompt('Why is this being declined? The person will see this message.', '');
   if (why === null) return;
   try {
+    // The RPC now RAISES if the claim is already decided or gone, so reaching
+    // this line means the decline really happened. It used to be able to update
+    // zero rows and still land here, reporting a decline that never occurred.
     await VendorDb.claims.reject(c.id, why || null);
     if (window.AppNotify) AppNotify.success('Registration declined.');
-    _claims = await VendorDb.claims.pending();
-    renderClaims();
-    updateClaimsBadge();
+    await _claimResync();
   } catch (e) {
+    if (await _claimHandledStale(e)) return;
     if (window.AppNotify) AppNotify.fromError(e, 'Could not decline');
     else alert('Could not decline: ' + (e.message || e));
   }
