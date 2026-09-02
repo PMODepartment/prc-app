@@ -122,6 +122,9 @@
     html.dark-mode, html.dark-mode body{background:#1E1F1E;color:#DCDBDB}
     html.dark-mode .wrap{color:#DCDBDB}
     html.dark-mode .panel{background:#2B2C2B;border-color:#3a3a3a}
+    /* .save-bar is sticky with an opaque background so content scrolls under it;
+       that background was hardcoded #fff, leaving a white band in dark mode. */
+    html.dark-mode .save-bar{background:#2B2C2B;border-top-color:#3a3a3a}
     html.dark-mode .panel-title{color:#F0EFEF}
     html.dark-mode .field label,html.dark-mode .ready-sub,html.dark-mode .ready-col h4,
     html.dark-mode .row-item-sub,html.dark-mode .empty{color:#9D9B9B}
@@ -212,30 +215,39 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     .cat-foot .cat-del:hover{border-color:#EE3124;color:#EE3124}
 
     /* Profile cards — the Stakeholder Map shape */
-    .prof-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:12px}
-    .prof-card{border:1.5px solid #e8e8e8;border-radius:10px;padding:14px;background:#fff;
-      display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;position:relative}
-    .prof-card:hover{border-color:#F5B8B3}
-    .prof-av{width:62px;height:62px;border-radius:50%;overflow:hidden;background:#231F20;color:#fff;
-      display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;margin-bottom:6px}
+    .prof-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:10px}
+    .prof-card{border:1px solid #e8e8e8;border-radius:10px;padding:13px 14px;background:#fff;
+      display:flex;align-items:flex-start;gap:12px;position:relative;transition:border-color .15s,box-shadow .15s}
+    .prof-card:hover{border-color:#F5B8B3;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+    .prof-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding-right:16px}
+    .prof-av{width:44px;height:44px;border-radius:50%;overflow:hidden;background:#231F20;color:#fff;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;position:relative}
     .prof-av img{width:100%;height:100%;object-fit:cover;cursor:zoom-in}
-    .prof-name{font-size:13.5px;font-weight:700;color:#231F20;line-height:1.3}
-    .prof-role{font-size:11.5px;color:#C42127;font-weight:600}
-    .prof-meta{font-size:11px;color:#777;word-break:break-word}
-    .prof-del{position:absolute;top:8px;right:8px;background:none;border:none;color:#ccc;cursor:pointer;
-      font-size:14px;padding:2px}
+    .prof-name{font-size:13.5px;font-weight:700;color:#231F20;line-height:1.3;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .prof-role{font-size:11.5px;color:#666}
+    .prof-meta{font-size:11px;color:#999;word-break:break-word}
+    .prof-del{position:absolute;top:9px;right:9px;background:none;border:none;color:#ccc;cursor:pointer;
+      font-size:15px;line-height:1;padding:2px}
     .prof-del:hover{color:#EE3124}
-    .prof-primary{position:absolute;top:8px;left:8px;font-size:9px;font-weight:700;letter-spacing:.05em;
-      background:#EE3124;color:#fff;border-radius:20px;padding:2px 7px}
+    /* A presence dot on the avatar, like the Stakeholder Universe cards. */
+    .prof-primary{position:absolute;bottom:0;right:0;width:13px;height:13px;border-radius:50%;
+      background:#2D9B6F;border:2px solid #fff}
+    html.dark-mode .prof-primary{border-color:#2B2C2B}
+    .prof-tag{font-size:9px;font-weight:700;letter-spacing:.05em;color:#EE3124;margin-top:1px}
 
     /* Item editor — grouped, not one flat row */
-    .itm-editor{border:1.5px solid #F5B8B3;border-radius:10px;padding:16px;background:#FFFBFB;margin-bottom:18px}
-    body.dark-mode .itm-editor, html.dark-mode .itm-editor{background:#2a1e1d;border-color:#5A2E2A}
+    .itm-editor{border:1px solid #e8e8e8;border-left:3px solid #EE3124;border-radius:8px;
+      padding:16px;background:#fafafa;margin-bottom:18px}
+    html.dark-mode .itm-editor{background:#252625;border-color:#3a3a3a;border-left-color:#EE3124}
     .itm-legend{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#C42127;
       margin:14px 0 8px;padding-top:12px;border-top:1px dashed #e5e5e5}
     .itm-legend:first-child{margin-top:0;padding-top:0;border-top:none}
-    .itm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
-    .itm-grid .field{margin-bottom:0}
+    .itm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end}
+    .itm-grid .field{margin-bottom:0;display:flex;flex-direction:column;justify-content:flex-end}
+    /* Reserve two lines for every label so one that wraps cannot shove its own
+       control out of line with the rest of the row. */
+    .itm-grid .field > label{min-height:2.5em;display:flex;align-items:flex-end}
     .itm-grid .wide{grid-column:1/-1}
     .itm-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
     .itm-acts .btn-primary{width:auto;padding:9px 18px}
@@ -248,6 +260,8 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     .pf-empty b{display:block;color:#666;font-size:14px;margin-bottom:3px}
 
     html.dark-mode .cat-card,html.dark-mode .prof-card{background:#232323;border-color:#3a3a3a}
+    html.dark-mode .prof-role{color:#9D9B9B}
+    html.dark-mode .prof-meta{color:#7f7d7d}
     html.dark-mode .cat-photo{background:#2c2c2c}
     html.dark-mode .cat-name,html.dark-mode .prof-name{color:#EDEDED}
     html.dark-mode .cat-chip{background:#333;color:#bbb}
@@ -291,17 +305,17 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
   <div id="statusBanner" class="banner" style="display:none"></div>
 
   <div class="tabs">
-    <button class="tab-btn active" data-tab="accreditation" onclick="switchTab('accreditation')">Accreditation</button>
-    <button class="tab-btn" data-tab="overview" onclick="switchTab('overview')">Company Info</button>
+    <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Company Info</button>
     <button class="tab-btn" data-tab="products" onclick="switchTab('products')">Products / Services</button>
-    <button class="tab-btn" data-tab="certs" onclick="switchTab('certs')">Certifications</button>
     <button class="tab-btn" data-tab="personnel" onclick="switchTab('personnel')">Personnel</button>
+    <button class="tab-btn" data-tab="certs" onclick="switchTab('certs')">Certifications</button>
+    <button class="tab-btn" data-tab="accreditation" onclick="switchTab('accreditation')">Accreditation</button>
   </div>
 
   <div class="msg" id="msgBox"></div>
 
   <!-- ── Accreditation ── -->
-  <div class="panel" id="panel-accreditation">
+  <div class="panel" id="panel-accreditation" style="display:none">
     <div class="panel-title">Accreditation readiness</div>
     <div class="ready-head">
       <span class="ready-pct" id="readyPct">—</span>
@@ -315,7 +329,7 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     <div class="req-box" id="requestBox"></div>
   </div>
 
-  <div class="panel" id="panel-documents">
+  <div class="panel" id="panel-documents" style="display:none">
     <div class="panel-title">Accreditation documents</div>
     <p style="font-size:12.5px;color:#888;margin:-6px 0 14px;line-height:1.6">
       Upload a clear scan or PDF of each document. Only Megawide Procurement can see these files.
@@ -324,7 +338,7 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
   </div>
 
   <!-- ── Company Info ── -->
-  <div class="panel" id="panel-overview" style="display:none">
+  <div class="panel" id="panel-overview">
     <div class="panel-title">Company Information</div>
     <div class="draft-note" id="draftNote" style="display:none"></div>
     <p style="font-size:12.5px;color:#888;margin:-4px 0 16px;line-height:1.6">
@@ -1293,14 +1307,16 @@ async function renderPersonnel() {
   }
   el.innerHTML = '<div class="prof-grid">' + list.map(function (p) {
     return '<div class="prof-card">'
-      + (p.is_primary ? '<span class="prof-primary">PRIMARY</span>' : '')
       + '<button class="prof-del" onclick="removePersonnel(' + Q + p.id + Q + ')" title="Remove">&times;</button>'
-      + '<div class="prof-av" data-photo="' + esc(p.photo_path || '') + '">' + esc(_initials(p.name)) + '</div>'
-      + '<div class="prof-name">' + esc(p.name) + '</div>'
+      + '<div class="prof-av" data-photo="' + esc(p.photo_path || '') + '">' + esc(_initials(p.name))
+      + (p.is_primary ? '<span class="prof-primary" title="Primary contact"></span>' : '') + '</div>'
+      + '<div class="prof-info">'
+      + '<div class="prof-name" title="' + esc(p.name) + '">' + esc(p.name) + '</div>'
       + (p.role_title ? '<div class="prof-role">' + esc(p.role_title) + '</div>' : '')
       + (p.contact_number ? '<div class="prof-meta">' + esc(p.contact_number) + '</div>' : '')
       + (p.email ? '<div class="prof-meta">' + esc(p.email) + '</div>' : '')
-      + '</div>';
+      + (p.is_primary ? '<div class="prof-tag">PRIMARY CONTACT</div>' : '')
+      + '</div></div>';
   }).join('') + '</div>';
   _perLoadPhotos();
 }

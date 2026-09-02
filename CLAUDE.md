@@ -1868,6 +1868,30 @@ catalogue**, and the field set closes the gap against what a work package actual
 - **Real empty states** (`.pf-empty`). An empty section previously showed only a bare add-row.
 - Portal topbar now uses the red **`megawide-mark.png`** rather than the wide logo.
 
+**Follow-up fixes after the first live look (2026-09-02, same day):**
+- **⚠️ BUG — `.save-bar` was hardcoded `background:#fff` with NO dark-mode rule**, so the Save
+  button sat on a white band. It is `position:sticky` with an opaque background by design (content
+  scrolls under it), which is why the colour could not simply be dropped.
+- **The editor was a RED card nested inside the panel card** and read as a second surface floating
+  inside the first. Now the same neutral surface as the panel with a **red left accent bar** — it
+  reads as part of the panel rather than a thing on top of it.
+- **⚠️ Uneven fields**: a label that wrapped to two lines pushed ITS OWN control down while its
+  neighbours stayed put (visible on “Material / subcon submittals” in the capability row).
+  `.itm-grid` is now `align-items:end` with `min-height:2.5em` reserved on every label, so a
+  wrapping label cannot knock its control out of line. **Any new grid field inherits this.**
+- **Personnel cards rebuilt to the Stakeholder Universe shape** — avatar LEFT with the details
+  stacked beside it (was centred), a green presence dot on the primary contact, and the name
+  ellipsised so a long one cannot blow out the card.
+- **Tabs reordered basics-first**: Company Info → Products / Services → Personnel → Certifications
+  → Accreditation. Accreditation is the OUTCOME of filling the rest in, so leading with it asked for
+  a submission before there was anything to submit. **⚠️ The panel `display` defaults had to flip
+  with it** — `#panel-accreditation`/`#panel-documents` were the only ones visible at load, so
+  moving the `active` class alone would have highlighted Company Info while showing Accreditation.
+- **NOT reproduced**: an empty red editor box. The real `_catEditorHtml` returns 3,088 characters
+  and renders in full against the real CSS. `openProductEditor` sets `display` BEFORE `innerHTML`,
+  so a throw in between would leave exactly that empty box — but nothing in it throws, and there
+  are no duplicate declarations of `_f`/`Q`/`sel`. Most likely a stale cached build. Re-check.
+
 **Verified**: every inline `<script>` passes `node --check`; the card grid, group headers, profile
 cards and empty state were rendered against the REAL portal CSS in a throwaway harness (deleted)
 and read back with `get_page_text` — the blank region in the screenshot was a static-snapshot
