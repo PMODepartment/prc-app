@@ -3383,6 +3383,36 @@ const VendorDb = (() => {
 })();
 window.VendorDb = VendorDb;
 
+// ── Vendor Registrations sidebar item ───────────────────────────────
+// A top-level nav item rather than a Data Tools entry: it is an approval queue
+// like User Management, not a data-cleanup tool.
+//
+// ⚠️ It sits in NAVIGATION, not the Admin section, on purpose. #nav-admin-section
+// is revealed only for admin/super_admin, but a claim can be approved by
+// specialist, manager and user too — putting it there would have hidden the
+// queue from most of the people expected to work it.
+window.initVendorClaimsNav = function (profile) {
+  const el = document.getElementById('nav-vendor-claims');
+  if (!el) return;
+  const role = (profile && profile.role) || '';
+  // Same audience as the queue's own buttons (_canManage in vendors.html), and
+  // withheld from the stripped-down `viewer` exactly like Vendor Management.
+  if (['viewer', 'viewer_budget', 'vendor'].includes(role)) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  if (!(window.VendorDb && VendorDb.claims)) return;
+  // Fire-and-forget. One indexed query on a small table, and it must never sit
+  // on a dashboard's render path; returns [] when the migration has not run.
+  VendorDb.claims.pending().then(function (rows) {
+    window.setVendorClaimsNavCount(rows.length);
+  }).catch(function () {});
+};
+window.setVendorClaimsNavCount = function (n) {
+  const b = document.getElementById('nav-claim-count');
+  if (!b) return;
+  b.textContent = n;
+  b.style.display = n ? '' : 'none';
+};
+
 /* ══ TaxonomyPicker ═══════════════════════════════════════════════════════
    A searchable, cascading tree picker for a product_taxonomy node.
 
