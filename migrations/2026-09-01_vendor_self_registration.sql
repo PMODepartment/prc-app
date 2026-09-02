@@ -5,6 +5,37 @@
 -- Run ONCE in the Supabase SQL Editor (production). Idempotent — safe to re-run.
 -- No temp tables and no cross-statement state.
 --
+-- ⚠️⚠️ RE-RUN REQUIRED (2026-09-01, after the original run). TWO fixes, and the
+-- first one meant NO REGISTRATION COULD EVER SUCCEED:
+--
+--   1. BLOCKER — all four match tiers in submit_vendor_claim used
+--      `min(v.id)`, and POSTGRES HAS NO min(uuid) AGGREGATE. Every submit died
+--      with "function min(uuid) does not exist" before a claim row was ever
+--      written; it fails at plan time, so it did NOT depend on how many vendors
+--      matched. Now `(array_agg(v.id order by v.id))[1]` — safe because each
+--      tier only uses the value when its own `count(*) = 1`, and ordered so the
+--      pick is deterministic regardless.
+--      ⚠️ THIS IS THE THIRD TIME min(uuid) HAS BITTEN THIS PROJECT — see
+--      SEED_vendor_accreditation_pass2.sql and the masterlist seed. There is no
+--      min/max for uuid. Reach for (array_agg(x order by x))[1] and never write
+--      min(<uuid column>) again. Both earlier cases were caught only by RUNNING
+--      the SQL, exactly like this one — a parser check cannot see it, because
+--      the statement is syntactically valid and only fails on function lookup.
+--
+--   2. reject_vendor_claim — see section 4c. It used to return CLEANLY without
+--      changing anything when the claim was already decided or the id did not
+--      exist, so the UI reported a decline that never happened.
+--
+-- Re-run this WHOLE file to pick both up; that is safe by construction (create
+-- table / index IF NOT EXISTS, DROP POLICY IF EXISTS before CREATE POLICY, every
+-- function CREATE OR REPLACE).
+--
+-- ⚠️ AND KEEP IT THAT WAY: this file is the ONLY definition of these four
+-- functions. Do NOT ship a follow-up migration that re-defines one of them —
+-- whichever ran last would win, which is exactly how internal.vendor_edit_guard
+-- ended up with five competing definitions and two silent regressions. Edit the
+-- definition HERE and re-run this file.
+--
 -- ⚠️ RUN AFTER the three vendor-data hardening migrations (soft-delete, audit
 -- trail, doc lock). This opens registration up, and those are what make the
 -- blast radius of a wrong admission survivable.
@@ -153,7 +184,7 @@ begin
 
   -- Tier 1 — vendor code AND TIN agree on ONE vendor. The strongest evidence.
   if n_code is not null and n_tin is not null then
-    select count(*), min(v.id) into n, v_id from public.vendors v
+    select count(*), (array_agg(v.id order by v.id))[1] into n, v_id from public.vendors v
      where internal.norm_vcode(v.vendor_code) = n_code
        and internal.norm_tin(v.tin) = n_tin;
     if n = 1 then v_method := 'code_and_tin'; v_conf := 'high';
@@ -162,7 +193,7 @@ begin
 
   -- Tier 2 — vendor code alone, unique.
   if v_id is null and n_code is not null then
-    select count(*), min(v.id) into n, v_id from public.vendors v
+    select count(*), (array_agg(v.id order by v.id))[1] into n, v_id from public.vendors v
      where internal.norm_vcode(v.vendor_code) = n_code;
     if n = 1 then v_method := 'code'; v_conf := 'medium';
     else v_id := null; if n > 1 then v_method := 'ambiguous'; end if; end if;
@@ -170,7 +201,7 @@ begin
 
   -- Tier 3 — TIN alone, unique.
   if v_id is null and n_tin is not null then
-    select count(*), min(v.id) into n, v_id from public.vendors v
+    select count(*), (array_agg(v.id order by v.id))[1] into n, v_id from public.vendors v
      where internal.norm_tin(v.tin) = n_tin;
     if n = 1 then v_method := 'tin'; v_conf := 'medium';
     else v_id := null; if n > 1 then v_method := 'ambiguous'; end if; end if;
@@ -181,7 +212,7 @@ begin
   -- and garbled multi-company rows; a fuzzy hit would hand one company's
   -- profile to another. Same refuse-to-guess rule the vendor analytics follows.
   if v_id is null and n_name is not null then
-    select count(*), min(v.id) into n, v_id from public.vendors v
+    select count(*), (array_agg(v.id order by v.id))[1] into n, v_id from public.vendors v
      where internal.norm_company(v.name) = n_name;
     if n = 1 then v_method := 'name'; v_conf := 'medium';
     else v_id := null; if n > 1 then v_method := 'ambiguous'; end if; end if;
@@ -343,20 +374,39 @@ comment on function public.create_vendor_from_claim(uuid,text,text) is
   'the name already exists, so a self-registration cannot create a duplicate of '
   'a record we already hold. Self-authorizes against the staff allow-list.';
 
+-- ── 4c. Declining a registration ────────────────────────────────────────────
 create or replace function public.reject_vendor_claim(p_claim uuid, p_notes text default null)
 returns void language plpgsql security definer
 set search_path = public as $$
-declare caller text; caller_name text;
+declare r public.vendor_claims%rowtype; caller text; caller_name text;
 begin
   select u.role, coalesce(u.name, u.email) into caller, caller_name
     from public.users u where u.id = auth.uid();
   if caller is null or caller not in ('super_admin','admin','specialist','manager','user') then
     raise exception 'Not authorised to decide vendor claims.' using errcode = '42501';
   end if;
+
+  -- ⚠️ LOOK THE ROW UP AND REFUSE, rather than letting the UPDATE match zero
+  -- rows. This was `where id = p_claim and status = 'pending'` with no
+  -- row-count check, so an already-decided claim — or a uuid that does not
+  -- exist at all — updated nothing and returned CLEANLY, and vendors.html went
+  -- on to toast "Registration declined." having changed nothing.
+  -- approve_vendor_claim raises in both of those cases, so the two functions
+  -- disagreed about the same situation. They must agree: a reviewer working
+  -- from a stale queue must never be told an action happened when it did not.
+  select * into r from public.vendor_claims where id = p_claim;
+  if r.id is null then raise exception 'Claim not found.' using errcode = 'P0002'; end if;
+  if r.status <> 'pending' then
+    raise exception 'This claim has already been decided.' using errcode = '42710';
+  end if;
+
+  -- The status condition is deliberately NOT repeated here — it is already
+  -- established above, and repeating it would reintroduce the silent
+  -- zero-row path this fix exists to remove.
   update public.vendor_claims
      set status = 'rejected', decided_at = now(), decided_by = auth.uid(),
          decided_by_name = caller_name, decision_notes = p_notes
-   where id = p_claim and status = 'pending';
+   where id = p_claim;
 end $$;
 
 revoke all on function public.reject_vendor_claim(uuid,text) from public, anon;
