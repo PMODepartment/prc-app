@@ -77,6 +77,17 @@ select
   v.vendor_category,
   v.vendor_group,
   v.payment_terms,
+  -- Capability the vendor declares about itself, added by
+  -- 2026-09-02_vendor_catalogue.sql. These answer work-package requirements
+  -- (surety/performance/warranty bonds, submittals) that are properties of the
+  -- COMPANY rather than of any one catalogue item, so they are vendor-owned and
+  -- must be readable AND writable here or the portal renders boxes that never
+  -- save. They are deliberately NOT pinned in internal.vendor_edit_guard.
+  v.can_surety_bond,
+  v.can_performance_bond,
+  v.can_warranty_bond,
+  v.can_provide_submittals,
+  v.payment_terms_days,
   v.website,
   v.created_at,
   v.updated_at
