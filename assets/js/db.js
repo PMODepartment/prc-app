@@ -2207,6 +2207,18 @@ const VendorDb = (() => {
     if (error) throw error;
     return path;
   }
+  // Generic per-vendor upload. `uploadCertFile` above is the same thing with a
+  // cert-shaped name; this one is for catalogue photos, spec sheets and
+  // personnel portraits. The <vendorId>/ prefix is LOAD-BEARING — the
+  // vendor-certs Storage policies authorize on the first path segment.
+  async function uploadVendorFile(vendorId, kind, file) {
+    const sb = await getSB();
+    const safeName = String(file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${vendorId}/${kind}_${Date.now()}_${safeName}`;
+    const { error } = await sb.storage.from('vendor-certs').upload(path, file, { upsert: false });
+    if (error) throw error;
+    return path;
+  }
   async function getCertFileUrl(path) {
     if (!path) return null;
     const sb = await getSB();
@@ -3372,7 +3384,7 @@ const VendorDb = (() => {
     taxonomyNodeForWP, findVendorsForWP,
     getVendorRates, addVendorRate, deleteVendorRate, upsertRate,
     uploadCertFile, getCertFileUrl, deleteCertFile,
-    documents: vendorDocuments, uploadVendorDoc, requests: accreditationRequests, claims: vendorClaims, history: vendorHistory,
+    documents: vendorDocuments, uploadVendorDoc, uploadVendorFile, requests: accreditationRequests, claims: vendorClaims, history: vendorHistory,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
