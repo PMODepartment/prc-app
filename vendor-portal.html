@@ -382,11 +382,11 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       <div class="field"><label>Terms of Payment <span style="color:#EE3124">*</span></label><input id="f-payment-terms" type="text" placeholder="e.g. 60 Days"></div>
       <div class="field"><label>Product / Vendor Group</label><input id="f-vendor-group" type="text" placeholder="e.g. Ready Mix Concrete"></div>
     </div>
-    <div class="itm-legend" style="margin-top:18px">What your company can commit to</div>
+    <div class="itm-legend" style="margin-top:18px">What you are generally able to provide</div>
     <div style="font-size:12px;color:#888;line-height:1.6;margin-bottom:10px">
-      Megawide work packages often require a bond or a material submittal before award.
-      Telling us up front which you can provide means we only invite you to packages you can
-      actually take on.
+      Requirements differ from one work package to the next, so this is not a commitment &mdash;
+      it only helps us shortlist you for packages you can realistically take on. What you actually
+      commit to is agreed per package, at the time you bid.
     </div>
     <div class="itm-grid">
       <div class="field"><label>Surety bond</label>
@@ -462,8 +462,8 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260902a"></script>
-<script src="assets/js/db.js?v=20260902a"></script>
+<script src="assets/js/auth.js?v=20260902b"></script>
+<script src="assets/js/db.js?v=20260902b"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -475,6 +475,12 @@ const draftKey = () => 'wpm_vendorprofile_' + (vendor ? vendor.id : 'x');
 AppAuth.requireLogin((user, profile) => {
   myProfile = profile;
   if (profile.role !== 'vendor' || !profile.vendor_id) { window.location.href = 'login.html'; return; }
+  // ⚠️ MUST be set before any VendorDb call. db.js's _vendorRel() reads these to
+  // route a vendor to vendor_self_view; without them it falls back to the
+  // `vendors` table, which a vendor has had no SELECT on since
+  // 2026-08-20_vendor_self_view.sql — every read then returns zero rows.
+  window.__wpmRole = profile.role;
+  window.__profile = profile;
   loadAll();
 });
 
@@ -1099,6 +1105,7 @@ function _catTrade(p) {
 }
 
 async function renderProducts() {
+  if (!vendor) return;
   _catTax = await VendorDb.getTaxonomy();
   _catItems = await VendorDb.products.list(vendor.id);
   const el = document.getElementById('productsList');
@@ -1179,7 +1186,15 @@ async function openProductEditor(id) {
   _catSpecPath = p.spec_file_path || null;
   const host = document.getElementById('catEditor');
   host.style.display = '';
-  host.innerHTML = _catEditorHtml(p);
+  try {
+    host.innerHTML = _catEditorHtml(p);
+  } catch (err) {
+    // Show WHY rather than an empty box — display is already on by this point.
+    console.error('[catalogue] editor failed to render', err);
+    host.innerHTML = '<div class="pf-empty"><b>The editor could not open</b>'
+      + esc((err && err.message) || String(err)) + '</div>';
+    return;
+  }
   // The taxonomy picker must be mounted after its container exists.
   _catPicker = window.TaxonomyPicker
     ? await TaxonomyPicker.mount(document.getElementById('ce-taxonomy'), { value: p.taxonomy_id || null })
@@ -1295,6 +1310,7 @@ function _initials(n) {
     .map(function (w) { return w[0]; }).join('').toUpperCase() || '?';
 }
 async function renderPersonnel() {
+  if (!vendor) return;
   const list = await VendorDb.personnel.list(vendor.id);
   const el = document.getElementById('personnelList');
   document.getElementById('perCount').textContent =

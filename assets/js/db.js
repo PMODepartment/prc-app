@@ -1827,11 +1827,15 @@ if (typeof window !== 'undefined') {
    is still missing and gates the Request button) and the staff detail modal
    (which shows the reviewer the same list). Keep it here, not duplicated in
    either page, or the two will disagree about whether a vendor is ready. */
+// The four documents Megawide Procurement requires for accreditation, in the
+// order they are asked for. The KEYS are load-bearing — they are stored in
+// vendor_documents.doc_type and referenced by every uploaded row, so RENAME A
+// LABEL FREELY BUT NEVER A KEY.
 const ACCRED_DOC_TYPES = [
-  { key: 'bir_2303',        label: 'BIR 2303 (Certificate of Registration)', required: true },
   { key: 'company_profile', label: 'Company Profile',                        required: true },
-  { key: 'business_permit', label: 'Business Permit',                        required: true },
-  { key: 'sample_invoice',  label: 'Scanned copy of an Invoice',             required: true },
+  { key: 'bir_2303',        label: 'BIR 2303 (Certificate of Registration)', required: true },
+  { key: 'sample_invoice',  label: 'Sample Invoice',                         required: true },
+  { key: 'business_permit', label: "Mayor's Business Permit",                required: true },
   { key: 'other',           label: 'Other supporting document',              required: false },
 ];
 function accredDocLabel(k) {
@@ -1896,8 +1900,14 @@ const VendorDb = (() => {
      probe is memoized and falls back to the base table if the view isn't
      deployed yet, so this is safe to ship before the migration runs. */
   let _vendorRelCache = null;
+  // Read the role from EITHER global. A page that sets one but not the other
+  // must not silently reroute a vendor to a relation they cannot read.
+  function _myRole() {
+    if (typeof window === 'undefined') return null;
+    return window.__wpmRole || (window.__profile && window.__profile.role) || null;
+  }
   async function _vendorRel() {
-    if (typeof window === 'undefined' || window.__wpmRole !== 'vendor') return 'vendors';
+    if (_myRole() !== 'vendor') return 'vendors';
     if (_vendorRelCache) return _vendorRelCache;
     try {
       const sb = await getSB();
