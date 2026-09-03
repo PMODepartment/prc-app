@@ -1831,12 +1831,16 @@ if (typeof window !== 'undefined') {
 // order they are asked for. The KEYS are load-bearing — they are stored in
 // vendor_documents.doc_type and referenced by every uploaded row, so RENAME A
 // LABEL FREELY BUT NEVER A KEY.
+/* The four documents Procurement's accreditation email asks for, in the order
+   it lists them. ⚠️ THE KEYS ARE STORED in vendor_documents.doc_type on every
+   uploaded row — relabel and reorder freely, but RENAMING A KEY orphans every
+   document already uploaded under the old one. */
 const ACCRED_DOC_TYPES = [
-  { key: 'company_profile', label: 'Company Profile',                        required: true },
-  { key: 'bir_2303',        label: 'BIR 2303 (Certificate of Registration)', required: true },
-  { key: 'sample_invoice',  label: 'Sample Invoice',                         required: true },
-  { key: 'business_permit', label: "Mayor's Business Permit",                required: true },
-  { key: 'other',           label: 'Other supporting document',              required: false },
+  { key: 'bir_2303',        label: 'BIR 2303',                  required: true },
+  { key: 'company_profile', label: 'Company Profile',           required: true },
+  { key: 'business_permit', label: 'Business Permits',          required: true },
+  { key: 'sample_invoice',  label: 'Scanned Copy of Invoice',   required: true },
+  { key: 'other',           label: 'Other supporting document', required: false },
 ];
 function accredDocLabel(k) {
   const d = ACCRED_DOC_TYPES.find(x => x.key === k);
@@ -1847,15 +1851,20 @@ function accredReadiness(vendor, docs) {
   const have = new Set((docs || []).filter(d => d && d.file_path).map(d => d.doc_type));
   const txt = k => !!(v[k] && String(v[k]).trim());
   const items = [
-    { key: 'name',             label: 'Company name',        ok: txt('name'),            group: 'info' },
-    { key: 'tin',              label: 'TIN',                 ok: txt('tin'),             group: 'info' },
-    { key: 'address',          label: 'Address',             ok: txt('address'),         group: 'info' },
-    { key: 'contact_person',   label: 'Contact person',      ok: txt('contact_person'),  group: 'info' },
-    { key: 'contact_position', label: 'Position',            ok: txt('contact_position'),group: 'info' },
-    { key: 'contact_number',   label: 'Contact number',      ok: txt('contact_number'),  group: 'info' },
-    { key: 'contact_email',    label: 'Email address',       ok: txt('contact_email'),   group: 'info' },
-    { key: 'payment_terms',    label: 'Terms of payment',    ok: txt('payment_terms'),   group: 'info' },
-    { key: 'trade_categories', label: 'Trade categories',    ok: (v.trade_categories || []).length > 0, group: 'info' },
+    { key: 'name',                 label: 'Company name',          ok: txt('name'),                 group: 'info' },
+    { key: 'tin',                  label: 'TIN',                   ok: txt('tin'),                  group: 'info' },
+    { key: 'payment_terms',        label: 'Terms of payment',      ok: txt('payment_terms'),        group: 'info' },
+    // Owner + the owner's own number: asked for under "Required Information"
+    // in the accreditation email, stored by 2026-09-03_vendor_owner_and_logo.sql.
+    // Distinct from contact_person/contact_number, which is the day-to-day contact.
+    { key: 'owner_name',           label: 'Owner',                 ok: txt('owner_name'),           group: 'info' },
+    { key: 'owner_contact_number', label: 'Contact # of Owner',    ok: txt('owner_contact_number'), group: 'info' },
+    { key: 'contact_person',       label: 'Contact person',        ok: txt('contact_person'),       group: 'info' },
+    { key: 'contact_position',     label: 'Position',              ok: txt('contact_position'),     group: 'info' },
+    { key: 'contact_number',       label: 'Contact number',        ok: txt('contact_number'),       group: 'info' },
+    { key: 'contact_email',        label: 'Email address',         ok: txt('contact_email'),        group: 'info' },
+    { key: 'address',              label: 'Address',               ok: txt('address'),              group: 'info' },
+    { key: 'trade_categories',     label: 'Trade categories',      ok: (v.trade_categories || []).length > 0, group: 'info' },
   ].concat(ACCRED_DOC_TYPES.filter(d => d.required).map(d => (
     { key: d.key, label: d.label, ok: have.has(d.key), group: 'docs' }
   )));
