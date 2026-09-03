@@ -3409,18 +3409,23 @@ window.VendorDb = VendorDb;
 // A top-level nav item rather than a Data Tools entry: it is an approval queue
 // like User Management, not a data-cleanup tool.
 //
-// ⚠️ It sits in NAVIGATION, not the Admin section, on purpose. #nav-admin-section
-// is revealed only for admin/super_admin, but a claim can be approved by
-// specialist, manager and user too — putting it there would have hidden the
-// queue from most of the people expected to work it.
+// ⚠️ Sits NEXT TO User Management (visually, under the "Admin" label) but is
+// NOT inside the container that gates on AppAuth.isAdmin. A claim can be
+// approved by specialist/manager/user too, so #sidebar-admin/#nav-admin-section
+// staying admin-only while this queue stays open to every contributor means
+// the <a> — and on index.html/project.html/vendors.html its own wrapper
+// #sidebar-vendor-claims — must be toggled independently of that container.
+// admin.html has no such wrapper (nothing there hides the item's ancestor),
+// so this falls back to the bare <a> when the wrapper is absent.
 window.initVendorClaimsNav = function (profile) {
   const el = document.getElementById('nav-vendor-claims');
   if (!el) return;
+  const target = document.getElementById('sidebar-vendor-claims') || el;
   const role = (profile && profile.role) || '';
   // Same audience as the queue's own buttons (_canManage in vendors.html), and
   // withheld from the stripped-down `viewer` exactly like Vendor Management.
-  if (['viewer', 'viewer_budget', 'vendor'].includes(role)) { el.style.display = 'none'; return; }
-  el.style.display = '';
+  if (['viewer', 'viewer_budget', 'vendor'].includes(role)) { target.style.display = 'none'; return; }
+  target.style.display = '';
   if (!(window.VendorDb && VendorDb.claims)) return;
   // Fire-and-forget. One indexed query on a small table, and it must never sit
   // on a dashboard's render path; returns [] when the migration has not run.
