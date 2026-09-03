@@ -399,17 +399,32 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       <div class="field"><label>Contact Person <span style="color:#EE3124">*</span></label><input id="f-contact-person" type="text"></div>
       <div class="field"><label>Position <span style="color:#EE3124">*</span></label><input id="f-contact-position" type="text" placeholder="e.g. Sales Manager"></div>
     </div>
+    <!-- Owner is a DIFFERENT person from the day-to-day contact above, and the
+         accreditation email asks for both by name. -->
     <div class="field-row">
-      <div class="field"><label>Contact Number (mobile) <span style="color:#EE3124">*</span></label><input id="f-contact-number" type="text"></div>
-      <div class="field"><label>Telephone</label><input id="f-telephone" type="text"></div>
+      <div class="field"><label>Owner / Proprietor <span style="color:#EE3124">*</span></label><input id="f-owner-name" type="text" placeholder="Full name"></div>
+      <div class="field"><label>Contact # of Owner <span style="color:#EE3124">*</span></label><input id="f-owner-contact-number" type="text" placeholder="+63 9xx xxx xxxx"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Contact Number (mobile) <span style="color:#EE3124">*</span></label>
+        <input id="f-contact-number" type="text" placeholder="+63 9xx xxx xxxx">
+        <div class="field-hint">Include the country code if you are outside the Philippines.</div>
+      </div>
+      <div class="field"><label>Telephone</label><input id="f-telephone" type="text" placeholder="+63 2 xxxx xxxx"></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Contact Email <span style="color:#EE3124">*</span></label><input id="f-contact-email" type="email"></div>
       <div class="field"><label>Website</label><input id="f-website" type="text" placeholder="https://"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Address <span style="color:#EE3124">*</span></label><input id="f-address" type="text"></div>
-      <div class="field"><label>City</label><input id="f-city" type="text"></div>
+      <div class="field"><label>Address <span style="color:#EE3124">*</span></label>
+        <input id="f-address" type="text" placeholder="Street, barangay / district">
+        <div class="field-hint">Street and district only — put the city beside it.</div>
+      </div>
+      <div class="field"><label>City <span style="color:#EE3124">*</span></label>
+        <input id="f-city" type="text" placeholder="e.g. Quezon City">
+        <div class="field-hint">Outside the Philippines? Use “City, Country”.</div>
+      </div>
     </div>
     <div class="field-row">
       <div class="field"><label>Terms of Payment <span style="color:#EE3124">*</span></label><input id="f-payment-terms" type="text" placeholder="e.g. 60 Days"></div>
@@ -505,8 +520,8 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260903d"></script>
-<script src="assets/js/db.js?v=20260903d"></script>
+<script src="assets/js/auth.js?v=20260903e"></script>
+<script src="assets/js/db.js?v=20260903e"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -802,6 +817,7 @@ const OVERVIEW_FIELDS = {
   'f-contact-number': 'contact_number', 'f-telephone': 'telephone',
   'f-contact-email': 'contact_email', 'f-website': 'website',
   'f-address': 'address', 'f-city': 'city',
+  'f-owner-name': 'owner_name', 'f-owner-contact-number': 'owner_contact_number',
 };
 // Capability the vendor declares about itself, answering the bond and submittal
 // requirements a work package carries. Vendor-owned, so NOT pinned in
@@ -908,7 +924,22 @@ function toggleTrade(el) {
   if (el.checked) selectedTrades.add(t); else selectedTrades.delete(t);
   markDirty();
 }
-function esc(v) { return window.esc ? window.esc(v) : String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+/* ⚠️ SELF-CONTAINED ON PURPOSE — DO NOT DELEGATE TO window.esc.
+   A top-level `function esc` in a classic script BECOMES window.esc, and this
+   block is parsed after db.js, so it overwrote db.js's global. The old body
+   read `window.esc ? window.esc(v) : …`, which therefore called ITSELF:
+   infinite recursion, RangeError on the very first escaped string. Because
+   every render escapes something, that one line took out the whole page —
+   Trade Categories rendered empty, Products/Services empty, Accreditation
+   readiness stuck on "Checking…", personnel photos never loaded, the status
+   pill stayed blank — and it even broke the error handler that was meant to
+   report it (the catch also called esc), which is why nothing appeared on
+   screen. Reproduced in a stubbed harness against this exact file. */
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
 
 /* ── Theme toggle (self-contained; shares wpm_theme_last with the rest of the
    app so the theme carries over from the login page). This page never loads
