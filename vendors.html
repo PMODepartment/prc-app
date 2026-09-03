@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260903b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260903b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260903b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260903c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260903c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260903c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260903b">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260903c">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -676,7 +676,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
        scroll, with the page behind it showing through. It is now a real route
        (vendors.html?vendor=<id>) so it gets the full content width, a sticky
        section rail, the browser Back button, and a URL you can send someone. */
-    #vendorDetailPage{display:none}
+    /* ⚠️ NO `#vendorDetailPage{display:none}` HERE. The initial hide is the
+       markup's inline style, and _vdShow() toggles that inline value. A
+       stylesheet rule would win the moment _vdShow set display to '' and
+       the profile would never appear (it did — the page rendered blank). */
     .vd-back{display:inline-flex;align-items:center;gap:6px;background:none;border:none;padding:0;margin:0 0 14px;
              color:var(--text-secondary);font-family:inherit;font-size:0.8571rem;cursor:pointer}
     .vd-back:hover{color:#EE3124}
@@ -974,7 +977,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
              ⚠️ THE SECTION IDS (#dsec-* / #dtab-*) ARE UNCHANGED from the old
              modal on purpose: every renderDetail*() writes into #dtab-<x>, so
              moving the markup here needed no change to any of them. -->
-        <div class="page-content" id="vendorDetailPage">
+        <!-- Hidden inline, NOT by a stylesheet rule: _vdShow() toggles this
+             inline value, and a stylesheet rule would beat it (that is exactly
+             why the profile first rendered blank). -->
+        <div class="page-content" id="vendorDetailPage" style="display:none">
           <button class="vd-back" onclick="closeVendorPage()">
             <i class="ti ti-arrow-left"></i> All vendors
           </button>
@@ -1172,9 +1178,9 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260903b"></script>
-<script src="assets/js/db.js?v=20260903b"></script>
-<script src="assets/js/ui.js?v=20260903b"></script>
+<script src="assets/js/auth.js?v=20260903c"></script>
+<script src="assets/js/db.js?v=20260903c"></script>
+<script src="assets/js/ui.js?v=20260903c"></script>
 <script src="assets/js/vendor-guide.js?v=20260902a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1213,6 +1219,16 @@ AppAuth.requireLogin((user, profile) => {
   loadAll().then(function () {
     // Deep link straight to a profile. Only now is allVendors populated.
     if (_vdBootVendor) openVendorPage(_vdBootVendor, { noPush: true });
+  }).catch(function (e) {
+    // Without this a rejected loadAll left the page on "Loading vendors…"
+    // forever with nothing on screen explaining why.
+    console.error('[vendors] loadAll failed', e);
+    const l = document.getElementById('loading');
+    if (l) l.innerHTML = '<div style="text-align:center;padding:30px">'
+      + '<i class="ti ti-alert-triangle" style="font-size:1.6rem;color:#EE3124"></i>'
+      + '<p style="margin:10px 0 4px;font-weight:700">Could not load the vendor directory.</p>'
+      + '<p style="margin:0;font-size:0.85rem;color:var(--text-hint)">' + esc((e && e.message) || String(e)) + '</p>'
+      + '<button class="btn-cancel" style="margin-top:14px" onclick="location.reload()">Try again</button></div>';
   });
   if (typeof VendorGuide !== 'undefined') VendorGuide.maybeAutoOpen(profile.id);
 });
@@ -4213,8 +4229,10 @@ function copyInviteLink() {
 function _vdShow(showPage) {
   const dir = document.getElementById('vendorDirectoryPage');
   const page = document.getElementById('vendorDetailPage');
-  if (dir) dir.style.display = showPage ? 'none' : '';
-  if (page) page.style.display = showPage ? '' : 'none';
+  // Explicit values both ways — never '' , which would hand control to a
+  // stylesheet rule (see the note where that rule used to live).
+  if (dir) dir.style.display = showPage ? 'none' : 'block';
+  if (page) page.style.display = showPage ? 'block' : 'none';
   // The directory's own bulk chrome must not linger over the profile.
   if (showPage) closeToolsMenu && closeToolsMenu();
   window.scrollTo({ top: 0, behavior: 'auto' });

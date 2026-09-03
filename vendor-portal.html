@@ -72,6 +72,22 @@
     .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:'Montserrat',sans-serif;color:#231F20;outline:none}
     .field input:focus,.field select:focus,.field textarea:focus{border-color:#EE3124}
     .field textarea{resize:vertical;min-height:70px}
+    .logo-row{display:flex;align-items:center;gap:14px}
+    .logo-box{flex-shrink:0;width:76px;height:76px;border-radius:12px;border:1.5px solid #e5e5e5;
+              background:#fafafa;display:flex;align-items:center;justify-content:center;
+              overflow:hidden;color:#bbb;font-size:26px}
+    .logo-box img{width:100%;height:100%;object-fit:contain;background:#fff}
+    .logo-btn{display:inline-flex;align-items:center;gap:6px;border:1.5px solid #e5e5e5;border-radius:8px;
+              padding:7px 12px;font-size:13px;color:#231F20;cursor:pointer;background:#fff}
+    .logo-btn:hover{border-color:#EE3124;color:#EE3124}
+    .logo-hint{font-size:11.5px;color:#888;margin-top:5px;line-height:1.5}
+    html.dark-mode .logo-box{background:#232423;border-color:#3a3a3a;color:#666}
+    html.dark-mode .logo-btn{background:#2B2C2B;border-color:#3a3a3a;color:#DCDBDB}
+    /* Swap a contact's photo without deleting and re-adding the person. */
+    .prof-photo-btn{position:absolute;bottom:8px;right:8px;border:none;background:rgba(0,0,0,.55);
+                    color:#fff;border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer;
+                    display:flex;align-items:center;justify-content:center;padding:0}
+    .prof-photo-btn:hover{background:#EE3124}
     .trade-checklist{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;border:1.5px solid #e5e5e5;border-radius:8px;padding:10px 12px;max-height:200px;overflow-y:auto}
     .trade-checklist label{display:flex;align-items:center;gap:8px;font-size:13px;color:#231F20;cursor:pointer}
     .trade-checklist input[type="checkbox"]{width:15px;height:15px;accent-color:#EE3124;cursor:pointer;flex-shrink:0}
@@ -295,7 +311,10 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     <span class="topbar-title">Vendor Portal</span>
   </div>
   <div class="topbar-right">
-    <span class="status-pill" id="statusPill">—</span>
+    <!-- Empty until renderStatus() knows the standing. It used to hold a
+         placeholder em-dash, which read as a stray control whenever that
+         render had not run yet. -->
+    <span class="status-pill" id="statusPill" style="display:none"></span>
     <button class="portal-theme-toggle" id="portalThemeToggle" onclick="togglePortalTheme()" aria-label="Toggle dark mode"></button>
     <button class="btn-logout" onclick="AppAuth.logout()">Sign out</button>
   </div>
@@ -346,6 +365,20 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       out — company name, payment terms and how Megawide classifies you are set by Megawide
       Procurement; contact them if any of those look wrong.
     </p>
+    <!-- The logo is the vendor's own asset, so they set it here. Stored in the
+         PRIVATE vendor-certs bucket, which means it can only be shown through a
+         signed URL — never a public one. -->
+    <div class="field">
+      <label>Company Logo</label>
+      <div class="logo-row">
+        <div class="logo-box" id="pfLogo"><i class="ti ti-building"></i></div>
+        <div>
+          <label class="logo-btn" for="pfLogoFile"><i class="ti ti-upload"></i> <span id="pfLogoBtnLbl">Upload logo</span></label>
+          <input id="pfLogoFile" type="file" accept="image/*" style="display:none" onchange="uploadPortalLogo(this)">
+          <div class="logo-hint">PNG or JPG, up to 4 MB. Megawide buyers see this on your profile.</div>
+        </div>
+      </div>
+    </div>
     <div class="field"><label>Company Name</label><input id="f-name" type="text" placeholder="Company Name"></div>
     <div class="field">
       <label>Trade Categories</label>
@@ -468,9 +501,12 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      instead of being dropped on the Megawide employee login. Must be set
      BEFORE auth.js runs. */
   window.__loginPage = 'vendor-login.html';
+  /* This IS a vendor surface — opt out of the vendor block that
+     requireLogin applies to every internal page. */
+  window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260903b"></script>
-<script src="assets/js/db.js?v=20260903b"></script>
+<script src="assets/js/auth.js?v=20260903c"></script>
+<script src="assets/js/db.js?v=20260903c"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -525,6 +561,26 @@ function msg(text, type) {
   setTimeout(() => { box.className = 'msg'; }, 4000);
 }
 
+/* Run one render step. A throw is reported IN the panel it belongs to (so the
+   vendor sees which part failed and staff get a copyable reason) and is never
+   allowed to abort the rest of the page. */
+async function _step(label, fn, hostId) {
+  try {
+    await fn();
+  } catch (e) {
+    console.error('[portal] ' + label + ' failed', e);
+    const host = hostId && document.getElementById(hostId);
+    if (host) {
+      host.innerHTML = '<div class="pf-empty"><i class="ti ti-alert-triangle"></i>'
+        + '<b>Could not load ' + esc(label) + '</b>'
+        + esc((e && e.message) || String(e))
+        + '<br><span style="font-size:11px">Tell Megawide Procurement if this keeps happening.</span></div>';
+    } else {
+      msg('Could not load ' + label + ': ' + ((e && e.message) || e), 'error');
+    }
+  }
+}
+
 async function loadAll() {
   try {
     vendor = await VendorDb.getVendor(myProfile.vendor_id);
@@ -532,10 +588,22 @@ async function loadAll() {
     msg('Could not load your vendor profile: ' + (e.message || e), 'error');
     return;
   }
-  renderOverviewForm();
-  buildTradeChips();
-  await renderProductCategoryOptions();   // async — mounts the taxonomy picker
-  await Promise.all([reloadAccreditation(), renderProducts(), renderCerts(), renderPersonnel()]);
+  /* ⚠️ EACH STEP IS ISOLATED. These used to run in sequence, so the FIRST one
+     to throw silently took every later one with it — which is exactly how an
+     empty Trade Categories box, an empty Products panel and an Accreditation
+     tab stuck on "Checking…" all appeared at once. Several of them touch
+     columns that only exist after 2026-09-02_vendor_catalogue.sql, so an unrun
+     migration must degrade to one broken panel, never to a blank page. */
+  await _step('company details', renderOverviewForm);
+  await _step('trade categories', buildTradeChips, 'tradeChips');
+  await _step('company logo', renderPortalLogo);
+  await _step('product categories', renderProductCategoryOptions);
+  await Promise.all([
+    _step('accreditation', reloadAccreditation, 'docsList'),
+    _step('products', renderProducts, 'productsList'),
+    _step('certifications', renderCerts, 'certsList'),
+    _step('personnel', renderPersonnel, 'personnelList'),
+  ]);
   // Only now do keystrokes count as edits — several render paths above write
   // into the form, and treating those as a change would arm the unload prompt
   // before the vendor has touched anything.
@@ -700,6 +768,7 @@ function renderStatus() {
   const key = window.accredKey ? window.accredKey(vendor.accreditation) : (vendor.accreditation || 'none');
   const label = window.accredLabel ? window.accredLabel(vendor.accreditation) : 'Not Assessed';
   pill.textContent = label;
+  pill.style.display = label ? '' : 'none';
   pill.className = 'status-pill status-' + (['accredited','problematic'].includes(key) ? key : 'none');
 
   const pending = currentRequest();
@@ -792,6 +861,42 @@ function renderOverviewForm() {
     panel.dataset.wired = '1';
   }
   syncSaveState();
+}
+
+/* The bucket is private, so the logo can only be shown through a short-lived
+   signed URL. Falls back to the placeholder icon when there is none. */
+async function renderPortalLogo() {
+  const box = document.getElementById('pfLogo');
+  const lbl = document.getElementById('pfLogoBtnLbl');
+  if (!box || !vendor) return;
+  if (!vendor.logo_path) {
+    box.innerHTML = '<i class="ti ti-building"></i>';
+    if (lbl) lbl.textContent = 'Upload logo';
+    return;
+  }
+  if (lbl) lbl.textContent = 'Replace logo';
+  try {
+    const url = await VendorDb.getCertFileUrl(vendor.logo_path);
+    if (url) box.innerHTML = '<img src="' + esc(url) + '" alt="Company logo">';
+  } catch (e) { /* a missing file must not blank the form */ }
+}
+
+async function uploadPortalLogo(input) {
+  const file = input && input.files && input.files[0];
+  if (!file || !vendor) return;
+  if (!/^image\//.test(file.type)) { msg('Pick an image file.', 'error'); input.value = ''; return; }
+  if (file.size > 4 * 1024 * 1024) { msg('The logo must be 4 MB or smaller.', 'error'); input.value = ''; return; }
+  try {
+    const path = await VendorDb.uploadVendorFile(vendor.id, 'logo', file);
+    vendor = await VendorDb.updateVendor(vendor.id, { logo_path: path }) || vendor;
+    if (!vendor.logo_path) vendor.logo_path = path;
+    await renderPortalLogo();
+    renderStatus();               // a vendor edit flips them back to pending_review
+    msg('Logo updated.', 'success');
+  } catch (e) {
+    msg('Could not upload the logo: ' + (e.message || e), 'error');
+  }
+  input.value = '';
 }
 
 function buildTradeChips() {
@@ -1333,6 +1438,13 @@ async function renderPersonnel() {
       + '<button class="prof-del" onclick="removePersonnel(' + Q + p.id + Q + ')" title="Remove">&times;</button>'
       + '<div class="prof-av" data-photo="' + esc(p.photo_path || '') + '">' + esc(_initials(p.name))
       + (p.is_primary ? '<span class="prof-primary" title="Primary contact"></span>' : '') + '</div>'
+      // Swap the photo in place — previously it could only be set when the
+      // contact was first added, so changing it meant deleting the person.
+      + '<button class="prof-photo-btn" title="' + (p.photo_path ? 'Replace photo' : 'Add photo') + '"'
+      + ' onclick="document.getElementById(' + Q + 'perph-' + p.id + Q + ').click()">'
+      + '<i class="ti ti-camera"></i></button>'
+      + '<input type="file" accept="image/*" id="perph-' + p.id + '" style="display:none"'
+      + ' onchange="replacePersonPhoto(' + Q + p.id + Q + ', this)">'
       + '<div class="prof-info">'
       + '<div class="prof-name" title="' + esc(p.name) + '">' + esc(p.name) + '</div>'
       + (p.role_title ? '<div class="prof-role">' + esc(p.role_title) + '</div>' : '')
@@ -1343,6 +1455,25 @@ async function renderPersonnel() {
   }).join('') + '</div>';
   _perLoadPhotos();
 }
+async function replacePersonPhoto(id, input) {
+  const file = input && input.files && input.files[0];
+  if (!file || !vendor) return;
+  if (!/^image\//.test(file.type)) { msg('Pick an image file.', 'error'); input.value = ''; return; }
+  if (file.size > 4 * 1024 * 1024) { msg('The photo must be 4 MB or smaller.', 'error'); input.value = ''; return; }
+  try {
+    const path = await VendorDb.uploadVendorFile(vendor.id, 'person_' + id, file);
+    await VendorDb.personnel.update(id, { photo_path: path });
+    await renderPersonnel();
+    await flagEdited();
+    msg('Photo updated.', 'success');
+  } catch (e) {
+    // photo_path arrives with 2026-09-02_vendor_catalogue.sql — say so plainly
+    // rather than failing silently, which is how the missing photo presented.
+    msg('Could not update the photo: ' + (e.message || e), 'error');
+  }
+  input.value = '';
+}
+
 async function _perLoadPhotos() {
   const nodes = document.querySelectorAll('.prof-av[data-photo]');
   for (const n of nodes) {

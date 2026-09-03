@@ -27,6 +27,19 @@ const AppAuth = (() => {
       try { if (profile) sessionStorage.setItem(cacheKey, JSON.stringify(profile)); } catch {}
     }
     if (!profile || profile.status !== 'approved') { await sb.auth.signOut(); window.location.href = _loginPage(); return; }
+    /* ⚠️ A VENDOR MAY NOT OPEN AN INTERNAL PAGE. RLS already starves them of the
+       data (which is why the dashboard rendered zeros), but the page itself still
+       exposed Megawide's internal surface: the tabs, the KPI set, the reporting
+       structure, every feature name. Blocking it here — the ONE place every
+       internal page funnels through — means a page added later is covered by
+       default instead of needing its own guard. Vendor surfaces opt IN with
+       window.__vendorSurface, set before auth.js runs; only vendor-portal.html
+       does. Never gate this per-page again: all nine internal pages had no
+       vendor check at all, which is how this shipped. */
+    if (profile.role === 'vendor' && !(typeof window !== 'undefined' && window.__vendorSurface)) {
+      window.location.href = 'vendor-portal.html';
+      return;
+    }
     window.__profile = profile; window.__session = session;
     if (typeof WPDb !== 'undefined' && WPDb.updateLastLogin) WPDb.updateLastLogin(session.user.id).catch(()=>{});
     if (typeof AppTheme !== 'undefined') AppTheme.init(session.user.id);
