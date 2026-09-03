@@ -871,7 +871,7 @@ The Split tool auto-detected only records with a delimiter or a repeated legal s
 - **"Suggest split points" DRILLS DOWN into the row's CURRENT segments**, not just the original name (`_splitSuggest` flatMaps `_suggestSplitPoints` over each current segment) — so on a record with SOME delimiters whose resulting segments still contain several companies joined only by spaces + mid-name `Inc.`/`Corp.` words (e.g. the "Affordaink … MCC … Corp. Microphase Corporation Northgate …" monster: delimiter split gives 4, one click → 10), it further-breaks each segment on its internal boundary words and preserves prior edits. Residual repeated-prefix garbles (`"MCC - EPC Central Warehouse MCC - EPC …"`) and boundary-word-less pairs still need a manual chip edit — no safe automatic signal. NOTE `"services"` is deliberately NOT a boundary word (too common in single names: "IT Services", "Allied Services").
 - **"Suggest split points" button per row** (`_splitSuggest` → **`_suggestSplitPoints(name)`**) — a deliberately aggressive, MANUAL-ONLY guesser (never wired into `_splitCandidates()`/the badge, so it can't pollute the auto count): splits after a company-boundary word (`SPLIT_HINT_RE` = inc/corp/ltd/…/trading/enterprises/industries/ventures/construction/builders/resources/manufacturing/…) **only when the next word starts with a capital** (a new company name begins), then runs the shared coalesce pass so a suffix continuation (`"… Trading Corporation"`) rejoins. Falls back to the whole name as one segment. Every suggested segment is editable before committing. Verified: `"Comanchesteel Corporation Rheymar Trading"` → 2; `"ABC Construction and Development Corp"` / `"Megawide Construction Corporation"` → 1; `"First Balfour Construction Group"` → 2 (accepted false positive — staff edits/removes). **Still not covered:** exact-duplicate-prefix garbles (`"Toyota Pasig Toyota Pasig Evolander Motor Corporation"`) — needs manual chip editing.
 - **"Split" shortcut in the vendor detail-modal footer** (`splitVendorFromDetail(id)`, write-roles only via `_canManage`): closes the detail modal, opens the Split modal, `_splitAddVendor(id)`s that vendor, and auto-runs `_splitSuggest` if its name is a single segment — so staff can jump straight from a profile they're viewing into splitting that record.
-- The **shared segment-cleanup loop was extracted to `_coalesceSegments(raw)`** (bare-suffix merge-back + leading-suffix reattach) so `_splitSegments` and `_suggestSplitPoints` can't drift. **Both `` sentinels (`_splitOnSuffixRuns`, `_suggestSplitPoints`) use the ASCII ESCAPE `''`, never a raw 0x01 byte** — a raw byte slipped into `_suggestSplitPoints` during authoring and was caught by `grep -c $'\x01'` (it makes the file register as binary; same trap as the earlier NUL-byte incident). If you add another sentinel, write `''` in source, never paste the control char.
+- The **shared segment-cleanup loop was extracted to `_coalesceSegments(raw)`** (bare-suffix merge-back + leading-suffix reattach) so `_splitSegments` and `_suggestSplitPoints` can't drift. **Both `\u0001` sentinels (`_splitOnSuffixRuns`, `_suggestSplitPoints`) use the ASCII ESCAPE `'\u0001'`, never a raw 0x01 byte** — a raw byte slipped into `_suggestSplitPoints` during authoring and was caught by `grep -c $'\x01'` (it makes the file register as binary; same trap as the earlier NUL-byte incident). If you add another sentinel, write `'\u0001'` in source, never paste the control char.
 
 ### Vendor guide — stable "Next" button (2026-08-10)
 
@@ -926,7 +926,7 @@ A 3-surface audit (DB/migrations, `vendors.html`, Phase 2b cross-page) produced 
 - **HIGH — `merge_vendors`/`delete_vendor_cascade` authorization was a deny-list** (`r in ('vendor','viewer')`) that let read-only `viewer_budget` + all write roles bypass the admin-only `vendors_delete` RLS policy via the SECURITY DEFINER RPCs. Changed both to an **allow-list `r not in ('super_admin','admin')` → reject** (matches `vendors_delete`). In `migrations/2026-08-10_vendor_merge.sql` — **re-run it**.
 - **MED — merge/delete left dangling ids in `work_packages.proposed_vendor_ids uuid[]`** (no FK). Both RPCs now scrub the array (merge substitutes source→target with dedup; delete `array_remove`s), each guarded by an `information_schema.columns` existence check so the RPC still works pre-`migrations/2026-08-10_wp_proposed_vendor_ids.sql`.
 - **MED — `vendor_bids.vendor_id` had no `ON DELETE`** (every sibling child table cascades). `migrations/2026-08-10_vendor_merge.sql` now `drop/add`s the FK with `on delete cascade`.
-- **MED — literal NUL byte** in `vendors.html` `_splitOnSuffixRuns` (`const marker = '\x00'` written as a raw 0x00) made the whole file register as **binary** (broke `grep`/diff). Replaced with the plain-text escape `''` (still a non-space sentinel; functionally identical).
+- **MED — literal NUL byte** in `vendors.html` `_splitOnSuffixRuns` (`const marker = '\x00'` written as a raw 0x00) made the whole file register as **binary** (broke `grep`/diff). Replaced with the plain-text escape `'\u0001'` (still a non-space sentinel; functionally identical).
 - **LOW — `db.js upsertRate`** fallback only caught a missing `wp_id` COLUMN; now also catches a missing/mismatched ON CONFLICT **constraint** (`/on conflict|unique or exclusion constraint/i`) — the partial-deploy state where `migrations/2026-08-10_vendor_rates_wp_link.sql` ran but not the `_fix`.
 - **LOW — backfill button feedback**: `backfillFromWPs()` referenced a dead id `#btn-backfill-vendor-data` (the trigger moved into the id-less Data Tools dropdown, which closes on click). Removed the dead spinner code; feedback is the `AppNotify` toast + a new **`_backfillRunning`** re-entrancy guard so it can't be double-triggered.
 - **LOW — `wp-form.html` reconcile** now guards `typeof VendorDb !== 'undefined'` (matches `project.html`) so a db.js load failure can't throw before the `.catch` attaches and make a good save look failed.
@@ -1067,7 +1067,10 @@ plural by nature).
   work). **Not done, flag if wanted**: the grid still collects no per-vendor awarded amounts, and
   `index.html` / `project.html`'s WP-detail panels are untouched.
 
-### Vendor Grid — Excel-style editing, full parity with `review.html`'s WP grid (`vendors.html`, 2026-08-14)
+### Vendor Grid — Excel-style editing model (`vendors.html`, 2026-08-14)
+
+> **Superseded in scope by the 2026-09-03 entry below**, which added the column/row/layout
+> features this one left out. This section still describes the editing model correctly.
 
 The vendor directory's view toggle is **Cards | Grid | Analytics** — the plain **Table** view was removed the same day, per explicit request, once Grid existed: it was a strict subset of what Grid does (same rows, same fields, no editing) so keeping both was pure repetition. `renderTable()`, `#vendorTableWrap`, the `#vv-table` button, and the now-dead `.v-table`/`.table-wrapper`/`.vth-check` CSS were deleted outright rather than hidden; `quickApprove`/`quickReject` (the row-level buttons Table used to expose) survive unchanged since Cards already renders them for `pending_review` vendors, and the Grid's Status cell can set `approved`/`rejected` directly.
 
@@ -1089,6 +1092,126 @@ The vendor directory's view toggle is **Cards | Grid | Analytics** — the plain
 - **Bug caught and fixed before shipping (first draft, single-cell-only version)**: the cell editor's own `keydown` handler for Enter/Tab/Escape called into a commit function that reset the "currently editing" flag, but didn't `stopPropagation()` — the same keystroke then bubbled to the wrap's own `keydown` listener, which no longer saw "still editing" and reprocessed the identical Enter/Tab as a **second** navigation (double-move / instant re-open of the editor on the cell just moved to). Fixed in the rewrite by keeping `finish()` (the editor's commit/cancel closure) entirely local — it doesn't rely on a bubbling re-check at all — and still adding `e.stopPropagation()` defensively. **General lesson: when an outer handler keys off state an inner handler just cleared, either stop the bubble or don't depend on the outer handler re-evaluating that state at all.**
 - Scoped entirely to `vendors.html`'s own inline `<style>`/`<script>` (CSS class prefix `vxl-`, JS function prefix `_vxl`/`vxl`) — no `db.js`/shared-asset changes, so no `?v=` bump was needed.
 - **Not yet verified against a live authenticated session** (built and pushed without a logged-in preview — static-parse / no-console-error checked only, since verifying needs the user's own login). Flag anything — especially the drag/fill/copy-paste interactions, which are the highest-risk part of this build — that doesn't behave as expected on first real use.
+
+### Vendor Grid — the REST of the parity with `review.html`'s WP grid (`vendors.html`, 2026-09-03)
+
+The 2026-08-14 entry above was titled "full parity" but delivered the editing MODEL only
+(select / edit / nav / range / fill / copy-paste / undo / staged-save). Everything that makes
+the WP grid workable on a wide, dense table was still missing. Asked for by pointing at the
+All Work Packages grid: *"I want the grid to follow the features already available."* Added:
+
+- **Collapsible column SECTIONS.** `VXL_GROUPS` (Identity / Accreditation / Classification /
+  Contact / Address / Notes) render as a clickable header band above the column row, exactly
+  like `XL_GROUPS`. **`VXL_GROUPS_DEFAULT_COLLAPSED = ['contact','address','other']`** on a
+  first visit so the grid opens at **~1,700px instead of ~3,180px** (measured); the user's own
+  choice persists per user thereafter.
+- **⚠️ `VVC` IS THE COORDINATE SPACE, exactly as `VC` is in `review.html`.** Every r/c
+  coordinate — selection, nav bounds, copy/paste, fill, editors, dirty repaint — indexes into
+  `VVC`, **never `VXL_COLS`**. Only the required-field tally (`_vxlRowMissing`) and the
+  save-time draft scan read `VXL_COLS`, so **a gap hidden behind a collapsed section is still
+  counted** (tested). If you add a coordinate-based lookup, use `VVC`.
+- **A collapsed section keeps its `keep:true` column or, failing that, a narrow hatched
+  placeholder** (`ph:true`) — without it that section's header would leave the screen and could
+  never be clicked again. Verified: collapse-all still leaves all six sections clickable.
+- **Row-number gutter** (`VXL_GUTTER = 42`), reddening on row hover so a row can be tracked
+  across the horizontal scroll; on a draft row it becomes the `×` discard button.
+- **Drag-to-resize columns** (`_vxlWidths`, persisted per user; double-click a grip to reset a
+  column, plus a Reset-widths toolbar button). Live-updates the `<col>` + table width during the
+  drag, then re-renders on release so the frozen columns' sticky offsets follow.
+- **User-set freeze boundary** — a 📌 pin per header; **`_vxlFreezeKey` stores the KEY, not the
+  index**, so the freeze survives a section collapse and falls back to the default when that
+  column is hidden (tested both ways). Clicking the current boundary again resets it.
+- **Per-column "set all" caret** (`_vxlColMenu` → `_vxlSetColumn`) — one value onto every visible
+  row, as ONE undo batch, behind a confirm. Excluded on `name` (the identity column).
+- **Collapsible ROW groups** — a `No grouping / Accreditation / Vendor category / Trade / City`
+  picker. There is no money on a vendor to subtotal, so **the count IS the summary**. A collapsed
+  group's rows leave `_vxlRows` (the coordinate space) but **its header still renders and still
+  reports its FULL count**, and collapsing *every* group still renders every header rather than
+  a dead "no rows" state that could never be re-opened.
+- **⚠️ GROUP ROWS CARRY NO `data-r`/`data-c`** — they are outside the coordinate space by
+  construction, which is what leaves selection / nav / paste / fill untouched. Keep any future
+  injected decorative row attribute-free the same way.
+- **⚠️ The group toggle takes an INDEX, never the key.** A key is free text (a city, a vendor
+  group, a trade) and **no escaping makes it safe in an inline handler**: the HTML parser decodes
+  the attribute *before* the JS is parsed, so a key containing the literal text `&quot;` becomes a
+  bare quote and throws a `SyntaxError` — **verified, this is not theoretical**. `_vxlGroupList`
+  holds the groups and `vxlToggleRowGroup(idx)` resolves against it; a test asserts every
+  group-row `onclick` is exactly `vxlToggleRowGroup(<digits>)`. Same trap as Known Issues #23.
+- **In-grid draft rows** — `Add Vendor` + a 1–100 count box pushes green `__new` rows pinned to
+  the top, each with a `×`. Drafts **ignore the Incomplete filter** so a row you just added can
+  never be filtered out from under you, and they are **excluded from `_pageIds`** (they have no
+  database row, so a bulk action must never reach them). Insert happens on Save via
+  `VendorDb.createVendor`, with `invite_email` filled from the existing
+  `_addVendorPlaceholderEmail()` (the column is NOT NULL).
+- **`reqIfAccredited` — conditional required-ness, mirroring `reqIfAwarded`.** The field list is
+  taken **VERBATIM from `window.accredReadiness()`'s `info` group** in `db.js` (tin, address,
+  contact person/position/number/email, payment terms, trade categories) — the one shared
+  definition the portal and the detail modal already hold vendors to. **Do not invent a second
+  list**, or the grid's red cells will disagree with the checklist. A test asserts the two match.
+- **⚠️ It highlights and feeds the "Incomplete" filter, but deliberately does NOT gate save.**
+  ~500 accredited vendors arrived from the masterlist seed with incomplete profiles; blocking an
+  unrelated one-cell edit on them would make the grid unusable. **Drafts DO get the full check**
+  (`req` only), same split as `review.html`'s edit-scoped gating.
+- **Duplicate-name guard on insert** — names are not unique-constrained in the DB, but a
+  duplicate vendor is exactly what Merge / Remove-Exact-Duplicates exist to clean up, so a draft
+  whose normalized name already exists is named and confirmed before it is created.
+- **Local draft autosave** (`wpm_vgriddraft_<uid>`) with a Restore/Discard banner, and the same
+  **`_vxlDraftChecked` race guard** as `review.html`: it stays false until the user chooses, so
+  the first (empty) render cannot autosave over the draft the banner is about to offer.
+- **`beforeunload` guard** while the grid holds unsaved edits.
+- **Measured height + a non-scrolling shell.** `body.vm-grid-fixed` makes `.vxl-wrap` the only
+  scroller via a flex CHAIN (`.app-shell → .main → .content → #main-content → .page-content →
+  #vendorGridPanel → .vxl-wrap`), **every link carrying `min-height:0`** — a flex item's default
+  `min-height:auto` refuses to shrink below its content and would push the page taller than the
+  viewport again. `#main-content` needs **`display:flex !important`** because this app sets its
+  display inline from JS and an inline style outranks a class rule (Known Issues #30). Gated to
+  ≥768px so a resize re-evaluates with no JS listener; below that, `_vxlFitHeight()` measures via
+  the **`offsetTop` chain** (never `getBoundingClientRect().top`, which is viewport-relative and
+  feeds back on itself). Verified: page does not scroll, the grid does, and the wrap carries no
+  inline height at all on desktop — the chain owns it.
+- **Help disclosure, colour legend (required / unsaved / new row), row count, selection readout,
+  required-empty tally, dirty count and autosave indicator**, all in a footer BELOW the grid so
+  the toolbar above stays one row.
+- **`_syncBulkUI()` is called from `renderVendorGrid` itself**, because a section collapse, a pin,
+  a resize, a group toggle or the Incomplete checkbox all re-render directly without going
+  through `renderVendorList()` — and each of those changes `_pageIds`.
+- **`renderVendorGrid(rows)` caches its source in `_vxlLastRows`**, so every pref-driven
+  re-render can call `renderVendorGrid()` with no argument.
+
+**⚠️ A literal NUL byte was written into the file during this work and caught before commit** —
+the `VXL_NEW_GROUP` sentinel was authored as a raw `\x00` instead of the six-character escape,
+which made the whole file register as **binary** to `grep`/diff. Exactly the trap CLAUDE.md
+already records for `vendors.html`'s `_splitOnSuffixRuns` and `review.html`. **Write `\u0000` in
+source; never paste the control character.** A byte scan is now part of the check.
+
+**Verified — 78 assertions against the VERBATIM shipped engine** (extracted from `vendors.html`
+between its own comment markers and run under `node:vm` with a DOM stub, so a test can only pass
+if the real shipped code does): section collapse/expand incl. the keep-vs-placeholder rule and
+"every header stays clickable"; freeze by key incl. the hidden-column fallback and cumulative
+sticky offsets; width math; `reqIfAccredited` matching `accredReadiness` exactly and counting
+through a collapsed section; `_vxlSet`'s reject/no-op/revert paths incl. masterdata free-text
+mapping and date normalization; undo batching; row groups incl. the no-coordinates invariant, the
+index-based toggle, full counts under collapse, and the all-collapsed case; drafts; draft payload
+(array trades, NULL-not-`''`, invite_email); the Incomplete filter; set-all; TSV copy/paste
+round-trip and its rejection path; save incl. the required-field block, the duplicate-name guard,
+NULL coercion, and **an edit staged on a row later hidden by a collapsed group still saving**;
+and the autosave draft round-trip. Plus `node --check` on all four inline script blocks.
+
+**Verified visually** in a throwaway harness built from the real CSS + real markup + real engine
+(deleted before commit): renders in light and dark, range highlight paints over the zebra via the
+box-shadow overlay, sticky group/column headers, frozen column, drafts in green, and the flex
+chain sizing the grid with the page not scrolling. **Toolbar/footer widths were measured, not
+eyeballed**, at 375–1900px with every status readout at its longest simultaneously: **nothing
+spills at any width**, and in the resting state it is a 1-row toolbar + 1-row footer at ≥1000px.
+That measurement found a real bug — `.vxl-bar-right` is `flex-shrink:0` and had no `flex-wrap`,
+so the readouts were **clipping out of the bar at every width ≤1200px**; it now wraps as a group.
+
+**Not verified against a live authenticated session** — this page needs the user's own Supabase
+login. The drag interactions (resize grip, fill handle) and the `VendorDb.createVendor` insert
+path for drafts are the highest-risk parts on first real use; flag anything that misbehaves.
+
+`vendors.html`-only change (its own inline `<style>`/`<script>`), so **no shared `?v=` bump** —
+same precedent as the other vendors.html-scoped work.
 
 ### Vendor Accreditation — accredited / unaccredited / problematic (2026-08-19)
 
