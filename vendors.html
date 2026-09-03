@@ -776,23 +776,24 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
       <div class="sidebar-section-label">Navigation</div>
       <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Portfolio Overview</a>
       <a class="nav-item active" href="vendors.html"><i class="ti ti-building-store"></i>Vendor Management</a>
-      <!-- Sits WITH Vendor Management: same vendor surface, same contributor
-           audience, and inside a LABELLED section so it can never render as an
-           unlabelled orphan floating between the Admin and Manager groups (which
-           is how it read when it was its own .sidebar-section). Still its own
-           wrapper, because its role gate differs from Vendor Management's --
-           viewer_budget may read the directory but not this queue -- so
-           initVendorClaimsNav() toggles THIS element independently. -->
-      <div id="sidebar-vendor-claims" style="display:none">
-        <a class="nav-item" id="nav-vendor-claims" href="vendors.html?claims=1">
-          <i class="ti ti-user-check"></i>Vendor Registrations
-          <span class="nbadge" id="nav-claim-count" style="display:none">0</span>
-        </a>
-      </div>
     </div>
     <div class="sidebar-section" id="nav-admin-section" style="display:none">
       <div class="sidebar-section-label">Admin</div>
       <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+    </div>
+    <!-- ⚠️ ITS OWN LABELLED SECTION, placed right after the Admin block so it
+         reads directly below User Management for an admin. It cannot go INSIDE
+         that block: the queue is open to every contributor role, and #nav-admin-section is
+         revealed on AppAuth.isAdmin alone, which would also expose User
+         Management / New Project / the project tools to them. The label is what
+         stops it being the unlabelled orphan it used to be for a contributor,
+         who never sees the Admin block. initVendorClaimsNav() toggles this. -->
+    <div class="sidebar-section" id="sidebar-vendor-claims" style="display:none">
+      <div class="sidebar-section-label">Approvals</div>
+      <a class="nav-item" id="nav-vendor-claims" href="vendors.html?claims=1">
+        <i class="ti ti-user-check"></i>Vendor Registrations
+        <span class="nbadge" id="nav-claim-count" style="display:none">0</span>
+      </a>
     </div>
     <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
@@ -1031,6 +1032,29 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
             </div>
           </div>
         </div>
+
+        <!-- ══ Vendor Registrations — the third page route ══════════════════
+             Sibling of the directory and the vendor profile; _vdShow() decides
+             which of the three is visible. ⚠️ #claimsModalBody KEEPS ITS ID:
+             renderClaims() writes into it, so moving the markup out of the
+             modal needed no change to it or to any of the decide/create
+             handlers. Hidden inline, never by a stylesheet rule — _vdShow
+             toggles the inline value, and a rule would win (that is exactly
+             why the profile page first rendered blank). -->
+        <div class="page-content" id="vendorClaimsPage" style="display:none">
+          <button class="vd-back" onclick="closeClaimsPage()">
+            <i class="ti ti-arrow-left"></i> All vendors
+          </button>
+          <div class="vm-head">
+            <div>
+              <h1>Vendor Registrations</h1>
+              <p>People who registered from the public link and are waiting to be given access to
+                 their company&rsquo;s profile. Check what they submitted against the vendor record,
+                 then approve or decline.</p>
+            </div>
+          </div>
+          <div id="claimsModalBody"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1207,18 +1231,17 @@ AppAuth.requireLogin((user, profile) => {
   // and shared. Runs after loadAll() has populated allVendors.
   _vdBootVendor = new URLSearchParams(location.search).get('vendor');
   if (typeof initVendorClaimsNav === 'function') initVendorClaimsNav(profile);
-  // Deep link from the other pages' sidebar item, which cannot open a modal
-  // that lives here. Runs after loadAll() so allVendors is populated and the
-  // queue can resolve each claim's matched vendor name.
-  if (new URLSearchParams(location.search).get('claims') === '1' && _canManage) {
-    setTimeout(function () { openClaimsModal(); }, 600);
-  }
+  // Deep link from the other pages' sidebar item. Opened off loadAll().then
+  // below rather than on a timer, because the queue resolves each claim's
+  // matched vendor name out of allVendors.
+  _vdBootClaims = new URLSearchParams(location.search).get('claims') === '1' && _canManage;
   renderUserBar('user-bar', profile);
   initMobileMenu();
   _initBulkUI();
   loadAll().then(function () {
-    // Deep link straight to a profile. Only now is allVendors populated.
+    // Deep link straight to a profile or the queue. Only now is allVendors populated.
     if (_vdBootVendor) openVendorPage(_vdBootVendor, { noPush: true });
+    else if (_vdBootClaims) openClaimsPage({ noPush: true });
   }).catch(function (e) {
     // Without this a rejected loadAll left the page on "Loading vendors…"
     // forever with nothing on screen explaining why.
@@ -4226,13 +4249,18 @@ function copyInviteLink() {
    openDetailModal() is kept as an alias because other call sites use it. */
 
 // Directory <-> page swap. Both are .page-content siblings.
-function _vdShow(showPage) {
-  const dir = document.getElementById('vendorDirectoryPage');
-  const page = document.getElementById('vendorDetailPage');
-  // Explicit values both ways — never '' , which would hand control to a
-  // stylesheet rule (see the note where that rule used to live).
-  if (dir) dir.style.display = showPage ? 'none' : 'block';
-  if (page) page.style.display = showPage ? 'block' : 'none';
+/* Which of the three pages is on screen: 'directory' | 'detail' | 'claims'.
+   Explicit display values both ways — never '', which would hand control back
+   to a stylesheet rule (see the note where that rule used to live). */
+function _vdShow(which) {
+  // Back-compat: _vdShow(true/false) still means detail / directory.
+  const w = which === true ? 'detail' : which === false ? 'directory' : which;
+  const map = { directory: 'vendorDirectoryPage', detail: 'vendorDetailPage', claims: 'vendorClaimsPage' };
+  Object.keys(map).forEach(function (k) {
+    const el = document.getElementById(map[k]);
+    if (el) el.style.display = (k === w) ? 'block' : 'none';
+  });
+  const showPage = w !== 'directory';
   // The directory's own bulk chrome must not linger over the profile.
   if (showPage) closeToolsMenu && closeToolsMenu();
   window.scrollTo({ top: 0, behavior: 'auto' });
@@ -4280,7 +4308,9 @@ function closeDetailModal() { return closeVendorPage(); }
 // Back/Forward between the directory and a profile. The URL has already moved by
 // the time this fires, so both branches pass noPush.
 window.addEventListener('popstate', function () {
-  const id = new URLSearchParams(location.search).get('vendor');
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('claims') === '1') { openClaimsPage({ noPush: true }); return; }
+  const id = qs.get('vendor');
   if (id) {
     if (activeVendor && activeVendor.id === id) return;
     openVendorPage(id, { noPush: true });
@@ -4357,6 +4387,7 @@ async function vdUploadLogo(file) {
 // buried button (a TIN was typed, Close was pressed, nothing saved).
 let _detailDirty = false;
 let _vdBootVendor = null;   // ?vendor=<id> captured at boot, opened once loadAll() resolves
+let _vdBootClaims = false;  // ?claims=1 — same, the queue needs allVendors
 function _markDetailDirty() {
   if (_detailDirty) return;
   _detailDirty = true;
@@ -5538,18 +5569,6 @@ function restoreDetailCert(id)      { return _restoreChild(VendorDb.certificatio
 function restoreDetailPersonnel(id) { return _restoreChild(VendorDb.personnel, id, renderDetailPersonnel); }
 </script>
 <!-- ── Vendor self-registration queue ─────────────────────────────────────── -->
-<div class="modal-overlay" id="claimsModal" style="display:none">
-  <div class="modal" style="max-width:820px">
-    <div class="modal-header">
-      <div>
-        <div class="modal-title">Vendor Registrations</div>
-        <div class="modal-subtitle">People who registered from the public link and are waiting to be given access to their company's profile. Check the details they submitted against the vendor record, then approve or decline.</div>
-      </div>
-      <button class="modal-close" onclick="closeClaimsModal()">&times;</button>
-    </div>
-    <div class="modal-body" id="claimsModalBody"></div>
-  </div>
-</div>
 
 <!-- ── Registration QR ────────────────────────────────────────────────────── -->
 <div class="modal-overlay" id="qrModal" style="display:none">
@@ -5610,18 +5629,39 @@ function _confBadge(c) {
     + esc(how) + '">' + m.txt + '</span>';
 }
 
-async function openClaimsModal() {
-  document.getElementById('claimsModal').style.display = 'flex';
-  _syncModalScrollLock();
+/* A route, not a modal — vendors.html?claims=1. openClaimsModal is kept as the
+   name because the sidebar deep-link, the Data Tools item and updateClaimsBadge
+   all call it. */
+async function openClaimsPage(opts) {
+  if (_detailDirty && !confirm('You have unsaved changes to a vendor. Leave without saving?')) return;
+  _detailDirty = false;
+  activeVendor = null;
+  if (_detailScrollSpy) { _detailScrollSpy.disconnect(); _detailScrollSpy = null; }
+  _vdShow('claims');
+  if (!(opts && opts.noPush)) {
+    try { history.pushState({ claims: 1 }, '', 'vendors.html?claims=1'); } catch (_) {}
+  }
+  document.title = 'Vendor Registrations — Vendor Management';
   document.getElementById('claimsModalBody').innerHTML = '<div class="empty">Loading…</div>';
   try { _claims = await VendorDb.claims.pending(); }
-  catch (e) { _claims = []; }
+  catch (e) {
+    _claims = [];
+    document.getElementById('claimsModalBody').innerHTML =
+      '<div class="empty">Could not load the registrations. ' + esc((e && e.message) || String(e)) + '</div>';
+    return;
+  }
   renderClaims();
 }
-function closeClaimsModal() {
-  document.getElementById('claimsModal').style.display = 'none';
-  _syncModalScrollLock();
+async function openClaimsModal() { return openClaimsPage(); }
+
+function closeClaimsPage(opts) {
+  _vdShow('directory');
+  document.title = 'Vendor Management';
+  if (!(opts && opts.noPush)) {
+    try { history.pushState({}, '', 'vendors.html'); } catch (_) {}
+  }
 }
+function closeClaimsModal() { return closeClaimsPage(); }
 
 function renderClaims() {
   const box = document.getElementById('claimsModalBody');
