@@ -33,6 +33,34 @@
     .btn-logout{background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;padding:6px 14px;border-radius:8px;font-family:inherit;font-size:12px;cursor:pointer}
     .btn-logout:hover{background:rgba(255,255,255,.1)}
     .wrap{max-width:960px;margin:0 auto;padding:24px 16px 60px}
+    /* ── Side panel ───────────────────────────────────────────────────────
+       Two top-level PAGES — Company Profile and Bid Board — because they are
+       different jobs, not two views of the same record. The profile's own tab
+       row lives inside the Company Profile page. Styled after the main app's
+       dark sidebar, but self-contained: this page never loads dashboard.css. */
+    .portal-shell{display:flex;align-items:flex-start}
+    .portal-nav{width:200px;flex-shrink:0;background:#231F20;align-self:stretch;
+      min-height:calc(100vh - 60px);position:sticky;top:60px;padding:14px 10px;
+      display:flex;flex-direction:column;gap:3px}
+    .pnav-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+      color:rgba(255,255,255,.38);padding:6px 12px 6px}
+    .pnav-item{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:none;
+      border-radius:8px;background:transparent;color:rgba(255,255,255,.72);font-size:13px;
+      font-weight:600;font-family:inherit;cursor:pointer;text-align:left}
+    .pnav-item:hover{background:rgba(255,255,255,.08);color:#fff}
+    .pnav-item.active{background:#EE3124;color:#fff}
+    .pnav-item i{font-size:17px;flex-shrink:0}
+    .pnav-item .lbl{flex:1;min-width:0}
+    .pnav-item.active .tab-badge{background:#fff;color:#EE3124}
+    .portal-body{flex:1;min-width:0}
+    @media(max-width:767px){
+      /* A 200px rail is most of a phone screen — become a strip instead. */
+      .portal-shell{flex-direction:column}
+      .portal-nav{width:auto;min-height:0;position:static;flex-direction:row;
+        padding:8px 10px;gap:6px;overflow-x:auto}
+      .pnav-title{display:none}
+      .pnav-item{width:auto;white-space:nowrap;padding:8px 13px}
+    }
     .banner{border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.5;margin-bottom:20px}
     .banner-pending{background:#FEF3C7;color:#92400E;border:1px solid #FDE68A}
     .banner-approved{background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0}
@@ -64,6 +92,9 @@
     .tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
     .tab-btn{padding:8px 16px;border:1px solid #e5e5e5;border-radius:8px;background:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;color:#888}
     .tab-btn.active{background:#EE3124;border-color:#EE3124;color:#fff}
+    .tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;
+      padding:0 4px;margin-left:6px;border-radius:20px;background:#EE3124;color:#fff;font-size:10px;font-weight:800}
+    .tab-btn.active .tab-badge{background:#fff;color:#EE3124}
     .panel{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:20px;margin-bottom:16px}
     .panel-title{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
     .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -107,7 +138,11 @@
     .row-item-del{background:none;border:none;color:#EE3124;cursor:pointer;font-size:16px;padding:4px}
     .add-form{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed #e5e5e5}
     .add-form input,.add-form select{flex:1;min-width:120px;padding:8px 10px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:12.5px;font-family:inherit}
-    .file-badge{font-size:11px;color:#2563EB;text-decoration:underline;cursor:pointer}
+    /* Styled as a link, so it must not keep the browser's default button box —
+       without the reset it renders as a bordered grey button here AND in the
+       accreditation documents list, which is not what the blue underline says. */
+    .file-badge{font-size:11px;color:#2563EB;text-decoration:underline;cursor:pointer;
+      border:none;background:none;padding:0;font-family:inherit}
     .msg{font-size:12.5px;padding:8px 12px;border-radius:8px;margin-bottom:12px;display:none}
     .msg.error{background:#FEE2E2;color:#991B1B;display:block}
     .msg.success{background:#D1FAE5;color:#065F46;display:block}
@@ -188,6 +223,27 @@
     html.dark-mode .ready-item.no{color:#FCA5A5}
     html.dark-mode .doc-missing{color:#FCA5A5}
     html.dark-mode .doc-have{color:#6EE7B7}
+    /* ⚠️ DESIGN TOKENS — this page does NOT load dashboard.css, and it had none
+       of these. Every SHARED component (window.TaxonomyPicker today, anything
+       added later) is written against var(--surface) / var(--text-primary) /
+       var(--border-md) …, so with no definitions here they silently resolved to
+       their LIGHT fallbacks — which is exactly why the category picker's
+       popover rendered white-on-dark. Values match dashboard.css so the portal
+       and the app look like one product.
+       ⚠️ Scoped to html.dark-mode, NOT body.dark-mode — that class is never set
+       on this page (no ui.js, so AppTheme is undefined here). */
+    :root{
+      --mw-red:#EE3124; --mw-red-dark:#C42127; --mw-red-light:#FDECEA;
+      --bg:#F5F5F5; --surface:#FFFFFF; --surface-2:#F9F9F9;
+      --border:rgba(0,0,0,.08); --border-md:rgba(0,0,0,.14);
+      --text-primary:#231F20; --text-secondary:#5A5858; --text-hint:#6E6C6C;
+    }
+    html.dark-mode{
+      --mw-red-light:#3D1A19;
+      --bg:#1C1C1C; --surface:#2B2C2B; --surface-2:#333433;
+      --border:rgba(255,255,255,.09); --border-md:rgba(255,255,255,.16);
+      --text-primary:#F0EFEF; --text-secondary:#DCDBDB; --text-hint:#9B9999;
+    }
     /* Native controls (date pickers, select popups, scrollbars) follow suit. */
     html.dark-mode{color-scheme:dark}
     .portal-theme-toggle{background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;
@@ -300,6 +356,56 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     html.dark-mode .cat-foot button{background:#2a2a2a;border-color:#3f3f3f;color:#bbb}
     html.dark-mode .cat-ghead,html.dark-mode .itm-legend{border-color:#3a3a3a}
     html.dark-mode .pf-empty{border-color:#3a3a3a}
+
+    /* ── Bid Board ────────────────────────────────────────────────────────
+       Invitations, not a catalogue, so a list of cards rather than a photo
+       grid — there is nothing to photograph about a request for quotation. */
+    .bid-card{border:1.5px solid #e8e8e8;border-radius:10px;padding:14px 16px;background:#fff;
+      margin-bottom:12px;transition:border-color .15s}
+    .bid-card.locked{opacity:.82}
+    .bid-top{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+    .bid-wp{font-size:13.5px;font-weight:700;color:#231F20;flex:1;min-width:180px}
+    .bid-wp small{display:block;font-weight:500;color:#888;font-size:11.5px;margin-top:2px}
+    .bid-badge{flex-shrink:0;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+      padding:3px 10px;border-radius:20px;white-space:nowrap}
+    .bid-badge-action{background:#FDECEA;color:#C42127;border:1px solid #F5B8B3}
+    .bid-badge-submitted{background:#EAF3FF;color:#1D4ED8;border:1px solid #BFDBFE}
+    .bid-badge-declined{background:#F1F1F1;color:#555;border:1px solid #ddd}
+    .bid-badge-awarded{background:#E7F7EF;color:#0F7A46;border:1px solid #BEEBD3}
+    .bid-badge-closed{background:#F1F1F1;color:#555;border:1px solid #ddd}
+    .bid-meta{font-size:11.5px;color:#888;margin-bottom:4px}
+    .bid-scope{font-size:12px;color:#555;background:#fafafa;border-radius:6px;padding:8px 10px;margin:8px 0;line-height:1.6}
+    .bid-due{font-size:11.5px;font-weight:600;color:#666}
+    .bid-due.bid-due-soon{color:#B45309}
+    .bid-due.bid-due-over{color:#C42127}
+    .bid-chips{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
+    .bid-chip{font-size:10px;color:#555;background:#f2f2f2;border-radius:4px;padding:2px 7px;white-space:nowrap}
+    .bid-offer-summary{font-size:12px;color:#555;background:#F9F9F9;border-radius:8px;padding:10px 12px;margin-top:8px;line-height:1.7}
+    .bid-offer-summary b{color:#231F20}
+    .bid-foot{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .bid-foot button{padding:7px 14px;font-size:12px;border-radius:7px;border:1px solid #e0e0e0;
+      background:#fff;cursor:pointer;font-family:'Montserrat',sans-serif;color:#555}
+    .bid-foot button.primary{background:#EE3124;border-color:#EE3124;color:#fff;font-weight:700}
+    .bid-foot button.danger:hover{border-color:#EE3124;color:#EE3124}
+    .bid-note{font-size:11.5px;color:#999;font-style:italic;margin-top:6px}
+    html.dark-mode .bid-card{background:#232323;border-color:#3a3a3a}
+    html.dark-mode .bid-wp{color:#EDEDED}
+    html.dark-mode .bid-wp small,html.dark-mode .bid-meta,html.dark-mode .bid-note{color:#9D9B9B}
+    html.dark-mode .bid-badge-action{background:#3D1A19;color:#FCA5A5;border-color:#5A2E2A}
+    html.dark-mode .bid-badge-submitted{background:#122A4A;color:#93C5FD;border-color:#1D4ED8}
+    html.dark-mode .bid-badge-declined,html.dark-mode .bid-badge-closed{background:#333;color:#bbb;border-color:#444}
+    html.dark-mode .bid-badge-awarded{background:#0F2E20;color:#6EE7B7;border-color:#0F7A46}
+    html.dark-mode .bid-scope,html.dark-mode .bid-offer-summary{background:#2c2c2c;color:#ccc}
+    html.dark-mode .bid-offer-summary b{color:#EDEDED}
+    html.dark-mode .bid-chip{background:#333;color:#bbb}
+    html.dark-mode .bid-foot button{background:#2a2a2a;border-color:#3f3f3f;color:#bbb}
+    /* The BASE colour needs the override too, not just the two urgency variants:
+       .bid-due is a child span with its own rule, so it does not inherit the
+       .bid-meta dark colour, and #666 on a #232323 card measures 2.7:1. */
+    html.dark-mode .bid-due{color:#9D9B9B}
+    html.dark-mode .bid-due-soon{color:#FBBF24}
+    html.dark-mode .bid-due-over{color:#FCA5A5}
+
     @media(max-width:600px){
       .cat-grid,.prof-grid{grid-template-columns:1fr 1fr;gap:9px}
       .cat-photo{height:104px}
@@ -336,6 +442,16 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
   </div>
 </div>
 
+<div class="portal-shell">
+<nav class="portal-nav" id="portalNav">
+  <div class="pnav-title">Vendor</div>
+  <button class="pnav-item active" data-sec="profile" onclick="switchSection('profile')">
+    <i class="ti ti-building"></i><span class="lbl">Company Profile</span></button>
+  <button class="pnav-item" data-sec="bidboard" onclick="switchSection('bidboard')">
+    <i class="ti ti-clipboard-list"></i><span class="lbl">Bid Board</span>
+    <span class="tab-badge" id="bidBadge" style="display:none">0</span></button>
+</nav>
+<div class="portal-body">
 <div class="wrap">
   <div id="statusBanner" class="banner" style="display:none"></div>
 
@@ -391,7 +507,7 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
         <div>
           <label class="logo-btn" for="pfLogoFile"><i class="ti ti-upload"></i> <span id="pfLogoBtnLbl">Upload logo</span></label>
           <input id="pfLogoFile" type="file" accept="image/*" style="display:none" onchange="uploadPortalLogo(this)">
-          <div class="logo-hint">PNG or JPG, up to 4 MB. Megawide buyers see this on your profile.</div>
+          <div class="logo-hint">PNG or JPG, up to 4 MB. Megawide Procurement sees this on your profile.</div>
         </div>
       </div>
     </div>
@@ -533,7 +649,22 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       <div class="itm-acts"><button class="btn-primary" onclick="addPersonnel()">Add contact</button></div>
     </div>
   </div>
-</div>
+
+  <!-- ── Bid Board ── -->
+  <div class="panel" id="panel-bidboard" style="display:none">
+    <div class="sec-head">
+      <div class="panel-title">Bid Board</div>
+      <span class="sec-count" id="bidCount"></span>
+    </div>
+    <p style="font-size:12.5px;color:#888;margin:-8px 0 14px;line-height:1.6">
+      Work packages Megawide Procurement has invited you to quote. You only see the packages
+      addressed to you — not the wider pipeline.
+    </p>
+    <div id="bidBoardList"></div>
+  </div>
+</div><!-- /.wrap -->
+</div><!-- /.portal-body -->
+</div><!-- /.portal-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
@@ -547,8 +678,8 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260903g"></script>
-<script src="assets/js/db.js?v=20260903g"></script>
+<script src="assets/js/auth.js?v=20260903h"></script>
+<script src="assets/js/db.js?v=20260903h"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -579,6 +710,9 @@ AppAuth.requireLogin((user, profile) => {
 function showWrongAccount(profile) {
   const tabs = document.querySelector('.tabs');
   if (tabs) tabs.style.display = 'none';
+  // The side panel goes too — every page it offers needs a vendor.
+  const nav = document.getElementById('portalNav');
+  if (nav) nav.style.display = 'none';
   document.querySelectorAll('.panel').forEach(function (el) { el.style.display = 'none'; });
   const host = document.querySelector('.wrap') || document.body;
   const who = esc((profile && (profile.name || profile.email)) || 'this account');
@@ -646,6 +780,7 @@ async function loadAll() {
     _step('products', renderProducts, 'productsList'),
     _step('certifications', renderCerts, 'certsList'),
     _step('personnel', renderPersonnel, 'personnelList'),
+    _step('bid invitations', renderBidBoard, 'bidBoardList'),
   ]);
   // Only now do keystrokes count as edits — several render paths above write
   // into the form, and treating those as a change would arm the unload prompt
@@ -1303,14 +1438,37 @@ function validateOverview() {
   return true;
 }
 
-/* ── Tabs ── */
-function switchTab(t) {
-  // 'accreditation' owns two stacked panels (readiness + documents).
-  const panels = { accreditation: ['accreditation', 'documents'], overview: ['overview'], products: ['products'], certs: ['certs'], personnel: ['personnel'] };
-  Object.entries(panels).forEach(([tab, ids]) => ids.forEach(id => {
+/* ── Sections and tabs ──────────────────────────────────────────────────────
+   TWO LEVELS. The side panel picks a PAGE (Company Profile / Bid Board) —
+   different jobs, not two views of one record — and the tab row belongs to the
+   Company Profile page only, so it is hidden on the Bid Board.
+   'accreditation' owns two stacked panels (readiness + documents). */
+const PROFILE_PANELS = {
+  overview: ['overview'], products: ['products'], personnel: ['personnel'],
+  certs: ['certs'], accreditation: ['accreditation', 'documents'],
+};
+let _portalSection = 'profile';
+let _activeTab = 'overview';   // remembered, so leaving and returning lands back
+
+function _showOnlyPanels(ids) {
+  document.querySelectorAll('.panel').forEach(el => { el.style.display = 'none'; });
+  ids.forEach(id => {
     const el = document.getElementById('panel-' + id);
-    if (el) el.style.display = tab === t ? 'block' : 'none';
-  }));
+    if (el) el.style.display = 'block';
+  });
+}
+function switchSection(sec) {
+  _portalSection = sec;
+  document.querySelectorAll('.pnav-item').forEach(b => b.classList.toggle('active', b.dataset.sec === sec));
+  const tabs = document.querySelector('.tabs');
+  // '' rather than 'flex' — let the stylesheet own the display value.
+  if (tabs) tabs.style.display = sec === 'profile' ? '' : 'none';
+  if (sec === 'bidboard') _showOnlyPanels(['bidboard']);
+  else switchTab(_activeTab);
+}
+function switchTab(t) {
+  _activeTab = t;
+  _showOnlyPanels(PROFILE_PANELS[t] || PROFILE_PANELS.overview);
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
 }
 
@@ -1411,6 +1569,17 @@ const Q = String.fromCharCode(39);
    stops short of per-AWARD facts (award dates, awarded cost, PO numbers): those
    describe a transaction and live on the work package.                        */
 const SUPPLY_SCOPES = ['Supply Only', 'Supply & Install', 'Labor Only', 'Service'];
+/* Supply scope -> the WP form's own Type vocabulary. Supply & Install is
+   materials-bearing, so it maps to Materials; the fact that it carries
+   installation is preserved in supply_scope itself, which is what a buyer
+   reads on the card. */
+const SCOPE_TO_TYPE = {
+  'Supply Only': 'Materials',
+  'Supply & Install': 'Materials',
+  'Labor Only': 'Labor',
+  'Service': 'Service',
+};
+function typeForScope(scope) { return SCOPE_TO_TYPE[scope] || null; }
 let _catItems = [], _catTax = [], _catEditId = null, _catPicker = null, _catPhotoPath = null, _catSpecPath = null;
 
 function _num(v) { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(n) ? n : null; }
@@ -1418,6 +1587,13 @@ function _int(v) { const n = parseInt(String(v == null ? '' : v).replace(/[^0-9-
 function _money(n, cur) {
   if (n == null) return '';
   return (cur || 'PHP') + ' ' + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+/* The country roster is window.COUNTRIES (db.js), so it can grow without a
+   migration. Rendered as datalist options — value only, no dial code, because
+   this is where a product was made, not somebody's phone number. */
+function _originOptions() {
+  const list = (window.COUNTRIES || []).filter(function (c) { return c.code !== 'XX'; });
+  return list.map(function (c) { return '<option value="' + esc(c.name) + '"></option>'; }).join('');
 }
 function _catTrade(p) {
   const path = p.taxonomy_id ? VendorDb.taxonomyPathLabel(_catTax, p.taxonomy_id) : '';
@@ -1436,7 +1612,7 @@ async function renderProducts() {
   if (!_catItems.length) {
     el.innerHTML = '<div class="pf-empty"><i class="ti ti-package"></i>'
       + '<b>Nothing listed yet</b>'
-      + 'Add what your company supplies so Megawide buyers can find you when a work package '
+      + 'Add what your company supplies so Megawide Procurement can find you when a work package '
       + 'matches. A photo, a lead time and a unit make an offering far more useful.</div>';
     return;
   }
@@ -1544,15 +1720,23 @@ function _catEditorHtml(p) {
   return '<div class="itm-legend">What it is</div>'
     + '<div class="itm-grid">'
     + '<div class="field wide"><label>Category</label><div id="ce-taxonomy"></div></div>'
-    + sel('ce-type', 'Type', ['Materials', 'Labor', 'Service'], p.item_type)
     + _f('Name / description *', 'ce-description', p.description, 'e.g. Ready-Mix Concrete 3000psi')
     + _f('Brand / make', 'ce-brand', p.brand, 'e.g. Holcim')
     + _f('Model / grade / spec', 'ce-model', p.model, 'e.g. Class A')
-    + _f('Country of origin', 'ce-origin', p.origin, 'e.g. Philippines')
+    /* Searchable, but NOT a closed list: origin is free text in the database and
+       a product can come from anywhere, so a <datalist> gives type-to-filter
+       over the known roster while still accepting a country that is not on it.
+       A <select> here would silently drop legitimate values. */
+    + '<div class="field"><label>Country of origin</label>'
+    + '<input id="ce-origin" list="ce-origin-list" value="' + esc(p.origin || '')
+    + '" placeholder="Type to search…" autocomplete="off">'
+    + '<datalist id="ce-origin-list">' + _originOptions() + '</datalist></div>'
     + '</div>'
     + '<div class="itm-legend">How you supply it</div>'
     + '<div class="itm-grid">'
-    + sel('ce-scope', 'Supply scope', SUPPLY_SCOPES, p.supply_scope)
+    /* ONE question, not two. This replaced a separate Type select that asked
+       the same thing in weaker words — see SCOPE_TO_TYPE. */
+    + sel('ce-scope', 'What you provide', SUPPLY_SCOPES, p.supply_scope)
     + _f('Unit', 'ce-unit', p.unit, 'e.g. cu.m.')
     + _f('Lead time (days)', 'ce-lead', p.lead_time_days, 'e.g. 14', 'number')
     + _f('Minimum order', 'ce-minqty', p.min_order_qty, 'e.g. 10', 'number')
@@ -1595,7 +1779,7 @@ async function saveProduct() {
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   const fields = {
     category: category, taxonomy_id: taxonomy_id,
-    item_type: g('ce-type') || null, description: description,
+    item_type: typeForScope(g('ce-scope')), description: description,
     brand: g('ce-brand') || null, model: g('ce-model') || null, origin: g('ce-origin') || null,
     supply_scope: g('ce-scope') || null, unit: g('ce-unit') || null,
     lead_time_days: _int(g('ce-lead')), min_order_qty: _num(g('ce-minqty')),
@@ -1736,6 +1920,243 @@ async function addPersonnel() {
     await syncPrimaryContact();
     await flagEdited();
   } catch (e) { msg('Could not add: ' + (e.message || e), 'error'); }
+}
+
+/* ── Bid Board ────────────────────────────────────────────────────────────
+   migrations/2026-09-03_vendor_bid_board.sql. This vendor sees ONLY the work
+   packages a buyer invited it to — VendorDb.bidBoard.forVendor() already
+   returns exactly that set (vendor_bid_board_view, RLS-scoped), so nothing
+   here filters by vendor again. Never add a "browse all work packages" path
+   to this tab — see the migration's header comment for why. */
+let _bidItems = [];
+let _bidOpenId = null;   // the ONE invitation currently showing its editor
+let _bidMode = 'offer';  // 'offer' | 'decline', for whichever is open
+
+async function renderBidBoard() {
+  if (!vendor) return;
+  _bidItems = await VendorDb.bidBoard.forVendor();
+  // Mark freshly-invited rows viewed — a courtesy signal to the buyer that the
+  // vendor opened the board, not something that should ever block the read.
+  // Flipped locally too, so the badge/label reflect it without a re-fetch.
+  _bidItems.filter(i => i.status === 'invited').forEach(i => {
+    VendorDb.bidBoard.markViewed(i.invitation_id);
+    i.status = 'viewed';
+  });
+  _renderBidList();
+}
+
+function _bidActionable(i) {
+  return (i.status === 'invited' || i.status === 'viewed') && !_bidPastDue(i);
+}
+function _bidPastDue(i) { return !!(i.due_at && new Date(i.due_at) < new Date()); }
+function _bidLocked(i) {
+  return i.status === 'closed' || i.status === 'withdrawn' || _bidPastDue(i);
+}
+
+function _renderBidList() {
+  const el = document.getElementById('bidBoardList');
+  if (!el) return;
+  const n = _bidItems.length;
+  document.getElementById('bidCount').textContent = n ? n + (n === 1 ? ' invitation' : ' invitations') : '';
+  const actionable = _bidItems.filter(_bidActionable).length;
+  const badge = document.getElementById('bidBadge');
+  if (badge) { badge.textContent = actionable; badge.style.display = actionable ? '' : 'none'; }
+
+  if (!n) {
+    el.innerHTML = '<div class="pf-empty"><i class="ti ti-clipboard-list"></i>'
+      + '<b>No invitations yet</b>'
+      + 'When Megawide Procurement invites you to quote a work package, it will show up here — '
+      + 'nothing to do until then.</div>';
+    return;
+  }
+  el.innerHTML = _bidItems.map(_bidCard).join('');
+}
+
+function _bidStatusMeta(i) {
+  if (i.status === 'closed') {
+    return i.outcome === 'awarded'
+      ? { label: 'Awarded to you', cls: 'bid-badge-awarded' }
+      : { label: 'Not awarded', cls: 'bid-badge-closed' };
+  }
+  if (i.status === 'withdrawn') return { label: 'Withdrawn by Megawide', cls: 'bid-badge-closed' };
+  if (_bidPastDue(i)) return { label: 'Deadline passed', cls: 'bid-badge-closed' };
+  if (i.status === 'submitted') return { label: 'Offer submitted', cls: 'bid-badge-submitted' };
+  if (i.status === 'declined') return { label: 'You declined', cls: 'bid-badge-declined' };
+  return { label: 'Needs your response', cls: 'bid-badge-action' };
+}
+
+function _bidDueInfo(i) {
+  if (!i.due_at) return { text: 'No deadline set', cls: '' };
+  const d = new Date(i.due_at);
+  const dateStr = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  const diffDays = Math.ceil((d - new Date()) / 86400000);
+  // Once it is decided or withdrawn the deadline is moot — in the overdue red it
+  // put an alarm on a card the vendor has just been told they WON.
+  if (i.status === 'closed' || i.status === 'withdrawn') return { text: 'Deadline was ' + dateStr, cls: '' };
+  if (diffDays < 0) return { text: 'Deadline was ' + dateStr, cls: 'bid-due-over' };
+  if (diffDays <= 2) return { text: 'Due ' + dateStr + ' (' + (diffDays <= 0 ? 'today' : diffDays + 'd left') + ')', cls: 'bid-due-soon' };
+  return { text: 'Due ' + dateStr, cls: '' };
+}
+
+function _bidCard(i) {
+  const st = _bidStatusMeta(i);
+  const due = _bidDueInfo(i);
+  const chips = [];
+  if (i.trade) chips.push(i.trade);
+  if (i.works) chips.push(i.works);
+  if (i.surety_bond === 'Yes') chips.push('Surety bond required');
+  if (i.performance_bond === 'Yes') chips.push('Performance bond required');
+  if (i.warranty_bond === 'Yes') chips.push('Warranty bond required');
+  if (i.requires_approval) chips.push('Submittal required');
+  const locked = _bidLocked(i);
+
+  let body = '';
+  if (i.scope_note) body += '<div class="bid-scope">' + esc(i.scope_note).replace(/\n/g, '<br>') + '</div>';
+  if (chips.length) body += '<div class="bid-chips">' + chips.map(c => '<span class="bid-chip">' + esc(c) + '</span>').join('') + '</div>';
+
+  if (i.status === 'submitted' || i.status === 'closed') {
+    body += '<div class="bid-offer-summary">'
+      + '<b>Your offer:</b> ' + esc(_money(i.offer_amount, i.offer_currency))
+      + (i.lead_time_days != null ? ' · Lead time ' + i.lead_time_days + 'd' : '')
+      + (i.validity_days != null ? ' · Valid ' + i.validity_days + 'd' : '')
+      + (i.payment_terms ? '<br><b>Terms:</b> ' + esc(i.payment_terms) : '')
+      + (i.vendor_notes ? '<br><b>Notes:</b> ' + esc(i.vendor_notes) : '')
+      + (i.attachment_name ? '<br><button class="file-badge" onclick="viewBidAttachment(' + Q + i.invitation_id + Q + ')">' + esc(i.attachment_name) + '</button>' : '')
+      + '</div>';
+  }
+  if (i.status === 'declined' && i.declined_reason) {
+    body += '<div class="bid-note">You declined: ' + esc(i.declined_reason) + '</div>';
+  }
+  if (i.status === 'closed' && i.outcome) {
+    body += '<div class="bid-note">Decided ' + (i.decided_at ? new Date(i.decided_at).toLocaleDateString() : '') + '.</div>';
+  }
+
+  let foot = '';
+  if (!locked) {
+    if (_bidOpenId === i.invitation_id) {
+      body += _bidEditorHtml(i);
+    } else {
+      const label = i.status === 'submitted' || i.status === 'declined' ? 'Revise your response' : 'Respond';
+      foot = '<div class="bid-foot"><button class="primary" onclick="openBidResponse(' + Q + i.invitation_id + Q + ')">' + label + '</button></div>';
+    }
+  }
+
+  return '<div class="bid-card' + (locked ? ' locked' : '') + '" id="bid-card-' + esc(i.invitation_id) + '">'
+    + '<div class="bid-top">'
+    + '<div class="bid-wp">' + esc(i.wp_no ? 'WP ' + i.wp_no : 'Work package') + (i.description ? ' — ' + esc(i.description) : '')
+    + (i.project_name ? '<small>' + esc(i.project_name) + (i.project_location ? ' · ' + esc(i.project_location) : '') + '</small>' : '')
+    + '</div>'
+    + '<span class="bid-badge ' + st.cls + '">' + esc(st.label) + '</span>'
+    + '</div>'
+    + '<div class="bid-meta"><span class="bid-due ' + due.cls + '">' + esc(due.text) + '</span>'
+    + (i.invited_at ? ' · Invited ' + new Date(i.invited_at).toLocaleDateString() : '') + '</div>'
+    + body + foot
+    + '</div>';
+}
+
+/* Fired from the collapsed card. Opens the offer form by default — a vendor
+   deciding to decline reaches it via the "Decline instead" link INSIDE that
+   form (switchBidMode), so there is one entry point, not two competing ones. */
+function openBidResponse(id) {
+  _bidOpenId = id; _bidMode = 'offer';
+  _renderBidList();
+  const card = document.getElementById('bid-card-' + id);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function closeBidResponse() {
+  _bidOpenId = null;
+  _renderBidList();
+}
+function switchBidMode(id, mode) {
+  _bidOpenId = id; _bidMode = mode;
+  _renderBidList();
+}
+
+function _bidEditorHtml(i) {
+  if (_bidMode === 'decline') {
+    return '<div class="itm-editor" style="margin-top:10px">'
+      + '<div class="itm-legend">Decline this invitation</div>'
+      + '<div class="field"><label>Reason (optional — shared with Megawide Procurement)</label>'
+      + '<textarea id="bo-decline-reason" rows="2" placeholder="e.g. Outside our current capacity">'
+      + esc(i.declined_reason || '') + '</textarea></div>'
+      + '<div class="itm-acts">'
+      + '<button class="btn-ghost" onclick="switchBidMode(' + Q + i.invitation_id + Q + ',' + Q + 'offer' + Q + ')">Back to offer</button>'
+      + '<button class="btn-primary" style="background:#EE3124" onclick="submitBidDecline(' + Q + i.invitation_id + Q + ')">Confirm decline</button>'
+      + '</div></div>';
+  }
+  return '<div class="itm-editor" style="margin-top:10px">'
+    + '<div class="itm-legend">Your offer</div>'
+    + '<div class="itm-grid">'
+    + _f('Offer amount *', 'bo-amount', i.offer_amount, 'e.g. 250000', 'number')
+    + _f('Currency', 'bo-currency', i.offer_currency || 'PHP', 'PHP')
+    + _f('Lead time (days)', 'bo-lead', i.lead_time_days, 'e.g. 14', 'number')
+    + _f('Price valid for (days)', 'bo-validity', i.validity_days, 'e.g. 30', 'number')
+    + '</div>'
+    + '<div class="itm-grid">' + _f('Payment terms', 'bo-terms', i.payment_terms, 'e.g. 30% DP, 70% on delivery') + '</div>'
+    + '<div class="field"><label>Notes to Megawide Procurement</label><textarea id="bo-notes" rows="2" '
+    + 'placeholder="Anything Megawide Procurement should know">' + esc(i.vendor_notes || '') + '</textarea></div>'
+    + '<div class="field"><label>Attach your quotation</label><input id="bo-file" type="file" accept=".pdf,.jpg,.jpeg,.png">'
+    + (i.attachment_path ? '<div class="field-hint">A file is already on file'
+      + (i.attachment_name ? ': ' + esc(i.attachment_name) : '') + ' — choosing a new one replaces it.</div>' : '') + '</div>'
+    + '<div class="itm-acts">'
+    + '<button class="btn-ghost" onclick="closeBidResponse()">Cancel</button>'
+    + '<button class="btn-ghost" style="color:#EE3124" onclick="switchBidMode(' + Q + i.invitation_id + Q + ',' + Q + 'decline' + Q + ')">Decline instead</button>'
+    + '<button class="btn-primary" id="bo-save" onclick="submitBidOffer(' + Q + i.invitation_id + Q + ')">'
+    + (i.status === 'submitted' ? 'Save revised offer' : 'Submit offer') + '</button>'
+    + '</div></div>';
+}
+
+async function submitBidOffer(id) {
+  const g = k => { const e = document.getElementById(k); return e ? e.value.trim() : ''; };
+  const amount = _num(g('bo-amount'));
+  if (amount == null || amount < 0) { msg('Enter your offer amount first.', 'error'); return; }
+  const btn = document.getElementById('bo-save');
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  try {
+    const fileInput = document.getElementById('bo-file');
+    const fields = {
+      offer_amount: amount,
+      offer_currency: g('bo-currency') || 'PHP',
+      lead_time_days: _int(g('bo-lead')),
+      validity_days: _int(g('bo-validity')),
+      payment_terms: g('bo-terms') || null,
+      vendor_notes: g('bo-notes') || null,
+    };
+    if (fileInput && fileInput.files && fileInput.files[0]) {
+      const file = fileInput.files[0];
+      if (file.size > 15 * 1024 * 1024) { msg('That file is over 15 MB — try a smaller scan or export.', 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Submit offer'; } return; }
+      fields.attachment_path = await VendorDb.uploadVendorFile(vendor.id, 'bid_' + id, file);
+      fields.attachment_name = file.name;
+    }
+    const row = await VendorDb.bidBoard.submit(id, fields);
+    _bidItems = _bidItems.map(x => x.invitation_id === id ? Object.assign({}, x, row) : x);
+    _bidOpenId = null;
+    _renderBidList();
+    msg('Offer submitted.', 'success');
+  } catch (e) {
+    msg('Could not submit: ' + (e.message || e), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit offer'; }
+  }
+}
+
+async function submitBidDecline(id) {
+  const reason = (document.getElementById('bo-decline-reason') || {}).value || '';
+  try {
+    const row = await VendorDb.bidBoard.decline(id, reason.trim() || null);
+    _bidItems = _bidItems.map(x => x.invitation_id === id ? Object.assign({}, x, row) : x);
+    _bidOpenId = null;
+    _renderBidList();
+    msg('Invitation declined.', 'success');
+  } catch (e) { msg('Could not decline: ' + (e.message || e), 'error'); }
+}
+
+async function viewBidAttachment(id) {
+  const i = _bidItems.find(x => x.invitation_id === id);
+  if (!i || !i.attachment_path) return;
+  try {
+    const url = await VendorDb.getCertFileUrl(i.attachment_path);
+    if (url) window.open(url, '_blank');
+  } catch (e) { msg('Could not open the file: ' + (e.message || e), 'error'); }
 }
 
 </script>

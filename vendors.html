@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260903g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260903g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260903g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260903h"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260903h"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260903h"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260903g">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260903h">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1202,9 +1202,9 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260903g"></script>
-<script src="assets/js/db.js?v=20260903g"></script>
-<script src="assets/js/ui.js?v=20260903g"></script>
+<script src="assets/js/auth.js?v=20260903h"></script>
+<script src="assets/js/db.js?v=20260903h"></script>
+<script src="assets/js/ui.js?v=20260903h"></script>
 <script src="assets/js/vendor-guide.js?v=20260902a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -6219,6 +6219,22 @@ async function _spLoadPersonPhotos() {
    ⚠️ A staff edit does NOT flip the vendor back to pending_review: the
    vendor_edit_guard trigger only forces that for the vendor's OWN login.      */
 const SP_SCOPES = ['Supply Only', 'Supply & Install', 'Labor Only', 'Service'];
+/* Supply scope -> the WP form's Type vocabulary. Mirrors SCOPE_TO_TYPE in
+   vendor-portal.html — a separate Type control asked the same question in
+   weaker words, so it was removed on both sides and item_type is DERIVED.
+   ⚠️ item_type itself is NOT dropped: the directory product search, the card
+   badge and backfillVendorDataFromWPs all read it. */
+const SP_SCOPE_TO_TYPE = {
+  'Supply Only': 'Materials', 'Supply & Install': 'Materials',
+  'Labor Only': 'Labor', 'Service': 'Service',
+};
+function spTypeForScope(s) { return SP_SCOPE_TO_TYPE[s] || null; }
+/* Searchable but open — origin is free text and a product can come from
+   anywhere, so a closed <select> would drop legitimate values. */
+function _spOriginOptions() {
+  return (window.COUNTRIES || []).filter(function (c) { return c.code !== 'XX'; })
+    .map(function (c) { return '<option value="' + esc(c.name) + '"></option>'; }).join('');
+}
 let _spTax = [], _spItems = [], _spEditId = null, _spPicker = null;
 
 function _spNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(n) ? n : null; }
@@ -6344,14 +6360,16 @@ function _spSel(id, label, opts, cur) {
 function _spEditorHtml(p) {
   return '<div class="itm-legend">What it is</div><div class="itm-grid">'
     + '<div class="field wide"><label>Category</label><div id="se-taxonomy"></div></div>'
-    + _spSel('se-type', 'Type', ['Materials', 'Labor', 'Service'], p.item_type)
     + _spF('Name / description *', 'se-description', p.description, 'e.g. Ready-Mix Concrete 3000psi')
     + _spF('Brand / make', 'se-brand', p.brand, 'e.g. Holcim')
     + _spF('Model / grade / spec', 'se-model', p.model, 'e.g. Class A')
-    + _spF('Country of origin', 'se-origin', p.origin, '')
+    + '<div class="field"><label>Country of origin</label>'
+    + '<input id="se-origin" list="se-origin-list" value="' + esc(p.origin || '')
+    + '" placeholder="Type to search…" autocomplete="off">'
+    + '<datalist id="se-origin-list">' + _spOriginOptions() + '</datalist></div>'
     + '</div>'
     + '<div class="itm-legend">How they supply it</div><div class="itm-grid">'
-    + _spSel('se-scope', 'Supply scope', SP_SCOPES, p.supply_scope)
+    + _spSel('se-scope', 'What they provide', SP_SCOPES, p.supply_scope)
     + _spF('Unit', 'se-unit', p.unit, 'e.g. cu.m.')
     + _spF('Lead time (days)', 'se-lead', p.lead_time_days, '', 'number')
     + _spF('Minimum order', 'se-minqty', p.min_order_qty, '', 'number')
@@ -6388,7 +6406,7 @@ async function saveStaffProduct() {
   const btn = document.getElementById('se-save');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   const fields = {
-    category, taxonomy_id, item_type: g('se-type') || null, description,
+    category, taxonomy_id, item_type: spTypeForScope(g('se-scope')), description,
     brand: g('se-brand') || null, model: g('se-model') || null, origin: g('se-origin') || null,
     supply_scope: g('se-scope') || null, unit: g('se-unit') || null,
     lead_time_days: _spInt(g('se-lead')), min_order_qty: _spNum(g('se-minqty')),

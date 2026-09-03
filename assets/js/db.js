@@ -3509,6 +3509,173 @@ const VendorDb = (() => {
       return data || [];
     } catch (e) { return []; }
   }
+
+  /* ══ Bid Board ══════════════════════════════════════════════════════════
+     migrations/2026-09-03_vendor_bid_board.sql.
+
+     ⚠️ INVITATION-ONLY. A vendor reaches only the work packages a buyer has
+        invited them to — enforced server-side by the `vbi_select_vendor` RLS
+        policy and by `vendor_bid_board_view`'s WHERE clause, not here. An open
+        board would publish the whole procurement pipeline to ~2,400 directory
+        companies, some of which are each other's competitors.
+
+     ⚠️ TWO RELATIONS, ON PURPOSE, and they are NOT interchangeable:
+          forVendor()  -> vendor_bid_board_view   (the vendor's own read surface;
+                          carries NO budget and NO other-vendor column)
+          forWP()      -> vendor_bid_invitations  (staff; the full row)
+        Never point a vendor-facing call at the base table: RLS would correctly
+        hide other vendors' ROWS, but the internal COLUMNS on their own row
+        would still come back. That is what vendor_self_view exists for too.
+
+     ⚠️ This is NOT vendor_bids. vendor_bids stays the internal negotiation
+        ledger (original/negotiated offer, staff notes, every competitor's row).
+        A vendor's submission is a PROPOSAL; promote() is the buyer choosing to
+        make it the figure of record. Same shape as planners_need_by vs
+        work_packages.target_installation.
+
+     Every read returns [] / 0 on a missing table, so both pages still render
+     before the migration is run. Writes THROW — a silent no-op on an invitation
+     or a submission would be worse than an error. */
+  const bidBoard = {
+    // ── vendor side ─────────────────────────────────────────────────────
+    async forVendor() {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_board_view').select('*')
+        .order('due_at', { ascending: true, nullsFirst: false });
+      if (error) { if (_isMissingTable(error, 'vendor_bid_board_view')) return []; throw error; }
+      return data || [];
+    },
+    // Marks an invitation opened. Best-effort: it is a courtesy signal to the
+    // buyer, so it must never block the vendor from reading the package.
+    async markViewed(id) {
+      try {
+        const sb = await getSB();
+        await sb.from('vendor_bid_invitations').update({ status: 'viewed' })
+          .eq('id', id).eq('status', 'invited');
+      } catch (e) { /* never block the read */ }
+    },
+    /* The vendor's own submission. ⚠️ Only these fields are ever sent — the
+       server pins the rest anyway (internal.vendor_bid_guard), but sending a
+       buyer-owned column would make a legitimate save look like an attack in
+       the logs. submitted_at is deliberately absent: the guard stamps it, and a
+       submission time the client can set is not evidence. */
+    async submit(id, fields) {
+      const sb = await getSB();
+      const payload = {
+        status: 'submitted',
+        offer_amount: fields.offer_amount,
+        offer_currency: fields.offer_currency || 'PHP',
+        lead_time_days: fields.lead_time_days == null ? null : fields.lead_time_days,
+        validity_days: fields.validity_days == null ? null : fields.validity_days,
+        payment_terms: fields.payment_terms || null,
+        vendor_notes: fields.vendor_notes || null,
+      };
+      if (fields.attachment_path) payload.attachment_path = fields.attachment_path;
+      if (fields.attachment_name) payload.attachment_name = fields.attachment_name;
+      const { data, error } = await sb.from('vendor_bid_invitations').update(payload)
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async decline(id, reason) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_invitations')
+        .update({ status: 'declined', declined_reason: reason || null })
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    },
+
+    // ── staff side ──────────────────────────────────────────────────────
+    // Every invitation on one work package, with the vendor's name and
+    // accreditation merged in. Two queries and a join in JS, matching
+    // getBidsForWP — no Supabase-join select syntax is used anywhere else here.
+    async forWP(wpId) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_invitations').select('*')
+        .eq('wp_id', wpId).order('invited_at', { ascending: true });
+      if (error) { if (_isMissingTable(error, 'vendor_bid_invitations')) return []; throw error; }
+      const rows = data || [];
+      if (!rows.length) return rows;
+      const ids = Array.from(new Set(rows.map(r => r.vendor_id).filter(Boolean)));
+      const byId = {};
+      try {
+        const vs = await getVendorsByIds(ids);
+        (vs || []).forEach(v => { byId[v.id] = v; });
+      } catch (e) { /* a name lookup failing must not hide the offers */ }
+      return rows.map(r => Object.assign({}, r, {
+        vendor_name: (byId[r.vendor_id] || {}).name || '(unknown vendor)',
+        vendor_accreditation: (byId[r.vendor_id] || {}).accreditation || null,
+      }));
+    },
+    // Issue (or re-issue) an invitation. Upsert on (wp_id, vendor_id) so a
+    // buyer re-inviting cannot end up with two rows and two different answers.
+    async invite(wpId, vendorId, projectId, fields, profile) {
+      const sb = await getSB();
+      const row = Object.assign({
+        wp_id: wpId, vendor_id: vendorId, project_id: projectId || null,
+        status: 'invited',
+        invited_at: new Date().toISOString(),
+        invited_by: (profile && profile.id) || null,
+        invited_by_name: (profile && (profile.name || profile.email)) || null,
+      }, fields || {}, _auditStamp(profile));
+      const { data, error } = await sb.from('vendor_bid_invitations')
+        .upsert(row, { onConflict: 'wp_id,vendor_id' }).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async update(id, fields, profile) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_invitations')
+        .update(Object.assign({}, fields, _auditStamp(profile)))
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async remove(id) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_bid_invitations').delete().eq('id', id);
+      if (error) throw error;
+    },
+    /* Record the outcome and tell the vendor. outcome_note is staff's private
+       reasoning and is NOT in vendor_bid_board_view — the vendor learns whether
+       they won, not why. */
+    async decide(id, outcome, note, profile) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_invitations').update(Object.assign({
+        outcome: outcome, outcome_note: note || null, status: 'closed',
+        decided_at: new Date().toISOString(),
+        decided_by: (profile && profile.id) || null,
+      }, _auditStamp(profile))).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    /* Copy a submitted offer into vendor_bids — the internal ledger every
+       analytic already reads. ⚠️ THE BUYER'S DELIBERATE ACT, never automatic:
+       a vendor must not be able to write the internal figure of record just by
+       typing into the portal. Lands as original_offer (their opening number),
+       leaving negotiated_offer/final_amount for the negotiation that follows. */
+    async promote(inv, profile) {
+      if (!inv || inv.offer_amount == null) throw new Error('That invitation has no offer to record.');
+      const bits = [];
+      if (inv.lead_time_days != null) bits.push('lead time ' + inv.lead_time_days + 'd');
+      if (inv.payment_terms) bits.push('terms: ' + inv.payment_terms);
+      return upsertBid(inv.wp_id, inv.vendor_id, inv.project_id, {
+        original_offer: inv.offer_amount,
+        status: 'participated',
+        bid_date: (inv.submitted_at || '').slice(0, 10) || null,
+        notes: 'From the vendor portal submission' + (bits.length ? ' · ' + bits.join(' · ') : ''),
+      }, profile);
+    },
+    // Waiting on a decision — drives the staff badge.
+    async pendingCount() {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_invitations')
+        .select('id').eq('status', 'submitted').is('outcome', null).limit(500);
+      if (error) return 0;
+      return (data || []).length;
+    },
+  };
   return {
     getVendors, getVendor, createVendor, updateVendor, approveVendor, rejectVendor, setVendorStatus, deleteVendor,
     products, certifications, personnel,
@@ -3518,6 +3685,7 @@ const VendorDb = (() => {
     uploadCertFile, getCertFileUrl, deleteCertFile,
     documents: vendorDocuments, uploadVendorDoc, uploadVendorFile, requests: accreditationRequests, claims: vendorClaims, history: vendorHistory,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
+    bidBoard,
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
     bulkSetVendorStatus, bulkSetAccreditation, findExactDuplicateGroups, mergeExactDuplicates, bulkDeleteVendors, getDeletionImpact, prepareInvites,

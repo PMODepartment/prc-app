@@ -2101,8 +2101,8 @@ add-form could only set type/description/unit/category, so a staff member fillin
 a vendor could not record a lead time. `reclassifyProduct()` was removed as dead code — the editor
 covers the category, and nothing called it any more.
 
-**The bid board is deliberately not started** (see the design note above); it needs the
-invitation-vs-open decision first.
+**The bid board is BUILT (2026-09-03)** — the invitation-vs-open decision it was waiting on was
+made (invitation-only). See "Vendor Bid Board" below.
 
 ### ⚠️ Vendor portal — the profile never loaded for ANY vendor (2026-09-02)
 
@@ -2508,7 +2508,7 @@ Public pages (login, register, pending, forgot-password) load UMD bundle inline 
 
 Resource hints in `<head>`: `preconnect` for fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net, cdnjs.cloudflare.com; `dns-prefetch` for Supabase URL; `preload as="script"` for all body scripts.
 
-**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260903g` (`20260903g` = the vendor-portal review batch — vendors barred from every internal page in `auth.js`, a separate `vendor-login.html` front door via `window.__loginPage`, per-document upload rules + `window.COUNTRIES` + dial codes + the owner items in `accredReadiness` in `db.js`, and the `esc` recursion fix; pairs with `migrations/2026-09-03_vendor_owner_and_logo.sql`, `_vendor_claim_tin_only.sql`, `_vendor_country.sql` and a re-run of `2026-09-01_vendor_edit_guard_consolidated.sql`; `20260902c` = Vendor Registrations reachable by every contributor role, not just admin/super_admin — `db.js`'s `initVendorClaimsNav` now toggles a sibling wrapper instead of an ancestor gated on `AppAuth.isAdmin`, see "Vendor Registrations — a top-level sidebar item"; `20260902b` = the vendor portal could not load ANY vendor — `_vendorRel` hardening + the four accreditation documents, see “Vendor portal — the profile never loaded”; `20260902a` = `20260902a` = vendor catalogue — `db.js` gained `uploadVendorFile`, see “Vendor portal — catalogue, profile cards, capability”; pairs with `migrations/2026-09-02_vendor_catalogue.sql`; `20260901e` = `20260901e` = Vendor Registrations promoted to a top-level sidebar item — `db.js` gained `initVendorClaimsNav`/`setVendorClaimsNavCount`, see “Vendor Registrations — a top-level sidebar item”; `20260901d` = `20260901d` = vendor change history + restore — `db.js` gained `VendorDb.history`, see “Vendor change history — version history and restore”; pairs with `migrations/2026-09-01_vendor_history_restore.sql`; `20260901c` = `20260901c` = vendor self-registration — `db.js` gained `VendorDb.claims`, see “Vendor self-service at scale”; pairs with `migrations/2026-09-01_vendor_self_registration.sql`; `20260901b` = `20260901b` = accreditation evidence is frozen — `db.js` gained `VendorDb.documents.setLocked`, see “Vendor documents — freeze approved evidence”; pairs with `migrations/2026-09-01_vendor_doc_lock.sql`; `20260901a` = `20260901a` = vendor child tables lost DELETE for the vendor role and gained archive/restore — `db.js` `_child()` rewritten, see “Vendor child data — archive, not delete”; pairs with `migrations/2026-09-01_vendor_child_soft_delete.sql`; `20260825g` = `20260825g` = the PMO ruling that an awarded WP counts whatever its cost, including ₱0 — `isMoneyAwarded` now delegates to `isResolved` (Known Issues #43); `20260825f` = Balance to Award reverted to `ctc` so the Cost Overview cards reconcile again, with the WP count moved onto the same basis (Known Issues #36); `20260825e` = the topbar help menu rendering unstyled before its CSS existed (Known Issues #42); `20260825d` = the read-only/layout role split — `viewer_budget` now gets the FULL contributor UI, read-only (see Known Issues #41); `20260825c` = Vendor Management gated to contributors, Select all/None on the admin project-assignment list, the sign-in page restyled to match the Planners/Engineering apps, and the Portfolio no longer caching an empty WP fetch — see Known Issues #37; `patch-notice.js` independently at `20260825a`; `20260825b` = renamed the visible label to **No-Cost Award** (DB column stays `free_of_charge`); `20260825a` = free-of-charge awards (`free_of_charge`, new `isMoneyAwarded`/`effectiveAwardedCost` branches + deploy guard in `db.js`) and Balance to Award summed over the backlog — see Known Issues #28c and #36; `20260822b` = the Analytics banner counting vendors with no directory record (vendors.html only, but bumped with the set); `20260822a` = sidebar project-search text colour fix + the Savings/Loss buyback annotation moved onto its own line — see Known Issues #35; `20260820m` = accreditation renewal/expiry (`accredStanding` in db.js), accreditation-risk + product-category analytics, WP-form "Suggest vendors", offering reclassify, and vendor-portal dark mode; `vendor-guide.js` independently at `20260820a`; `20260820l` = vendor performance analytics (scorecard + cycle time), the WP-List vendor filter resolving through the `vendor_id` FK (`db.js` unchanged for this, but bumped with the set), and the directory triage views; `20260820k` = the hybrid product taxonomy — `db.js` gained the taxonomy API (`getTaxonomy`/`buildTaxonomyTree`/`taxonomyPathLabel`/`taxonomyNodeForWP`/`findVendorsForWP`) and the shared `window.TaxonomyPicker`; pairs with `migrations/2026-08-20_product_taxonomy.sql`; `20260820j` = accreditation guardrails — `db.js` `searchApprovedVendors`/`getVendorsByIds` now select `accreditation` to feed the picker badges + the problematic-award confirm gate; `20260820i` = the true vendor-edit flag — `db.js` `updateVendor` gained the `vendor_edited_at` deploy-safe strip; pairs with `migrations/2026-08-20_vendor_edited_flag.sql` and the `vendors.html` `_vendorEdited` rewrite; `20260820h` = `vendor_self_view` — vendors read AND write through a column-free view (`_vendorRel()` in db.js); `20260820g` = vendor field-ownership lockdown (`migrations/2026-08-20_vendor_field_ownership.sql`, portal STAFF_FIELDS); `20260820f` = vendor self-service round 2 — `VendorDb.prepareInvites`, the vendor-edit flag, and the portal's draft/validation pass; `20260820e` = bulk-delete impact pre-flight (`VendorDb.getDeletionImpact`) + CSV backup; `20260820d` = fuzzy-token merge suggestions + large clusters shown instead of hidden (vendors.html only, but bumped with the set); `20260820c` = merges preserve accreditation (`_preserveOnMerge` inside `mergeVendors`, standing-led canonical score); `20260820b` = one not-accredited state (`ACCREDITATIONS` is now two keys, `accredKey` folds legacy `'unaccredited'` onto `'none'`) + the vendor-directory UI pass; `20260820a` = vendor self-service + accreditation requests — `db.js` gained `VendorDb.documents`/`VendorDb.requests`, `window.accredReadiness`/`ACCRED_DOC_TYPES`, and the `_stripProfile` deploy guard; `20260819b` = retiring the `vendors.status` tagging — `db.js` `createVendor`/`quickCreateVendor` now write `status:'approved'` and `searchApprovedVendors` no longer filters on it; `20260819a` = the vendor-accreditation feature: `db.js` gained the `ACCREDITATIONS` roster + `accredKey`/`accredMeta`/`accredLabel`/`accredFromText` helpers, `bulkSetAccreditation`, and the `_stripAccred` deploy guard on `createVendor`/`updateVendor`; `20260812k` = folding the "Missing Planned Award Date" section into Data Gaps; `k`'s predecessor `j` = folding the "Missing Planned Award Date" section into Data Gaps; `j` = the Action Center sortable/collapsible-table rework + `db.js`'s `fmtSavingsBuyback`/buyback-not-auto-folded change; `i` = the missing-planned-date chart footnote; `h` = the onboarding.js fixed-height-slides + "?" help-menu fix; `g` was the `db.js` `renderUserBar()` "What's New" dropdown item; `f` was the buyback work: `h` added the exact-amount mode + `buybackExactAmount`, `i` added the granular `_stripBuyback`/`_retryUpdate` deploy guards; `g` was the shared `db.js` buyback money helpers — `buybackValue`/`buybackDepFraction`/`effectiveAwardedCost` + the `_isMissingBuybackCol` deploy guard; previously `20260811f`/`e` for the `_pagedSelect` 1000-row-cap fix + `ui.js` `AppNotify.progress`, and `20260811c` for the per-vendor-amount co-award work — `awarded_vendor_ids`/`awarded_vendor_amounts` guards + per-vendor `reconcileBidsOnAward`/backfill + `_splitAwarded`; `vendor-guide.js` carries an independent version; the prose here has drifted before — always trust a `grep -oh "v=20260[0-9]*[a-z]*"` over the real files, not this line). (`onboarding.js` + `coachmarks.js` now share this SAME version string too, not an independent one — the earlier note about a separate `20260730a` was stale; verify with a repo-wide grep before assuming otherwise.) **The shared `auth.js`/`db.js`/`ui.js`/`dashboard.css` includes now ALSO carry `?v=` on the other app pages (`admin.html`, `review.html`, `wp-form.html`, `my-wps.html`, `claim-form.html`, `project-selector.html`)** — previously they were unversioned and served stale `db.js` for ~10 min after a deploy (a real bug: e.g. admin.html not getting a new `db.js` write-path). When you bump the version, update it on ALL these pages too (a repo-wide `sed 's/?v=OLD/?v=NEW/g'` over the `*.html` set is simplest). `charts.js` is still only on index/project.
+**Cache-busting (`?v=` query param)**: ALL five core asset includes (`auth.js`, `db.js`, `ui.js`, `charts.js`, `dashboard.css`) carry a shared `?v=YYYYMMDD<letter>` param in `index.html` and `project.html` â€” on both the `<link rel=preload>` and the `<script>`/`<link rel=stylesheet>` tags. GitHub Pages + browser caching can serve a **stale** asset for up to ~10 min after a push (symptom: a JS/CSS fix is confirmed live via `curl` but the user still sees old behavior â€” e.g. dark-mode chart bars still dark, or a `db.js` rank-table fix not applying, because the browser cached the previous file). **When you change ANY of those five files, bump the single `?v=` value in BOTH `index.html` and `project.html`** (use one replace for the old `?v=` string + ensure any newly-versioned file matches) so browsers refetch immediately. Current version: `20260903h` (`20260903h` = the Vendor Bid Board — `db.js` gained `VendorDb.bidBoard`, the portal gained a side panel + the Bid Board page, and the catalogue's Type/Supply-scope merge, searchable country of origin and the portal's missing design tokens; pairs with `migrations/2026-09-03_vendor_bid_board.sql`; `20260903g` = the vendor-portal review batch — vendors barred from every internal page in `auth.js`, a separate `vendor-login.html` front door via `window.__loginPage`, per-document upload rules + `window.COUNTRIES` + dial codes + the owner items in `accredReadiness` in `db.js`, and the `esc` recursion fix; pairs with `migrations/2026-09-03_vendor_owner_and_logo.sql`, `_vendor_claim_tin_only.sql`, `_vendor_country.sql` and a re-run of `2026-09-01_vendor_edit_guard_consolidated.sql`; `20260902c` = Vendor Registrations reachable by every contributor role, not just admin/super_admin — `db.js`'s `initVendorClaimsNav` now toggles a sibling wrapper instead of an ancestor gated on `AppAuth.isAdmin`, see "Vendor Registrations — a top-level sidebar item"; `20260902b` = the vendor portal could not load ANY vendor — `_vendorRel` hardening + the four accreditation documents, see “Vendor portal — the profile never loaded”; `20260902a` = `20260902a` = vendor catalogue — `db.js` gained `uploadVendorFile`, see “Vendor portal — catalogue, profile cards, capability”; pairs with `migrations/2026-09-02_vendor_catalogue.sql`; `20260901e` = `20260901e` = Vendor Registrations promoted to a top-level sidebar item — `db.js` gained `initVendorClaimsNav`/`setVendorClaimsNavCount`, see “Vendor Registrations — a top-level sidebar item”; `20260901d` = `20260901d` = vendor change history + restore — `db.js` gained `VendorDb.history`, see “Vendor change history — version history and restore”; pairs with `migrations/2026-09-01_vendor_history_restore.sql`; `20260901c` = `20260901c` = vendor self-registration — `db.js` gained `VendorDb.claims`, see “Vendor self-service at scale”; pairs with `migrations/2026-09-01_vendor_self_registration.sql`; `20260901b` = `20260901b` = accreditation evidence is frozen — `db.js` gained `VendorDb.documents.setLocked`, see “Vendor documents — freeze approved evidence”; pairs with `migrations/2026-09-01_vendor_doc_lock.sql`; `20260901a` = `20260901a` = vendor child tables lost DELETE for the vendor role and gained archive/restore — `db.js` `_child()` rewritten, see “Vendor child data — archive, not delete”; pairs with `migrations/2026-09-01_vendor_child_soft_delete.sql`; `20260825g` = `20260825g` = the PMO ruling that an awarded WP counts whatever its cost, including ₱0 — `isMoneyAwarded` now delegates to `isResolved` (Known Issues #43); `20260825f` = Balance to Award reverted to `ctc` so the Cost Overview cards reconcile again, with the WP count moved onto the same basis (Known Issues #36); `20260825e` = the topbar help menu rendering unstyled before its CSS existed (Known Issues #42); `20260825d` = the read-only/layout role split — `viewer_budget` now gets the FULL contributor UI, read-only (see Known Issues #41); `20260825c` = Vendor Management gated to contributors, Select all/None on the admin project-assignment list, the sign-in page restyled to match the Planners/Engineering apps, and the Portfolio no longer caching an empty WP fetch — see Known Issues #37; `patch-notice.js` independently at `20260825a`; `20260825b` = renamed the visible label to **No-Cost Award** (DB column stays `free_of_charge`); `20260825a` = free-of-charge awards (`free_of_charge`, new `isMoneyAwarded`/`effectiveAwardedCost` branches + deploy guard in `db.js`) and Balance to Award summed over the backlog — see Known Issues #28c and #36; `20260822b` = the Analytics banner counting vendors with no directory record (vendors.html only, but bumped with the set); `20260822a` = sidebar project-search text colour fix + the Savings/Loss buyback annotation moved onto its own line — see Known Issues #35; `20260820m` = accreditation renewal/expiry (`accredStanding` in db.js), accreditation-risk + product-category analytics, WP-form "Suggest vendors", offering reclassify, and vendor-portal dark mode; `vendor-guide.js` independently at `20260820a`; `20260820l` = vendor performance analytics (scorecard + cycle time), the WP-List vendor filter resolving through the `vendor_id` FK (`db.js` unchanged for this, but bumped with the set), and the directory triage views; `20260820k` = the hybrid product taxonomy — `db.js` gained the taxonomy API (`getTaxonomy`/`buildTaxonomyTree`/`taxonomyPathLabel`/`taxonomyNodeForWP`/`findVendorsForWP`) and the shared `window.TaxonomyPicker`; pairs with `migrations/2026-08-20_product_taxonomy.sql`; `20260820j` = accreditation guardrails — `db.js` `searchApprovedVendors`/`getVendorsByIds` now select `accreditation` to feed the picker badges + the problematic-award confirm gate; `20260820i` = the true vendor-edit flag — `db.js` `updateVendor` gained the `vendor_edited_at` deploy-safe strip; pairs with `migrations/2026-08-20_vendor_edited_flag.sql` and the `vendors.html` `_vendorEdited` rewrite; `20260820h` = `vendor_self_view` — vendors read AND write through a column-free view (`_vendorRel()` in db.js); `20260820g` = vendor field-ownership lockdown (`migrations/2026-08-20_vendor_field_ownership.sql`, portal STAFF_FIELDS); `20260820f` = vendor self-service round 2 — `VendorDb.prepareInvites`, the vendor-edit flag, and the portal's draft/validation pass; `20260820e` = bulk-delete impact pre-flight (`VendorDb.getDeletionImpact`) + CSV backup; `20260820d` = fuzzy-token merge suggestions + large clusters shown instead of hidden (vendors.html only, but bumped with the set); `20260820c` = merges preserve accreditation (`_preserveOnMerge` inside `mergeVendors`, standing-led canonical score); `20260820b` = one not-accredited state (`ACCREDITATIONS` is now two keys, `accredKey` folds legacy `'unaccredited'` onto `'none'`) + the vendor-directory UI pass; `20260820a` = vendor self-service + accreditation requests — `db.js` gained `VendorDb.documents`/`VendorDb.requests`, `window.accredReadiness`/`ACCRED_DOC_TYPES`, and the `_stripProfile` deploy guard; `20260819b` = retiring the `vendors.status` tagging — `db.js` `createVendor`/`quickCreateVendor` now write `status:'approved'` and `searchApprovedVendors` no longer filters on it; `20260819a` = the vendor-accreditation feature: `db.js` gained the `ACCREDITATIONS` roster + `accredKey`/`accredMeta`/`accredLabel`/`accredFromText` helpers, `bulkSetAccreditation`, and the `_stripAccred` deploy guard on `createVendor`/`updateVendor`; `20260812k` = folding the "Missing Planned Award Date" section into Data Gaps; `k`'s predecessor `j` = folding the "Missing Planned Award Date" section into Data Gaps; `j` = the Action Center sortable/collapsible-table rework + `db.js`'s `fmtSavingsBuyback`/buyback-not-auto-folded change; `i` = the missing-planned-date chart footnote; `h` = the onboarding.js fixed-height-slides + "?" help-menu fix; `g` was the `db.js` `renderUserBar()` "What's New" dropdown item; `f` was the buyback work: `h` added the exact-amount mode + `buybackExactAmount`, `i` added the granular `_stripBuyback`/`_retryUpdate` deploy guards; `g` was the shared `db.js` buyback money helpers — `buybackValue`/`buybackDepFraction`/`effectiveAwardedCost` + the `_isMissingBuybackCol` deploy guard; previously `20260811f`/`e` for the `_pagedSelect` 1000-row-cap fix + `ui.js` `AppNotify.progress`, and `20260811c` for the per-vendor-amount co-award work — `awarded_vendor_ids`/`awarded_vendor_amounts` guards + per-vendor `reconcileBidsOnAward`/backfill + `_splitAwarded`; `vendor-guide.js` carries an independent version; the prose here has drifted before — always trust a `grep -oh "v=20260[0-9]*[a-z]*"` over the real files, not this line). (`onboarding.js` + `coachmarks.js` now share this SAME version string too, not an independent one — the earlier note about a separate `20260730a` was stale; verify with a repo-wide grep before assuming otherwise.) **The shared `auth.js`/`db.js`/`ui.js`/`dashboard.css` includes now ALSO carry `?v=` on the other app pages (`admin.html`, `review.html`, `wp-form.html`, `my-wps.html`, `claim-form.html`, `project-selector.html`)** — previously they were unversioned and served stale `db.js` for ~10 min after a deploy (a real bug: e.g. admin.html not getting a new `db.js` write-path). When you bump the version, update it on ALL these pages too (a repo-wide `sed 's/?v=OLD/?v=NEW/g'` over the `*.html` set is simplest). `charts.js` is still only on index/project.
 
 ---
 
@@ -2567,7 +2567,8 @@ Full audit of `index.html` + `project.html`, verified live against production as
 
 ### Vendor page, sidebar, accreditation requirements, history restore, vendor front door (2026-09-03)
 
-Five changes from one review pass. `migrations/2026-09-03_vendor_owner_and_logo.sql` (**not run yet**).
+Five changes from one review pass. `migrations/2026-09-03_vendor_owner_and_logo.sql` (**RUN — confirmed
+by the user 2026-09-03, along with `_vendor_country.sql`**).
 
 **Vendor Registrations moved in the sidebar.** It was its own `.sidebar-section` with **no
 `.sidebar-section-label`**, so it rendered as an orphan item carrying section spacing, floating
@@ -3131,3 +3132,133 @@ simply being lived with.
 > The earlier per-WP **Contract Package switcher** on both dashboards (2026-08-27, `planners_package_id`)
 > is untouched and still valid — under this direction it breaks a single project down by the packages
 > Planning pushes for it, which is a different axis from consolidating sibling projects here.
+
+### Catalogue: one supply question, searchable origin, and the portal's missing design tokens (2026-09-03)
+
+Three things reported off the live portal, fixed on BOTH sides (`vendor-portal.html` and the staff
+detail page in `vendors.html` — the two editors mirror each other and must not drift):
+
+- **⚠️ THE PORTAL HAD NO DESIGN TOKENS AT ALL, and that is what broke dark mode.** This page does
+  not load `dashboard.css`, but every SHARED component it mounts — `window.TaxonomyPicker` today,
+  anything added later — is written against `var(--surface)` / `var(--text-primary)` /
+  `var(--border-md)`. With nothing defining them they silently resolved to their LIGHT fallbacks,
+  which is why the product-category picker's popover rendered white-on-dark. A `:root` +
+  `html.dark-mode` token block matching `dashboard.css` now lives in the portal's own `<style>`.
+  **⚠️ Scoped to `html.dark-mode`, NOT `body.dark-mode`** — that class is never set here (no
+  `ui.js`, so `AppTheme` is undefined). **Any shared component mounted into this page needs its
+  tokens defined here, or it will look correct in light mode and wrong in dark.**
+- **"Type" and "Supply scope" were one question asked twice.** Type (Materials/Labor/Service) and
+  Supply scope (Supply Only / Supply & Install / Labor Only / Service) overlap almost entirely, and
+  a vendor could set them to contradict each other. The Type control is gone; `item_type` is now
+  DERIVED from the scope via `SCOPE_TO_TYPE` (portal) / `SP_SCOPE_TO_TYPE` (staff), and the
+  remaining control is labelled **"What you provide"**. `Supply & Install` maps to `Materials` —
+  it is materials-bearing, and the installation half is preserved in `supply_scope` itself, which
+  is what actually shows on the card. **⚠️ `item_type` is NOT dropped from the schema**: the
+  directory product search, the card badge and `backfillVendorDataFromWPs` all read it.
+- **Country of origin is a `<datalist>`, deliberately NOT a `<select>`.** It is free text in the
+  database and a product can come from anywhere, so the roster (`window.COUNTRIES`, minus the `XX`
+  sentinel) gives type-to-filter while still accepting a country not on it. A closed list would
+  silently drop legitimate values.
+
+### Vendor-facing copy says "Megawide Procurement", never "buyers" (2026-09-03)
+
+Reported off the live portal: *"What does Megawide 'buyers' mean. Should it be Megawide
+Procurement?"* — yes. "Buyer" is internal jargon; the rest of the page already said "Megawide
+Procurement" ("Set by Megawide Procurement", "contact them if any of those look wrong"), so the two
+readings sat side by side. All seven vendor-facing strings across `vendor-portal.html` were changed
+(the logo hint, the catalogue empty state, and the Bid Board's page note, empty state, decline-reason
+label, notes label and its placeholder). **The four remaining occurrences are CODE COMMENTS and stay
+"buyer"** — that is the correct internal term and the migration uses it throughout.
+`vendor-register.html` and `vendor-login.html` had none. **Staff-facing `vendors.html` keeps
+"buyer".**
+
+### Vendor Bid Board — invitation-only (2026-09-03)
+
+`migrations/2026-09-03_vendor_bid_board.sql`. A vendor can be **invited to quote a specific work
+package** and answer through the portal instead of by email; staff see the submissions side by side.
+
+- **⚠️⚠️ THE ONE DECISION EVERYTHING ELSE FOLLOWS: INVITATION-ONLY, NOT AN OPEN BOARD.** An open
+  board would publish the entire procurement pipeline — what Megawide is buying, when, in what
+  quantity — to every registered vendor, and the directory holds ~2,400 companies imported from
+  work-package history and the SAP masterlist, **some of which are each other's direct
+  competitors**. It also maps badly onto how buyers actually work: they nominate
+  `proposed_vendors` on the work package. **Never "open it up" by relaxing `vbi_select_vendor`** —
+  the whole design rests on a vendor only ever reaching rows addressed to them.
+- **⚠️ A NEW TABLE, NOT vendors-into-`vendor_bids`.** `vendor_bids` is the INTERNAL negotiation
+  ledger: our own negotiating position (`original_offer`/`negotiated_offer`), staff notes, and one
+  row per COMPETING vendor on the same package. Row-scoping it by `vendor_id` would hide the other
+  vendors' rows, but **RLS filters ROWS, NEVER COLUMNS**, so the internal columns on the vendor's
+  OWN row would still be readable at the REST API — the trap that needed `vendor_self_view`.
+  So the two stay apart, exactly like `planners_need_by` vs `work_packages.target_installation`:
+  **THE VENDOR PROPOSES; THE BUYER RECORDS.** `bidBoard.promote()` is the buyer's deliberate act of
+  copying a submission into `vendor_bids` as `original_offer` — never automatic, or a vendor could
+  write the internal figure of record just by typing into the portal.
+- **⚠️ `internal.vendor_bid_guard` is the enforcement; the portal's hidden buttons are
+  presentation.** A vendor holds UPDATE on its own invitation, so without the trigger it could
+  PATCH the due date, the scope or the outcome straight at the REST API. It pins every buyer-owned
+  column, stamps `updated_by` from `auth.uid()` (unforgeable), refuses any change once closed /
+  withdrawn / past the deadline, allows only the `viewed`/`submitted`/`declined` transitions, and
+  server-stamps `submitted_at` — a submission time the client can set is not evidence. **Add a
+  buyer-owned column to that table and you must pin it there.**
+- **⚠️ `vendor_bid_board_view`'s COLUMN LIST IS THE ACCESS CONTROL, and the omissions are the
+  point.** NEVER add `approved_budget_bcb`/`budget_bcb0..2` (our budget IS the ceiling we will pay —
+  handing it to the vendor quoting against it destroys the negotiation), `awarded_cost`/
+  `total_awarded`/`variance`/`buyback_*`, `contractor`/`awarded_vendor_*`/`proposed_vendor*` (who
+  else is quoting, and what they were paid — competitor identities), or `remarks`/`dp_*`/
+  `retention_*`/`approver*`/`review_status`. `outcome` IS included — a vendor is told whether they
+  won; `outcome_note` (staff's private reasoning) is not. Supabase will flag it
+  `security_definer_view`: the same accepted exception as `wp_view_public` and `vendor_self_view`,
+  for the same reason. **Do not "fix" it by flipping to `security_invoker` — that re-exposes the
+  budget.**
+- **`VendorDb.bidBoard` (`db.js`) — TWO RELATIONS, NOT INTERCHANGEABLE:** `forVendor()` reads
+  `vendor_bid_board_view` (the vendor's cost-free surface), `forWP()` reads the base
+  `vendor_bid_invitations` (staff, full row). **Never point a vendor-facing call at the base
+  table.** Reads return `[]`/`0` on a missing table so both pages render before the migration is
+  run; **writes THROW** — a silent no-op on an invitation or a submission is worse than an error.
+  `invite()` upserts on `(wp_id, vendor_id)` so re-inviting cannot produce two rows and two answers.
+- **THE PORTAL'S SHAPE CHANGED WITH IT: a side panel, not a sixth tab (per explicit request).**
+  Company Profile and Bid Board are different jobs, not two views of one record, so the side panel
+  picks a **page** and the old tab row (Company Info / Products / Personnel / Certifications /
+  Accreditation) now belongs to the Company Profile page only and is hidden on the Bid Board.
+  `switchSection(sec)` is the outer level, `switchTab(t)` the inner; `_activeTab` is remembered, so
+  leaving to the Bid Board and coming back lands on the tab you left. `_showOnlyPanels()` hides
+  every `.panel` before showing a set, so the two levels cannot leak into each other.
+  `showWrongAccount()` hides the nav too — every page it offers needs a vendor. Below 767px the
+  200px rail becomes a horizontal strip.
+- **A vendor may revise up to the deadline, and may change their mind from `declined` to
+  `submitted`** — a quotation is routinely corrected before it is opened, and making a buyer
+  re-issue the invitation over a typo is worse for both sides. The card therefore offers "Revise
+  your response" on a submitted OR declined invitation, and nothing at all once locked.
+- **⚠️ A past deadline locks the invitation even though `status` is still `invited`/`submitted`** —
+  the status column only moves when staff decide. `_bidLocked()` accounts for that, so the UI never
+  offers a control the database will reject. **But a decided outcome outranks the deadline in the
+  LABEL**: an awarded card must never read "Deadline passed", and its due line is rendered neutral
+  rather than in the overdue red — an alarm on a card that just told the vendor they won.
+- **Verified: 75 assertions in a Node harness against the VERBATIM shipped functions** (extracted
+  from `vendor-portal.html` and run under a DOM stub, so a test can only pass if the shipped code
+  does it) — locking in every state combination, the label rules incl. the outcome-beats-deadline
+  case, deadline wording and boundaries, card rendering, escaping of buyer- and vendor-authored
+  free text, the Known-Issues-#23 inline-handler check, editor open/close and mode switching, the
+  badge counting only what needs an answer, submit (incl. that **nothing buyer-owned is ever sent**),
+  attachment upload under the `<vendorId>/` prefix the Storage policy authorizes on, the oversized-
+  file refusal, and decline. Plus the navigation logic asserted in a live harness (tab row hidden on
+  the Bid Board, remembered tab, Accreditation's two stacked panels, no panel leakage) and the
+  layout measured at 375px (no horizontal overflow).
+- **⚠️ A HARNESS TRAP WORTH REMEMBERING: a top-level `let` in a `vm` script is a LEXICAL binding,
+  NOT a property of the sandbox.** `ctx._bidOpenId = x` therefore set a *different* binding than the
+  shipped code reads, and seven tests failed for a reason that had nothing to do with the code.
+  (Function *declarations* do land on the global object, which is why `ctx._bidCard` worked.) The
+  fix is an epilogue evaluated INSIDE the same script exposing accessors, so the extracted source
+  stays byte-identical. Same class of self-inflicted failure as the missing `window.location` mock
+  in the QR harness — **when a harness assertion fails, rule out the harness before the code.**
+- **Two real defects the harness/screenshots caught**: `.file-badge` is styled as a link (blue,
+  underlined) but kept the browser's default button box — wrong **here AND in the accreditation
+  documents list**, now reset; and in dark mode `.bid-due` had an override for its urgent/overdue
+  variants but not the BASE colour, leaving `#666` on a `#232323` card at **2.7:1**. A child span
+  with its own rule does not inherit the parent's dark colour — **when you add a dark-mode override
+  for a state variant, check the base rule too.**
+- **⚠️ NOT EXERCISED BY A REAL VENDOR.** `users where role='vendor'` is still 0, so like the rest of
+  the self-service path this is verified by construction only. The staff side of the board (issuing
+  an invitation, comparing submissions, `decide()`/`promote()`) is **NOT built yet** — the API
+  exists in `VendorDb.bidBoard`, but `vendors.html` has no UI for it, so today an invitation can
+  only be created by SQL. That is the next piece.
