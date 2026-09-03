@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260903f"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260903f"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260903f"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260903g"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260903g"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260903g"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260903f">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260903g">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1202,9 +1202,9 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260903f"></script>
-<script src="assets/js/db.js?v=20260903f"></script>
-<script src="assets/js/ui.js?v=20260903f"></script>
+<script src="assets/js/auth.js?v=20260903g"></script>
+<script src="assets/js/db.js?v=20260903g"></script>
+<script src="assets/js/ui.js?v=20260903g"></script>
 <script src="assets/js/vendor-guide.js?v=20260902a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -4579,6 +4579,13 @@ function renderDetailOverview() {
    Staff can upload here too, deliberately: these documents overwhelmingly
    arrive by email today (no vendor has ever used the portal), and an officer
    with the BIR 2303 in their inbox needs somewhere to file it. */
+// Mirrors the portal's own wording so both sides state the same allowance.
+function _docRuleText(key) {
+  if (!window.accredDocRule) return '';
+  const r = window.accredDocRule(key);
+  return r.exts.map(function (e) { return e.toUpperCase(); }).join(' / ') + ' · up to ' + r.maxMB + ' MB';
+}
+
 async function renderDetailAccred() {
   const box = document.getElementById('dtab-accred');
   if (!box || !activeVendor) return;
@@ -4612,9 +4619,9 @@ async function renderDetailAccred() {
         ${on ? `<span class="accred-when">filed ${esc(_reqDate(doc.uploaded_at))}</span>` : '<span class="accred-when">not on file</span>'}
       </div>
       ${on ? `<a class="accred-view" onclick="viewVendorDoc('${doc.id}')"><i class="ti ti-eye"></i> View</a>${_docLockMarker(doc)}` : ''}
-      ${_canManage ? `<label class="accred-up" title="Attach a ${esc(t.label)} received from this vendor">
+      ${_canManage ? `<label class="accred-up" title="Attach a ${esc(t.label)} received from this vendor — ${esc(_docRuleText(t.key))}">
         <i class="ti ti-upload"></i> ${on ? 'Replace' : 'Upload'}
-        <input type="file" style="display:none" onchange="uploadDetailDoc('${esc(t.key)}', this)">
+        <input type="file" style="display:none" accept="${window.accredDocAccept ? window.accredDocAccept(t.key) : ''}" onchange="uploadDetailDoc('${esc(t.key)}', this)">
       </label>` : ''}
     </div>`;
   }).join('');
@@ -4636,7 +4643,12 @@ async function uploadDetailDoc(docType, input) {
   if (!_canManage || !activeVendor) return;
   const file = input && input.files && input.files[0];
   if (!file) return;
-  if (file.size > 15 * 1024 * 1024) { AppNotify && AppNotify.warn('That file is over 15 MB.'); input.value = ''; return; }
+  // Same per-type rule the vendor portal enforces (window.checkAccredDoc in
+  // db.js), so the two sides cannot disagree about what is acceptable.
+  if (window.checkAccredDoc) {
+    const bad = window.checkAccredDoc(docType, file);
+    if (bad) { AppNotify && AppNotify.warn(bad); input.value = ''; return; }
+  }
   try {
     await VendorDb.uploadVendorDoc(activeVendor.id, docType, file);
     if (window.AppNotify) AppNotify.success('Filed.');

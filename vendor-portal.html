@@ -116,6 +116,8 @@
     .field-err{font-size:11.5px;color:#991B1B;margin-top:5px;display:none}
     .field-err.on{display:block}
     .field input:disabled,.field select:disabled{background:#F4F4F4;color:#6B6A6A;cursor:not-allowed;border-color:#e9e9e9}
+    .doc-rule{font-size:10.5px;color:#999;flex-basis:100%;margin-top:2px}
+    html.dark-mode .doc-rule{color:#777}
     .locked-note{font-size:11px;color:#888;margin-top:5px;display:flex;gap:5px;align-items:center}
     /* Small helper text under a field. Was being used before it existed here
        (it is defined in vendor-register.html, not this file), so the hints
@@ -433,7 +435,15 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       <div class="field"><label>Address <span style="color:#EE3124">*</span></label>
         <input id="f-address" type="text" placeholder="Street, barangay / district"></div>
       <div class="field"><label>City <span style="color:#EE3124">*</span></label>
-        <input id="f-city" type="text" placeholder="e.g. Quezon City, or City, Country"></div>
+        <input id="f-city" type="text" placeholder="e.g. Quezon City"></div>
+    </div>
+    <div class="field-row">
+      <!-- Gives an overseas vendor somewhere real to say where they are, instead
+           of the old workaround of typing "City, Country" into City. Also drives
+           the phone prefix below. -->
+      <div class="field"><label>Country <span style="color:#EE3124">*</span></label>
+        <select id="f-country" onchange="onCountryChange()"></select></div>
+      <div class="field"></div>
     </div>
     <div class="field-row">
       <!-- ⚠️ VENDOR-OWNED, not staff-set. Payment terms are commercial: the vendor
@@ -537,8 +547,8 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260903f"></script>
-<script src="assets/js/db.js?v=20260903f"></script>
+<script src="assets/js/auth.js?v=20260903g"></script>
+<script src="assets/js/db.js?v=20260903g"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -629,6 +639,7 @@ async function loadAll() {
   await _step('company details', renderOverviewForm);
   await _step('trade categories', buildTradeChips, 'tradeChips');
   await _step('company logo', renderPortalLogo);
+  await _step('country', function () { buildCountryOptions(); applyDialCode(); });
   await _step('product categories', renderProductCategoryOptions);
   await Promise.all([
     _step('accreditation', reloadAccreditation, 'docsList'),
@@ -723,6 +734,14 @@ async function withdrawRequest(id) {
   catch (e) { msg('Could not withdraw: ' + (e.message || e), 'error'); }
 }
 
+/* Tell the vendor the allowance up front. A rejection after a slow upload of a
+   30 MB phone photo is a bad way to learn the rule. */
+function _docRuleText(key) {
+  if (!window.accredDocRule) return '';
+  const r = window.accredDocRule(key);
+  return r.exts.map(function (e) { return e.toUpperCase(); }).join(' / ') + ' · up to ' + r.maxMB + ' MB';
+}
+
 function renderDocs() {
   const types = (window.ACCRED_DOC_TYPES || []).filter(d => d.required);
   const extra = myDocs.filter(d => !types.some(t => t.key === d.doc_type));
@@ -740,7 +759,8 @@ function renderDocs() {
       <span class="doc-name">${esc(label)}${required ? ' <span style="color:#EE3124">*</span>' : ''}</span>
       ${have.length ? `<span class="doc-have">On file</span> ${uploaded}`
                     : `<span class="doc-missing">Not uploaded</span>
-                       <input type="file" accept=".pdf,.jpg,.jpeg,.png" onchange="uploadDoc('${key}', this)" style="flex:1;min-width:170px;font-size:12px">`}
+                       <input type="file" accept="${window.accredDocAccept ? window.accredDocAccept(key) : '.pdf,.jpg,.jpeg,.png'}" onchange="uploadDoc('${key}', this)" style="flex:1;min-width:170px;font-size:12px">`}
+      ${have.length ? '' : `<span class="doc-rule">${esc(_docRuleText(key))}</span>`}
     </div>`;
   };
   document.getElementById('docsList').innerHTML =
@@ -748,7 +768,8 @@ function renderDocs() {
     extra.map(d => rowFor(d.doc_type, window.accredDocLabel(d.doc_type), false)).join('') +
     `<div class="doc-row">
       <span class="doc-name" style="color:#888;font-weight:500">Other supporting document</span>
-      <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onchange="uploadDoc('other', this)" style="flex:1;min-width:170px;font-size:12px">
+      <input type="file" multiple accept="${window.accredDocAccept ? window.accredDocAccept('other') : '.pdf,.jpg,.jpeg,.png'}" onchange="uploadDoc('other', this)" style="flex:1;min-width:170px;font-size:12px">
+      <span class="doc-rule">${esc(_docRuleText('other'))}</span>
     </div>`;
 }
 /* Handles one file for each of the four required rows, and SEVERAL for "Other
@@ -758,12 +779,13 @@ function renderDocs() {
 async function uploadDoc(docType, input) {
   const files = input.files ? Array.from(input.files) : [];
   if (!files.length) return;
-  const tooBig = files.filter(f => f.size > 15 * 1024 * 1024);
-  if (tooBig.length) {
-    msg(tooBig.length === 1
-      ? 'That file is larger than 15 MB — please upload a smaller scan.'
-      : tooBig.length + ' of those files are larger than 15 MB — please upload smaller scans.', 'error');
-    input.value = ''; return;
+  // ⚠️ RE-CHECKED HERE. The `accept` attribute is a hint to the file picker and
+  // is trivially bypassed (drag-drop, "All files"), so the real gate is this.
+  // Per-type: a one-page certificate has no business being 20 MB, while a
+  // company-profile deck legitimately is. See window.checkAccredDoc in db.js.
+  if (window.checkAccredDoc) {
+    const bad = files.map(f => window.checkAccredDoc(docType, f)).filter(Boolean);
+    if (bad.length) { msg(bad[0], 'error'); input.value = ''; return; }
   }
   input.disabled = true;
   let done = 0;
@@ -854,7 +876,7 @@ const OVERVIEW_FIELDS = {
   'f-contact-email': 'contact_email', 'f-website': 'website',
   'f-address': 'address', 'f-city': 'city',
   'f-owner-name': 'owner_name', 'f-owner-contact-number': 'owner_contact_number',
-  'f-payment-terms': 'payment_terms',
+  'f-payment-terms': 'payment_terms', 'f-country': 'country',
 };
 // Capability the vendor declares about itself, answering the bond and submittal
 // requirements a work package carries. Vendor-owned, so NOT pinned in
@@ -953,6 +975,122 @@ async function uploadPortalLogo(input) {
     msg('Could not upload the logo: ' + (e.message || e), 'error');
   }
   input.value = '';
+}
+
+/* The country roster lives in db.js (window.COUNTRIES) so it can change without
+   a migration; vendors.country stores only the ISO alpha-2. */
+/* The four Company Info contact fields mirror the primary contact from the
+   Personnel tab. When one exists they are read-only there — one place to edit,
+   so the two copies cannot drift. When none exists they stay editable, because
+   Contact person / Position / Contact number / Email address are required
+   accreditation items and a vendor must never be blocked on a field they are
+   not allowed to fill. */
+const CONTACT_MIRROR = {
+  'f-contact-person': 'name',
+  'f-contact-position': 'role_title',
+  'f-contact-number': 'contact_number',
+  'f-contact-email': 'email',
+};
+function applyContactLock() {
+  const p = primaryPerson();
+  Object.keys(CONTACT_MIRROR).forEach(function (id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const box = el.parentNode;
+    if (box) {
+      const old = box.querySelector('.mirror-note');
+      if (old) old.remove();
+    }
+    if (p) {
+      el.value = p[CONTACT_MIRROR[id]] || '';
+      el.disabled = true;
+      el.title = 'From your primary contact in the Personnel tab.';
+      if (box) {
+        const n = document.createElement('div');
+        n.className = 'locked-note mirror-note';
+        n.innerHTML = 'From <b>' + esc(p.name) + '</b> in Personnel. '
+          + '<a href="#" onclick="switchTab(' + Q + 'personnel' + Q + ');return false">Edit there</a>.';
+        box.appendChild(n);
+      }
+    } else {
+      el.disabled = false;
+      el.title = '';
+      if (box) {
+        const n = document.createElement('div');
+        n.className = 'locked-note mirror-note';
+        n.innerHTML = 'Tip: add this person under <a href="#" onclick="switchTab('
+          + Q + 'personnel' + Q + ');return false">Personnel</a> and mark them primary, '
+          + 'and this fills in from there.';
+        box.appendChild(n);
+      }
+    }
+  });
+}
+
+/* Keep vendors.contact_* in step with the primary contact. It stays the column
+   the checklist, the staff cards, the analytics and the WP vendor pickers read,
+   so it must not go stale — it just is not separately edited any more. Writes
+   only when something actually differs, so it does not raise a pointless
+   vendor-edit flag for staff on every personnel touch. */
+async function syncPrimaryContact() {
+  const p = primaryPerson();
+  if (!p || !vendor) return;
+  const want = {
+    contact_person: p.name || '',
+    contact_position: p.role_title || '',
+    contact_number: p.contact_number || '',
+    contact_email: p.email || '',
+  };
+  const changed = Object.keys(want).some(function (k) {
+    return String(vendor[k] || '') !== String(want[k]);
+  });
+  if (!changed) return;
+  try {
+    vendor = (await VendorDb.updateVendor(vendor.id, want)) || Object.assign(vendor, want);
+    applyContactLock();
+    await reloadAccreditation();   // those four are checklist items
+  } catch (e) {
+    msg('Saved the contact, but could not copy it to Company Info: ' + (e.message || e), 'error');
+  }
+}
+
+function buildCountryOptions() {
+  const sel = document.getElementById('f-country');
+  if (!sel || !window.COUNTRIES) return;
+  const cur = String((vendor && vendor.country) || 'PH').toUpperCase();
+  sel.innerHTML = window.COUNTRIES.map(function (c) {
+    return '<option value="' + esc(c.code) + '"' + (c.code === cur ? ' selected' : '') + '>'
+      + esc(c.name) + (c.dial ? ' (' + esc(c.dial) + ')' : '') + '</option>';
+  }).join('');
+  // An off-roster code already on file must not be silently rewritten to PH.
+  if (!window.COUNTRIES.some(function (c) { return c.code === cur; })) {
+    sel.insertAdjacentHTML('afterbegin',
+      '<option value="' + esc(cur) + '" selected>' + esc(cur) + '</option>');
+  }
+}
+
+/* Phone fields carry the dial code for the chosen country, the way every other
+   app does it — the vendor should not have to remember +63. Only ever REPLACES
+   a recognised prefix or fills an empty field: a number the vendor typed with
+   some other prefix is left alone rather than mangled. */
+const PHONE_FIELDS = ['f-contact-number', 'f-telephone', 'f-owner-contact-number'];
+function applyDialCode() {
+  const sel = document.getElementById('f-country');
+  const dial = window.countryDial ? window.countryDial(sel && sel.value) : '';
+  if (!dial) return;
+  PHONE_FIELDS.forEach(function (id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const v = (el.value || '').trim();
+    const had = window.dialPrefixOf ? window.dialPrefixOf(v) : '';
+    if (!v) el.value = dial + ' ';
+    else if (had && had !== dial) el.value = (dial + ' ' + v.slice(had.length).trim()).trim();
+    el.placeholder = dial + ' 9xx xxx xxxx';
+  });
+}
+function onCountryChange() {
+  applyDialCode();
+  markDirty();
 }
 
 function buildTradeChips() {
@@ -1492,9 +1630,19 @@ function _initials(n) {
   return String(n || '?').trim().split(/\s+/).slice(0, 2)
     .map(function (w) { return w[0]; }).join('').toUpperCase() || '?';
 }
+let _perList = [];
+/* Whoever is flagged primary, else the only contact if there is exactly one —
+   a single contact IS the primary contact in practice, and making the vendor
+   tick a box to say so is friction for no information. */
+function primaryPerson() {
+  return _perList.find(function (p) { return p.is_primary; })
+      || (_perList.length === 1 ? _perList[0] : null);
+}
+
 async function renderPersonnel() {
   if (!vendor) return;
   const list = await VendorDb.personnel.list(vendor.id);
+  _perList = list;
   const el = document.getElementById('personnelList');
   document.getElementById('perCount').textContent =
     list.length ? list.length + (list.length === 1 ? ' contact' : ' contacts') : '';
@@ -1502,8 +1650,10 @@ async function renderPersonnel() {
     el.innerHTML = '<div class="pf-empty"><i class="ti ti-users"></i><b>No contacts yet</b>'
       + 'Add the people Megawide should deal with — a sales contact, a technical contact, '
       + 'whoever answers a request for quotation fastest.</div>';
+    applyContactLock();          // no primary yet -> the Company Info fields stay editable
     return;
   }
+  applyContactLock();
   el.innerHTML = '<div class="prof-grid">' + list.map(function (p) {
     return '<div class="prof-card">'
       + '<button class="prof-del" onclick="removePersonnel(' + Q + p.id + Q + ')" title="Remove">&times;</button>'
@@ -1540,6 +1690,7 @@ async function replacePersonPhoto(id, input) {
     const path = await VendorDb.uploadVendorFile(vendor.id, 'person_' + id, file);
     await VendorDb.personnel.update(id, { photo_path: path });
     await renderPersonnel();
+    await syncPrimaryContact();
     await flagEdited();
     msg('Photo updated.', 'success');
   } catch (e) {
@@ -1582,6 +1733,7 @@ async function addPersonnel() {
     document.getElementById('np-primary').checked = false;
     if (ph) ph.value = '';
     await renderPersonnel();
+    await syncPrimaryContact();
     await flagEdited();
   } catch (e) { msg('Could not add: ' + (e.message || e), 'error'); }
 }

@@ -1835,13 +1835,120 @@ if (typeof window !== 'undefined') {
    it lists them. ⚠️ THE KEYS ARE STORED in vendor_documents.doc_type on every
    uploaded row — relabel and reorder freely, but RENAMING A KEY orphans every
    document already uploaded under the old one. */
-const ACCRED_DOC_TYPES = [
-  { key: 'bir_2303',        label: 'BIR 2303',                  required: true },
-  { key: 'company_profile', label: 'Company Profile',           required: true },
-  { key: 'business_permit', label: 'Business Permits',          required: true },
-  { key: 'sample_invoice',  label: 'Scanned Copy of Invoice',   required: true },
-  { key: 'other',           label: 'Other supporting document', required: false },
+/* Countries a vendor can be based in, with their dial code. Held HERE rather
+   than in the database (vendors.country stores only the ISO alpha-2) for the
+   same reason as window.GROUP_HEADS and window.ACCREDITATIONS: the roster
+   changes with business, not with schema, so adding one must not need a
+   migration.
+
+   Deliberately NOT all ~250 countries — a long list is worse to use than a
+   short relevant one. Philippines first, then the markets Megawide actually
+   buys from, then Other. `dial` drives the phone prefix in vendor-portal.html
+   so a vendor never has to remember it. */
+const COUNTRIES = [
+  { code: 'PH', name: 'Philippines',          dial: '+63' },
+  { code: 'CN', name: 'China',                dial: '+86' },
+  { code: 'HK', name: 'Hong Kong',            dial: '+852' },
+  { code: 'TW', name: 'Taiwan',               dial: '+886' },
+  { code: 'JP', name: 'Japan',                dial: '+81' },
+  { code: 'KR', name: 'South Korea',          dial: '+82' },
+  { code: 'SG', name: 'Singapore',            dial: '+65' },
+  { code: 'MY', name: 'Malaysia',             dial: '+60' },
+  { code: 'TH', name: 'Thailand',             dial: '+66' },
+  { code: 'VN', name: 'Vietnam',              dial: '+84' },
+  { code: 'ID', name: 'Indonesia',            dial: '+62' },
+  { code: 'IN', name: 'India',                dial: '+91' },
+  { code: 'AE', name: 'United Arab Emirates', dial: '+971' },
+  { code: 'SA', name: 'Saudi Arabia',         dial: '+966' },
+  { code: 'AU', name: 'Australia',            dial: '+61' },
+  { code: 'US', name: 'United States',        dial: '+1' },
+  { code: 'GB', name: 'United Kingdom',       dial: '+44' },
+  { code: 'DE', name: 'Germany',              dial: '+49' },
+  { code: 'IT', name: 'Italy',                dial: '+39' },
+  { code: 'ES', name: 'Spain',                dial: '+34' },
+  { code: 'TR', name: 'Turkey',               dial: '+90' },
+  { code: 'XX', name: 'Other',                dial: '' },
 ];
+function countryName(code) {
+  const c = COUNTRIES.find(x => x.code === String(code || '').toUpperCase());
+  return c ? c.name : (code || '');
+}
+function countryDial(code) {
+  const c = COUNTRIES.find(x => x.code === String(code || '').toUpperCase());
+  return c ? c.dial : '';
+}
+/* Longest dial code first, so +63 is not matched inside +6 and Singapore's +65
+   is not mistaken for a +6 prefix. Returns '' when the number carries none. */
+function dialPrefixOf(number) {
+  const s = String(number || '').trim();
+  const codes = COUNTRIES.map(c => c.dial).filter(Boolean).sort((a, b) => b.length - a.length);
+  return codes.find(dc => s.indexOf(dc) === 0) || '';
+}
+if (typeof window !== 'undefined') {
+  window.COUNTRIES = COUNTRIES;
+  window.countryName = countryName;
+  window.countryDial = countryDial;
+  window.dialPrefixOf = dialPrefixOf;
+}
+
+const ACCRED_DOC_TYPES = [
+  { key: 'bir_2303',        label: 'BIR 2303',                  required: true,
+    maxMB: 5,  exts: ['pdf', 'jpg', 'jpeg', 'png'],
+    note: 'One certificate — a clear scan or photo.' },
+  { key: 'company_profile', label: 'Company Profile',           required: true,
+    maxMB: 20, exts: ['pdf', 'doc', 'docx', 'ppt', 'pptx'],
+    note: 'A document or deck. Bigger allowance because these carry images.' },
+  { key: 'business_permit', label: 'Business Permits',          required: true,
+    maxMB: 10, exts: ['pdf', 'jpg', 'jpeg', 'png'],
+    note: 'Several permits or pages — combine them into one PDF if you can.' },
+  { key: 'sample_invoice',  label: 'Scanned Copy of Invoice',   required: true,
+    maxMB: 5,  exts: ['pdf', 'jpg', 'jpeg', 'png'],
+    note: 'One invoice.' },
+  { key: 'other',           label: 'Other supporting document', required: false,
+    maxMB: 10, exts: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'],
+    note: 'Anything else Procurement has asked you for.' },
+];
+const ACCRED_DOC_FALLBACK = { maxMB: 10, exts: ['pdf', 'jpg', 'jpeg', 'png'] };
+function accredDocRule(key) {
+  const d = ACCRED_DOC_TYPES.find(x => x.key === key);
+  return {
+    maxMB: (d && d.maxMB) || ACCRED_DOC_FALLBACK.maxMB,
+    exts: (d && d.exts) || ACCRED_DOC_FALLBACK.exts,
+    label: (d && d.label) || key || 'Document',
+    note: (d && d.note) || '',
+  };
+}
+/* The `accept` attribute for a file input. A hint to the picker only — it is
+   trivially bypassed, which is why checkAccredDoc() re-checks on submit. */
+function accredDocAccept(key) {
+  return accredDocRule(key).exts.map(e => '.' + e).join(',');
+}
+/* Validate one File against its document type. Returns null when fine, else a
+   sentence to show the user.
+
+   ⚠️ Checks the EXTENSION, not the MIME type. Browsers report file.type
+   inconsistently (empty for many files, and wrong for others depending on the
+   OS registry), so a MIME check would reject legitimate uploads. This is a
+   usability guard, not a security boundary — the real limits are the bucket's
+   own and the Storage policies. */
+function checkAccredDoc(key, file) {
+  if (!file) return 'No file chosen.';
+  const r = accredDocRule(key);
+  // ⚠️ split('.').pop() on a name with NO dot returns the whole name, so
+  // "scan" reported itself as a file of type SCAN. Check for the dot first.
+  const nm = String(file.name || '');
+  const ext = nm.includes('.') ? nm.split('.').pop().toLowerCase() : '';
+  if (!r.exts.includes(ext)) {
+    return r.label + ' must be ' + r.exts.map(e => e.toUpperCase()).join(', ')
+      + '. That file is a ' + (ext ? ext.toUpperCase() : 'file with no extension') + '.';
+  }
+  if (file.size > r.maxMB * 1024 * 1024) {
+    return r.label + ' must be ' + r.maxMB + ' MB or smaller — that one is '
+      + (file.size / 1048576).toFixed(1) + ' MB.'
+      + (r.exts.includes('pdf') ? ' A PDF scan at 150–200 dpi is usually well under it.' : '');
+  }
+  return null;
+}
 function accredDocLabel(k) {
   const d = ACCRED_DOC_TYPES.find(x => x.key === k);
   return d ? d.label : (k || 'Document');
@@ -1874,6 +1981,9 @@ function accredReadiness(vendor, docs) {
 if (typeof window !== 'undefined') {
   window.ACCRED_DOC_TYPES = ACCRED_DOC_TYPES;
   window.accredDocLabel = accredDocLabel;
+  window.accredDocRule = accredDocRule;
+  window.accredDocAccept = accredDocAccept;
+  window.checkAccredDoc = checkAccredDoc;
   window.accredReadiness = accredReadiness;
 }
 
