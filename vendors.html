@@ -647,6 +647,89 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
       border-radius:6px;font-family:inherit;font-size:0.78rem;background:var(--surface,#fff);color:var(--text-primary,#231F20)}
     .itm-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
     .itm-acts .btn-primary{width:auto;padding:8px 16px}
+
+    /* ══ Vendor detail as a DEDICATED PAGE (not a modal) ══════════════════════
+       A vendor profile is nine sections deep — Overview, Work Packages,
+       Schedule, Products, Certifications, Personnel, Rates, Bid History,
+       Change History. In a 760px modal that meant a cramped scroll inside a
+       scroll, with the page behind it showing through. It is now a real route
+       (vendors.html?vendor=<id>) so it gets the full content width, a sticky
+       section rail, the browser Back button, and a URL you can send someone. */
+    #vendorDetailPage{display:none}
+    .vd-back{display:inline-flex;align-items:center;gap:6px;background:none;border:none;padding:0;margin:0 0 14px;
+             color:var(--text-secondary);font-family:inherit;font-size:0.8571rem;cursor:pointer}
+    .vd-back:hover{color:#EE3124}
+    /* Header: logo, name, standing. */
+    .vd-head{display:flex;align-items:flex-start;gap:18px;padding-bottom:18px;margin-bottom:20px;
+             border-bottom:1.5px solid var(--border-md);flex-wrap:wrap}
+    .vd-logo-wrap{flex-shrink:0;position:relative}
+    .vd-logo{width:84px;height:84px;border-radius:14px;border:1.5px solid var(--border-md);background:var(--surface-2);
+             display:flex;align-items:center;justify-content:center;overflow:hidden;
+             font-size:1.7rem;font-weight:800;color:#EE3124;letter-spacing:-.5px}
+    .vd-logo img{width:100%;height:100%;object-fit:contain;background:#fff}
+    .vd-logo-btn{position:absolute;right:-6px;bottom:-6px;width:28px;height:28px;border-radius:50%;
+                 border:1.5px solid var(--border-md);background:var(--surface);color:var(--text-secondary);
+                 cursor:pointer;font-size:0.85rem;display:flex;align-items:center;justify-content:center;padding:0}
+    .vd-logo-btn:hover{border-color:#EE3124;color:#EE3124}
+    .vd-head-main{flex:1;min-width:220px}
+    .vd-name{font-size:1.55rem;font-weight:800;color:var(--text-primary);line-height:1.2;margin:0 0 8px;
+             word-break:break-word}
+    .vd-badges{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+    .vd-meta{font-size:0.8571rem;color:var(--text-hint);display:flex;gap:14px;flex-wrap:wrap}
+    .vd-meta code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.8rem}
+    /* Two-column body: sticky section rail + the sections themselves. */
+    .vd-body{display:flex;gap:26px;align-items:flex-start}
+    .vd-rail{position:sticky;top:76px;flex-shrink:0;width:186px;display:flex;flex-direction:column;gap:2px;
+             max-height:calc(100vh - 100px);overflow-y:auto}
+    .vd-rail a{display:block;padding:7px 11px;border-radius:7px;border-left:2.5px solid transparent;
+               color:var(--text-secondary);text-decoration:none;font-size:0.8571rem;line-height:1.3}
+    .vd-rail a:hover{background:var(--mw-red-light,#FDECEA);color:var(--text-primary)}
+    .vd-rail a.active{border-left-color:#EE3124;background:var(--mw-red-light,#FDECEA);color:#EE3124;font-weight:600}
+    .vd-sections{flex:1;min-width:0}
+    /* On the page each section is a card, so nine of them read as nine things
+       rather than one long undifferentiated scroll. */
+    .vd-sections .detail-section{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;
+                                 padding:18px 20px;margin-bottom:16px;scroll-margin-top:80px}
+    .vd-sections .detail-section-title{margin:0 0 14px;font-size:1.05rem;font-weight:700;color:var(--text-primary);
+                                       padding-bottom:9px;border-bottom:1px solid var(--border)}
+    /* Action bar pinned to the bottom of the viewport: the page is long, and Save
+       must never be a scroll away (a TIN was once typed, Close pressed, and the
+       edit lost — the same reason it moved into the modal footer before this). */
+    .vd-actions{position:sticky;bottom:0;z-index:6;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+                margin-top:4px;padding:12px 0;background:var(--bg);border-top:1.5px solid var(--border-md)}
+    @media (max-width:900px){
+      .vd-body{display:block}
+      .vd-rail{position:static;width:auto;flex-direction:row;overflow-x:auto;max-height:none;
+               gap:6px;margin-bottom:16px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+      .vd-rail a{white-space:nowrap;border-left:none;border-bottom:2.5px solid transparent;border-radius:7px 7px 0 0}
+      .vd-rail a.active{border-left-color:transparent;border-bottom-color:#EE3124}
+    }
+
+    /* ── Personnel profile cards, mirroring vendor-portal.html ────────────────
+       Staff used to see personnel as a flat one-line-per-person list while the
+       vendor filled in a photo, role and primary flag the staff side then threw
+       away visually. Same .prof-* shape as the portal so both sides show the
+       same record. */
+    .prof-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:12px}
+    .prof-card{position:relative;display:flex;align-items:flex-start;gap:12px;padding:14px;
+               border:1.5px solid var(--border-md);border-radius:12px;background:var(--surface-2)}
+    .prof-av{position:relative;flex-shrink:0;width:52px;height:52px;border-radius:50%;background:#EE3124;color:#fff;
+             display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.05rem;overflow:hidden}
+    .prof-av img{width:100%;height:100%;object-fit:cover}
+    .prof-primary{position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;
+                  background:#2D9B6F;border:2px solid var(--surface-2)}
+    .prof-info{flex:1;min-width:0}
+    .prof-name{font-weight:700;font-size:0.9286rem;color:var(--text-primary);
+               overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .prof-role{font-size:0.8rem;color:var(--text-secondary);margin-top:1px}
+    .prof-meta{font-size:0.7857rem;color:var(--text-hint);margin-top:3px;word-break:break-word}
+    .prof-tag{margin-top:6px;display:inline-block;font-size:0.6429rem;font-weight:700;letter-spacing:.4px;
+              color:#2D9B6F;background:rgba(45,155,111,.12);padding:2px 7px;border-radius:10px}
+    .prof-del{position:absolute;top:6px;right:8px;border:none;background:none;color:var(--text-hint);
+              font-size:1.05rem;line-height:1;cursor:pointer;padding:2px 4px}
+    .prof-del:hover{color:#EE3124}
+    .prof-audit{font-size:0.7143rem;color:var(--text-hint);margin-top:5px}
+    body.dark-mode .vd-logo img{background:#fff}
 </style>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -704,7 +787,9 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
     <div class="content" id="main-content-region" role="main" tabindex="-1">
       <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading vendors…</span></div>
       <div id="main-content" style="display:none">
-        <div class="page-content">
+        <!-- The directory. Its sibling #vendorDetailPage is the profile route;
+             openVendorPage() / closeVendorPage() swap which one is shown. -->
+        <div class="page-content" id="vendorDirectoryPage">
           <div class="vm-head">
             <div>
               <h1>Vendor Management</h1>
@@ -860,6 +945,63 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
           <div class="vendor-cards" id="vendorCards"></div>
           <div class="vendor-pager" id="vendorPager"></div>
         </div>
+
+        <!-- ══ Vendor detail — a DEDICATED PAGE, not a modal ═══════════════════
+             Sibling of the directory's .page-content; openVendorPage() swaps
+             which of the two is visible and pushes vendors.html?vendor=<id>, so
+             this is a real addressable route with working Back/Forward.
+             ⚠️ THE SECTION IDS (#dsec-* / #dtab-*) ARE UNCHANGED from the old
+             modal on purpose: every renderDetail*() writes into #dtab-<x>, so
+             moving the markup here needed no change to any of them. -->
+        <div class="page-content" id="vendorDetailPage">
+          <button class="vd-back" onclick="closeVendorPage()">
+            <i class="ti ti-arrow-left"></i> All vendors
+          </button>
+
+          <div class="vd-head">
+            <div class="vd-logo-wrap">
+              <div class="vd-logo" id="vdLogo"></div>
+              <!-- Shown only for write roles; wired in _vdRenderHeader(). -->
+              <button class="vd-logo-btn" id="vdLogoBtn" title="Upload or replace the company logo"
+                      onclick="document.getElementById('vdLogoFile').click()" style="display:none">
+                <i class="ti ti-camera"></i>
+              </button>
+              <input type="file" id="vdLogoFile" accept="image/*" style="display:none"
+                     onchange="vdUploadLogo(this.files[0])">
+            </div>
+            <div class="vd-head-main">
+              <h1 class="vd-name" id="vdName">Vendor</h1>
+              <div class="vd-badges" id="vdBadges"></div>
+              <div class="vd-meta" id="vdMeta"></div>
+            </div>
+          </div>
+
+          <div class="vd-body">
+            <nav class="vd-rail" id="detailJump">
+              <a href="#dsec-overview">Overview</a>
+              <a href="#dsec-wps">Work Packages</a>
+              <a href="#dsec-sched">Schedule Performance</a>
+              <a href="#dsec-products">Products &amp; Services</a>
+              <a href="#dsec-certs">Certifications</a>
+              <a href="#dsec-personnel">Personnel</a>
+              <a href="#dsec-rates">Reference Rates</a>
+              <a href="#dsec-bids">Bid History</a>
+              <a href="#dsec-history">Change History</a>
+            </nav>
+            <div class="vd-sections" id="detailScroll">
+              <section class="detail-section" id="dsec-overview"><h3 class="detail-section-title">Overview</h3><div id="dtab-overview"></div></section>
+              <section class="detail-section" id="dsec-wps"><h3 class="detail-section-title">Work Packages</h3><div id="dtab-wps"></div></section>
+              <section class="detail-section" id="dsec-sched"><h3 class="detail-section-title">Schedule Performance</h3><div id="dtab-sched"></div></section>
+              <section class="detail-section" id="dsec-products"><h3 class="detail-section-title">Products &amp; Services</h3><div id="dtab-products"></div></section>
+              <section class="detail-section" id="dsec-certs"><h3 class="detail-section-title">Certifications</h3><div id="dtab-certs"></div></section>
+              <section class="detail-section" id="dsec-personnel"><h3 class="detail-section-title">Personnel</h3><div id="dtab-personnel"></div></section>
+              <section class="detail-section" id="dsec-rates"><h3 class="detail-section-title">Reference Rates</h3><div id="dtab-rates"></div></section>
+              <section class="detail-section" id="dsec-bids"><h3 class="detail-section-title">Bid History</h3><div id="dtab-bids"></div></section>
+              <section class="detail-section" id="dsec-history"><h3 class="detail-section-title">Change History</h3><div id="dtab-history"></div></section>
+              <div class="vd-actions" id="detailFooter"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1005,39 +1147,6 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 </div>
 
 <!-- Vendor Detail Modal -->
-<div class="modal-overlay" id="detailModal" style="display:none">
-  <div class="modal" style="max-width:760px">
-    <div class="modal-header">
-      <div><div class="modal-title" id="detailTitle">Vendor</div><div class="modal-subtitle" id="detailSub"></div></div>
-      <button class="modal-close" onclick="closeDetailModal()">&times;</button>
-    </div>
-    <div class="modal-body" id="detailModalBody">
-      <nav class="detail-jump" id="detailJump">
-        <a href="#dsec-overview">Overview</a>
-        <a href="#dsec-wps">Work Packages</a>
-        <a href="#dsec-sched">Schedule</a>
-        <a href="#dsec-products">Products</a>
-        <a href="#dsec-certs">Certifications</a>
-        <a href="#dsec-personnel">Personnel</a>
-        <a href="#dsec-rates">Rates</a>
-        <a href="#dsec-bids">Bid History</a>
-        <a href="#dsec-history">Change History</a>
-      </nav>
-      <div class="detail-scroll" id="detailScroll">
-        <section class="detail-section" id="dsec-overview"><h3 class="detail-section-title">Overview</h3><div id="dtab-overview"></div></section>
-        <section class="detail-section" id="dsec-wps"><h3 class="detail-section-title">Work Packages</h3><div id="dtab-wps"></div></section>
-        <section class="detail-section" id="dsec-sched"><h3 class="detail-section-title">Schedule Performance</h3><div id="dtab-sched"></div></section>
-        <section class="detail-section" id="dsec-products"><h3 class="detail-section-title">Products &amp; Services</h3><div id="dtab-products"></div></section>
-        <section class="detail-section" id="dsec-certs"><h3 class="detail-section-title">Certifications</h3><div id="dtab-certs"></div></section>
-        <section class="detail-section" id="dsec-personnel"><h3 class="detail-section-title">Personnel</h3><div id="dtab-personnel"></div></section>
-        <section class="detail-section" id="dsec-rates"><h3 class="detail-section-title">Reference Rates</h3><div id="dtab-rates"></div></section>
-        <section class="detail-section" id="dsec-bids"><h3 class="detail-section-title">Bid History</h3><div id="dtab-bids"></div></section>
-        <section class="detail-section" id="dsec-history"><h3 class="detail-section-title">Change History</h3><div id="dtab-history"></div></section>
-      </div>
-    </div>
-    <div class="modal-footer" id="detailFooter"></div>
-  </div>
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="assets/js/auth.js?v=20260903a"></script>
@@ -1065,6 +1174,9 @@ AppAuth.requireLogin((user, profile) => {
   _canBulkDelete = AppAuth.isAdmin(profile);                            // delete is admin-only (matches RLS)
   if (profile.role === 'viewer') { const b = document.getElementById('vv-analytics'); if (b) b.style.display = 'none'; } // Analytics shows spend
   if (AppAuth.isAdmin(profile)) document.getElementById('nav-admin-section').style.display = '';
+  // ?vendor=<id> opens that profile directly, so the URL can be bookmarked
+  // and shared. Runs after loadAll() has populated allVendors.
+  _vdBootVendor = new URLSearchParams(location.search).get('vendor');
   if (typeof initVendorClaimsNav === 'function') initVendorClaimsNav(profile);
   // Deep link from the other pages' sidebar item, which cannot open a modal
   // that lives here. Runs after loadAll() so allVendors is populated and the
@@ -1075,7 +1187,10 @@ AppAuth.requireLogin((user, profile) => {
   renderUserBar('user-bar', profile);
   initMobileMenu();
   _initBulkUI();
-  loadAll();
+  loadAll().then(function () {
+    // Deep link straight to a profile. Only now is allVendors populated.
+    if (_vdBootVendor) openVendorPage(_vdBootVendor, { noPush: true });
+  });
   if (typeof VendorGuide !== 'undefined') VendorGuide.maybeAutoOpen(profile.id);
 });
 
@@ -4065,23 +4180,141 @@ function copyInviteLink() {
 }
 
 /* ── Detail modal ── */
-async function openDetailModal(id) {
-  activeVendor = allVendors.find(v => v.id === id);
-  if (!activeVendor) return;
-  document.getElementById('detailTitle').textContent = activeVendor.name;
-  document.getElementById('detailSub').innerHTML = _accredBadge(activeVendor);
+/* ══ Vendor detail page — routing, header, logo ════════════════════════════
+   Was a 760px modal over the directory. A profile is nine sections deep, so
+   it is now a real route: vendors.html?vendor=<id>, full content width, a
+   sticky section rail, working Back/Forward, and a URL you can send someone.
+   openDetailModal() is kept as an alias because other call sites use it. */
+
+// Directory <-> page swap. Both are .page-content siblings.
+function _vdShow(showPage) {
+  const dir = document.getElementById('vendorDirectoryPage');
+  const page = document.getElementById('vendorDetailPage');
+  if (dir) dir.style.display = showPage ? 'none' : '';
+  if (page) page.style.display = showPage ? '' : 'none';
+  // The directory's own bulk chrome must not linger over the profile.
+  if (showPage) closeToolsMenu && closeToolsMenu();
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  const region = document.getElementById('main-content-region');
+  if (region) region.scrollTop = 0;
+}
+
+async function openVendorPage(id, opts) {
+  const v = allVendors.find(x => x.id === id);
+  if (!v) return;
+  activeVendor = v;
+  _detailDirty = false;
+  _vdRenderHeader();
   renderDetailFooter();
-  document.getElementById('detailModal').style.display = 'flex';
-  _syncModalScrollLock();
-  document.getElementById('detailModalBody').scrollTop = 0;
-  await Promise.all([renderDetailWps(), renderDetailSched(), renderDetailProducts(), renderDetailCerts(), renderDetailPersonnel(), renderDetailRates(), renderDetailBids(), renderDetailHistory()]);
+  _vdShow(true);
+  // A real route, so Back returns to the directory and the URL is shareable.
+  // `replace` is used when we are only reflecting a URL the browser already has
+  // (first load, or a popstate) — pushing there would double up the history.
+  if (!(opts && opts.noPush)) {
+    try { history.pushState({ vendor: id }, '', 'vendors.html?vendor=' + encodeURIComponent(id)); } catch (_) {}
+  }
+  await Promise.all([renderDetailWps(), renderDetailSched(), renderDetailProducts(), renderDetailCerts(),
+                     renderDetailPersonnel(), renderDetailRates(), renderDetailBids(), renderDetailHistory()]);
   renderDetailOverview();
   _wireDetailScrollSpy();
+}
+// Kept: cards, the analytics tables and the claims queue all call this name.
+async function openDetailModal(id) { return openVendorPage(id); }
+
+function closeVendorPage(opts) {
+  if (_detailDirty && !confirm('You have unsaved changes to this vendor. Leave without saving?')) return;
+  _detailDirty = false;
+  activeVendor = null;
+  if (_detailScrollSpy) { _detailScrollSpy.disconnect(); _detailScrollSpy = null; }
+  _vdShow(false);
+  if (!(opts && opts.noPush)) {
+    try { history.pushState({}, '', 'vendors.html'); } catch (_) {}
+  }
+}
+// Kept: splitVendorFromDetail / deleteVendorFromDetail and the claims queue all
+// call this name.
+function closeDetailModal() { return closeVendorPage(); }
+
+// Back/Forward between the directory and a profile. The URL has already moved by
+// the time this fires, so both branches pass noPush.
+window.addEventListener('popstate', function () {
+  const id = new URLSearchParams(location.search).get('vendor');
+  if (id) {
+    if (activeVendor && activeVendor.id === id) return;
+    openVendorPage(id, { noPush: true });
+  } else if (activeVendor) {
+    _detailDirty = false;          // the navigation already happened; do not trap it
+    closeVendorPage({ noPush: true });
+  }
+});
+
+function _vdInitials(n) {
+  const parts = String(n || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}
+
+function _vdRenderHeader() {
+  const v = activeVendor; if (!v) return;
+  document.getElementById('vdName').textContent = v.name || 'Vendor';
+  document.title = (v.name || 'Vendor') + ' — Vendor Management';
+  document.getElementById('vdBadges').innerHTML = _accredBadge(v) + (_renewBadge ? _renewBadge(v) : '')
+    + (_vendorEdited(v) ? '<span class="chip-edited"><i class="ti ti-pencil"></i> Vendor edit</span>' : '');
+  const meta = [];
+  if (v.vendor_code) meta.push('<span>SAP code <code>' + esc(v.vendor_code) + '</code></span>');
+  if (v.tin) meta.push('<span>TIN <code>' + esc(v.tin) + '</code></span>');
+  if (v.city) meta.push('<span><i class="ti ti-map-pin"></i> ' + esc(v.city) + '</span>');
+  if (v.vendor_group) meta.push('<span>' + esc(v.vendor_group) + '</span>');
+  document.getElementById('vdMeta').innerHTML = meta.join('');
+  const btn = document.getElementById('vdLogoBtn');
+  if (btn) btn.style.display = _canManage ? '' : 'none';
+  _vdRenderLogo();
+}
+
+// The logo lives in the PRIVATE vendor-certs bucket, so it needs a signed URL —
+// there is no public link to point an <img> at. Falls back to initials.
+async function _vdRenderLogo() {
+  const box = document.getElementById('vdLogo'); if (!box) return;
+  const v = activeVendor; if (!v) return;
+  box.innerHTML = esc(_vdInitials(v.name));
+  if (!v.logo_path) return;
+  try {
+    const url = await VendorDb.getCertFileUrl(v.logo_path);
+    // The vendor may have changed under us while the URL was being signed.
+    if (url && activeVendor && activeVendor.id === v.id) {
+      box.innerHTML = '<img src="' + esc(url) + '" alt="' + esc(v.name) + ' logo">';
+    }
+  } catch (_) { /* a missing file must not blank the header */ }
+}
+
+async function vdUploadLogo(file) {
+  if (!file || !activeVendor) return;
+  if (!_canManage) return;
+  if (!/^image\//.test(file.type)) { AppNotify && AppNotify.warn('Pick an image file.'); return; }
+  if (file.size > 4 * 1024 * 1024) { AppNotify && AppNotify.warn('Logo must be 4 MB or smaller.'); return; }
+  const id = activeVendor.id;
+  try {
+    // ⚠️ The <vendorId>/ path prefix is load-bearing: the bucket's Storage
+    // policies authorize on the first path segment. uploadVendorFile adds it.
+    const path = await VendorDb.uploadVendorFile(id, 'logo', file);
+    const row = await VendorDb.updateVendor(id, { logo_path: path });
+    const i = allVendors.findIndex(x => x.id === id);
+    if (i >= 0) allVendors[i] = Object.assign({}, allVendors[i], row || { logo_path: path });
+    if (activeVendor && activeVendor.id === id) {
+      activeVendor.logo_path = path;
+      _vdRenderLogo();
+    }
+    AppNotify && AppNotify.success('Logo updated.');
+  } catch (e) {
+    AppNotify ? AppNotify.fromError(e, 'Could not upload the logo') : alert(e.message);
+  }
+  const f = document.getElementById('vdLogoFile'); if (f) f.value = '';
 }
 // Unsaved-change tracking for the Overview form. Without autosave, closing the
 // modal is the moment work gets lost — which is exactly what happened with the
 // buried button (a TIN was typed, Close was pressed, nothing saved).
 let _detailDirty = false;
+let _vdBootVendor = null;   // ?vendor=<id> captured at boot, opened once loadAll() resolves
 function _markDetailDirty() {
   if (_detailDirty) return;
   _detailDirty = true;
@@ -4100,17 +4333,11 @@ function _wireDetailDirty() {
   box.addEventListener('input', _markDetailDirty);
   box.addEventListener('change', _markDetailDirty);
 }
-function closeDetailModal() {
-  if (_detailDirty && !confirm('You have unsaved changes to this vendor. Close without saving?')) return;
-  _detailDirty = false;
-  document.getElementById('detailModal').style.display = 'none';
-  _syncModalScrollLock();
-  activeVendor = null;
-  if (_detailScrollSpy) { _detailScrollSpy.disconnect(); _detailScrollSpy = null; }
-}
 let _detailScrollSpy = null;
 function _wireDetailScrollSpy() {
-  const scroller = document.getElementById('detailModalBody');
+  // The page scrolls in the viewport now, not inside a modal body, so the
+  // observer root is the viewport (null). rootMargin keeps the active link
+  // on whichever section sits near the top.
   const links = [...document.querySelectorAll('#detailJump a')];
   if (_detailScrollSpy) _detailScrollSpy.disconnect();
   _detailScrollSpy = new IntersectionObserver((entries) => {
@@ -4119,7 +4346,7 @@ function _wireDetailScrollSpy() {
       const id = e.target.id;
       links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
     });
-  }, { root: scroller, rootMargin: '-10% 0px -70% 0px' });
+  }, { rootMargin: '-15% 0px -70% 0px' });
   document.querySelectorAll('.detail-section').forEach(s => _detailScrollSpy.observe(s));
   links.forEach(a => a.onclick = (e) => {
     e.preventDefault();
@@ -4129,7 +4356,8 @@ function _wireDetailScrollSpy() {
 function renderDetailFooter() {
   const el = document.getElementById('detailFooter');
   const v = activeVendor;
-  let btns = '<button class="btn-cancel" onclick="closeDetailModal()">Close</button>';
+  let btns = '<button class="btn-cancel" onclick="closeVendorPage()">'
+    + '<i class="ti ti-arrow-left"></i> All vendors</button>';
   if (_canManage) btns += ` <button class="action-btn" style="padding:10px 16px" onclick="splitVendorFromDetail('${v.id}')" title="Open the Split tool for this vendor — for a record that is several companies in one name"><i class="ti ti-cut"></i> Split</button>`;
   btns += ` <button class="action-btn btn-reject-row" style="padding:10px 16px" onclick="deleteVendorFromDetail('${v.id}')" title="Permanently delete this vendor and all its records"><i class="ti ti-trash"></i> Delete</button>`;
   // Save is the primary action and sits alone on the right — margin-left:auto
@@ -4364,7 +4592,7 @@ async function decideRequest(requestId, decision) {
     activeVendor = updated || activeVendor;
     const idx = allVendors.findIndex(x => x.id === activeVendor.id);
     if (idx > -1) allVendors[idx] = activeVendor;
-    document.getElementById('detailSub').innerHTML = _accredBadge(activeVendor);
+    _vdRenderHeader();
     renderDetailOverview();
     renderKpis();
     renderVendorList();
@@ -4477,8 +4705,7 @@ async function saveDetailOverview() {
     activeVendor = await VendorDb.updateVendor(activeVendor.id, fields);
     const idx = allVendors.findIndex(v => v.id === activeVendor.id);
     if (idx > -1) allVendors[idx] = activeVendor;
-    document.getElementById('detailTitle').textContent = activeVendor.name;
-    document.getElementById('detailSub').innerHTML = _accredBadge(activeVendor);
+    _vdRenderHeader();
     renderDetailFooter();
     renderVendorList();
     renderKpis();
@@ -4560,12 +4787,25 @@ async function renderDetailPersonnel() {
   const _all = await VendorDb.personnel.list(activeVendor.id, { includeArchived: true });
   const list = _all.filter(x => !x.archived_at);
   const _arch = _all.filter(x => x.archived_at);
-  const rows = list.length ? list.map(p =>
-    `<div class="row-item"><span class="sp-av" data-photo="${esc(p.photo_path||'')}">${esc(_spInitials(p.name))}</span><div style="flex:1;min-width:0"><div class="row-item-title">${esc(p.name)}${p.is_primary?' <span style="color:#EE3124;font-size:0.7rem;font-weight:700">PRIMARY</span>':''}</div>
-    <div class="row-item-sub">${esc(p.role_title||'')}${p.contact_number?' · '+esc(p.contact_number):''}${p.email?' · '+esc(p.email):''}${_auditLine(p)}</div></div>
-    <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeDetailPersonnel('${p.id}')" title="Remove"><i class="ti ti-trash"></i></button></div>`
-  ).join('') : '<div class="empty">No personnel on file.</div>';
-  document.getElementById('dtab-personnel').innerHTML = rows
+  // Profile cards, the SAME .prof-* shape vendor-portal.html uses. Staff used to
+  // see a flat one-line-per-person list, which threw away the photo, role and
+  // primary-contact flag the vendor had filled in.
+  const cards = list.length
+    ? '<div class="prof-grid">' + list.map(p =>
+        `<div class="prof-card">
+          ${_canManage ? `<button class="prof-del" onclick="removeDetailPersonnel('${p.id}')" title="Remove">&times;</button>` : ''}
+          <div class="prof-av" data-photo="${esc(p.photo_path || '')}">${esc(_spInitials(p.name))}${p.is_primary ? '<span class="prof-primary" title="Primary contact"></span>' : ''}</div>
+          <div class="prof-info">
+            <div class="prof-name" title="${esc(p.name)}">${esc(p.name)}</div>
+            ${p.role_title ? `<div class="prof-role">${esc(p.role_title)}</div>` : ''}
+            ${p.contact_number ? `<div class="prof-meta"><i class="ti ti-phone"></i> ${esc(p.contact_number)}</div>` : ''}
+            ${p.email ? `<div class="prof-meta"><i class="ti ti-mail"></i> ${esc(p.email)}</div>` : ''}
+            ${p.is_primary ? '<div class="prof-tag">PRIMARY CONTACT</div>' : ''}
+            <div class="prof-audit">${_auditLine(p)}</div>
+          </div>
+        </div>`).join('') + '</div>'
+    : '<div class="empty">No personnel on file.</div>';
+  document.getElementById('dtab-personnel').innerHTML = cards
     + _archivedBlock(_arch, 'restoreDetailPersonnel', r => r.name || '')
     + (!_canManage ? '' : `
     <div class="add-form">
@@ -4573,7 +4813,8 @@ async function renderDetailPersonnel() {
       <input id="dnp2-role" placeholder="Role (e.g. Sales Rep)">
       <input id="dnp2-number" placeholder="Contact Number">
       <input id="dnp2-email" placeholder="Email">
-      <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;color:#555"><input type="checkbox" id="dnp2-primary" style="width:auto"> Primary</label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;color:var(--text-secondary)"><input type="checkbox" id="dnp2-primary" style="width:auto"> Primary</label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;color:var(--text-secondary)">Photo <input type="file" id="dnp2-photo" accept="image/*" style="width:auto"></label>
       <button class="btn-primary" onclick="addDetailPersonnel()">Add</button>
     </div>`);
   _spLoadPersonPhotos();
@@ -4587,7 +4828,13 @@ async function addDetailPersonnel() {
   const is_primary = document.getElementById('dnp2-primary').checked;
   if (!name) { AppNotify && AppNotify.warn('Enter a name first.'); return; }
   try {
-    await VendorDb.personnel.add(activeVendor.id, { name, role_title, contact_number, email, is_primary });
+    const row = await VendorDb.personnel.add(activeVendor.id, { name, role_title, contact_number, email, is_primary });
+    // Same two-step as the portal: insert to get an id, then attach the photo.
+    const ph = document.getElementById('dnp2-photo');
+    if (ph && ph.files && ph.files[0] && row && row.id) {
+      const path = await VendorDb.uploadVendorFile(activeVendor.id, 'person_' + row.id, ph.files[0]);
+      await VendorDb.personnel.update(row.id, { photo_path: path });
+    }
     await renderDetailPersonnel();
   } catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not add') : alert(e.message); }
 }
