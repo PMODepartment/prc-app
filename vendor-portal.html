@@ -415,7 +415,6 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     </div>
     <div class="itm-editor" id="catEditor" style="display:none"></div>
     <div id="productsList"></div>
-    <div id="reclHost" style="display:none"></div>
   </div>
 
   <!-- ── Certifications ── -->
@@ -995,34 +994,6 @@ function switchTab(t) {
 
 /* ── Products ── */
 
-
-/* Re-file an existing offering under a different category, in place — the
-   offering row (and its id) is kept; only taxonomy_id/category change. */
-async function reclassifyOwnProduct(id) {
-  const list = await VendorDb.products.list(vendor.id);
-  const cur = list.find(x => x.id === id);
-  if (!cur) return;
-  const host = document.getElementById('reclHost');
-  host.style.display = 'block';
-  host.innerHTML = '<div class="field"><label>Change category</label><div id="reclPick"></div></div>' +
-    '<div style="display:flex;gap:8px"><button class="btn-primary" id="reclSave">Save category</button>' +
-    '<button class="btn-ghost" id="reclCancel">Cancel</button></div>';
-  document.getElementById('reclCancel').onclick = () => { host.style.display = 'none'; };
-  const pick = await TaxonomyPicker.mount(document.getElementById('reclPick'), { value: cur.taxonomy_id || null });
-  document.getElementById('reclSave').onclick = async () => {
-    const taxonomy_id = pick.value();
-    const tax = await VendorDb.getTaxonomy();
-    const node = taxonomy_id ? tax.find(n => n.id === taxonomy_id) : null;
-    const category = node ? (node.trade || (tax.find(x => x.id === (node.path || [])[0]) || {}).name || '') : '';
-    try {
-      await VendorDb.products.update(id, { taxonomy_id, category });
-      host.style.display = 'none';
-      await renderProducts();
-      await flagEdited();
-      msg('Category updated.', 'success');
-    } catch (e) { msg('Could not update: ' + (e.message || e), 'error'); }
-  };
-}
 async function removeProduct(id) {
   if (!confirm('Remove this product/service from your profile?\n\nMegawide Procurement can restore it if this was a mistake.')) return;
   try {

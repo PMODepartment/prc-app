@@ -645,6 +645,7 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
               </select>
               <button onclick="bulkPrepareInvites()" title="Use each vendor's contact email as their invite address so they can register">Enable self-service</button>
               <button onclick="exportInviteList()" title="Download name + email + registration link for the selected vendors">Invite list (CSV)</button>
+              <button onclick="bulkGenerateQr()" title="Download one QR image per selected vendor (with a Vendor Code), named for a mail-merge">QR Codes (ZIP)</button>
               <button class="b-delete" id="bulkDeleteBtn" onclick="bulkDelete()">Delete</button>
               <button onclick="clearVendorSel()">Clear</button>
             </div>
@@ -850,7 +851,7 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <script src="assets/js/auth.js?v=20260902c"></script>
 <script src="assets/js/db.js?v=20260902c"></script>
 <script src="assets/js/ui.js?v=20260902c"></script>
-<script src="assets/js/vendor-guide.js?v=20260820a"></script>
+<script src="assets/js/vendor-guide.js?v=20260902a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -3227,7 +3228,12 @@ async function createInvite() {
     };
     const v = await VendorDb.createVendor(fields, userProfile);
     if (invite_email) {
-      const link = window.location.origin + window.location.pathname.replace('vendors.html','') + 'vendor-register.html?vendor=' + v.id;
+      // `v` isn't in allVendors yet (loadAll() hasn't run), so build the link
+      // from this fresh object directly rather than through _vendorInviteLink,
+      // which looks up by id. A brand-new vendor has no Vendor Code yet (this
+      // form doesn't collect one), so this correctly falls back to the plain
+      // generic link — a code can be added later from the vendor's profile.
+      const link = _regLinkFor(v.vendor_code);
       document.getElementById('inviteLinkText').textContent = link;
       document.getElementById('inviteLinkWrap').style.display = 'block';
       btn.style.display = 'none';
@@ -3409,16 +3415,19 @@ function renderDetailOverview() {
     <div class="field"><label>Login &amp; Self-Service Access</label>
       <div style="font-size:0.8125rem;color:#666;margin-bottom:8px">${v.invite_claimed_at
         ? '<i class="ti ti-circle-check" style="color:#16A34A;vertical-align:middle"></i> Activated ' + esc(new Date(v.invite_claimed_at).toLocaleDateString()) + ' — this vendor can log in and edit their own details.'
-        : 'Not activated yet. Set the vendor’s email, click <b>Save Changes</b>, then send them the link below so they can create a login and maintain their own profile.'}</div>
+        : 'Not activated yet. Anyone can register at the ONE public link/QR below — they type their company name and, if they have them, their Vendor Code and TIN. It always lands in <b>Vendor Registrations</b> (sidebar, under User Management) for approval; nothing here grants access on its own.'}</div>
       ${v.invite_claimed_at ? '' : `
-      <label style="display:block;font-size:0.7143rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">Invite Email</label>
-      <input id="dov-invite-email" type="email" placeholder="vendor@company.com" value="${_placeholderEmail(v.invite_email) ? '' : esc(v.invite_email)}" style="margin-bottom:10px">
-      <label style="display:block;font-size:0.7143rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">Invite Link</label>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <label style="display:block;font-size:0.7143rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">Registration Link</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
         <div class="invite-link-box" style="flex:1;min-width:220px;margin-top:0">${esc(_vendorInviteLink(v.id))}</div>
         <button type="button" class="btn-cancel" onclick="event.stopPropagation();copyVendorInviteLink('${v.id}')"><i class="ti ti-copy" style="margin-right:4px"></i>Copy</button>
+        <button type="button" class="btn-cancel" onclick="event.stopPropagation();viewVendorQrFromDetail('${v.id}')"><i class="ti ti-qrcode" style="margin-right:4px"></i>View QR</button>
       </div>
-      <div style="font-size:0.72rem;color:#999;margin-top:6px">The vendor must register using the Invite Email above; the link works once, until the account is claimed.</div>`}
+      <div style="font-size:0.72rem;color:#999;margin-bottom:12px">${v.vendor_code
+        ? 'Carries this vendor’s code (' + esc(v.vendor_code) + ') so it only saves them typing it — it does not grant access by itself, and the registration is still reviewed here.'
+        : 'No Vendor Code on file yet, so this is the same link every vendor gets. Add a Vendor Code above to generate one that pre-fills it for this vendor.'}</div>
+      <label style="display:block;font-size:0.7143rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">Invite Email <span style="font-weight:400;text-transform:none;color:#999">(optional — a real contact address, not required to register)</span></label>
+      <input id="dov-invite-email" type="email" placeholder="vendor@company.com" value="${_placeholderEmail(v.invite_email) ? '' : esc(v.invite_email)}">`}
     </div>
     `;
   // NOTE the Save button deliberately does NOT live here any more. This modal is
@@ -3588,9 +3597,32 @@ function _accredParseDate(v) {
   return isNaN(d) ? null : iso(d);
 }
 function _placeholderEmail(e) { return /@no-invite\.local$/i.test(e || ''); }
-function _vendorInviteLink(id) { return window.location.origin + window.location.pathname.replace('vendors.html', '') + 'vendor-register.html?vendor=' + id; }
+// Resolve by id rather than taking vendor_code/name as an inline onclick
+// argument — a vendor NAME can contain an apostrophe, which would break out of
+// a single-quoted onclick string (Known Issues #23). activeVendor covers the
+// open detail modal even before a fresh allVendors reload lands.
+function _vendorById(id) { return allVendors.find(v => v.id === id) || (activeVendor && activeVendor.id === id ? activeVendor : null); }
+// ⚠️ FIXED (2026-09-02) — three separate call sites (this, exportInviteList's
+// CSV, and the post-create Add Vendor callback) used to build
+// `vendor-register.html?vendor=<id>`, a URL scheme the page stopped reading
+// when it was rewritten for the generic claim-based flow
+// (migrations/2026-09-01_vendor_self_registration.sql). Every one of them was
+// handing vendors a dead link. `?code=` only PREFILLS the vendor code field on
+// the ONE public registration page — see openQrModal. All three now go
+// through this ONE builder so the URL scheme cannot drift out of sync again.
+function _regLinkFor(vendorCode) {
+  return _registerBaseUrl() + (vendorCode ? '?code=' + encodeURIComponent(vendorCode) : '');
+}
+function _vendorInviteLink(id) {
+  const v = _vendorById(id);
+  return _regLinkFor(v && v.vendor_code);
+}
 function copyVendorInviteLink(id) {
-  navigator.clipboard.writeText(_vendorInviteLink(id)).then(() => AppNotify && AppNotify.success('Invite link copied.'));
+  navigator.clipboard.writeText(_vendorInviteLink(id)).then(() => AppNotify && AppNotify.success('Registration link copied.'));
+}
+function viewVendorQrFromDetail(id) {
+  const v = _vendorById(id); if (!v) return;
+  openQrModal(v.vendor_code || '', v.name || '');
 }
 function buildDetailTradeChips() {
   document.getElementById('dovTradeChips').innerHTML = TRADES.map((t, i) =>
@@ -4645,6 +4677,80 @@ function printQr() {
   w.document.close();
   w.focus();
   w.print();
+}
+
+/* ══ Bulk QR — one image per selected vendor, for a PO mail-merge ═══════════
+   A mail-merge (Word's IncludePicture, a label-print tool, an SAP output
+   template) that embeds a per-record image typically wants a FILE it can
+   match by name against a merge field — not a link the merge tool would have
+   to render itself. So this produces a ZIP of one image per vendor, named by
+   Vendor Code, plus a manifest CSV mapping code → name → URL → filename.
+
+   ⚠️ ONLY vendors WITH a Vendor Code are included. Without one, the QR would
+   just be the same generic link for every such vendor — identical images are
+   useless for a per-record merge, so those are skipped and counted rather
+   than silently included as noise. */
+function _loadJsZip() {
+  if (window.JSZip) return Promise.resolve();
+  return new Promise(function (res, rej) {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = res;
+    s.onerror = function () { rej(new Error('jszip-lib')); };
+    document.head.appendChild(s);
+  });
+}
+async function bulkGenerateQr() {
+  const ids = [..._selectedVendors];
+  if (!ids.length) return;
+  const vendors = ids.map(_vendorById).filter(Boolean);
+  const withCode = vendors.filter(v => v.vendor_code);
+  const skipped = vendors.length - withCode.length;
+  if (!withCode.length) {
+    alert('None of the ' + vendors.length + ' selected vendor(s) have a Vendor Code on file, so there is nothing to personalise — every QR would be identical. Add Vendor Codes first, or select vendors that already have one.');
+    return;
+  }
+  if (!confirm('Generate ' + withCode.length + ' QR code(s) for vendors with a Vendor Code'
+      + (skipped ? ' (' + skipped + ' selected vendor(s) skipped — no Vendor Code on file)' : '') + '?')) return;
+
+  const prog = AppNotify ? AppNotify.progress('Generating QR codes… (0/' + withCode.length + ')') : null;
+  try {
+    await Promise.all([_loadQrLib(), _loadJsZip()]);
+    const zip = new JSZip();
+    const seenNames = new Set();
+    const manifestRows = [['Vendor Code', 'Company Name', 'Registration URL', 'Image File']];
+    for (let i = 0; i < withCode.length; i++) {
+      const v = withCode[i];
+      const url = _registerBaseUrl() + '?code=' + encodeURIComponent(v.vendor_code);
+      const qr = window.qrcode(0, 'M');
+      qr.addData(url);
+      qr.make();
+      // createDataURL returns a GIF — a raster format every mail-merge / label
+      // tool already supports, so no canvas round-trip is needed to rasterise
+      // the SVG the single-vendor modal uses.
+      const dataUrl = qr.createDataURL(8, 8);
+      const base64 = dataUrl.split(',')[1];
+      let fname = String(v.vendor_code).replace(/[^A-Za-z0-9_-]+/g, '_');
+      if (seenNames.has(fname)) { let n = 2; while (seenNames.has(fname + '_' + n)) n++; fname = fname + '_' + n; }
+      seenNames.add(fname);
+      zip.file(fname + '.gif', base64, { base64: true });
+      manifestRows.push([v.vendor_code, v.name, url, fname + '.gif']);
+      if (prog) prog.update('Generating QR codes… (' + (i + 1) + '/' + withCode.length + ')');
+    }
+    const manifestCsv = manifestRows.map(r => r.map(_csvCell).join(',')).join('\n');
+    zip.file('manifest.csv', '﻿' + manifestCsv);
+    if (prog) prog.update('Packaging ZIP…');
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'megawide-vendor-qr-codes-' + new Date().toISOString().slice(0, 10) + '.zip';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    if (prog) prog.done(withCode.length + ' QR code(s) downloaded' + (skipped ? ' (' + skipped + ' skipped — no code)' : '') + '.');
+  } catch (e) {
+    if (prog) prog.fail('Could not generate QR codes: ' + (e.message || e));
+    else alert('Could not generate QR codes: ' + (e.message || e));
+  }
 }
 </script>
 

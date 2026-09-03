@@ -1372,7 +1372,12 @@ That number is pushed into this app so a buyer can see what construction actuall
 - **`window.TaxonomyPicker` lives in `db.js`, NOT `ui.js`** — `vendor-portal.html` loads only `auth.js` + `db.js`, and the picker is needed on that page *and* `vendors.html`. There is precedent (`renderUserBar`, `buildRankTable`). Searchable cascading tree, own injected CSS, one delegated document listener; **search shows every match PLUS its ancestors** so a deep hit stays readable in context.
 - **Wired into**: the staff detail Products add-form (`vendors.html`), the vendor's own Products panel (`vendor-portal.html`) — both now show the **taxonomy path** on each offering row, falling back to the legacy `category` when unclassified — and a **Data Tools → Manage Product Categories** manager. The manager **locks depth ≤ 2** (rename/delete disabled): those mirror `TRADE_WORKS`, and editing one silently breaks WP→vendor matching. Adding sub-nodes under them is always allowed.
 - **Verified interactively** in a throwaway harness (real `dashboard.css`, stubbed 97-node tree + a 5-deep custom chain, deleted before commit) driving the SHIPPED picker: opens to 10 roots in canonical trade order (not alphabetical), twisty expands in place, a 5-level chain renders with progressive indent, searching `16mm` surfaces the leaf **with its whole ancestor chain**, selection returns the right id + full path and fires `onChange`, the popover closes and the search resets, re-opening auto-expands to and marks the selection, outside-click closes, clear resets to null. Dark mode resolves to a dark surface + light text + dark-red selection. Tree helpers additionally unit-tested against the shipped source (ordering by `sort_order`, no mutation of the input, orphan surfaced as a root rather than silently dropped, `path @> [X]` descendant set).
-- **NOT built yet in this area**: WP-side "suggest vendors for this work package" UI (the `findVendorsForWP` API exists but nothing calls it), taxonomy rollups in the Analytics view, and reclassifying an EXISTING offering (you remove and re-add it).
+- **All three of the following are now DONE** (were listed here as not-yet-built; see "The
+  'still open' backlog" under Vendor Management, 2026-09-02, which found all three already
+  shipped): the WP-side "suggest vendors" UI (`wp-form.html`'s Proposed Vendors section calls
+  `findVendorsForWP`), taxonomy rollups in the Analytics view (`renderVendorAnalytics`'s
+  "Vendors by Product Category"), and reclassifying an existing offering in place (the catalogue
+  editor's taxonomy picker, no remove-and-re-add needed).
 - ⚠ **The migration has NOT been executed against a live Postgres** — there is no local Postgres/Docker in this environment. It is written to be safe for the Supabase SQL Editor: **no temp tables and no cross-statement state** (the lesson from `SEED_vendor_accreditation.sql`), every statement independently re-runnable, and it ends with a report SELECT. Watch the trigger behaviour on the first re-parent.
 
 ### Accreditation guardrails — standing surfaced at the point of award (2026-08-20)
@@ -1802,6 +1807,62 @@ only Close / Split / Delete. A TIN was typed, `Close` was pressed, and the edit 
   success path already calls that). The two `btn` references in `saveDetailOverview()` were made
   null-safe since the button is now conditionally rendered elsewhere.
 - `vendors.html`-only change, so **no shared `?v=` bump** (`db.js` untouched).
+
+### The "still open" backlog — three of six items turned out already shipped (2026-09-02)
+
+Asked to close six previously-flagged gaps. Investigation before writing anything found three
+were **already fully built** in earlier sessions and the backlog note was simply stale:
+
+- **Reclassifying an existing offering** — `openProductEditor`/`openStaffProductEditor` (the
+  catalogue rewrite) already re-file an item in place via the taxonomy picker + `update()`; the
+  "remove and re-add" limitation no longer exists. Only cleanup remained: the pre-catalogue
+  `reclassifyOwnProduct()` + its `#reclHost` div in `vendor-portal.html` had no call site any
+  more (superseded, same as `reclassifyProduct()` was already removed from `vendors.html`) —
+  removed as dead code.
+- **Taxonomy rollups in Vendor Analytics** — the "Vendors by Product Category" table
+  (`renderVendorAnalytics`'s `taxTbl`) already rolls every offering up to its L1 trade via
+  `path[0]` and was already committed. Verified the rollup logic (deep node → L2 → L1, unknown id)
+  against the shipped source rather than trust it blind — all four cases correct.
+- **`findVendorsForWP` wiring** — `wp-form.html`'s Proposed Vendors section already has a
+  **"Suggest vendors for this Trade / Works"** button calling `VendorDb.findVendorsForWP` exactly
+  as designed, with accreditation badges and one-click Add. Already shipped.
+
+**⚠️ Found in passing, not asked for, and fixed because it was live and broken:**
+`_vendorInviteLink()` still built `vendor-register.html?vendor=<id>` — the URL scheme
+`vendor-register.html` **stopped reading** when it was rewritten to the generic claim flow
+(`migrations/2026-09-01_vendor_self_registration.sql`). **Three separate call sites** were handing
+vendors a dead link: the detail-modal "copy invite link" button, the `exportInviteList()` CSV, and
+a THIRD, independent inline copy of the same dead URL in the post-create "Add Vendor" callback that
+never went through `_vendorInviteLink` at all. All three now go through **one shared builder,
+`_regLinkFor(vendorCode)`** — `?code=` only prefills the vendor-code field (see `openQrModal`), so
+a vendor with no code yet correctly falls back to the plain generic link rather than a broken one.
+`_vendorById(id)` resolves via `allVendors`, falling back to `activeVendor` for a just-created
+vendor not in that array yet. The detail modal's "Login & Self-Service Access" panel — whose copy
+described the OLD single-use, email-gated link ("the link works once, until the account is
+claimed") — was rewritten to describe the actual mechanism, and gained a **View QR** button
+(`viewVendorQrFromDetail`, reusing `openQrModal` — its FIRST per-vendor UI entry point; until now
+it was reachable only as the generic Data Tools QR).
+
+**Verified**: 18 assertions on `bulkGenerateQr` (below) plus 5 on the link builder, all against the
+verbatim shipped source — correct `?code=` construction, a bare-fallback for no/empty code, and
+URL-encoding of special characters in a code.
+
+**Flagged, not fixed here** (`spawn_task task_5662eb6a`): "Enable self-service" (bulk bar) only
+sets `vendors.invite_email` — a column `vendor-register.html` no longer reads at all under the new
+claim flow, so the button runs, writes a real value, and reports success while having zero effect
+on whether anyone can actually register. Deliberately not ripped out inline — retiring a working
+bulk-bar button is a decision worth its own look, not a side effect of an unrelated fix.
+
+### Vendor guide brought current with the self-registration + catalogue rewrites (2026-09-02)
+
+`assets/js/vendor-guide.js`'s "Adding vendors" slide still described the fully-retired per-vendor
+invite-email flow as the primary path. Rewritten to lead with the QR/generic-link flow, keeping the
+old bulk CSV path mentioned as a still-functional alternative (pending the `spawn_task` decision
+above). Added a new **"Vendor Registrations"** slide covering the claim queue, match confidence,
+and the duplicate-refusing "Create new vendor" action — an entire nav item + feature that had no
+mention anywhere in the guide. **"Inside a vendor profile"** now names **Change History** (was
+missing) and explains document locking on approved accreditation evidence. Versioned independently
+of the 5-file shared bump, per its own convention: `?v=20260820a → 20260902a`.
 
 ### Vendor Registrations — a top-level sidebar item (2026-09-01)
 
