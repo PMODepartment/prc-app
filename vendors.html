@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260903c"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260903c"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260903c"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260903d"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260903d"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260903d"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260903c">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260903d">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1178,9 +1178,9 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260903c"></script>
-<script src="assets/js/db.js?v=20260903c"></script>
-<script src="assets/js/ui.js?v=20260903c"></script>
+<script src="assets/js/auth.js?v=20260903d"></script>
+<script src="assets/js/db.js?v=20260903d"></script>
+<script src="assets/js/ui.js?v=20260903d"></script>
 <script src="assets/js/vendor-guide.js?v=20260902a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -4495,7 +4495,7 @@ function renderDetailOverview() {
     <div class="field"><label>Login &amp; Self-Service Access</label>
       <div style="font-size:0.8125rem;color:#666;margin-bottom:8px">${v.invite_claimed_at
         ? '<i class="ti ti-circle-check" style="color:#16A34A;vertical-align:middle"></i> Activated ' + esc(new Date(v.invite_claimed_at).toLocaleDateString()) + ' — this vendor can log in and edit their own details.'
-        : 'Not activated yet. Anyone can register at the ONE public link/QR below — they type their company name and, if they have them, their Vendor Code and TIN. It always lands in <b>Vendor Registrations</b> (sidebar, under User Management) for approval; nothing here grants access on its own.'}</div>
+        : 'Not activated yet. Anyone can register at the ONE public link/QR below — they type their company name and their TIN (which is on their BIR 2303). It always lands in <b>Vendor Registrations</b> (sidebar, under User Management) for approval; nothing here grants access on its own.'}</div>
       ${v.invite_claimed_at ? '' : `
       <label style="display:block;font-size:0.7143rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">Registration Link</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
@@ -4770,8 +4770,14 @@ function _vendorById(id) { return allVendors.find(v => v.id === id) || (activeVe
 // handing vendors a dead link. `?code=` only PREFILLS the vendor code field on
 // the ONE public registration page — see openQrModal. All three now go
 // through this ONE builder so the URL scheme cannot drift out of sync again.
-function _regLinkFor(vendorCode) {
-  return _registerBaseUrl() + (vendorCode ? '?code=' + encodeURIComponent(vendorCode) : '');
+/* ONE registration link for every vendor. It used to carry ?code=<vendor_code>
+   to prefill that field on the form, but the field is gone — a vendor never
+   sees their SAP code, so it could only ever be guessed at. The parameter is
+   simply not produced any more (an old printed QR still works; it just has
+   nothing to prefill). The `vendorCode` argument is accepted and ignored so the
+   call sites did not all have to change. */
+function _regLinkFor(_vendorCode) {
+  return _registerBaseUrl();
 }
 function _vendorInviteLink(id) {
   const v = _vendorById(id);
@@ -5798,18 +5804,20 @@ function _loadQrLib() {
   });
 }
 async function openQrModal(vendorCode, label) {
-  _qrUrlStr = _registerBaseUrl() + (vendorCode ? '?code=' + encodeURIComponent(vendorCode) : '');
+  // Always the generic link — see _regLinkFor. `vendorCode` now only decides
+  // the wording, not the URL.
+  _qrUrlStr = _registerBaseUrl();
   _qrLabel = label || '';
   document.getElementById('qrModal').style.display = 'flex';
   _syncModalScrollLock();
   document.getElementById('qrTitle').textContent = label ? 'Registration QR — ' + label : 'Registration QR Code';
   document.getElementById('qrSubtitle').textContent = label
-    ? 'Prefills this vendor’s code. Print it on their Purchase Orders so they can register by scanning.'
+    ? 'Print this on their Purchase Orders so they can register by scanning. It is the same code every vendor uses.'
     : 'Print this on Purchase Orders, RFQs and notices. A vendor scans it, registers, and lands in the queue — no invite link to send.';
   document.getElementById('qrUrl').textContent = _qrUrlStr;
-  document.getElementById('qrNote').textContent = vendorCode
-    ? 'The code only prefills the form. The registration is still checked against the TIN and company name, and still reviewed here — so this QR is not a password.'
-    : 'One code for every vendor. Nothing about it identifies a company, so it is safe to print anywhere.';
+  document.getElementById('qrNote').textContent =
+    'One code for every vendor. Nothing about it identifies a company, so it is safe to print anywhere. '
+    + 'The registration is matched on the TIN and company name the vendor types, and still reviewed here — this QR is not a password.';
   const box = document.getElementById('qrBox');
   box.innerHTML = '<div class="empty">Generating…</div>';
   try {
@@ -5900,7 +5908,8 @@ async function bulkGenerateQr() {
     const manifestRows = [['Vendor Code', 'Company Name', 'Registration URL', 'Image File']];
     for (let i = 0; i < withCode.length; i++) {
       const v = withCode[i];
-      const url = _registerBaseUrl() + '?code=' + encodeURIComponent(v.vendor_code);
+      // Same generic link for every row — nothing left to prefill.
+      const url = _registerBaseUrl();
       const qr = window.qrcode(0, 'M');
       qr.addData(url);
       qr.make();

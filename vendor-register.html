@@ -100,15 +100,18 @@
         </div>
       </div>
 
+      <!-- Neither note mentions a Vendor Code any more. It is Megawide's internal
+           SAP id, it is NOT printed on the purchase order (the old copy claimed it
+           was), and a vendor has no way to look it up. -->
       <div class="note" id="noteExisting">
-        <b>Have these ready.</b> Your <b>Vendor Code</b> (printed on every Purchase Order we send you,
-        e.g.&nbsp;V-00042) and your <b>TIN</b>. They are how we confirm you are the company you say you
-        are, so please include them if you can.
+        <b>Have your TIN ready.</b> Use the TIN exactly as it appears on your
+        <b>BIR&nbsp;2303</b> — that, with your registered company name, is how we confirm you are
+        the company you say you are.
       </div>
       <div class="note" id="noteNew" style="display:none">
-        <b>No Vendor Code yet? That is expected.</b> A code is only issued once you have worked with us,
-        so leave it out. Give us your registered company name and <b>TIN</b> and Megawide Procurement
-        will set up your vendor record.
+        <b>New supplier? That is fine.</b> Give us your registered company name and your
+        <b>TIN</b> (as printed on your BIR&nbsp;2303) and Megawide Procurement will set up your
+        vendor record.
       </div>
 
       <div id="authFields">
@@ -147,11 +150,9 @@
         <input type="text" id="contactName" placeholder="Who we should address" autocomplete="name">
       </div>
       <div class="row2">
-        <div class="field" id="codeField">
-          <label>Vendor Code</label>
-          <input type="text" id="vendorCode" placeholder="e.g. V-00042">
-          <div class="field-hint">On your Purchase Orders.</div>
-        </div>
+        <!-- Vendor Code used to sit here. Removed: it is Megawide's internal SAP
+             id and appears on nothing a vendor receives, so it could only ever
+             be guessed at. TIN is the proof now — it is on their own BIR 2303. -->
         <div class="field">
           <label>TIN</label>
           <input type="text" id="tin" placeholder="e.g. 000-313-856-000">
@@ -196,17 +197,16 @@ const sb = window.supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw'
 );
 
-// A QR printed on a Purchase Order can carry ?code=<vendor code> to save typing.
-// NOTE it is ONLY a prefill: the claim is still matched server-side against the
-// TIN/company and still reviewed by staff, so photographing someone else's PO
-// grants no access. Named `code` rather than `v` so it can never be confused
-// with the app-wide `?v=` cache-buster.
+// ONE public registration URL for every vendor — nothing in it identifies a
+// company, so it is safe to print on a Purchase Order, an RFQ or a notice.
 const params = new URLSearchParams(window.location.search);
+/* ?code= used to prefill the Vendor Code box. That box is gone, so the
+   parameter is ignored — a QR printed with one still works, it just has nothing
+   to prefill. Kept as a no-op read so an old link cannot throw. */
 const preCode = params.get('code');
-if (preCode) document.getElementById('vendorCode').value = preCode;
 
-// A company that has never worked with Megawide has no Vendor Code and no
-// directory row, so "no match" is the CORRECT outcome for them. Asking up front
+// A company that has never worked with Megawide has no directory row at all, so
+// "no match" is the CORRECT outcome for them. Asking up front
 // keeps that from reading as a failure, and tells the reviewer which of the two
 // populations they are looking at.
 // NOTE the server still runs the matcher either way: a company that believes it
@@ -217,10 +217,8 @@ window.setIsNew = function (v) {
   isNewVendor = !!v;
   document.getElementById('segExisting').classList.toggle('active', !v);
   document.getElementById('segNew').classList.toggle('active', !!v);
-  document.getElementById('codeField').style.display = v ? 'none' : '';
   document.getElementById('noteExisting').style.display = v ? 'none' : '';
   document.getElementById('noteNew').style.display = v ? '' : 'none';
-  if (v) document.getElementById('vendorCode').value = '';
 };
 if (preCode) setIsNew(false);
 
@@ -324,7 +322,6 @@ async function submit() {
   const pw2 = document.getElementById('confirmPassword').value;
   const company = document.getElementById('company').value.trim();
   const contact = document.getElementById('contactName').value.trim();
-  const code = document.getElementById('vendorCode').value.trim();
   const tin = document.getElementById('tin').value.trim();
 
   let bad = false;
@@ -359,7 +356,6 @@ async function submit() {
     const r = await sb.rpc('submit_vendor_claim', {
       p_company: company,
       p_contact_name: contact || null,
-      p_vendor_code: code || null,
       p_tin: tin || null,
       p_is_new: isNewVendor
     });

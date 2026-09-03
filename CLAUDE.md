@@ -2560,6 +2560,42 @@ unique → medium**, stopping `approve_vendor_claim`/`create_vendor_from_claim` 
 from the claim, and retiring the per-vendor QR's `?code=` in favour of the generic link. Keep the
 `vendors.vendor_code` column and its staff-side UI — it is still the best dedup key internally.
 
+### Vendor self-registration identifies by TIN, not Vendor Code (2026-09-03)
+
+`migrations/2026-09-03_vendor_claim_tin_only.sql` (**run me**).
+
+**⚠️ VENDOR CODE IS INTERNAL SAP TAGGING AND A VENDOR NEVER SEES IT.** Verified against a real
+purchase order (`PO 376000333`, Switch Gear Phils.): it carries the PO number, the project code,
+the supplier name and address — and **no vendor code, and no supplier TIN**. The old registration
+form asked for it anyway (and its help text claimed it was "printed on every Purchase Order",
+which is simply false), so the matcher's strongest tier was dead weight and the field was pure
+confusion on a public page.
+
+- **Four tiers become two**: TIN unique → `high`, exact normalized company name unique → `medium`.
+  TIN is now the strongest evidence a vendor can actually supply — it is on their own BIR 2303, a
+  document they must upload for accreditation anyway, it is nationally unique, and the masterlist
+  already gave us one for much of the directory. It is therefore rated `high`, not the `medium` it
+  carried while the code tiers outranked it.
+- **⚠️ The 5-argument `submit_vendor_claim` is DROPPED, not just replaced.** PostgREST resolves
+  overloads by argument NAME, so leaving both signatures in place would make
+  `rpc('submit_vendor_claim')` ambiguous and every registration would start failing. The migration
+  drops it explicitly and the verification asserts `exactly_one_overload`.
+- **⚠️ ANTI-ENUMERATION IS UNCHANGED AND LOAD-BEARING.** The RPC still returns ONLY a claim id, and
+  the same answer whether or not it matched. Returning the match — even as a boolean — would make
+  it an oracle for brute-forcing TINs to discover which companies Megawide works with. Never
+  surface the match on the registration page.
+- **⚠️ NO FUZZY MATCHING**, same refuse-to-guess rule as the vendor analytics: the directory holds
+  real duplicates and garbled multi-company rows, so a fuzzy hit would hand one company's profile
+  to another.
+- **`vendors.vendor_code` and `vendor_claims.claimed_vendor_code` are both KEPT.** The column is
+  still the best internal dedup key (of 1,461 codes only 97 mapped to more than one name string,
+  nearly all case/spacing variants), it is what the PO-history backfill resolved against, and staff
+  still set and search it. What changed is only that a VENDOR is never asked for it — and
+  `create_vendor_from_claim` no longer stamps a claimed code onto a new vendor.
+- **ONE registration URL for everyone.** `_regLinkFor()` no longer emits `?code=`, the per-vendor
+  and bulk QRs both carry the generic link, and `vendor-register.html` reads `?code=` as a no-op so
+  an already-printed QR cannot throw. The QR copy no longer describes a prefill.
+
 ## Known Issues / Gotchas
 
 1. **Generated columns**: `total_awarded`, `awarding_lead_time`, `variance` â€” never INSERT into them. Use `awarded_cost` and `lead_time`. `unmap()` strips all three automatically.

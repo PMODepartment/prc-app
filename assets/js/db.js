@@ -2340,12 +2340,15 @@ const VendorDb = (() => {
     // ⚠️ Returns only a claim id. The RPC deliberately does NOT report whether
     // or to whom it matched — that would make it an oracle for enumerating
     // vendors and confirming TINs. Do not "helpfully" surface a match here.
-    async submit(company, contactName, vendorCode, tin, isNew) {
+    /* ⚠️ Vendor Code is NOT an argument. It is internal SAP tagging a vendor
+       never sees, so the 5-argument signature was dropped outright in
+       2026-09-03_vendor_claim_tin_only.sql — PostgREST resolves overloads by
+       argument NAME, so sending p_vendor_code here would fail to resolve. */
+    async submit(company, contactName, tin, isNew) {
       const sb = await getSB();
       const { data, error } = await sb.rpc('submit_vendor_claim', {
         p_company: company, p_contact_name: contactName || null,
-        p_vendor_code: vendorCode || null, p_tin: tin || null,
-        p_is_new: !!isNew });
+        p_tin: tin || null, p_is_new: !!isNew });
       if (error) throw error;
       return data;
     },
