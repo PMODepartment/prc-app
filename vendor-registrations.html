@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https://cayjeqeleenizbdzrums.supabase.co wss://cayjeqeleenizbdzrums.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'"/>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Vendor Registrations — Megawide PRC Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
+  <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
+  <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260904a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260904a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260904a"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904a">
+  <style>
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
+    .modal{background:#fff;border-radius:12px;width:100%;max-width:420px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden}
+    .modal-header{padding:20px 20px 0;flex-shrink:0}
+    .modal-body{padding:16px 20px;overflow-y:auto;flex:1}
+    .modal-footer{padding:12px 20px 20px;flex-shrink:0;border-top:1px solid #f0f0f0;display:flex;gap:10px}
+    .modal-title{font-size:1.1429rem;font-weight:600;color:#231F20;margin:0 0 4px}
+    .modal-subtitle{font-size:0.9286rem;color:#888;margin:0 0 16px}
+    .modal-field-label{font-size:0.7857rem;font-weight:600;letter-spacing:.06em;color:#888;text-transform:uppercase;margin-bottom:8px}
+    .project-checkboxes{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+    .project-checkbox-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e5e5e5;border-radius:8px;cursor:pointer;transition:border-color .15s}
+    .project-checkbox-item:hover{border-color:#EE3124}
+    .project-checkbox-item input[type="checkbox"]{width:16px;height:16px;accent-color:#EE3124;cursor:pointer}
+    .project-checkbox-item label{font-size:1rem;font-weight:500;color:#231F20;cursor:pointer}
+    /* Select all / None for the project-assignment list -- quiet secondary buttons so they
+       read as tools, not as the modal's primary action (which is Save Changes). */
+    .proj-bulk-btn{padding:4px 10px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:6px;font-size:0.8571rem;font-weight:600;font-family:inherit;cursor:pointer;transition:border-color .15s,color .15s}
+    .proj-bulk-btn:hover{border-color:#EE3124;color:#EE3124}
+    .proj-bulk-count{font-size:0.7857rem;color:#888;font-weight:600;margin-left:auto}
+    .role-select{width:100%;padding:10px 12px;border:1px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:'Montserrat',sans-serif;color:#231F20;background:#fff}
+    .btn-approve{flex:1;padding:10px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;font-family:inherit;cursor:pointer}
+    .btn-approve:hover{background:#C42127}
+    .btn-cancel{padding:10px 16px;background:transparent;color:#666;border:1px solid #e5e5e5;border-radius:8px;font-size:1rem;font-family:inherit;cursor:pointer}
+    .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
+    @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:540px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:360px){.kpi-grid{grid-template-columns:1fr}}
+    .kpi-card{background:#fff;border:1px solid #f0f0f0;border-radius:10px;padding:14px 16px}
+    .kpi-value{font-size:1.5714rem;font-weight:700;color:#231F20;line-height:1}
+    .kpi-label{font-size:0.7143rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;margin-top:4px}
+    .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .user-table{width:100%;min-width:600px;border-collapse:collapse;table-layout:auto}
+    .user-table th{font-size:0.7143rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#999;padding:9px 10px;text-align:left;border-bottom:2px solid #f0f0f0;background:#fafafa;white-space:nowrap}
+    .user-table td{padding:10px 10px;font-size:0.9286rem;color:#231F20;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+    .user-table tr:last-child td{border-bottom:none}
+    .user-table tr:hover td{background:#fafafa}
+    /* checkbox col — fixed narrow width */
+    .user-table td:first-child,.user-table th:first-child{width:36px;padding-right:4px}
+    .action-btn{padding:4px 10px;border-radius:6px;font-size:0.7857rem;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:opacity .15s}
+    .action-btn:hover{opacity:.8}
+    .btn-approve-row{background:#EE3124;color:#fff}
+    .btn-reject-row{background:#f5f5f5;color:#666}
+    .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7857rem;font-weight:600}
+    .badge-pending{background:#FEF3C7;color:#92400E}
+    .badge-approved{background:#D1FAE5;color:#065F46}
+    .badge-rejected{background:#FEE2E2;color:#991B1B}
+    .tab-row{display:flex;gap:4px;margin-bottom:16px}
+    .tab-btn{padding:7px 16px;border:1px solid #e5e5e5;border-radius:8px;background:transparent;font-size:0.9286rem;font-weight:500;font-family:inherit;cursor:pointer;color:#888;transition:all .15s}
+    .tab-btn.active{background:#231F20;border-color:#231F20;color:#fff}
+    .page-content{padding:20px;max-width:100%}
+    .section-card{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:20px;margin-bottom:20px}
+    .hidden{display:none!important}
+    /* ── Performance tab ── */
+    .perf-table{width:100%;min-width:720px;border-collapse:collapse}
+    .perf-table th{font-size:0.7143rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#999;padding:9px 12px;text-align:left;border-bottom:2px solid #f0f0f0;background:#fafafa;cursor:pointer;white-space:nowrap;user-select:none}
+    .perf-table th:hover{color:#231F20}
+    .perf-table th .sort-ind{margin-left:4px;color:#EE3124}
+    .perf-table td{padding:10px 12px;font-size:0.8571rem;color:#231F20;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+    .perf-table tr.perf-user-row{cursor:pointer}
+    .perf-table tr.perf-user-row:hover td{background:#fafafa}
+    .perf-table tr.perf-expand-row td{padding:0;background:#f9f9f9;border-bottom:2px solid #f0f0f0}
+    .perf-chip{display:inline-block;padding:2px 9px;border-radius:10px;font-size:0.7857rem;font-weight:700;white-space:nowrap}
+    .perf-green{background:#D1FAE5;color:#065F46}
+    .perf-yellow{background:#FEF3C7;color:#92400E}
+    .perf-red{background:#FEE2E2;color:#991B1B}
+    .perf-neutral{background:#F3F4F6;color:#374151}
+    .perf-bar-wrap{display:inline-flex;align-items:center;gap:6px;width:100%}
+    .perf-bar-bg{flex:1;height:5px;background:#f0f0f0;border-radius:3px;overflow:hidden;min-width:40px}
+    .perf-bar-fill{height:100%;border-radius:3px;transition:width .3s}
+    .perf-wp-sub{padding:12px 16px}
+    .perf-wp-sub table{width:100%;border-collapse:collapse;font-size:0.7857rem}
+    .perf-wp-sub th{color:#aaa;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:4px 8px;border-bottom:1px solid #e5e5e5;text-align:left}
+    .perf-wp-sub td{padding:5px 8px;border-bottom:1px solid #f0f0f0;color:#374151}
+    .perf-wp-sub tr:last-child td{border-bottom:none}
+      /* ══ Vendor Registrations ═════════════════════════════════════════════
+       Everything below is a token or has a measured dark variant. */
+    .vr-strong{font-weight:700;color:var(--text-primary)}
+    .vr-sub{font-size:0.7857rem;color:var(--text-hint);margin-top:2px}
+    .vr-empty{text-align:center;color:var(--text-hint);padding:34px 16px;font-size:0.9286rem;line-height:1.6}
+    .vr-link{color:var(--mw-red-ink);font-weight:600;text-decoration:none}
+    .vr-link:hover{text-decoration:underline}
+    .vr-conf{display:inline-block;font-size:0.7143rem;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap}
+    .vr-conf-high{background:var(--green-light);color:#0F7A46}
+    .vr-conf-med {background:var(--amber-light);color:#92400E}
+    .vr-conf-none{background:var(--gray-light);color:var(--text-secondary)}
+    .vr-conf-new {background:var(--gray-light);color:var(--text-secondary)}
+    body.dark-mode .vr-conf-high{color:#6EE7B7}
+    body.dark-mode .vr-conf-med {color:#FBBF24}
+    .vr-role{display:inline-block;font-size:0.7143rem;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
+    /* Brand red so a vendor can never be mistaken for the blue User pill that
+       marks a procurement officer. */
+    .vr-role-vendor{background:var(--mw-red-light);color:var(--mw-red-ink)}
+    .vr-role-bad{background:var(--amber-light);color:#92400E;cursor:help}
+    body.dark-mode .vr-role-bad{color:#FBBF24}
+    .vr-act-on {font-size:0.7857rem;font-weight:700;color:#0F7A46}
+    .vr-act-off{font-size:0.7857rem;font-weight:700;color:#92400E}
+    body.dark-mode .vr-act-on {color:#6EE7B7}
+    body.dark-mode .vr-act-off{color:#FBBF24}
+
+    /* review dialog */
+    .vr-review-grid{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;
+      padding:10px 12px;margin-bottom:12px}
+    .vr-kv{display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px;font-size:0.8571rem;padding:3px 0}
+    .vr-kv>span{color:var(--text-hint);font-weight:600}
+    .vr-kv>b{color:var(--text-primary);word-break:break-word;font-weight:600}
+    .vr-match{margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap}
+    .vr-input{width:100%;padding:9px 12px;border:1.5px solid var(--border-md);border-radius:8px;
+      font-size:0.9286rem;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary)}
+    .vr-input:focus{border-color:var(--mw-red)}
+    .vr-results{max-height:180px;overflow-y:auto;margin-top:6px}
+    .vr-hit{display:block;width:100%;text-align:left;padding:8px 11px;border:none;background:transparent;
+      cursor:pointer;font-family:inherit;font-size:0.8571rem;color:var(--text-primary);border-radius:6px}
+    .vr-hit:hover{background:var(--mw-red-light)}
+    .vr-hit small{color:var(--text-hint);font-weight:600}
+    .vr-hit-none{padding:8px 11px;color:var(--text-hint);font-size:0.8rem}
+    .vr-picked{font-size:0.7857rem;color:var(--text-hint);margin-top:7px;line-height:1.55}
+
+    /* ── Mobile: the table becomes cards ─────────────────────────────────────
+       A six-column account table on a phone is a horizontal-scroll puzzle. The
+       same rows render as cards instead — the pattern the WP List already uses
+       (.wp-table-wrap / .wp-card-list). Both are always in the DOM and CSS
+       picks one, so there is no JS branch to keep in step. */
+    .vr-card-list{display:none}
+    @media (max-width:767px){
+      #vrTableWrap{display:none}
+      .vr-card-list{display:block}
+      .vr-card{border:1px solid var(--border-md);border-radius:10px;padding:12px 13px;margin-bottom:10px;
+        background:var(--surface)}
+      .vr-card-head{display:flex;align-items:flex-start;gap:8px;justify-content:space-between;
+        margin-bottom:8px;flex-wrap:wrap}
+      .vr-card-foot{margin-top:11px;display:flex;gap:8px;flex-wrap:wrap}
+      .vr-card-foot .btn-approve,.vr-card-foot .action-btn{flex:1;min-height:38px;justify-content:center}
+      /* a label above its value reads far better than two cramped columns */
+      .vr-card .vr-kv{grid-template-columns:1fr;gap:1px;padding:5px 0;border-bottom:1px dashed var(--border)}
+      .vr-card .vr-kv:last-of-type{border-bottom:none}
+      .kpi-grid{grid-template-columns:1fr 1fr}
+      .tab-row{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+      .tab-row::-webkit-scrollbar{display:none}
+      .tab-btn{flex-shrink:0}
+      /* a dialog on a phone should use the screen, not float in the middle */
+      .modal{max-width:none!important;width:100%;border-radius:14px 14px 0 0;max-height:92vh;margin-top:auto}
+      .modal-overlay{align-items:flex-end;padding:0}
+      .modal-footer{position:sticky;bottom:0;background:var(--surface);flex-wrap:wrap}
+      .modal-footer button{flex:1;min-height:40px}
+      .vr-kv{grid-template-columns:1fr}
+    }
+    /* KPI accents — measured on both surfaces, see the note above. */
+    .vr-ink-warn{color:#B45309}
+    .vr-ink-ok  {color:#0F7A46}
+    .vr-ink-mute{color:var(--text-secondary)}
+    .vr-ink-bad {color:var(--mw-red-ink)}
+    body.dark-mode .vr-ink-warn{color:#FBBF24}
+    body.dark-mode .vr-ink-ok  {color:#6EE7B7}
+    body.dark-mode .vr-ink-mute{color:var(--text-secondary)}
+    body.dark-mode .vr-ink-bad {color:var(--mw-red-ink)}
+</style>
+<body>
+<a class="skip-link" href="#main-content-region">Skip to main content</a>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <img src="assets/img/megawide-logo.png" alt="Megawide Construction"/>
+      <div class="app-label">Procurement Dashboard</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Navigation</div>
+      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Portfolio Overview</a>
+      <a class="nav-item" href="vendors.html"><i class="ti ti-building-store"></i>Vendor Management</a>
+      <a class="nav-item" href="bids.html"><i class="ti ti-gavel"></i>Bid Management</a>
+    </div>
+    <!-- Navigation only. Rendered by window.initSidebarProjects in db.js. -->
+    <div class="sidebar-section" id="sidebar-projects-section" style="display:none">
+      <div class="sidebar-section-label">Projects</div>
+      <div id="sidebar-proj-search-wrap" style="padding:0 4px 6px;display:none;position:sticky;top:0;z-index:3;background:var(--mw-black)">
+        <div style="position:relative">
+          <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.3);font-size:0.8571rem;pointer-events:none"></i>
+          <input id="sidebar-proj-search" type="text" placeholder="Search projects…" oninput="filterSidebarProjects(this.value)"
+            style="width:100%;padding:6px 8px 6px 28px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:0.7857rem;color:#fff;caret-color:#fff;box-sizing:border-box;font-family:inherit;outline:none">
+        </div>
+      </div>
+      <div id="nav-projects-list"></div>
+    </div>
+    <div class="sidebar-section" id="nav-admin-section" style="display:none">
+      <div class="sidebar-section-label">Admin</div>
+      <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Approvals</div>
+      <a class="nav-item active" href="vendor-registrations.html">
+        <i class="ti ti-user-check"></i>Vendor Registrations
+        <span class="nbadge" id="nav-claim-count" style="display:none">0</span>
+      </a>
+    </div>
+    <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
+        <div class="page-title">Vendor Registrations</div>
+      </div>
+      <div class="topbar-right">
+        <button class="btn-refresh" id="btn-refresh" title="Refresh" aria-label="Refresh" onclick="refreshAll()"><i class="ti ti-refresh"></i></button>
+        <div id="user-bar"></div>
+      </div>
+    </div>
+    <div class="content" id="main-content-region" role="main" tabindex="-1">
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading registrations…</span></div>
+      <div id="main-content" style="display:none">
+        <div class="page-content">
+          <div class="kpi-grid">
+            <div class="kpi-card"><div class="kpi-value vr-ink-warn" id="kpiPending">—</div><div class="kpi-label">Awaiting Review</div></div>
+            <div class="kpi-card"><div class="kpi-value vr-ink-ok" id="kpiRegistered">—</div><div class="kpi-label">Registered Vendors</div></div>
+            <div class="kpi-card"><div class="kpi-value vr-ink-mute" id="kpiDeclined">—</div><div class="kpi-label">Declined</div></div>
+            <div class="kpi-card"><div class="kpi-value vr-ink-bad" id="kpiMistagged">—</div><div class="kpi-label">Wrongly Tagged</div></div>
+          </div>
+          <div class="tab-row">
+            <button class="tab-btn active" id="tabPending" onclick="switchTab('pending')">
+              Awaiting Review <span id="pending-count" style="display:none;background:#EE3124;color:#fff;border-radius:10px;padding:1px 6px;font-size:0.7143rem;font-weight:700;margin-left:4px"></span>
+            </button>
+            <button class="tab-btn" id="tabRegistered" onclick="switchTab('registered')">Registered Vendors</button>
+            <button class="tab-btn" id="tabDeclined" onclick="switchTab('declined')">Declined</button>
+          </div>
+          <div class="section-card">
+            <div id="mistag-note" style="display:none"></div>
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+              <div style="position:relative;flex:1;min-width:200px">
+                <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-hint);font-size:1rem;pointer-events:none"></i>
+                <input id="vr-search" type="text" placeholder="Search by company, contact or email…" oninput="render()"
+                  style="width:100%;padding:8px 12px 8px 34px;border:1.5px solid var(--border-md);border-radius:8px;font-size:0.9286rem;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary)">
+              </div>
+            </div>
+            <!-- Desktop table. Below 768px it is hidden and #vrCards shows the
+                 same rows as cards — the WP List's established pattern, because
+                 an 7-column table on a phone is a horizontal-scroll puzzle. -->
+            <div class="table-wrapper" id="vrTableWrap">
+              <table class="user-table" id="vrTable">
+                <thead><tr id="vrHead"></tr></thead>
+                <tbody id="vrBody"></tbody>
+              </table>
+            </div>
+            <div class="vr-card-list" id="vrCards"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Review one registration. Mirrors admin.html's approve modal: the decision
+     and everything it needs in one dialog, rather than a form inside a row. -->
+<div class="modal-overlay hidden" id="reviewModal">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header"><h3 class="modal-title">Review registration</h3></div>
+    <div class="modal-body" id="reviewBody"></div>
+    <div class="modal-footer" id="reviewFoot"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/js/auth.js?v=20260904a"></script>
+<script src="assets/js/db.js?v=20260904a"></script>
+<script src="assets/js/ui.js?v=20260904a"></script>
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   Vendor Registrations — the approval queue for vendors who signed up from the
+   public link, plus the vendor logins that queue has already created.
+
+   ⚠️ ITS OWN PAGE, AND IT DELIBERATELY MIRRORS admin.html. This used to be a
+      third view inside vendors.html reached by ?claims=1, which put an
+      approval queue behind a directory. Registered vendors are accounts, so
+      they belong in the shape User Management already uses for accounts:
+      KPI tiles → tabs → searchable table, one Review dialog per decision.
+
+   ⚠️ A VENDOR LOGIN IS NOT A PROCUREMENT USER. approve_vendor_claim writes
+      role='vendor', but roleLabel in admin.html had no case for it and fell
+      through to "User" — so an external vendor read exactly like an internal
+      officer. They are listed here, filtered out of User Management, and any
+      row carrying users.vendor_id WITHOUT role='vendor' is surfaced as wrongly
+      tagged with a one-click fix, because that mis-tag hands a vendor a
+      procurement role.
+   ════════════════════════════════════════════════════════════════════════════ */
+let profile = null, canManage = false, isAdmin = false;
+let CLAIMS = [], VENDOR_USERS = [], VNAMES = {}, TAB = 'pending';
+let reviewIdx = -1, reviewPick = null;
+const Q = String.fromCharCode(39);
+
+function esc2(v) { return window.esc ? window.esc(v) : String(v == null ? '' : v); }
+function fmtDate(v) {
+  if (!v) return '—';
+  const d = new Date(v);
+  // new Date of a rubbish value does not throw — it yields an Invalid Date
+  // whose toLocaleDateString is the literal string "Invalid Date".
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+function vendorName(id) { return id ? (VNAMES[id] || '(vendor record not found)') : ''; }
+
+/* A vendor login by EITHER signal — see the header note. users.vendor_id is set
+   only for a vendor login (internal roles are scoped by projects[]), so a row
+   carrying it is a vendor account whatever the role column says. */
+function isVendorLogin(u) { return !!u && (u.role === 'vendor' || !!u.vendor_id); }
+function isMistagged(u)   { return !!u && !!u.vendor_id && u.role !== 'vendor'; }
+
+async function loadAll() {
+  try {
+    const [claims, users] = await Promise.all([
+      VendorDb.claims.all(),
+      WPDb.getAllUsers().catch(function () { return []; })
+    ]);
+    CLAIMS = claims || [];
+    VENDOR_USERS = (users || []).filter(isVendorLogin);
+    // Resolve only the vendor ids actually referenced — never the whole ~1,600
+    // row directory, which this page has no other use for.
+    const ids = Array.from(new Set(
+      CLAIMS.map(function (c) { return c.vendor_id; })
+        .concat(VENDOR_USERS.map(function (u) { return u.vendor_id; }))
+        .filter(Boolean)));
+    if (ids.length) {
+      try {
+        (await VendorDb.getVendorsByIds(ids) || []).forEach(function (v) { VNAMES[v.id] = v.name; });
+      } catch (e) { /* a failed name lookup must not hide the queue */ }
+    }
+  } catch (e) {
+    if (window.AppNotify) AppNotify.fromError(e, 'Could not load registrations');
+  }
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  renderKpis();
+  render();
+}
+async function refreshAll() {
+  const i = document.querySelector('#btn-refresh i');
+  if (i) i.classList.add('spin');
+  await loadAll();
+  if (i) i.classList.remove('spin');
+}
+
+function pendingClaims()  { return CLAIMS.filter(function (c) { return c.status === 'pending'; }); }
+function declinedClaims() { return CLAIMS.filter(function (c) { return c.status === 'rejected' || c.status === 'declined'; }); }
+function mistagged()      { return VENDOR_USERS.filter(isMistagged); }
+
+function renderKpis() {
+  document.getElementById('kpiPending').textContent = pendingClaims().length.toLocaleString();
+  document.getElementById('kpiRegistered').textContent = VENDOR_USERS.length.toLocaleString();
+  document.getElementById('kpiDeclined').textContent = declinedClaims().length.toLocaleString();
+  document.getElementById('kpiMistagged').textContent = mistagged().length.toLocaleString();
+  const pc = document.getElementById('pending-count');
+  const n = pendingClaims().length;
+  pc.textContent = n; pc.style.display = n ? 'inline-block' : 'none';
+  if (typeof setVendorClaimsNavCount === 'function') setVendorClaimsNavCount(n);
+  renderMistagNote();
+}
+/* A mis-tagged row is an access problem, not a cosmetic one, so it is called
+   out above the table rather than left for somebody to notice. */
+function renderMistagNote() {
+  const host = document.getElementById('mistag-note');
+  const rows = mistagged();
+  if (!rows.length || !canManage) { host.style.display = 'none'; host.innerHTML = ''; return; }
+  host.style.display = 'block';
+  host.innerHTML = '<div class="vendor-login-note">'
+    + '<i class="ti ti-alert-triangle"></i>'
+    + '<div><b>' + rows.length + ' ' + (rows.length === 1 ? 'account is' : 'accounts are')
+    + ' tagged with a procurement role</b> but linked to a vendor record. Until this is corrected they read as internal staff.</div>'
+    + '<button class="vln-link" onclick="fixAllTags()"><i class="ti ti-wand"></i>Tag '
+    + (rows.length === 1 ? 'it' : 'them') + ' as Vendor</button></div>';
+}
+
+function switchTab(t) {
+  TAB = t;
+  ['pending', 'registered', 'declined'].forEach(function (k) {
+    const b = document.getElementById('tab' + k.charAt(0).toUpperCase() + k.slice(1));
+    if (b) b.classList.toggle('active', k === t);
+  });
+  render();
+}
+
+function q() { return (document.getElementById('vr-search').value || '').toLowerCase().trim(); }
+function claimMatches(c, s) {
+  return !s || [c.claimed_company, c.claimed_contact_name, c.email, c.claimed_tin]
+    .some(function (v) { return String(v || '').toLowerCase().includes(s); });
+}
+function userMatches(u, s) {
+  return !s || [u.name, u.email, vendorName(u.vendor_id)]
+    .some(function (v) { return String(v || '').toLowerCase().includes(s); });
+}
+
+const HEADS = {
+  pending:    ['Company as entered', 'Contact', 'Match', 'Submitted', 'Actions'],
+  registered: ['Vendor login', 'Role', 'Vendor record', 'Activity', 'Registered', 'Actions'],
+  declined:   ['Company as entered', 'Contact', 'Reason given', 'Decided'],
+};
+
+function render() {
+  const s = q();
+  document.getElementById('vrHead').innerHTML =
+    HEADS[TAB].map(function (h) { return '<th>' + esc2(h) + '</th>'; }).join('');
+  let rowsHtml = '', cardsHtml = '', n = 0;
+  if (TAB === 'pending') {
+    const rows = pendingClaims().filter(function (c) { return claimMatches(c, s); });
+    n = rows.length; rowsHtml = rows.map(rowPending).join(''); cardsHtml = rows.map(cardPending).join('');
+  } else if (TAB === 'registered') {
+    const rows = VENDOR_USERS.filter(function (u) { return userMatches(u, s); });
+    n = rows.length; rowsHtml = rows.map(rowUser).join(''); cardsHtml = rows.map(cardUser).join('');
+  } else {
+    const rows = declinedClaims().filter(function (c) { return claimMatches(c, s); });
+    n = rows.length; rowsHtml = rows.map(rowDeclined).join(''); cardsHtml = rows.map(cardDeclined).join('');
+  }
+  if (!n) {
+    const msg = TAB === 'pending'
+      ? (s ? 'No registration matches that.' : 'No registrations waiting. When a vendor signs up from the public link or the QR code they appear here.')
+      : TAB === 'registered'
+        ? (s ? 'No vendor login matches that.' : 'No vendor has completed registration yet.')
+        : (s ? 'No declined registration matches that.' : 'Nothing has been declined.');
+    rowsHtml = '<tr><td colspan="' + HEADS[TAB].length + '" class="vr-empty">' + esc2(msg) + '</td></tr>';
+    cardsHtml = '<div class="vr-empty">' + esc2(msg) + '</div>';
+  }
+  document.getElementById('vrBody').innerHTML = rowsHtml;
+  document.getElementById('vrCards').innerHTML = cardsHtml;
+}
+
+/* ── the pending queue ── */
+function confLabel(c) {
+  const m = { high: 'Strong match', medium: 'Possible match', ambiguous: 'Ambiguous', none: 'No match' };
+  return m[c.match_confidence] || (c.vendor_id ? 'Matched' : 'No match');
+}
+function confClass(c) {
+  if (c.match_confidence === 'high') return 'vr-conf vr-conf-high';
+  if (c.match_confidence === 'medium') return 'vr-conf vr-conf-med';
+  return 'vr-conf vr-conf-none';
+}
+function idxOf(c) { return CLAIMS.indexOf(c); }
+function rowPending(c) {
+  const i = idxOf(c);
+  return '<tr>'
+    + '<td><div class="vr-strong">' + esc2(c.claimed_company || '—') + '</div>'
+    + (c.is_new_vendor ? '<div class="vr-sub">Says new supplier</div>' : '')
+    + (c.claimed_tin ? '<div class="vr-sub">TIN ' + esc2(c.claimed_tin) + '</div>' : '') + '</td>'
+    + '<td>' + esc2(c.claimed_contact_name || '—') + '<div class="vr-sub">' + esc2(c.email || '') + '</div></td>'
+    + '<td><span class="' + confClass(c) + '">' + esc2(confLabel(c)) + '</span>'
+    + (c.vendor_id ? '<div class="vr-sub">' + esc2(vendorName(c.vendor_id)) + '</div>' : '') + '</td>'
+    + '<td>' + esc2(fmtDate(c.created_at)) + '</td>'
+    + '<td>' + (canManage
+        ? '<button class="action-btn btn-approve-row" onclick="openReview(' + i + ')">Review</button>'
+        : '<span class="vr-sub">View only</span>') + '</td></tr>';
+}
+function cardPending(c) {
+  const i = idxOf(c);
+  return '<div class="vr-card">'
+    + '<div class="vr-card-head"><div class="vr-strong">' + esc2(c.claimed_company || '—') + '</div>'
+    + '<span class="' + confClass(c) + '">' + esc2(confLabel(c)) + '</span></div>'
+    + '<div class="vr-kv"><span>Contact</span><b>' + esc2(c.claimed_contact_name || '—') + '</b></div>'
+    + '<div class="vr-kv"><span>Email</span><b>' + esc2(c.email || '—') + '</b></div>'
+    + (c.claimed_tin ? '<div class="vr-kv"><span>TIN</span><b>' + esc2(c.claimed_tin) + '</b></div>' : '')
+    + (c.vendor_id ? '<div class="vr-kv"><span>Matched</span><b>' + esc2(vendorName(c.vendor_id)) + '</b></div>' : '')
+    + '<div class="vr-kv"><span>Submitted</span><b>' + esc2(fmtDate(c.created_at)) + '</b></div>'
+    + (canManage ? '<div class="vr-card-foot"><button class="btn-approve" onclick="openReview(' + i + ')">Review registration</button></div>' : '')
+    + '</div>';
+}
+
+/* ── registered vendor logins ── */
+function roleChip(u) {
+  return isMistagged(u)
+    ? '<span class="vr-role vr-role-bad" title="Linked to a vendor record but tagged with a procurement role">'
+      + esc2(u.role || 'user') + ' — wrong</span>'
+    : '<span class="vr-role vr-role-vendor">Vendor</span>';
+}
+function activity(u) {
+  if (!u.last_login) return '<span class="vr-sub">Never signed in</span>';
+  const days = Math.floor((Date.now() - new Date(u.last_login).getTime()) / 86400000);
+  return '<span class="' + (days <= 7 ? 'vr-act-on' : 'vr-act-off') + '">'
+    + (days <= 7 ? 'Active' : 'Inactive') + '</span>'
+    + '<div class="vr-sub">' + esc2(fmtDate(u.last_login)) + '</div>';
+}
+function userActions(u) {
+  if (!canManage) return '<span class="vr-sub">View only</span>';
+  let h = '';
+  if (isMistagged(u)) h += '<button class="action-btn btn-approve-row" onclick="fixTag(' + Q + u.id + Q + ')">Tag as Vendor</button> ';
+  if (isAdmin) h += '<button class="action-btn btn-reject-row" onclick="removeLogin(' + Q + u.id + Q + ')">Remove login</button>';
+  return h || '<span class="vr-sub">—</span>';
+}
+function vendorLink(u) {
+  return u.vendor_id
+    ? '<a class="vr-link" href="vendors.html?vendor=' + encodeURIComponent(u.vendor_id) + '">' + esc2(vendorName(u.vendor_id)) + '</a>'
+    : '<span class="vr-sub">Not linked</span>';
+}
+function rowUser(u) {
+  return '<tr>'
+    + '<td><div class="vr-strong">' + esc2(u.name || '—') + '</div><div class="vr-sub">' + esc2(u.email || '') + '</div></td>'
+    + '<td>' + roleChip(u) + '</td>'
+    + '<td>' + vendorLink(u) + '</td>'
+    + '<td>' + activity(u) + '</td>'
+    + '<td>' + esc2(fmtDate(u.created_at)) + '</td>'
+    + '<td>' + userActions(u) + '</td></tr>';
+}
+function cardUser(u) {
+  return '<div class="vr-card">'
+    + '<div class="vr-card-head"><div class="vr-strong">' + esc2(u.name || '—') + '</div>' + roleChip(u) + '</div>'
+    + '<div class="vr-kv"><span>Email</span><b>' + esc2(u.email || '—') + '</b></div>'
+    + '<div class="vr-kv"><span>Vendor record</span><b>' + vendorLink(u) + '</b></div>'
+    + '<div class="vr-kv"><span>Activity</span><b>' + activity(u) + '</b></div>'
+    + '<div class="vr-kv"><span>Registered</span><b>' + esc2(fmtDate(u.created_at)) + '</b></div>'
+    + (canManage ? '<div class="vr-card-foot">' + userActions(u) + '</div>' : '')
+    + '</div>';
+}
+
+/* ── declined ── */
+function rowDeclined(c) {
+  return '<tr>'
+    + '<td><div class="vr-strong">' + esc2(c.claimed_company || '—') + '</div></td>'
+    + '<td>' + esc2(c.claimed_contact_name || '—') + '<div class="vr-sub">' + esc2(c.email || '') + '</div></td>'
+    + '<td>' + esc2(c.decision_notes || '—') + '</td>'
+    + '<td>' + esc2(fmtDate(c.decided_at)) + '<div class="vr-sub">' + esc2(c.decided_by_name || '') + '</div></td></tr>';
+}
+function cardDeclined(c) {
+  return '<div class="vr-card">'
+    + '<div class="vr-card-head"><div class="vr-strong">' + esc2(c.claimed_company || '—') + '</div></div>'
+    + '<div class="vr-kv"><span>Contact</span><b>' + esc2(c.claimed_contact_name || '—') + '</b></div>'
+    + '<div class="vr-kv"><span>Email</span><b>' + esc2(c.email || '—') + '</b></div>'
+    + '<div class="vr-kv"><span>Reason given</span><b>' + esc2(c.decision_notes || '—') + '</b></div>'
+    + '<div class="vr-kv"><span>Decided</span><b>' + esc2(fmtDate(c.decided_at)) + '</b></div>'
+    + '</div>';
+}
+
+/* ══ Review dialog — the decision and everything it needs in one place, the
+      way admin.html reviews a pending user. ══════════════════════════════ */
+function openReview(i) {
+  const c = CLAIMS[i];
+  if (!c || !canManage) return;
+  reviewIdx = i;
+  reviewPick = c.vendor_id || null;
+  const kv = [
+    ['Company as entered', c.claimed_company],
+    ['Contact person', c.claimed_contact_name],
+    ['Email', c.email],
+    ['TIN', c.claimed_tin],
+    ['Submitted', fmtDate(c.created_at)]
+  ].filter(function (r) { return r[1]; })
+   .map(function (r) { return '<div class="vr-kv"><span>' + esc2(r[0]) + '</span><b>' + esc2(r[1]) + '</b></div>'; }).join('');
+  document.getElementById('reviewBody').innerHTML =
+      '<p class="modal-subtitle">What they told us when they signed up. None of it is proof of identity on its own, '
+    + 'so match them to the right vendor record before granting access.</p>'
+    + '<div class="vr-review-grid">' + kv + '</div>'
+    + '<div class="vr-match"><span class="' + confClass(c) + '">' + esc2(confLabel(c)) + '</span>'
+    + (c.is_new_vendor ? ' <span class="vr-conf vr-conf-new">Says new supplier</span>' : '') + '</div>'
+    + '<label class="modal-field-label" for="rv-search">Give this person access to</label>'
+    + '<input id="rv-search" type="text" class="vr-input" autocomplete="off" placeholder="Search the vendor directory…" '
+    + 'value="' + esc2(c.vendor_id ? vendorName(c.vendor_id) : '') + '" oninput="rvSearch()">'
+    + '<div class="vr-results" id="rv-results"></div>'
+    + '<div class="vr-picked" id="rv-picked">' + (c.vendor_id
+        ? 'Matched automatically: <b>' + esc2(vendorName(c.vendor_id)) + '</b>'
+        : (c.is_new_vendor
+            ? 'No match, which is expected for a new supplier. Search first in case we already hold them.'
+            : 'No automatic match — search for the right vendor, or create one if we have never dealt with them.')) + '</div>';
+  document.getElementById('reviewFoot').innerHTML =
+      '<button class="btn-cancel" onclick="closeReview()">Cancel</button>'
+    + '<button class="btn-cancel" onclick="declineClaim()">Decline</button>'
+    + '<button class="btn-cancel" onclick="approveAsNew()" '
+    + 'title="Only if we have never dealt with this company. Refused if the name already exists.">'
+    + '<i class="ti ti-building-plus"></i> Create new vendor</button>'
+    + '<button class="btn-approve" onclick="approveClaim()">Approve access</button>';
+  document.getElementById('reviewModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+function closeReview() {
+  document.getElementById('reviewModal').classList.add('hidden');
+  document.body.style.overflow = '';
+  reviewIdx = -1; reviewPick = null;
+}
+
+/* Searches the directory on demand. This page holds no vendor list of its own:
+   loading ~1,600 rows to fill a typeahead is the 1000-row-cap trap again. */
+let rvTimer = null;
+function rvSearch() {
+  const box = document.getElementById('rv-results');
+  const s = (document.getElementById('rv-search').value || '').trim();
+  reviewPick = null;
+  document.getElementById('rv-picked').textContent = 'Pick a vendor from the list, or create a new record.';
+  if (s.length < 2) { box.innerHTML = ''; return; }
+  clearTimeout(rvTimer);
+  rvTimer = setTimeout(async function () {
+    let hits = [];
+    try { hits = await VendorDb.searchApprovedVendors(s); } catch (e) { hits = []; }
+    // The id comes from the directory and the NAME is not interpolated into the
+    // handler at all — rvChoose looks it up. Known Issues #23: no escaping makes
+    // a user-entered string safe inside an inline attribute.
+    window.__rvHits = hits || [];
+    box.innerHTML = (hits && hits.length)
+      ? hits.slice(0, 8).map(function (v, k) {
+          return '<button class="vr-hit" onclick="rvChoose(' + k + ')">' + esc2(v.name)
+            + (v.vendor_code ? ' <small>' + esc2(v.vendor_code) + '</small>' : '') + '</button>';
+        }).join('')
+      : '<div class="vr-hit-none">No vendor matches that.</div>';
+  }, 250);
+}
+function rvChoose(k) {
+  const v = (window.__rvHits || [])[k];
+  if (!v) return;
+  reviewPick = v.id;
+  document.getElementById('rv-search').value = v.name;
+  document.getElementById('rv-results').innerHTML = '';
+  document.getElementById('rv-picked').innerHTML = 'Selected: <b>' + esc2(v.name) + '</b>';
+}
+
+/* A stale card is not a failure to apologise for — say so plainly and refresh.
+   Matches what reject_ and approve_vendor_claim raise (42710 / P0002). */
+function isStale(e) { return /already been decided|claim not found/i.test((e && e.message) || ''); }
+async function afterDecision(msg) {
+  closeReview();
+  if (window.AppNotify) AppNotify.success(msg);
+  await loadAll();
+}
+async function handleStale(e) {
+  if (!isStale(e)) return false;
+  if (window.AppNotify) AppNotify.warn('That registration had already been decided by somebody else — refreshed.');
+  closeReview();
+  await loadAll();
+  return true;
+}
+
+async function approveClaim() {
+  const c = CLAIMS[reviewIdx];
+  if (!c) return;
+  if (!reviewPick) {
+    if (window.AppNotify) AppNotify.warn('Pick the vendor record this person should get access to first.');
+    return;
+  }
+  if (!confirm('Give ' + (c.claimed_contact_name || c.email) + ' access to "' + vendorName(reviewPick) + '"?')) return;
+  try { await VendorDb.claims.approve(c.id, reviewPick, null); await afterDecision('Access granted.'); }
+  catch (e) { if (!(await handleStale(e)) && window.AppNotify) AppNotify.fromError(e, 'Could not approve'); }
+}
+async function approveAsNew() {
+  const c = CLAIMS[reviewIdx];
+  if (!c) return;
+  const name = prompt('Create a new vendor record named:', c.claimed_company || '');
+  if (name == null || !name.trim()) return;
+  try { await VendorDb.claims.approveAsNew(c.id, name.trim(), null); await afterDecision('Vendor created and access granted.'); }
+  catch (e) {
+    if (await handleStale(e)) return;
+    // 23505 = the name already exists. That is exactly the duplicate the
+    // directory Merge and Split tools exist to clean up, so link instead.
+    if (/duplicate key|already exists|23505/i.test((e && e.message) || '')) {
+      if (window.AppNotify) AppNotify.warn('A vendor with that name already exists — search for it above and approve against that record instead.');
+      return;
+    }
+    if (window.AppNotify) AppNotify.fromError(e, 'Could not create the vendor');
+  }
+}
+async function declineClaim() {
+  const c = CLAIMS[reviewIdx];
+  if (!c) return;
+  // The claimant sees this on the registration page, so it is not optional.
+  const why = prompt('Why is this being declined? The person who registered will see this.');
+  if (why == null || !why.trim()) return;
+  try { await VendorDb.claims.reject(c.id, why.trim()); await afterDecision('Registration declined.'); }
+  catch (e) { if (!(await handleStale(e)) && window.AppNotify) AppNotify.fromError(e, 'Could not decline'); }
+}
+
+/* ── correcting a mis-tagged login ── */
+async function fixTag(id) {
+  const u = VENDOR_USERS.find(function (x) { return x.id === id; });
+  if (!u || !canManage) return;
+  if (!confirm('Tag ' + (u.name || u.email) + ' as a Vendor?\n\nThey are linked to a vendor record but hold the "'
+    + (u.role || 'user') + '" procurement role, which is why they read as internal staff.')) return;
+  try {
+    await WPDb.updateUser(id, { role: 'vendor' });
+    if (window.AppNotify) AppNotify.success('Tagged as Vendor.');
+    await loadAll();
+  } catch (e) { if (window.AppNotify) AppNotify.fromError(e, 'Could not change the role'); }
+}
+async function fixAllTags() {
+  const rows = mistagged();
+  if (!rows.length) return;
+  if (!confirm('Tag ' + rows.length + ' account(s) as Vendor?\n\nEach is linked to a vendor record but holds a procurement role.')) return;
+  let ok = 0, bad = 0;
+  for (const u of rows) {
+    try { await WPDb.updateUser(u.id, { role: 'vendor' }); ok++; }
+    catch (e) { bad++; console.error('[vendor-registrations] tag failed', u.id, e); }
+  }
+  if (window.AppNotify) {
+    if (bad) AppNotify.warn(ok + ' tagged, ' + bad + ' failed — see the console.');
+    else AppNotify.success(ok + ' tagged as Vendor.');
+  }
+  await loadAll();
+}
+/* Removes the LOGIN, not the vendor. Same complete-delete path as the Remove
+   action in User Management (admin_delete_user), so the auth record goes too
+   and the email is free to register again. The vendors row is untouched. */
+async function removeLogin(id) {
+  const u = VENDOR_USERS.find(function (x) { return x.id === id; });
+  if (!u || !isAdmin) return;
+  if (!confirm('Remove the login for ' + (u.name || u.email) + '?\n\nThe vendor RECORD and everything on it is kept. '
+    + 'Only this access is removed, and the email becomes free to register again.')) return;
+  try {
+    await WPDb.deleteUser(id);
+    if (window.AppNotify) AppNotify.success('Login removed.');
+    await loadAll();
+  } catch (e) { if (window.AppNotify) AppNotify.fromError(e, 'Could not remove the login'); }
+}
+
+/* ── init ── */
+AppAuth.requireLogin(function (user, p) {
+  profile = p;
+  if (p.role === 'vendor') { window.location.href = 'vendor-portal.html'; return; }
+  // Same audience as the sidebar item in db.js and the queue actions: withheld
+  // from the read-only roles. Hiding a link is not enough on its own, so the
+  // rule is enforced here too — a direct URL would otherwise load the page.
+  if (['viewer', 'viewer_budget'].includes(p.role)) { window.location.href = 'index.html'; return; }
+  canManage = true;
+  isAdmin = AppAuth.isAdmin(p);
+  window.__wpmRole = p.role;
+  window.__profile = p;
+  if (isAdmin) document.getElementById('nav-admin-section').style.display = '';
+  if (typeof initSidebarProjects === 'function') initSidebarProjects(p);
+  renderUserBar('user-bar', p);
+  initMobileMenu();
+  loadAll();
+});
+</script>
+</body>
+</html>

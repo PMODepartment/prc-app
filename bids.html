@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https://cayjeqeleenizbdzrums.supabase.co wss://cayjeqeleenizbdzrums.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'"/>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Bid Management — Megawide PRC Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
+  <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904a"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904a"/>
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <style>
+    /* ── Bid workspace ──────────────────────────────────────────────────── */
+    .bm-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+    .bm-head h2{font-size:1.2857rem;font-weight:700;margin:0;flex:1;min-width:200px;line-height:1.3}
+    .bm-head h2 small{display:block;font-size:0.8571rem;font-weight:500;color:var(--text-hint);margin-top:3px}
+
+    /* The stepper IS the business process (BP 2.2.1 -> 2.4.2). */
+    .bm-steps{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:18px}
+    .bm-step{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;
+      border:1px solid var(--border-md);background:var(--surface);cursor:pointer;
+      font-size:0.7857rem;font-weight:600;color:var(--text-hint);font-family:inherit;white-space:nowrap}
+    .bm-step:hover{border-color:var(--mw-red);color:var(--mw-red-ink)}
+    .bm-step.done{color:#0F7A46;border-color:#BEEBD3;background:#E7F7EF}
+    .bm-step.now{background:var(--mw-red);border-color:var(--mw-red);color:#fff}
+    body.dark-mode .bm-step.done{background:#0F2E20;color:#6EE7B7;border-color:#0F7A46}
+    .bm-stepn{font-size:0.6429rem;opacity:.75;font-weight:800}
+
+    .bm-doc{font-size:0.7143rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+      background:var(--mw-red-light);color:var(--mw-red-ink);border:1px solid #F5B8B3;
+      border-radius:20px;padding:3px 10px;flex-shrink:0}
+    body.dark-mode .bm-doc{background:#3D1A19;color:#FCA5A5;border-color:#5A2E2A}
+
+    .bm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end}
+    .bm-grid .field{margin-bottom:0}
+    .bm-grid .wide{grid-column:1/-1}
+    .field{margin-bottom:14px}
+    .field label{display:block;font-size:0.7857rem;font-weight:600;letter-spacing:.04em;
+      text-transform:uppercase;color:var(--text-hint);margin-bottom:6px;min-height:2.4em;
+      display:flex;align-items:flex-end}
+    .field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1.5px solid var(--border-md);
+      border-radius:8px;font-size:0.9286rem;font-family:inherit;background:var(--surface);
+      color:var(--text-primary);outline:none}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--mw-red)}
+    .field textarea{resize:vertical;min-height:74px}
+    .field-hint{font-size:0.7857rem;color:var(--text-hint);margin-top:5px;line-height:1.5}
+
+    .bm-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:14px}
+
+    /* bidder rows */
+    .bidder{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 0;
+      border-bottom:1px solid var(--border)}
+    .bidder:last-child{border-bottom:none}
+    .bidder-name{flex:1;min-width:170px;font-size:0.9286rem;font-weight:600}
+    .bidder-name small{display:block;font-weight:500;color:var(--text-hint);font-size:0.7857rem;margin-top:2px}
+    .bstat{font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;
+      padding:3px 9px;border-radius:20px;white-space:nowrap}
+    .bstat-invited{background:var(--surface-2);color:var(--text-hint);border:1px solid var(--border-md)}
+    .bstat-viewed{background:#EAF3FF;color:#1D4ED8;border:1px solid #BFDBFE}
+    .bstat-submitted{background:#E7F7EF;color:#0F7A46;border:1px solid #BEEBD3}
+    .bstat-declined{background:var(--mw-red-light);color:var(--mw-red-ink);border:1px solid #F5B8B3}
+    .bstat-closed{background:var(--surface-2);color:var(--text-hint);border:1px solid var(--border-md)}
+    body.dark-mode .bstat-viewed{background:#122A4A;color:#93C5FD;border-color:#1D4ED8}
+    body.dark-mode .bstat-submitted{background:#0F2E20;color:#6EE7B7;border-color:#0F7A46}
+    body.dark-mode .bstat-declined{background:#3D1A19;color:#FCA5A5;border-color:#5A2E2A}
+
+    .bm-win{background:#E7F7EF;border:1px solid #BEEBD3;border-radius:8px;padding:2px 8px;
+      font-size:0.7143rem;font-weight:800;color:#0F7A46;text-transform:uppercase;letter-spacing:.03em}
+    body.dark-mode .bm-win{background:#0F2E20;color:#6EE7B7;border-color:#0F7A46}
+    .bm-low{font-size:0.7143rem;font-weight:700;color:#0F7A46}
+    /* #0F7A46 is 2.60:1 on the dark surface — a foreground-only rule, so it
+       inherits the dark panel and has to invert. See the contrast pass in
+       vendors.html for the same treatment. */
+    body.dark-mode .bm-low{color:#6EE7B7}
+    .bm-high{font-size:0.7143rem;font-weight:700;color:var(--mw-red-ink)}
+
+    /* clarification thread */
+    .cl-msg{border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px;
+      background:var(--surface-2)}
+    .cl-msg.staff{border-left:3px solid var(--mw-red)}
+    .cl-from{font-size:0.7143rem;font-weight:700;color:var(--text-hint);margin-bottom:3px}
+    .cl-body{font-size:0.9286rem;white-space:pre-wrap;line-height:1.6}
+
+    /* the RFQ composer */
+    .rfq-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 0;
+      border-bottom:1px solid var(--border)}
+    .rfq-row:last-child{border-bottom:none}
+    .rfq-link{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.7143rem;
+      color:var(--text-hint);word-break:break-all;flex:1;min-width:180px}
+    .rfq-noemail{font-size:0.7143rem;color:var(--mw-red-ink);font-weight:600}
+
+    .empty-state{text-align:center;padding:34px 18px;color:var(--text-hint);font-size:0.9286rem;
+      line-height:1.7;border:1.5px dashed var(--border-md);border-radius:10px}
+    .empty-state i{font-size:1.8571rem;display:block;margin-bottom:9px;opacity:.55}
+    .empty-state b{display:block;color:var(--text-secondary);font-size:1rem;margin-bottom:4px}
+    .sec-note{font-size:0.7857rem;color:var(--text-hint);line-height:1.7;margin:-6px 0 14px}
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main-content-region">Skip to main content</a>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <img src="assets/img/megawide-logo.png" alt="Megawide Construction"/>
+      <div class="app-label">Procurement Dashboard</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Navigation</div>
+      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Portfolio Overview</a>
+      <a class="nav-item" href="vendors.html"><i class="ti ti-building-store"></i>Vendor Management</a>
+      <a class="nav-item active" href="bids.html"><i class="ti ti-gavel"></i>Bid Management</a>
+    </div>
+    <!-- Navigation only, like admin.html's — vendors are not project-scoped.
+         Rendered by window.initSidebarProjects in db.js; hidden until it
+         resolves so an empty section never flashes. -->
+    <div class="sidebar-section" id="sidebar-projects-section" style="display:none">
+      <div class="sidebar-section-label">Projects</div>
+      <div id="sidebar-proj-search-wrap" style="padding:0 4px 6px;display:none;position:sticky;top:0;z-index:3;background:var(--mw-black)">
+        <div style="position:relative">
+          <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.3);font-size:0.8571rem;pointer-events:none"></i>
+          <!-- color:#fff is deliberate: `color:inherit` here inherits the BODY's
+               dark text on this dark rail and the typed text vanishes. Known Issues #35. -->
+          <input id="sidebar-proj-search" type="text" placeholder="Search projects…" oninput="filterSidebarProjects(this.value)"
+            style="width:100%;padding:6px 8px 6px 28px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:0.7857rem;color:#fff;caret-color:#fff;box-sizing:border-box;font-family:inherit;outline:none">
+        </div>
+      </div>
+      <div id="nav-projects-list"></div>
+    </div>
+    <div class="sidebar-section" id="nav-admin-section" style="display:none">
+      <div class="sidebar-section-label">Admin</div>
+      <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+    </div>
+    <div class="sidebar-section" id="sidebar-vendor-claims" style="display:none">
+      <div class="sidebar-section-label">Approvals</div>
+      <a class="nav-item" id="nav-vendor-claims" href="vendor-registrations.html">
+        <i class="ti ti-user-check"></i>Vendor Registrations
+        <span class="nbadge" id="nav-claim-count" style="display:none">0</span>
+      </a>
+    </div>
+    <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
+        <div class="page-title" id="page-title">Bid Management</div>
+      </div>
+      <div class="topbar-right">
+        <button class="btn-refresh" id="btn-refresh" title="Refresh" aria-label="Refresh" onclick="refreshAll()"><i class="ti ti-refresh"></i></button>
+        <div id="user-bar"></div>
+      </div>
+    </div>
+
+    <div class="content" id="main-content-region" role="main" tabindex="-1">
+      <div id="loading" class="loading-overlay"><div class="spinner"></div><span>Loading bids…</span></div>
+
+      <!-- ── The list of solicitations ── -->
+      <div id="bidListPage" style="display:none">
+        <div class="panel">
+          <div class="bm-head">
+            <h2>Bid rounds<small>Every solicitation, newest first. A package can be re-tendered — each attempt is its own round.</small></h2>
+            <button class="btn btn-primary" id="btnNewRound" onclick="openNewRound()">
+              <i class="ti ti-plus"></i> New bid round</button>
+          </div>
+          <div class="filter-bar" style="margin-bottom:14px">
+            <div class="filter-group">
+              <label>Stage</label>
+              <select id="fStage" onchange="renderList()">
+                <option value="">All stages</option>
+              </select>
+            </div>
+            <div style="flex:1 1 200px;min-width:160px">
+              <input id="fSearch" type="text" placeholder="Search work package or project…" oninput="renderList()"
+                style="width:100%;padding:8px 11px;border:1.5px solid var(--border-md);border-radius:8px;font-family:inherit;font-size:0.9286rem;background:var(--surface);color:var(--text-primary)">
+            </div>
+          </div>
+          <div id="listHost"></div>
+        </div>
+      </div>
+
+      <!-- ── One round's workspace ── -->
+      <div id="bidRoundPage" style="display:none">
+        <button class="btn" onclick="showList()" style="margin-bottom:14px">
+          <i class="ti ti-arrow-left"></i> All bid rounds</button>
+        <div id="roundHost"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New round -->
+<div class="modal-overlay" id="newRoundModal" style="display:none">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <h3>New bid round</h3>
+      <button class="modal-close" onclick="closeNewRound()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="sec-note">Pick the work package to put out to bid. Packages already awarded are not listed.</div>
+      <div class="field">
+        <label>Work package</label>
+        <input id="nrSearch" type="text" placeholder="Search by WP no., description or project…" oninput="renderNrOptions()" autocomplete="off">
+        <div id="nrOptions" style="max-height:270px;overflow-y:auto;margin-top:8px;border:1px solid var(--border);border-radius:8px"></div>
+      </div>
+      <div id="nrPicked" class="sec-note"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeNewRound()">Cancel</button>
+      <button class="btn btn-primary" id="nrCreate" onclick="createRound()" disabled>Create round</button>
+    </div>
+  </div>
+</div>
+
+<!-- RFQ composer -->
+<div class="modal-overlay" id="rfqModal" style="display:none">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <h3>Send the <span id="rfqDocType">RFQ</span></h3>
+      <button class="modal-close" onclick="closeRfq()">&times;</button>
+    </div>
+    <div class="modal-body" id="rfqBody"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeRfq()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/js/auth.js?v=20260904a"></script>
+<script src="assets/js/db.js?v=20260904a"></script>
+<script src="assets/js/ui.js?v=20260904a"></script>
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   Bid Management — the officer's side of BP 2.2 Solicitation through
+   2.4 Negotiation & Award. migrations/2026-09-04_bid_process.sql.
+
+   ⚠️ THE POINT OF THIS PAGE IS THAT IT REPLACES THE MAILBOX, NOT THAT IT SITS
+      BESIDE IT. Issuing the RFQ from here writes the invitations AND composes
+      the email in the officer's own Outlook, each vendor's link included, so
+      running a bid is one action rather than two. If a change ever makes the
+      officer do the work twice, it has broken the reason this exists.
+
+   ⚠️ LETTERS ARE OUT OF SCOPE. Megawide already has drafted NOA and
+      Letter-of-Regret templates. Award records THAT a notice went out and its
+      reference — never any letter wording.
+   ════════════════════════════════════════════════════════════════════════════ */
+let profile = null, canManage = false;
+let ROUNDS = [], WPS = [], PROJECTS = {}, WPBYID = {};
+let R = null;              // the open round
+let INV = [];              // its invitations
+let THREADS = {};          // invitation_id -> clarification[]
+let _nrPick = null, _busy = false;
+
+AppAuth.requireLogin(async (user, p) => {
+  profile = p;
+  if (p.role === 'vendor') { window.location.href = 'vendor-portal.html'; return; }
+  // Read-only roles have nothing to do here: every action on this page is a
+  // write. viewer_budget may READ a bid, so it is let in and locked down.
+  if (p.role === 'viewer') { window.location.href = 'index.html'; return; }
+  canManage = !['viewer', 'viewer_budget'].includes(p.role);
+  window.__wpmRole = p.role;
+  window.__profile = p;
+  if (AppAuth.isAdmin(p)) document.getElementById('nav-admin-section').style.display = '';
+  if (typeof initVendorClaimsNav === 'function') initVendorClaimsNav(p);
+  if (typeof initSidebarProjects === 'function') initSidebarProjects(p);
+  renderUserBar('user-bar', p);
+  initMobileMenu();
+  if (!canManage) {
+    const b = document.getElementById('btnNewRound');
+    if (b) b.style.display = 'none';
+  }
+  // Stage filter options come from the one roster in db.js.
+  const sel = document.getElementById('fStage');
+  VendorDb.bidRounds.stages.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = VendorDb.bidRounds.stageLabel(s);
+    sel.appendChild(o);
+  });
+  await loadAll();
+});
+
+async function loadAll() {
+  try {
+    const projects = await WPDb.getProjects();
+    (projects || []).forEach(pr => { PROJECTS[pr.id] = pr; });
+    // The work packages this user may actually bid out.
+    const seesAll = ['super_admin', 'admin', 'specialist'].includes(profile.role);
+    WPS = seesAll ? await WPDb.getAllApprovedWPs()
+                  : await WPDb.getApprovedWPsForProjects(profile.projects || []);
+    WPS = (WPS || []).filter(w => w.project_id !== 'DEMO');
+    WPS.forEach(w => { WPBYID[w.id] = w; });
+    ROUNDS = await VendorDb.bidRounds.list();
+  } catch (e) {
+    AppNotify.fromError(e, 'Could not load bid rounds');
+  }
+  document.getElementById('loading').style.display = 'none';
+  // ?round=<id> so a round is bookmarkable and shareable with a colleague.
+  const boot = new URLSearchParams(location.search).get('round');
+  if (boot && ROUNDS.some(r => r.id === boot)) { await openRound(boot); return; }
+  showList();
+}
+async function refreshAll() {
+  const b = document.getElementById('btn-refresh');
+  const i = b && b.querySelector('i');
+  if (i) i.classList.add('spin');
+  try {
+    ROUNDS = await VendorDb.bidRounds.list();
+    if (R) { await openRound(R.id); } else { renderList(); }
+  } catch (e) { AppNotify.fromError(e, 'Could not refresh'); }
+  if (i) i.classList.remove('spin');
+}
+
+/* ── helpers ─────────────────────────────────────────────────────────────── */
+function money(n, cur) {
+  if (n == null || n === '') return '—';
+  return (cur || 'PHP') + ' ' + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+function num(v) { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(n) ? n : null; }
+function intOf(v) { const n = parseInt(String(v == null ? '' : v).replace(/[^0-9-]/g, ''), 10); return isFinite(n) ? n : null; }
+function dt(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  // An Invalid Date renders the literal string "Invalid Date" — never show that.
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+function dOnly(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+// <input type="datetime-local"> wants local wall-clock, not an ISO Z string.
+function toLocalInput(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return '';
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+       + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function fromLocalInput(v) { return v ? new Date(v).toISOString() : null; }
+function wpLabel(w) {
+  if (!w) return 'Work package';
+  return (w.wp_no ? 'WP ' + w.wp_no : 'Work package') + (w.description ? ' — ' + w.description : '');
+}
+function projName(pid) { return (PROJECTS[pid] || {}).name || pid || ''; }
+function val(id) { const e = document.getElementById(id); return e ? e.value.trim() : ''; }
+function checked(id) { const e = document.getElementById(id); return !!(e && e.checked); }
+
+/* ── the list ────────────────────────────────────────────────────────────── */
+function showList() {
+  R = null;
+  document.getElementById('bidRoundPage').style.display = 'none';
+  document.getElementById('bidListPage').style.display = '';
+  document.getElementById('page-title').textContent = 'Bid Management';
+  if (location.search) history.replaceState(null, '', location.pathname);
+  renderList();
+}
+function renderList() {
+  const stage = val('fStage'), q = val('fSearch').toLowerCase();
+  const rows = ROUNDS.filter(r => {
+    if (stage && r.stage !== stage) return false;
+    if (!q) return true;
+    const w = WPBYID[r.wp_id] || {};
+    return (wpLabel(w) + ' ' + projName(r.project_id)).toLowerCase().includes(q);
+  });
+  const host = document.getElementById('listHost');
+  if (!rows.length) {
+    host.innerHTML = '<div class="empty-state"><i class="ti ti-gavel"></i>'
+      + '<b>' + (ROUNDS.length ? 'Nothing matches those filters' : 'No bid rounds yet') + '</b>'
+      + (ROUNDS.length ? 'Clear the stage or search to see the rest.'
+         : 'Start one from a work package and the app will issue the RFQ for you.') + '</div>';
+    return;
+  }
+  host.innerHTML = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
+    + '<th>Work package</th><th>Project</th><th>Type</th><th>Stage</th>'
+    + '<th>Bidders</th><th>Deadline</th></tr></thead><tbody>'
+    + rows.map(r => {
+        const w = WPBYID[r.wp_id] || {};
+        return '<tr style="cursor:pointer" onclick="openRound(' + Q + r.id + Q + ')">'
+          + '<td><b>' + esc(wpLabel(w)) + '</b>'
+          + (r.round_no > 1 ? ' <span class="bstat bstat-invited">Round ' + r.round_no + '</span>' : '') + '</td>'
+          + '<td>' + esc(projName(r.project_id)) + '</td>'
+          + '<td>' + esc(r.doc_type || 'RFQ') + '</td>'
+          + '<td>' + esc(VendorDb.bidRounds.stageLabel(r.stage)) + '</td>'
+          + '<td>' + (r._n == null ? '—' : r._n) + '</td>'
+          + '<td>' + esc(dOnly(r.bid_due_at) || '—') + '</td></tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+/* ── new round ───────────────────────────────────────────────────────────── */
+function openNewRound() {
+  _nrPick = null;
+  document.getElementById('nrSearch').value = '';
+  document.getElementById('nrPicked').textContent = '';
+  document.getElementById('nrCreate').disabled = true;
+  document.getElementById('newRoundModal').style.display = 'flex';
+  renderNrOptions();
+  setTimeout(() => { const e = document.getElementById('nrSearch'); if (e) e.focus(); }, 60);
+}
+function closeNewRound() { document.getElementById('newRoundModal').style.display = 'none'; }
+function renderNrOptions() {
+  const q = val('nrSearch').toLowerCase();
+  // Already-resolved packages are not put out to bid. isResolved is the shared
+  // predicate (Known Issues #28) — never re-inline award_status here.
+  const pool = WPS.filter(w => !window.isResolved(w))
+    .filter(w => !q || (wpLabel(w) + ' ' + projName(w.project_id)).toLowerCase().includes(q))
+    .slice(0, 60);
+  const host = document.getElementById('nrOptions');
+  if (!pool.length) { host.innerHTML = '<div style="padding:14px;font-size:0.8571rem;color:var(--text-hint)">No matching work packages.</div>'; return; }
+  host.innerHTML = pool.map(w =>
+    '<div class="bidder" style="padding:9px 12px;cursor:pointer" onclick="pickWp(' + Q + w.id + Q + ')">'
+    + '<div class="bidder-name">' + esc(wpLabel(w))
+    + '<small>' + esc(projName(w.project_id)) + (w.trade ? ' · ' + esc(w.trade) : '') + '</small></div></div>').join('');
+}
+function pickWp(id) {
+  _nrPick = WPBYID[id] || null;
+  if (!_nrPick) return;
+  document.getElementById('nrPicked').innerHTML =
+    'Selected: <b>' + esc(wpLabel(_nrPick)) + '</b> · ' + esc(projName(_nrPick.project_id));
+  document.getElementById('nrCreate').disabled = false;
+}
+async function createRound() {
+  if (!_nrPick || _busy) return;
+  _busy = true;
+  const btn = document.getElementById('nrCreate');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    // Seed the ask from the work package so the officer starts from what is
+    // already known rather than an empty form.
+    const r = await VendorDb.bidRounds.create(_nrPick.id, _nrPick.project_id, {
+      doc_type: /labor|service/i.test(_nrPick.type_of_works || _nrPick.type_of_service || '') ? 'RFP' : 'RFQ',
+      scope_note: _nrPick.scope || _nrPick.detailed_description || null,
+      payment_terms: _nrPick.payment_terms_days ? _nrPick.payment_terms_days + ' days' : null,
+      contact_person: profile.name || profile.email || null,
+      contact_email: profile.email || null,
+    }, profile);
+    ROUNDS.unshift(r);
+    closeNewRound();
+    await openRound(r.id);
+    AppNotify.success('Bid round created. Set the ask, then add bidders.');
+  } catch (e) {
+    AppNotify.fromError(e, 'Could not create the bid round');
+  } finally {
+    _busy = false; btn.disabled = false; btn.textContent = 'Create round';
+  }
+}
+
+/* ── the workspace ───────────────────────────────────────────────────────── */
+async function openRound(id) {
+  try {
+    R = await VendorDb.bidRounds.get(id);
+    INV = await VendorDb.bidRounds.invitations(id);
+    THREADS = {};
+    const all = await VendorDb.bidClarifications.forRound(id);
+    all.forEach(m => { (THREADS[m.invitation_id] = THREADS[m.invitation_id] || []).push(m); });
+  } catch (e) {
+    AppNotify.fromError(e, 'Could not open that bid round');
+    return;
+  }
+  document.getElementById('bidListPage').style.display = 'none';
+  document.getElementById('bidRoundPage').style.display = '';
+  history.replaceState(null, '', location.pathname + '?round=' + encodeURIComponent(id));
+  renderRound();
+}
+
+function renderRound() {
+  const w = WPBYID[R.wp_id] || {};
+  document.getElementById('page-title').textContent = wpLabel(w);
+  const stages = VendorDb.bidRounds.stages.filter(s => s !== 'cancelled');
+  const at = stages.indexOf(R.stage);
+  const steps = stages.map((s, i) =>
+    '<button class="bm-step ' + (s === R.stage ? 'now' : (at >= 0 && i < at ? 'done' : '')) + '"'
+    + (canManage ? ' onclick="setStage(' + Q + s + Q + ')"' : ' disabled')
+    + '><span class="bm-stepn">' + (i + 1) + '</span>' + esc(VendorDb.bidRounds.stageLabel(s)) + '</button>').join('');
+
+  document.getElementById('roundHost').innerHTML =
+      '<div class="panel">'
+    + '<div class="bm-head">'
+    + '<span class="bm-doc">' + esc(R.doc_type || 'RFQ') + (R.round_no > 1 ? ' · Round ' + R.round_no : '') + '</span>'
+    + '<h2>' + esc(wpLabel(w)) + '<small>' + esc(projName(R.project_id))
+    + (w.trade ? ' · ' + esc(w.trade) : '') + '</small></h2></div>'
+    + '<div class="bm-steps">' + steps + '</div>'
+    + (R.stage === 'cancelled'
+       ? '<div class="banner-warn" style="padding:11px 14px;border-radius:8px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;font-size:0.8571rem">'
+         + 'This round was cancelled' + (R.cancelled_reason ? ': ' + esc(R.cancelled_reason) : '.') + '</div>'
+       : '')
+    + '</div>'
+    + askPanel() + biddersPanel() + responsesPanel() + clarifyPanel()
+    + comparisonPanel() + evaluationPanel() + negotiationPanel() + awardPanel();
+}
+
+async function setStage(s) {
+  if (!canManage || _busy) return;
+  _busy = true;
+  try {
+    R = await VendorDb.bidRounds.setStage(R.id, s, profile);
+    const i = ROUNDS.findIndex(x => x.id === R.id);
+    if (i >= 0) ROUNDS[i] = R;
+    renderRound();
+  } catch (e) { AppNotify.fromError(e, 'Could not move the stage'); }
+  finally { _busy = false; }
+}
+
+/* 2.2.1 — Preparation of Scope of Works (BOQ) and TOR. */
+function askPanel() {
+  const ro = canManage ? '' : ' disabled';
+  return '<div class="panel"><div class="panel-title">1 · The ask <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.2.1</span></div>'
+    + '<div class="sec-note">Scope, deadline and terms. Everything here goes to the bidders exactly as written.</div>'
+    + '<div class="bm-grid">'
+    + '<div class="field"><label>Document type</label><select id="a-doc"' + ro + '>'
+    + ['RFQ', 'RFP', 'ITB'].map(t => '<option value="' + t + '"' + (R.doc_type === t ? ' selected' : '') + '>' + t
+        + (t === 'RFQ' ? ' — materials' : t === 'RFP' ? ' — labor / services' : ' — formal tender') + '</option>').join('')
+    + '</select></div>'
+    + '<div class="field"><label>Bid deadline (BAC)</label>'
+    + '<input id="a-due" type="datetime-local" value="' + esc(toLocalInput(R.bid_due_at)) + '"' + ro + '></div>'
+    + '<div class="field"><label>Pre-bid</label>'
+    + '<input id="a-prebid" type="datetime-local" value="' + esc(toLocalInput(R.prebid_at)) + '"' + ro + '></div>'
+    + '<div class="field"><label>Two envelopes</label>'
+    + '<select id="a-two"' + ro + '>'
+    + '<option value="1"' + (R.two_envelope ? ' selected' : '') + '>Technical + Commercial</option>'
+    + '<option value="0"' + (R.two_envelope ? '' : ' selected') + '>Commercial only</option></select>'
+    + '<div class="field-hint">BP 2.2.3 asks for both. A simple materials RFQ is legitimately one quotation.</div></div>'
+    + '</div>'
+    + '<div class="field" style="margin-top:12px"><label>Scope of works</label>'
+    + '<textarea id="a-scope"' + ro + ' placeholder="What you want quoted, in words.">' + esc(R.scope_note || '') + '</textarea></div>'
+    + '<div class="bm-grid">'
+    + '<div class="field"><label>Bill of quantities</label>'
+    + '<input id="a-boq" value="' + esc(R.boq_note || '') + '" placeholder="BOQ reference"' + ro + '></div>'
+    + '<div class="field"><label>Payment terms</label>'
+    + '<input id="a-terms" value="' + esc(R.payment_terms || '') + '" placeholder="e.g. 30% DP, 70% on delivery"' + ro + '></div>'
+    + '<div class="field"><label>Contact person</label>'
+    + '<input id="a-contact" value="' + esc(R.contact_person || '') + '"' + ro + '></div>'
+    + '<div class="field"><label>Contact email</label>'
+    + '<input id="a-email" type="email" value="' + esc(R.contact_email || '') + '"' + ro + '></div>'
+    + '</div>'
+    + '<div class="field" style="margin-top:12px"><label>Conditions</label>'
+    + '<textarea id="a-cond"' + ro + ' placeholder="Protocols, validity, site conditions, anything else a bidder must know.">' + esc(R.conditions || '') + '</textarea></div>'
+    + (canManage ? '<div class="bm-actions"><button class="btn btn-primary" id="btnSaveAsk" onclick="saveAsk()">Save the ask</button></div>' : '')
+    + '</div>';
+}
+async function saveAsk() {
+  if (_busy) return;
+  _busy = true;
+  const btn = document.getElementById('btnSaveAsk');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    R = await VendorDb.bidRounds.update(R.id, {
+      doc_type: val('a-doc') || 'RFQ',
+      two_envelope: val('a-two') === '1',
+      bid_due_at: fromLocalInput(val('a-due')),
+      prebid_at: fromLocalInput(val('a-prebid')),
+      scope_note: val('a-scope') || null,
+      boq_note: val('a-boq') || null,
+      payment_terms: val('a-terms') || null,
+      contact_person: val('a-contact') || null,
+      contact_email: val('a-email') || null,
+      conditions: val('a-cond') || null,
+    }, profile);
+    const i = ROUNDS.findIndex(x => x.id === R.id);
+    if (i >= 0) ROUNDS[i] = R;
+    renderRound();
+    AppNotify.success('Saved.');
+  } catch (e) {
+    AppNotify.fromError(e, 'Could not save');
+    btn.disabled = false; btn.textContent = 'Save the ask';
+  } finally { _busy = false; }
+}
+
+/* 2.2.2 — Issuance of RFQ / RFP / ITB to the invited vendors. */
+function biddersPanel() {
+  const rows = INV.map(i => {
+    const acc = window.accredMeta ? window.accredMeta(i.vendor_accreditation) : null;
+    return '<div class="bidder">'
+      + '<div class="bidder-name">' + esc(i.vendor_name)
+      + '<small>' + esc(i.vendor_contact_email || 'no contact email on file') + '</small></div>'
+      + (acc ? '<span class="bstat bstat-invited" title="Accreditation">' + esc(acc.label) + '</span>' : '')
+      + '<span class="bstat bstat-' + esc(i.status === 'closed' ? 'closed' : i.status) + '">'
+      + esc(i.status === 'invited' ? 'Invited' : i.status === 'viewed' ? 'Opened'
+            : i.status === 'submitted' ? 'Bid in' : i.status === 'declined' ? 'Declined'
+            : i.status === 'withdrawn' ? 'Withdrawn' : 'Closed') + '</span>'
+      + (canManage && R.stage === 'draft'
+          ? '<button class="btn btn-sm" onclick="dropBidder(' + Q + i.id + Q + ')" title="Remove"><i class="ti ti-x"></i></button>'
+          : '')
+      + '</div>';
+  }).join('');
+
+  return '<div class="panel"><div class="panel-title">2 · Bidders <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.2.2</span></div>'
+    + '<div class="sec-note">Who is being asked to quote. '
+    + '<b>Unaccredited vendors may be invited</b> — BP policy N29 runs accreditation in parallel; only the AWARD requires it.</div>'
+    + (INV.length ? rows : '<div class="empty-state"><i class="ti ti-users"></i><b>No bidders yet</b>Add the vendors you want to quote this package.</div>')
+    + (canManage ? '<div class="field" style="margin-top:14px"><label>Add a bidder</label>'
+        + '<input id="vSearch" type="text" placeholder="Search the vendor directory…" oninput="searchVendors()" autocomplete="off">'
+        + '<div id="vResults"></div></div>'
+        + '<div class="bm-actions">'
+        + (WPBYID[R.wp_id] && WPBYID[R.wp_id].trade
+            ? '<button class="btn" onclick="suggestVendors()"><i class="ti ti-wand"></i> Suggest from the catalogue</button>' : '')
+        + '<button class="btn btn-primary" onclick="openRfq()"' + (INV.length ? '' : ' disabled') + '>'
+        + '<i class="ti ti-mail-forward"></i> ' + (R.issued_at ? 'Send again' : 'Issue the ' + esc(R.doc_type || 'RFQ')) + '</button>'
+        + '</div>' : '')
+    + (R.issued_at ? '<div class="sec-note" style="margin:10px 0 0">Issued ' + esc(dt(R.issued_at))
+        + (R.issued_by_name ? ' by ' + esc(R.issued_by_name) : '') + '.</div>' : '')
+    + '</div>';
+}
+
+let _vTimer = null;
+function searchVendors() {
+  clearTimeout(_vTimer);
+  _vTimer = setTimeout(async () => {
+    const q = val('vSearch');
+    const host = document.getElementById('vResults');
+    if (!host) return;
+    if (q.length < 2) { host.innerHTML = ''; return; }
+    try {
+      const rows = await VendorDb.searchApprovedVendors(q);
+      const have = new Set(INV.map(i => i.vendor_id));
+      const list = (rows || []).filter(v => !have.has(v.id));
+      host.innerHTML = list.length
+        ? list.map(v => vendorOption(v)).join('')
+        : '<div class="sec-note" style="margin:8px 0 0">No match — or they are already on this round.</div>';
+    } catch (e) { host.innerHTML = ''; }
+  }, 250);
+}
+/* Vendors whose catalogue says they supply this trade/works. findVendorsForWP
+   sorts accredited first. */
+async function suggestVendors() {
+  const w = WPBYID[R.wp_id] || {};
+  const host = document.getElementById('vResults');
+  if (!host) return;
+  host.innerHTML = '<div class="sec-note" style="margin:8px 0 0">Looking…</div>';
+  try {
+    const rows = await VendorDb.findVendorsForWP(w.trade, w.works);
+    const have = new Set(INV.map(i => i.vendor_id));
+    const list = (rows || []).filter(v => !have.has(v.id)).slice(0, 25);
+    host.innerHTML = list.length
+      ? '<div class="sec-note" style="margin:8px 0 4px">Vendors whose catalogue covers '
+        + esc(w.works || w.trade) + ', accredited first:</div>' + list.map(v => vendorOption(v)).join('')
+      : '<div class="sec-note" style="margin:8px 0 0">Nobody is filed under that works yet.</div>';
+  } catch (e) {
+    host.innerHTML = '<div class="sec-note" style="margin:8px 0 0">Could not search the catalogue.</div>';
+  }
+}
+function vendorOption(v) {
+  const acc = window.accredMeta ? window.accredMeta(v.accreditation) : null;
+  // ⚠️ Only the id goes into the handler — a company name can contain an
+  //    apostrophe and would break out of the inline argument (Known Issues #23).
+  return '<div class="bidder" style="padding:8px 0;cursor:pointer" onclick="addBidder(' + Q + v.id + Q + ')">'
+    + '<div class="bidder-name">' + esc(v.name) + '</div>'
+    + (acc ? '<span class="bstat bstat-invited">' + esc(acc.label) + '</span>' : '')
+    + '<button class="btn btn-sm"><i class="ti ti-plus"></i></button></div>';
+}
+async function addBidder(vendorId) {
+  if (_busy) return;
+  _busy = true;
+  try {
+    await VendorDb.bidRounds.addVendors(R, [vendorId], profile);
+    INV = await VendorDb.bidRounds.invitations(R.id);
+    const s = document.getElementById('vSearch'); if (s) s.value = '';
+    renderRound();
+  } catch (e) { AppNotify.fromError(e, 'Could not add that bidder'); }
+  finally { _busy = false; }
+}
+async function dropBidder(id) {
+  if (!confirm('Remove this bidder from the round?')) return;
+  try {
+    await VendorDb.bidRounds.removeInvitation(id);
+    INV = await VendorDb.bidRounds.invitations(R.id);
+    renderRound();
+  } catch (e) { AppNotify.fromError(e, 'Could not remove that bidder'); }
+}
+
+/* ── the RFQ composer ────────────────────────────────────────────────────
+   ⚠️ THE EMAIL IS SENT FROM THE OFFICER'S OWN MAILBOX, deliberately. Supabase's
+      built-in sender is documented development-only on every tier, and this
+      stack has no Edge Functions — but more to the point, an RFQ arriving from
+      the buyer the vendor already deals with lands better than one from a
+      no-reply robot. The app writes it; Outlook sends it. */
+function rfqSubject() {
+  const w = WPBYID[R.wp_id] || {};
+  return (R.doc_type || 'RFQ') + ' — ' + wpLabel(w) + ' — ' + projName(R.project_id);
+}
+function bidLink(inv) {
+  const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+  return base + 'bid-response.html?t=' + encodeURIComponent(inv.access_token);
+}
+function rfqBody(inv) {
+  const w = WPBYID[R.wp_id] || {};
+  const L = [];
+  L.push('Dear ' + (inv.vendor_contact_person || inv.vendor_name) + ',');
+  L.push('');
+  L.push('Megawide Construction Corporation invites you to quote the following work package.');
+  L.push('');
+  L.push('Package : ' + wpLabel(w));
+  L.push('Project : ' + projName(R.project_id));
+  if (R.bid_due_at) L.push('Deadline: ' + dt(R.bid_due_at));
+  if (R.prebid_at) L.push('Pre-bid : ' + dt(R.prebid_at));
+  if (R.two_envelope) L.push('Envelopes: Technical Bid and Commercial Bid are both required.');
+  L.push('');
+  L.push('Full details, and the form to submit your bid:');
+  L.push(bidLink(inv));
+  L.push('');
+  L.push('The link is personal to your company — please do not forward it. You do not need');
+  L.push('an account: open it, enter your price and attach your quotation.');
+  L.push('');
+  L.push('Thank you,');
+  L.push(R.contact_person || profile.name || '');
+  L.push('Megawide Procurement' + (R.contact_email ? ' · ' + R.contact_email : ''));
+  return L.join('\n');
+}
+function openRfq() {
+  document.getElementById('rfqDocType').textContent = R.doc_type || 'RFQ';
+  const withEmail = INV.filter(i => i.vendor_contact_email);
+  const without = INV.filter(i => !i.vendor_contact_email);
+  document.getElementById('rfqBody').innerHTML =
+      '<div class="sec-note">The app has written the invitation. Each bidder gets their own link, so '
+    + 'each is a separate email — open them in Outlook and send. Nothing here sends mail on your behalf.</div>'
+    + '<div class="field"><label>Subject</label><input id="rfqSubj" value="' + esc(rfqSubject()) + '" readonly></div>'
+    + INV.map(i =>
+        '<div class="rfq-row">'
+        + '<div class="bidder-name" style="flex:0 0 190px">' + esc(i.vendor_name)
+        + '<small>' + (i.vendor_contact_email ? esc(i.vendor_contact_email)
+            : '<span class="rfq-noemail">no email on file</span>') + '</small></div>'
+        + '<div class="rfq-link">' + esc(bidLink(i)) + '</div>'
+        + '<button class="btn btn-sm" onclick="copyLink(' + Q + i.id + Q + ')" title="Copy just the link"><i class="ti ti-link"></i></button>'
+        + (i.vendor_contact_email
+            ? '<button class="btn btn-sm btn-primary" onclick="mailTo(' + Q + i.id + Q + ')"><i class="ti ti-mail"></i> Open in Outlook</button>'
+            : '<button class="btn btn-sm" onclick="copyMail(' + Q + i.id + Q + ')"><i class="ti ti-copy"></i> Copy email</button>')
+        + '</div>').join('')
+    + (without.length
+        ? '<div class="sec-note" style="margin-top:12px"><b>' + without.length + '</b> bidder(s) have no contact '
+          + 'email on file — copy their message and address it yourself, or add the email to their vendor profile.</div>'
+        : '')
+    + '<div class="bm-actions">'
+    + '<button class="btn" onclick="copyMergeCsv()"><i class="ti ti-table-export"></i> Copy mail-merge list (CSV)</button>'
+    + (canManage && R.stage === 'draft'
+        ? '<button class="btn btn-primary" onclick="markIssued()"><i class="ti ti-send"></i> Mark as issued</button>' : '')
+    + '</div>';
+  document.getElementById('rfqModal').style.display = 'flex';
+}
+function closeRfq() { document.getElementById('rfqModal').style.display = 'none'; }
+function invById(id) { return INV.find(i => i.id === id); }
+function copyLink(id) {
+  const i = invById(id); if (!i) return;
+  navigator.clipboard.writeText(bidLink(i)).then(() => AppNotify.success('Link copied.'));
+}
+function copyMail(id) {
+  const i = invById(id); if (!i) return;
+  navigator.clipboard.writeText(rfqSubject() + '\n\n' + rfqBody(i))
+    .then(() => AppNotify.success('Email copied — paste it into Outlook.'));
+}
+function mailTo(id) {
+  const i = invById(id); if (!i) return;
+  // mailto has a practical URL length limit, so the body is deliberately short
+  // and the detail lives behind the link.
+  const url = 'mailto:' + encodeURIComponent(i.vendor_contact_email)
+    + '?subject=' + encodeURIComponent(rfqSubject())
+    + '&body=' + encodeURIComponent(rfqBody(i));
+  if (url.length > 1900) { copyMail(id); return; }
+  window.location.href = url;
+}
+function csvCell(v) {
+  const s = String(v == null ? '' : v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function copyMergeCsv() {
+  const rows = [['Company', 'Contact', 'Email', 'Subject', 'Link']];
+  INV.forEach(i => rows.push([i.vendor_name, i.vendor_contact_person || '',
+    i.vendor_contact_email || '', rfqSubject(), bidLink(i)]));
+  navigator.clipboard.writeText(rows.map(r => r.map(csvCell).join(',')).join('\n'))
+    .then(() => AppNotify.success('Merge list copied — paste into Excel for an Outlook mail merge.'));
+}
+async function markIssued() {
+  try {
+    INV = await VendorDb.bidRounds.issue(R, profile);
+    R = await VendorDb.bidRounds.get(R.id);
+    const i = ROUNDS.findIndex(x => x.id === R.id);
+    if (i >= 0) ROUNDS[i] = R;
+    closeRfq();
+    renderRound();
+    AppNotify.success('Round issued. Bidders can now respond from their link.');
+  } catch (e) { AppNotify.fromError(e, 'Could not mark it issued'); }
+}
+
+/* 2.2.3 — Receipt of Proposal. */
+function responsesPanel() {
+  const inPlay = INV.filter(i => i.status === 'submitted' || i.status === 'closed');
+  return '<div class="panel"><div class="panel-title">3 · Bids received <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.2.3</span></div>'
+    + '<div class="sec-note">' + inPlay.length + ' of ' + INV.length + ' invited bidders have submitted.'
+    + (R.two_envelope ? ' This round is two-envelope, so each bid carries a Technical and a Commercial document.' : '') + '</div>'
+    + (inPlay.length
+        ? inPlay.map(i =>
+            '<div class="bidder"><div class="bidder-name">' + esc(i.vendor_name)
+            + '<small>Submitted ' + esc(dt(i.submitted_at) || '—')
+            + (i.lead_time_days != null ? ' · lead time ' + i.lead_time_days + 'd' : '')
+            + (i.validity_days != null ? ' · valid ' + i.validity_days + 'd' : '')
+            + (i.payment_terms ? ' · ' + esc(i.payment_terms) : '') + '</small></div>'
+            + '<b style="font-size:0.9286rem">' + esc(money(i.offer_amount, i.offer_currency)) + '</b>'
+            + (i.technical_path ? '<button class="btn btn-sm" onclick="openFile(' + Q + i.technical_path + Q + ')"><i class="ti ti-file-text"></i> Technical</button>' : '')
+            + (i.commercial_path ? '<button class="btn btn-sm" onclick="openFile(' + Q + i.commercial_path + Q + ')"><i class="ti ti-file-dollar"></i> Commercial</button>' : '')
+            + '</div>'
+            + (i.vendor_notes ? '<div class="sec-note" style="margin:-4px 0 10px 2px">' + esc(i.vendor_notes) + '</div>' : ''))
+          .join('')
+        : '<div class="empty-state"><i class="ti ti-inbox"></i><b>Nothing in yet</b>Bids appear here as they are submitted.</div>')
+    + '</div>';
+}
+/* Submissions live in the private bid-submissions bucket, so each needs a
+   signed URL — staff read is allowed by policy, anonymous read is not. */
+async function openFile(path) {
+  try {
+    const sb = await getSB();
+    const { data, error } = await sb.storage.from('bid-submissions').createSignedUrl(path, 3600);
+    if (error) throw error;
+    if (data && data.signedUrl) window.open(data.signedUrl, '_blank');
+  } catch (e) { AppNotify.fromError(e, 'Could not open that file'); }
+}
+
+/* 2.3.1 — Clarification. One thread per bidder; a bidder never sees another's. */
+function clarifyPanel() {
+  const rows = INV.filter(i => i.status === 'submitted' || (THREADS[i.id] || []).length);
+  if (!rows.length) return '';
+  return '<div class="panel"><div class="panel-title">4 · Clarifications <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.3.1</span></div>'
+    + '<div class="sec-note">Questions to one bidder about their proposal. Each thread is private to that bidder, '
+    + 'and they answer from the same link they bid with — no login.</div>'
+    + rows.map(i => {
+        const th = THREADS[i.id] || [];
+        return '<div style="margin-bottom:18px">'
+          + '<div class="bidder-name" style="margin-bottom:8px">' + esc(i.vendor_name) + '</div>'
+          + (th.length ? th.map(m =>
+              '<div class="cl-msg' + (m.author === 'staff' ? ' staff' : '') + '">'
+              + '<div class="cl-from">' + esc(m.author === 'staff' ? (m.created_by_name || 'Megawide Procurement') : i.vendor_name)
+              + ' · ' + esc(dt(m.created_at)) + '</div>'
+              + '<div class="cl-body">' + esc(m.message) + '</div></div>').join('')
+            : '<div class="sec-note" style="margin:0 0 8px">No clarifications yet.</div>')
+          + (canManage
+              ? '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">'
+                + '<textarea id="cl-' + i.id + '" placeholder="Ask this bidder something…" '
+                + 'style="flex:1;min-width:200px;min-height:56px;padding:9px 11px;border:1.5px solid var(--border-md);'
+                + 'border-radius:8px;font-family:inherit;font-size:0.9286rem;background:var(--surface);color:var(--text-primary)"></textarea>'
+                + '<button class="btn" onclick="sendClarify(' + Q + i.id + Q + ')">Send</button></div>'
+              : '')
+          + '</div>';
+      }).join('')
+    + '</div>';
+}
+async function sendClarify(invId) {
+  const el = document.getElementById('cl-' + invId);
+  const text = el ? el.value.trim() : '';
+  if (!text) return;
+  try {
+    await VendorDb.bidClarifications.add(invId, text, profile);
+    const all = await VendorDb.bidClarifications.forRound(R.id);
+    THREADS = {};
+    all.forEach(m => { (THREADS[m.invitation_id] = THREADS[m.invitation_id] || []).push(m); });
+    renderRound();
+    AppNotify.success('Sent. The bidder sees it on their bid link.');
+  } catch (e) { AppNotify.fromError(e, 'Could not send that'); }
+}
+
+/* 2.3.2 — Summarization (Cost Comparison). */
+function bidsInPlay() {
+  return INV.filter(i => i.status === 'submitted' || i.status === 'closed')
+            .filter(i => i.offer_amount != null);
+}
+function comparisonPanel() {
+  const rows = bidsInPlay().slice().sort((a, b) => (a.offer_amount || 0) - (b.offer_amount || 0));
+  if (!rows.length) return '';
+  const low = rows[0].offer_amount;
+  const w = WPBYID[R.wp_id] || {};
+  // ⚠️ The BCB is OURS and is shown to staff only — it is deliberately absent
+  //    from every vendor-facing surface (see the migration's view).
+  const bcb = window.__hideBudget ? null : (w.approved_budget_bcb || null);
+  return '<div class="panel"><div class="panel-title">5 · Cost comparison <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.3.2</span></div>'
+    + (bcb ? '<div class="sec-note">Budget (BCB) for this package: <b>' + esc(money(bcb)) + '</b></div>' : '')
+    + '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
+    + '<th>Bidder</th><th style="text-align:right">Offer</th><th style="text-align:right">vs lowest</th>'
+    + (bcb ? '<th style="text-align:right">vs BCB</th>' : '')
+    + '<th>Lead time</th><th>Validity</th><th>Payment terms</th></tr></thead><tbody>'
+    + rows.map((i, n) => {
+        const diff = (i.offer_amount || 0) - low;
+        const vsB = bcb ? (i.offer_amount || 0) - bcb : null;
+        return '<tr><td><b>' + esc(i.vendor_name) + '</b>'
+          + (n === 0 ? ' <span class="bm-low">lowest</span>' : '') + '</td>'
+          + '<td style="text-align:right"><b>' + esc(money(i.offer_amount, i.offer_currency)) + '</b></td>'
+          + '<td style="text-align:right">' + (diff ? '+' + esc(money(diff, i.offer_currency)) : '—') + '</td>'
+          + (bcb ? '<td style="text-align:right" class="' + (vsB > 0 ? 'bm-high' : 'bm-low') + '">'
+              + (vsB > 0 ? '+' : '') + esc(money(vsB)) + '</td>' : '')
+          + '<td>' + (i.lead_time_days != null ? i.lead_time_days + ' d' : '—') + '</td>'
+          + '<td>' + (i.validity_days != null ? i.validity_days + ' d' : '—') + '</td>'
+          + '<td>' + esc(i.payment_terms || '—') + '</td></tr>';
+      }).join('')
+    + '</tbody></table></div>'
+    + '<div class="sec-note" style="margin-top:12px">Lowest is not the same as best value — BP 2.3.3 weighs technical, '
+    + 'commercial and financial together.</div></div>';
+}
+
+/* 2.3.3 — Evaluation. */
+function evaluationPanel() {
+  const rows = bidsInPlay();
+  if (!rows.length) return '';
+  const ro = canManage ? '' : ' disabled';
+  return '<div class="panel"><div class="panel-title">6 · Evaluation <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.3.3</span></div>'
+    + '<div class="sec-note">Technical result and ranking. Offshore packages should also weigh lead time, freight, '
+    + 'duties and total landed cost.</div>'
+    + rows.map(i =>
+        '<div class="bidder" style="align-items:flex-start">'
+        + '<div class="bidder-name" style="flex:0 0 170px">' + esc(i.vendor_name)
+        + '<small>' + esc(money(i.offer_amount, i.offer_currency)) + '</small></div>'
+        + '<div style="flex:0 0 130px"><select id="ev-r-' + i.id + '"' + ro
+        + ' style="width:100%;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+        + '<option value="">Technical…</option>'
+        + ['pass', 'conditional', 'fail'].map(o => '<option value="' + o + '"' + (i.technical_result === o ? ' selected' : '') + '>'
+            + (o === 'pass' ? 'Pass' : o === 'conditional' ? 'Conditional' : 'Fail') + '</option>').join('')
+        + '</select></div>'
+        + '<input id="ev-s-' + i.id + '" type="number" step="0.01" placeholder="Score" value="' + esc(i.technical_score == null ? '' : i.technical_score) + '"' + ro
+        + ' style="flex:0 0 90px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+        + '<input id="ev-k-' + i.id + '" type="number" placeholder="Rank" value="' + esc(i.rank == null ? '' : i.rank) + '"' + ro
+        + ' style="flex:0 0 80px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+        + '<input id="ev-n-' + i.id + '" placeholder="Notes" value="' + esc(i.evaluation_notes || '') + '"' + ro
+        + ' style="flex:1;min-width:150px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+        + '</div>').join('')
+    + (canManage ? '<div class="bm-actions"><button class="btn btn-primary" onclick="saveEvaluation()">Save evaluation</button></div>' : '')
+    + '</div>';
+}
+async function saveEvaluation() {
+  try {
+    for (const i of bidsInPlay()) {
+      await VendorDb.bidBoard.update(i.id, {
+        technical_result: val('ev-r-' + i.id) || null,
+        technical_score: num(val('ev-s-' + i.id)),
+        rank: intOf(val('ev-k-' + i.id)),
+        evaluation_notes: val('ev-n-' + i.id) || null,
+      }, profile);
+    }
+    INV = await VendorDb.bidRounds.invitations(R.id);
+    renderRound();
+    AppNotify.success('Evaluation saved.');
+  } catch (e) { AppNotify.fromError(e, 'Could not save the evaluation'); }
+}
+
+/* 2.4.1 — Negotiation with the top 1-3 bidders. */
+function negotiationPanel() {
+  const rows = bidsInPlay();
+  if (!rows.length) return '';
+  const ro = canManage ? '' : ' disabled';
+  const short = rows.filter(i => i.shortlisted).length;
+  return '<div class="panel"><div class="panel-title">7 · Negotiation <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.4.1</span></div>'
+    + '<div class="sec-note">Shortlist the top bidders and record the negotiated price — the handshake figure. '
+    + '<b>BP 2.4.1 says 1 to 3 bidders.</b>' + (short > 3 ? ' <span class="bm-high">' + short + ' are shortlisted.</span>' : '') + '</div>'
+    + rows.map(i =>
+        '<div class="bidder">'
+        + '<label style="display:flex;align-items:center;gap:7px;flex:0 0 190px;font-size:0.9286rem;font-weight:600;cursor:pointer">'
+        + '<input type="checkbox" id="ng-s-' + i.id + '"' + (i.shortlisted ? ' checked' : '') + ro
+        + ' style="width:auto">' + esc(i.vendor_name) + '</label>'
+        + '<small style="flex:0 0 130px;color:var(--text-hint)">was ' + esc(money(i.offer_amount, i.offer_currency)) + '</small>'
+        + '<input id="ng-a-' + i.id + '" type="number" step="0.01" placeholder="Negotiated amount" value="'
+        + esc(i.negotiated_amount == null ? '' : i.negotiated_amount) + '"' + ro
+        + ' style="flex:0 0 170px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+        + '<input id="ng-n-' + i.id + '" placeholder="Notes" value="' + esc(i.negotiation_notes || '') + '"' + ro
+        + ' style="flex:1;min-width:140px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+        + '</div>').join('')
+    + (canManage ? '<div class="bm-actions"><button class="btn btn-primary" onclick="saveNegotiation()">Save negotiation</button></div>' : '')
+    + '</div>';
+}
+async function saveNegotiation() {
+  try {
+    for (const i of bidsInPlay()) {
+      await VendorDb.bidBoard.update(i.id, {
+        shortlisted: checked('ng-s-' + i.id),
+        negotiated_amount: num(val('ng-a-' + i.id)),
+        negotiation_notes: val('ng-n-' + i.id) || null,
+      }, profile);
+    }
+    INV = await VendorDb.bidRounds.invitations(R.id);
+    renderRound();
+    AppNotify.success('Negotiation saved.');
+  } catch (e) { AppNotify.fromError(e, 'Could not save'); }
+}
+
+/* 2.4.2 — Award: NOA to the winner, Letter of Regret to the rest.
+   ⚠️ The letters themselves stay with Megawide's existing templates. This
+      records the decision and, per bidder, that a notice went out. */
+function awardPanel() {
+  const rows = bidsInPlay();
+  if (!rows.length) return '';
+  const winner = INV.find(i => i.outcome === 'awarded');
+  const decided = !!winner;
+  return '<div class="panel"><div class="panel-title">8 · Award <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.4.2</span></div>'
+    + '<div class="sec-note">' + (decided
+        ? 'Awarded to <b>' + esc(winner.vendor_name) + '</b>' + (winner.decided_at ? ' on ' + esc(dOnly(winner.decided_at)) : '') + '.'
+        : 'Awarding closes the round: the winner is marked awarded and every other bidder not awarded, so nobody is left un-notified.')
+    + ' <b>Policy N29: award only to accredited vendors.</b> The NOA and Letter of Regret are issued from your existing templates — '
+    + 'record the reference here once each goes out.</div>'
+    + (decided ? '' :
+        (canManage
+          ? '<div class="bm-grid">'
+            + '<div class="field"><label>Award to</label><select id="aw-win">'
+            + '<option value="">Select the winning bidder…</option>'
+            + rows.map(i => '<option value="' + esc(i.id) + '">' + esc(i.vendor_name) + ' — '
+                + esc(money(i.negotiated_amount != null ? i.negotiated_amount : i.offer_amount, i.offer_currency))
+                + (window.accredKey && window.accredKey(i.vendor_accreditation) !== 'accredited' ? ' (not accredited)' : '')
+                + '</option>').join('')
+            + '</select></div>'
+            + '<div class="field"><label>Final amount</label><input id="aw-amt" type="number" step="0.01" placeholder="Final negotiated amount"></div>'
+            + '<div class="field"><label>NOA reference</label><input id="aw-ref" placeholder="e.g. NOA-2026-0142"></div>'
+            + '</div>'
+            + '<div class="bm-actions"><button class="btn btn-primary" onclick="doAward()"><i class="ti ti-award"></i> Record the award</button></div>'
+          : ''))
+    + (decided
+        ? '<div style="margin-top:6px">' + INV.filter(i => i.outcome).map(i =>
+            '<div class="bidder">'
+            + '<div class="bidder-name">' + esc(i.vendor_name)
+            + '<small>' + (i.outcome === 'awarded'
+                ? 'Awarded' + (i.final_amount != null ? ' at ' + esc(money(i.final_amount, i.offer_currency)) : '')
+                : 'Not awarded — Letter of Regret') + '</small></div>'
+            + (i.notice_issued_at
+                ? '<span class="bstat bstat-submitted">Notice sent ' + esc(dOnly(i.notice_issued_at))
+                  + (i.notice_ref ? ' · ' + esc(i.notice_ref) : '') + '</span>'
+                : (canManage
+                    ? '<input id="nt-' + i.id + '" placeholder="Notice ref." style="flex:0 0 150px;padding:6px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+                      + '<button class="btn btn-sm" onclick="recordNotice(' + Q + i.id + Q + ')">Mark sent</button>'
+                    : '<span class="bstat bstat-invited">Notice pending</span>'))
+            + (i.outcome === 'awarded' ? ' <span class="bm-win">Winner</span>' : '')
+            + '</div>').join('') + '</div>'
+        : '')
+    + '</div>';
+}
+async function doAward() {
+  const winId = val('aw-win');
+  if (!winId) { AppNotify.warn('Pick the winning bidder first.'); return; }
+  const win = invById(winId);
+  // N29 is a policy, not a database rule — so warn clearly and let a human
+  // decide, rather than silently blocking or silently allowing.
+  if (window.accredKey && window.accredKey(win.vendor_accreditation) !== 'accredited') {
+    if (!confirm(win.vendor_name + ' is not accredited.\n\nBP policy N29: packages are awarded to accredited '
+      + 'vendors only, with accreditation run in parallel for new vendors.\n\nRecord the award anyway?')) return;
+  }
+  const others = bidsInPlay().length - 1;
+  if (!confirm('Award to ' + win.vendor_name + '?\n\n'
+    + (others > 0 ? others + ' other bidder(s) will be marked not awarded, ready for their Letter of Regret.\n\n' : '')
+    + 'This closes the round.')) return;
+  try {
+    INV = await VendorDb.bidRounds.award(R.id, winId,
+      { finalAmount: num(val('aw-amt')), noticeRef: val('aw-ref') || null }, profile);
+    R = await VendorDb.bidRounds.get(R.id);
+    const n = ROUNDS.findIndex(x => x.id === R.id);
+    if (n >= 0) ROUNDS[n] = R;
+    renderRound();
+    AppNotify.success('Award recorded. Issue the NOA and the regret letters from your templates.');
+  } catch (e) { AppNotify.fromError(e, 'Could not record the award'); }
+}
+async function recordNotice(id) {
+  try {
+    await VendorDb.bidRounds.recordNotice(id, val('nt-' + id) || null, profile);
+    INV = await VendorDb.bidRounds.invitations(R.id);
+    renderRound();
+  } catch (e) { AppNotify.fromError(e, 'Could not record that'); }
+}
+</script>
+</body>
+</html>

@@ -8,8 +8,15 @@
 :root {
   /* ── Megawide Brand Colors ── */
   --mw-red:        #EE3124;
-  --mw-red-dark:   #C42127;
+  --mw-red-dark:   #C42127;   /* a DARKER red — for hover BACKGROUNDS */
   --mw-red-darker: #9B1B1B;
+  /* ⚠️ BRAND RED THAT IS SAFE AS TEXT IN BOTH THEMES. Use this for any
+     `color:`, and keep --mw-red-dark for `background:`. --mw-red-dark is
+     never remapped for dark mode (it can't be — it is a hover background
+     under white text), so text painted with it sat at 2.4:1 on the dark
+     surface and 2.6:1 on the dark tinted panel: unreadable. This token is
+     the inverse-able half of that pair. */
+  --mw-red-ink:    #C42127;
   --mw-red-light:  #FDECEA;
   --mw-red-mid:    #F9C8C5;
   --mw-black:      #231F20;
@@ -404,7 +411,7 @@ body {
   font-size: 0.7143rem;
   font-weight: 600;
   background: var(--mw-red-light);
-  color: var(--mw-red-dark);
+  color: var(--mw-red-ink);
   padding: 3px 10px;
   border-radius: 20px;
   border: 1px solid var(--mw-red-mid);
@@ -725,7 +732,7 @@ body {
 .data-table th[onclick]:hover { color: var(--mw-red); }
 .data-table th.group-header {
   background: var(--mw-red-light);
-  color: var(--mw-red-dark);
+  color: var(--mw-red-ink);
   font-size: 0.6429rem;
   letter-spacing: .07em;
   border-bottom: 2px solid var(--mw-red-mid);
@@ -897,7 +904,7 @@ body {
   gap: 10px;
   font-weight: 500;
 }
-.alert-error   { background: var(--red-light);   border: 1.5px solid var(--mw-red-mid);  color: var(--mw-red-dark); }
+.alert-error   { background: var(--red-light);   border: 1.5px solid var(--mw-red-mid);  color: var(--mw-red-ink); }
 .alert-success { background: var(--green-light);  border: 1.5px solid #A7D9BC;  color: #1A6645; }
 .alert-info    { background: var(--amber-light);  border: 1.5px solid #FCD34D;  color: #92400E; }
 .hidden { display: none !important; }
@@ -1217,7 +1224,7 @@ body {
   border-radius: var(--radius-md);
   padding: 8px 12px;
   font-size: 0.7857rem;
-  color: var(--mw-red-dark);
+  color: var(--mw-red-ink);
   margin-top: 8px;
   font-weight: 500;
 }
@@ -1231,7 +1238,7 @@ body {
   border-radius: var(--radius-md);
   padding: 12px 16px;
   font-size: 0.8571rem;
-  color: var(--mw-red-dark);
+  color: var(--mw-red-ink);
   margin-bottom: 20px;
   display: flex;
   gap: 10px;
@@ -1520,6 +1527,7 @@ body.dark-mode {
   --text-hint:     #9B9999;
   --mw-gray-light: #333433;        /* table th background */
   --mw-red-light:  #3D1A19;
+  --mw-red-ink:    #FF8B80;   /* 6.18:1 on --surface, 6.81:1 on the tinted panel */
   --green-light:   #102B1F;
   --amber-light:   #2C2108;
   --red-light:     #3D1A19;
@@ -1936,3 +1944,37 @@ body.dark-mode .skel::after { background: linear-gradient(90deg, transparent, rg
 
 /* "Nothing here" cell inside a table body */
 .empty-cell { text-align: center; color: var(--text-hint); padding: 20px; }
+
+/* ── Shared sidebar project list (window.initSidebarProjects) ─────────────
+   Used by Vendor Management and Bid Management, which sit in the same shell
+   but had no way to jump to a project. */
+.nav-proj-id   { font-weight: 700; flex-shrink: 0; }
+/* ⚠️ min-width:0 is load-bearing. A flex item's default min-width is `auto`,
+   so without it this span refuses to shrink below its text and the name is
+   hard-clipped by .sidebar's overflow instead of ellipsising. Known Issues #31. */
+.nav-proj-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+                 white-space: nowrap; opacity: .55; font-weight: 400; font-size: 0.7857rem; }
+.nav-proj-empty{ font-size: 0.7857rem; color: rgba(255,255,255,.3); padding: 4px 12px; }
+
+/* ── admin.html: "vendor logins are managed elsewhere" notice ─────────────
+   Rows are filtered out of User Management, so say where they went rather than
+   leave someone thinking the record vanished. */
+/* A neutral surface with a thin red accent, not a red fill — this is a
+   signpost, not a warning, and a tinted block here would compete with the
+   KPI cards right above it. */
+.vendor-login-note {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--surface-2); border: 1px solid var(--border-md);
+  border-left: 3px solid var(--mw-red);
+  border-radius: 10px; padding: 9px 13px; margin-bottom: 14px;
+  font-size: 0.8571rem; line-height: 1.5; color: var(--text-primary);
+}
+.vendor-login-note > i { font-size: 1.15rem; color: var(--text-hint); flex-shrink: 0; }
+.vendor-login-note > div { flex: 1; min-width: 180px; }
+.vln-link {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  font-size: 0.8125rem; font-weight: 600; text-decoration: none;
+  color: var(--text-primary); border: 1px solid var(--border-md);
+  background: var(--surface); border-radius: 8px; padding: 6px 11px;
+}
+.vln-link:hover { border-color: var(--mw-red); color: var(--mw-red-ink); }

@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https://cayjeqeleenizbdzrums.supabase.co wss://cayjeqeleenizbdzrums.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'"/>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Submit Your Bid — Megawide Procurement</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet">
+  <script>
+    /* Anti-flash, and it shares wpm_theme_last with the rest of the app so a
+       vendor who has set a theme in the portal sees it here too. */
+    (function(){ try {
+      var t = localStorage.getItem('wpm_theme_last');
+      var dark = t === 'dark' || (t === null && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+      if (dark) document.documentElement.classList.add('dark-mode');
+    } catch(e){} })();
+  </script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{overflow-x:hidden}
+    :root{
+      --mw-red:#EE3124;--mw-red-dark:#C42127;--mw-red-light:#FDECEA;
+      --bg:#F5F5F5;--surface:#FFFFFF;--surface-2:#F9F9F9;
+      --border:rgba(0,0,0,.08);--border-md:rgba(0,0,0,.14);
+      --text-primary:#231F20;--text-secondary:#5A5858;--text-hint:#6E6C6C;
+    }
+    html.dark-mode{
+      --mw-red-light:#3D1A19;
+      --bg:#1C1C1C;--surface:#2B2C2B;--surface-2:#333433;
+      --border:rgba(255,255,255,.09);--border-md:rgba(255,255,255,.16);
+      --text-primary:#F0EFEF;--text-secondary:#DCDBDB;--text-hint:#9B9999;
+      color-scheme:dark;
+    }
+    body{font-family:'Montserrat',sans-serif;background:var(--bg);color:var(--text-primary);
+      font-size:14px;line-height:1.5}
+    .topbar{height:60px;background:#231F20;display:flex;align-items:center;
+      justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:10}
+    .topbar-left{display:flex;align-items:center;gap:10px}
+    .topbar-mark{height:26px;width:auto;display:block}
+    .topbar-title{color:#fff;font-weight:700;font-size:15px}
+    .theme-toggle{background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;
+      width:32px;height:32px;border-radius:8px;cursor:pointer;display:inline-flex;
+      align-items:center;justify-content:center;padding:0}
+    .theme-toggle:hover{background:rgba(255,255,255,.1)}
+    .wrap{max-width:820px;margin:0 auto;padding:24px 16px 60px}
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+      padding:20px;margin-bottom:16px}
+    .panel-title{font-size:15px;font-weight:700;margin-bottom:12px}
+    .muted{font-size:12.5px;color:var(--text-hint);line-height:1.7}
+    .state{text-align:center;padding:48px 20px}
+    .state i{font-size:38px;color:var(--text-hint);display:block;margin-bottom:12px}
+    .state b{display:block;font-size:17px;margin-bottom:6px}
+    /* ── the ask ── */
+    .rfq-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+    .rfq-doc{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+      background:var(--mw-red-light);color:var(--mw-red-ink);border:1px solid #F5B8B3;
+      border-radius:20px;padding:3px 10px;flex-shrink:0}
+    .rfq-title{font-size:17px;font-weight:700;flex:1;min-width:200px;line-height:1.35}
+    .rfq-title small{display:block;font-size:12.5px;font-weight:500;color:var(--text-hint);margin-top:3px}
+    .rfq-due{font-size:12.5px;font-weight:700;margin-top:10px}
+    .rfq-due.soon{color:#B45309}.rfq-due.over{color:var(--mw-red-ink)}
+    html.dark-mode .rfq-due.soon{color:#FBBF24}html.dark-mode .rfq-due.over{color:#FCA5A5}
+    .kv{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;font-size:12.5px;margin-top:14px}
+    .kv dt{color:var(--text-hint);font-weight:600}
+    .kv dd{color:var(--text-primary);word-break:break-word}
+    .scope{font-size:13px;background:var(--surface-2);border-radius:8px;padding:12px 14px;
+      margin-top:14px;line-height:1.7;white-space:pre-wrap}
+    .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+    .chip{font-size:10.5px;color:var(--text-secondary);background:var(--surface-2);
+      border:1px solid var(--border);border-radius:4px;padding:3px 8px}
+    /* ── the form ── */
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;align-items:end}
+    .field{margin-bottom:14px}
+    .field.wide{grid-column:1/-1}
+    .grid .field{margin-bottom:0}
+    .field label{display:block;font-size:11px;font-weight:700;letter-spacing:.05em;
+      text-transform:uppercase;color:var(--text-hint);margin-bottom:6px;min-height:2.4em;
+      display:flex;align-items:flex-end}
+    .field input,.field textarea,.field select{width:100%;padding:10px 12px;
+      border:1.5px solid var(--border-md);border-radius:8px;font-size:13px;
+      font-family:'Montserrat',sans-serif;background:var(--surface);color:var(--text-primary);outline:none}
+    .field input:focus,.field textarea:focus{border-color:var(--mw-red)}
+    .field textarea{resize:vertical;min-height:76px}
+    .field input.bad,.field textarea.bad{border-color:var(--mw-red);background:var(--mw-red-light)}
+    .field-hint{font-size:11px;color:var(--text-hint);margin-top:5px;line-height:1.5}
+    .field-err{font-size:11px;color:var(--mw-red-ink);margin-top:5px;font-weight:600}
+    .legend{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+      color:var(--mw-red-ink);margin:18px 0 10px;padding-top:14px;border-top:1px dashed var(--border-md)}
+    .legend:first-child{margin-top:0;padding-top:0;border-top:none}
+    .req{color:var(--mw-red)}
+    .acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:20px}
+    .btn{padding:11px 20px;border-radius:8px;font-size:13px;font-weight:700;
+      font-family:inherit;cursor:pointer;border:1px solid var(--border-md);
+      background:var(--surface);color:var(--text-secondary)}
+    .btn-primary{background:var(--mw-red);border-color:var(--mw-red);color:#fff}
+    .btn:disabled{opacity:.55;cursor:default}
+    .banner{padding:13px 16px;border-radius:10px;font-size:13px;margin-bottom:16px;line-height:1.7}
+    .banner.ok{background:#E7F7EF;color:#0F7A46;border:1px solid #BEEBD3}
+    .banner.warn{background:#FEF3C7;color:#92400E;border:1px solid #FCD34D}
+    .banner.err{background:var(--mw-red-light);color:var(--mw-red-ink);border:1px solid #F5B8B3}
+    html.dark-mode .banner.ok{background:#0F2E20;color:#6EE7B7;border-color:#0F7A46}
+    html.dark-mode .banner.warn{background:#3A2E10;color:#FBBF24;border-color:#92400E}
+    /* ── clarification thread ── */
+    .msg{border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:9px;
+      background:var(--surface-2)}
+    .msg.staff{border-left:3px solid var(--mw-red)}
+    .msg-from{font-size:11px;font-weight:700;color:var(--text-hint);margin-bottom:4px}
+    .msg-body{font-size:13px;white-space:pre-wrap;line-height:1.65}
+    .foot{text-align:center;font-size:11.5px;color:var(--text-hint);padding:10px 16px 30px;line-height:1.7}
+    @media(max-width:600px){
+      .kv{grid-template-columns:1fr;gap:2px 0}
+      .kv dt{margin-top:8px}
+      .acts .btn{flex:1}
+    }
+  </style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <img class="topbar-mark" src="assets/img/megawide-mark.png" alt="Megawide"/>
+    <span class="topbar-title">Megawide Procurement</span>
+  </div>
+  <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle dark mode"></button>
+</div>
+
+<div class="wrap" id="wrap">
+  <div class="panel"><div class="state"><i class="ti ti-loader-2"></i><b>Loading your invitation…</b></div></div>
+</div>
+
+<div class="foot">
+  Megawide Construction Corporation &middot; EPC Procurement<br>
+  This link is personal to your company. Please do not forward it.
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   Bid response — the page a vendor reaches from the RFQ email.
+
+   ⚠️ NO LOGIN, BY DESIGN, AND THAT IS THE WHOLE POINT. Requiring an account
+      before a vendor can price a package is the step that would keep everyone
+      on email and leave the officer running a board AND a mailbox. The `t`
+      parameter is a CAPABILITY: an unguessable uuid addressing exactly one
+      invitation, which stops working when the round closes or the deadline
+      passes. It is not a login and grants nothing else — every read and write
+      goes through a SECURITY DEFINER RPC that re-derives everything from the
+      token (migrations/2026-09-04_bid_process.sql §7).
+
+   ⚠️ Self-contained on purpose: this is a PUBLIC page, so it creates its own
+      Supabase client with the anon key and loads none of auth.js/db.js/ui.js —
+      the same rule as login.html and vendor-register.html.
+   ════════════════════════════════════════════════════════════════════════════ */
+const sb = window.supabase.createClient(
+  'https://cayjeqeleenizbdzrums.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw'
+);
+const BUCKET = 'bid-submissions';
+const MAX_MB = 15;
+
+/* Self-contained — must never delegate to window.esc. A top-level `function esc`
+   IS window.esc, so `window.esc ? window.esc(v) : ...` calls itself and blows
+   the stack; that one line killed every panel of the vendor portal once. */
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+const Q = String.fromCharCode(39);
+
+const _SUN='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg>';
+const _MOON='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+function applyTheme(dark, persist) {
+  document.documentElement.classList.toggle('dark-mode', dark);
+  const b = document.getElementById('themeToggle');
+  if (b) b.innerHTML = dark ? _SUN : _MOON;
+  if (persist) { try { localStorage.setItem('wpm_theme_last', dark ? 'dark' : 'light'); } catch (e) {} }
+}
+function toggleTheme() { applyTheme(!document.documentElement.classList.contains('dark-mode'), true); }
+applyTheme(document.documentElement.classList.contains('dark-mode'), false);
+
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+let BID = null, THREAD = [], _busy = false;
+
+function money(n, cur) {
+  if (n == null || n === '') return '';
+  return (cur || 'PHP') + ' ' + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+function num(v) { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(n) ? n : null; }
+function intOf(v) { const n = parseInt(String(v == null ? '' : v).replace(/[^0-9-]/g, ''), 10); return isFinite(n) ? n : null; }
+function fmtDate(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return '';   // an Invalid Date prints "Invalid Date" — never show that
+  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric',
+                                       hour: 'numeric', minute: '2-digit' });
+}
+function dueInfo(v) {
+  if (!v) return { text: 'No deadline set', cls: '' };
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return { text: '', cls: '' };
+  const days = Math.ceil((d - new Date()) / 86400000);
+  const s = fmtDate(v);
+  if (days < 0) return { text: 'The deadline passed on ' + s, cls: 'over' };
+  if (days <= 2) return { text: 'Due ' + s + (days <= 0 ? ' — today' : ' — ' + days + ' day(s) left'), cls: 'soon' };
+  return { text: 'Due ' + s, cls: '' };
+}
+
+function shell(html) { document.getElementById('wrap').innerHTML = html; }
+function stateBox(icon, title, body) {
+  shell('<div class="panel"><div class="state"><i class="ti ' + icon + '"></i>'
+      + '<b>' + esc(title) + '</b><div class="muted">' + body + '</div></div></div>');
+}
+
+async function load() {
+  if (!TOKEN) {
+    stateBox('ti-link-off', 'This link is incomplete',
+      'Open the link exactly as it appears in the email from Megawide Procurement — '
+      + 'it may have been cut in half by your mail client.');
+    return;
+  }
+  try {
+    const { data, error } = await sb.rpc('bid_by_token', { p_token: TOKEN });
+    if (error) throw error;
+    BID = data;
+  } catch (e) {
+    // A bad token and an expired one are deliberately indistinguishable, so the
+    // message covers both without telling an unknown caller which it was.
+    stateBox('ti-lock', 'This link is not valid',
+      'It may have expired, or the invitation may have been closed. '
+      + 'Please contact your Megawide Procurement contact for a new link.');
+    return;
+  }
+  // Courtesy signal to the buyer that it was opened. Never block the read on it.
+  sb.rpc('view_bid_by_token', { p_token: TOKEN }).then(function(){}, function(){});
+  try {
+    const { data } = await sb.rpc('bid_clarifications_by_token', { p_token: TOKEN });
+    THREAD = Array.isArray(data) ? data : [];
+  } catch (e) { THREAD = []; }
+  render();
+}
+
+function render() {
+  const b = BID, due = dueInfo(b.due_at);
+  const closed = !b.open;
+  const chips = [];
+  if (b.trade) chips.push(b.trade);
+  if (b.works) chips.push(b.works);
+  if (b.surety_bond === 'Yes') chips.push('Surety bond required');
+  if (b.performance_bond === 'Yes') chips.push('Performance bond required');
+  if (b.warranty_bond === 'Yes') chips.push('Warranty bond required');
+  if (b.requires_approval) chips.push('Submittal required');
+
+  let banner = '';
+  if (b.outcome === 'awarded') {
+    banner = '<div class="banner ok"><b>This package was awarded to you.</b><br>'
+      + 'Megawide Procurement will be in touch with the Notice of Award'
+      + (b.notice_ref ? ' (ref. ' + esc(b.notice_ref) + ')' : '') + ' and the contract documents.</div>';
+  } else if (b.outcome === 'not_awarded') {
+    banner = '<div class="banner warn">This package has been awarded to another bidder. '
+      + 'Thank you for taking part — you stay on our list for future packages.</div>';
+  } else if (b.status === 'submitted') {
+    banner = '<div class="banner ok"><b>Your bid is in.</b> Submitted ' + esc(fmtDate(b.submitted_at)) + '.'
+      + (closed ? '' : ' You can still revise it until the deadline.') + '</div>';
+  } else if (b.status === 'declined') {
+    banner = '<div class="banner warn">You declined this invitation'
+      + (b.declined_reason ? ': ' + esc(b.declined_reason) : '.')
+      + (closed ? '' : ' You can still change your mind and submit before the deadline.') + '</div>';
+  } else if (closed) {
+    banner = '<div class="banner err">This invitation is closed and can no longer be answered.</div>';
+  }
+
+  const ask = '<div class="panel">'
+    + '<div class="rfq-head">'
+    + '<span class="rfq-doc">' + esc(b.doc_type || 'RFQ') + '</span>'
+    + '<div class="rfq-title">' + esc(b.wp_no ? 'WP ' + b.wp_no : 'Work package')
+    + (b.description ? ' — ' + esc(b.description) : '')
+    + (b.project_name ? '<small>' + esc(b.project_name)
+        + (b.project_location ? ' · ' + esc(b.project_location) : '') + '</small>' : '')
+    + '</div></div>'
+    + '<div class="rfq-due ' + due.cls + '">' + esc(due.text) + '</div>'
+    + (chips.length ? '<div class="chips">' + chips.map(function (c) {
+        return '<span class="chip">' + esc(c) + '</span>'; }).join('') + '</div>' : '')
+    + (b.scope_note ? '<div class="scope">' + esc(b.scope_note) + '</div>' : '')
+    + (b.detailed_description ? '<div class="scope">' + esc(b.detailed_description) + '</div>' : '')
+    + '<dl class="kv">'
+    + (b.boq_note ? '<dt>Bill of quantities</dt><dd>' + esc(b.boq_note) + '</dd>' : '')
+    + (b.target_delivery ? '<dt>Target delivery</dt><dd>' + esc(b.target_delivery) + '</dd>' : '')
+    + (b.target_installation ? '<dt>Target installation</dt><dd>' + esc(b.target_installation) + '</dd>' : '')
+    + (b.payment_terms_required ? '<dt>Payment terms</dt><dd>' + esc(b.payment_terms_required) + '</dd>' : '')
+    + (b.prebid_at ? '<dt>Pre-bid</dt><dd>' + esc(fmtDate(b.prebid_at)) + '</dd>' : '')
+    + (b.conditions ? '<dt>Conditions</dt><dd>' + esc(b.conditions) + '</dd>' : '')
+    + (b.contact_person ? '<dt>Contact</dt><dd>' + esc(b.contact_person)
+        + (b.contact_email ? ' · ' + esc(b.contact_email) : '') + '</dd>' : '')
+    + '</dl></div>';
+
+  shell('<div class="muted" style="margin-bottom:14px">Invitation for <b>' + esc(b.vendor_name || 'your company')
+      + '</b></div>' + banner + ask + (closed ? '' : formHtml()) + threadHtml());
+
+  if (!closed) {
+    const el = document.getElementById('f-amount');
+    if (el) el.focus();
+  }
+}
+
+function formHtml() {
+  const b = BID;
+  const two = !!b.two_envelope;
+  return '<div class="panel"><div class="panel-title">Your bid</div>'
+    + (two
+      ? '<div class="banner warn" style="margin-bottom:14px">This package is bid in <b>two envelopes</b>: '
+        + 'a <b>Technical Bid</b> and a <b>Commercial Bid</b>. Both are required.</div>'
+      : '')
+    + '<div class="legend">Commercial bid</div>'
+    + '<div class="grid">'
+    + fld('Offer amount <span class="req">*</span>', 'f-amount', b.offer_amount, 'e.g. 250000', 'number')
+    + fld('Currency', 'f-currency', b.offer_currency || 'PHP', 'PHP')
+    + fld('Lead time (days)', 'f-lead', b.lead_time_days, 'e.g. 14', 'number')
+    + fld('Price valid for (days)', 'f-validity', b.validity_days, 'e.g. 30', 'number')
+    + '</div>'
+    + '<div class="field" style="margin-top:12px"><label>Your payment terms</label>'
+    + '<input id="f-terms" value="' + esc(b.payment_terms || '') + '" placeholder="e.g. 30% down payment, 70% on delivery"></div>'
+    + '<div class="field"><label>Commercial bid document</label>'
+    + '<input id="f-commercial" type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx">'
+    + (b.commercial_name
+        ? '<div class="field-hint">On file: ' + esc(b.commercial_name) + ' — choosing a new file replaces it.</div>'
+        : '<div class="field-hint">Your quotation. PDF, image, Word or Excel, up to ' + MAX_MB + ' MB.</div>')
+    + '</div>'
+    + (two
+      ? '<div class="legend">Technical bid <span class="req">*</span></div>'
+        + '<div class="field"><label>Technical bid document</label>'
+        + '<input id="f-technical" type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx">'
+        + (b.technical_name
+            ? '<div class="field-hint">On file: ' + esc(b.technical_name) + ' — choosing a new file replaces it.</div>'
+            : '<div class="field-hint">Specifications, methodology, schedule, org chart — whatever the package asks for.</div>')
+        + '</div>'
+      : '')
+    + '<div class="legend">Anything else</div>'
+    + '<div class="field"><label>Notes to Megawide Procurement</label>'
+    + '<textarea id="f-notes" placeholder="Exclusions, assumptions, alternatives you would like considered">'
+    + esc(b.vendor_notes || '') + '</textarea></div>'
+    + '<div id="formErr"></div>'
+    + '<div class="acts">'
+    + '<button class="btn" id="btnDecline" onclick="declineBid()">Decline this invitation</button>'
+    + '<button class="btn btn-primary" id="btnSubmit" onclick="submitBid()">'
+    + (BID.status === 'submitted' ? 'Save revised bid' : 'Submit bid') + '</button>'
+    + '</div></div>';
+}
+function fld(label, id, val, ph, type) {
+  return '<div class="field"><label>' + label + '</label>'
+    + '<input id="' + id + '" type="' + (type || 'text') + '" value="' + esc(val == null ? '' : val)
+    + '" placeholder="' + esc(ph || '') + '"></div>';
+}
+
+/* BP 2.3.1 — the clarification thread. Shown once there is something in it, or
+   once a bid is in, since that is when clarification actually happens. */
+function threadHtml() {
+  const b = BID;
+  const canWrite = b.outcome == null;
+  if (!THREAD.length && b.status !== 'submitted') return '';
+  return '<div class="panel"><div class="panel-title">Clarifications</div>'
+    + '<div class="muted" style="margin-bottom:12px">Questions from Megawide Procurement about your '
+    + 'submission, and your replies. Only your company sees this thread.</div>'
+    + (THREAD.length
+        ? THREAD.map(function (m) {
+            return '<div class="msg' + (m.author === 'staff' ? ' staff' : '') + '">'
+              + '<div class="msg-from">' + esc(m.from) + ' · ' + esc(fmtDate(m.created_at)) + '</div>'
+              + '<div class="msg-body">' + esc(m.message) + '</div></div>';
+          }).join('')
+        : '<div class="muted">Nothing yet.</div>')
+    + (canWrite
+        ? '<div class="field" style="margin-top:14px"><label>Reply</label>'
+          + '<textarea id="f-clarify" placeholder="Answer a question, or raise one of your own"></textarea></div>'
+          + '<div class="acts"><button class="btn" id="btnClarify" onclick="sendClarification()">Send reply</button></div>'
+        : '')
+    + '</div>';
+}
+
+function fieldErr(id, message) {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('bad');
+  const host = document.getElementById('formErr');
+  if (host) host.innerHTML = '<div class="banner err">' + esc(message) + '</div>';
+  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); try { el.focus(); } catch (_) {} }
+}
+function clearErrs() {
+  ['f-amount', 'f-currency', 'f-lead', 'f-validity', 'f-terms', 'f-notes']
+    .forEach(function (id) { const e = document.getElementById(id); if (e) e.classList.remove('bad'); });
+  const host = document.getElementById('formErr');
+  if (host) host.innerHTML = '';
+}
+
+/* Files go into bid-submissions under a folder named for the token. That path
+   prefix IS the authorization — the Storage policy only allows an anonymous
+   write inside a folder whose name is a token that is still open. */
+async function upload(input) {
+  const file = input && input.files && input.files[0];
+  if (!file) return null;
+  if (file.size > MAX_MB * 1024 * 1024) {
+    throw new Error('"' + file.name + '" is larger than ' + MAX_MB + ' MB. Please send a smaller file.');
+  }
+  const safe = String(file.name).replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = TOKEN + '/' + Date.now() + '_' + safe;
+  const { error } = await sb.storage.from(BUCKET).upload(path, file, { upsert: false });
+  if (error) throw error;
+  return { path: path, name: file.name };
+}
+
+async function submitBid() {
+  if (_busy) return;
+  clearErrs();
+  const g = function (id) { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+  const amount = num(g('f-amount'));
+  if (amount == null || amount < 0) { fieldErr('f-amount', 'Enter your offer amount before submitting.'); return; }
+
+  const btn = document.getElementById('btnSubmit');
+  _busy = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  try {
+    const comm = await upload(document.getElementById('f-commercial'));
+    const tech = await upload(document.getElementById('f-technical'));
+    const { error } = await sb.rpc('submit_bid_by_token', {
+      p_token: TOKEN,
+      p_offer_amount: amount,
+      p_offer_currency: g('f-currency') || 'PHP',
+      p_lead_time_days: intOf(g('f-lead')),
+      p_validity_days: intOf(g('f-validity')),
+      p_payment_terms: g('f-terms') || null,
+      p_vendor_notes: g('f-notes') || null,
+      p_commercial_path: comm ? comm.path : null,
+      p_commercial_name: comm ? comm.name : null,
+      p_technical_path: tech ? tech.path : null,
+      p_technical_name: tech ? tech.name : null,
+    });
+    if (error) throw error;
+    await load();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    fieldErr('f-amount', (e && (e.message || e.hint)) || 'Could not submit your bid. Please try again.');
+    if (btn) { btn.disabled = false; btn.textContent = BID.status === 'submitted' ? 'Save revised bid' : 'Submit bid'; }
+  } finally { _busy = false; }
+}
+
+async function declineBid() {
+  if (_busy) return;
+  const reason = window.prompt('Let Megawide Procurement know why, if you would like to (optional):', '');
+  if (reason === null) return;         // cancelled the dialog — do nothing
+  _busy = true;
+  const btn = document.getElementById('btnDecline');
+  if (btn) { btn.disabled = true; btn.textContent = 'Declining…'; }
+  try {
+    const { error } = await sb.rpc('decline_bid_by_token', { p_token: TOKEN, p_reason: reason || null });
+    if (error) throw error;
+    await load();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    alert('Could not record that: ' + ((e && e.message) || e));
+    if (btn) { btn.disabled = false; btn.textContent = 'Decline this invitation'; }
+  } finally { _busy = false; }
+}
+
+async function sendClarification() {
+  const el = document.getElementById('f-clarify');
+  const text = el ? el.value.trim() : '';
+  if (!text) { if (el) el.classList.add('bad'); return; }
+  const btn = document.getElementById('btnClarify');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const { error } = await sb.rpc('clarify_bid_by_token', { p_token: TOKEN, p_message: text });
+    if (error) throw error;
+    await load();
+  } catch (e) {
+    alert('Could not send that: ' + ((e && e.message) || e));
+    if (btn) { btn.disabled = false; btn.textContent = 'Send reply'; }
+  }
+}
+
+load();
+</script>
+</body>
+</html>

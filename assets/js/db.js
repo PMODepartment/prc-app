@@ -2432,6 +2432,23 @@ const VendorDb = (() => {
       if (error) { if (_isMissingTable(error, 'vendor_claims')) return []; throw error; }
       return data || [];
     },
+    /* Every claim, decided ones included — the registrations page shows the
+       declined and approved history beside the queue, the way User Management
+       shows rejected users beside the pending ones. Paged, because a public
+       registration link is the one thing here that can grow without bound and
+       the 1000-row cap has bitten three times. Staff-only by RLS
+       (vendor_claims_select); a claimant still sees only their own row. */
+    async all() {
+      try {
+        return await _pagedSelect(async () => {
+          const sb = await getSB();
+          return sb.from('vendor_claims').select('*').order('created_at', { ascending: false });
+        });
+      } catch (e) {
+        if (_isMissingTable(e, 'vendor_claims')) return [];
+        throw e;
+      }
+    },
     async forVendor(vendorId) {
       const sb = await getSB();
       const { data, error } = await sb.from('vendor_claims').select('*')
@@ -2715,7 +2732,11 @@ const VendorDb = (() => {
   async function getVendorsByIds(ids) {
     if (!ids || !ids.length) return [];
     const sb = await getSB();
-    const { data, error } = await sb.from('vendors').select('id,name,status,accreditation').in('id', ids);
+    // contact_person/contact_email are here for the RFQ composer, which needs
+    // somebody to address the invitation to. Additive — every other caller
+    // (the WP-form pickers, the bid board) just ignores them.
+    const { data, error } = await sb.from('vendors')
+      .select('id,name,status,accreditation,contact_person,contact_email').in('id', ids);
     if (error) throw error;
     return data || [];
   }
@@ -3372,7 +3393,17 @@ const VendorDb = (() => {
      Every read degrades to [] when the table is absent, so both the directory
      and the vendor portal still render before the migration is run. */
   let _taxCache = null;
-  function _isMissingTable(e) {
+  /* ⚠️ NAMED FOR ITS TABLE, and it must stay that way. This was declared as a
+     second `_isMissingTable(e)` in the SAME closure as the two-argument
+     `_isMissingTable(error, name)` above, and a later function declaration
+     REPLACES an earlier one — so this single-argument, product_taxonomy-only
+     version silently won for all 14 two-argument callers (vendor_history,
+     vendor_claims, vendor_documents, vendor_accreditation_requests and every
+     bid table). Each of those guards therefore always answered "not missing",
+     so the documented "degrade to an empty list on an un-migrated database"
+     never actually happened — the read threw instead. Proven by extracting
+     both definitions into one scope and checking which survived. */
+  function _isMissingTaxonomyTable(e) {
     const m = ((e && (e.message || '')) + (e && e.details || '')).toLowerCase();
     return /product_taxonomy/.test(m) &&
            (/does not exist|schema cache|could not find/.test(m) || e?.code === '42P01' || e?.code === 'PGRST205');
@@ -3385,7 +3416,7 @@ const VendorDb = (() => {
         sb.from('product_taxonomy').select('*').order('depth').order('sort_order').order('name'));
       _taxCache = rows || [];
     } catch (e) {
-      if (!_isMissingTable(e)) console.warn('[Taxonomy] load failed:', e && e.message);
+      if (!_isMissingTaxonomyTable(e)) console.warn('[Taxonomy] load failed:', e && e.message);
       _taxCache = [];
     }
     return _taxCache;
@@ -3676,6 +3707,245 @@ const VendorDb = (() => {
       return (data || []).length;
     },
   };
+
+  /* ══ The bid process — BP 2.2 → 2.4 ═══════════════════════════════════════
+     migrations/2026-09-04_bid_process.sql.
+
+     A ROUND is one solicitation of one work package. A package can be
+     re-tendered, so each attempt is its own round with its own deadline,
+     invitees and outcome — never columns on the work package.
+
+     ⚠️ ROUNDS ARE STAFF-ONLY. There is no vendor read path to this table by
+        design: it holds the other invitees' context, the BAC's internal dates
+        and the evaluation. What a vendor may see comes through
+        vendor_bid_board_view (logged in) or bid_by_token (from the RFQ link).
+
+     ⚠️ Letters are deliberately not modelled. Megawide already has drafted NOA
+        and Letter-of-Regret templates, so `award()` records THAT a notice was
+        issued and its reference — never any letter wording. */
+  const BID_STAGES = ['draft', 'issued', 'clarification', 'comparison',
+                      'evaluation', 'negotiation', 'awarded', 'cancelled'];
+  const BID_STAGE_LABEL = {
+    draft: 'Preparing', issued: 'Out for bid', clarification: 'Clarification',
+    comparison: 'Cost comparison', evaluation: 'Evaluation',
+    negotiation: 'Negotiation', awarded: 'Awarded', cancelled: 'Cancelled',
+  };
+
+  const bidRounds = {
+    stages: BID_STAGES,
+    stageLabel(s) { return BID_STAGE_LABEL[s] || s || '—'; },
+
+    async forWP(wpId) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_rounds').select('*')
+        .eq('wp_id', wpId).order('round_no', { ascending: false });
+      if (error) { if (_isMissingTable(error, 'vendor_bid_rounds')) return []; throw error; }
+      return data || [];
+    },
+    // Every round, newest first — the staff list. Paged: a busy portfolio will
+    // pass 1000 rounds eventually, and that cap has bitten three times.
+    async list() {
+      try {
+        return await _pagedSelect(async () => {
+          const sb = await getSB();
+          return sb.from('vendor_bid_rounds').select('*')
+            .order('created_at', { ascending: false });
+        });
+      } catch (e) {
+        if (_isMissingTable(e, 'vendor_bid_rounds')) return [];
+        throw e;
+      }
+    },
+    async get(id) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_rounds').select('*').eq('id', id).single();
+      if (error) throw error;
+      return data;
+    },
+    async create(wpId, projectId, fields, profile) {
+      const sb = await getSB();
+      // Next round number for this package — a re-tender is round 2, not a
+      // second row fighting the same unique key.
+      const prior = await this.forWP(wpId);
+      const nextNo = prior.reduce((m, r) => Math.max(m, r.round_no || 1), 0) + 1;
+      const row = Object.assign({
+        wp_id: wpId, project_id: projectId || null, round_no: nextNo,
+        stage: 'draft',
+        created_by: (profile && profile.id) || null,
+      }, fields || {}, _auditStamp(profile));
+      const { data, error } = await sb.from('vendor_bid_rounds').insert(row).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async update(id, fields, profile) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_rounds')
+        .update(Object.assign({}, fields, _auditStamp(profile)))
+        .eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async setStage(id, stage, profile) {
+      if (BID_STAGES.indexOf(stage) < 0) throw new Error('Unknown bid stage: ' + stage);
+      const patch = { stage: stage };
+      if (stage === 'awarded') patch.awarded_at = new Date().toISOString();
+      return this.update(id, patch, profile);
+    },
+
+    /* Every invitation on a round, with the vendor's name and accreditation
+       merged in. Two queries and a join in JS, matching getBidsForWP — no
+       Supabase-join select syntax is used anywhere else in this file. */
+    async invitations(roundId) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_invitations').select('*')
+        .eq('round_id', roundId).order('invited_at', { ascending: true });
+      if (error) { if (_isMissingTable(error, 'vendor_bid_invitations')) return []; throw error; }
+      const rows = data || [];
+      if (!rows.length) return rows;
+      const ids = Array.from(new Set(rows.map(r => r.vendor_id).filter(Boolean)));
+      const byId = {};
+      try {
+        (await getVendorsByIds(ids) || []).forEach(v => { byId[v.id] = v; });
+      } catch (e) { /* a name lookup failing must not hide the offers */ }
+      return rows.map(r => Object.assign({}, r, {
+        vendor_name: (byId[r.vendor_id] || {}).name || '(unknown vendor)',
+        vendor_accreditation: (byId[r.vendor_id] || {}).accreditation || null,
+        vendor_contact_person: (byId[r.vendor_id] || {}).contact_person || null,
+        vendor_contact_email: (byId[r.vendor_id] || {}).contact_email || null,
+      }));
+    },
+
+    /* Add bidders to a round. Upserts on (round_id, vendor_id) so re-adding
+       somebody already invited cannot produce two rows and two answers. */
+    async addVendors(round, vendorIds, profile) {
+      const sb = await getSB();
+      const rows = (vendorIds || []).map(vid => Object.assign({
+        round_id: round.id, wp_id: round.wp_id, vendor_id: vid,
+        project_id: round.project_id || null,
+        status: 'invited',
+        scope_note: round.scope_note || null,
+        due_at: round.bid_due_at || null,
+        invited_at: new Date().toISOString(),
+        invited_by: (profile && profile.id) || null,
+        invited_by_name: (profile && (profile.name || profile.email)) || null,
+      }, _auditStamp(profile)));
+      if (!rows.length) return [];
+      const { data, error } = await sb.from('vendor_bid_invitations')
+        .upsert(rows, { onConflict: 'round_id,vendor_id' }).select();
+      if (error) throw error;
+      return data || [];
+    },
+    async removeInvitation(id) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_bid_invitations').delete().eq('id', id);
+      if (error) throw error;
+    },
+
+    /* 2.2.2 Issuance. Moves the round to `issued`, stamps who issued it, and
+       pushes the round's deadline and scope onto every invitation so the
+       vendor-facing surfaces read one consistent ask.
+       Returns the invitations WITH their access tokens — that is what the RFQ
+       composer needs to build each vendor's private link. */
+    async issue(round, profile) {
+      const sb = await getSB();
+      const nowIso = new Date().toISOString();
+      await this.update(round.id, {
+        stage: 'issued', issued_at: nowIso,
+        issued_by: (profile && profile.id) || null,
+        issued_by_name: (profile && (profile.name || profile.email)) || null,
+      }, profile);
+      const patch = {};
+      if (round.bid_due_at) patch.due_at = round.bid_due_at;
+      if (round.scope_note) patch.scope_note = round.scope_note;
+      if (Object.keys(patch).length) {
+        const { error } = await sb.from('vendor_bid_invitations')
+          .update(patch).eq('round_id', round.id);
+        if (error) throw error;
+      }
+      return this.invitations(round.id);
+    },
+
+    /* 2.4.2 Award. ONE winner per round: the winner is marked awarded and
+       every other invitation not_awarded, in one pass, so a round can never
+       end up with two winners or with a bidder left un-notified.
+       ⚠️ Records only that a notice was issued and its reference — the NOA and
+          Letter of Regret themselves stay with Megawide's existing templates. */
+    async award(roundId, winnerInvitationId, opts, profile) {
+      const sb = await getSB();
+      const o = opts || {};
+      const rows = await this.invitations(roundId);
+      const nowIso = new Date().toISOString();
+      for (const inv of rows) {
+        const won = inv.id === winnerInvitationId;
+        // A vendor that withdrew or declined is not "not awarded" — it never
+        // stood. Leave its status alone and record no outcome.
+        if (!won && (inv.status === 'withdrawn' || inv.status === 'declined')) continue;
+        const patch = Object.assign({
+          outcome: won ? 'awarded' : 'not_awarded',
+          status: 'closed',
+          decided_at: nowIso,
+          decided_by: (profile && profile.id) || null,
+        }, _auditStamp(profile));
+        if (won) {
+          if (o.finalAmount != null) patch.final_amount = o.finalAmount;
+          if (o.noticeRef) patch.notice_ref = o.noticeRef;
+        }
+        const { error } = await sb.from('vendor_bid_invitations')
+          .update(patch).eq('id', inv.id);
+        if (error) throw error;
+      }
+      await this.setStage(roundId, 'awarded', profile);
+      return this.invitations(roundId);
+    },
+
+    // Mark the NOA / regret notice as sent for one bidder. Separate from
+    // award() because the letters go out after the decision, often days later.
+    async recordNotice(invitationId, ref, profile) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_invitations')
+        .update(Object.assign({
+          notice_issued_at: new Date().toISOString(),
+          notice_ref: ref || null,
+        }, _auditStamp(profile)))
+        .eq('id', invitationId).select().single();
+      if (error) throw error;
+      return data;
+    },
+  };
+
+  /* 2.3.1 Clarification — the thread between Procurement and ONE bidder.
+     ⚠️ Scoped per INVITATION, never per round: a clarification is between us
+        and one vendor and must never be visible to the others. Immutable by
+        design — the table has no update or delete policy. */
+  const bidClarifications = {
+    async forInvitation(invitationId) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_clarifications').select('*')
+        .eq('invitation_id', invitationId).order('created_at', { ascending: true });
+      if (error) { if (_isMissingTable(error, 'vendor_bid_clarifications')) return []; throw error; }
+      return data || [];
+    },
+    async forRound(roundId) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_clarifications').select('*')
+        .eq('round_id', roundId).order('created_at', { ascending: true });
+      if (error) { if (_isMissingTable(error, 'vendor_bid_clarifications')) return []; throw error; }
+      return data || [];
+    },
+    // author/created_by are stamped SERVER-SIDE by internal.bid_clarification_guard,
+    // so a vendor cannot post a message attributed to Megawide.
+    async add(invitationId, message, profile) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_clarifications')
+        .insert({ invitation_id: invitationId, author: 'staff', message: message,
+                  created_by: (profile && profile.id) || null,
+                  created_by_name: (profile && (profile.name || profile.email)) || null })
+        .select().single();
+      if (error) throw error;
+      return data;
+    },
+  };
+
   return {
     getVendors, getVendor, createVendor, updateVendor, approveVendor, rejectVendor, setVendorStatus, deleteVendor,
     products, certifications, personnel,
@@ -3685,7 +3955,7 @@ const VendorDb = (() => {
     uploadCertFile, getCertFileUrl, deleteCertFile,
     documents: vendorDocuments, uploadVendorDoc, uploadVendorFile, requests: accreditationRequests, claims: vendorClaims, history: vendorHistory,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
-    bidBoard,
+    bidBoard, bidRounds, bidClarifications,
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
     bulkSetVendorStatus, bulkSetAccreditation, findExactDuplicateGroups, mergeExactDuplicates, bulkDeleteVendors, getDeletionImpact, prepareInvites,
@@ -3729,6 +3999,67 @@ window.setVendorClaimsNavCount = function (n) {
   b.textContent = n;
   b.style.display = n ? '' : 'none';
 };
+/* ══ Shared sidebar project list ══════════════════════════════════════════
+   The searchable Projects nav that index.html / project.html / admin.html each
+   carry. Vendor Management and Bid Management sit inside the same shell and had
+   no way to jump to a project, so an officer had to go back to the Portfolio
+   first. Put here rather than copied a third and fourth time — the same reason
+   initVendorClaimsNav lives here.
+
+   ⚠️ Renders into #nav-projects-list, an id admin.html does NOT use (it has its
+      own #nav-projects-admin renderer with a New Project button). This is a
+      no-op on any page without that container, so adding it cannot disturb the
+      three pages that already have a list of their own.
+
+   Navigation only — these are plain links, like admin.html's. Vendors are not
+   project-scoped, so this does not filter anything on the page. */
+window.initSidebarProjects = function (profile) {
+  const host = document.getElementById('nav-projects-list');
+  if (!host) return;
+  const section = document.getElementById('sidebar-projects-section');
+  const role = (profile && profile.role) || '';
+  if (role === 'vendor') { if (section) section.style.display = 'none'; return; }
+  host.innerHTML = '<div class="nav-proj-empty">Loading…</div>';
+  // Fire-and-forget: a nav list must never sit on the page's render path.
+  WPDb.getProjects().then(function (all) {
+    // Same rule as every other sidebar: assigned projects only, no archived
+    // (you do not jump into one to work), and never the DEMO sandbox.
+    const list = AppAuth.getPermittedProjects(profile, all || [])
+      .filter(function (p) { return p.status !== 'archived' && p.id !== 'DEMO'; })
+      .sort(function (a, b) { return String(a.id).localeCompare(String(b.id)); });
+    window._sidebarProjects = list;
+    if (section) section.style.display = list.length ? '' : 'none';
+    // The search box only earns its space past a handful of projects — same
+    // >1 test admin.html uses.
+    const sw = document.getElementById('sidebar-proj-search-wrap');
+    if (sw) sw.style.display = list.length > 1 ? 'block' : 'none';
+    window.filterSidebarProjects('');
+  }).catch(function (e) {
+    console.warn('[sidebar] project list failed', e && e.message);
+    if (section) section.style.display = 'none';
+  });
+};
+window.filterSidebarProjects = function (q) {
+  const host = document.getElementById('nav-projects-list');
+  if (!host || !window._sidebarProjects) return;
+  const s = String(q || '').toLowerCase().trim();
+  const list = s
+    ? window._sidebarProjects.filter(function (p) {
+        return String(p.id).toLowerCase().includes(s) || String(p.name || '').toLowerCase().includes(s);
+      })
+    : window._sidebarProjects;
+  host.innerHTML = list.length
+    ? list.map(function (p) {
+        // esc() on both — a project name is user-entered (Known Issues #23).
+        return '<a class="nav-item" href="project.html?id=' + encodeURIComponent(p.id) + '" title="'
+          + esc(p.id + (p.name ? ' — ' + p.name : '')) + '">'
+          + '<i class="ti ti-building-community"></i>'
+          + '<span class="nav-proj-id">' + esc(p.id) + '</span>'
+          + '<span class="nav-proj-name">' + esc(p.name || '') + '</span></a>';
+      }).join('')
+    : '<div class="nav-proj-empty">No matching projects</div>';
+};
+
 
 /* ══ TaxonomyPicker ═══════════════════════════════════════════════════════
    A searchable, cascading tree picker for a product_taxonomy node.
