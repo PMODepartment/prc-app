@@ -1810,11 +1810,13 @@ data-cleanup tools, two clicks deep. It is now a sidebar nav item on **all four 
 the sidebar** (`index.html`, `project.html`, `admin.html`, `vendors.html`), directly under Vendor
 Management.
 
-- **⚠️ It sits in NAVIGATION, not the Admin section, deliberately.** `#nav-admin-section` is
+- **⚠️ MOVED into the Admin section, directly under User Management (2026-09-02, per request).** It originally sat in NAVIGATION for the reason below — which still applies and is now a live consequence: `#nav-admin-section` is
   revealed only for `AppAuth.isAdmin` (admin/super_admin), but a claim can be approved by
   **specialist, manager and user** too — the RPCs' allow-list is the same `_canManage` audience.
-  Filing it under Admin would have hidden the queue from most of the people expected to work it.
-  It is still "the same level as User Management" in the sense asked for: a top-level nav item.
+  **So on `index.html`/`project.html`/`vendors.html` the queue is now admin/super_admin-only**,
+  because those pages reveal `#sidebar-admin`/`#nav-admin-section` on `AppAuth.isAdmin` alone.
+  The RPCs still authorise specialist/manager/user, so if those roles need to work the queue the
+  fix is to widen the section reveal and gate `User Management` itself — not to move the item back.
 - **One shared helper in `db.js`, not four copies**: `window.initVendorClaimsNav(profile)` reveals
   the item and fills the count; `window.setVendorClaimsNavCount(n)` is the setter `vendors.html`'s
   own `updateClaimsBadge()` calls after an approve/decline so the badge follows without a reload.
@@ -1947,6 +1949,20 @@ every uploaded row, so a key rename would orphan existing uploads.**
 **The capability block was re-worded, not removed.** Bond and submittal requirements differ per work
 package, so “what your company can commit to” over-promised: it is a **pre-filter for shortlisting**,
 not a commitment. It now says so explicitly, and the binding commitment belongs to the bid.
+
+### Vendor Portal — a staff account no longer bounces to the login page (2026-09-02)
+
+**Reported as “opening `vendor-portal.html` redirects me to the procurement login page”.** The page
+guarded with `if (profile.role !== 'vendor' || !profile.vendor_id) { window.location.href =
+'login.html'; }` — but `AppAuth.requireLogin` has ALREADY established a valid session by that point,
+so a signed-in staff member was sent to a login page that re-authenticated them and dropped them on
+the dashboard chooser. A loop that reads as a broken page.
+
+- **A vendor with NO session is still sent to `login.html`, and that is correct** — that is where
+  vendors sign in, and `login.html` routes `role==='vendor'` straight back to the portal.
+- **A signed-in NON-vendor now gets `showWrongAccount(profile)`**: the tabs and panels are hidden and
+  a panel explains whose account they are on, with links to Vendor Management and the Portfolio.
+  Telling someone which account they are using is more useful than silently re-routing them.
 
 ### Masterlist re-import — `SEED_vendor_masterlist.sql` (2026-08-20)
 

@@ -474,7 +474,11 @@ const draftKey = () => 'wpm_vendorprofile_' + (vendor ? vendor.id : 'x');
 
 AppAuth.requireLogin((user, profile) => {
   myProfile = profile;
-  if (profile.role !== 'vendor' || !profile.vendor_id) { window.location.href = 'login.html'; return; }
+  // ⚠️ Do NOT bounce a signed-in staff account to login.html. requireLogin has
+  // already established a valid session, so login.html just re-authenticates
+  // them and drops them on the dashboard chooser — a loop that reads like the
+  // portal is broken. Say plainly whose account this is and where to go.
+  if (profile.role !== 'vendor' || !profile.vendor_id) { showWrongAccount(profile); return; }
   // ⚠️ MUST be set before any VendorDb call. db.js's _vendorRel() reads these to
   // route a vendor to vendor_self_view; without them it falls back to the
   // `vendors` table, which a vendor has had no SELECT on since
@@ -484,6 +488,30 @@ AppAuth.requireLogin((user, profile) => {
   loadAll();
 });
 
+// Shown when a NON-vendor account opens this page. A vendor with no session is
+// still sent to login.html by requireLogin, which is correct — that is where
+// vendors sign in, and login.html routes role='vendor' straight back here.
+function showWrongAccount(profile) {
+  const tabs = document.querySelector('.tabs');
+  if (tabs) tabs.style.display = 'none';
+  document.querySelectorAll('.panel').forEach(function (el) { el.style.display = 'none'; });
+  const host = document.querySelector('.wrap') || document.body;
+  const who = esc((profile && (profile.name || profile.email)) || 'this account');
+  const role = esc((profile && profile.role) || 'unknown');
+  const box = document.createElement('div');
+  box.className = 'panel';
+  box.innerHTML =
+    '<div class="panel-title">This page is for vendor accounts</div>'
+    + '<div style="font-size:13px;color:#888;line-height:1.7">You are signed in as <b>' + who
+    + '</b> (' + role + '), which is a Megawide staff account rather than a vendor login. '
+    + 'The Vendor Portal only opens for the vendor it belongs to.</div>'
+    + '<div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">'
+    + '<a class="btn-primary" style="text-decoration:none;display:inline-block;width:auto;padding:11px 18px" '
+    + 'href="vendors.html">Go to Vendor Management</a>'
+    + '<a class="btn-ghost" style="text-decoration:none;display:inline-block;padding:11px 18px" '
+    + 'href="index.html">Portfolio Overview</a></div>';
+  host.appendChild(box);
+}
 function msg(text, type) {
   const box = document.getElementById('msgBox');
   box.textContent = text; box.className = 'msg ' + (type || 'success');
