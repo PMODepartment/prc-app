@@ -174,16 +174,20 @@ begin
   -- name            : renaming breaks the link to the masterlist and to their
   --                   own WPs, and would let one company take another's name.
   -- vendor_code     : the SAP BP identity — the most reliable dedup key there is.
-  -- payment_terms   : a commercial term MEGAWIDE agrees. A vendor could
-  --                   otherwise have set themselves to "7 Days".
   -- vendor_category / vendor_group : Megawide's SAP classification, not a
   --                   vendor self-declaration.
   -- notes           : STAFF-INTERNAL remarks about this vendor. The Add Vendor
   --                   modal and the portal once edited the SAME column, so a
   --                   vendor could overwrite what staff had written about them.
+  -- ⚠️ payment_terms IS DELIBERATELY *NOT* PINNED (changed 2026-09-03).
+  --    It is a COMMERCIAL term the vendor proposes — their usual terms — and the
+  --    binding terms are agreed per work package at bid time. Procurement does
+  --    not set it unilaterally. It was pinned AND the field was marked required
+  --    on the accreditation checklist, so a vendor was blocked on an item they
+  --    were not allowed to fill in. It is vendor-owned in
+  --    vendor-portal.html's OVERVIEW_FIELDS to match.
   new.vendor_code     := old.vendor_code;
   new.name            := old.name;
-  new.payment_terms   := old.payment_terms;
   new.vendor_category := old.vendor_category;
   new.vendor_group    := old.vendor_group;
   new.notes           := old.notes;
@@ -250,7 +254,9 @@ select
       and t.tgenabled = 'O')                       as trigger_installed_and_enabled,
   p.prosrc like '%new.vendor_edited_at%'           as flags_vendor_edits,
   p.prosrc like '%new.name%'                       as pins_name,
-  p.prosrc like '%new.payment_terms%'              as pins_payment_terms,
+  -- payment_terms is intentionally NOT pinned (see the note in section 3), so
+  -- this asserts the ABSENCE of that pin.
+  p.prosrc not like '%new.payment_terms%'          as payment_terms_left_to_vendor,
   p.prosrc like '%new.vendor_category%'            as pins_vendor_category,
   p.prosrc like '%new.vendor_group%'               as pins_vendor_group,
   p.prosrc like '%new.notes%'                      as pins_staff_notes,

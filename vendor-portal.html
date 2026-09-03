@@ -114,6 +114,10 @@
     .field-err.on{display:block}
     .field input:disabled,.field select:disabled{background:#F4F4F4;color:#6B6A6A;cursor:not-allowed;border-color:#e9e9e9}
     .locked-note{font-size:11px;color:#888;margin-top:5px;display:flex;gap:5px;align-items:center}
+    /* Small helper text under a field. Was being used before it existed here
+       (it is defined in vendor-register.html, not this file), so the hints
+       rendered unstyled at full body size. Same scale as .locked-note. */
+    .field-hint{font-size:11px;color:#888;margin-top:5px;line-height:1.5}
     .locked-note::before{content:'\ea6a';font-family:'tabler-icons';font-size:12px;color:#aaa}
     /* Save bar sticks to the bottom while a change is pending, so the vendor
        can never scroll past it and lose the edit. */
@@ -407,9 +411,7 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     </div>
     <div class="field-row">
       <div class="field"><label>Contact Number (mobile) <span style="color:#EE3124">*</span></label>
-        <input id="f-contact-number" type="text" placeholder="+63 9xx xxx xxxx">
-        <div class="field-hint">Include the country code if you are outside the Philippines.</div>
-      </div>
+        <input id="f-contact-number" type="text" placeholder="+63 9xx xxx xxxx"></div>
       <div class="field"><label>Telephone</label><input id="f-telephone" type="text" placeholder="+63 2 xxxx xxxx"></div>
     </div>
     <div class="field-row">
@@ -417,17 +419,22 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       <div class="field"><label>Website</label><input id="f-website" type="text" placeholder="https://"></div>
     </div>
     <div class="field-row">
+      <!-- The placeholders already say what goes where, so these carry no hint. -->
       <div class="field"><label>Address <span style="color:#EE3124">*</span></label>
-        <input id="f-address" type="text" placeholder="Street, barangay / district">
-        <div class="field-hint">Street and district only — put the city beside it.</div>
-      </div>
+        <input id="f-address" type="text" placeholder="Street, barangay / district"></div>
       <div class="field"><label>City <span style="color:#EE3124">*</span></label>
-        <input id="f-city" type="text" placeholder="e.g. Quezon City">
-        <div class="field-hint">Outside the Philippines? Use “City, Country”.</div>
-      </div>
+        <input id="f-city" type="text" placeholder="e.g. Quezon City, or City, Country"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Terms of Payment <span style="color:#EE3124">*</span></label><input id="f-payment-terms" type="text" placeholder="e.g. 60 Days"></div>
+      <!-- ⚠️ VENDOR-OWNED, not staff-set. Payment terms are commercial: the vendor
+           proposes what they usually work on, and the binding terms are agreed per
+           work package at bid time. It used to be locked to Procurement AND marked
+           required, so a vendor could never satisfy the checklist item it blocked.
+           Free text on purpose — real terms are richer than a day count. -->
+      <div class="field"><label>Terms of Payment <span style="color:#EE3124">*</span></label>
+        <input id="f-payment-terms" type="text" placeholder="e.g. 60 days, or 50% DP + balance on delivery">
+        <div class="field-hint">Your usual terms. What applies is agreed per work package when you bid.</div>
+      </div>
       <div class="field"><label>Product / Vendor Group</label><input id="f-vendor-group" type="text" placeholder="e.g. Ready Mix Concrete"></div>
     </div>
     <div class="itm-legend" style="margin-top:18px">What you are generally able to provide</div>
@@ -446,7 +453,7 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       <div class="field"><label>Material / subcon submittals</label>
         <select id="f-can-submittals"><option value="">—</option><option value="yes">We can provide</option><option value="no">We cannot</option></select></div>
       <div class="field"><label>Payment terms (days)</label>
-        <input id="f-payment-terms-days" type="number" placeholder="e.g. 60"></div>
+        <input id="f-payment-terms-days" type="number" placeholder="e.g. 60" style="display:none"></div>
     </div>
     <div class="save-bar" style="margin-top:16px">
       <button class="btn-primary" id="btnSaveOverview" onclick="saveOverview()">Save Company Info</button>
@@ -520,8 +527,8 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260903e"></script>
-<script src="assets/js/db.js?v=20260903e"></script>
+<script src="assets/js/auth.js?v=20260903f"></script>
+<script src="assets/js/db.js?v=20260903f"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -731,24 +738,43 @@ function renderDocs() {
     extra.map(d => rowFor(d.doc_type, window.accredDocLabel(d.doc_type), false)).join('') +
     `<div class="doc-row">
       <span class="doc-name" style="color:#888;font-weight:500">Other supporting document</span>
-      <input type="file" accept=".pdf,.jpg,.jpeg,.png" onchange="uploadDoc('other', this)" style="flex:1;min-width:170px;font-size:12px">
+      <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onchange="uploadDoc('other', this)" style="flex:1;min-width:170px;font-size:12px">
     </div>`;
 }
+/* Handles one file for each of the four required rows, and SEVERAL for "Other
+   supporting document" (that input carries `multiple`). Files are uploaded one
+   at a time rather than in parallel so a failure part-way names the file that
+   failed and the ones already stored keep their rows. */
 async function uploadDoc(docType, input) {
-  const file = input.files && input.files[0];
-  if (!file) return;
-  if (file.size > 15 * 1024 * 1024) { msg('That file is larger than 15 MB — please upload a smaller scan.', 'error'); input.value = ''; return; }
+  const files = input.files ? Array.from(input.files) : [];
+  if (!files.length) return;
+  const tooBig = files.filter(f => f.size > 15 * 1024 * 1024);
+  if (tooBig.length) {
+    msg(tooBig.length === 1
+      ? 'That file is larger than 15 MB — please upload a smaller scan.'
+      : tooBig.length + ' of those files are larger than 15 MB — please upload smaller scans.', 'error');
+    input.value = ''; return;
+  }
   input.disabled = true;
+  let done = 0;
   try {
-    const path = await VendorDb.uploadVendorDoc(vendor.id, docType, file);
-    await VendorDb.documents.add(vendor.id, { doc_type: docType, file_path: path, file_name: file.name });
+    for (const file of files) {
+      const path = await VendorDb.uploadVendorDoc(vendor.id, docType, file);
+      await VendorDb.documents.add(vendor.id, { doc_type: docType, file_path: path, file_name: file.name });
+      done++;
+    }
     // Touching the parent row is what tells staff the profile moved (the same
     // reason the products/certs/personnel editors call updateVendor).
     try { vendor = await VendorDb.updateVendor(vendor.id, {}); } catch (_) {}
     await reloadAccreditation();
-    msg('Document uploaded.', 'success');
-  } catch (e) { msg('Upload failed: ' + (e.message || e), 'error'); }
+    msg(done === 1 ? 'Document uploaded.' : done + ' documents uploaded.', 'success');
+  } catch (e) {
+    // Say what DID land, so the vendor does not re-upload files already stored.
+    await reloadAccreditation();
+    msg((done ? done + ' uploaded, then it failed: ' : 'Upload failed: ') + (e.message || e), 'error');
+  }
   input.disabled = false;
+  input.value = '';
 }
 async function removeDoc(id) {
   const d = myDocs.find(x => x.id === id);
@@ -818,6 +844,7 @@ const OVERVIEW_FIELDS = {
   'f-contact-email': 'contact_email', 'f-website': 'website',
   'f-address': 'address', 'f-city': 'city',
   'f-owner-name': 'owner_name', 'f-owner-contact-number': 'owner_contact_number',
+  'f-payment-terms': 'payment_terms',
 };
 // Capability the vendor declares about itself, answering the bond and submittal
 // requirements a work package carries. Vendor-owned, so NOT pinned in
@@ -834,7 +861,10 @@ const CAPABILITY_FIELDS = {
 // vendor cannot provide a bond when they simply have not said.
 function _capIn(v) { return v === 'yes' ? true : v === 'no' ? false : null; }
 function _capOut(v) { return v === true ? 'yes' : v === false ? 'no' : ''; }
-const STAFF_FIELDS = { 'f-name': 'name', 'f-payment-terms': 'payment_terms',
+// payment_terms is NOT here any more — see the field's own note. It is the
+// vendor's to propose, and 2026-09-01_vendor_edit_guard_consolidated.sql no
+// longer pins it server-side.
+const STAFF_FIELDS = { 'f-name': 'name',
                        'f-vendor-category': 'vendor_category', 'f-vendor-group': 'vendor_group' };
 const TIN_FIELD = 'f-tin';
 function tinIsLocked() { return !!(vendor && String(vendor.tin || '').trim()); }
