@@ -461,8 +461,16 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260903a"></script>
-<script src="assets/js/db.js?v=20260903a"></script>
+<script>
+  /* This page is the vendor's, not staff's. auth.js reads window.__loginPage
+     for every redirect it owns — no session, a profile that is not approved,
+     and AppAuth.logout() — so a vendor is always returned to THEIR door
+     instead of being dropped on the Megawide employee login. Must be set
+     BEFORE auth.js runs. */
+  window.__loginPage = 'vendor-login.html';
+</script>
+<script src="assets/js/auth.js?v=20260903b"></script>
+<script src="assets/js/db.js?v=20260903b"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -488,8 +496,8 @@ AppAuth.requireLogin((user, profile) => {
 });
 
 // Shown when a NON-vendor account opens this page. A vendor with no session is
-// still sent to login.html by requireLogin, which is correct — that is where
-// vendors sign in, and login.html routes role='vendor' straight back here.
+// sent to vendor-login.html instead (window.__loginPage, set above) — vendors and
+// Megawide staff have separate front doors, so neither is ever handed the other's.
 function showWrongAccount(profile) {
   const tabs = document.querySelector('.tabs');
   if (tabs) tabs.style.display = 'none';

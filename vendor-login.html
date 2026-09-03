@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com data:; img-src 'self' data: blob:; connect-src 'self' https://cayjeqeleenizbdzrums.supabase.co wss://cayjeqeleenizbdzrums.supabase.co; object-src 'none'; form-action 'self'">
+<title>Vendor Sign In — Megawide</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="icon" href="assets/icons/favicon-32.png" sizes="32x32">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Procurement">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script>
+  /* Anti-flash: adopt the stored theme before first paint. Shares the
+     wpm_theme_last key with every other page so the theme carries across.
+     This page does not load ui.js (it is public), so it owns its own theme,
+     exactly like login.html / forgot-password.html. */
+  (function () {
+    try {
+      var t = localStorage.getItem('wpm_theme_last');
+      var dark = t ? t === 'dark'
+        : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (dark) document.documentElement.classList.add('dark-mode');
+    } catch (e) {}
+  })();
+</script>
+<style>
+  :root{--mw-red:#EE3124;--mw-black:#231F20;--bg:#F4F4F4;--surface:#fff;
+        --text:#231F20;--text-2:#5A5A5A;--border:rgba(0,0,0,.10);--field:#EEF1F8}
+  html.dark-mode{--bg:#1C1C1C;--surface:#2B2C2B;--text:#F0EFEF;--text-2:#9B9999;
+                 --border:rgba(255,255,255,.12);--field:#333433;color-scheme:dark}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);
+       font-family:'Montserrat',sans-serif;display:flex;flex-direction:column;
+       align-items:center;justify-content:center;padding:32px 20px;overflow-x:hidden}
+  .brand{text-align:center;margin-bottom:26px}
+  .brand img{width:64px;height:64px;object-fit:contain;margin-bottom:14px}
+  .brand h1{margin:0;font-size:1.9rem;font-weight:800;color:var(--mw-red);letter-spacing:-.5px}
+  .brand p{margin:6px 0 0;font-size:0.95rem;color:var(--text-2)}
+  .card{width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);
+        border-radius:14px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,.07)}
+  label{display:block;font-size:0.72rem;font-weight:700;letter-spacing:.06em;
+        text-transform:uppercase;color:var(--text-2);margin-bottom:6px}
+  input{width:100%;padding:13px 14px;border:1.5px solid transparent;border-radius:9px;
+        background:var(--field);color:var(--text);font-family:inherit;font-size:1rem;outline:none}
+  input:focus{border-color:var(--mw-red)}
+  .field{margin-bottom:16px}
+  .btn{width:100%;min-height:50px;border:none;border-radius:9px;background:var(--mw-red);color:#fff;
+       font-family:inherit;font-size:1rem;font-weight:700;cursor:pointer}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  .msg{margin-bottom:16px;padding:11px 13px;border-radius:9px;font-size:0.88rem;display:none;line-height:1.45}
+  .msg.error{display:block;background:#FDECEA;border:1px solid #F5B8B3;color:#9B1B1B}
+  .msg.info{display:block;background:#FDECEA;border:1px solid #F5B8B3;color:#C42127}
+  html.dark-mode .msg.error{background:#3D1A19;border-color:#5A2E2A;color:#FFB4AC}
+  html.dark-mode .msg.info{background:#33211F;border-color:#5A2E2A;color:#FF9C92}
+  .foot{margin-top:20px;padding-top:16px;border-top:1px solid var(--border);
+        text-align:center;font-size:0.88rem;color:var(--text-2);line-height:1.9}
+  .foot a{color:var(--mw-red);text-decoration:none;font-weight:600}
+  .foot a:hover{text-decoration:underline}
+  /* The employee door, kept deliberately quiet: a vendor should not be nudged
+     toward it, but a Megawide colleague who lands here needs a way across. */
+  .staff-door{margin-top:22px;text-align:center;font-size:0.8rem;color:var(--text-2)}
+  .staff-door a{color:var(--text-2);text-decoration:underline}
+  .theme{position:fixed;top:16px;right:16px;width:38px;height:38px;border-radius:50%;
+         border:1px solid var(--border);background:var(--surface);color:var(--text-2);
+         cursor:pointer;display:flex;align-items:center;justify-content:center}
+  @media (max-width:640px){
+    .card{background:none;border:none;box-shadow:none;padding:0;max-width:none}
+    body{justify-content:flex-start;padding-top:44px}
+  }
+</style>
+</head>
+<body>
+
+<button class="theme" onclick="toggleTheme()" aria-label="Toggle dark mode"><i class="ti ti-sun"></i></button>
+
+<div class="brand">
+  <img src="assets/img/megawide-mark.png" alt="Megawide">
+  <h1>Vendor Portal</h1>
+  <p>Megawide Construction Corporation</p>
+</div>
+
+<div class="card">
+  <div class="msg" id="msg"></div>
+  <form id="form" onsubmit="signIn(event)">
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="username" required>
+    </div>
+    <div class="field">
+      <label for="pw">Password</label>
+      <input type="password" id="pw" autocomplete="current-password" required>
+    </div>
+    <button class="btn" id="btn" type="submit">Sign In</button>
+  </form>
+  <div class="foot">
+    <a href="forgot-password.html">Forgot password?</a><br>
+    Not registered yet? <a href="vendor-register.html">Register your company</a>
+  </div>
+</div>
+
+<div class="staff-door">
+  Megawide employee? <a href="login.html">Sign in to the Procurement Dashboard</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SB_URL = 'https://cayjeqeleenizbdzrums.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw';
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+function toggleTheme() {
+  const dark = document.documentElement.classList.toggle('dark-mode');
+  try { localStorage.setItem('wpm_theme_last', dark ? 'dark' : 'light'); } catch (e) {}
+}
+function msg(text, kind) {
+  const b = document.getElementById('msg');
+  b.className = 'msg ' + (kind || 'error');
+  b.innerHTML = text;
+}
+
+/* Where a signed-in account belongs. This page is the VENDOR door, so it only
+   ever lets a vendor through — a Megawide login is sent to its own door rather
+   than into a portal that would just tell it that it is on the wrong account.
+   A claimant whose registration is still pending has no users row at all (by
+   design: they must not land in the staff approval queue), so they go back to
+   vendor-register.html, which shows their claim's status. */
+async function route(session) {
+  const { data: prof } = await sb.from('users').select('role, status').eq('id', session.user.id).maybeSingle();
+  if (!prof) { window.location.href = 'vendor-register.html'; return; }
+  if (prof.role === 'vendor') {
+    if (prof.status !== 'approved') { window.location.href = 'vendor-register.html'; return; }
+    window.location.href = 'vendor-portal.html';
+    return;
+  }
+  // A Megawide account. Do not sign it out — it is a valid session; just point
+  // it at the right entrance.
+  msg('That is a Megawide employee account. '
+    + '<a href="login.html">Open the Procurement Dashboard</a> instead.', 'info');
+  document.getElementById('btn').disabled = false;
+  document.getElementById('btn').textContent = 'Sign In';
+}
+
+async function signIn(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn');
+  const email = document.getElementById('email').value.trim();
+  const pw = document.getElementById('pw').value;
+  document.getElementById('msg').style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email: email, password: pw });
+    if (error) throw error;
+    await route(data.session);
+  } catch (err) {
+    msg(/invalid login/i.test(err.message || '')
+      ? 'That email and password do not match. Check them and try again.'
+      : (err.message || 'Could not sign in.'));
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+// Already signed in? Route straight through rather than asking again.
+(async function () {
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data && data.session) await route(data.session);
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>

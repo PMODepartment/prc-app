@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260903a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260903a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260903a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260903b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260903b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260903b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260903a">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260903b">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -581,6 +581,7 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
     .hist-row{border:1px solid var(--border,#eee);border-radius:8px;padding:11px 13px;margin-bottom:9px}
     .hist-head{font-size:0.8rem;color:var(--text-primary,#231F20);margin-bottom:7px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
     .hist-when{margin-left:auto;font-size:0.72rem;color:var(--text-hint,#6E6C6C)}
+    .hist-entry-preview:not(:empty){margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-md)}
     .hist-diff{display:grid;grid-template-columns:130px 1fr 1fr;gap:8px;font-size:0.76rem;padding:2px 0;align-items:baseline}
     .hist-diff span{color:var(--text-hint,#6E6C6C);font-weight:600;word-break:break-word}
     .hist-diff del{color:#9B1B1B;text-decoration:line-through;word-break:break-word}
@@ -1149,9 +1150,9 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260903a"></script>
-<script src="assets/js/db.js?v=20260903a"></script>
-<script src="assets/js/ui.js?v=20260903a"></script>
+<script src="assets/js/auth.js?v=20260903b"></script>
+<script src="assets/js/db.js?v=20260903b"></script>
+<script src="assets/js/ui.js?v=20260903b"></script>
 <script src="assets/js/vendor-guide.js?v=20260902a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -5876,17 +5877,12 @@ async function renderDetailHistory() {
   try { _histRows = await VendorDb.history.forVendor(activeVendor.id, 60); }
   catch (e) { _histRows = []; }
 
-  const rollback = (_canManage && AppAuth.isAdmin && AppAuth.isAdmin(userProfile))
-    ? '<div class="hist-rollback">'
-      + '<label>Roll this vendor back to how it was at</label>'
-      + '<div class="hist-rollback-row">'
-      + '<input type="datetime-local" id="histWhen" class="claim-input" style="max-width:230px">'
-      + '<button class="btn-cancel" onclick="previewVendorRollback()">Preview</button>'
-      + '</div>'
-      + '<div id="histPreview"></div>'
-      + '<p class="hist-note">Everything this vendor owns is put back the way it was at that moment. '
-      + 'Rows that did not exist then are archived, never deleted. You will see exactly what changes before anything happens.</p>'
-      + '</div>'
+  // Restoring is driven off the entries themselves (see _histCanRollback), the
+  // way every Microsoft version-history pane works — there is no date to pick.
+  const rollback = _histCanRollback()
+    ? '<p class="hist-note">Each entry can put this vendor back to how it was at that point. '
+      + 'You always see exactly what would change first, and rows that did not exist then are '
+      + 'archived rather than deleted.</p>'
     : '';
 
   if (!_histRows.length) {
@@ -5914,8 +5910,18 @@ async function renderDetailHistory() {
       + '<span class="hist-when">' + esc(_fmtAuditDate(h.changed_at))
       + (h.changed_by_name ? ' · ' + esc(h.changed_by_name) : ' · system') + '</span>'
       + '</div>' + detail
-      + (canRestore ? '<div class="hist-actions"><button class="btn-cancel" onclick="restoreHistoryRow(' + i + ')">'
-          + '<i class="ti ti-arrow-back-up"></i> Put this back</button></div>' : '')
+      + '<div class="hist-actions">'
+      // Undoes THIS ONE row, from its own old_data. An INSERT entry has no
+      // earlier state, so the server refuses it and the button is not offered.
+      + (canRestore ? '<button class="btn-cancel" onclick="restoreHistoryRow(' + i + ')">'
+          + '<i class="ti ti-arrow-back-up"></i> Undo this change</button>' : '')
+      // Puts the WHOLE vendor back to how it stood at this entry — the
+      // MS-style "restore this version". Admin only, matching restore_vendor_to.
+      + (_histCanRollback() ? '<button class="btn-cancel" onclick="previewRestoreToEntry(' + i + ')" '
+          + 'title="Put this vendor and everything it owns back to how it was at this point">'
+          + '<i class="ti ti-history"></i> Restore everything to this version</button>' : '')
+      + '</div>'
+      + '<div class="hist-entry-preview" id="histPrev-' + i + '"></div>'
       + '</div>';
   }).join('') + rollback;
 }
@@ -5929,31 +5935,39 @@ async function restoreHistoryRow(i) {
     await VendorDb.history.restoreRow(h.id);
     if (window.AppNotify) AppNotify.success('Restored.');
     await loadAll();
-    await openDetailModal(activeVendor.id);
+    await openVendorPage(activeVendor.id, { noPush: true });
   } catch (e) {
     if (window.AppNotify) AppNotify.fromError(e, 'Could not restore');
     else alert('Could not restore: ' + (e.message || e));
   }
 }
 
-function _histWhenIso() {
-  const el = document.getElementById('histWhen');
-  if (!el || !el.value) return null;
-  // datetime-local has no timezone; the user means their own clock, and
-  // toISOString converts from local, which is what we want.
-  const d = new Date(el.value);
-  return isNaN(d.getTime()) ? null : d.toISOString();
+// Point-in-time restore is admin-only, matching restore_vendor_to's own
+// allow-list — its blast radius is the whole vendor, like merge/delete.
+function _histCanRollback() {
+  return !!(_canManage && AppAuth.isAdmin && AppAuth.isAdmin(userProfile));
 }
 
-async function previewVendorRollback() {
-  const iso = _histWhenIso();
-  const box = document.getElementById('histPreview');
-  if (!iso) { box.innerHTML = '<div class="hist-more">Pick a date and time first.</div>'; return; }
-  box.innerHTML = '<div class="hist-more">Checking…</div>';
+/* Preview what restoring to a given ENTRY would do, rendered under that entry.
+   ⚠️ Passing the entry's own changed_at means "the state this entry LEFT the
+   vendor in" — restore_vendor_to takes the newest entry at or before that
+   instant, which is this one. That is the MS "restore this version" reading:
+   the version you are looking at is the version you get back. */
+async function previewRestoreToEntry(i) {
+  if (!_histCanRollback()) return;
+  const h = _histRows[i];
+  const box = document.getElementById('histPrev-' + i);
+  if (!h || !box) return;
+  // Only one preview open at a time, or several stale ones sit there contradicting.
+  document.querySelectorAll('.hist-entry-preview').forEach(function (el) {
+    if (el !== box) el.innerHTML = '';
+  });
+  box.innerHTML = '<div class="hist-more">Checking what would change…</div>';
   try {
-    const rows = await VendorDb.history.preview(activeVendor.id, iso);
+    const rows = await VendorDb.history.preview(activeVendor.id, h.changed_at);
     if (!rows.length) {
-      box.innerHTML = '<div class="hist-more">Nothing has changed since then — there is nothing to put back.</div>';
+      box.innerHTML = '<div class="hist-more">Nothing has changed since then — this vendor already '
+        + 'looks exactly as it did at this point.</div>';
       return;
     }
     const restores = rows.filter(function (r) { return r.action === 'restore'; }).length;
@@ -5965,26 +5979,30 @@ async function previewVendorRollback() {
             + esc(_HIST_TABLES[r.table_name] || r.table_name) + ' · ' + esc(r.label || '') + '</li>';
         }).join('') + '</ul>'
       + (rows.length > 12 ? '<div class="hist-more">+' + (rows.length - 12) + ' more</div>' : '')
-      + '<button class="btn-primary" onclick="applyVendorRollback()">Restore ' + rows.length + ' row(s)</button>'
+      + '<button class="btn-primary" onclick="applyRestoreToEntry(' + i + ')">'
+      + 'Restore ' + rows.length + ' row(s) to this version</button> '
+      + '<button class="btn-cancel" onclick="document.getElementById(\'histPrev-' + i + '\').innerHTML=\'\'">Cancel</button>'
       + '</div>';
   } catch (e) {
     box.innerHTML = '<div class="hist-more" style="color:#9B1B1B">' + esc((e && e.message) || String(e)) + '</div>';
   }
 }
 
-async function applyVendorRollback() {
-  const iso = _histWhenIso();
-  if (!iso) return;
-  if (!confirm('Roll ' + (activeVendor.name || 'this vendor') + ' back to ' + new Date(iso).toLocaleString()
+async function applyRestoreToEntry(i) {
+  if (!_histCanRollback()) return;
+  const h = _histRows[i];
+  if (!h) return;
+  const when = _fmtAuditDate(h.changed_at);
+  if (!confirm('Put ' + (activeVendor.name || 'this vendor') + ' back to how it was at ' + when
     + '? Every change made since then is undone. This is itself recorded in the history, so it can be undone again.')) return;
   try {
-    const n = await VendorDb.history.restoreTo(activeVendor.id, iso);
+    const n = await VendorDb.history.restoreTo(activeVendor.id, h.changed_at);
     if (window.AppNotify) AppNotify.success('Restored ' + n + ' row(s).');
     await loadAll();
-    await openDetailModal(activeVendor.id);
+    await openVendorPage(activeVendor.id, { noPush: true });
   } catch (e) {
-    if (window.AppNotify) AppNotify.fromError(e, 'Could not roll back');
-    else alert('Could not roll back: ' + (e.message || e));
+    if (window.AppNotify) AppNotify.fromError(e, 'Could not restore');
+    else alert('Could not restore: ' + (e.message || e));
   }
 }
 

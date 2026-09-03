@@ -4,10 +4,19 @@ const _SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsIn
 window.__sb = window.supabase.createClient(_SB_URL, _SB_KEY);
 async function getSB() { return window.__sb; }
 const AppAuth = (() => {
+  /* Which sign-in page this surface belongs to. Vendors and Megawide staff are
+     separate audiences with separate front doors: vendor-portal.html sets
+     window.__loginPage = 'vendor-login.html' so an expired session, a rejected
+     profile and Sign out all return the vendor to THEIR door rather than
+     dropping them on the employee dashboard's login. Every other page leaves it
+     unset and keeps login.html. */
+  function _loginPage() {
+    return (typeof window !== 'undefined' && window.__loginPage) || 'login.html';
+  }
   async function requireLogin(onReady) {
     const sb = await getSB();
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) { window.location.href = 'login.html'; return; }
+    if (!session) { window.location.href = _loginPage(); return; }
     // Profile cache: avoids a DB round-trip on every page navigation within a session
     let profile;
     const cacheKey = 'wpm_prof_' + session.user.id;
@@ -17,7 +26,7 @@ const AppAuth = (() => {
       profile = data;
       try { if (profile) sessionStorage.setItem(cacheKey, JSON.stringify(profile)); } catch {}
     }
-    if (!profile || profile.status !== 'approved') { await sb.auth.signOut(); window.location.href = 'login.html'; return; }
+    if (!profile || profile.status !== 'approved') { await sb.auth.signOut(); window.location.href = _loginPage(); return; }
     window.__profile = profile; window.__session = session;
     if (typeof WPDb !== 'undefined' && WPDb.updateLastLogin) WPDb.updateLastLogin(session.user.id).catch(()=>{});
     if (typeof AppTheme !== 'undefined') AppTheme.init(session.user.id);
@@ -28,7 +37,7 @@ const AppAuth = (() => {
     const sb = await getSB();
     try { [...Object.keys(sessionStorage)].forEach(k => { if (k.startsWith('wpm_prof_')) sessionStorage.removeItem(k); }); } catch {}
     await sb.auth.signOut();
-    window.location.href = 'login.html';
+    window.location.href = _loginPage();
   }
   // Roles that see ALL projects (not just assigned)
   const _ALL_PROJECT_ROLES = ['admin','super_admin','specialist'];
