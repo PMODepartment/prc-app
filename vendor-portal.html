@@ -33,33 +33,68 @@
     .btn-logout{background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;padding:6px 14px;border-radius:8px;font-family:inherit;font-size:12px;cursor:pointer}
     .btn-logout:hover{background:rgba(255,255,255,.1)}
     .wrap{max-width:960px;margin:0 auto;padding:24px 16px 60px}
-    /* ── Side panel ───────────────────────────────────────────────────────
+    /* ── Sidebar ──────────────────────────────────────────────────────────
        Two top-level PAGES — Company Profile and Bid Board — because they are
        different jobs, not two views of the same record. The profile's own tab
-       row lives inside the Company Profile page. Styled after the main app's
-       dark sidebar, but self-contained: this page never loads dashboard.css. */
-    .portal-shell{display:flex;align-items:flex-start}
-    .portal-nav{width:200px;flex-shrink:0;background:#231F20;align-self:stretch;
-      min-height:calc(100vh - 60px);position:sticky;top:60px;padding:14px 10px;
-      display:flex;flex-direction:column;gap:3px}
-    .pnav-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-      color:rgba(255,255,255,.38);padding:6px 12px 6px}
-    .pnav-item{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:none;
-      border-radius:8px;background:transparent;color:rgba(255,255,255,.72);font-size:13px;
-      font-weight:600;font-family:inherit;cursor:pointer;text-align:left}
-    .pnav-item:hover{background:rgba(255,255,255,.08);color:#fff}
-    .pnav-item.active{background:#EE3124;color:#fff}
-    .pnav-item i{font-size:17px;flex-shrink:0}
-    .pnav-item .lbl{flex:1;min-width:0}
-    .pnav-item.active .tab-badge{background:#fff;color:#EE3124}
-    .portal-body{flex:1;min-width:0}
+       row lives inside the Company Profile page.
+
+       ⚠️ This is the SAME BUILD as the WPM app's sidebar (`.sidebar` in
+       dashboard.css + initMobileMenu in ui.js), reimplemented here because this
+       page loads NEITHER of those files. Keep the two in step: same 240px rail,
+       same collapse-by-translate, same drawer-plus-overlay below 768px, and the
+       SAME localStorage key, so the choice carries across the two apps. */
+    :root{--sidebar-w:240px}
+    .app-shell{display:flex;min-height:100vh}
+    .sidebar{width:var(--sidebar-w);flex-shrink:0;background:#231F20;display:flex;
+      flex-direction:column;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;
+      overflow-x:hidden;z-index:100;transition:transform .3s ease;
+      scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+    .sidebar::-webkit-scrollbar{width:6px}
+    .sidebar::-webkit-scrollbar-track{background:transparent}
+    .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
+    .sidebar-logo{padding:18px 20px 16px;border-bottom:1px solid rgba(255,255,255,.08);
+      display:flex;flex-direction:column;gap:10px}
+    .sidebar-logo img{width:100%;height:auto;display:block;object-fit:contain;object-position:left center}
+    .sidebar-logo .app-label{font-size:10px;font-weight:700;letter-spacing:.14em;
+      color:#EE3124;text-transform:uppercase}
+    .sidebar-section{padding:16px 12px 4px}
+    .sidebar-section-label{font-size:10px;font-weight:700;letter-spacing:.12em;
+      color:rgba(255,255,255,.3);text-transform:uppercase;padding:0 8px;margin-bottom:4px}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;
+      color:rgba(255,255,255,.65);font-size:13px;font-weight:500;font-family:inherit;
+      cursor:pointer;transition:all .15s;text-decoration:none;border:none;background:none;
+      width:100%;text-align:left;position:relative;white-space:nowrap;overflow:hidden;
+      text-overflow:ellipsis}
+    .nav-item:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.9)}
+    .nav-item.active{background:#EE3124;color:#fff;font-weight:600}
+    .nav-item i{font-size:16px;flex-shrink:0}
+    .nav-item .nbadge{position:absolute;right:10px;font-size:10px;background:#fff;color:#EE3124;
+      border-radius:10px;padding:1px 6px;font-weight:700;min-width:18px;text-align:center}
+    .nav-item.active .nbadge{background:rgba(255,255,255,.25);color:#fff}
+    .sidebar-footer{margin-top:auto;padding:14px 20px;border-top:1px solid rgba(255,255,255,.06);
+      font-size:10px;color:rgba(255,255,255,.25);line-height:1.6}
+    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
+    .main{flex:1;min-width:0;display:flex;flex-direction:column;
+      margin-left:var(--sidebar-w);transition:margin-left .3s ease}
+    /* The hamburger sits on the portal's DARK topbar, so it takes the same
+       treatment as the theme toggle beside it rather than the app's light one. */
+    .btn-menu{display:flex;align-items:center;justify-content:center;width:32px;height:32px;
+      border-radius:8px;border:1px solid rgba(255,255,255,.25);background:transparent;
+      color:#fff;cursor:pointer;flex-shrink:0;padding:0}
+    .btn-menu:hover{background:rgba(255,255,255,.1)}
+    .btn-menu i{font-size:18px}
+    @media(min-width:768px){
+      body.sidebar-collapsed .sidebar{transform:translateX(-100%);box-shadow:none}
+      body.sidebar-collapsed .main{margin-left:0}
+    }
+    /* Suppress the slide on first paint when restoring a collapsed sidebar. */
+    .no-transition .sidebar,.no-transition .main{transition:none !important}
     @media(max-width:767px){
-      /* A 200px rail is most of a phone screen — become a strip instead. */
-      .portal-shell{flex-direction:column}
-      .portal-nav{width:auto;min-height:0;position:static;flex-direction:row;
-        padding:8px 10px;gap:6px;overflow-x:auto}
-      .pnav-title{display:none}
-      .pnav-item{width:auto;white-space:nowrap;padding:8px 13px}
+      :root{--sidebar-w:260px}
+      .sidebar{transform:translateX(-100%);box-shadow:none}
+      .sidebar.open{transform:translateX(0);box-shadow:0 10px 30px rgba(0,0,0,.3)}
+      .sidebar-overlay.show{display:block}
+      .main{margin-left:0}
     }
     .banner{border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.5;margin-bottom:20px}
     .banner-pending{background:#FEF3C7;color:#92400E;border:1px solid #FDE68A}
@@ -427,8 +462,31 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
   <meta name="mobile-web-app-capable" content="yes"/>
 </head>
 <body>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="app-shell">
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <img src="assets/img/megawide-logo.png" alt="Megawide"/>
+    <div class="app-label">Vendor Portal</div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Vendor</div>
+    <button class="nav-item active" data-sec="profile" onclick="switchSection('profile')">
+      <i class="ti ti-building"></i>Company Profile</button>
+    <button class="nav-item" data-sec="bidboard" onclick="switchSection('bidboard')">
+      <i class="ti ti-clipboard-list"></i>Bid Board
+      <span class="nbadge" id="bidBadge" style="display:none">0</span></button>
+  </div>
+  <div class="sidebar-footer">
+    Megawide Construction Corporation<br>EPC · Procurement · Vendor Portal
+  </div>
+</aside>
+
+<div class="main">
 <div class="topbar">
   <div class="topbar-left">
+    <button class="btn-menu" id="btn-menu" aria-label="Toggle menu"><i class="ti ti-menu-2"></i></button>
     <img class="topbar-mark" src="assets/img/megawide-mark.png" alt="Megawide"/>
     <span class="topbar-title">Vendor Portal</span>
   </div>
@@ -442,16 +500,6 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
   </div>
 </div>
 
-<div class="portal-shell">
-<nav class="portal-nav" id="portalNav">
-  <div class="pnav-title">Vendor</div>
-  <button class="pnav-item active" data-sec="profile" onclick="switchSection('profile')">
-    <i class="ti ti-building"></i><span class="lbl">Company Profile</span></button>
-  <button class="pnav-item" data-sec="bidboard" onclick="switchSection('bidboard')">
-    <i class="ti ti-clipboard-list"></i><span class="lbl">Bid Board</span>
-    <span class="tab-badge" id="bidBadge" style="display:none">0</span></button>
-</nav>
-<div class="portal-body">
 <div class="wrap">
   <div id="statusBanner" class="banner" style="display:none"></div>
 
@@ -663,8 +711,8 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     <div id="bidBoardList"></div>
   </div>
 </div><!-- /.wrap -->
-</div><!-- /.portal-body -->
-</div><!-- /.portal-shell -->
+</div><!-- /.main -->
+</div><!-- /.app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
@@ -710,9 +758,12 @@ AppAuth.requireLogin((user, profile) => {
 function showWrongAccount(profile) {
   const tabs = document.querySelector('.tabs');
   if (tabs) tabs.style.display = 'none';
-  // The side panel goes too — every page it offers needs a vendor.
-  const nav = document.getElementById('portalNav');
+  // The sidebar goes too — every page it offers needs a vendor.
+  const nav = document.getElementById('sidebar');
   if (nav) nav.style.display = 'none';
+  const menu = document.getElementById('btn-menu');
+  if (menu) menu.style.display = 'none';
+  document.querySelectorAll('.main').forEach(function (m) { m.style.marginLeft = '0'; });
   document.querySelectorAll('.panel').forEach(function (el) { el.style.display = 'none'; });
   const host = document.querySelector('.wrap') || document.body;
   const who = esc((profile && (profile.name || profile.email)) || 'this account');
@@ -1269,6 +1320,55 @@ function togglePortalTheme() { _portalApplyTheme(!document.documentElement.class
 // Sync the button icon with whatever the anti-flash script already decided.
 _portalApplyTheme(document.documentElement.classList.contains('dark-mode'), false);
 
+/* ── Collapsible sidebar ────────────────────────────────────────────────────
+   ⚠️ A REIMPLEMENTATION of initMobileMenu() in ui.js, which this page cannot
+   load. Keep the behaviour identical: ≥768px the hamburger collapses the rail
+   and the main column reclaims the space (persisted); below that it is a
+   slide-in drawer with an overlay that any nav click closes.
+   The SAME localStorage key as the app, so the choice carries across both. */
+function initPortalSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const btnMenu = document.getElementById('btn-menu');
+  if (!sidebar || !btnMenu) return;
+  const KEY = 'wpm_sidebar_collapsed';
+  const isDesktop = () => window.innerWidth >= 768;
+
+  // Default COLLAPSED, matching the app — it only stays open if this user has
+  // explicitly expanded it before ('0'). The .no-transition guard stops the
+  // panel visibly sliding shut on first paint.
+  let stored = null;
+  try { stored = localStorage.getItem(KEY); } catch (e) {}
+  if (isDesktop() && stored !== '0') {
+    document.body.classList.add('no-transition', 'sidebar-collapsed');
+    requestAnimationFrame(() => requestAnimationFrame(
+      () => document.body.classList.remove('no-transition')));
+  }
+
+  function closeMenu() {
+    sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+  btnMenu.addEventListener('click', () => {
+    if (isDesktop()) {
+      const collapsed = document.body.classList.toggle('sidebar-collapsed');
+      try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (e) {}
+    } else if (sidebar.classList.contains('open')) {
+      closeMenu();                     // the drawer has no close button of its own
+    } else {
+      sidebar.classList.add('open');
+      if (overlay) overlay.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+  });
+  if (overlay) overlay.addEventListener('click', closeMenu);
+  sidebar.querySelectorAll('.nav-item').forEach(el => {
+    el.addEventListener('click', () => { if (!isDesktop()) closeMenu(); });
+  });
+}
+initPortalSidebar();
+
 /* The offering category is now a taxonomy-tree picker (Trade → Works → …)
    rather than a flat trade dropdown, so a vendor can say exactly what they
    supply and the app can match them to a work package. */
@@ -1459,7 +1559,7 @@ function _showOnlyPanels(ids) {
 }
 function switchSection(sec) {
   _portalSection = sec;
-  document.querySelectorAll('.pnav-item').forEach(b => b.classList.toggle('active', b.dataset.sec === sec));
+  document.querySelectorAll('.sidebar .nav-item').forEach(b => b.classList.toggle('active', b.dataset.sec === sec));
   const tabs = document.querySelector('.tabs');
   // '' rather than 'flex' — let the stylesheet own the display value.
   if (tabs) tabs.style.display = sec === 'profile' ? '' : 'none';

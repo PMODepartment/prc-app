@@ -3216,15 +3216,35 @@ package** and answer through the portal instead of by email; staff see the submi
   table.** Reads return `[]`/`0` on a missing table so both pages render before the migration is
   run; **writes THROW** — a silent no-op on an invitation or a submission is worse than an error.
   `invite()` upserts on `(wp_id, vendor_id)` so re-inviting cannot produce two rows and two answers.
-- **THE PORTAL'S SHAPE CHANGED WITH IT: a side panel, not a sixth tab (per explicit request).**
-  Company Profile and Bid Board are different jobs, not two views of one record, so the side panel
+- **THE PORTAL'S SHAPE CHANGED WITH IT: a sidebar, not a sixth tab (per explicit request).**
+  Company Profile and Bid Board are different jobs, not two views of one record, so the sidebar
   picks a **page** and the old tab row (Company Info / Products / Personnel / Certifications /
   Accreditation) now belongs to the Company Profile page only and is hidden on the Bid Board.
   `switchSection(sec)` is the outer level, `switchTab(t)` the inner; `_activeTab` is remembered, so
   leaving to the Bid Board and coming back lands on the tab you left. `_showOnlyPanels()` hides
   every `.panel` before showing a set, so the two levels cannot leak into each other.
-  `showWrongAccount()` hides the nav too — every page it offers needs a vendor. Below 767px the
-  200px rail becomes a horizontal strip.
+  `showWrongAccount()` hides the sidebar and the hamburger and clears the margin — every page it
+  offers needs a vendor.
+- **⚠️ THE SIDEBAR IS THE WPM APP'S BUILD, REIMPLEMENTED — keep the two in step.** Asked for
+  explicitly ("follow the same build as the work package monitoring app... collapsible as well").
+  It is the same `.app-shell` > `.sidebar` + `.main` structure, the same `.sidebar-logo` /
+  `.sidebar-section-label` / `.nav-item` / `.nbadge` / `.sidebar-footer` vocabulary, a 240px fixed
+  rail collapsed by `body.sidebar-collapsed` translating it out while `.main` reclaims the margin,
+  a `.no-transition` guard on first paint, and below 768px a 260px drawer with an overlay that any
+  nav click closes. **It had to be REIMPLEMENTED rather than reused: this page loads neither
+  `dashboard.css` nor `ui.js`** (`initMobileMenu` lives in the latter). It shares the **same
+  `localStorage` key `wpm_sidebar_collapsed`**, like `wpm_theme_last`, so the choice carries across
+  both apps — and **defaults to COLLAPSED** unless the user has explicitly expanded before (`'0'`),
+  matching the app. Every `localStorage` touch is wrapped: the harness proved it throws outright in
+  an opaque origin, and an unavailable store must not break the nav.
+  The hamburger is styled for the portal's DARK topbar (transparent + white border, like the theme
+  toggle beside it) rather than the app's light-topbar treatment.
+- **Verified by geometry, not by eye**: collapsed/expanded/re-collapsed each settle to
+  `margin-left` 240px → 0 → 240px, and the mobile drawer measures 260px wide sitting fully
+  off-screen when closed (`right: 0`) and flush at `left: 0` when open, with the overlay shown,
+  body scroll locked, and both the overlay and a nav click closing it. **⚠️ Measure AFTER the
+  300ms transition settles** — reading `getComputedStyle().marginLeft` straight after a click
+  returns the animating value and reads as a failure that isn't one (it did, twice).
 - **A vendor may revise up to the deadline, and may change their mind from `declined` to
   `submitted`** — a quotation is routinely corrected before it is opened, and making a buyer
   re-issue the invitation over a typo is worse for both sides. The card therefore offers "Revise
