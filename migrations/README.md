@@ -70,7 +70,10 @@ scratch, run them in exactly this order.
 | 40 | `2026-09-01_vendor_self_registration.sql` | **after #37–#39** — one public registration URL, the claim queue, and the RPCs that grant access. Opens registration up, so the three hardening migrations above are what make it safe |
 | 41 | `2026-09-01_vendor_history_restore.sql` | **after #37–#39** — full before/after snapshots of every vendor change, plus per-row and point-in-time restore |
 | 42 | `2026-09-02_vendor_catalogue.sql` | catalogue + capability fields closing the gap against what a work package asks for. **⚠️ Then RE-RUN #33** — its five new `vendors` columns are vendor-owned and invisible until `vendor_self_view` is rebuilt; its verification fails until you do |
-| 43 | `2026-09-01_vendor_edit_guard_consolidated.sql` | **⚠️ MUST BE LAST — see below** |
+| 43 | `2026-09-03_vendor_owner_and_logo.sql` | `owner_name`, `owner_contact_number`, `logo_path` — the Owner items are REQUIRED accreditation items, so the checklist could not be satisfied without them. Rebuilds `vendor_self_view` (31 cols) itself, so #33 does NOT need re-running for this one |
+| 44 | `2026-09-03_vendor_claim_tin_only.sql` | registration identifies a company by **TIN, then exact name** — Vendor Code was internal SAP tagging a vendor never sees (verified against a real PO: no vendor code anywhere on it). **⚠️ DROPS the old 5-argument `submit_vendor_claim`** — PostgREST resolves overloads by argument NAME, so leaving both would make the call ambiguous |
+| 45 | `2026-09-03_vendor_country.sql` | `vendors.country` (ISO alpha-2, defaults `PH`) — an overseas vendor had nowhere to say where they are, and the dial code keys off it. Rebuilds `vendor_self_view` (32 cols) |
+| 46 | `2026-09-01_vendor_edit_guard_consolidated.sql` | **⚠️ MUST BE LAST — see below.** ⚠️ **RE-RUN IT after #43–#45**: it was edited 2026-09-03 to stop pinning `payment_terms` (a required accreditation item a vendor was not allowed to fill), so a database still holding the older body silently discards a vendor's Terms of Payment |
 
 ---
 
@@ -87,8 +90,12 @@ or #33 afterwards** — each would replace the function body with its own narrow
 version and reintroduce the regression. Their *other* statements are still current;
 it is only their guard block that is superseded.
 
-(#40, #41 and #42 sort around it alphabetically but none of them touches the guard, so their
+(#40–#45 sort around it alphabetically but none of them touches the guard, so their
 order relative to it is immaterial — what matters is that it follows the five that DO define the guard.)
+
+**It was itself amended on 2026-09-03** to drop the `payment_terms` pin, so its
+verification now asserts the ABSENCE of that pin (`payment_terms_left_to_vendor`) and
+the field superset is 16, not 17. If you ran it before that date, run it again.
 
 Its section 6 is a verification `SELECT` whose every column must read `t`. That is
 also how you diagnose a database where an older migration has been re-run on top.
