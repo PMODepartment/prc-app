@@ -582,6 +582,26 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
     .hist-head{font-size:0.8rem;color:var(--text-primary,#231F20);margin-bottom:7px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
     .hist-when{margin-left:auto;font-size:0.72rem;color:var(--text-hint,#6E6C6C)}
     .hist-entry-preview:not(:empty){margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-md)}
+    /* Accreditation document register (staff side) */
+    .accred-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+    .accred-bar{flex:1;height:8px;border-radius:5px;background:var(--surface-2);overflow:hidden}
+    .accred-bar span{display:block;height:100%;background:#2D9B6F}
+    .accred-pct{flex-shrink:0;font-size:0.7857rem;font-weight:700;color:var(--text-secondary)}
+    .accred-missing{font-size:0.7857rem;color:#9B1B1B;margin-bottom:12px}
+    .accred-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+    .accred-row:last-of-type{border-bottom:none}
+    .accred-state.on{color:#2D9B6F}
+    .accred-state.off{color:var(--text-hint)}
+    .accred-name{flex:1;min-width:0;font-size:0.8571rem;color:var(--text-primary)}
+    .accred-when{display:block;font-size:0.7143rem;color:var(--text-hint)}
+    .accred-view{flex-shrink:0;font-size:0.7857rem;color:#EE3124;cursor:pointer;text-decoration:none}
+    .accred-view:hover{text-decoration:underline}
+    .accred-up{flex-shrink:0;font-size:0.7857rem;color:var(--text-secondary);cursor:pointer;
+               border:1px solid var(--border-md);border-radius:7px;padding:4px 9px}
+    .accred-up:hover{border-color:#EE3124;color:#EE3124}
+    .accred-extra{margin-top:10px;font-size:0.7857rem;color:var(--text-secondary)}
+    .accred-extra a{color:#EE3124;cursor:pointer}
+    .accred-note{margin:14px 0 0;font-size:0.7143rem;color:var(--text-hint);line-height:1.5}
     .hist-diff{display:grid;grid-template-columns:130px 1fr 1fr;gap:8px;font-size:0.76rem;padding:2px 0;align-items:baseline}
     .hist-diff span{color:var(--text-hint,#6E6C6C);font-weight:600;word-break:break-word}
     .hist-diff del{color:#9B1B1B;text-decoration:line-through;word-break:break-word}
@@ -980,6 +1000,7 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
           <div class="vd-body">
             <nav class="vd-rail" id="detailJump">
               <a href="#dsec-overview">Overview</a>
+              <a href="#dsec-accred">Accreditation</a>
               <a href="#dsec-wps">Work Packages</a>
               <a href="#dsec-sched">Schedule Performance</a>
               <a href="#dsec-products">Products &amp; Services</a>
@@ -991,6 +1012,7 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
             </nav>
             <div class="vd-sections" id="detailScroll">
               <section class="detail-section" id="dsec-overview"><h3 class="detail-section-title">Overview</h3><div id="dtab-overview"></div></section>
+              <section class="detail-section" id="dsec-accred"><h3 class="detail-section-title">Accreditation</h3><div id="dtab-accred"></div></section>
               <section class="detail-section" id="dsec-wps"><h3 class="detail-section-title">Work Packages</h3><div id="dtab-wps"></div></section>
               <section class="detail-section" id="dsec-sched"><h3 class="detail-section-title">Schedule Performance</h3><div id="dtab-sched"></div></section>
               <section class="detail-section" id="dsec-products"><h3 class="detail-section-title">Products &amp; Services</h3><div id="dtab-products"></div></section>
@@ -4214,8 +4236,9 @@ async function openVendorPage(id, opts) {
   if (!(opts && opts.noPush)) {
     try { history.pushState({ vendor: id }, '', 'vendors.html?vendor=' + encodeURIComponent(id)); } catch (_) {}
   }
-  await Promise.all([renderDetailWps(), renderDetailSched(), renderDetailProducts(), renderDetailCerts(),
-                     renderDetailPersonnel(), renderDetailRates(), renderDetailBids(), renderDetailHistory()]);
+  await Promise.all([renderDetailAccred(), renderDetailWps(), renderDetailSched(), renderDetailProducts(),
+                     renderDetailCerts(), renderDetailPersonnel(), renderDetailRates(), renderDetailBids(),
+                     renderDetailHistory()]);
   renderDetailOverview();
   _wireDetailScrollSpy();
 }
@@ -4493,6 +4516,86 @@ function renderDetailOverview() {
   // so locking before it ran left them clickable for read-only roles.
   if (!_canManage) _lockDetailInputs('dtab-overview');
 }
+/* ── Accreditation documents, staff side ───────────────────────────────────
+   The register of the four documents Procurement's accreditation email asks
+   for, mirroring the vendor portal's Accreditation tab. The checklist comes
+   from window.accredReadiness in db.js — the SAME function the portal uses to
+   decide what to ask the vendor for, so the two can never disagree about
+   whether a vendor is ready.
+
+   Staff can upload here too, deliberately: these documents overwhelmingly
+   arrive by email today (no vendor has ever used the portal), and an officer
+   with the BIR 2303 in their inbox needs somewhere to file it. */
+async function renderDetailAccred() {
+  const box = document.getElementById('dtab-accred');
+  if (!box || !activeVendor) return;
+  const v = activeVendor;
+  box.innerHTML = '<div class="empty">Loading…</div>';
+  let docs = [];
+  try { docs = await VendorDb.documents.list(v.id); } catch (e) { docs = []; }
+  // The page can be reopened on another vendor while this await is in flight.
+  if (!activeVendor || activeVendor.id !== v.id) return;
+  _detailDocs = docs;                       // shared with renderDetailRequest
+
+  const types = (window.ACCRED_DOC_TYPES || []).filter(t => t.required);
+  const byType = {};
+  docs.forEach(x => { if (!byType[x.doc_type] || x.uploaded_at > byType[x.doc_type].uploaded_at) byType[x.doc_type] = x; });
+  const rd = window.accredReadiness ? window.accredReadiness(v, docs) : null;
+
+  const head = rd
+    ? `<div class="accred-head">
+         <div class="accred-bar"><span style="width:${rd.pct}%"></span></div>
+         <div class="accred-pct">${rd.done} of ${rd.total} complete</div>
+       </div>
+       ${rd.missing.length ? `<div class="accred-missing">Still missing: <b>${esc(rd.missing.join(', '))}</b></div>` : ''}`
+    : '';
+
+  const rows = types.map(t => {
+    const doc = byType[t.key];
+    const on = !!(doc && doc.file_path);
+    return `<div class="accred-row">
+      <span class="accred-state ${on ? 'on' : 'off'}"><i class="ti ti-${on ? 'circle-check' : 'circle-dashed'}"></i></span>
+      <div class="accred-name">${esc(t.label)}
+        ${on ? `<span class="accred-when">filed ${esc(_reqDate(doc.uploaded_at))}</span>` : '<span class="accred-when">not on file</span>'}
+      </div>
+      ${on ? `<a class="accred-view" onclick="viewVendorDoc('${doc.id}')"><i class="ti ti-eye"></i> View</a>${_docLockMarker(doc)}` : ''}
+      ${_canManage ? `<label class="accred-up" title="Attach a ${esc(t.label)} received from this vendor">
+        <i class="ti ti-upload"></i> ${on ? 'Replace' : 'Upload'}
+        <input type="file" style="display:none" onchange="uploadDetailDoc('${esc(t.key)}', this)">
+      </label>` : ''}
+    </div>`;
+  }).join('');
+
+  // Anything filed under a type that is not one of the four required ones.
+  const extra = docs.filter(x => x.file_path && !types.some(t => t.key === x.doc_type));
+  const extraHtml = extra.length
+    ? `<div class="accred-extra"><b>Other documents on file:</b> ${extra.map(x =>
+        `<a onclick="viewVendorDoc('${x.id}')">${esc(window.accredDocLabel ? window.accredDocLabel(x.doc_type) : x.doc_type)}</a>${_docLockMarker(x)}`).join(' · ')}</div>`
+    : '';
+
+  box.innerHTML = head + rows + extraHtml
+    + `<p class="accred-note">The vendor uploads these themselves in the Accreditation tab of the vendor portal.
+       Upload here when they send them by email instead. A document is frozen once the accreditation it
+       supports is approved — a locked one can only be replaced by uploading a new version.</p>`;
+}
+
+async function uploadDetailDoc(docType, input) {
+  if (!_canManage || !activeVendor) return;
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 15 * 1024 * 1024) { AppNotify && AppNotify.warn('That file is over 15 MB.'); input.value = ''; return; }
+  try {
+    await VendorDb.uploadVendorDoc(activeVendor.id, docType, file);
+    if (window.AppNotify) AppNotify.success('Filed.');
+    await renderDetailAccred();
+    renderDetailRequest();          // the readiness read-out above reflects it too
+  } catch (e) {
+    if (window.AppNotify) AppNotify.fromError(e, 'Could not file that document');
+    else alert(e.message);
+  }
+  input.value = '';
+}
+
 /* ── Accreditation request review ──────────────────────────────────────────
    Rendered at the top of the vendor's Overview section whenever that vendor
    has raised a request (or, when they haven't, as a readiness read-out so a

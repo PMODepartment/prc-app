@@ -2439,6 +2439,127 @@ Full audit of `index.html` + `project.html`, verified live against production as
 
 **LOW — the admin fetch path ignores the DEMO exclusion.** `index.html` line ~843 uses `WPDb.getAllApprovedWPs()` for `_seesAllWPs` roles, bypassing the `filter(p => p.id !== '''DEMO''')` applied to `permitted` on line ~848 (the non-admin path at ~897 scopes correctly). So an admin loads DEMO'''s 10 sample rows into `_rawAll`/`_allWPs`/`window._wpById`. **Not currently a live defect** — every consumer filters by `_activeIds` (verified: DEMO'''s ₱344.5M BCB / ₱227.3M awarded are absent from the rendered KPIs, and the cache key is per-user) — but it means an admin and a regular user compute `BcbBaseline.resolve()` over different row sets, and anything added later that iterates `_allWPs` unscoped would silently include demo data for admins only.
 
+### Vendor page, sidebar, accreditation requirements, history restore, vendor front door (2026-09-03)
+
+Five changes from one review pass. `migrations/2026-09-03_vendor_owner_and_logo.sql` (**not run yet**).
+
+**Vendor Registrations moved in the sidebar.** It was its own `.sidebar-section` with **no
+`.sidebar-section-label`**, so it rendered as an orphan item carrying section spacing, floating
+between the Admin and Manager groups — and for a contributor, who never sees the Admin group at
+all, as a lone unlabelled item above the footer. It now sits **beside Vendor Management** inside an
+already-labelled section: same vendor surface, same contributor audience. **It keeps its own
+wrapper** (`#sidebar-vendor-claims`) because its role gate differs from Vendor Management's —
+`viewer_budget` may read the directory but **not** this queue — so `initVendorClaimsNav()` still
+toggles it independently. All four sidebars; `admin.html`'s stale inline `display:none` on the link
+is gone so the wrapper carries the toggle uniformly.
+
+**⚠️ The vendor detail is now a PAGE, not a modal — `vendors.html?vendor=<id>`.** Nine sections deep
+in a 760px modal meant a cramped scroll inside a scroll with the directory showing through.
+`openVendorPage()` / `closeVendorPage()` swap `#vendorDirectoryPage` and `#vendorDetailPage` (both
+`.page-content` siblings) and `pushState` the URL, so Back/Forward work and the URL is shareable;
+`?vendor=` at boot opens it (captured into `_vdBootVendor`, opened off `loadAll().then` because
+allVendors must be populated first). Measured 1177px of content width against the modal's 760px.
+- **⚠️ THE SECTION IDS ARE UNCHANGED (`#dsec-*` / `#dtab-*`) ON PURPOSE.** Every `renderDetail*()`
+  writes into `#dtab-<x>`, so all nine sections, their editors and the document locking moved with
+  no change to any of them. **`openDetailModal` / `closeDetailModal` are kept as aliases** — the
+  cards, the analytics tables, the claims queue, `splitVendorFromDetail` and
+  `deleteVendorFromDetail` all call those names.
+- The scroll-spy root moved from the modal body to the **viewport** (`root` omitted), and the
+  action bar is `position:sticky;bottom:0` so **Save is never a scroll away** — the reason it was
+  moved into the modal footer in the first place.
+- **Company logo** in the page header. The `vendor-certs` bucket is PRIVATE, so it renders through
+  a **signed URL** (`getCertFileUrl`) and falls back to initials; upload is `uploadVendorFile(id,
+  'logo', file)` → `updateVendor({logo_path})`, write roles only. The `<vendorId>/` path prefix
+  that `uploadVendorFile` adds is load-bearing — the bucket's Storage policies authorize on the
+  first path segment.
+- **Personnel now uses the portal's `.prof-*` profile cards** (photo, role, contact, primary dot +
+  tag). Staff previously saw a flat one-line-per-person `.row-item` list, discarding the photo and
+  primary flag the vendor had filled in; the staff add-form takes a photo too, via the same
+  insert-then-attach sequence (`personnel.add` → `uploadVendorFile(id,'person_'+row.id)` →
+  `personnel.update({photo_path})`).
+- **⚠️ A syntax check cannot catch a missing identifier.** An over-greedy
+  `function closeDetailModal\(\) \{.*?\n\}\n` regex during the conversion silently ate the alias,
+  the `popstate` listener and `_vdInitials`, and all four inline blocks still "parsed". Caught by a
+  **definition check** (`scratchpad/check_defs.js`: 34 helpers defined, 23 ids present exactly
+  once) — run that shape of check after any structural edit here, not just `node --check`.
+
+**Accreditation requirements now mirror the email Procurement sends**: BIR 2303, Company Profile,
+Business Permits, Scanned Copy of Invoice, in that order. **⚠️ ONLY LABELS AND ORDER CHANGED —
+`ACCRED_DOC_TYPES` keys are stored in `vendor_documents.doc_type` on every uploaded row, so
+renaming one orphans every document already uploaded under it.** Vendors upload these in the
+**Accreditation tab of `vendor-portal.html`** (a `.doc-row` per required type → `uploadVendorDoc`),
+which also shows the readiness % and gates the Request Accreditation button.
+- Added **Owner** and **Contact # of Owner** (`owner_name`, `owner_contact_number`) — that email
+  asks for both under Required Information but the app stored neither, so the checklist could
+  never match what staff were chasing. Both vendor-owned, in `accredReadiness`'s info group.
+- **⚠️ The migration re-creates `vendor_self_view`** to add them plus `logo_path`: a `vendors`
+  column absent from that view is invisible AND unwritable to a vendor, and the portal would render
+  boxes that silently never save. Verified the new 31-column list is a **superset of every prior
+  definition** — nothing dropped, staff-only `notes`/`accreditation_notes` still omitted. None of
+  the three is pinned in `vendor_edit_guard`; they are the vendor's own information.
+
+**Where staff reach the accreditation documents — a new Accreditation section on the vendor page.**
+They were previously reachable from the employee side ONLY as a one-line `Documents on file: BIR
+2303 · …` strip inside the request-review panel at the top of Overview, and **that panel is
+suppressed entirely for a vendor with no request, no documents and no claimed login** — so there was
+no register of what is on file, no view of WHICH of the four are missing, and no way for staff to
+add one. The page's second section (`#dsec-accred`, `renderDetailAccred`) now shows the readiness
+bar plus one row per required document: on-file/missing state, filed date, a **View** link (signed
+URL via `viewVendorDoc`), the lock marker, and — for write roles — **Upload / Replace**
+(`uploadDetailDoc` → `VendorDb.uploadVendorDoc`).
+- **Staff upload is deliberate, not a convenience.** No vendor has ever logged in, so in practice
+  these documents arrive by email to an officer, who needs somewhere to file them. The vendor's own
+  route (portal → Accreditation tab) is unchanged and the note on the section says so.
+- The checklist is `window.accredReadiness` — the SAME function the portal uses — so the two sides
+  can never disagree about whether a vendor is ready. `_detailDocs` is still shared with
+  `renderDetailRequest`, and a successful upload re-renders both.
+- Documents filed under a type outside the four required ones are listed separately rather than
+  dropped.
+
+**Change history restores from an ENTRY, not a calendar.** A datetime picker meant knowing when
+something happened before you could undo it, and nothing said which instants mattered. Each entry
+now offers **"Restore everything to this version"** — the MS version-history model, where the list
+IS the control. **Passing that entry's own `changed_at` is the correct reading**: `restore_vendor_to`
+takes the newest entry at or before the instant, which is that entry, so the version you are
+looking at is the version you get back. Preview still runs first, renders under that entry, and only
+one stays open. The per-row **"Undo this change"** (one row, from its `old_data`) is kept beside it —
+different question, and both are now labelled to say which. `_histWhenIso`,
+`previewVendorRollback`, `applyVendorRollback` and `#histWhen` are gone; the patch asserts no
+reference survives. Point-in-time restore stays **admin-only** (`_histCanRollback`), matching
+`restore_vendor_to`'s own allow-list.
+
+**⚠️ Vendors and Megawide staff now have SEPARATE FRONT DOORS.** Signing out of the vendor portal
+dropped vendors on the employee login. **`auth.js` reads `window.__loginPage`** for all three
+redirects it owns — no session, an unapproved profile, and `AppAuth.logout()` — defaulting to
+`login.html`, so every other page is unchanged. **`vendor-portal.html` sets it to
+`vendor-login.html` BEFORE loading auth.js** (order matters).
+- **`vendor-login.html`** is new: public, self-contained (own Supabase client + own anti-flash
+  theme on `html.dark-mode`, like `login.html`/`forgot-password.html` — it does not load `ui.js`).
+  `route()` sends a vendor to the portal, a **still-pending claimant back to
+  `vendor-register.html`** (they have **no `users` row** by design, so they must never land in the
+  staff approval queue), and a **Megawide account to its own entrance** rather than into a portal
+  that would only tell it it is on the wrong account. A quiet staff link sits at the bottom for a
+  colleague who lands there by mistake.
+- `vendor-register.html`'s two sign-in links now point at `vendor-login.html`.
+- **⚠️ Take the anon key from an existing public page, never from memory** — the first draft of
+  `vendor-login.html` carried a wrong one; it is now lifted from `vendor-register.html`'s
+  `createClient` call.
+- `login.html` still routes a `role==='vendor'` sign-in to the portal, deliberately: the doors are
+  separated for signposting, not to lock a vendor out who uses the wrong one.
+
+**Shared `?v=` bumped `20260902c → 20260903b`** (`db.js` for the accreditation checklist, then
+`auth.js` for `__loginPage`).
+
+**STILL OPEN from this review — the registration identity check.** The decision is **TIN only**:
+Vendor Code has to come out of `vendor-register.html` because **it is internal SAP tagging a vendor
+never sees** — confirmed against a real PO (`PO 376000333`, Switch Gear Phils.), which carries the
+PO number, project code, supplier name and address but **no vendor code and no supplier TIN**. Not
+yet built: dropping the Vendor Code field and the `?code=` prefill, replacing
+`submit_vendor_claim`'s four tiers (code+TIN, code, TIN, name) with **TIN unique → high, exact name
+unique → medium**, stopping `approve_vendor_claim`/`create_vendor_from_claim` writing `vendor_code`
+from the claim, and retiring the per-vendor QR's `?code=` in favour of the generic link. Keep the
+`vendors.vendor_code` column and its staff-side UI — it is still the best dedup key internally.
+
 ## Known Issues / Gotchas
 
 1. **Generated columns**: `total_awarded`, `awarding_lead_time`, `variance` â€” never INSERT into them. Use `awarded_cost` and `lead_time`. `unmap()` strips all three automatically.
