@@ -3600,6 +3600,36 @@ const VendorDb = (() => {
         throw e;
       }
     },
+    /* Bidder counts for the round LIST, in one query rather than one per round.
+       Returns { roundId: { total, submitted } }. PostgREST has no group-by, so
+       the rows are counted here — cheap, and it also gives "3 of 5 in" for free. */
+    async invitationCounts() {
+      try {
+        const sb = await getSB();
+        const rows = await _pagedSelect(() =>
+          sb.from('vendor_bid_invitations').select('round_id,status'));
+        const out = {};
+        (rows || []).forEach(function (r) {
+          if (!r.round_id) return;
+          const c = out[r.round_id] || (out[r.round_id] = { total: 0, submitted: 0 });
+          c.total++;
+          if (r.status === 'submitted' || r.status === 'closed') c.submitted++;
+        });
+        return out;
+      } catch (e) {
+        if (_isMissingTable(e, 'vendor_bid_invitations')) return {};
+        throw e;
+      }
+    },
+    /* A round that produced nothing still has to be closable, or it sits in the
+       list as "Out for bid" forever. Cancelling keeps it as history and leaves
+       the package free to be re-tendered as a new round. */
+    async cancel(id, reason, profile) {
+      return this.update(id, {
+        stage: 'cancelled',
+        cancelled_reason: (reason && String(reason).trim()) || null,
+      }, profile);
+    },
     async get(id) {
       const sb = await getSB();
       const { data, error } = await sb.from('vendor_bid_rounds').select('*').eq('id', id).single();

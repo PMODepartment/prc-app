@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904d"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904d"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904e"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904e"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -253,9 +253,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260904d"></script>
-<script src="assets/js/db.js?v=20260904d"></script>
-<script src="assets/js/ui.js?v=20260904d"></script>
+<script src="assets/js/auth.js?v=20260904e"></script>
+<script src="assets/js/db.js?v=20260904e"></script>
+<script src="assets/js/ui.js?v=20260904e"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -273,6 +273,7 @@
    ════════════════════════════════════════════════════════════════════════════ */
 let profile = null, canManage = false;
 let ROUNDS = [], WPS = [], PROJECTS = {}, WPBYID = {};
+let COUNTS = {};   // roundId -> { total, submitted } for the list
 let R = null;              // the open round
 let INV = [];              // its invitations
 let THREADS = {};          // invitation_id -> clarification[]
@@ -319,6 +320,7 @@ async function loadAll() {
     WPS = (WPS || []).filter(w => w.project_id !== 'DEMO');
     WPS.forEach(w => { WPBYID[w.id] = w; });
     ROUNDS = await VendorDb.bidRounds.list();
+    COUNTS = await VendorDb.bidRounds.invitationCounts();
   } catch (e) {
     AppNotify.fromError(e, 'Could not load bid rounds');
   }
@@ -334,6 +336,7 @@ async function refreshAll() {
   if (i) i.classList.add('spin');
   try {
     ROUNDS = await VendorDb.bidRounds.list();
+    COUNTS = await VendorDb.bidRounds.invitationCounts();
     if (R) { await openRound(R.id); } else { renderList(); }
   } catch (e) { AppNotify.fromError(e, 'Could not refresh'); }
   if (i) i.classList.remove('spin');
@@ -413,7 +416,11 @@ function renderList() {
           + '<td>' + esc(projName(r.project_id)) + '</td>'
           + '<td>' + esc(r.doc_type || 'RFQ') + '</td>'
           + '<td>' + esc(VendorDb.bidRounds.stageLabel(r.stage)) + '</td>'
-          + '<td>' + (r._n == null ? '—' : r._n) + '</td>'
+          + '<td>' + (function () {
+              const c = COUNTS[r.id];
+              if (!c || !c.total) return '<span style="color:var(--text-hint)">none yet</span>';
+              return c.submitted + ' of ' + c.total + ' in';
+            })() + '</td>'
           + '<td>' + esc(dOnly(r.bid_due_at) || '—') + '</td></tr>';
       }).join('')
     + '</tbody></table></div>';
@@ -512,6 +519,16 @@ function renderRound() {
     + '<h2>' + esc(wpLabel(w)) + '<small>' + esc(projName(R.project_id))
     + (w.trade ? ' · ' + esc(w.trade) : '') + '</small></h2></div>'
     + '<div class="bm-steps">' + steps + '</div>'
+    + (canManage && R.stage !== 'awarded' && R.stage !== 'cancelled'
+        ? '<div class="bm-actions" style="margin-top:-4px">'
+          + '<button class="btn" onclick="cancelRound()"><i class="ti ti-ban"></i> Cancel this round</button>'
+          + '</div>'
+        : '')
+    + (R.stage === 'cancelled' && canManage
+        ? '<div class="bm-actions" style="margin-top:-4px">'
+          + '<button class="btn" onclick="reTender()"><i class="ti ti-refresh"></i> Re-tender as a new round</button>'
+          + '</div>'
+        : '')
     + (R.stage === 'cancelled'
        ? '<div class="banner-warn" style="padding:11px 14px;border-radius:8px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;font-size:0.8571rem">'
          + 'This round was cancelled' + (R.cancelled_reason ? ': ' + esc(R.cancelled_reason) : '.') + '</div>'
@@ -531,6 +548,46 @@ async function setStage(s) {
     renderRound();
   } catch (e) { AppNotify.fromError(e, 'Could not move the stage'); }
   finally { _busy = false; }
+}
+
+/* A round that drew nothing, or was overtaken by a scope change, still has to be
+   closable — otherwise it sits in the list as "Out for bid" indefinitely and the
+   package looks like it is still in the market. Cancelling keeps the round as
+   history; the package can then be re-tendered as round 2. */
+async function cancelRound() {
+  const reason = window.prompt(
+    'Cancel this round?\n\nIt stays on record as history, and the package can be '
+    + 're-tendered as a new round.\n\nReason (optional):', '');
+  if (reason === null) return;                       // dismissed the dialog
+  try {
+    R = await VendorDb.bidRounds.cancel(R.id, reason, profile);
+    const i = ROUNDS.findIndex(x => x.id === R.id);
+    if (i >= 0) ROUNDS[i] = R;
+    renderRound();
+    AppNotify.success('Round cancelled.');
+  } catch (e) { AppNotify.fromError(e, 'Could not cancel the round'); }
+}
+
+/* ⚠️ A NEW ROUND, never a reopen of the cancelled one. Its bidders, deadline and
+   any offers belong to the attempt that failed and must stay readable as they
+   were — which is the whole reason rounds exist rather than columns on the work
+   package. The ask is copied forward so the officer is not retyping it. */
+async function reTender() {
+  const w = WPBYID[R.wp_id] || {};
+  if (!confirm('Start a new round for ' + wpLabel(w) + '?\n\n'
+    + 'The cancelled round stays on record. The scope and terms are copied into '
+    + 'the new one, and you pick the bidders again.')) return;
+  try {
+    const r = await VendorDb.bidRounds.create(R.wp_id, R.project_id, {
+      doc_type: R.doc_type, two_envelope: R.two_envelope,
+      scope_note: R.scope_note, boq_note: R.boq_note,
+      payment_terms: R.payment_terms, conditions: R.conditions,
+      contact_person: R.contact_person, contact_email: R.contact_email,
+    }, profile);
+    ROUNDS.unshift(r);
+    await openRound(r.id);
+    AppNotify.success('Round ' + r.round_no + ' created. Set the deadline, then add bidders.');
+  } catch (e) { AppNotify.fromError(e, 'Could not start a new round'); }
 }
 
 /* 2.2.1 — Preparation of Scope of Works (BOQ) and TOR. */
@@ -1055,29 +1112,120 @@ function awardPanel() {
         : '')
     + '</div>';
 }
+/* 2.4.2 Award — and the ONLY place the bid process writes back to the rest of
+   the app. Three things happen together, in this order:
+
+     1. every submitted offer is promoted into vendor_bids (the internal ledger
+        the vendor analytics, win rate and scorecard all read),
+     2. the WORK PACKAGE is marked awarded with the winner and the final amount,
+     3. the invitations are closed — winner awarded, everyone else not awarded.
+
+   ⚠️ WITHOUT STEP 2 THE WHOLE FEATURE IS INERT. Running a bid to award used to
+      change no KPI, no savings figure and no dashboard: the package stayed "Not
+      Yet Awarded" with no contractor and no cost. Awarding here is what makes a
+      bid mean something to the rest of the system.
+
+   ⚠️ ORDER MATTERS. The work package is written FIRST of the two that can fail
+      on permissions, and a failure there ABORTS before the round is closed —
+      a closed round pointing at an un-awarded package is the worst outcome,
+      because it looks finished and reconciles to nothing. */
 async function doAward() {
   const winId = val('aw-win');
   if (!winId) { AppNotify.warn('Pick the winning bidder first.'); return; }
   const win = invById(winId);
+  const w = WPBYID[R.wp_id] || {};
+
+  /* ⚠️ PRE-FLIGHT: awarding writes to work_packages, which RLS scopes to the
+     projects this user may edit. Checking up front means they are told plainly
+     instead of getting a permission error half way through, with the bids
+     already promoted. */
+  if (!AppAuth.canEditProject(profile, R.project_id)) {
+    AppNotify.error('You cannot award this package',
+      { detail: 'Recording an award updates the work package itself, and ' + esc(projName(R.project_id))
+        + ' is not one of your assigned projects. Ask someone assigned to it, or an admin, to record it.' });
+    return;
+  }
+
+  // The figure of record: the negotiated price if there is one, else the offer.
+  const finalAmt = num(val('aw-amt'))
+    ?? (win.negotiated_amount != null ? win.negotiated_amount : win.offer_amount);
+  if (finalAmt == null || finalAmt < 0) {
+    AppNotify.warn('Enter the final amount before recording the award.');
+    return;
+  }
+
   // N29 is a policy, not a database rule — so warn clearly and let a human
   // decide, rather than silently blocking or silently allowing.
   if (window.accredKey && window.accredKey(win.vendor_accreditation) !== 'accredited') {
     if (!confirm(win.vendor_name + ' is not accredited.\n\nBP policy N29: packages are awarded to accredited '
       + 'vendors only, with accreditation run in parallel for new vendors.\n\nRecord the award anyway?')) return;
   }
+
   const others = bidsInPlay().length - 1;
-  if (!confirm('Award to ' + win.vendor_name + '?\n\n'
-    + (others > 0 ? others + ' other bidder(s) will be marked not awarded, ready for their Letter of Regret.\n\n' : '')
-    + 'This closes the round.')) return;
+  // Spell out every consequence — this is the least reversible action here.
+  if (!confirm(
+      'Award ' + wpLabel(w) + ' to ' + win.vendor_name + '?\n\n'
+    + 'This will:\n'
+    + '  • set the work package to Awarded at ' + money(finalAmt, win.offer_currency) + '\n'
+    + '  • record ' + win.vendor_name + ' as the awarded vendor\n'
+    + (others > 0 ? '  • mark ' + others + ' other bidder(s) not awarded, ready for their Letter of Regret\n' : '')
+    + '  • add every submitted offer to the vendors’ bid history\n'
+    + '  • close the round\n\n'
+    + 'The NOA and regret letters are still issued from your own templates.')) return;
+
+  const prog = AppNotify.progress ? AppNotify.progress('Recording the award…') : null;
   try {
+    // ── 1. bid history, before anything closes ──────────────────────────────
+    if (prog) prog.update('Adding offers to vendor bid history…');
+    for (const inv of bidsInPlay()) {
+      // Never fail the award because one history row would not write — the
+      // ledger is derived data, the award is the fact.
+      try { await VendorDb.bidBoard.promote(inv, profile); }
+      catch (e) { console.error('[bids] promote failed for ' + inv.vendor_name, e); }
+    }
+
+    // ── 2. the work package itself ─────────────────────────────────────────
+    if (prog) prog.update('Awarding the work package…');
+    const today = new Date().toISOString().slice(0, 10);
+    const patch = {
+      // ⚠️ award_status is DERIVED from procurement_status everywhere else in
+      //    this app, so both move together or the WP form and the dashboards
+      //    disagree about the same row.
+      procurement_status: 'Awarded',
+      award_status: 'Awarded',
+      awarded_cost: finalAmt,
+      contractor: win.vendor_name,
+      vendor_id: win.vendor_id,
+      awarded_vendor_ids: [win.vendor_id],
+      awarded_vendor_amounts: [finalAmt],
+      actual_awarding_date: today,
+    };
+    // updateWPDirect keeps review_status as-is; every writing role here is
+    // auto-approve, so an award must not knock the package back to pending.
+    await WPDb.updateWPDirect(R.wp_id, patch);
+    Object.assign(w, patch);            // keep the in-memory copy honest
+
+    // ── 3. close the round ─────────────────────────────────────────────────
+    if (prog) prog.update('Closing the round…');
     INV = await VendorDb.bidRounds.award(R.id, winId,
-      { finalAmount: num(val('aw-amt')), noticeRef: val('aw-ref') || null }, profile);
+      { finalAmount: finalAmt, noticeRef: val('aw-ref') || null }, profile);
+    // Winner -> awarded, everyone else -> lost, in vendor_bids.
+    try { await VendorDb.reconcileBidsOnAward(R.wp_id, [{ vendorId: win.vendor_id, amount: finalAmt }], finalAmt); }
+    catch (e) { console.error('[bids] reconcileBidsOnAward failed', e); }
+
     R = await VendorDb.bidRounds.get(R.id);
     const n = ROUNDS.findIndex(x => x.id === R.id);
     if (n >= 0) ROUNDS[n] = R;
+    // The portfolio caches work packages for 5 minutes; without this the
+    // dashboards would keep showing the package as not awarded.
+    try { Object.keys(sessionStorage).forEach(k => { if (k.indexOf('wpm_wps_idx') === 0) sessionStorage.removeItem(k); }); } catch (e) {}
     renderRound();
-    AppNotify.success('Award recorded. Issue the NOA and the regret letters from your templates.');
-  } catch (e) { AppNotify.fromError(e, 'Could not record the award'); }
+    if (prog) prog.done('Awarded to ' + win.vendor_name + '. The work package is updated — issue the NOA and the regret letters from your templates.');
+    else AppNotify.success('Award recorded.');
+  } catch (e) {
+    if (prog) prog.fail('Could not record the award: ' + ((e && e.message) || e));
+    else AppNotify.fromError(e, 'Could not record the award');
+  }
 }
 async function recordNotice(id) {
   try {
