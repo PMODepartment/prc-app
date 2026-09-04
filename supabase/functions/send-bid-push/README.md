@@ -1,5 +1,15 @@
 # Vendor push notifications — deploy
 
+> ✅ **ALL FOUR STEPS ARE DONE on the production project** (2026-09-05):
+> migration run, `send-bid-push` deployed and answering
+> `200 {"skipped":"no outbox row in the request"}`, all three secrets set (the
+> `VAPID_PUBLIC_KEY` secret verified by SHA-256 to be the same key as in the two
+> files), and the `send_bid_push` webhook wired to the function with its
+> `Authorization` header. **What has never happened is a real notification
+> reaching a real device** — see “If notifications do not arrive” below.
+>
+> Keep these steps for a rebuild, a second project, or a staging environment.
+
 Three steps. Everything else is already in the repo and in the database.
 
 > **⚠️ No subscription is required.** Supabase Pro already includes Edge
@@ -30,7 +40,9 @@ Then **Edge Functions → Secrets**, add:
 |---|---|
 | `VAPID_PUBLIC_KEY` | the public key from step 1 |
 | `VAPID_PRIVATE_KEY` | **the private key — this is the secret** |
-| `VAPID_SUBJECT` | `mailto:pmodepartment@megawide.com.ph` |
+| `VAPID_SUBJECT` | `mailto:pmodepartment2@megawide.com.ph` — what is deployed. Any
+  reachable `mailto:` or `https:` contact satisfies RFC 8292; the function's own
+  fallback is the address without the `2`, so set the secret explicitly. |
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically; do
 not add them by hand.

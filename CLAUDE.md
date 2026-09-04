@@ -2849,9 +2849,10 @@ neither is stored. Its section 5 verification `SELECT` must read true on all fiv
 
 ### Web push for the vendor portal (2026-09-05)
 
-`migrations/2026-09-05_vendor_push.sql` (**RUN ME**), then deploy
-`supabase/functions/send-bid-push/` and add ONE Database Webhook — the four
-steps are in that folder's **README.md**.
+`migrations/2026-09-05_vendor_push.sql`, `supabase/functions/send-bid-push/`,
+`vendor-sw.js`. **✅ FULLY DEPLOYED on production 2026-09-05** — migration run,
+function live, secrets set, webhook wired, public key in both files. The four
+steps in that folder's **README.md** are kept for a rebuild or a second project.
 
 **⚠️ AN EARLIER NOTE HERE SAID PUSH NEEDED A NEW SUBSCRIPTION. THAT WAS WRONG.**
 Supabase Pro already includes Edge Functions, and the push services themselves
@@ -2943,13 +2944,33 @@ carries no figure or deadline, and `pushsubscriptionchange` re-subscribes in all
 three states — key handed back, `oldSubscription` absent, and `options` empty —
 while still doing nothing at all with the key unset, which is the shipped state.
 
-**⚠️ WHAT IS LEFT IS DEPLOYMENT, AND NONE OF IT IS IN THIS REPO.** The migration
-IS run (both tables resolve). Still outstanding: `node gen_vapid_keys.mjs` once
-(**regenerating later invalidates every stored device subscription**), the public
-half pasted into `vendor-portal.html` AND `vendor-sw.js`, the function deployed
-with its three secrets, and the one Database Webhook on `vendor_push_outbox`.
-Until the key is set the portal offers no notification option at all — by
-design, so a half-deployed state cannot look broken.
+**DEPLOYMENT IS DONE (2026-09-05), and two faults in it were found by probing
+rather than by trusting the dashboard.** The function answers
+`200 {"skipped":"no outbox row in the request"}` with a JWT — which also proves
+the VAPID secrets are loaded, since that branch sits AFTER the keys check.
+
+- **⚠️ THE WEBHOOK HAD NO EDGE FUNCTION SELECTED.** It was created before the
+  function existed, so the dropdown had nothing to offer and saved empty. It
+  looked correct in the list — right table, right event, a `POST` to a
+  `/functions/v1/` URL — and would have fired at nothing forever.
+- **⚠️ `Verify JWT` IS ON, SO A WEBHOOK WITH NO `Authorization` HEADER GETS 401**
+  and the notification silently never sends (the outbox row just sits at
+  `attempts = 0`, indistinguishable from the webhook not firing). Selecting the
+  function in that dialog makes Supabase add the header itself — do not hand-type
+  a key there. Verified: with a JWT 200, without one 401.
+- **The `VAPID_PUBLIC_KEY` secret was verified to be the SAME key as in the two
+  files, not assumed** — the dashboard's Digest column is a plain SHA-256 of the
+  value, so it can be checked against the key without revealing it. A mismatch
+  between page and server is invisible until a push 403s. `VAPID_SUBJECT` is
+  `mailto:pmodepartment2@megawide.com.ph` (the billing address, with the `2`) —
+  confirmed correct; the function's own fallback is the address without it, so
+  the secret must stay set explicitly.
+
+**⚠️ STILL UNPROVEN: a real notification reaching a real device.** Nobody has
+turned notifications on, so `vendor_push_subscriptions` is empty and every send
+would record `last_error = 'no subscribed devices'`. Read the outbox, not the
+function log — the query is in the README. **Regenerating the VAPID pair
+invalidates every stored subscription**, so do not re-run the generator.
 
 
 ### Class codes, the reference pack, and the portal as an app (2026-09-05)
