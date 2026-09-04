@@ -101,7 +101,14 @@
     .cl-msg{border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px;
       background:var(--surface-2)}
     .cl-msg.staff{border-left:3px solid var(--mw-red)}
-    .cl-from{font-size:0.7143rem;font-weight:700;color:var(--text-hint);margin-bottom:3px}
+    /* The vendor's reply is offset and paler, so a four-message exchange reads
+       as an exchange rather than as four identical boxes. */
+    .cl-msg.vendor{margin-left:22px;background:var(--surface);border-left:3px solid var(--border-md)}
+    .cl-from{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+      font-size:0.7143rem;font-weight:700;color:var(--text-hint);margin-bottom:3px}
+    .cl-who{font-size:0.6071rem;font-weight:800;letter-spacing:.05em;border-radius:5px;padding:1px 5px}
+    .cl-msg.staff .cl-who{background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink)}
+    .cl-msg.vendor .cl-who{background:var(--surface-2);color:var(--text-secondary)}
     .cl-body{font-size:0.9286rem;white-space:pre-wrap;line-height:1.6}
 
     /* the RFQ composer */
@@ -185,6 +192,7 @@
        row) keeps working when the row wraps on a narrow screen and when there
        are several bidders. */
     .bm-cell{display:flex;flex-direction:column;gap:3px;min-width:0}
+    .bm-hint{font-size:0.6786rem;color:var(--text-hint);margin-top:5px;line-height:1.5}
     .bm-cl{font-size:0.6429rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
       color:var(--text-hint);white-space:nowrap}
     .bm-in{width:100%;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;
@@ -456,6 +464,24 @@ async function refreshAll() {
 }
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
+/* The quotation button, and a second one ONLY when a genuinely different file
+   was uploaded under the old two-envelope model \u2014 otherwise that file becomes
+   unreachable the moment the split is retired. */
+function _quoteBtn(i) {
+  const q = i.attachment_path || i.commercial_path || i.technical_path;
+  if (!q) return '';
+  let out = '<button class="btn btn-sm" onclick="openFile(' + Q + q + Q + ')">'
+    + '<i class="ti ti-file-text"></i> Quotation</button>';
+  const other = [i.attachment_path, i.commercial_path, i.technical_path]
+    .filter(function (x) { return x && x !== q; });
+  if (other.length) {
+    out += '<button class="btn btn-sm" onclick="openFile(' + Q + other[0] + Q + ')" '
+      + 'title="Uploaded separately before the technical/commercial split was retired">'
+      + '<i class="ti ti-paperclip"></i> Also attached</button>';
+  }
+  return out;
+}
+
 function money(n, cur) {
   if (n == null || n === '') return '—';
   return (cur || 'PHP') + ' ' + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -864,7 +890,7 @@ async function reTender() {
     + 'the new one, and you pick the bidders again.')) return;
   try {
     const r = await VendorDb.bidRounds.create(R.wp_id, R.project_id, {
-      doc_type: R.doc_type, two_envelope: R.two_envelope,
+      doc_type: R.doc_type,
       scope_note: R.scope_note, boq_note: R.boq_note,
       payment_terms: R.payment_terms, conditions: R.conditions,
       contact_person: R.contact_person, contact_email: R.contact_email,
@@ -889,12 +915,9 @@ function askPanel() {
     + '<input id="a-due" type="datetime-local" value="' + esc(toLocalInput(R.bid_due_at)) + '"' + ro + '></div>'
     + '<div class="field"><label>Pre-bid</label>'
     + '<input id="a-prebid" type="datetime-local" value="' + esc(toLocalInput(R.prebid_at)) + '"' + ro + '></div>'
-    + '<div class="field"><label>What to submit</label>'
-    + '<select id="a-two"' + ro + '>'
-    + '<option value="1"' + (R.two_envelope ? ' selected' : '') + '>Technical submission and quotation</option>'
-    + '<option value="0"' + (R.two_envelope ? '' : ' selected') + '>Quotation only</option></select>'
-    + '<div class="field-hint">Ask for a technical submission when compliance with the design criteria has to be '
-    + 'checked. A simple materials enquiry is legitimately just a quotation.</div></div>'
+    // The Technical / Commercial split was retired 2026-09-04: the quotation a
+    // vendor sends already describes what it is pricing, so asking them to cut
+    // it in two served nobody. One upload, called the quotation.
     + '</div>'
     + '<div class="field" style="margin-top:12px"><label>Scope of works</label>'
     + '<textarea id="a-scope"' + ro + ' placeholder="What you want quoted, in words.">' + esc(R.scope_note || '') + '</textarea></div>'
@@ -921,7 +944,6 @@ async function saveAsk() {
   try {
     R = await VendorDb.bidRounds.update(R.id, {
       doc_type: val('a-doc') || 'RFQ',
-      two_envelope: val('a-two') === '1',
       bid_due_at: fromLocalInput(val('a-due')),
       prebid_at: fromLocalInput(val('a-prebid')),
       scope_note: val('a-scope') || null,
@@ -1084,7 +1106,7 @@ function rfqBody(inv) {
   L.push('Project : ' + projName(R.project_id));
   if (R.bid_due_at) L.push('Deadline: ' + dt(R.bid_due_at));
   if (R.prebid_at) L.push('Pre-bid : ' + dt(R.prebid_at));
-  if (R.two_envelope) L.push('Please send both a technical submission and your quotation.');
+  L.push('Please attach your quotation with the offer.');
   L.push('');
   L.push('Full details, and the form to submit your bid:');
   L.push(bidLink(inv));
@@ -1177,7 +1199,7 @@ function responsesPanel() {
   const inPlay = INV.filter(i => i.status === 'submitted' || i.status === 'closed');
   return '<div class="panel"><div class="panel-title">3 · Bids received</div>'
     + '<div class="sec-note">' + inPlay.length + ' of ' + INV.length + ' invited bidders have submitted.'
-    + (R.two_envelope ? ' Each bid carries a technical submission as well as its quotation.' : '') + '</div>'
+    + '</div>'
     + (inPlay.length
         ? inPlay.map(i =>
             '<div class="bidder"><div class="bidder-name">' + esc(i.vendor_name)
@@ -1186,8 +1208,10 @@ function responsesPanel() {
             + (i.validity_days != null ? ' · valid ' + i.validity_days + 'd' : '')
             + (i.payment_terms ? ' · ' + esc(i.payment_terms) : '') + '</small></div>'
             + '<b style="font-size:0.9286rem">' + esc(money(i.offer_amount, i.offer_currency)) + '</b>'
-            + (i.technical_path ? '<button class="btn btn-sm" onclick="openFile(' + Q + i.technical_path + Q + ')"><i class="ti ti-file-text"></i> Technical</button>' : '')
-            + (i.commercial_path ? '<button class="btn btn-sm" onclick="openFile(' + Q + i.commercial_path + Q + ')"><i class="ti ti-file-dollar"></i> Commercial</button>' : '')
+            // ONE quotation. The fallback chain matters: the portal wrote
+            // attachment_path and the token link wrote commercial_path, so a
+            // bid could arrive with a file the buyer had no button for.
+            + _quoteBtn(i)
             + '</div>'
             + (i.vendor_notes ? '<div class="sec-note" style="margin:-4px 0 10px 2px">' + esc(i.vendor_notes) + '</div>' : ''))
           .join('')
@@ -1222,9 +1246,11 @@ function clarifyPanel() {
   const rows = INV.filter(i => i.status === 'submitted' || (THREADS[i.id] || []).length);
   if (!rows.length) return '';
   return '<div class="panel"><div class="panel-title">4 · Clarifications</div>'
-    + '<div class="sec-note">Questions to one bidder about their proposal, kept in a thread per subject. '
-    + 'Each thread is private to that bidder, and they answer from the same link they bid with — no login. '
-    + 'The whole exchange is kept, so the back-and-forth stays on the record.</div>'
+    + '<div class="sec-note">Questions to one bidder about their proposal. '
+    + '<b>Messages with the same subject are one thread</b> \u2014 to start another, just pick a '
+    + 'different subject and send. There is no thread to create or name. '
+    + 'Each thread is private to that bidder, and they answer from the same link they bid with, '
+    + 'with no login. The whole exchange is kept, so the back-and-forth stays on the record.</div>'
     + rows.map(i => {
         const th = THREADS[i.id] || [];
         // group into threads, newest-active first, but only categories in use
@@ -1239,22 +1265,28 @@ function clarifyPanel() {
           + (used.length ? used.map(c =>
               '<div class="cl-thread"><div class="cl-thread-head">' + esc(clarCatLabel(c))
               + '<span class="cl-n">' + by[c].length + '</span></div>'
-              + by[c].map(m =>
-                  '<div class="cl-msg' + (m.author === 'staff' ? ' staff' : '') + '">'
-                  + '<div class="cl-from">' + esc(m.author === 'staff' ? (m.created_by_name || 'Megawide Procurement') : i.vendor_name)
-                  + ' · ' + esc(dt(m.created_at)) + '</div>'
-                  + '<div class="cl-body">' + esc(m.message) + '</div></div>').join('')
+              + by[c].map(m => {
+                  const staff = m.author === 'staff';
+                  return '<div class="cl-msg ' + (staff ? 'staff' : 'vendor') + '">'
+                  + '<div class="cl-from">'
+                  + '<span class="cl-who">' + (staff ? 'MEGAWIDE' : 'VENDOR') + '</span>'
+                  + esc(staff ? (m.created_by_name || 'Megawide Procurement') : i.vendor_name)
+                  + ' \u00b7 ' + esc(dt(m.created_at)) + '</div>'
+                  + '<div class="cl-body">' + esc(m.message) + '</div></div>';
+                }).join('')
               + '</div>').join('')
-            : '<div class="sec-note" style="margin:0 0 8px">No clarifications yet.</div>')
+            : '<div class="sec-note" style="margin:0 0 8px">No clarifications yet \u2014 '
+              + 'pick a subject below and send the first question.</div>')
           + (canManage
               ? '<div class="cl-ask">'
-                + '<div class="bm-cell" style="flex:0 0 150px"><label class="bm-cl" for="cc-' + i.id + '">Thread</label>'
+                + '<div class="bm-cell" style="flex:0 0 150px"><label class="bm-cl" for="cc-' + i.id + '">Subject</label>'
                 + '<select id="cc-' + i.id + '" class="bm-in">'
                 + CLAR_CATS.map(c => '<option value="' + c + '">' + esc(clarCatLabel(c)) + '</option>').join('')
                 + '</select></div>'
                 + '<div class="bm-cell" style="flex:1;min-width:200px"><label class="bm-cl" for="cl-' + i.id + '">Question</label>'
-                + '<textarea id="cl-' + i.id + '" class="bm-in" placeholder="Ask this bidder something…" '
-                + 'style="min-height:56px"></textarea></div>'
+                + '<textarea id="cl-' + i.id + '" class="bm-in" placeholder="Ask this bidder something\u2026" '
+                + 'style="min-height:56px;max-height:180px;resize:vertical"></textarea>'
+                + '<div class="bm-hint">Same subject as an earlier question &rarr; it joins that thread.</div></div>'
                 + '<button class="btn" onclick="sendClarify(' + Q + i.id + Q + ')">Send</button></div>'
               : '')
           + '</div>';

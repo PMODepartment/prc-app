@@ -2633,8 +2633,15 @@ async function submitBidOffer(id) {
     if (fileInput && fileInput.files && fileInput.files[0]) {
       const file = fileInput.files[0];
       if (file.size > 15 * 1024 * 1024) { msg('That file is over 15 MB — try a smaller scan or export.', 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Submit offer'; } return; }
-      fields.attachment_path = await VendorDb.uploadVendorFile(vendor.id, 'bid_' + id, file);
+      const path = await VendorDb.uploadVendorFile(vendor.id, 'bid_' + id, file);
+      fields.attachment_path = path;
       fields.attachment_name = file.name;
+      // \u26a0\ufe0f WRITE BOTH. This page updates the row directly while the token
+      //    link goes through submit_bid_by_token, and the two used to write
+      //    DIFFERENT columns \u2014 so a quotation sent from here showed the buyer
+      //    no file at all. Keep them in step until commercial_* is retired.
+      fields.commercial_path = path;
+      fields.commercial_name = file.name;
     }
     const row = await VendorDb.bidBoard.submit(id, fields);
     _bidItems = _bidItems.map(x => x.invitation_id === id ? Object.assign({}, x, row) : x);

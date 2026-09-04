@@ -320,12 +320,9 @@ function render() {
 
 function formHtml() {
   const b = BID;
-  const two = !!b.two_envelope;
+  // One document, called the quotation. The technical/commercial split was
+  // retired 2026-09-04: the quotation already describes what is being priced.
   return '<div class="panel"><div class="panel-title">Your bid</div>'
-    + (two
-      ? '<div class="banner warn" style="margin-bottom:14px">This package needs <b>both</b> a '
-        + '<b>technical submission</b> and your <b>quotation</b>.</div>'
-      : '')
     + '<div class="legend">Quotation</div>'
     + '<div class="grid">'
     + fld('Offer amount <span class="req">*</span>', 'f-amount', b.offer_amount, 'e.g. 250000', 'number')
@@ -335,21 +332,14 @@ function formHtml() {
     + '</div>'
     + '<div class="field" style="margin-top:12px"><label>Your payment terms</label>'
     + '<input id="f-terms" value="' + esc(b.payment_terms || '') + '" placeholder="e.g. 30% down payment, 70% on delivery"></div>'
-    + '<div class="field"><label>Commercial bid document</label>'
+    + '<div class="field"><label>Attach your quotation</label>'
     + '<input id="f-commercial" type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx">'
-    + (b.commercial_name
-        ? '<div class="field-hint">On file: ' + esc(b.commercial_name) + ' — choosing a new file replaces it.</div>'
-        : '<div class="field-hint">Your quotation. PDF, image, Word or Excel, up to ' + MAX_MB + ' MB.</div>')
+    + ((b.attachment_name || b.commercial_name)
+        ? '<div class="field-hint">On file: ' + esc(b.attachment_name || b.commercial_name)
+          + ' — choosing a new file replaces it.</div>'
+        : '<div class="field-hint">Your priced quotation, with the specifications it is based on. '
+          + 'PDF, image, Word or Excel, up to ' + MAX_MB + ' MB.</div>')
     + '</div>'
-    + (two
-      ? '<div class="legend">Technical bid <span class="req">*</span></div>'
-        + '<div class="field"><label>Technical bid document</label>'
-        + '<input id="f-technical" type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx">'
-        + (b.technical_name
-            ? '<div class="field-hint">On file: ' + esc(b.technical_name) + ' — choosing a new file replaces it.</div>'
-            : '<div class="field-hint">Specifications, methodology, schedule, org chart — whatever the package asks for.</div>')
-        + '</div>'
-      : '')
     + '<div class="legend">Anything else</div>'
     + '<div class="field"><label>Notes to Megawide Procurement</label>'
     + '<textarea id="f-notes" placeholder="Exclusions, assumptions, alternatives you would like considered">'
@@ -506,7 +496,6 @@ async function submitBid() {
   if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
   try {
     const comm = await upload(document.getElementById('f-commercial'));
-    const tech = await upload(document.getElementById('f-technical'));
     const { error } = await sb.rpc('submit_bid_by_token', {
       p_token: TOKEN,
       p_offer_amount: amount,
@@ -517,8 +506,11 @@ async function submitBid() {
       p_vendor_notes: g('f-notes') || null,
       p_commercial_path: comm ? comm.path : null,
       p_commercial_name: comm ? comm.name : null,
-      p_technical_path: tech ? tech.path : null,
-      p_technical_name: tech ? tech.name : null,
+      // The RPC keeps its parameter names (renaming them would create a second
+      // PostgREST overload and break every vendor's submit), but there is only
+      // one document now, so the technical pair is always null.
+      p_technical_path: null,
+      p_technical_name: null,
     });
     if (error) throw error;
     await load();
