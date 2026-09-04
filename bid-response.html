@@ -23,12 +23,18 @@
     html,body{overflow-x:hidden}
     :root{
       --mw-red:#EE3124;--mw-red-dark:#C42127;--mw-red-light:#FDECEA;
+      /* Brand red that is safe as TEXT. --mw-red-dark is a hover BACKGROUND
+         under white text and cannot be inverted for dark mode; this one can.
+         Defined HERE because this page loads no dashboard.css — an undefined
+         custom property is invalid at computed-value time, so the colour
+         silently falls back to currentcolor. */
+      --mw-red-ink:#C42127;
       --bg:#F5F5F5;--surface:#FFFFFF;--surface-2:#F9F9F9;
       --border:rgba(0,0,0,.08);--border-md:rgba(0,0,0,.14);
       --text-primary:#231F20;--text-secondary:#5A5858;--text-hint:#6E6C6C;
     }
     html.dark-mode{
-      --mw-red-light:#3D1A19;
+      --mw-red-light:#3D1A19;--mw-red-ink:#FF8B80;
       --bg:#1C1C1C;--surface:#2B2C2B;--surface-2:#333433;
       --border:rgba(255,255,255,.09);--border-md:rgba(255,255,255,.16);
       --text-primary:#F0EFEF;--text-secondary:#DCDBDB;--text-hint:#9B9999;
@@ -297,7 +303,7 @@ function render() {
     + '</dl></div>';
 
   shell('<div class="muted" style="margin-bottom:14px">Invitation for <b>' + esc(b.vendor_name || 'your company')
-      + '</b></div>' + banner + ask + (closed ? '' : formHtml()) + threadHtml());
+      + '</b></div>' + banner + ask + (closed ? '' : formHtml()) + threadHtml() + accountHtml());
 
   if (!closed) {
     const el = document.getElementById('f-amount');
@@ -375,6 +381,37 @@ function threadHtml() {
           + '<textarea id="f-clarify" placeholder="Answer a question, or raise one of your own"></textarea></div>'
           + '<div class="acts"><button class="btn" id="btnClarify" onclick="sendClarification()">Send reply</button></div>'
         : '')
+    + '</div>';
+}
+
+/* ── Offer the portal account, without making it a toll gate ──────────────
+   ⚠️ BIDDING MUST NEVER REQUIRE AN ACCOUNT. The whole reason this page exists
+      is that demanding a login before a vendor can quote is what would push
+      everyone back to email. So this is an offer shown AFTER the work is done,
+      framed by what the account actually gets them — not a prompt standing
+      between them and the form.
+
+   The company name is prefilled into the registration form. That leaks nothing:
+   whoever holds this link already knows their own company name. The claim is
+   still matched and reviewed server-side exactly as any other registration. */
+function accountHtml() {
+  const b = BID;
+  // Nothing to offer somebody who is already signed in to the portal, and no
+  // point interrupting a vendor who has not answered yet.
+  if (b.status !== 'submitted' && !b.outcome) return '';
+  const href = 'vendor-register.html?company=' + encodeURIComponent(b.vendor_name || '');
+  return '<div class="panel">'
+    + '<div class="panel-title">Keep track of your bids with Megawide</div>'
+    + '<div class="muted">You bid on this package without an account, and you always can. '
+    + 'A Vendor Portal account is optional — it gives you:</div>'
+    + '<ul style="margin:12px 0 0 18px;font-size:13px;line-height:1.9;color:var(--text-secondary)">'
+    + '<li>every invitation and its outcome in one place, instead of hunting through email</li>'
+    + '<li>your accreditation documents on file, so you are eligible to be awarded work</li>'
+    + '<li>a catalogue of what you supply, which is how buyers find you for new packages</li>'
+    + '<li>your own contacts and certificates kept current, without emailing anyone</li>'
+    + '</ul>'
+    + '<div class="acts"><a class="btn btn-primary" style="text-decoration:none" href="'
+    + esc(href) + '">Create your account</a></div>'
     + '</div>';
 }
 

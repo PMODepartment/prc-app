@@ -2351,7 +2351,7 @@ const VendorDb = (() => {
   async function getCertFileUrl(path) {
     if (!path) return null;
     const sb = await getSB();
-    const { data, error } = await sb.storage.from('vendor-certs').createSignedUrl(path, 3600);
+    const { data, error } = await sb.storage.from('vendor-certs').createSignedUrl(path, 300);
     if (error) throw error;
     return data?.signedUrl || null;
   }

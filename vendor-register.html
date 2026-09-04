@@ -204,6 +204,12 @@ const params = new URLSearchParams(window.location.search);
    parameter is ignored — a QR printed with one still works, it just has nothing
    to prefill. Kept as a no-op read so an old link cannot throw. */
 const preCode = params.get('code');
+/* ?company= is set by the bid-response page when a bidder chooses to create an
+   account off the back of an invitation. It only PREFILLS the name box: the
+   server still runs the same matcher, so this cannot skip review or assert an
+   identity. Safe to pass because the holder of a bid link already knows their
+   own company name — it tells them nothing new. */
+const preCompany = params.get('company');
 
 // A company that has never worked with Megawide has no directory row at all, so
 // "no match" is the CORRECT outcome for them. Asking up front
@@ -213,6 +219,11 @@ const preCode = params.get('code');
 // is new is often already in the directory (2,400 rows came from work packages
 // and the SAP masterlist), and catching that is what prevents a duplicate.
 let isNewVendor = false;
+(function prefillCompany() {
+  if (!preCompany) return;
+  const el = document.getElementById('company');
+  if (el && !el.value) el.value = preCompany;
+})();
 window.setIsNew = function (v) {
   isNewVendor = !!v;
   document.getElementById('segExisting').classList.toggle('active', !v);

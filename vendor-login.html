@@ -64,8 +64,6 @@
   .foot a:hover{text-decoration:underline}
   /* The employee door, kept deliberately quiet: a vendor should not be nudged
      toward it, but a Megawide colleague who lands here needs a way across. */
-  .staff-door{margin-top:22px;text-align:center;font-size:0.8rem;color:var(--text-2)}
-  .staff-door a{color:var(--text-2);text-decoration:underline}
   .theme{position:fixed;top:16px;right:16px;width:38px;height:38px;border-radius:50%;
          border:1px solid var(--border);background:var(--surface);color:var(--text-2);
          cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -104,10 +102,6 @@
   </div>
 </div>
 
-<div class="staff-door">
-  Megawide employee? <a href="login.html">Sign in to the Procurement Dashboard</a>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 const SB_URL = 'https://cayjeqeleenizbdzrums.supabase.co';
@@ -122,6 +116,10 @@ function msg(text, kind) {
   const b = document.getElementById('msg');
   b.className = 'msg ' + (kind || 'error');
   b.innerHTML = text;
+  // ⚠️ CLEARS THE INLINE display:none set by signIn(). Without this the box
+  //    stays hidden forever: an inline style outranks `.msg.error{display:block}`
+  //    however specific the class rule is, so every failed sign-in was silent.
+  b.style.display = '';
 }
 
 /* Where a signed-in account belongs. This page is the VENDOR door, so it only
@@ -138,12 +136,10 @@ async function route(session) {
     window.location.href = 'vendor-portal.html';
     return;
   }
-  // A Megawide account. Do not sign it out — it is a valid session; just point
-  // it at the right entrance.
-  msg('That is a Megawide employee account. '
-    + '<a href="login.html">Open the Procurement Dashboard</a> instead.', 'info');
-  document.getElementById('btn').disabled = false;
-  document.getElementById('btn').textContent = 'Sign In';
+  // A Megawide account. Do not sign it out — it is a valid session; send it to
+  // its own entrance silently. Deliberately says nothing: this door is the
+  // vendors' and should not name the internal app to anyone standing at it.
+  window.location.href = 'login.html';
 }
 
 async function signIn(e) {

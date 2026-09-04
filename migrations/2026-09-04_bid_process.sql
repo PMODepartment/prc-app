@@ -732,7 +732,12 @@ select
   w.submittal_document_type,
   p.id                as project_id,
   p.name              as project_name,
-  p.location          as project_location
+  p.location          as project_location,
+  -- Lifecycle flag only (active / archived). Not cost, not competitor data, and
+  -- the portal needs it: an AWARDED package retires from the vendor's board once
+  -- its project is archived, which is a truer "this is finished" signal than any
+  -- fixed number of days.
+  p.status            as project_status
 from public.vendor_bid_invitations i
 join public.work_packages w on w.id = i.wp_id
 left join public.vendor_bid_rounds r on r.id = i.round_id

@@ -188,12 +188,14 @@
     .field input:disabled,.field select:disabled{background:#F4F4F4;color:#6B6A6A;cursor:not-allowed;border-color:#e9e9e9}
     .doc-rule{font-size:10.5px;color:#999;flex-basis:100%;margin-top:2px}
     html.dark-mode .doc-rule{color:#777}
-    .locked-note{font-size:11px;color:#888;margin-top:5px;display:flex;gap:5px;align-items:center}
+    .locked-note{font-size:11px;color:#888;margin-top:5px;line-height:1.6;
+      position:relative;padding-left:17px}
     /* Small helper text under a field. Was being used before it existed here
        (it is defined in vendor-register.html, not this file), so the hints
        rendered unstyled at full body size. Same scale as .locked-note. */
     .field-hint{font-size:11px;color:#888;margin-top:5px;line-height:1.5}
-    .locked-note::before{content:'\ea6a';font-family:'tabler-icons';font-size:12px;color:#aaa}
+    .locked-note::before{content:'\ea6a';font-family:'tabler-icons';font-size:12px;color:#aaa;
+      position:absolute;left:0;top:1px}
     /* Save bar sticks to the bottom while a change is pending, so the vendor
        can never scroll past it and lose the edit. */
     .save-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid #eee;padding:12px 0 4px;
@@ -284,6 +286,12 @@
     .portal-theme-toggle{background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;
       width:32px;height:32px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
     .portal-theme-toggle:hover{background:rgba(255,255,255,.1)}
+  /* The dismiss control on the settled "you are accredited" banner. */
+  .banner{position:relative}
+  .banner-x{position:absolute;top:8px;right:9px;background:none;border:none;cursor:pointer;
+    font-size:19px;line-height:1;color:currentColor;opacity:.45;padding:2px 5px;border-radius:6px}
+  .banner-x:hover{opacity:1;background:rgba(0,0,0,.06)}
+  html.dark-mode .banner-x:hover{background:rgba(255,255,255,.12)}
   .doc-locked{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;
   color:#6E6C6C;background:#F1F1F1;border:1px solid #E0E0E0;border-radius:4px;padding:2px 7px;cursor:help}
 html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a}
@@ -422,6 +430,15 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       background:#fff;cursor:pointer;font-family:'Montserrat',sans-serif;color:#555}
     .bid-foot button.primary{background:#EE3124;border-color:#EE3124;color:#fff;font-weight:700}
     .bid-foot button.danger:hover{border-color:#EE3124;color:#EE3124}
+    /* Settled bids, tucked behind a disclosure so the board shows what is live. */
+    .bid-past{margin-top:20px;border-top:1px solid #eee;padding-top:14px}
+    .bid-past > summary{cursor:pointer;font-size:12.5px;font-weight:700;color:#666;
+      list-style:none;display:flex;align-items:center;gap:6px;padding:4px 0}
+    .bid-past > summary::-webkit-details-marker{display:none}
+    .bid-past > summary::before{content:'b8';font-size:11px;transition:transform .15s;display:inline-block}
+    .bid-past[open] > summary::before{transform:rotate(90deg)}
+    html.dark-mode .bid-past{border-color:#3a3a3a}
+    html.dark-mode .bid-past > summary{color:#9D9B9B}
     .bid-note{font-size:11.5px;color:#999;font-style:italic;margin-top:6px}
     html.dark-mode .bid-card{background:#232323;border-color:#3a3a3a}
     html.dark-mode .bid-wp{color:#EDEDED}
@@ -564,17 +581,26 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       <label>Trade Categories</label>
       <div class="trade-checklist" id="tradeChips"></div>
     </div>
+    <!-- TIN stands alone: it is identity, not part of a pair. -->
+    <div class="field"><label>TIN <span style="color:#EE3124">*</span></label>
+      <input id="f-tin" type="text" placeholder="e.g. 006-819-950-000"></div>
+
+    <!-- ⚠️ LOCATION COMES BEFORE THE PHONE FIELDS, and that ordering is
+         load-bearing: the country sets the dial code the phone fields are
+         prefixed with. Asking for a number first and the country afterwards is
+         what left mobile numbers sitting there as bare local digits. -->
     <div class="field-row">
-      <div class="field"><label>TIN <span style="color:#EE3124">*</span></label><input id="f-tin" type="text" placeholder="e.g. 006-819-950-000"></div>
-      <div class="field"><label>Vendor Category</label>
-        <select id="f-vendor-category">
-          <option value="">Select…</option>
-          <option>Supplier</option>
-          <option>Subcon</option>
-          <option>Services</option>
-        </select>
-      </div>
+      <div class="field"><label>Address <span style="color:#EE3124">*</span></label>
+        <input id="f-address" type="text" placeholder="Street, barangay / district"></div>
+      <div class="field"><label>City <span style="color:#EE3124">*</span></label>
+        <input id="f-city" type="text" placeholder="e.g. Quezon City"></div>
     </div>
+    <div class="field-row">
+      <div class="field"><label>Country <span style="color:#EE3124">*</span></label>
+        <select id="f-country" onchange="onCountryChange()"></select></div>
+      <div class="field"></div>
+    </div>
+
     <div class="field-row">
       <div class="field"><label>Contact Person <span style="color:#EE3124">*</span></label><input id="f-contact-person" type="text"></div>
       <div class="field"><label>Position <span style="color:#EE3124">*</span></label><input id="f-contact-position" type="text" placeholder="e.g. Sales Manager"></div>
@@ -583,43 +609,18 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
          accreditation email asks for both by name. -->
     <div class="field-row">
       <div class="field"><label>Owner / Proprietor <span style="color:#EE3124">*</span></label><input id="f-owner-name" type="text" placeholder="Full name"></div>
-      <div class="field"><label>Contact # of Owner <span style="color:#EE3124">*</span></label><input id="f-owner-contact-number" type="text" placeholder="+63 9xx xxx xxxx"></div>
+      <div class="field"><label>Contact # of Owner <span style="color:#EE3124">*</span></label>
+        <input id="f-owner-contact-number" type="text" onblur="normalisePhone(this)"></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Contact Number (mobile) <span style="color:#EE3124">*</span></label>
-        <input id="f-contact-number" type="text" placeholder="+63 9xx xxx xxxx"></div>
-      <div class="field"><label>Telephone</label><input id="f-telephone" type="text" placeholder="+63 2 xxxx xxxx"></div>
+        <input id="f-contact-number" type="text" onblur="normalisePhone(this)"></div>
+      <div class="field"><label>Telephone</label>
+        <input id="f-telephone" type="text" onblur="normalisePhone(this)"></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Contact Email <span style="color:#EE3124">*</span></label><input id="f-contact-email" type="email"></div>
       <div class="field"><label>Website</label><input id="f-website" type="text" placeholder="https://"></div>
-    </div>
-    <div class="field-row">
-      <!-- The placeholders already say what goes where, so these carry no hint. -->
-      <div class="field"><label>Address <span style="color:#EE3124">*</span></label>
-        <input id="f-address" type="text" placeholder="Street, barangay / district"></div>
-      <div class="field"><label>City <span style="color:#EE3124">*</span></label>
-        <input id="f-city" type="text" placeholder="e.g. Quezon City"></div>
-    </div>
-    <div class="field-row">
-      <!-- Gives an overseas vendor somewhere real to say where they are, instead
-           of the old workaround of typing "City, Country" into City. Also drives
-           the phone prefix below. -->
-      <div class="field"><label>Country <span style="color:#EE3124">*</span></label>
-        <select id="f-country" onchange="onCountryChange()"></select></div>
-      <div class="field"></div>
-    </div>
-    <div class="field-row">
-      <!-- ⚠️ VENDOR-OWNED, not staff-set. Payment terms are commercial: the vendor
-           proposes what they usually work on, and the binding terms are agreed per
-           work package at bid time. It used to be locked to Procurement AND marked
-           required, so a vendor could never satisfy the checklist item it blocked.
-           Free text on purpose — real terms are richer than a day count. -->
-      <div class="field"><label>Terms of Payment <span style="color:#EE3124">*</span></label>
-        <input id="f-payment-terms" type="text" placeholder="e.g. 60 days, or 50% DP + balance on delivery">
-        <div class="field-hint">Your usual terms. What applies is agreed per work package when you bid.</div>
-      </div>
-      <div class="field"><label>Product / Vendor Group</label><input id="f-vendor-group" type="text" placeholder="e.g. Ready Mix Concrete"></div>
     </div>
     <div class="itm-legend" style="margin-top:18px">What you are generally able to provide</div>
     <div style="font-size:12px;color:#888;line-height:1.6;margin-bottom:10px">
@@ -636,8 +637,16 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
         <select id="f-can-warranty"><option value="">—</option><option value="yes">We can provide</option><option value="no">We cannot</option></select></div>
       <div class="field"><label>Material / subcon submittals</label>
         <select id="f-can-submittals"><option value="">—</option><option value="yes">We can provide</option><option value="no">We cannot</option></select></div>
-      <div class="field"><label>Payment terms (days)</label>
-        <input id="f-payment-terms-days" type="number" placeholder="e.g. 60" style="display:none"></div>
+      <!-- ⚠️ MOVED HERE from Company Information, and it replaced an orphan
+           "Payment terms (days)" label whose input carried style="display:none"
+           — a label with no visible box under it. One question about terms, in
+           the section about what the vendor can commercially offer.
+           VENDOR-OWNED free text: real terms are richer than a day count, and
+           the binding terms are agreed per work package at bid time. -->
+      <div class="field wide"><label>Terms of Payment <span style="color:#EE3124">*</span></label>
+        <input id="f-payment-terms" type="text" placeholder="e.g. 60 days, or 50% DP + balance on delivery">
+        <div class="field-hint">Your usual terms. What applies is agreed per work package when you bid.</div>
+      </div>
     </div>
     <div class="save-bar" style="margin-top:16px">
       <button class="btn-primary" id="btnSaveOverview" onclick="saveOverview()">Save Company Info</button>
@@ -1045,9 +1054,36 @@ function renderStatus() {
   } else {
     html = '<b>You are not accredited yet.</b>Complete your company information and upload the required documents on the Accreditation tab, then request accreditation.';
   }
+  /* ⚠️ ONLY the settled "you are accredited" banner is dismissible, and that
+     asymmetry is the point. It is a standing fact the vendor already knows, so
+     it becomes clutter on every visit. The others are ACTIONABLE — not
+     accredited yet, request under review, account on hold — and a vendor who
+     dismissed one of those would lose the only prompt telling them what to do
+     next, so those stay put. */
+  const dismissible = key === 'accredited';
+  if (dismissible && _bannerDismissed()) { banner.style.display = 'none'; return; }
   banner.style.display = 'block';
   banner.className = 'banner banner-' + cls;
-  banner.innerHTML = html;
+  banner.innerHTML = html
+    + (dismissible
+        ? '<button class="banner-x" onclick="dismissBanner()" aria-label="Dismiss">&times;</button>'
+        : '');
+}
+
+/* Remembered per vendor AND per standing: if the standing later changes (an
+   accreditation lapses and is regained, say) the new banner is shown again
+   rather than being silently swallowed by an old dismissal. */
+function _bannerKey() {
+  return 'wpm_vbanner_' + ((vendor && vendor.id) || 'x') + '_'
+    + (window.accredKey ? window.accredKey(vendor && vendor.accreditation) : 'none');
+}
+function _bannerDismissed() {
+  try { return localStorage.getItem(_bannerKey()) === '1'; } catch (e) { return false; }
+}
+function dismissBanner() {
+  try { localStorage.setItem(_bannerKey(), '1'); } catch (e) {}
+  const b = document.getElementById('statusBanner');
+  if (b) b.style.display = 'none';
 }
 
 /* ONLY the fields a vendor owns. Company name, payment terms, vendor
@@ -1082,8 +1118,11 @@ function _capOut(v) { return v === true ? 'yes' : v === false ? 'no' : ''; }
 // payment_terms is NOT here any more — see the field's own note. It is the
 // vendor's to propose, and 2026-09-01_vendor_edit_guard_consolidated.sql no
 // longer pins it server-side.
-const STAFF_FIELDS = { 'f-name': 'name',
-                       'f-vendor-category': 'vendor_category', 'f-vendor-group': 'vendor_group' };
+// ⚠️ Company Name ONLY. vendor_category and vendor_group were removed from
+//    this page entirely: they are Megawide's internal SAP tagging, mean nothing
+//    to a vendor, and a locked box just raised a question with no useful answer.
+//    The COLUMNS are untouched — staff still set them in vendors.html.
+const STAFF_FIELDS = { 'f-name': 'name' };
 const TIN_FIELD = 'f-tin';
 function tinIsLocked() { return !!(vendor && String(vendor.tin || '').trim()); }
 function renderOverviewForm() {
@@ -1095,8 +1134,6 @@ function renderOverviewForm() {
     const el = document.getElementById(id);
     if (el) el.value = _capOut(vendor[key]);
   });
-  const ptd = document.getElementById('f-payment-terms-days');
-  if (ptd) ptd.value = vendor.payment_terms_days == null ? '' : vendor.payment_terms_days;
   // Staff-owned: shown so the vendor can SEE what Megawide has on file, and
   // locked so the form never invites an edit the server would discard.
   Object.entries(STAFF_FIELDS).forEach(([id, key]) => {
@@ -1274,8 +1311,40 @@ function applyDialCode() {
     el.placeholder = dial + ' 9xx xxx xxxx';
   });
 }
+/* Turn what somebody actually typed into international form.
+   ⚠️ Runs on BLUR, never on input: rewriting digits under a cursor mid-typing
+      is hostile, and it would fight the caret.
+   The rules, in order, and each is deliberately conservative:
+     "+63 ..."      already international  -> left exactly alone
+     "0063..."      international access   -> "+63..."
+     "0945..."      national trunk prefix  -> drop the 0, prepend the dial code
+     "945..."       bare subscriber number -> prepend the dial code
+   A trunk-prefix 0 is the convention in the Philippines and most of Europe. In
+   countries that have none (US, Canada) a number never legitimately starts with
+   0 anyway, so stripping one cannot corrupt a valid number. */
+function normalisePhone(el) {
+  if (!el) return;
+  const raw = String(el.value || '').trim();
+  if (!raw) return;
+  const sel = document.getElementById('f-country');
+  const dial = window.countryDial ? window.countryDial(sel && sel.value) : '';
+  if (!dial) return;
+  if (raw[0] === '+') return;                       // already international
+  let rest = raw.replace(/^00/, '');                // 00 = international access
+  if (rest !== raw) { el.value = '+' + rest.trim(); markDirty(); return; }
+  rest = raw.replace(/^0+/, '');                    // national trunk prefix
+  if (!rest) return;                                // all zeroes — leave it be
+  el.value = dial + ' ' + rest;
+  markDirty();
+}
 function onCountryChange() {
   applyDialCode();
+  // Re-express whatever is already typed against the NEW country, so changing
+  // the country does not leave a number carrying the old one's code.
+  PHONE_FIELDS.forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el && (el.value || '').trim()) normalisePhone(el);
+  });
   markDirty();
 }
 
@@ -1431,11 +1500,6 @@ function collectOverview() {
     const el = document.getElementById(id);
     if (el) f[key] = _capIn(el.value);
   });
-  const _ptd = document.getElementById('f-payment-terms-days');
-  if (_ptd) {
-    const v = parseInt(_ptd.value, 10);
-    f.payment_terms_days = isFinite(v) ? v : null;
-  }
   const tin = document.getElementById(TIN_FIELD);
   if (tin && !tinIsLocked()) f.tin = tin.value.trim();
   return f;
@@ -1482,8 +1546,6 @@ function restoreDraft() {
     const el = document.getElementById(id);
     if (el && d.fields[key] !== undefined) el.value = _capOut(d.fields[key]);
   });
-  const _rptd = document.getElementById('f-payment-terms-days');
-  if (_rptd && d.fields.payment_terms_days != null) _rptd.value = d.fields.payment_terms_days;
   if (Array.isArray(d.fields.trade_categories)) { selectedTrades = new Set(d.fields.trade_categories); buildTradeChips(); }
   document.getElementById('draftNote').style.display = 'none';
   formDirty = true; syncSaveState();
@@ -2053,23 +2115,120 @@ function _bidLocked(i) {
   return i.status === 'closed' || i.status === 'withdrawn' || _bidPastDue(i);
 }
 
+/* ── When a finished bid stops cluttering the board ───────────────────────
+   A bid the vendor lost is of no use to them a month later, and leaving it
+   there makes the board read as a graveyard. A bid they WON is different: it
+   is live commercial work, so it stays until the project itself is done.
+
+   ⚠️ DISPLAY ONLY. Nothing is deleted and no server state changes — the
+      invitation is a procurement record and stays exactly as it is. This
+      decides what the VENDOR is shown, and past bids remain reachable under
+      "Past bids" until the retention window runs out. */
+const BID_KEEP_LOST_DAYS = 30;    // not awarded / declined / never answered
+const BID_KEEP_WON_DAYS  = 365;   // awarded, and the project is still running
+
+// What the bid should be dated from, newest meaningful event first.
+function _bidWhen(i) {
+  return i.decided_at || i.submitted_at || i.due_at || i.invited_at || null;
+}
+function _bidAgeDays(i) {
+  const w = _bidWhen(i);
+  if (!w) return 0;
+  const d = new Date(w);
+  if (isNaN(d.getTime())) return 0;
+  return Math.floor((new Date() - d) / 86400000);
+}
+// Settled: nothing the vendor can do about it any more.
+function _bidIsPast(i) {
+  return !!i.outcome || i.status === 'declined' || i.status === 'withdrawn' || _bidLocked(i);
+}
+/* Gone from the board entirely. An awarded package also retires as soon as its
+   PROJECT is archived — that is the signal the work is finished, and it is a
+   truer end date than any fixed number of days. */
+function _bidIsRetired(i) {
+  if (!_bidIsPast(i)) return false;
+  const won = i.outcome === 'awarded';
+  if (won && String(i.project_status || '').toLowerCase() === 'archived') return true;
+  return _bidAgeDays(i) > (won ? BID_KEEP_WON_DAYS : BID_KEEP_LOST_DAYS);
+}
+
 function _renderBidList() {
   const el = document.getElementById('bidBoardList');
   if (!el) return;
-  const n = _bidItems.length;
-  document.getElementById('bidCount').textContent = n ? n + (n === 1 ? ' invitation' : ' invitations') : '';
+
+  const live = _bidItems.filter(function (i) { return !_bidIsRetired(i); });
+  const active = live.filter(function (i) { return !_bidIsPast(i); });
+  const past = live.filter(_bidIsPast);
+
+  const n = active.length;
+  document.getElementById('bidCount').textContent =
+    n ? n + (n === 1 ? ' open invitation' : ' open invitations') : '';
   const actionable = _bidItems.filter(_bidActionable).length;
   const badge = document.getElementById('bidBadge');
   if (badge) { badge.textContent = actionable; badge.style.display = actionable ? '' : 'none'; }
 
-  if (!n) {
+  if (!live.length) {
     el.innerHTML = '<div class="pf-empty"><i class="ti ti-clipboard-list"></i>'
       + '<b>No invitations yet</b>'
       + 'When Megawide Procurement invites you to quote a work package, it will show up here — '
       + 'nothing to do until then.</div>';
     return;
   }
-  el.innerHTML = _bidItems.map(_bidCard).join('');
+
+  el.innerHTML =
+    (active.length
+      ? _bidByProject(active)
+      : '<div class="pf-empty"><i class="ti ti-check"></i><b>Nothing needs your attention</b>'
+        + 'You are up to date on every open invitation.</div>')
+    + (past.length ? _bidPastSection(past) : '');
+}
+
+/* ⚠️ GROUPED BY PROJECT, because that is how a vendor with several
+   invitations actually thinks about them — "what do I owe Avesta this week"
+   rather than a flat list of unrelated packages. Projects are ordered by their
+   most urgent deadline, so whatever is due first is at the top of the page. */
+function _bidByProject(rows) {
+  const groups = {};
+  rows.forEach(function (i) {
+    const k = i.project_name || 'Other packages';
+    (groups[k] = groups[k] || []).push(i);
+  });
+  const soonest = function (list) {
+    return list.reduce(function (m, i) {
+      const d = i.due_at ? new Date(i.due_at).getTime() : Infinity;
+      return isNaN(d) ? m : Math.min(m, d);
+    }, Infinity);
+  };
+  return Object.keys(groups)
+    .sort(function (a, b) { return soonest(groups[a]) - soonest(groups[b]); })
+    .map(function (name) {
+      const list = groups[name].slice().sort(function (a, b) {
+        const x = a.due_at ? new Date(a.due_at).getTime() : Infinity;
+        const y = b.due_at ? new Date(b.due_at).getTime() : Infinity;
+        return x - y;
+      });
+      const loc = (list[0] && list[0].project_location) || '';
+      return '<div class="cat-group">'
+        + '<div class="cat-ghead"><span class="cat-gname">' + esc(name) + '</span>'
+        + (loc ? '<span class="cat-gcount">' + esc(loc) + '</span>' : '')
+        + '<span class="cat-gcount">' + list.length
+        + (list.length === 1 ? ' package' : ' packages') + '</span></div>'
+        + list.map(_bidCard).join('') + '</div>';
+    }).join('');
+}
+
+/* Settled bids, collapsed. They are out of the way but not hidden — a vendor
+   can still look back at what they won or lost until it retires. */
+function _bidPastSection(rows) {
+  const sorted = rows.slice().sort(function (a, b) {
+    return new Date(_bidWhen(b) || 0) - new Date(_bidWhen(a) || 0);
+  });
+  return '<details class="bid-past"><summary>Past bids (' + sorted.length + ')</summary>'
+    + '<div class="sec-note" style="margin:10px 0 12px;font-size:12px;color:#888;line-height:1.6">'
+    + 'Bids that are settled. These clear themselves from your board over time — '
+    + 'packages you were not awarded after ' + BID_KEEP_LOST_DAYS + ' days, and ones you won '
+    + 'once the project is finished.</div>'
+    + sorted.map(_bidCard).join('') + '</details>';
 }
 
 function _bidStatusMeta(i) {
