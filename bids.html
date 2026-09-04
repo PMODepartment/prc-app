@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904f"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904f"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904g"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -254,9 +254,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260904f"></script>
-<script src="assets/js/db.js?v=20260904f"></script>
-<script src="assets/js/ui.js?v=20260904f"></script>
+<script src="assets/js/auth.js?v=20260904g"></script>
+<script src="assets/js/db.js?v=20260904g"></script>
+<script src="assets/js/ui.js?v=20260904g"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -974,7 +974,7 @@ function comparisonPanel() {
   // ⚠️ The BCB is OURS and is shown to staff only — it is deliberately absent
   //    from every vendor-facing surface (see the migration's view).
   const bcb = window.__hideBudget ? null : (w.approved_budget_bcb || null);
-  return '<div class="panel"><div class="panel-title">5 · Cost comparison <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.3.2</span></div>'
+  return '<div class="panel"><div class="panel-title">5 · Bids at a glance <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.3.2</span></div>'
     + (bcb ? '<div class="sec-note">Budget (BCB) for this package: <b>' + esc(money(bcb)) + '</b></div>' : '')
     + '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
     + '<th>Bidder</th><th style="text-align:right">Offer</th><th style="text-align:right">vs lowest</th>'
@@ -998,9 +998,12 @@ function comparisonPanel() {
     + 'commercial and financial together.</div>'
     /* BP 2.3.2 calls this a PRESENTED deliverable, so it has to leave the screen.
        Both outputs carry the BCB and are internal — the print view says so on it. */
+    + '<div class="sec-note" style="margin-top:10px">The <b>cost comparison itself is prepared outside '
+    + 'this app</b>, in the per-package template — line-by-line quantities and rates, inclusions and '
+    + 'exclusions, duties and FX, and matched technical specifications. This screen is the headline '
+    + 'position; export the bidders below to start that workbook without retyping them.</div>'
     + '<div class="bm-actions">'
-    + '<button class="btn" onclick="exportComparisonCsv()"><i class="ti ti-file-spreadsheet"></i> Download CSV</button>'
-    + '<button class="btn" onclick="printComparison()"><i class="ti ti-printer"></i> Print / PDF</button>'
+    + '<button class="btn" onclick="exportBidders()"><i class="ti ti-file-spreadsheet"></i> Export bidders &amp; offers (CSV)</button>'
     + '</div></div>';
 }
 
@@ -1192,16 +1195,30 @@ function deadlineNudge() {
     + '</div>';
 }
 
-/* ── 2.3.2 Cost Comparison as a DELIVERABLE ───────────────────────────────
-   The BP calls this a "Presentation of Cost Comparison" — an artefact that gets
-   circulated and filed, not just a table on a screen. Two outputs, because they
-   are used differently: CSV is what a buyer reworks in Excel, the print view is
-   what goes into the pack.
+/* ── Bidders & offers, as INPUT to the cost comparison ────────────────────
+   ⚠️ THIS IS NOT THE COST COMPARISON, and must never be presented as one.
+      Megawide's real comparison is a bespoke per-package workbook prepared
+      OUTSIDE this app, and it is a different kind of document entirely:
 
-   ⚠️ BOTH CARRY THE BCB, so both are INTERNAL. The budget is the ceiling we are
-      willing to pay and is deliberately absent from every vendor-facing surface
-      (see vendor_bid_board_view). It is suppressed here too for a cost-hidden
-      role, the same rule as the on-screen table. */
+        · a multi-line BOQ per bidder (QTY / UoM / RATE / TOTAL per line),
+          grouped by building or scope — the Busducts one runs to 82 columns;
+        · per-line "Included" / "Excluded", which is often the whole argument;
+        · Incoterm and tax build-ups that differ per bidder — VAT, CIF, FOB,
+          ExWorks, duties, transmodal fees — and an FX rate for imported goods;
+        · matched technical specification rows (tensile strength, aspect ratio,
+          fiber assembly…), which is BP 2.3.2's "Matching of Line Items with
+          Complete Description and Specification";
+        · one purchase allocated across several projects.
+
+      The app holds ONE headline figure per bidder. It cannot represent any of
+      that, and a flat table titled "Cost Comparison" would be a worse version
+      of a document that already exists. A print view that did exactly that was
+      removed on 2026-09-04.
+
+   What this export IS: the bidder list the analyst would otherwise retype into
+   their template — who was invited, who submitted, their contacts and headline
+   offers — which is close to the "Bidders" sheet those workbooks already carry
+   (schedule, contact, invited, confirmed, did-not-submit). */
 function _comparisonRows() {
   return bidsInPlay().slice().sort((a, b) => (a.offer_amount || 0) - (b.offer_amount || 0));
 }
@@ -1217,14 +1234,14 @@ function _comparisonMeta() {
   };
 }
 
-function exportComparisonCsv() {
+function exportBidders() {
   const rows = _comparisonRows();
   if (!rows.length) { AppNotify.warn('No offers to compare yet.'); return; }
   const m = _comparisonMeta();
   const low = rows[0].offer_amount;
   const out = [];
   // A header block, so the file still makes sense months later on its own.
-  out.push(['Cost Comparison']);
+  out.push(['Bidders and offers — input to the cost comparison']);
   out.push(['Work package', m.title]);
   out.push(['Project', m.project]);
   out.push([(R.doc_type || 'RFQ') + ' round', R.round_no]);
@@ -1255,84 +1272,13 @@ function exportComparisonCsv() {
   const csv = '﻿' + out.map(r => r.map(csvCell).join(',')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = 'Cost-Comparison-' + (m.w.wp_no ? 'WP' + m.w.wp_no + '-' : '')
+  a.download = 'Bidders-' + (m.w.wp_no ? 'WP' + m.w.wp_no + '-' : '')
     + (R.project_id || '') + '-R' + R.round_no + '.csv';
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  AppNotify.success('Cost comparison downloaded.');
+  AppNotify.success('Bidder list downloaded — use it to fill in your cost-comparison template.');
 }
 
-function printComparison() {
-  const rows = _comparisonRows();
-  if (!rows.length) { AppNotify.warn('No offers to compare yet.'); return; }
-  const m = _comparisonMeta();
-  const low = rows[0].offer_amount;
-  const cell = (v, right) => '<td' + (right ? ' style="text-align:right"' : '') + '>' + esc(v) + '</td>';
-
-  const body = rows.map((i, n) => {
-    const diff = (i.offer_amount || 0) - low;
-    const vsB = m.bcb != null ? (i.offer_amount || 0) - m.bcb : null;
-    return '<tr>' + cell(n + 1, true)
-      + '<td><b>' + esc(i.vendor_name) + '</b>'
-      + (window.accredKey && accredKey(i.vendor_accreditation) !== 'accredited'
-          ? '<br><span class="warn">not accredited</span>' : '')
-      + '</td>'
-      + cell(money(i.offer_amount, i.offer_currency), true)
-      + cell(diff ? '+' + money(diff, i.offer_currency) : '—', true)
-      + (m.bcb != null ? '<td style="text-align:right" class="' + (vsB > 0 ? 'warn' : 'good') + '">'
-          + (vsB > 0 ? '+' : '') + esc(money(vsB)) + '</td>' : '')
-      + cell(i.lead_time_days != null ? i.lead_time_days + ' d' : '—')
-      + cell(i.validity_days != null ? i.validity_days + ' d' : '—')
-      + cell(i.payment_terms || '—')
-      + cell(i.negotiated_amount != null ? money(i.negotiated_amount, i.offer_currency) : '—', true)
-      + '</tr>';
-  }).join('');
-
-  const doc = [
-    '<!doctype html><meta charset="utf-8"><title>Cost Comparison</title>',
-    '<style>',
-    'body{font-family:Segoe UI,Arial,sans-serif;color:#231F20;margin:28px;font-size:12px}',
-    'h1{font-size:17px;margin:0 0 2px}h2{font-size:12px;font-weight:500;color:#666;margin:0 0 18px}',
-    '.meta{border-collapse:collapse;margin-bottom:16px}.meta td{padding:2px 14px 2px 0;font-size:11.5px}',
-    '.meta td:first-child{color:#666}',
-    'table.cmp{border-collapse:collapse;width:100%}',
-    'table.cmp th{background:#231F20;color:#fff;text-align:left;padding:7px 9px;font-size:11px;',
-    'text-transform:uppercase;letter-spacing:.04em}',
-    'table.cmp td{border-bottom:1px solid #e5e5e5;padding:7px 9px;vertical-align:top}',
-    'table.cmp tr:nth-child(even) td{background:#fafafa}',
-    '.warn{color:#C42127;font-weight:600}.good{color:#0F7A46;font-weight:600}',
-    '.foot{margin-top:20px;font-size:10.5px;color:#777;line-height:1.7;border-top:1px solid #e5e5e5;padding-top:10px}',
-    '@media print{body{margin:12mm}}',
-    '</style>',
-    '<h1>Cost Comparison</h1>',
-    '<h2>' + esc(m.title) + '</h2>',
-    '<table class="meta">',
-    '<tr><td>Project</td><td><b>' + esc(m.project) + '</b></td></tr>',
-    '<tr><td>Solicitation</td><td>' + esc(R.doc_type || 'RFQ') + ' &middot; round ' + esc(R.round_no) + '</td></tr>',
-    R.bid_due_at ? '<tr><td>Bid deadline</td><td>' + esc(dt(R.bid_due_at)) + '</td></tr>' : '',
-    m.bcb != null ? '<tr><td>Budget (BCB)</td><td><b>' + esc(money(m.bcb)) + '</b></td></tr>' : '',
-    '<tr><td>Prepared</td><td>' + esc(m.when) + (m.by ? ' by ' + esc(m.by) : '') + '</td></tr>',
-    '</table>',
-    '<table class="cmp"><thead><tr><th>#</th><th>Bidder</th><th style="text-align:right">Offer</th>',
-    '<th style="text-align:right">vs lowest</th>',
-    m.bcb != null ? '<th style="text-align:right">vs BCB</th>' : '',
-    '<th>Lead time</th><th>Validity</th><th>Payment terms</th>',
-    '<th style="text-align:right">Negotiated</th></tr></thead><tbody>',
-    body,
-    '</tbody></table>',
-    '<div class="foot">',
-    'Lowest is not the same as best value — BP 2.3.3 weighs technical, commercial and financial together.<br>',
-    m.bcb != null ? 'Contains Megawide budget information. Internal use only — not for release to bidders.' : '',
-    '</div>',
-  ].join('');
-
-  const wnd = window.open('', '_blank');
-  if (!wnd) { AppNotify.warn('Allow pop-ups for this site to print the comparison.'); return; }
-  wnd.document.write(doc);
-  wnd.document.close();
-  // Let the styles settle before the print dialog, or the first page renders unstyled.
-  setTimeout(() => { try { wnd.focus(); wnd.print(); } catch (e) {} }, 250);
-}
 
 /* 2.4.2 — Award: NOA to the winner, Letter of Regret to the rest.
    ⚠️ The letters themselves stay with Megawide's existing templates. This
