@@ -1011,54 +1011,9 @@ async function deleteWPFromDetail(id, wpNo) {
 
 function fmt(n){ if(n==null)return'—'; return'₱'+(Math.abs(n)/1e6).toFixed(1)+'M'; }
 function fmtDate(d){ if(!d)return'—'; try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'});}catch{return d;} }
-function claimTagBadge(t) {
-  if (!t) return '<span style="color:#bbb">—</span>';
-  const map = {
-    'Extension of Time (EOT)': {bg:'#FDECEA',c:'#EE3124'},
-    'Material Escalation':     {bg:'#FFF7ED',c:'#EA580C'},
-    'Labor Escalation':        {bg:'#FFFBEB',c:'#D97706'},
-    'Change Order':            {bg:'#F0FDF4',c:'#15803D'},
-  };
-  const {bg,c} = map[t] || {bg:'#F3F4F6',c:'#6B7280'};
-  return '<span style="font-size:0.7143rem;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+t+'</span>';
-}
 function statusBadge(s){
   const c={Awarded:'#2D9B6F','Not Yet Awarded':'#EE3124'}[s]||'#999';
   return '<span style="font-size:0.7143rem;font-weight:600;color:'+c+'">'+(s||'—')+'</span>';
-}
-function procStatusBadge(s){
-  const map={
-    'Not Started': {bg:'#F3F4F6',c:'#6B7280'},
-    'Sourced':     {bg:'#FDECEA',c:'#D9564C'},
-    'Solicited':   {bg:'#F0FDF4',c:'#16A34A'},
-    'Evaluated':   {bg:'#FFFBEB',c:'#D97706'},
-    'Awarded':     {bg:'#F0FDF4',c:'#15803D'},
-  };
-  const {bg,c}=map[s]||{bg:'#F3F4F6',c:'#9CA3AF'};
-  // statusLabel() prefixes a glyph so the state doesn't rely on colour alone
-  return '<span style="font-size:0.7143rem;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+statusLabel(s)+'</span>';
-}
-function submittalBadge(s){
-  const map={
-    'Not Required':          {bg:'#F3F4F6',c:'#9CA3AF'},
-    'Submitted':             {bg:'#FDECEA',c:'#EE3124'},
-    'Approved w/ Comments':  {bg:'#FFFBEB',c:'#D97706'},
-    'Approved':              {bg:'#F0FDF4',c:'#15803D'},
-  };
-  const {bg,c}=map[s]||{bg:'#F3F4F6',c:'#9CA3AF'};
-  // statusLabel() prefixes a glyph so the state doesn't rely on colour alone
-  return '<span style="font-size:0.7143rem;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+statusLabel(s)+'</span>';
-}
-function deliveryBadge(s){
-  const map={
-    'DP Paid':                        {bg:'#F0F9FF',c:'#0369A1'},
-    'Accomplished Detailed Drawings': {bg:'#FDECEA',c:'#EE3124'},
-    'Manufactured/Produced':          {bg:'#FFFBEB',c:'#D97706'},
-    'Delivered':                      {bg:'#F0FDF4',c:'#15803D'},
-  };
-  const {bg,c}=map[s]||{bg:'#F3F4F6',c:'#9CA3AF'};
-  // statusLabel() prefixes a glyph so the state doesn't rely on colour alone
-  return '<span style="font-size:0.7143rem;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+c+'">'+statusLabel(s)+'</span>';
 }
 
 const _rendered = { overview: false, dashboard: false, backlog: false, table: false };
@@ -1287,48 +1242,6 @@ function _stOptsHtml(opts, cur){
 function _stSelect(id, field, opts, cur){
   return `<select onchange="updateWpStatus('${id}','${field}',this.value,this)" style="width:100%;font-size:0.7857rem;padding:3px 4px;border:1px solid var(--border-md);border-radius:5px;background:var(--surface-2);color:var(--text-primary);font-family:inherit;cursor:pointer">${_stOptsHtml(opts,cur)}</select>`;
 }
-// One-time "NEW" hint on the Status Tracker (dismissed per user via localStorage).
-function _stNewKey(){ return 'wpm_st_seen_' + ((window.__profile&&window.__profile.id)||'anon'); }
-function _stMaybeShowNew(){
-  if(window.__readOnly||window.__demo) return;
-  let seen=false; try{ seen=!!localStorage.getItem(_stNewKey()); }catch(_){}
-  const badge=document.getElementById('st-new-badge'), co=document.getElementById('st-new-callout');
-  if(badge) badge.style.display = seen?'none':'inline-block';
-  if(co) co.style.display = seen?'none':'flex';
-}
-window.dismissStNew=function(){
-  try{ localStorage.setItem(_stNewKey(),'1'); }catch(_){}
-  const badge=document.getElementById('st-new-badge'), co=document.getElementById('st-new-callout');
-  if(badge) badge.style.display='none';
-  if(co) co.style.display='none';
-};
-function renderStatusTracker(){ if(!document.getElementById('status-tracker-thead')) return;
-  if(window.__readOnly) return;
-  const thead=document.getElementById('status-tracker-thead'), tbody=document.getElementById('status-tracker-tbody');
-  if(!thead||!tbody) return;
-  _stMaybeShowNew();
-  const hint=document.getElementById('status-tracker-hint');
-  if(hint) hint.textContent = _stAutoApprove()
-    ? 'Set Procurement & Delivery status inline — saves instantly. Award Status follows Procurement (Awarded → Awarded). Reflects current filters.'
-    : 'Set status inline — changes are submitted to your manager / WP approver. Award Status follows Procurement Status. Reflects current filters.';
-  const groups=getFilteredSorted();
-  const thS='position:sticky;top:0;background:var(--surface-2);z-index:2;text-align:left;';
-  thead.innerHTML=`<tr><th style="${thS}width:80px">WP No.</th><th style="${thS}">Description</th><th style="${thS}width:150px">Award Status</th><th style="${thS}width:175px">Procurement Status</th><th style="${thS}width:160px">Delivery Status</th></tr>`;
-  let html='';
-  groups.forEach(({trade,wps})=>{
-    html+=`<tr><td colspan="5" style="background:var(--surface-2);font-weight:700;font-size:0.7143rem;text-transform:uppercase;letter-spacing:.04em;color:#888">${_stEsc(trade||'—')} · ${wps.length}</td></tr>`;
-    wps.forEach(w=>{
-      html+=`<tr>`+
-        `<td style="font-weight:600;color:#EE3124;white-space:nowrap">${_stEsc(w.wp_no)}</td>`+
-        `<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_stEsc(w.description)}">${_stEsc(w.description)||'—'}</td>`+
-        `<td>${_stAwardBadge(w.id,w.award_status,w.not_to_be_awarded)}</td>`+
-        `<td>${_stSelect(w.id,'procurement_status',ST_PROC_OPTS,w.procurement_status)}</td>`+
-        `<td>${_stSelect(w.id,'delivery_status',ST_DELIV_OPTS,w.delivery_status)}</td>`+
-      `</tr>`;
-    });
-  });
-  tbody.innerHTML = html || `<tr><td colspan="5" style="text-align:center;color:#999;padding:14px">No work packages for the current filter</td></tr>`;
-}
 let _stToastT=null;
 function _stToast(msg, isErr){
   let t=document.getElementById('_st-toast');
@@ -1383,7 +1296,6 @@ window.updateWpStatus = async function(id, field, value, sel){
   const prev = w[field];
   if(prev===value) return;
   if(window.__archived){ _stToast('Project is archived — read-only', true); sel.value = prev==null?'':prev; return; }
-  if(window.dismissStNew) dismissStNew();   // they've discovered the tracker — retire the NEW hint
   if(window.GettingStarted){ GettingStarted.markStep('setStatus'); if(field==='procurement_status'&&value==='Awarded') GettingStarted.markStep('awardIt'); }
   // Award Status is DERIVED from Procurement Status. Changing Procurement Status drives Award Status:
   //  • Awarded  → Award Status = Awarded (requires Awarded Cost + Vendor → popup if missing)
@@ -2097,100 +2009,8 @@ window.setDashView = function(v){
   setDashDataMode(_dashComboMode());
 };
 
-function renderStatusTable(wps, tableId) {
-  const today = new Date();
-  const total = wps.length;
-  const awarded = helpingMetrics(wps).awarded;   // authoritative (Helping Sheet)
-  const due = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).length;
-  const notDue = Math.max(0, total - awarded - due);
-  const pct = v => total ? Math.round(v/total*100) : 0;
-  const el = document.getElementById(tableId);
-  if(!el) return;
-  const row = (dot, label, count, p) =>
-    `<div style="display:grid;grid-template-columns:14px 1fr 44px 36px;align-items:center;gap:6px;padding:9px 14px;border-bottom:1px solid #f5f5f5">
-      <span style="width:9px;height:9px;border-radius:50%;background:${dot};display:inline-block"></span>
-      <span style="font-size:0.7857rem;font-weight:600;color:#555">${label}</span>
-      <span style="font-size:1.0714rem;font-weight:700;color:#231F20;text-align:right">${count}</span>
-      <span style="font-size:0.7143rem;color:#aaa;text-align:right">${p}%</span>
-    </div>`;
-  el.innerHTML =
-    `<div style="display:grid;grid-template-columns:14px 1fr 44px 36px;gap:6px;padding:7px 14px 6px;border-bottom:2px solid #f0f0f0">
-      <span></span>
-      <span style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#aaa">Status</span>
-      <span style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#aaa;text-align:right">Count</span>
-      <span style="font-size:0.7143rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#aaa;text-align:right">%</span>
-    </div>
-    ${row('#EE3124','Awarded', awarded, pct(awarded))}
-    ${row('#282C28','Due Not Awarded', due, pct(due))}
-    ${row('#DCDBDB','Not Due', notDue, pct(notDue))}
-    <div style="display:grid;grid-template-columns:14px 1fr 44px 36px;align-items:center;gap:6px;padding:9px 14px;background:#fafafa;border-top:2px solid #e5e5e5">
-      <span></span>
-      <span style="font-size:0.7857rem;font-weight:700;color:#231F20">Total</span>
-      <span style="font-size:1.0714rem;font-weight:700;color:#231F20;text-align:right">${total}</span>
-      <span style="font-size:0.7143rem;color:#aaa;text-align:right">100%</span>
-    </div>`;
-}
 
-function renderDashStatusBars(wps) {
-  const today = new Date();
-  const total = wps.length;
-  const hm = helpingMetrics(wps);              // authoritative (Helping Sheet)
-  const awarded = hm.awarded;
-  const due = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).length;
-  const notDue = Math.max(0, total - awarded - due);
-  const bcbTotal = hm.totalBudget;
-  const bcbAwd = hm.awardedCost;              // Awarded value = Helping Sheet Awarded Cost
-  const bcbDue = wps.filter(w=>!window.isResolved(w)&&w.awarding_date&&new Date(w.awarding_date)<today).reduce((s,w)=>s+(w.approved_budget_bcb||0),0);
-  const bcbNotDue = Math.max(0, bcbTotal - bcbAwd - bcbDue);
-  const wpPct  = total    ? Math.round(awarded/total*100)    : 0;
-  const valPct = bcbTotal ? Math.round(bcbAwd/bcbTotal*100)  : 0;
-  const wpDuePct  = total    ? Math.round(due/total*100)       : 0;
-  const valDuePct = bcbTotal ? Math.round(bcbDue/bcbTotal*100) : 0;
-  const el = document.getElementById('dash-status-bars');
-  if (!el) return;
-  function bar(label, pctAwd, pctDue, items) {
-    const pctND = Math.max(0, 100 - pctAwd - pctDue);
-    return `<div style="margin-bottom:18px">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px">
-        <span style="font-size:0.7143rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.07em">${label}</span>
-        <span style="font-size:1.5714rem;font-weight:800;color:#2D9B6F;letter-spacing:-.5px;line-height:1">${pctAwd}%<span style="font-size:0.7857rem;font-weight:500;color:#aaa;margin-left:3px">awarded</span></span>
-      </div>
-      <div style="height:18px;border-radius:6px;overflow:hidden;background:#e8e8e8;display:flex">
-        <div style="width:${pctAwd}%;background:linear-gradient(to right,#1a7a50,#2D9B6F);min-width:${pctAwd>0?2:0}px"></div>
-        <div style="width:${pctDue}%;background:#EE3124;opacity:.85;min-width:${pctDue>0?2:0}px"></div>
-        <div style="width:${pctND}%;background:#D1D5DB;min-width:${pctND>0?2:0}px"></div>
-      </div>
-      <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
-        ${items.map(it=>`<div style="display:flex;align-items:center;gap:5px">
-          <div style="width:8px;height:8px;border-radius:2px;background:${it.color};flex-shrink:0"></div>
-          <span style="font-size:0.7143rem;color:#777">${it.label}</span>
-          <span style="font-size:0.7857rem;font-weight:700;color:#231F20">${it.val}</span>
-        </div>`).join('')}
-      </div>
-    </div>`;
-  }
-  el.innerHTML =
-    bar('By WP Count', wpPct, wpDuePct, [
-      {color:'#2D9B6F', label:'Awarded', val:awarded},
-      {color:'#EE3124', label:'Due Not Awarded', val:due},
-      {color:'#D1D5DB', label:'Not Due', val:notDue}
-    ]) +
-    `<div style="height:1px;background:#f0f0f0;margin-bottom:18px"></div>` +
-    bar('By BCB Value', valPct, valDuePct, [
-      {color:'#2D9B6F', label:'Awarded', val:Fmt.money(bcbAwd)},
-      {color:'#EE3124', label:'Due Not Awarded', val:Fmt.money(bcbDue)},
-      {color:'#D1D5DB', label:'Not Due', val:Fmt.money(bcbNotDue)}
-    ]);
-}
 
-function renderDashboard(){
-  const wps = allWPs;
-  renderDashPeriod(wps);
-  renderDashStatusBars(wps);
-  renderStatusTable(wps, 'dash-status-table');
-  renderDashBacklog();
-  renderTop5(wps);
-}
 
 window.renderDashBacklog = function() {
   const today = new Date();
@@ -3212,7 +3032,6 @@ AppAuth.requireLogin(async (user, profile) => {
   if (typeof initVendorClaimsNav === 'function') initVendorClaimsNav(window.__isViewer ? { role: 'viewer' } : profile);
   if (window.__readOnly) {
     document.body.classList.add('read-only');
-    const st=document.getElementById('status-tracker'); if(st) st.style.display='none';    // inline editing
   }
   if (window.__isViewer) {
     document.body.classList.add('viewer-mode');
@@ -3236,7 +3055,6 @@ AppAuth.requireLogin(async (user, profile) => {
     if (!_hb) _cs.push({ sel:'#metrics-cost', title:'Cost overview', body:'Headline cost figures — <b>hover any label</b> for its definition.', before:_ov });
     if (!_cv) _cs.push({ sel:'#add-wp-link', title:'Add a work package', body:'Add a single WP here, or use <b>Import from CSV</b> (in Tools) to add many at once.' });
     _cs.push({ sel:'#f-status', title:'Filter the WP List', body:'Filter by status, trade, works, vendor or search to find work packages fast.', before:_tb });
-    if (!_cv) _cs.push({ sel:'#status-tracker', title:'Work Package Status Tracker', body:'Update <b>Award, Procurement &amp; Delivery</b> status inline. Setting Procurement to <b>Awarded</b> prompts for the awarded cost &amp; vendor.', before:_tb });
     CoachTour.configure({ key:'coach_project', steps:_cs });
     CoachTour.maybeAutoStart();
   }
@@ -4119,7 +3937,6 @@ AppAuth.requireLogin(async (user, profile) => {
   /* Archived project — read-only for everyone: hide all editing entry points */
   body.archived-readonly #add-wp-link,
   body.archived-readonly #sidebar-tools,
-  body.archived-readonly #status-tracker,
   body.archived-readonly #review-wps-link { display:none !important; }
   .btn-sm {
     font-size:0.7143rem;font-weight:600;padding:4px 10px;border:1px solid #e5e5e5;

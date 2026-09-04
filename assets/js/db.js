@@ -749,95 +749,6 @@ const Calc = {
 };
 
 /* ── CSV Export ─────────────────────────────────────────────────────── */
-function exportCSV(wps, label) {
-  // Sort by project then WP number for clean consolidated output
-  const sorted = [...wps].sort((a,b) => {
-    const pCmp = (a.project_id||'').localeCompare(b.project_id||'');
-    if (pCmp !== 0) return pCmp;
-    // Natural sort WP numbers (WP-1 < WP-10 < WP-100)
-    const na = parseInt((a.wp_no||'').replace(/\D/g,''))||0;
-    const nb = parseInt((b.wp_no||'').replace(/\D/g,''))||0;
-    return na - nb;
-  });
-
-  const h = [
-    // Identity
-    'Project','WP No','Cost Code','Trade','Works','Type of Works','Zone',
-    // Description
-    'Work Package Description','Scope of Work','Type of Service',
-    'Type of Procurement','Type of Contract',
-    // Charging
-    'Charging Type','Contract Package No.','CO Description',
-    // Vendors & PO
-    'Proposed Vendors','No. of PO/JO','PO/JO Numbers',
-    // Team
-    'Responsible Team','Approver','Support Team',
-    // Procurement schedule
-    'Lead Time (d)','Planned Award Date','Actual Award Date',
-    'Target Delivery','Actual Delivery','Target Installation','Target Completion',
-    // Budget & contract
-    'Budget BCB (PHP)','Contract Amount (PHP)','Total Awarded (PHP)','Variance (PHP)',
-    'Award Status','Contractor',
-    // Bonds
-    'Surety Bond','Performance Bond','Warranty Bond',
-    // Payment terms
-    'Payment Terms (d)','DP %','DP Terms','DP Amount (PHP)','DP Release Date','DP Notes',
-    // Retention
-    'Retention %','Retention Amount (PHP)','Retention Period',
-    // Submittals
-    'Requires Submittal Approval','Type of Submittal','Submittal Approver','Approval Date',
-    // Status
-    'Procurement Status','Awarding Status','Delivery Status','Submittal Status',
-    'Purchase Request','Remarks',
-  ];
-
-  const pct = v => v != null ? (parseFloat(v) * 100).toFixed(2) + '%' : '';
-  const cell = v => `"${(v??'').toString().replace(/"/g,'""')}"`;
-  const rows = sorted.map(w => [
-    // Identity
-    w.project_id, w.wp_no, w.cost_code, w.trade, w.works, w.type_of_works, w.zone,
-    // Description
-    w.description, w.scope, w.type_of_service,
-    w.type_of_procurement, w.type_of_contract,
-    // Charging
-    w.charging_type, w.contract_package_no, w.co_description,
-    // Vendors & PO
-    w.proposed_vendors, w.po_jo_count, w.po_jo_numbers,
-    // Team
-    w.responsible_team, w.approver, w.support_team,
-    // Procurement schedule
-    w.awarding_lead_time, w.awarding_date, w.actual_awarding_date,
-    w.target_delivery, w.actual_delivery, w.target_installation, w.target_completion,
-    // Budget & contract
-    w.approved_budget_bcb, w.awarded_cost, w.total_awarded, w.variance,
-    w.award_status, w.contractor,
-    // Bonds
-    w.surety_bond, w.performance_bond, w.warranty_bond,
-    // Payment terms
-    w.payment_terms_days, pct(w.dp_percent), w.dp_terms, w.dp_amount, w.dp_release_date, w.dp_notes,
-    // Retention
-    pct(w.retention_percent), w.retention_amount, w.retention_period,
-    // Submittals
-    w.requires_approval ? 'Yes' : 'No', w.submittal_document_type, w.approver_name, w.approval_date,
-    // Status
-    w.procurement_status, w.awarding_status, w.delivery_status, w.submittal_type,
-    w.purchase_request, w.remarks,
-  ].map(cell).join(','));
-
-  // BOM + header + data — BOM ensures Excel opens UTF-8 correctly (handles ₱ etc)
-  const BOM = '\uFEFF';
-  const csv = BOM + [h.join(','), ...rows].join('\n');
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${label||'wps'}_${new Date().toISOString().slice(0,10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
-}
 
 /* ── KPI help — plain-English definitions shown as hover tooltips on metric labels ── */
 window.KPI_HELP = {
@@ -1042,26 +953,6 @@ function buildRankTable(id, items, type) {
   el.innerHTML = `<div class="rank-table-scroll"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead>${thead}</thead><tbody>${rows}</tbody></table></div>`;
 }
 
-function buildRankList(id, items, colorClass, fmtVal) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  if (!items.length) { el.innerHTML='<div style="color:#aaa;font-size:0.8571rem;padding:8px 0">No data</div>'; return; }
-  el.innerHTML = items.map((item,i) => {
-    const hasBcbAwd = item.bcb!=null && item.awarded!=null;
-    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f5f5f5">
-      <span style="font-size:0.7857rem;color:#aaa;font-weight:600;width:16px;flex-shrink:0;padding-top:2px">${i+1}</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:0.8571rem;font-weight:600;color:#231F20;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(item.name)}</div>
-        <div style="font-size:0.7143rem;color:#999;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.sub}</div>
-        ${hasBcbAwd?`<div style="font-size:0.7143rem;color:#bbb;margin-top:1px;white-space:nowrap">BCB ${Fmt.money(item.bcb)} <span style="color:#ddd">→</span> Awd ${Fmt.money(item.awarded)}</div>`:''}
-      </div>
-      <div style="text-align:right;flex-shrink:0;padding-top:2px">
-        <div style="font-size:0.9286rem;font-weight:700;color:${item.color};white-space:nowrap">${fmtVal(item.val)}</div>
-        ${item.pct!=null?`<div style="font-size:0.7143rem;font-weight:600;color:${item.color};white-space:nowrap">${item.pct}</div>`:''}
-      </div>
-    </div>`;
-  }).join('');
-}
 
 /* ── PDF Export (jsPDF + AutoTable, lazy-loaded) ──────────────────────── */
 async function _loadPDFLibs() {

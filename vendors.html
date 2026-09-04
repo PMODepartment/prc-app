@@ -557,24 +557,6 @@
     #btnSaveDetailOverview.has-changes{box-shadow:0 0 0 3px rgba(238,49,36,.28)}
     #btnSaveDetailOverview.has-changes::after{content:' 2'}
 body.dark-mode .arch-block{border-top-color:var(--border-md)}
-    .claim-card{border:1.5px solid var(--border-md,#e5e5e5);border-radius:10px;padding:16px;margin-bottom:14px;background:var(--surface,#fff)}
-    .claim-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-    .claim-conf{font-size:0.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:20px;cursor:help}
-    .claim-when{font-size:0.72rem;color:var(--text-hint,#6E6C6C);margin-left:auto}
-    .claim-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 16px;margin-bottom:12px}
-    .claim-kv{font-size:0.78rem;min-width:0}
-    .claim-kv span{display:block;font-size:0.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--text-hint,#6E6C6C)}
-    .claim-kv b{color:var(--text-primary,#231F20);word-break:break-word}
-    .claim-match{border-top:1px dashed var(--border,#eee);padding-top:12px}
-    .claim-match label{display:block;font-size:0.66rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-hint,#6E6C6C);margin-bottom:5px}
-    .claim-input{width:100%;padding:8px 11px;border:1.5px solid var(--border-md,#e5e5e5);border-radius:7px;font-family:inherit;font-size:0.82rem;background:var(--surface,#fff);color:var(--text-primary,#231F20)}
-    .claim-results{display:flex;flex-direction:column;gap:2px;margin-top:4px}
-    .claim-hit{text-align:left;background:none;border:none;padding:6px 9px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:0.8rem;color:var(--text-primary,#231F20)}
-    .claim-hit:hover{background:var(--mw-red-light,#FDECEA)}
-    .claim-hit small{color:var(--text-hint,#6E6C6C);font-family:monospace}
-    .claim-hit-none{font-size:0.76rem;color:var(--text-hint,#6E6C6C);padding:6px 9px}
-    .claim-picked{font-size:0.76rem;color:var(--text-hint,#6E6C6C);margin-top:6px}
-    .claim-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
     .qr-box{display:flex;justify-content:center;padding:18px;background:#fff;border:1.5px solid var(--border-md,#e5e5e5);border-radius:10px}
     .qr-box svg{width:230px;height:230px}
     .qr-url{margin-top:12px;font-family:monospace;font-size:0.72rem;word-break:break-all;color:var(--text-hint,#6E6C6C);text-align:center}
@@ -921,7 +903,6 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
       .modal-footer button{flex:1 1 46%;min-height:40px}
 
       /* label-above-value reads far better than two cramped columns */
-      .vr-kv,.claim-kv{grid-template-columns:1fr!important}
     }
 
     /* Vendor-edit KPI — brand red, not the purple it used to carry inline. */
@@ -1222,28 +1203,6 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
           </div>
         </div>
 
-        <!-- ══ Vendor Registrations — the third page route ══════════════════
-             Sibling of the directory and the vendor profile; _vdShow() decides
-             which of the three is visible. ⚠️ #claimsModalBody KEEPS ITS ID:
-             renderClaims() writes into it, so moving the markup out of the
-             modal needed no change to it or to any of the decide/create
-             handlers. Hidden inline, never by a stylesheet rule — _vdShow
-             toggles the inline value, and a rule would win (that is exactly
-             why the profile page first rendered blank). -->
-        <div class="page-content" id="vendorClaimsPage" style="display:none">
-          <button class="vd-back" onclick="closeClaimsPage()">
-            <i class="ti ti-arrow-left"></i> All vendors
-          </button>
-          <div class="vm-head">
-            <div>
-              <h1>Vendor Registrations</h1>
-              <p>People who registered from the public link and are waiting to be given access to
-                 their company&rsquo;s profile. Check what they submitted against the vendor record,
-                 then approve or decline.</p>
-            </div>
-          </div>
-          <div id="claimsModalBody"></div>
-        </div>
       </div>
     </div>
   </div>
@@ -1421,19 +1380,20 @@ AppAuth.requireLogin((user, profile) => {
   _vdBootVendor = new URLSearchParams(location.search).get('vendor');
   if (typeof initVendorClaimsNav === 'function') initVendorClaimsNav(profile);
   if (typeof initSidebarProjects === 'function') initSidebarProjects(profile);
-  // Deep link from the other pages' sidebar item. Opened off loadAll().then
-  // below rather than on a timer, because the queue resolves each claim's
-  // matched vendor name out of allVendors.
-  // ?claims=1 now redirects (see the popstate/boot handler); nothing on this
-  // page opens the queue any more.
-  _vdBootClaims = false;
+  /* ⚠️ ON FRESH LOAD, not just on back/forward. The queue lives at
+     vendor-registrations.html now, and popstate does NOT fire for an initial
+     navigation — so a bookmark or an already-sent ?claims=1 link used to land
+     on the directory with no explanation. */
+  if (new URLSearchParams(location.search).get('claims') === '1') {
+    window.location.replace('vendor-registrations.html');
+    return;
+  }
   renderUserBar('user-bar', profile);
   initMobileMenu();
   _initBulkUI();
   loadAll().then(function () {
-    // Deep link straight to a profile or the queue. Only now is allVendors populated.
+    // Deep link straight to a profile. Only now is allVendors populated.
     if (_vdBootVendor) openVendorPage(_vdBootVendor, { noPush: true });
-    else if (_vdBootClaims) openClaimsPage({ noPush: true });
   }).catch(function (e) {
     // Without this a rejected loadAll left the page on "Loading vendors…"
     // forever with nothing on screen explaining why.
@@ -4447,7 +4407,7 @@ function copyInviteLink() {
 function _vdShow(which) {
   // Back-compat: _vdShow(true/false) still means detail / directory.
   const w = which === true ? 'detail' : which === false ? 'directory' : which;
-  const map = { directory: 'vendorDirectoryPage', detail: 'vendorDetailPage', claims: 'vendorClaimsPage' };
+  const map = { directory: 'vendorDirectoryPage', detail: 'vendorDetailPage' };
   Object.keys(map).forEach(function (k) {
     const el = document.getElementById(map[k]);
     if (el) el.style.display = (k === w) ? 'block' : 'none';
@@ -4581,7 +4541,6 @@ async function vdUploadLogo(file) {
 // buried button (a TIN was typed, Close was pressed, nothing saved).
 let _detailDirty = false;
 let _vdBootVendor = null;   // ?vendor=<id> captured at boot, opened once loadAll() resolves
-let _vdBootClaims = false;  // ?claims=1 — same, the queue needs allVendors
 function _markDetailDirty() {
   if (_detailDirty) return;
   _detailDirty = true;
@@ -5811,235 +5770,11 @@ function restoreDetailPersonnel(id) { return _restoreChild(VendorDb.personnel, i
 </div>
 
 <script>
-/* ══ Vendor self-registration — staff queue ════════════════════════════════
-   migrations/2026-09-01_vendor_self_registration.sql replaced the per-vendor
-   invite link with ONE public URL. A claimant proves who they are with data
-   only the real vendor holds (Vendor Code / TIN / company name), the server
-   matches it, and the claim lands here for a person to confirm.
-
-   ⚠️ The claimant is NEVER told whether they matched — that would let anyone
-   brute-force TINs to discover Megawide's vendors. The match result exists for
-   THIS screen only.                                                        */
-let _claims = [];
-
-function _claimVendorName(id) {
-  if (!id) return null;
-  const v = (allVendors || []).find(x => x.id === id);
-  return v ? v.name : null;
-}
-function _confBadge(c) {
-  const conf = c.match_confidence || 'none';
-  const map = {
-    high:   { bg: '#D1FAE5', fg: '#065F46', txt: 'Strong match' },
-    medium: { bg: '#FEF3C7', fg: '#92400E', txt: 'Partial match' },
-    none:   { bg: '#FDECEA', fg: '#9B1B1B', txt: 'No match' }
-  };
-  const m = map[conf] || map.none;
-  const how = {
-    code_and_tin: 'Vendor Code and TIN both matched the same record',
-    code: 'Vendor Code matched', tin: 'TIN matched',
-    name: 'Company name matched exactly',
-    ambiguous: 'What they entered matched more than one vendor — pick the right one',
-    none: 'Nothing they entered matched a vendor record'
-  }[c.match_method || 'none'] || '';
-  return '<span class="claim-conf" style="background:' + m.bg + ';color:' + m.fg + '" title="'
-    + esc(how) + '">' + m.txt + '</span>';
-}
-
-/* A route, not a modal — vendors.html?claims=1. openClaimsModal is kept as the
-   name because the sidebar deep-link, the Data Tools item and updateClaimsBadge
-   all call it. */
-async function openClaimsPage(opts) {
-  if (_detailDirty && !confirm('You have unsaved changes to a vendor. Leave without saving?')) return;
-  _detailDirty = false;
-  activeVendor = null;
-  if (_detailScrollSpy) { _detailScrollSpy.disconnect(); _detailScrollSpy = null; }
-  _vdShow('claims');
-  if (!(opts && opts.noPush)) {
-    try { history.pushState({ claims: 1 }, '', 'vendors.html?claims=1'); } catch (_) {}
-  }
-  document.title = 'Vendor Registrations — Vendor Management';
-  document.getElementById('claimsModalBody').innerHTML = '<div class="empty">Loading…</div>';
-  try { _claims = await VendorDb.claims.pending(); }
-  catch (e) {
-    _claims = [];
-    document.getElementById('claimsModalBody').innerHTML =
-      '<div class="empty">Could not load the registrations. ' + esc((e && e.message) || String(e)) + '</div>';
-    return;
-  }
-  renderClaims();
-}
-async function openClaimsModal() { return openClaimsPage(); }
-
-function closeClaimsPage(opts) {
-  _vdShow('directory');
-  document.title = 'Vendor Management';
-  if (!(opts && opts.noPush)) {
-    try { history.pushState({}, '', 'vendors.html'); } catch (_) {}
-  }
-}
-function closeClaimsModal() { return closeClaimsPage(); }
-
-function renderClaims() {
-  const box = document.getElementById('claimsModalBody');
-  if (!_claims.length) {
-    box.innerHTML = '<div class="empty"><i class="ti ti-inbox" style="font-size:1.6rem;display:block;margin-bottom:6px"></i>'
-      + 'No registrations waiting. When a vendor registers from the public link they will appear here.</div>';
-    return;
-  }
-  box.innerHTML = _claims.map(function (c, i) {
-    const matched = _claimVendorName(c.vendor_id);
-    const rows = [
-      ['Company as entered', c.claimed_company],
-      ['Contact', c.claimed_contact_name],
-      ['Email', c.email],
-      ['Vendor Code', c.claimed_vendor_code],
-      ['TIN', c.claimed_tin]
-    ].filter(function (r) { return r[1]; })
-     .map(function (r) { return '<div class="claim-kv"><span>' + esc(r[0]) + '</span><b>' + esc(r[1]) + '</b></div>'; })
-     .join('');
-    return '<div class="claim-card">'
-      + '<div class="claim-head">' + _confBadge(c)
-      + (c.is_new_vendor ? '<span class="claim-conf" style="background:#EFF6FF;color:#1E40AF" '
-          + 'title="They told us they have never supplied Megawide, so having no Vendor Code is expected.">'
-          + 'Says new supplier</span>' : '')
-      + '<span class="claim-when">' + esc(_fmtAuditDate(c.created_at)) + '</span></div>'
-      + '<div class="claim-grid">' + rows + '</div>'
-      + '<div class="claim-match">'
-      + '<label>Give this person access to</label>'
-      + '<input type="text" id="claim-search-' + i + '" class="claim-input" placeholder="Search the directory…" '
-      + 'value="' + esc(matched || '') + '" oninput="_claimSearch(' + i + ')" autocomplete="off">'
-      + '<div class="claim-results" id="claim-results-' + i + '"></div>'
-      + '<div class="claim-picked" id="claim-picked-' + i + '">'
-      + (matched
-          ? 'Matched automatically: <b>' + esc(matched) + '</b>'
-          : (c.is_new_vendor
-              ? 'No match, which is expected for a new supplier. Search first in case we already hold them — otherwise create a record.'
-              : 'No automatic match — search for the right vendor, or create one if we have never dealt with them.'))
-      + '</div></div>'
-      + (_canManage ? '<div class="claim-actions">'
-          + '<button class="btn-cancel" onclick="rejectClaim(' + i + ')">Decline</button>'
-          + '<button class="btn-cancel" onclick="approveAsNewClaim(' + i + ')" '
-          + 'title="Only if we have never dealt with this company. Refused if the name already exists.">'
-          + '<i class="ti ti-building-plus"></i> Create new vendor</button>'
-          + '<button class="btn-primary" onclick="approveClaim(' + i + ')">Approve access</button>'
-          + '</div>' : '')
-      + '</div>';
-  }).join('');
-  _claims.forEach(function (c, i) { _claimPick[i] = c.vendor_id || null; });
-}
-
-const _claimPick = {};
-
-function _claimSearch(i) {
-  const q = (document.getElementById('claim-search-' + i).value || '').trim().toLowerCase();
-  const box = document.getElementById('claim-results-' + i);
-  if (q.length < 2) { box.innerHTML = ''; return; }
-  const hits = (allVendors || []).filter(function (v) {
-    return String(v.name || '').toLowerCase().indexOf(q) >= 0
-        || String(v.vendor_code || '').toLowerCase().indexOf(q) >= 0;
-  }).slice(0, 8);
-  box.innerHTML = hits.length
-    ? hits.map(function (v) {
-        return '<button class="claim-hit" onclick="_claimChoose(' + i + ',' + Q2 + v.id + Q2 + ')">'
-          + esc(v.name) + (v.vendor_code ? ' <small>' + esc(v.vendor_code) + '</small>' : '') + '</button>';
-      }).join('')
-    : '<div class="claim-hit-none">No vendor matches that.</div>';
-}
-function _claimChoose(i, vid) {
-  const v = (allVendors || []).find(function (x) { return x.id === vid; });
-  if (!v) return;
-  _claimPick[i] = vid;
-  document.getElementById('claim-search-' + i).value = v.name;
-  document.getElementById('claim-results-' + i).innerHTML = '';
-  document.getElementById('claim-picked-' + i).innerHTML = 'Selected: <b>' + esc(v.name) + '</b>';
-}
-
-/* Re-read the queue and repaint. The three decision handlers all need this, on
-   success AND when they discover the card was stale. */
-async function _claimResync() {
-  _claims = await VendorDb.claims.pending();
-  renderClaims();
-  updateClaimsBadge();
-}
-/* Someone else already decided this claim (or it no longer exists). That is not
-   a failure to apologise for — it is a stale card, and the useful response is to
-   say so plainly and refresh, NOT to show "Could not decline" with the real
-   reason buried behind AppNotify.fromError's "Show details" disclosure.
-   Matches the errors reject_/approve_vendor_claim raise (42710 / P0002). */
-function _claimStale(e) {
-  return /already been decided|claim not found/i.test((e && e.message) || '');
-}
-async function _claimHandledStale(e) {
-  if (!_claimStale(e)) return false;
-  if (window.AppNotify) {
-    AppNotify.warn('That registration had already been decided by someone else — queue refreshed.');
-  }
-  await _claimResync();
-  return true;
-}
-
-async function approveClaim(i) {
-  const c = _claims[i];
-  const vid = _claimPick[i];
-  if (!vid) { alert('Search for and select the vendor this person belongs to first.'); return; }
-  const vname = _claimVendorName(vid) || '';
-  if (!confirm('Give ' + c.email + ' access to ' + vname + '?')) return;
-  try {
-    await VendorDb.claims.approve(c.id, vid, null);
-    if (window.AppNotify) AppNotify.success('Access granted to ' + vname + '.');
-    await loadAll();
-    await _claimResync();
-  } catch (e) {
-    if (await _claimHandledStale(e)) return;
-    if (window.AppNotify) AppNotify.fromError(e, 'Could not approve');
-    else alert('Could not approve: ' + (e.message || e));
-  }
-}
-// For a company genuinely not in the directory yet. The RPC REFUSES if the name
-// already exists, which is the guardrail that stops a self-registration adding a
-// duplicate of a record we already hold — so surface that message rather than
-// treating it as a plain failure.
-async function approveAsNewClaim(i) {
-  const c = _claims[i];
-  const name = prompt('Create a NEW vendor record with this name?', c.claimed_company || '');
-  if (name === null) return;
-  const nm = String(name).trim();
-  if (!nm) { alert('A company name is required.'); return; }
-  try {
-    await VendorDb.claims.approveAsNew(c.id, nm, null);
-    if (window.AppNotify) AppNotify.success('Created ' + nm + ' and granted access.');
-    await loadAll();
-    await _claimResync();
-  } catch (e) {
-    if (await _claimHandledStale(e)) return;
-    const m = (e && e.message) || String(e);
-    if (/already in the directory/i.test(m)) {
-      alert(m + '  Search for that vendor in the box above and use "Approve access" instead.');
-    } else if (window.AppNotify) { AppNotify.fromError(e, 'Could not create the vendor'); }
-    else { alert('Could not create: ' + m); }
-  }
-}
-async function rejectClaim(i) {
-  const c = _claims[i];
-  // The reason is shown to the claimant on the registration page, so it is
-  // worth asking for rather than declining silently.
-  const why = prompt('Why is this being declined? The person will see this message.', '');
-  if (why === null) return;
-  try {
-    // The RPC now RAISES if the claim is already decided or gone, so reaching
-    // this line means the decline really happened. It used to be able to update
-    // zero rows and still land here, reporting a decline that never occurred.
-    await VendorDb.claims.reject(c.id, why || null);
-    if (window.AppNotify) AppNotify.success('Registration declined.');
-    await _claimResync();
-  } catch (e) {
-    if (await _claimHandledStale(e)) return;
-    if (window.AppNotify) AppNotify.fromError(e, 'Could not decline');
-    else alert('Could not decline: ' + (e.message || e));
-  }
-}
-
+/* ══ Vendor registrations ══════════════════════════════════════════════════
+   The staff queue MOVED to vendor-registrations.html (2026-09-04). What is left
+   here is only the sidebar badge — the queue view itself, and every decide /
+   create-vendor handler with it, was removed as dead code once nothing could
+   reach it.                                                                  */
 async function updateClaimsBadge() {
   let n = 0;
   try { n = (await VendorDb.claims.pending()).length; } catch (e) { n = 0; }
