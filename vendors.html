@@ -794,6 +794,15 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
       font-size:0.7857rem;font-weight:600;color:var(--text-primary);background:var(--surface);
       border:1px dashed var(--border-md);border-radius:9px}
     .hist-more-btn:hover{border-color:var(--mw-red);color:var(--mw-red-ink)}
+    .rate-group{margin-bottom:14px}
+    .rate-ghead{display:flex;align-items:center;gap:8px;font-size:0.7143rem;font-weight:800;
+      letter-spacing:.04em;text-transform:uppercase;color:var(--text-hint);
+      padding:6px 0 7px;border-bottom:1px solid var(--border);margin-bottom:7px}
+    .rate-gn{font-size:0.6429rem;font-weight:800;background:var(--surface-2);
+      color:var(--text-secondary);border-radius:9px;padding:1px 7px}
+    .rate-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;
+      color:var(--mw-red-ink)}
+    .rate-nocodes{color:#B45309}
     .sec-note{font-size:0.7857rem;line-height:1.6;color:var(--text-hint,#6E6C6C);margin:0 0 12px}
     .hist-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px}
     .hist-ftab{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;
@@ -5203,51 +5212,84 @@ async function removeDetailPersonnel(id) {
   await VendorDb.personnel.remove(id);
   await renderDetailPersonnel();
 }
-/* \u26a0\ufe0f DERIVED, NOT TYPED. Reference rates are what this vendor has actually
-   been paid on awarded work packages \u2014 VendorDb.backfillVendorDataFromWPs
-   writes them from the award, keyed to the source WP by vendor_rates.wp_id.
-   A hand-typed rate is somebody's recollection sitting in the same list as a
-   contract figure, indistinguishable from it, and nothing downstream can tell
-   them apart. The add form and the per-row delete were removed 2026-09-04 for
-   that reason; a wrong rate is corrected by fixing the award it came from.
-   Rows created before that (wp_id null) are still shown, marked as entered by
-   hand so their weight is obvious. */
-/* Every group already in the directory, so staff choose from what SAP actually
-   uses instead of typing a near-duplicate. Free text is kept deliberately \u2014 the
-   masterlist can gain a group we have not imported yet \u2014 but a datalist makes
-   the existing value the path of least resistance. */
-function _vendorGroupOptions() {
-  const seen = Object.create(null);
-  (allVendors || []).forEach(function (v) {
-    const g = String(v.vendor_group || '').trim();
-    if (g) seen[g] = true;
-  });
-  return Object.keys(seen).sort(function (a, b) { return a.localeCompare(b); })
-    .map(function (g) { return '<option value="' + esc(g) + '">'; }).join('');
-}
+/* ⚠️ DERIVED, NOT TYPED. Reference rates are what this vendor has actually been
+   paid on awarded work packages — VendorDb.backfillVendorDataFromWPs writes
+   them from the award, keyed to the source WP by vendor_rates.wp_id. A
+   hand-typed rate is somebody's recollection sitting in the same list as a
+   contract figure, indistinguishable from it. The add form and the per-row
+   delete were removed 2026-09-04 for that reason; a wrong rate is corrected by
+   fixing the award it came from.
 
+   GROUPED BY CLASS CODE — Finance's own breakdown, the same one the Planning
+   app uses, so a rate here and a cost there are filed under the same heading.
+   Two rates for the same thing under two different wordings are now visibly
+   the same line item. Rows with no class code (the WP carried no cost code)
+   are kept in an "Unclassified" group rather than dropped. */
+let _classIdx = null;
 async function renderDetailRates() {
-  const list = await VendorDb.getVendorRates(activeVendor.id);
   const el = document.getElementById('dtab-rates');
+  const [list, codes] = await Promise.all([
+    VendorDb.getVendorRates(activeVendor.id),
+    _classIdx ? Promise.resolve(null) : VendorDb.getClassCodes(),
+  ]);
+  if (codes) _classIdx = VendorDb.classCodeIndex(codes);
+  const idx = _classIdx;
+  const haveTree = !!(idx && Object.keys(idx.byCode).length);
+
   const note = '<p class="sec-note">These come from work packages this vendor was awarded '
     + '\u2014 there is nothing to type here. Run <b>Data Tools \u2192 Backfill Trade/Bid Data</b> '
-    + 'to pick up awards made since the last run.</p>';
+    + 'to pick up awards made since the last run.'
+    + (haveTree ? ' Grouped by <b>class code</b>, the same breakdown Finance and the '
+        + 'Planning app use.'
+      : ' <span class="rate-nocodes">Class codes are not loaded yet \u2014 run '
+        + 'SEED_class_codes.sql to group these by cost code.</span>')
+    + '</p>';
   if (!list.length) {
     el.innerHTML = note + '<div class="empty">No awarded work packages with a rate yet.</div>';
     return;
   }
-  el.innerHTML = note + list.map(function (r) {
-    const manual = !r.wp_id;
-    return '<div class="row-item"><div>'
-      + '<div class="row-item-title">' + esc(r.item_description)
-      + ' \u2014 \u20b1' + Number(r.rate || 0).toLocaleString()
-      + (r.unit ? '/' + esc(r.unit) : '') + '</div>'
-      + '<div class="row-item-sub">' + esc(r.trade || '')
-      + (r.project_id ? ' \u00b7 ' + esc(r.project_id) : '')
-      + (r.date_quoted ? ' \u00b7 ' + esc(r.date_quoted) : '')
-      + (r.source ? ' \u00b7 ' + esc(r.source) : '')
-      + (manual ? ' \u00b7 <i>entered by hand</i>' : '')
-      + '</div></div></div>';
+
+  // Bucket by the LEVEL 2 group where we can resolve one, else level 1, else
+  // Unclassified. Level 3 is too fine to group by — most groups would hold one
+  // row and the headings would outnumber the rates.
+  const groups = new Map();
+  list.forEach(function (r) {
+    let key = '\uffffUnclassified', label = 'Unclassified', sort = 1e9;
+    if (haveTree) {
+      const path = idx.path(r.class_code);
+      const node = path.length > 1 ? path[1] : (path[0] || null);
+      if (node) {
+        key = node.code;
+        label = node.code + ' \u00b7 ' + node.name;
+        sort = node.sort_order || 0;
+        if (path[0] && path[0].code !== node.code) label = path[0].name + ' \u2192 ' + label;
+      }
+    }
+    if (!groups.has(key)) groups.set(key, { label: label, sort: sort, rows: [] });
+    groups.get(key).rows.push(r);
+  });
+  const ordered = Array.from(groups.values()).sort(function (a, b) { return a.sort - b.sort; });
+
+  el.innerHTML = note + ordered.map(function (g) {
+    return '<div class="rate-group"><div class="rate-ghead">' + esc(g.label)
+      + '<span class="rate-gn">' + g.rows.length + '</span></div>'
+      + g.rows.map(function (r) {
+          const manual = !r.wp_id;
+          const leaf = haveTree ? idx.get(r.class_code) : null;
+          return '<div class="row-item"><div>'
+            + '<div class="row-item-title">' + esc(r.item_description)
+            + ' \u2014 \u20b1' + Number(r.rate || 0).toLocaleString()
+            + (r.unit ? '/' + esc(r.unit) : '') + '</div>'
+            + '<div class="row-item-sub">'
+            + (leaf && leaf.level === 3 ? '<span class="rate-code">' + esc(leaf.code) + '</span> ' + esc(leaf.name) + ' \u00b7 ' : '')
+            + esc(r.trade || '')
+            + (r.project_id ? ' \u00b7 ' + esc(r.project_id) : '')
+            + (r.date_quoted ? ' \u00b7 ' + esc(r.date_quoted) : '')
+            + (r.source ? ' \u00b7 ' + esc(r.source) : '')
+            + (manual ? ' \u00b7 <i>entered by hand</i>' : '')
+            + '</div></div></div>';
+        }).join('')
+      + '</div>';
   }).join('');
 }
 

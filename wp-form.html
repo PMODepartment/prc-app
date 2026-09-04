@@ -315,6 +315,19 @@
                 <label>Cost Code No.</label>
                 <input type="text" id="f-cost-code"/>
               </div>
+              <!-- ⚠️ CLASS CODE IS NOT THE COST CODE. Cost Code No. above is the
+                   project's own budget-line reference and stays free text.
+                   Class Code is Finance's chart of accounts, shared with the
+                   Planning app, and it is what reference rates are filed under.
+                   Two different fields, deliberately kept apart. -->
+              <div class="form-group">
+                <label>Class Code</label>
+                <input type="text" id="f-class-code" list="class-code-list"
+                       autocomplete="off" oninput="onClassCodeInput()"
+                       placeholder="e.g. 010523"/>
+                <datalist id="class-code-list"></datalist>
+                <div id="class-code-hint" class="field-hint" style="display:none"></div>
+              </div>
               <div class="form-group">
                 <label>Trade / Discipline *</label>
                 <select id="f-trade" onchange="onTradeChange()">
@@ -921,6 +934,57 @@
       ['Site Development','Service'],
     ],
   };
+
+  /* ── Cost Code ↔ class code ────────────────────────────────────────────────
+     THIS IS THE MAPPING. work_packages.cost_code is the field; class_codes.code
+     is what it points at, matched on digits only so "01-050.23", "010523" and a
+     spreadsheet's "010523.0" all resolve to the same node.
+
+     ⚠️ ASSISTED, NOT ENFORCED, and deliberately so. The column stays plain text
+        and the field stays optional: thousands of imported work packages already
+        carry codes, some of them retired or mistyped, and making this a hard FK
+        would have made those rows unsaveable. The readout tells the officer what
+        their code resolves to — an unrecognised one is flagged, not rejected.
+
+     ⚠️ Degrades to the old free-text box when class_codes is empty (the seed has
+        not been run): no datalist, no readout, nothing breaks. */
+  function _ccEsc(v) { return window.esc ? window.esc(v) : String(v == null ? '' : v); }
+  let _ccIdx = null;
+  async function loadClassCodes() {
+    try {
+      if (typeof VendorDb === 'undefined' || !VendorDb.getClassCodes) return;
+      const rows = await VendorDb.getClassCodes();
+      if (!rows || !rows.length) return;
+      _ccIdx = VendorDb.classCodeIndex(rows);
+      const dl = document.getElementById('class-code-list');
+      if (dl) {
+        // Level 3 is what a work package is coded to; the groups above it are
+        // headings, not codes you would put on a WP.
+        dl.innerHTML = rows.filter(function (r) { return r.level === 3 && r.active; })
+          .map(function (r) {
+            return '<option value="' + _ccEsc(r.code) + '">' + _ccEsc(r.name) + '</option>';
+          }).join('');
+      }
+      onClassCodeInput();
+    } catch (e) { console.warn('[classCodes]', e && e.message); }
+  }
+  function onClassCodeInput() {
+    const el = document.getElementById('f-class-code');
+    const hint = document.getElementById('class-code-hint');
+    if (!el || !hint) return;
+    const raw = (el.value || '').trim();
+    if (!_ccIdx || !raw) { hint.style.display = 'none'; hint.textContent = ''; return; }
+    const node = _ccIdx.get(raw);
+    hint.style.display = '';
+    if (!node) {
+      hint.innerHTML = '<span style="color:#B45309">Not in the class code list \u2014 '
+        + 'it will be saved as typed.</span>';
+      return;
+    }
+    const path = _ccIdx.path(raw).map(function (n) { return _ccEsc(n.name); }).join(' \u203a ');
+    hint.innerHTML = '<span style="color:#2D9B6F">\u2713</span> ' + path;
+  }
+
 
   function onTradeChange() {
     const trade = document.getElementById('f-trade').value;
@@ -2161,6 +2225,7 @@ AppAuth.requireLogin(async (user, profile) => {
       /* Fill form */
       const fill = (id, val) => { const el=document.getElementById(id); if(el&&val!=null) el.value=val; };
       fill('f-cost-code', existingWP.cost_code);
+      fill('f-class-code', existingWP.class_code);
       fill('f-wp-no', existingWP.wp_no);
       fill('f-description', existingWP.description);
       fill('f-detailed-description', existingWP.detailed_description);
@@ -2258,6 +2323,9 @@ AppAuth.requireLogin(async (user, profile) => {
     initVendorCombo();
     initProposedVendorsCombo();
     onRequiresApprovalChange();   // apply N/A on first load (new WP defaults to "No")
+    // Fire-and-forget: the class-code list is an aid, never on the critical
+    // path — the form must open whether or not the seed has been run.
+    loadClassCodes();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
     markClean();                  // discard any dirty flag set by the programmatic fill above
@@ -2397,6 +2465,7 @@ AppAuth.requireLogin(async (user, profile) => {
 
     const data = {
       cost_code:                getVal('f-cost-code'),
+      class_code:               getVal('f-class-code') || null,
       // ⚠️ null, not '' — the column is a uuid and an empty string is a cast error,
       //    which would fail the whole save on any WP left unassigned.
       planners_package_id:      getVal('f-planners-package') || null,
@@ -2525,7 +2594,7 @@ AppAuth.requireLogin(async (user, profile) => {
       }
       /* Clear form if new */
       if (!editId) {
-        ['f-cost-code','f-wp-no','f-description','f-zone','f-actual-awarding-date',
+        ['f-cost-code','f-class-code','f-wp-no','f-description','f-zone','f-actual-awarding-date',
          'f-target-installation','f-contract','f-contractor','f-remarks','f-vendor-id',
          'f-proposed-vendors'].forEach(id=>{
           document.getElementById(id).value='';

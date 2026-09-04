@@ -63,6 +63,19 @@ const WPDb = (() => {
   function _stripAudit(obj) { const d = {...obj}; delete d.updated_at; delete d.updated_by; delete d.updated_by_name; return d; }
   // Same deploy-order guard for the BCB baseline columns: they only exist once
   // migrations/2026-07-23_bcb_baselines.sql has been run, so every write retries without them.
+  /* work_packages.class_code arrives with 2026-09-05_class_codes.sql. Same
+     strip-and-retry shape as every other optional column here.
+     ⚠️ Also catches a foreign-key violation: a class code typed on a WP that is
+        not in the seeded tree must not block the save — the officer is told by
+        the form's own readout, and losing the whole edit over it would be worse. */
+  function _isMissingClassCodeCol(error) {
+    return _isMissingCol(error, /class_code/)
+        || /foreign key|violates foreign key/i.test((error && error.message) || '');
+  }
+  function _stripClassCode(payload) {
+    const p = { ...payload }; delete p.class_code; return p;
+  }
+
   function _isMissingBcbCol(error) {
     if (!error) return false;
     const m = (error.message || '') + (error.details || '');
@@ -97,6 +110,7 @@ const WPDb = (() => {
     if (_isMissingAwardedVendorIdsCol(error)) d = _stripAwardedVendorIds(d);
     if (_isMissingBuybackCol(error)) d = _stripBuyback(d, error);
     if (_isMissingFreeOfChargeCol(error)) d = _stripFreeOfCharge(d);
+    if (_isMissingClassCodeCol(error)) d = _stripClassCode(d);
     _warnDropped('write retry', obj, d, error);
     return d;
   }
@@ -2206,6 +2220,61 @@ const VendorDb = (() => {
   function _isMissingWpIdCol(error) {
     return _isMissingCol(error, /wp_id/);
   }
+  /* ── Class codes ─ Finance's cost breakdown, shared with the Planning app ──
+     Seeded by SEED_class_codes.sql (generated locally, never committed).
+     ⚠️ getClassCodes() returns [] on ANY failure INCLUDING "table does not
+        exist". The rates list must still render before the migration is run. */
+  let _classCache = null;
+  async function getClassCodes() {
+    if (_classCache) return _classCache;
+    try {
+      const sb = await getSB();
+      const rows = await _pagedSelect(() =>
+        sb.from('class_codes').select('*').order('sort_order', { ascending: true }));
+      _classCache = rows || [];
+    } catch (e) {
+      console.warn('[classCodes] not available:', e && e.message);
+      _classCache = [];
+    }
+    return _classCache;
+  }
+  /* A cost code is typed by people, so it arrives with spaces, dashes and the
+     odd trailing ".0" from a spreadsheet. Digits only is the comparable form.
+     ⚠️ Returns null rather than '' — the column is a real FK, and '' would
+        fail it while null is a legitimate "not classified". */
+  function normClassCode(v) {
+    const d = String(v == null ? '' : v).replace(/[^0-9]/g, '');
+    return d ? d : null;
+  }
+  /* Index the tree once: code -> row, plus the level-1 and level-2 ancestors so
+     a rate can be grouped without walking parents per row. */
+  function classCodeIndex(rows) {
+    const byCode = Object.create(null);
+    (rows || []).forEach(function (r) { byCode[String(r.code)] = r; });
+    return {
+      byCode: byCode,
+      get: function (code) {
+        const c = normClassCode(code);
+        // The seed stores level 1 as '01' and level 3 as '010523'; a code typed
+        // without its leading zero still has to find its row.
+        return c ? (byCode[c] || byCode['0' + c] || null) : null;
+      },
+      label: function (code) {
+        const r = this.get(code);
+        return r ? r.code + ' · ' + r.name : '';
+      },
+      path: function (code) {
+        const r = this.get(code);
+        if (!r) return [];
+        const out = [];
+        if (r.l1_code && byCode[r.l1_code]) out.push(byCode[r.l1_code]);
+        if (r.l2_code && byCode[r.l2_code] && r.l2_code !== r.code) out.push(byCode[r.l2_code]);
+        if (!out.length || out[out.length - 1].code !== r.code) out.push(r);
+        return out;
+      },
+    };
+  }
+
   async function upsertRate(wpId, vendorId, projectId, fields, profile) {
     const sb = await getSB();
     const payload = {
@@ -2225,6 +2294,19 @@ const VendorDb = (() => {
     if (error && (_isMissingWpIdCol(error) || /on conflict|unique or exclusion constraint/i.test((error.message || '') + (error.details || '')))) {
       const d2 = { ...payload }; delete d2.wp_id;
       ({ data, error } = await sb.from('vendor_rates').insert(d2).select().single());
+    }
+    // class_code arrives with migrations/2026-09-05_class_codes.sql. Deploy-safe:
+    // drop it and retry rather than failing the whole backfill.
+    // ⚠️ ALSO retries on a foreign-key violation — a work package can carry a
+    //    cost code that is not in the seeded tree (a retired code, or a typo),
+    //    and one such WP must not stop every other rate being written.
+    if (error && (_isMissingCol(error, /class_code/) || /foreign key|violates foreign key/i.test(error.message || ''))) {
+      const d3 = { ...payload }; delete d3.class_code;
+      _warnDropped('rate retry', payload, d3, error);
+      ({ data, error } = await sb.from('vendor_rates')
+        .upsert(d3, { onConflict: 'vendor_id,wp_id' }).select().single());
+      if (error) { const d4 = { ...d3 }; delete d4.wp_id;
+        ({ data, error } = await sb.from('vendor_rates').insert(d4).select().single()); }
     }
     if (error) throw error;
     return data;
@@ -2750,15 +2832,20 @@ const VendorDb = (() => {
   //     so bids only populate final_amount.
   async function backfillVendorDataFromWPs(profile) {
     const sb = await getSB();
-    const _bfCols = 'id,project_id,wp_no,description,trade,type_of_works,contractor,proposed_vendors,vendor_id,awarded_vendor_ids,awarded_vendor_amounts,award_status,awarded_cost,awarding_date,actual_awarding_date';
+    // class_code carries Finance's chart-of-accounts code onto the rate.
+    const _bfCols = 'id,project_id,wp_no,description,trade,type_of_works,contractor,proposed_vendors,vendor_id,awarded_vendor_ids,awarded_vendor_amounts,award_status,awarded_cost,awarding_date,actual_awarding_date,class_code';
     // PAGINATED for the same reason as importVendorsFromWPs above — this read used to stop
     // at 1000 rows, so trades/products/bids/rates were never backfilled for the rest.
     let rows;
     try { rows = await _pagedSelect(() => sb.from('work_packages').select(_bfCols)); }
     catch (e) {
-      if (!_isMissingAwardedVendorIdsCol(e)) throw e;
-      // pre-migration: the awarded-vendor array columns don't exist yet
-      const cols2 = _bfCols.replace(',awarded_vendor_ids,awarded_vendor_amounts', '');
+      if (!_isMissingAwardedVendorIdsCol(e) && !_isMissingClassCodeCol(e)) throw e;
+      // pre-migration: those columns don't exist yet. Drop whichever the error
+      // names — dropping both blindly would lose the co-award amounts on a DB
+      // that only lacks class_code.
+      let cols2 = _bfCols;
+      if (_isMissingAwardedVendorIdsCol(e)) cols2 = cols2.replace(',awarded_vendor_ids,awarded_vendor_amounts', '');
+      if (_isMissingClassCodeCol(e)) cols2 = cols2.replace(',class_code', '');
       rows = await _pagedSelect(() => sb.from('work_packages').select(cols2));
     }
 
@@ -2850,6 +2937,11 @@ const VendorDb = (() => {
             item_description: w.description || null, trade: w.trade || null,
             rate: share, unit: null, date_quoted: awardDate,
             source: 'awarded contract',
+            // ⚠️ w.class_code, NOT w.cost_code. Cost Code No. is the project's
+            //    own budget-line reference; Class Code is Finance's chart of
+            //    accounts. Reading the rate's class code off cost_code would
+            //    file the whole rate history under the wrong headings.
+            class_code: normClassCode(w.class_code),
           },
         });
       });
@@ -3919,6 +4011,7 @@ const VendorDb = (() => {
     getTaxonomy, buildTaxonomyTree, taxonomyPathLabel, createTaxonomyNode, updateTaxonomyNode, deleteTaxonomyNode,
     taxonomyNodeForWP, findVendorsForWP,
     getVendorRates, addVendorRate, deleteVendorRate, upsertRate,
+    getClassCodes, classCodeIndex, normClassCode,
     uploadCertFile, getCertFileUrl, deleteCertFile,
     documents: vendorDocuments, uploadVendorDoc, uploadVendorFile, requests: accreditationRequests, claims: vendorClaims, history: vendorHistory,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
