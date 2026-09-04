@@ -2994,6 +2994,15 @@ first thing in this project that lives outside the repo — not money.
   the outbox row (`sent_at` / `attempts` / `last_error`) — that is the thing to
   read, not the HTTP status. A **404/410 deletes that device**: the browser threw
   the subscription away, and keeping it means retrying a dead endpoint forever.
+- **⚠️ THE ROW IS OFFERED ON PHONES AND TABLETS ONLY — `PUSH_ON_DESKTOP = false`
+  in `vendor-portal.html`. That is a PRODUCT decision, not a technical limit:**
+  desktop Chrome and Edge support web push perfectly well, and a vendor at their
+  desk would be told when an RFQ arrives, browser closed included. It was judged
+  clutter on a laptop because these vendors work from phones. **Flip that one
+  flag to offer it there again.** Gated on `_coarsePointer()`, the same test as
+  the install item — a narrowed desktop window is still a desktop. The tour's
+  own "Get told" step carries `when: pushSupported`, or it would count a step it
+  then skips.
 - **⚠️ Permission is only ever requested FROM A CLICK.** Asking on load gets
   denied, and a denial is permanent until the vendor digs into browser settings.
   **On iPhone outside the Home Screen there is no prompt at all**, so the portal
