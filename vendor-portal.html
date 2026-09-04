@@ -13,7 +13,10 @@
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{font-family:'Montserrat',sans-serif;background:#f5f5f5;color:#231F20}
-    body{overflow-x:hidden}
+    /* ⚠️ BOTH, not just body. iOS Safari will still pan the page when only
+       body carries this, which is why the portal could be dragged sideways
+       with the content half off the left edge. */
+    html,body{overflow-x:hidden}
     .topbar{height:60px;background:#231F20;display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:10}
     .topbar-left{display:flex;align-items:center;gap:10px}
     .topbar-left img{height:26px}
@@ -32,7 +35,20 @@
     .status-none{background:#F3F4F6;color:#555}
     .btn-logout{background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;padding:6px 14px;border-radius:8px;font-family:inherit;font-size:12px;cursor:pointer}
     .btn-logout:hover{background:rgba(255,255,255,.1)}
-    .wrap{max-width:960px;margin:0 auto;padding:24px 16px 60px}
+    /* ⚠️ min-width:0 IS LOAD-BEARING. .wrap is a FLEX ITEM of .main (a column
+       flex container), so its min-width defaults to `auto` — it refuses to
+       shrink below its content's min-content width. The no-wrap tab strip has
+       a 654px min-content width, so .wrap stretched to 654 inside a 390px
+       parent: the tabs never became a scroller (their clientWidth equalled
+       their scrollWidth) and everything else was simply clipped by
+       overflow-x:hidden.
+       ⚠️ THE LEVER IS width:100%, NOT min-width. `margin:0 auto` on a FLEX
+       ITEM disables cross-axis stretch (auto cross margins absorb the free
+       space instead), so .wrap was shrink-to-fit — and with a no-wrap tab row
+       its min-content IS the whole 654px strip, which it then took. An
+       explicit width pins it to the column again; max-width + margin:0 auto
+       still centre it on a wide screen. Measured, not guessed. */
+    .wrap{width:100%;max-width:960px;margin:0 auto;padding:24px 16px 60px;min-width:0}
     /* ── Sidebar ──────────────────────────────────────────────────────────
        Two top-level PAGES — Company Profile and Bid Board — because they are
        different jobs, not two views of the same record. The profile's own tab
@@ -44,9 +60,16 @@
        same collapse-by-translate, same drawer-plus-overlay below 768px, and the
        SAME localStorage key, so the choice carries across the two apps. */
     :root{--sidebar-w:240px}
-    .app-shell{display:flex;min-height:100vh}
+    .app-shell{display:flex;min-height:100vh;min-height:100dvh}
+    /* ⚠️ 100dvh, WITH 100vh ONLY AS THE FALLBACK. On iOS `100vh` is the LARGE
+       viewport height — measured as if the browser chrome were hidden — so a
+       fixed panel of that height extends BELOW what is actually visible while
+       Safari's toolbars are up, and its bottom (the footer, and "Add to home
+       screen") is cut off. As the toolbar shrinks on scroll the cut appears and
+       disappears, which is exactly how it was reported. `dvh` tracks the real
+       visible height. */
     .sidebar{width:var(--sidebar-w);flex-shrink:0;background:#231F20;display:flex;
-      flex-direction:column;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;
+      flex-direction:column;position:fixed;top:0;left:0;height:100vh;height:100dvh;overflow-y:auto;
       overflow-x:hidden;z-index:100;transition:transform .3s ease;
       scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
     .sidebar::-webkit-scrollbar{width:6px}
@@ -213,6 +236,51 @@
     @media(max-width:640px){.ready-grid{grid-template-columns:1fr}}
     .tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
     .tab-btn{padding:8px 16px;border:1px solid #e5e5e5;border-radius:8px;background:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;color:#888}
+    /* ⚠️ ONE SCROLLING ROW ON A PHONE, NOT flex-wrap.
+       Five tabs do not fit 358px, and wrapping only moved the problem: the
+       second row still overflowed, so "Accreditation" was cut through by
+       body's overflow-x:hidden. A wrapped row does not shrink to fit — it just
+       spills where you cannot see it.
+       The negative margins let the strip bleed to both screen edges, so the
+       last tab is not clipped by .wrap's padding and a partly-visible next tab
+       is what tells you it scrolls. Same pattern as .view-tabs elsewhere. */
+    @media(max-width:600px){
+      .tabs-wrap{position:relative;margin-bottom:16px}
+      .tabs{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
+        -webkit-overflow-scrolling:touch;scrollbar-width:none;
+        margin:0 -16px;padding:0 16px 3px}
+      .tabs::-webkit-scrollbar{display:none}
+      .tab-btn{flex:0 0 auto;white-space:nowrap}
+      /* ⚠️ A BARE SCROLL STRIP IS INVISIBLE AS AN AFFORDANCE. A phone user has
+         no scrollbar and no hover, so without this the tabs past the edge simply
+         do not exist to them. A fade plus a chevron at the edge it scrolls
+         TOWARDS, shown only while there is actually more that way — a permanent
+         fade reads as a graphic, not as a hint.
+         The fade colour is the BODY background (#f5f5f5 / #1E1F1E), not --bg,
+         whose dark value is #1C1C1C and would leave a visible seam. */
+      .tabs-wrap::after,.tabs-wrap::before{content:'';position:absolute;top:0;bottom:3px;
+        width:56px;pointer-events:none;opacity:0;transition:opacity .18s ease;z-index:1}
+      .tabs-wrap::after{right:-16px;
+        background:linear-gradient(to right,rgba(245,245,245,0),#f5f5f5 60%)}
+      .tabs-wrap::before{left:-16px;
+        background:linear-gradient(to left,rgba(245,245,245,0),#f5f5f5 60%)}
+      .tabs-wrap.more-right::after{opacity:1}
+      .tabs-wrap.more-left::before{opacity:1}
+      .tabs-chev{position:absolute;top:50%;transform:translateY(-50%);z-index:2;
+        width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+        justify-content:center;font-size:13px;font-weight:800;line-height:1;
+        color:#fff;background:rgba(35,31,32,.55);pointer-events:none;
+        opacity:0;transition:opacity .18s ease}
+      .tabs-chev.r{right:-4px}
+      .tabs-chev.l{left:-4px}
+      .tabs-wrap.more-right .tabs-chev.r{opacity:1}
+      .tabs-wrap.more-left .tabs-chev.l{opacity:1}
+      html.dark-mode .tabs-wrap::after{background:linear-gradient(to right,rgba(30,31,30,0),#1E1F1E 60%)}
+      html.dark-mode .tabs-wrap::before{background:linear-gradient(to left,rgba(30,31,30,0),#1E1F1E 60%)}
+      html.dark-mode .tabs-chev{background:rgba(220,219,219,.30)}
+    }
+    /* Desktop: the wrapper is inert and the tabs keep their own margin. */
+    @media(min-width:601px){.tabs-chev{display:none}}
     .tab-btn.active{background:#EE3124;border-color:#EE3124;color:#fff}
     .tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;
       padding:0 4px;margin-left:6px;border-radius:20px;background:#EE3124;color:#fff;font-size:10px;font-weight:800}
@@ -611,8 +679,13 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
   <!-- ⚠️ ITS OWN MANIFEST, not the staff app's. Installing the portal must
        land a vendor on vendor-portal.html, not on the procurement login. -->
   <link rel="manifest" href="vendor-portal.webmanifest"/>
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png"/>
+  <!-- ⚠️ ITS OWN ICONS, not the procurement app's. These pointed at the
+       internal tile, so a vendor installing the portal got an icon reading
+       "PROCUREMENT APP" on their home screen. Same family, different app. -->
+  <link rel="apple-touch-icon" href="assets/icons/vendor-apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/vendor-favicon-32.png"/>
+  <!-- iOS labels the home-screen icon from this, else it truncates <title>. -->
+  <meta name="apple-mobile-web-app-title" content="Vendor Portal"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="mobile-web-app-capable" content="yes"/>
 </head>
@@ -669,12 +742,16 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
 <div class="wrap">
   <div id="statusBanner" class="banner" style="display:none"></div>
 
+  <div class="tabs-wrap" id="tabsWrap">
+    <span class="tabs-chev l" aria-hidden="true">&#10094;</span>
+    <span class="tabs-chev r" aria-hidden="true">&#10095;</span>
   <div class="tabs">
     <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Company Info</button>
     <button class="tab-btn" data-tab="products" onclick="switchTab('products')">Products / Services</button>
     <button class="tab-btn" data-tab="personnel" onclick="switchTab('personnel')">Personnel</button>
     <button class="tab-btn" data-tab="certs" onclick="switchTab('certs')">Certifications</button>
     <button class="tab-btn" data-tab="accreditation" onclick="switchTab('accreditation')">Accreditation</button>
+  </div>
   </div>
 
   <div class="msg" id="msgBox"></div>
@@ -913,12 +990,12 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260905d"></script>
-<script src="assets/js/db.js?v=20260905d"></script>
+<script src="assets/js/auth.js?v=20260905e"></script>
+<script src="assets/js/db.js?v=20260905e"></script>
 <!-- Self-contained: this page loads no ui.js, so the guide injects its own
      CSS and its own "?" button. Versioned independently of the shared assets. -->
-<script src="assets/js/coachmarks.js?v=20260905d"></script>
-<script src="assets/js/portal-guide.js?v=20260905d"></script>
+<script src="assets/js/coachmarks.js?v=20260905e"></script>
+<script src="assets/js/portal-guide.js?v=20260905e"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -2053,10 +2130,48 @@ function switchSection(sec) {
   else switchTab(_activeTab);
 }
 
+/* ⚠️ THE HINT HAS TO BE TRUE, or it stops being a hint. The fade and chevron
+   show only while there IS more that way — a fade that never goes away reads as
+   decoration and teaches the user nothing. Called on load, on scroll, on resize
+   and after a tab switch. */
+function _syncTabScrollHint() {
+  const w = document.getElementById('tabsWrap');
+  if (!w) return;
+  const t = w.querySelector('.tabs');
+  if (!t) return;
+  w.classList.toggle('more-right', t.scrollWidth - t.clientWidth - t.scrollLeft > 2);
+  w.classList.toggle('more-left', t.scrollLeft > 2);
+}
+(function wireTabScrollHint() {
+  const go = () => {
+    const w = document.getElementById('tabsWrap');
+    if (!w) return;
+    const t = w.querySelector('.tabs');
+    if (!t) return;
+    t.addEventListener('scroll', _syncTabScrollHint, { passive: true });
+    window.addEventListener('resize', _syncTabScrollHint);
+    _syncTabScrollHint();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go);
+  else go();
+})();
+
+/* With the tabs on one scrolling row, switching to a tab that is off to the
+   right must bring it into view — otherwise the highlight moves somewhere the
+   vendor cannot see. `block:'nearest'` so this never scrolls the PAGE. */
+function _revealActiveTab() {
+  try {
+    const a = document.querySelector('.tab-btn.active');
+    if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  } catch (e) {}
+  // the smooth scroll settles after this returns, so re-check once it has
+  setTimeout(_syncTabScrollHint, 400);
+}
 function switchTab(t) {
   _activeTab = t;
   _showOnlyPanels(PROFILE_PANELS[t] || PROFILE_PANELS.overview);
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  _revealActiveTab();
 }
 
 /* ── Products ── */
