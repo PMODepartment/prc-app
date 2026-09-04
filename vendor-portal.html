@@ -2622,26 +2622,45 @@ async function submitBidOffer(id) {
   if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
   try {
     const fileInput = document.getElementById('bo-file');
+    const cur = _bidItems.find(function (x) { return x.invitation_id === id; }) || {};
+    // ⚠️ THE FIRST SUBMISSION IS THE OFFER; EVERY LATER ONE NEGOTIATES.
+    //    Revising used to overwrite offer_amount and replace the attachment, so
+    //    the original was simply gone and "initial -> negotiated" could not be
+    //    reconstructed for the award record or for reporting. Mirrors what
+    //    submit_bid_by_token does server-side for the token link.
+    const isRevision = !!cur.submitted_at;
     const fields = {
-      offer_amount: amount,
       offer_currency: g('bo-currency') || 'PHP',
       lead_time_days: _int(g('bo-lead')),
       validity_days: _int(g('bo-validity')),
       payment_terms: g('bo-terms') || null,
       vendor_notes: g('bo-notes') || null,
     };
+    if (isRevision) {
+      fields.negotiated_amount = amount;
+      fields.negotiated_at = new Date().toISOString();
+    } else {
+      fields.offer_amount = amount;
+    }
     if (fileInput && fileInput.files && fileInput.files[0]) {
       const file = fileInput.files[0];
       if (file.size > 15 * 1024 * 1024) { msg('That file is over 15 MB — try a smaller scan or export.', 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Submit offer'; } return; }
       const path = await VendorDb.uploadVendorFile(vendor.id, 'bid_' + id, file);
-      fields.attachment_path = path;
-      fields.attachment_name = file.name;
+      if (isRevision) {
+        // The revised quotation is the evidence behind the negotiated figure,
+        // which staff previously had to key in with nothing to check it against.
+        fields.negotiated_doc_path = path;
+        fields.negotiated_doc_name = file.name;
+      } else {
+        fields.attachment_path = path;
+        fields.attachment_name = file.name;
       // \u26a0\ufe0f WRITE BOTH. This page updates the row directly while the token
       //    link goes through submit_bid_by_token, and the two used to write
       //    DIFFERENT columns \u2014 so a quotation sent from here showed the buyer
       //    no file at all. Keep them in step until commercial_* is retired.
-      fields.commercial_path = path;
-      fields.commercial_name = file.name;
+        fields.commercial_path = path;
+        fields.commercial_name = file.name;
+      }
     }
     const row = await VendorDb.bidBoard.submit(id, fields);
     _bidItems = _bidItems.map(x => x.invitation_id === id ? Object.assign({}, x, row) : x);

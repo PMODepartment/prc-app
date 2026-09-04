@@ -202,10 +202,14 @@
     .nv-tag{display:inline-block;margin-left:6px;font-size:0.6071rem;font-weight:800;letter-spacing:.05em;
       background:var(--mw-red);color:#fff;border-radius:5px;padding:1px 6px;vertical-align:middle}
     .nv-track{position:relative;height:22px;background:var(--surface-2);border-radius:6px}
+    /* Same two colours the period charts use for the same two ideas:
+       charts.js draws Budget/original in the near-black brand ink and Awarded
+       in brand red. Reusing them means this panel reads like the dashboards
+       rather than like a new chart language. */
     .nv-orig{position:absolute;left:0;top:0;height:100%;border-radius:6px;
-      background:repeating-linear-gradient(45deg,var(--border-md) 0 5px,transparent 5px 10px)}
-    .nv-fin{position:absolute;left:0;top:0;height:100%;border-radius:6px;background:var(--mw-red);opacity:.85}
-    .nv-won .nv-fin{opacity:1}
+      background:var(--mw-black,#231F20);opacity:.28}
+    .nv-fin{position:absolute;left:0;top:0;height:100%;border-radius:6px;background:var(--mw-red)}
+    html.dark-mode .nv-orig,body.dark-mode .nv-orig{background:#DCDBDB;opacity:.30}
     /* z-index so it stays readable where a bar runs past the budget — which is
        exactly the case a reader most needs to see. */
     .nv-bcb{position:absolute;top:-4px;bottom:-4px;width:0;z-index:2;
@@ -214,10 +218,36 @@
     .nv-was{text-decoration:line-through;color:var(--text-hint);font-size:0.75rem}
     .nv-cut{font-size:0.7143rem;font-weight:700;color:#2D9B6F}
     .nv-flat{color:var(--text-hint);font-weight:600}
+    .nv-under{color:#2D9B6F}
+    .nv-over{color:var(--mw-red-ink)}
     .nv-total{margin-top:14px;padding-top:11px;border-top:1px solid var(--border);
       font-size:0.8125rem;color:var(--text-secondary)}
     @media (max-width:700px){.nv-row{grid-template-columns:1fr;gap:5px}
       .nv-figs{justify-content:flex-start}}
+    /* Section jump. Sticky rail on desktop, a scrolling strip on narrow
+       screens — the shape wp-form.html and the dashboards already use. */
+    .bid-layout{display:flex;gap:18px;align-items:flex-start}
+    .bid-layout > #roundHost{flex:1;min-width:0}
+    .bid-nav{position:sticky;top:76px;flex:0 0 178px;max-height:calc(100vh - 96px);overflow-y:auto;
+      display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:11px;
+      background:var(--surface);border:1px solid var(--border)}
+    .bid-nav a{display:block;padding:7px 10px;border-radius:7px;text-decoration:none;
+      font-size:0.7857rem;font-weight:600;color:var(--text-secondary);
+      border-left:3px solid transparent;line-height:1.35}
+    .bid-nav a:hover{background:var(--surface-2);color:var(--text-primary)}
+    .bid-nav a.on{background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);
+      border-left-color:var(--mw-red)}
+    #roundHost .panel{scroll-margin-top:84px}
+    @media (max-width:900px){
+      .bid-layout{display:block}
+      .bid-nav{position:sticky;top:52px;z-index:9;flex-direction:row;max-height:none;
+        overflow-x:auto;overflow-y:hidden;margin-bottom:12px;padding:6px}
+      .bid-nav a{white-space:nowrap;border-left:0;border-bottom:3px solid transparent}
+      .bid-nav a.on{border-left:0;border-bottom-color:var(--mw-red)}
+      #roundHost .panel{scroll-margin-top:108px}
+    }
+    .bm-wpstat-bad{color:var(--mw-red-ink)}
+    .bm-behind-bad{background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);font-weight:700}
     .cmp-th{cursor:pointer;user-select:none;white-space:nowrap}
     .cmp-th:hover{color:var(--mw-red-ink)}
     .cmp-th.on{color:var(--mw-red-ink)}
@@ -335,7 +365,10 @@
       <div id="bidRoundPage" style="display:none">
         <button class="btn" onclick="showList()" style="margin-bottom:14px">
           <i class="ti ti-arrow-left"></i> All bid rounds</button>
-        <div id="roundHost"></div>
+        <div class="bid-layout">
+          <nav class="bid-nav" id="bid-nav" style="display:none"></nav>
+          <div id="roundHost"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -804,9 +837,24 @@ function wpStatusLine() {
   const want = roundProcStatus();
   const behind = want && want !== 'Awarded'
     && VendorDb.bidRounds.procRank(want) > VendorDb.bidRounds.procRank(w.procurement_status);
-  return '<div class="bm-wpstat">'
+  // ⚠️ THE AWARDED CASE WAS DELIBERATELY EXCLUDED, AND THAT WAS THE BUG.
+  //    The reasoning was "doAward() writes it, so it cannot be out of step" —
+  //    but if that write failed, or the round was awarded before doAward wired
+  //    the work package up, the screen shows "5 Awarded" in red directly above
+  //    "procurement status: Not Started" and says nothing about it. That is the
+  //    ONE mismatch worth shouting about: the award has not reached the record
+  //    anything downstream reads.
+  const winner = INV.find(function (i) { return i.outcome === 'awarded'; });
+  const awardStranded = R.stage === 'awarded' && w.procurement_status !== 'Awarded';
+  return '<div class="bm-wpstat' + (awardStranded ? ' bm-wpstat-bad' : '') + '">'
     + '<i class="ti ti-package"></i> Work package procurement status: <b>' + esc(cur) + '</b>'
-    + (behind
+    + (awardStranded
+        ? ' <span class="bm-behind bm-behind-bad">the award did not reach the work package</span>'
+          + (canManage && winner
+              ? ' <button class="btn btn-sm" onclick="finishAwardOnWp()">'
+                + '<i class="ti ti-refresh"></i> Finish the award</button>'
+              : '')
+        : behind
         ? ' <span class="bm-behind">behind this round</span>'
           + (canManage ? ' <button class="btn btn-sm" onclick="syncWpStatus(true)">'
                          + 'Set to ' + esc(want) + '</button>' : '')
@@ -848,6 +896,118 @@ async function syncWpStatus(loud) {
   }
 }
 
+/* Repair path for an award that closed the round but never reached the work
+   package. Runs exactly the write doAward() does — no more — from the winner
+   already on record, so it is safe to press twice.
+   ⚠️ It does NOT re-close the round or touch vendor_bids: those already
+      happened. This only lands the work-package side. */
+async function finishAwardOnWp() {
+  const win = INV.find(i => i.outcome === 'awarded');
+  if (!win) { AppNotify.warn('No winner is recorded on this round.'); return; }
+  if (!AppAuth.canEditProject(profile, R.project_id)) {
+    AppNotify.error('You do not have rights on ' + projName(R.project_id) + ', so the work package cannot be updated from here.');
+    return;
+  }
+  const amt = win.negotiated_amount != null ? Number(win.negotiated_amount) : Number(win.offer_amount);
+  if (!(amt >= 0)) { AppNotify.warn('The winning bid has no amount recorded.'); return; }
+  const w = WPBYID[R.wp_id] || {};
+  if (!confirm('Set ' + wpLabel(w) + ' to Awarded?\n\n'
+    + 'Vendor: ' + win.vendor_name + '\nAmount: ' + money(amt, win.offer_currency)
+    + '\n\nThe round is already closed — this only brings the work package into line.')) return;
+  const prog = AppNotify.progress('Updating the work package…');
+  try {
+    const today = new Date();
+    const iso = today.getFullYear() + '-'
+      + String(today.getMonth() + 1).padStart(2, '0') + '-'
+      + String(today.getDate()).padStart(2, '0');
+    await WPDb.updateWPDirect(R.wp_id, {
+      procurement_status: 'Awarded',
+      award_status: 'Awarded',
+      awarded_cost: amt,
+      contractor: win.vendor_name,
+      vendor_id: win.vendor_id,
+      awarded_vendor_ids: [win.vendor_id],
+      awarded_vendor_amounts: [amt],
+      actual_awarding_date: win.decided_at ? String(win.decided_at).slice(0, 10) : iso,
+    });
+    // or every dashboard serves the old status for the cache's lifetime
+    try {
+      Object.keys(sessionStorage).forEach(function (k) {
+        if (k.indexOf('wpm_wps_idx') === 0) sessionStorage.removeItem(k);
+      });
+    } catch (_) { /* private window / storage disabled */ }
+    WPBYID[R.wp_id] = Object.assign({}, w, { procurement_status: 'Awarded', award_status: 'Awarded' });
+    prog.done('Work package awarded to ' + win.vendor_name + '.');
+    renderRound();
+  } catch (e) {
+    prog.fail('Could not update the work package: ' + (e.message || e));
+  }
+}
+
+/* ── Section jump for a very long round page ───────────────────────────────
+   Eight panels on one scroll, so finding "Negotiation" meant scrolling past
+   everything. Same pattern as wp-form.html's #form-nav and the dashboards'
+   .viewer-side-nav: a sticky rail with scroll-spy, a horizontal strip on
+   narrow screens.
+   ⚠️ Built from what is ACTUALLY on screen, not a fixed list — several panels
+      render nothing until the round reaches them (there is no comparison
+      before a bid arrives), and a link to a section that is not there is worse
+      than no link. */
+function buildBidNav() {
+  const nav = document.getElementById('bid-nav');
+  if (!nav) return;
+  const host = document.getElementById('roundHost');
+  const panels = host ? Array.prototype.slice.call(host.querySelectorAll('.panel')) : [];
+  const items = [];
+  panels.forEach(function (p, n) {
+    const t = p.querySelector('.panel-title');
+    if (!t) return;
+    // "4 · Clarifications" -> "Clarifications"; the number is already the order
+    const label = t.textContent.replace(/^\s*\d+\s*[\u00b7.\u2014-]\s*/, '').trim();
+    if (!label) return;
+    if (!p.id) p.id = 'bsec-' + n;
+    items.push({ id: p.id, label: label });
+  });
+  if (items.length < 3) { nav.style.display = 'none'; return; }
+  nav.style.display = '';
+  nav.innerHTML = items.map(function (it) {
+    return '<a href="#' + it.id + '" data-sec="' + it.id + '">' + esc(it.label) + '</a>';
+  }).join('');
+  _wireBidNavSpy(nav, items);
+}
+let _bidSpy = null, _bidNavLock = 0;
+function _wireBidNavSpy(nav, items) {
+  if (_bidSpy) { _bidSpy.disconnect(); _bidSpy = null; }
+  nav.querySelectorAll('a').forEach(function (a) {
+    a.onclick = function (e) {
+      e.preventDefault();
+      const el = document.getElementById(a.dataset.sec);
+      if (!el) return;
+      // Highlight immediately and hold it, or the spy fights the smooth scroll
+      // and the active link flickers on the way down.
+      nav.querySelectorAll('a').forEach(function (x) { x.classList.toggle('on', x === a); });
+      _bidNavLock = Date.now() + 700;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+  });
+  _bidSpy = new IntersectionObserver(function (entries) {
+    if (Date.now() < _bidNavLock) return;
+    let best = null;
+    entries.forEach(function (en) {
+      if (!en.isIntersecting) return;
+      if (!best || en.boundingClientRect.top < best.boundingClientRect.top) best = en;
+    });
+    if (!best) return;
+    nav.querySelectorAll('a').forEach(function (x) {
+      x.classList.toggle('on', x.dataset.sec === best.target.id);
+    });
+  }, { rootMargin: '-80px 0px -55% 0px' });
+  items.forEach(function (it) {
+    const el = document.getElementById(it.id);
+    if (el) _bidSpy.observe(el);
+  });
+}
+
 function renderRound() {
   const w = WPBYID[R.wp_id] || {};
   document.getElementById('page-title').textContent = wpLabel(w);
@@ -876,6 +1036,8 @@ function renderRound() {
     + '</div>'
     + deadlineNudge() + askPanel() + biddersPanel() + responsesPanel() + clarifyPanel()
     + comparisonPanel() + evaluationPanel() + negotiationPanel() + negotiationViz() + awardPanel();
+
+  buildBidNav();
 }
 
 async function setStage(s) {
@@ -1504,8 +1666,11 @@ function negotiationPanel() {
   const ro = canManage ? '' : ' disabled';
   const short = rows.filter(i => i.shortlisted).length;
   return '<div class="panel"><div class="panel-title">7 · Negotiation</div>'
-    + '<div class="sec-note">Shortlist the top bidders and record the negotiated price — the handshake figure. '
-    + '<b>Negotiate with one to three.</b>' + (short > 3 ? ' <span class="bm-high">' + short + ' are shortlisted.</span>' : '') + '</div>'
+    + '<div class="sec-note">Shortlist the top bidders and record the negotiated price. '
+    + '<b>Negotiate with one to three.</b> Where the bidder resubmitted through their bid link, '
+    + 'their revised quotation is here and the figure comes with it; where you agreed it by email, '
+    + 'attach that quotation so the number is not standing on its own.'
+    + (short > 3 ? ' <span class="bm-high">' + short + ' are shortlisted.</span>' : '') + '</div>'
     + rows.map(i =>
         '<div class="bidder">'
         + '<label style="display:flex;align-items:center;gap:7px;flex:0 0 190px;font-size:0.9286rem;font-weight:600;cursor:pointer">'
@@ -1517,10 +1682,52 @@ function negotiationPanel() {
         + ' style="flex:0 0 170px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
         + '<input id="ng-n-' + i.id + '" placeholder="Notes" value="' + esc(i.negotiation_notes || '') + '"' + ro
         + ' style="flex:1;min-width:140px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+        + _negoDoc(i)
         + '</div>').join('')
     + (canManage ? '<div class="bm-actions"><button class="btn btn-primary" onclick="saveNegotiation()">Save negotiation</button></div>' : '')
     + '</div>';
 }
+/* The quotation behind the negotiated figure.
+   ⚠️ A NEGOTIATED PRICE WITH NO DOCUMENT IS SOMEBODY'S RECOLLECTION. This
+      panel used to be a bare number box, so the figure that decides an award
+      rested entirely on the officer keying it right, and a reviewer had nothing
+      to check it against. If the bidder resubmitted on their bid link the file
+      is already here; if it was agreed by email, it can be attached. */
+function _negoDoc(i) {
+  if (i.negotiated_doc_path) {
+    return '<button class="btn btn-sm" onclick="openFile(' + Q + i.negotiated_doc_path + Q + ')" '
+      + 'title="' + esc(i.negotiated_doc_name || 'Revised quotation') + '">'
+      + '<i class="ti ti-file-check"></i> Revised quotation</button>';
+  }
+  if (!canManage) return '';
+  return '<label class="btn btn-sm" style="cursor:pointer" title="Attach the revised quotation">'
+    + '<i class="ti ti-paperclip"></i> Attach revised'
+    + '<input type="file" style="display:none" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx" '
+    + 'onchange="uploadNegotiated(' + Q + i.id + Q + ', this)"></label>';
+}
+async function uploadNegotiated(invId, input) {
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 15 * 1024 * 1024) { AppNotify.warn('That file is over 15 MB.'); input.value = ''; return; }
+  const inv = invById(invId);
+  if (!inv) return;
+  const prog = AppNotify.progress('Uploading the revised quotation…');
+  try {
+    // Same bucket and the same vendor-id prefix the Storage policy authorises on.
+    const path = await VendorDb.uploadVendorFile(inv.vendor_id, 'nego_' + invId, file);
+    await VendorDb.bidBoard.update(invId, {
+      negotiated_doc_path: path, negotiated_doc_name: file.name,
+      negotiated_at: new Date().toISOString(),
+    }, profile);
+    INV = await VendorDb.bidRounds.invitations(R.id);
+    prog.done('Revised quotation attached.');
+    renderRound();
+  } catch (e) {
+    prog.fail('Could not attach it: ' + (e.message || e));
+  }
+  input.value = '';
+}
+
 async function saveNegotiation() {
   try {
     for (const i of bidsInPlay()) {
@@ -1792,6 +1999,14 @@ function negotiationViz() {
       + '</div></div>';
   }).join('');
 
+  // Against the BCB is the number that actually gets reported: what the
+  // negotiation delivered relative to what was budgeted for this package.
+  const lead = rows.slice().sort(function (a, b) {
+    return (Number(a.negotiated_amount != null ? a.negotiated_amount : a.offer_amount) || 0)
+         - (Number(b.negotiated_amount != null ? b.negotiated_amount : b.offer_amount) || 0);
+  })[0];
+  const leadFin = lead ? Number(lead.negotiated_amount != null ? lead.negotiated_amount : lead.offer_amount) : null;
+  const vsBcb = (bcb && leadFin != null) ? bcb - leadFin : null;
   return '<div class="panel"><div class="panel-title">Offer \u2192 negotiated</div>'
     + '<div class="sec-note">Each bar is that bidder\u2019s original offer; the solid part is where it '
     + 'landed after negotiation, so the gap is what was taken off.'
@@ -1799,8 +2014,16 @@ function negotiationViz() {
     + (moved.length ? '' : ' <b>Nothing has been negotiated yet</b> \u2014 the bars show the offers as they stand.')
     + '</div>'
     + '<div class="nv-wrap">' + bars + '</div>'
-    + (totalSaved > 0
-        ? '<div class="nv-total">Taken off across all bidders: <b>' + esc(money(totalSaved)) + '</b></div>'
+    + ((totalSaved > 0 || vsBcb != null)
+        ? '<div class="nv-total">'
+          + (totalSaved > 0 ? 'Taken off across all bidders: <b>' + esc(money(totalSaved)) + '</b>' : '')
+          + (totalSaved > 0 && vsBcb != null ? ' · ' : '')
+          + (vsBcb != null
+              ? (vsBcb >= 0
+                  ? 'Best position is <b class="nv-under">' + esc(money(vsBcb)) + ' under</b> the budget'
+                  : 'Best position is <b class="nv-over">' + esc(money(-vsBcb)) + ' over</b> the budget')
+              : '')
+          + '</div>'
         : '')
     + '</div>';
 }
