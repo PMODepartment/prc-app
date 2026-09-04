@@ -142,6 +142,26 @@
       .modal-footer{position:sticky;bottom:0;background:var(--surface)}
       .modal-footer button{flex:1 1 46%;min-height:40px}
     }
+
+    /* ── New-bid-round picker (project → work package) ─────────────────── */
+    .nr-list{max-height:300px;overflow-y:auto;margin-top:8px;border:1px solid var(--border);
+      border-radius:8px;background:var(--surface)}
+    .nr-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 12px;
+      border:none;border-bottom:1px solid var(--border);background:transparent;cursor:pointer;
+      font-family:inherit;font-size:0.8571rem;color:var(--text-primary)}
+    .nr-row:last-child{border-bottom:none}
+    .nr-row:hover{background:var(--mw-red-light)}
+    .nr-pid{font-weight:800;font-size:0.7857rem;letter-spacing:.02em;color:var(--mw-red-ink);
+      background:var(--mw-red-light);border-radius:5px;padding:2px 7px;flex-shrink:0}
+    .nr-pname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .nr-wp{flex:1;min-width:0}
+    .nr-count{font-size:0.7857rem;color:var(--text-hint);flex-shrink:0;white-space:nowrap}
+    .nr-empty{padding:14px;font-size:0.8571rem;color:var(--text-hint)}
+    .nr-back{background:none;border:none;padding:0;margin-bottom:8px;cursor:pointer;font-family:inherit;
+      font-size:0.8125rem;font-weight:600;color:var(--text-hint);display:inline-flex;align-items:center;gap:5px}
+    .nr-back:hover{color:var(--mw-red-ink)}
+    .nr-crumb{display:flex;align-items:center;gap:8px;font-size:0.9286rem;font-weight:600;
+      color:var(--text-primary);margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -263,13 +283,29 @@
       <button class="modal-close" onclick="closeNewRound()">&times;</button>
     </div>
     <div class="modal-body">
-      <div class="sec-note">Pick the work package to put out to bid. Packages already awarded are not listed.</div>
-      <div class="field">
-        <label>Work package</label>
-        <input id="nrSearch" type="text" placeholder="Search by WP no., description or project…" oninput="renderNrOptions()" autocomplete="off">
-        <div id="nrOptions" style="max-height:270px;overflow-y:auto;margin-top:8px;border:1px solid var(--border);border-radius:8px"></div>
+      <!-- Step 1: project. A flat search over every work package in the
+           portfolio put ~1,860 packages from 21 projects in one box, which is
+           not how an officer thinks about a solicitation — they are working on
+           a project. Project first, then its packages. -->
+      <div id="nrStepProject">
+        <div class="sec-note">Pick the project first, then the work package inside it. Packages already awarded are not listed.</div>
+        <div class="field">
+          <label>Project</label>
+          <input id="nrProjSearch" type="text" placeholder="Search by project code or name…" oninput="renderNrProjects()" autocomplete="off">
+          <div id="nrProjects" class="nr-list"></div>
+        </div>
       </div>
-      <div id="nrPicked" class="sec-note"></div>
+      <!-- Step 2: the work packages of that project. -->
+      <div id="nrStepWp" style="display:none">
+        <button type="button" class="nr-back" onclick="nrBackToProjects()"><i class="ti ti-arrow-left"></i> All projects</button>
+        <div class="nr-crumb" id="nrCrumb"></div>
+        <div class="field">
+          <label>Work package</label>
+          <input id="nrSearch" type="text" placeholder="Search by WP no. or description…" oninput="renderNrOptions()" autocomplete="off">
+          <div id="nrOptions" class="nr-list"></div>
+        </div>
+        <div id="nrPicked" class="sec-note"></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeNewRound()">Cancel</button>
@@ -489,29 +525,103 @@ function renderList() {
 }
 
 /* ── new round ───────────────────────────────────────────────────────────── */
+/* ══ New bid round — project first, then its work packages ═════════════════
+   A flat search over the whole portfolio meant scrolling ~1,860 packages from
+   21 projects in one box. An officer runs a solicitation FOR a project, so the
+   picker follows that: choose the project, then the package inside it. Vendors
+   are invited afterwards in the round workspace, which is where the RFQ is
+   composed and issued. */
+let _nrProject = null;
+
 function openNewRound() {
   _nrPick = null;
-  document.getElementById('nrSearch').value = '';
+  _nrProject = null;
+  const ps = document.getElementById('nrProjSearch'); if (ps) ps.value = '';
+  const ws = document.getElementById('nrSearch'); if (ws) ws.value = '';
   document.getElementById('nrPicked').textContent = '';
   document.getElementById('nrCreate').disabled = true;
+  nrShowStep('project');
+  renderNrProjects();
   document.getElementById('newRoundModal').style.display = 'flex';
+  setTimeout(() => { const e = document.getElementById('nrProjSearch'); if (e) e.focus(); }, 60);
+}
+function closeNewRound() { document.getElementById('newRoundModal').style.display = 'none'; }
+
+function nrShowStep(step) {
+  document.getElementById('nrStepProject').style.display = step === 'project' ? '' : 'none';
+  document.getElementById('nrStepWp').style.display = step === 'wp' ? '' : 'none';
+}
+function nrBackToProjects() {
+  _nrProject = null; _nrPick = null;
+  document.getElementById('nrPicked').textContent = '';
+  document.getElementById('nrCreate').disabled = true;
+  nrShowStep('project');
+  setTimeout(() => { const e = document.getElementById('nrProjSearch'); if (e) e.focus(); }, 40);
+}
+
+/* Only projects that actually have something biddable. Listing a project whose
+   packages are all awarded would be a dead end, and the count is what tells an
+   officer where the work is. isResolved is the shared predicate (Known Issues
+   #28) — never re-inline award_status here. */
+function nrBiddableByProject() {
+  const by = {};
+  WPS.forEach(w => {
+    if (window.isResolved(w)) return;
+    (by[w.project_id] = by[w.project_id] || []).push(w);
+  });
+  return by;
+}
+function renderNrProjects() {
+  const q = val('nrProjSearch').toLowerCase();
+  const by = nrBiddableByProject();
+  const rows = Object.keys(by)
+    .map(pid => ({ pid: pid, n: by[pid].length, name: projName(pid) }))
+    .filter(r => !q || (r.pid + ' ' + r.name).toLowerCase().includes(q))
+    .sort((a, b) => String(a.pid).localeCompare(String(b.pid)));
+  const host = document.getElementById('nrProjects');
+  if (!rows.length) {
+    host.innerHTML = '<div class="nr-empty">' + (q
+      ? 'No project matches that.'
+      : 'Every work package is already awarded or closed, so there is nothing to put out to bid.') + '</div>';
+    return;
+  }
+  host.innerHTML = rows.map(r =>
+    '<button type="button" class="nr-row" onclick="pickNrProject(' + Q + r.pid + Q + ')">'
+    + '<span class="nr-pid">' + esc(r.pid) + '</span>'
+    + '<span class="nr-pname">' + esc(r.name) + '</span>'
+    + '<span class="nr-count">' + r.n + (r.n === 1 ? ' package' : ' packages') + '</span></button>').join('');
+}
+function pickNrProject(pid) {
+  _nrProject = pid;
+  _nrPick = null;
+  document.getElementById('nrPicked').textContent = '';
+  document.getElementById('nrCreate').disabled = true;
+  document.getElementById('nrSearch').value = '';
+  document.getElementById('nrCrumb').innerHTML =
+    '<span class="nr-pid">' + esc(pid) + '</span> ' + esc(projName(pid));
+  nrShowStep('wp');
   renderNrOptions();
   setTimeout(() => { const e = document.getElementById('nrSearch'); if (e) e.focus(); }, 60);
 }
-function closeNewRound() { document.getElementById('newRoundModal').style.display = 'none'; }
+
 function renderNrOptions() {
   const q = val('nrSearch').toLowerCase();
-  // Already-resolved packages are not put out to bid. isResolved is the shared
-  // predicate (Known Issues #28) — never re-inline award_status here.
-  const pool = WPS.filter(w => !window.isResolved(w))
-    .filter(w => !q || (wpLabel(w) + ' ' + projName(w.project_id)).toLowerCase().includes(q))
-    .slice(0, 60);
+  // Scoped to the chosen project — the whole point of the two steps.
+  const pool = WPS.filter(w => w.project_id === _nrProject)
+    .filter(w => !window.isResolved(w))
+    .filter(w => !q || wpLabel(w).toLowerCase().includes(q))
+    .slice(0, 200);
   const host = document.getElementById('nrOptions');
-  if (!pool.length) { host.innerHTML = '<div style="padding:14px;font-size:0.8571rem;color:var(--text-hint)">No matching work packages.</div>'; return; }
+  if (!pool.length) {
+    host.innerHTML = '<div class="nr-empty">' + (q
+      ? 'No work package in this project matches that.'
+      : 'Nothing left to bid in this project.') + '</div>';
+    return;
+  }
   host.innerHTML = pool.map(w =>
-    '<div class="bidder" style="padding:9px 12px;cursor:pointer" onclick="pickWp(' + Q + w.id + Q + ')">'
-    + '<div class="bidder-name">' + esc(wpLabel(w))
-    + '<small>' + esc(projName(w.project_id)) + (w.trade ? ' · ' + esc(w.trade) : '') + '</small></div></div>').join('');
+    '<button type="button" class="nr-row" onclick="pickWp(' + Q + w.id + Q + ')">'
+    + '<span class="nr-wp">' + esc(wpLabel(w)) + '</span>'
+    + (w.trade ? '<span class="nr-count">' + esc(w.trade) + '</span>' : '') + '</button>').join('');
 }
 function pickWp(id) {
   _nrPick = WPBYID[id] || null;
@@ -520,6 +630,7 @@ function pickWp(id) {
     'Selected: <b>' + esc(wpLabel(_nrPick)) + '</b> · ' + esc(projName(_nrPick.project_id));
   document.getElementById('nrCreate').disabled = false;
 }
+
 async function createRound() {
   if (!_nrPick || _busy) return;
   _busy = true;
