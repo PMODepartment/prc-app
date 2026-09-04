@@ -103,7 +103,46 @@
     .empty-state i{font-size:1.8571rem;display:block;margin-bottom:9px;opacity:.55}
     .empty-state b{display:block;color:var(--text-secondary);font-size:1rem;margin-bottom:4px}
     .sec-note{font-size:0.7857rem;color:var(--text-hint);line-height:1.7;margin:-6px 0 14px}
-  </style>
+  
+    /* ══ Modals ═══════════════════════════════════════════════════════════
+       ⚠️ THESE WERE MISSING ENTIRELY AND BOTH MODALS ON THIS PAGE WERE DEAD.
+       Found by clicking "New bid round" on the live site: the overlay got
+       display:flex from openNewRound(), but with no .modal-overlay rule
+       anywhere it stayed `position:static` and laid out as an ordinary block
+       at y=900 — below the fold, no backdrop, invisible. The RFQ composer had
+       the same fault, so an officer could neither start a round nor issue an
+       invitation: the two things this page exists for.
+
+       dashboard.css defines .modal-bg, NOT .modal-overlay — that class lives in
+       each page's own <style> (admin.html, vendors.html, vendor-registrations.html
+       all carry it) and this page never got a copy.
+
+       ⚠️ padding:0 is load-bearing. dashboard.css .modal sets padding:28px (and
+       20px under a media query); without overriding it that padding stacks on
+       top of .modal-header/.modal-body/.modal-footer. Tokens throughout, so
+       dark mode needs no separate override. */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;
+      display:flex;align-items:center;justify-content:center;padding:16px}
+    .modal{background:var(--surface);color:var(--text-primary);border-radius:12px;padding:0;
+      width:100%;max-width:640px;display:flex;flex-direction:column;max-height:90vh;
+      overflow:hidden;box-shadow:var(--shadow-lg)}
+    .modal-header{padding:18px 20px 0;flex-shrink:0;display:flex;gap:12px;
+      justify-content:space-between;align-items:flex-start}
+    .modal-header h3{margin:0;font-size:1.1429rem;font-weight:700;color:var(--text-primary)}
+    .modal-body{padding:14px 20px;overflow-y:auto;flex:1}
+    .modal-footer{padding:12px 20px 18px;flex-shrink:0;border-top:1px solid var(--border);
+      display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+    .modal-close{background:none;border:none;font-size:22px;line-height:1;padding:0 2px;
+      color:var(--text-hint);cursor:pointer;font-family:inherit}
+    .modal-close:hover{color:var(--mw-red-ink)}
+    @media (max-width:767px){
+      /* A dialog should use the screen on a phone, not float in the middle of it. */
+      .modal-overlay{align-items:flex-end;padding:0}
+      .modal{max-width:none;border-radius:14px 14px 0 0;max-height:92vh}
+      .modal-footer{position:sticky;bottom:0;background:var(--surface)}
+      .modal-footer button{flex:1 1 46%;min-height:40px}
+    }
+</style>
 </head>
 <body>
 <a class="skip-link" href="#main-content-region">Skip to main content</a>
@@ -274,6 +313,15 @@
    ════════════════════════════════════════════════════════════════════════════ */
 let profile = null, canManage = false;
 let ROUNDS = [], WPS = [], PROJECTS = {}, WPBYID = {};
+/* Single-quote delimiter for the inline onclick handlers this page builds.
+   ⚠ IT WAS USED 15 TIMES AND NEVER DECLARED, so every interactive control
+   threw ReferenceError: Q is not defined — the round list, the work-package
+   picker, the stage stepper, add/remove/withdraw/reinstate bidder, the RFQ
+   links and mailto, opening a submitted file, clarifications and notices.
+   Only the empty state rendered, because it builds no handlers. Found by
+   clicking New bid round on the live site.
+   Written as a char code so no quoting layer can eat it. */
+const Q = String.fromCharCode(39);
 let COUNTS = {};   // roundId -> { total, submitted } for the list
 let R = null;              // the open round
 let INV = [];              // its invitations
