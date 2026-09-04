@@ -1,5 +1,36 @@
 ﻿
 /* ── WPDb ─────────────────────────────────────────────────────────── */
+/* Audit stamp: who last changed a row and when, from the logged-in profile.
+   updated_by_name is a snapshot so the display survives if that user is later removed.
+
+   ⚠ MODULE SCOPE, DELIBERATELY. This used to live inside the WPDb closure while
+   VendorDb called it 8 times — bidBoard.invite / update / decide and
+   bidRounds.create / update / addVendors / award / recordNotice — so every one
+   of those threw "ReferenceError: _auditStamp is not defined". The entire bid
+   write surface was dead, which is why no bid round had ever been created.
+   Found by clicking Create round on the live site; node --check cannot see it,
+   because a free variable parses fine and only throws when its line runs.
+
+   WPDb calls it with no argument and VendorDb passes an explicit profile, so it
+   accepts one and falls back to window.__profile — identical behaviour to the
+   old WPDb-local version when called bare. Keep ONE definition: a second copy
+   in another closure is what caused the _isMissingTable shadowing bug. */
+/* ⚠ MODULE SCOPE: VendorDb.backfillVendorDataFromWPs calls this too, and it
+   used to live inside the WPDb closure — so the pre-migration fallback there
+   would have thrown ReferenceError instead of retrying without the columns.
+   Latent rather than live (the columns exist now), but the same class of fault
+   as _auditStamp. Pure predicate, no closure dependencies. */
+function _isMissingAwardedVendorIdsCol(error) {
+  if (!error) return false;
+  const m = (error.message || '') + (error.details || '');
+  return /awarded_vendor_(ids|amounts)/.test(m) && /column|does not exist|schema cache/i.test(m);
+}
+
+function _auditStamp(profile) {
+  const p = profile || (typeof window !== 'undefined' && window.__profile) || {};
+  return { updated_at: new Date().toISOString(), updated_by: p.id || null, updated_by_name: p.name || p.email || null };
+}
+
 const WPDb = (() => {
   function mapWP(w) {
     if (!w) return null;
@@ -22,13 +53,6 @@ const WPDb = (() => {
     // stamp is applied fresh on every write via _auditStamp()
     delete d.updated_at; delete d.updated_by; delete d.updated_by_name;
     return d;
-  }
-  // Per-WP audit trail: stamp who last changed a work package and when, from the logged-in
-  // profile. Applied on every insert/update so the WP detail panel can show "Last updated by …".
-  // updated_by_name is a snapshot so the display survives even if that user is later removed.
-  function _auditStamp() {
-    const p = (typeof window !== 'undefined' && window.__profile) || {};
-    return { updated_at: new Date().toISOString(), updated_by: p.id || null, updated_by_name: p.name || p.email || null };
   }
   // True if the error is a "column does not exist" (audit columns not migrated yet).
   function _isMissingAuditCol(error) {
@@ -107,11 +131,6 @@ const WPDb = (() => {
   // awarded_vendor_ids + awarded_vendor_amounts). Every WP write retries without them if that
   // migration hasn't run yet. Precise column-name match so it can't cross-trigger with
   // _isMissingVendorCol (vendor_id\b) or _isMissingProposedVendorIdsCol.
-  function _isMissingAwardedVendorIdsCol(error) {
-    if (!error) return false;
-    const m = (error.message || '') + (error.details || '');
-    return /awarded_vendor_(ids|amounts)/.test(m) && /column|does not exist|schema cache/i.test(m);
-  }
   function _stripAwardedVendorIds(obj) { const d = {...obj}; delete d.awarded_vendor_ids; delete d.awarded_vendor_amounts; return d; }
   // Same deploy-order guard for the buyback columns (migrations/2026-08-11_wp_buyback.sql:
   // buyback + buyback_depreciation_percent). Every WP write retries without them if
