@@ -3108,9 +3108,20 @@ subscription rotation. **⚠️ Three of those failed first on a HARNESS fault**
 false. In a browser `window` IS the global. **Rule out the harness before the
 code.**
 
-**⚠️ NOT EXERCISED END-TO-END.** No vendor has ever received one of these. The
-function, the webhook and the iOS path are all verified by construction and by
-harness only.
+**✅ PROVEN END-TO-END on production, 2026-09-04.** An outbox row inserted for the
+test vendor came back `sent_at` set 3s later, `attempts = 1`, `last_error = null`
+— which, read against what the function writes, proves every link at once: the
+webhook fired (only the function sets `attempts`), it authenticated (no 401), the
+VAPID secrets were loaded (it got past the keys check), **the private key in
+Supabase matches the public key in the page** (a mismatch is a 403 in
+`last_error`), the device subscription had saved (else
+`'no subscribed devices'`), and the push service accepted the send (`sent_at` is
+only set when at least one device succeeded).
+
+**⚠️ READ THE OUTBOX ROW, NOT THE FUNCTION LOG** — the function always returns
+200 so the HTTP status tells you nothing, and each field above rules out a
+different link. What the row canNOT tell you is whether the banner actually
+appeared: once the push service accepts it, the OS decides.
 
 **Two first-use risks found by cross-checking the four parts against each other,
 after the migration was run (2026-09-05).** Each harness had passed against its
