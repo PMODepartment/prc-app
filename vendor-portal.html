@@ -900,11 +900,12 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260905c"></script>
-<script src="assets/js/db.js?v=20260905c"></script>
+<script src="assets/js/auth.js?v=20260905d"></script>
+<script src="assets/js/db.js?v=20260905d"></script>
 <!-- Self-contained: this page loads no ui.js, so the guide injects its own
      CSS and its own "?" button. Versioned independently of the shared assets. -->
-<script src="assets/js/portal-guide.js?v=20260905c"></script>
+<script src="assets/js/coachmarks.js?v=20260905d"></script>
+<script src="assets/js/portal-guide.js?v=20260905d"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -951,10 +952,103 @@ AppAuth.requireLogin((user, profile) => {
   loadAll();
   // Once per vendor, and never in a staff preview — the preview is for
   // troubleshooting, not a tour, and it would burn the vendor's own first-run.
-  if (!_staffPreview && window.PortalGuide) {
-    PortalGuide.maybeAutoOpen(profile.vendor_id || profile.id);
+  if (!_staffPreview) {
+    // ⚠️ Configured AFTER loadAll() is under way but started on a delay, because
+    //    several steps point at things that do not exist until the vendor's data
+    //    lands (#pushRow, the bid board, the install item). CoachTour skips a
+    //    step whose element is missing, so configuring too early would silently
+    //    drop exactly the steps worth showing.
+    setTimeout(function () {
+      configurePortalTour();
+      if (window.CoachTour) CoachTour.maybeAutoStart();
+    }, 1200);
   }
 });
+
+/* ── The tutorial: a spotlight tour of the REAL portal ─────────────────────
+   ⚠️ THIS REPLACED A TEN-SLIDE TEXT DECK as the first-run experience, for the
+      reason the dashboards reached the same conclusion: a modal describing the
+      UI is a wall of prose the vendor has to hold in their head and then go
+      looking for. Pointing at the actual thing needs no translation.
+      The deck survives behind the "?" menu as something to read start to
+      finish; it is no longer what a vendor meets on their first visit.
+
+   ⚠️ ON A PHONE THE SIDEBAR IS A DRAWER, TRANSLATED OFF-SCREEN. An off-screen
+      element still reports offsetParent and a width, so the engine's own
+      visible() test would call it visible and draw the spotlight off the edge
+      of the screen. Rather than open the drawer and close it again around one
+      step, the phone gets a step on the hamburger itself — which is the thing
+      a vendor actually has to learn there. */
+function configurePortalTour() {
+  if (!window.CoachTour) return;
+  /* ⚠️ NOT decided here. This runs 1200ms after login, and freezing the phone
+     /desktop choice at that moment is wrong the first time anyone rotates a
+     tablet or the tour is reopened at another size. Each step carries a when()
+     the engine evaluates as it RUNS. */
+  /* ⚠️ 767px, NOT 600 — this must match the width at which THE SIDEBAR BECOMES A
+     DRAWER (see the @media(max-width:767px) block), because that is the fact
+     every one of these steps actually depends on. With it at 600 there was a
+     dead band from 601-767px: the nav item was off-screen behind the drawer so
+     its step was skipped, and the drawer-aware variant was excluded too, so a
+     tablet got NO navigation step at all.
+     The coach card switches to a bottom sheet at 600px instead — a different
+     question (does the card fit in a corner), so a different breakpoint. */
+  const drawered = () => { try { return matchMedia('(max-width:767px)').matches; }
+                           catch (e) { return innerWidth <= 767; } };
+  const phone = drawered;
+  const toProfile = () => { try { switchSection('profile'); } catch (e) {} };
+  const toBoard   = () => { try { switchSection('bidboard'); } catch (e) {} };
+  const tab = t => () => { toProfile(); try { switchTab(t); } catch (e) {} };
+  /* ⚠️ DO NOT try to spotlight #btn-install on a phone. It lives in the drawer,
+     and opening the drawer in before() does not help: the drawer slides in on a
+     transform transition, so the engine's synchronous visible() test right
+     afterwards still measures it off-screen and skips the step. Pointing at the
+     control it lives BEHIND is both truthful and less jarring than a panel
+     flying open and shut for one step. */
+  const closeDrawer = () => {
+    const sb = document.getElementById('sidebar');
+    if (sb && sb.classList.contains('open')) {
+      const b = document.getElementById('btn-menu');
+      if (b) b.click();
+    }
+  };
+
+  CoachTour.configure({
+    key: 'portal_tour',
+    steps: [
+      { sel: '#btn-menu', when: phone, title: 'Everything is in here',
+        body: 'Two places: <b>Company Profile</b> and <b>Bid Board</b>. Tap here to move between them.' },
+      { sel: '.nav-item[data-sec="profile"]', when: () => !phone(), title: 'Two places',
+        body: '<b>Company Profile</b> is what Megawide knows about you. <b>Bid Board</b> is what they have asked you to quote.' },
+      { sel: '.tabs', title: 'Your profile', before: toProfile,
+        body: 'Contact details, what you supply, your people and your documents.<br><br>Procurement works from what is here.' },
+      { sel: '.tab-btn[data-tab="personnel"]', title: 'People go in Personnel', before: toProfile,
+        body: 'Add someone once here, then tick <b>Primary contact</b> or <b>Owner</b>.<br><br>The boxes on Company Information fill in from this — which is why you cannot type them directly.' },
+      { sel: '#panel-accreditation', title: 'What is still missing', before: tab('accreditation'), pad: 4,
+        body: 'This tab lists every item, ticked or not. Upload the four documents, fill the gaps, and <b>Request accreditation</b> switches on by itself.' },
+      { sel: '#panel-bidboard', title: 'Your bid board', before: toBoard, pad: 4,
+        body: 'Only packages addressed to you — never the wider pipeline.<br><br>Open one, read the <b>reference pack</b>, then enter your amount, lead time and how long the price holds. You can revise until the deadline.' },
+      /* Skipped on a desktop along with the row itself — see PUSH_ON_DESKTOP. */
+      { sel: '#pushRow', title: 'Get told', before: toBoard,
+        when: () => typeof pushSupported === 'function' && pushSupported(),
+        body: 'Turn this on and your phone tells you when a new invitation arrives, when we ask you something, and when a round is decided \u2014 even with the portal closed.' },
+      /* ⚠️ when() must also say whether the button is OFFERED at all, not just
+         that this is a desktop. The count is frozen at start() from whether an
+         element EXISTS — it has to be, because the panels below are display:none
+         until before() reveals them — so a permanently hidden #btn-install would
+         be counted and then skipped, jumping "6 of 8" straight to "8 of 8". */
+      { sel: '#btn-install',
+        when: () => !drawered() && (b => !!b && b.style.display !== 'none')(document.getElementById('btn-install')),
+        title: 'Keep it on your home screen',
+        body: 'It then opens like an app, with a badge showing how many bids are still waiting on you.' },
+      { sel: '#btn-menu', when: phone, before: closeDrawer, title: 'Keep it on your home screen',
+        body: 'In this menu, <b>Add to home screen</b> makes the portal open like an app — with a badge '
+            + 'for bids still waiting on you, and it is what lets us notify you at all on iPhone.' },
+      { sel: '#btn-portal-guide', before: closeDrawer, title: 'That is it',
+        body: 'This tour and the written guide both live here. Start with your <b>Accreditation</b> checklist.' },
+    ],
+  });
+}
 
 // Shown when a NON-vendor account opens this page. A vendor with no session is
 // sent to vendor-login.html instead (window.__loginPage, set above) — vendors and
@@ -2728,7 +2822,7 @@ let _installPrompt = null;
    reports its mouse as the primary pointer. */
 function _canOfferInstall() {
   if (_isStandalone()) return false;              // already installed
-  try { return window.matchMedia('(pointer:coarse)').matches; } catch (e) { return false; }
+  return _coarsePointer();
 }
 function _syncInstallBtn(show) {
   const b = document.getElementById('btn-install');
@@ -2791,7 +2885,17 @@ function _isStandalone() {
 function _iosNeedsInstall() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent) && !_isStandalone();
 }
+/* ⚠️ OFFERED ON PHONES AND TABLETS ONLY — a deliberate product decision, NOT a
+   technical limit. Desktop Chrome and Edge support web push perfectly well, and
+   a vendor at their desk would be told when an RFQ arrives, browser closed
+   included; the row was judged clutter on a laptop because these vendors work
+   from phones. Flip this one flag to offer it on desktop again. */
+const PUSH_ON_DESKTOP = false;
+function _coarsePointer() {
+  try { return window.matchMedia('(pointer:coarse)').matches; } catch (e) { return false; }
+}
 function pushSupported() {
+  if (!PUSH_ON_DESKTOP && !_coarsePointer()) return false;
   return !!(VAPID_PUBLIC_KEY && 'serviceWorker' in navigator
             && 'PushManager' in window && 'Notification' in window);
 }

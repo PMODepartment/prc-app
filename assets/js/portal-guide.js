@@ -65,7 +65,32 @@
       '.pg-head{position:relative}',
       '.btn-guide-p{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:16px;font-weight:700;line-height:1}',
       '.btn-guide-p:hover{background:rgba(255,255,255,.12)}',
-      '@media(max-width:520px){.pg-body{height:min(250px,50vh);padding:24px 20px 8px}}',
+      '.pg-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:4100;width:262px;background:var(--surface,#fff);border:1px solid var(--border-md,rgba(0,0,0,.16));border-radius:11px;box-shadow:0 14px 40px rgba(0,0,0,.24);overflow:hidden}',
+      '.pg-menu.show{display:block}',
+      '.pg-mi{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;background:none;border:0;padding:11px 13px;font-family:inherit;cursor:pointer;color:var(--text-primary,#231F20)}',
+      '.pg-mi+.pg-mi{border-top:1px solid var(--border,rgba(0,0,0,.08))}',
+      '.pg-mi:hover{background:var(--mw-red-light,#FDECEA)}',
+      '.pg-mi i{font-size:17px;color:var(--mw-red,#EE3124);margin-top:1px}',
+      '.pg-mi b{display:block;font-size:13px;font-weight:700}',
+      '.pg-mi em{display:block;font-size:11.5px;font-style:normal;color:var(--text-hint,#6E6C6C);line-height:1.4;margin-top:1px}',
+      /* ⚠️ A phone gets the deck as a BOTTOM SHEET filling the lower screen,
+         not a 250px scrolling box floating in the middle — that box was the
+         "just a pop-up with text" complaint. The body grows with the sheet, so
+         a slide reads as a page instead of a peephole; the footer is pinned so
+         Next still never moves between slides. */
+      '@media(max-width:600px){' +
+        '.pg-overlay{padding:0;align-items:flex-end}' +
+        '.pg-card{max-width:none;border-radius:18px 18px 0 0;height:82vh}' +
+        '.pg-body{flex:1;height:auto;padding:26px 22px 8px}' +
+        '.pg-ic{width:52px;height:52px;border-radius:14px;margin-bottom:14px}' +
+        '.pg-ic i{font-size:26px}' +
+        '.pg-title{font-size:19px}' +
+        '.pg-text{font-size:14.5px;line-height:1.65}' +
+        '.pg-foot{padding:12px 18px calc(18px + env(safe-area-inset-bottom,0px))}' +
+        '.pg-btn{padding:11px 18px;min-height:44px}' +
+        '.pg-menu{position:fixed;top:auto;bottom:0;left:0;right:0;width:auto;border-radius:16px 16px 0 0;border-left:0;border-right:0;border-bottom:0}' +
+        '.pg-mi{padding:15px 18px}' +
+      '}',
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -161,9 +186,54 @@
     b.title = 'How this portal works';
     b.setAttribute('aria-label', 'How this portal works');
     b.textContent = '?';
-    b.onclick = open;
+    b.onclick = toggleMenu;
+    var wrap = document.createElement('div');
+    wrap.style.position = 'relative';
+    wrap.appendChild(b);
     var before = document.getElementById('portalThemeToggle') || bar.firstChild;
-    bar.insertBefore(b, before);
+    bar.insertBefore(wrap, before);
+    var m = document.createElement('div');
+    m.id = 'pg-menu';
+    m.className = 'pg-menu';
+    wrap.appendChild(m);
+  }
+
+  /* ⚠️ BUILT ON EVERY OPEN, not once at inject time. coachmarks.js loads before
+     this file but configurePortalTour() runs on a delay after the vendor's data
+     lands, so at inject time CoachTour.available() is still false and the tour
+     item would be permanently missing. */
+  function toggleMenu(e) {
+    if (e) e.stopPropagation();
+    var m = document.getElementById('pg-menu');
+    if (!m) { open(); return; }
+    if (m.classList.contains('show')) { closeMenu(); return; }
+    var items = '';
+    if (window.CoachTour && CoachTour.available()) {
+      items += '<button class="pg-mi" data-a="tour"><i class="ti ti-route"></i>'
+             + '<span><b>Show me around</b><em>Points at the real thing, one step at a time</em></span></button>';
+    }
+    items += '<button class="pg-mi" data-a="guide"><i class="ti ti-book"></i>'
+           + '<span><b>Read the guide</b><em>The whole portal, start to finish</em></span></button>';
+    m.innerHTML = items;
+    m.querySelectorAll('.pg-mi').forEach(function (btn) {
+      btn.onclick = function () {
+        var a = btn.getAttribute('data-a');
+        closeMenu();
+        if (a === 'tour' && window.CoachTour) CoachTour.start(true);
+        else open();
+      };
+    });
+    m.classList.add('show');
+    setTimeout(function () { document.addEventListener('click', outside, true); }, 0);
+  }
+  function closeMenu() {
+    var m = document.getElementById('pg-menu');
+    if (m) m.classList.remove('show');
+    document.removeEventListener('click', outside, true);
+  }
+  function outside(e) {
+    var m = document.getElementById('pg-menu');
+    if (m && !m.contains(e.target) && e.target.id !== 'btn-portal-guide') closeMenu();
   }
 
   if (document.readyState === 'loading') {
