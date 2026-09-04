@@ -5904,7 +5904,16 @@ const _HIST_NOISE = new Set([
   'updated_at', 'updated_by', 'updated_by_name',
   'created_at', 'created_by', 'created_by_name',
   'archived_by', 'archived_by_name', 'locked_by', 'locked_by_name',
-  'vendor_edited_at', 'uploaded_at', 'uploaded_by', 'uploaded_by_name'
+  'vendor_edited_at', 'uploaded_at', 'uploaded_by', 'uploaded_by_name',
+  // ⚠️ vendors.status is a CONSEQUENCE, never an intent. internal.vendor_edit_guard
+  //    flips it to pending_review on every vendor self-edit and acknowledgeVendorEdit
+  //    puts it back, so it appeared on live data as "Record status: approved →
+  //    pending_review" in the middle of a vendor's real changes — pure noise that
+  //    told a reviewer nothing. The column is retired from the UI anyway (2026-08-19).
+  'status',
+  // archived_at carries the same meaning _histOpLabel already renders as
+  // "Removed" / "Restored", so showing the raw timestamp beside it is a duplicate.
+  'archived_at'
 ]);
 
 /* Column name -> what a person calls it. The diff used to print the raw
@@ -6024,7 +6033,23 @@ function _histChangedFields(h) {
   });
   return out;
 }
-function _histVal(v) {
+/* Columns holding a Storage path. Rendering one verbatim showed a reviewer
+   "c26350b3-…/person_04bf395a-…_1788419380766_image__17_.png" where they wanted
+   to know a photo had been replaced — seen on live data. uploadVendorFile writes
+   <vendorId>/<kind>_<rowId>_<timestamp>_<original filename>, so the real name is
+   recoverable; anything that does not match that shape falls back to a plain
+   "(a file)" rather than a guess. */
+const _HIST_PATH_KEYS = new Set(['photo_path', 'logo_path', 'file_path', 'spec_path']);
+function _histFileVal(v) {
+  if (v === null || v === undefined || v === '') return '(none)';
+  const base = String(v).split('/').pop();
+  const m = base.match(/^[A-Za-z]+_[0-9a-fA-F-]{8,}_\d+_(.+)$/);
+  const name = m ? m[1] : base;
+  if (!name || /^[0-9a-fA-F-]{16,}$/.test(name)) return '(a file)';
+  return name.length > 44 ? name.slice(0, 44) + '…' : name;
+}
+function _histVal(v, k) {
+  if (k && _HIST_PATH_KEYS.has(k)) return _histFileVal(v);
   if (v === null || v === undefined || v === '') return '(empty)';
   if (Array.isArray(v)) return v.length ? v.join(', ') : '(empty)';
   if (typeof v === 'object') return JSON.stringify(v);
@@ -6093,9 +6118,9 @@ function _renderVendorChangeSummary() {
       return fields.map(function (k) {
         fieldCount++;
         return '<div class="vc-row"><span class="vc-field">' + esc(_histLabel(k)) + '</span>'
-          + '<span class="vc-old">' + esc(_histVal(h.old_data ? h.old_data[k] : null)) + '</span>'
+          + '<span class="vc-old">' + esc(_histVal(h.old_data ? h.old_data[k] : null, k)) + '</span>'
           + '<span class="vc-arrow" aria-hidden="true">→</span>'
-          + '<span class="vc-new">' + esc(_histVal(h.new_data ? h.new_data[k] : null)) + '</span></div>';
+          + '<span class="vc-new">' + esc(_histVal(h.new_data ? h.new_data[k] : null, k)) + '</span></div>';
       }).join('');
     }).join('');
     if (!rows) return '';
@@ -6187,8 +6212,8 @@ async function renderDetailHistory() {
           // Plain field names, not the raw column — reading a change should not
           // require knowing the schema.
           return '<div class="hist-diff"><span>' + esc(_histLabel(k)) + '</span>'
-            + '<del>' + esc(_histVal(h.old_data ? h.old_data[k] : null)) + '</del>'
-            + '<ins>' + esc(_histVal(h.new_data ? h.new_data[k] : null)) + '</ins></div>';
+            + '<del>' + esc(_histVal(h.old_data ? h.old_data[k] : null, k)) + '</del>'
+            + '<ins>' + esc(_histVal(h.new_data ? h.new_data[k] : null, k)) + '</ins></div>';
         }).join('') + (fields.length > 6 ? '<div class="hist-more">+' + (fields.length - 6) + ' more</div>' : '')
       : '<div class="hist-more">No content fields changed.</div>';
     // An INSERT entry has no earlier state, so there is nothing to restore to —
