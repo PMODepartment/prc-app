@@ -31,6 +31,14 @@ self.addEventListener('fetch', function () { return; });
    ⚠️ A NOTIFICATION MUST BE SHOWN. The subscription is userVisibleOnly, so a
       push that shows nothing gets the origin's push permission revoked by the
       browser. Every path below ends in showNotification. */
+/* ⚠️ MUST MATCH VAPID_PUBLIC_KEY IN vendor-portal.html.
+   It is only needed by the pushsubscriptionchange handler at the bottom, as
+   the fallback for browsers that do not hand back the old subscription. It is
+   not a secret — the browser needs it to subscribe. A service worker cannot
+   read the page's constant (separate script, and it is restarted between
+   events), so the value genuinely has to be in both files. */
+const VAPID_PUBLIC_KEY = '';
+
 const TITLE = 'Megawide Procurement';
 const BODY  = 'Something is waiting on your Bid Board.';
 
@@ -68,10 +76,23 @@ self.addEventListener('notificationclick', function (event) {
    in the database goes stale, every later push 410s, and the row is deleted —
    the vendor is silently unsubscribed having done nothing. Re-subscribe with
    the same key and tell the page, which stores it. */
+function _b64uToU8(v) {
+  const pad = (v + '='.repeat((4 - (v.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(pad);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
 self.addEventListener('pushsubscriptionchange', function (event) {
   event.waitUntil((async function () {
     const old = event.oldSubscription || null;
-    const key = (old && old.options && old.options.applicationServerKey) || null;
+    /* ⚠️ oldSubscription IS OFTEN ABSENT, and its options emptier still —
+       support for this event is patchy. Returning here is what would silently
+       unsubscribe the vendor, which is the exact thing this handler exists to
+       prevent, so fall back to the constant above. */
+    let key = (old && old.options && old.options.applicationServerKey) || null;
+    if (!key && VAPID_PUBLIC_KEY) key = _b64uToU8(VAPID_PUBLIC_KEY);
     if (!key) return;
     try {
       const sub = await self.registration.pushManager.subscribe({

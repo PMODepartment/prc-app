@@ -47,13 +47,21 @@ Dashboard → **Database → Webhooks → Create a new hook**:
 That is the only webhook needed. Everything that deserves a notification writes
 to that one table (see the triggers in `migrations/2026-09-05_vendor_push.sql`).
 
-## 4. Put the public key in the portal
+## 4. Put the public key in the portal — in BOTH files
 
-In `vendor-portal.html`, replace the placeholder:
+Same value in each; they must match:
 
 ```js
+// vendor-portal.html
 const VAPID_PUBLIC_KEY = '';   // ← paste the PUBLIC key here
+
+// vendor-sw.js
+const VAPID_PUBLIC_KEY = '';   // ← the same PUBLIC key
 ```
+
+The service worker needs its own copy: it cannot read the page's constant, and it is
+the fallback that re-subscribes a device whose browser rotated the subscription
+without handing back the old one.
 
 The public key is not a secret — the browser needs it to subscribe. Until it is
 set, the portal simply does not offer notifications; nothing breaks.

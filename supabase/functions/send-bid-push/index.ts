@@ -121,12 +121,17 @@ Deno.serve(async (req: Request) => {
     try {
       const res = await fetch(s.endpoint, {
         method: 'POST',
+        // ⚠️ NO BODY, SO NO `Content-Encoding` AND NO `Content-Length`.
+        //    `Content-Encoding: aes128gcm` DECLARES an RFC 8291 encrypted
+        //    payload; sending it with no body is a request whose headers and
+        //    body disagree, and a push service is entitled to 400 it. The
+        //    reference `web-push` library sets it only when there IS a
+        //    payload, and this send never has one. `Content-Length` is a
+        //    forbidden header for fetch anyway — it is stripped, and fetch
+        //    sets 0 itself for a bodyless request.
         headers: {
           Authorization: await vapidHeader(s.endpoint),
           TTL: '86400',                 // hold it for a day if the device is off
-          'Content-Length': '0',
-          // Some push services reject a payloadless POST without this.
-          'Content-Encoding': 'aes128gcm',
           Urgency: 'normal',
         },
       });

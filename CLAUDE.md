@@ -2913,6 +2913,45 @@ code.**
 function, the webhook and the iOS path are all verified by construction and by
 harness only.
 
+**Two first-use risks found by cross-checking the four parts against each other,
+after the migration was run (2026-09-05).** Each harness had passed against its
+own stub; neither could see a mismatch BETWEEN files.
+
+- **⚠️ THE PAYLOADLESS PUSH WAS SENDING `Content-Encoding: aes128gcm`.** That
+  header DECLARES an RFC 8291 encrypted payload, and this send deliberately has
+  no body — a request whose headers and body disagree, which a push service is
+  entitled to reject with a 400. The reference `web-push` library sets it only
+  when there IS a payload. Removed, along with `Content-Length: 0` (a forbidden
+  header for `fetch`, so it was being stripped anyway; fetch sets 0 itself).
+  **Do not add either back for a payloadless push.**
+- **⚠️ `pushsubscriptionchange` GAVE UP when the browser did not hand back the
+  old subscription** — `if (!key) return;` — which is precisely the case that
+  silently unsubscribes a vendor, the thing that handler exists to prevent.
+  Support for that event's `oldSubscription` is patchy. It now falls back to a
+  **`VAPID_PUBLIC_KEY` constant in `vendor-sw.js`**, so the value genuinely
+  lives in TWO files and **they must match** — a service worker cannot read the
+  page's constant (separate script, restarted between events), and it has
+  nowhere to cache one given the SW caches nothing. README step 4 names both.
+
+**Verified: 56 assertions across three harnesses** — 11 on the VAPID JWT
+(signature verifies against its public key, raw r||s not DER, `aud` per
+endpoint), 21 on the portal client (every unusable state, both toggles,
+rotation), and **24 new ones on the VERBATIM shipped `vendor-sw.js`** driven
+under a stub: a push always shows exactly one notification, **nothing reads
+`event.data`** (asserted with a throwing getter, not by inspection), the body
+carries no figure or deadline, and `pushsubscriptionchange` re-subscribes in all
+three states — key handed back, `oldSubscription` absent, and `options` empty —
+while still doing nothing at all with the key unset, which is the shipped state.
+
+**⚠️ WHAT IS LEFT IS DEPLOYMENT, AND NONE OF IT IS IN THIS REPO.** The migration
+IS run (both tables resolve). Still outstanding: `node gen_vapid_keys.mjs` once
+(**regenerating later invalidates every stored device subscription**), the public
+half pasted into `vendor-portal.html` AND `vendor-sw.js`, the function deployed
+with its three secrets, and the one Database Webhook on `vendor_push_outbox`.
+Until the key is set the portal offers no notification option at all — by
+design, so a half-deployed state cannot look broken.
+
+
 ### Class codes, the reference pack, and the portal as an app (2026-09-05)
 
 `migrations/2026-09-05_class_codes.sql` + `SEED_class_codes.sql`, and
