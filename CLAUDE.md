@@ -3122,6 +3122,136 @@ there is nothing per-vendor to encode — and a link that looked personal would 
 authority it does not carry. It is not a password: every claim still lands in Vendor
 Registrations for review.
 
+
+### Live testing found Bid Management completely non-functional (2026-09-04)
+
+Driven against the live site as super_admin. The page LOOKED fine — it rendered
+its empty state and logged no errors — because the empty state is the one thing
+on it that builds no inline handler.
+
+- **⚠️ `Q` WAS USED 15 TIMES AND NEVER DECLARED.** It is the single-quote
+  delimiter this page builds every `onclick` with, so `openNewRound()` threw
+  `ReferenceError: Q is not defined` and rendered nothing. The same free
+  variable sits behind the round-list rows, the stage stepper, add / remove /
+  withdraw / reinstate bidder, the RFQ copy-link and mailto buttons, opening a
+  submitted file, clarifications and notices. Declared as
+  `String.fromCharCode(39)` so no quoting layer can eat it.
+  **`node --check` cannot catch this class of bug** — a free variable parses
+  fine and only throws when its line runs. Clicking the button found it.
+- **⚠️ The page used `.modal-overlay` / `.modal-header` / `.modal-body` /
+  `.modal-footer` / `.modal-close` and defined NONE of them.** `dashboard.css`
+  provides **`.modal-bg`, not `.modal-overlay`** — that class lives in each
+  page's own `<style>` (`admin.html`, `vendors.html`,
+  `vendor-registrations.html` each carry a copy) and this page never got one.
+  So the overlay took `display:flex` from `openNewRound()` but stayed
+  `position:static` and laid out as an ordinary block at y=900: below the fold,
+  no backdrop, invisible. Both the New-bid-round modal AND the RFQ composer
+  were affected, so an officer could neither start a round nor issue an
+  invitation — the two things the page exists for.
+  **⚠️ `padding:0` on `.modal` is load-bearing**: `dashboard.css .modal` sets
+  `padding:28px` (20px under a media query), which would otherwise stack on top
+  of the header/body/footer padding.
+
+**When adding a page that uses the `.modal-overlay` vocabulary, copy the modal
+CSS into it — that vocabulary is per-page, not in `dashboard.css`.**
+
+### New bid round: project first, then its work packages (2026-09-04)
+
+Asked for after seeing the flat picker: *"organize this per project rather than
+a scattered approach with work packages from multiple projects."* A single
+search box over **~1,860 packages across 21 projects** is not how an officer
+thinks about a solicitation — they are working on a project.
+
+- **Step 1 lists only projects that have something biddable, with a count.** A
+  project whose packages are all awarded would be a dead end, and the count is
+  what tells an officer where the work is (`nrBiddableByProject`). Searchable on
+  code or name.
+- **Step 2 is scoped to that project** — a package from another project is
+  neither listed nor findable by search. Breadcrumb + "← All projects" back.
+- **⚠️ Back clears `_nrPick`** so a package chosen under a previous project can
+  never be carried into Create.
+- `isResolved` stays the shared "not biddable" predicate (Known Issues #28) —
+  `award_status` is never re-inlined here.
+- Vendors are still invited afterwards in the round workspace, which is where
+  the RFQ is composed and issued. That part was not restructured.
+- **Verified live**: step 1 showed real counts (AVR101 1 package, AVR102 35,
+  BAU101 23, GPR101 51 …); picking BAU101 listed exactly its 23 packages with
+  Create still disabled. Plus 28 assertions against the verbatim shipped
+  functions under a DOM stub.
+
+### Vendor portal, tested live as a real vendor (2026-09-04)
+
+The first time this path has been driven by an actual vendor login
+(`ZZ Test Accredited Supplies Inc.`), which CLAUDE.md had recorded as never
+exercised.
+
+**Held up:** every role guard — `vendors.html`, `bids.html`,
+`vendor-registrations.html`, `admin.html` and `vendor-register.html` all bounce
+a vendor to the portal; all five portal tabs render; the Bid Board loads its
+empty state (first live proof the `vendor_bid_board_view` read path works); no
+console errors anywhere.
+
+**Two defects found:**
+
+- **⚠️ The dark-mode contrast pass had never been applied to this page.** It got
+  the `--mw-red-ink` token but not the pass, so its own hardcoded colours were
+  still light-page values. Worst: **"Still needed before you can request: …" at
+  1.69:1** — the single most actionable thing a vendor is told, effectively
+  invisible. It was an **inline style**, which beats any `html.dark-mode` class
+  rule, so it needed a class (`.ready-missing`) before it could be themed at
+  all (Known Issues #30). 13 class rules fixed alongside it.
+  **⚠️ `.doc-rule` already HAD a dark override — at `#777`, i.e. 3.13:1.** The
+  block-aware scanner skips a rule that has an override, so this one was only
+  caught by measuring the rendered page. **Having an override does not mean the
+  override passes.**
+  **⚠️ `.sidebar-logo .app-label` was deliberately left alone** — the sidebar is
+  near-black in BOTH themes, so its red sits on `#231F20` (3.96:1), not on
+  `--surface`. A scanner that assumes `--surface` will mis-flag it.
+- **⚠️ `.bid-past > summary::before` carried `content:'\x15b8'`** — a stray
+  control byte plus `"b8"`, a mangled `▸`. **The same corruption signature
+  CLAUDE.md already records for `review.html`'s `.xl-help` arrow**, and it made
+  the file register as binary to `grep`/diff. Repaired; a byte scan now shows no
+  control bytes anywhere in the repo.
+
+**Open question, not a bug:** the vendor reads **ACCREDITED** while the
+Accreditation tab shows 20% readiness, twelve red ✗ items and a live "Request
+accreditation" gate. Consistent (staff granted accreditation against an
+incomplete profile) but it presents as a failure state to a vendor who is
+already approved. Worth deciding whether that panel should switch to a
+"you are accredited — keep these current" framing.
+
+### The vendor-change summary, corrected against real data (2026-09-04)
+
+Opening a vendor with a live self-edit showed the feature working, and exposed
+two things a synthetic fixture had not:
+
+- **⚠️ `vendors.status` is a CONSEQUENCE, not a change anyone made.**
+  `internal.vendor_edit_guard` flips it to `pending_review` on every vendor
+  self-edit and `acknowledgeVendorEdit` puts it back, so the panel read
+  "Record status: approved → pending_review" in the middle of the vendor's real
+  changes. It is now in `_HIST_NOISE`, along with `archived_at` — `_histOpLabel`
+  already renders that as "Removed"/"Restored", so the raw timestamp beside it
+  was a duplicate.
+- **A photo change rendered as a raw Storage path.** `uploadVendorFile` writes
+  `<vendorId>/<kind>_<rowId>_<timestamp>_<original name>`, so the real filename
+  is recoverable: `_histVal` now takes the column key and routes the four
+  path-bearing columns (`photo_path`, `logo_path`, `file_path`, `spec_path`)
+  through `_histFileVal`. Anything not matching that shape falls back to its
+  basename, and a bare uuid to `(a file)` rather than a guess.
+- **⚠️ The shipped regex was `/_d+_/`, not `/_\d+_/`** — a backslash lost
+  through a heredoc into a template literal. The documented double-escaping
+  trap, and the **test caught it, review did not**. Build a regex with
+  `String.fromCharCode(92)` or a plain literal, never through nested string
+  layers.
+- 18 assertions against the verbatim shipped functions, using the exact path and
+  history rows read out of production.
+
+**⚠️ A LIVE-DATA NOTE ON THE ORIGINAL "vendor shown as User" REPORT:** the
+database was always correct. `approve_vendor_claim` writes `role='vendor'`, and
+Vendor Registrations confirms **0 wrongly tagged**. It was purely `roleLabel()`
+in `admin.html` having no `vendor` case and falling through to `'User'`. The
+mis-tag detector added alongside the fix is a safety net, not the fix.
+
 ## Claims & Change Orders (HIDDEN â€” not yet active)
 
 To re-enable: remove `style="display:none"` from sidebar section + tab button in `project.html`; Claims tab button in `index.html`; restore Claims/CO cards in template picker modals.
