@@ -45,6 +45,9 @@ Database sidebar has no Webhooks entry at all. Direct link:
 
 Settings:
 
+- **Name**: `send_bid_push` — anything you like, but it becomes the name of the
+  Postgres trigger created on that table, so keep it lowercase with underscores.
+  Nothing else triggers on `vendor_push_outbox`, so there is no collision.
 - **Table**: `public.vendor_push_outbox`
 - **Events**: `Insert` only
 - **Type**: Supabase Edge Functions → `send-bid-push`
