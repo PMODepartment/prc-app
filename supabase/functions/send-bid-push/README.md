@@ -37,12 +37,21 @@ not add them by hand.
 
 ## 3. Point one Database Webhook at it
 
-Dashboard → **Database → Webhooks → Create a new hook**:
+Dashboard → **Integrations → Webhooks → Create a new hook**.
+
+⚠️ **Not** under Database — Supabase moved webhooks out of that section, and the
+Database sidebar has no Webhooks entry at all. Direct link:
+`/dashboard/project/<ref>/integrations/webhooks/overview`
+
+Settings:
 
 - **Table**: `public.vendor_push_outbox`
 - **Events**: `Insert` only
 - **Type**: Supabase Edge Functions → `send-bid-push`
 - **Method**: `POST`
+
+If it offers to enable the `pg_net` extension, say yes — Database Webhooks are a
+wrapper around a trigger that calls `net.http_post`, so it cannot work without it.
 
 That is the only webhook needed. Everything that deserves a notification writes
 to that one table (see the triggers in `migrations/2026-09-05_vendor_push.sql`).
