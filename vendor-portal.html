@@ -124,6 +124,8 @@
     .nav-item .nbadge{position:absolute;right:10px;font-size:10px;background:#fff;color:#EE3124;
       border-radius:10px;padding:1px 6px;font-weight:700;min-width:18px;text-align:center}
     .nav-item.active .nbadge{background:rgba(255,255,255,.25);color:#fff}
+    .sidebar-bottom{margin-top:auto}
+    .sidebar-bottom .sidebar-footer{margin-top:0}
     .sidebar-footer{margin-top:auto;padding:14px 20px;border-top:1px solid rgba(255,255,255,.06);
       font-size:10px;color:rgba(255,255,255,.25);line-height:1.6}
     .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
@@ -148,6 +150,37 @@
       .sidebar.open{transform:translateX(0);box-shadow:0 10px 30px rgba(0,0,0,.3)}
       .sidebar-overlay.show{display:block}
       .main{margin-left:0}
+    }
+    /* ⚠️ BASE RULE FIRST. A media query adds NO specificity, so an equal
+       rule later in the file beats it — putting this after the @media below
+       hid the icon at every width and left an empty 32x32 button on a phone.
+       The icon exists only for the phone; on desktop the word carries it. */
+    .btn-logout .ti{display:none}
+    /* ══ PHONE ═══════════════════════════════════════════════════════════
+       Measured, not guessed: at 375px the topbar wanted 452px of content, so
+       "Sign out" sat 77px past the right edge and the title broke into
+       "Vendor" / "Portal". Two things go, and the choice is about what a
+       vendor actually needs up there: the TITLE (they know which app they
+       opened, and the sidebar header repeats it) and the WORD on Sign out.
+       ⚠️ The ACCREDITED pill STAYS — it is their standing, the one thing in
+          that bar they cannot get anywhere else at a glance, and the banner
+          that also carries it is dismissible. */
+    @media(max-width:600px){
+      .topbar{padding:0 12px}
+      .topbar-left,.topbar-right{gap:8px}
+      .topbar-title{display:none}
+      .btn-logout{padding:0;width:32px;height:32px;display:flex;align-items:center;
+        justify-content:center;font-size:15px}
+      .btn-logout .logout-word{display:none}
+      .btn-logout .ti{display:block}
+    }
+    /* A 320px screen (an old SE, or a phone in accessibility zoom) still needed
+       347px. The mark goes rather than the standing pill or the controls — a bar
+       that scrolls sideways is worse than one without the logo in it. */
+    @media(max-width:340px){
+      .topbar{padding:0 10px}
+      .topbar-left,.topbar-right{gap:6px}
+      .topbar-mark{display:none}
     }
     .banner{border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.5;margin-bottom:20px}
     .banner-pending{background:#FEF3C7;color:#92400E;border:1px solid #FDE68A}
@@ -212,6 +245,12 @@
     html.dark-mode .prof-photo-btn{box-shadow:0 0 0 2px #232323}
     .prof-photo-btn:hover{background:#EE3124}
     .trade-checklist{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;border:1.5px solid #e5e5e5;border-radius:8px;padding:10px 12px;max-height:200px;overflow-y:auto}
+    /* ⚠️ NO INNER SCROLLER ON A PHONE. Ten trades in two columns of wrapped
+       labels need 276px against the 197px this box allowed, so the last two
+       (Plumbing, Fire Protection) were cut through the middle of their text —
+       which reads as broken, not as scrollable. The page already scrolls; a
+       second scroller inside it is the thing this app avoids everywhere. */
+    @media(max-width:600px){.trade-checklist{max-height:none;overflow-y:visible}}
     .trade-checklist label{display:flex;align-items:center;gap:8px;font-size:13px;color:#231F20;cursor:pointer}
     .trade-checklist input[type="checkbox"]{width:15px;height:15px;accent-color:#EE3124;cursor:pointer;flex-shrink:0}
     .btn-primary{padding:10px 20px;background:#EE3124;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer}
@@ -581,12 +620,19 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       <i class="ti ti-clipboard-list"></i>Bid Board
       <span class="nbadge" id="bidBadge" style="display:none">0</span></button>
   </div>
-  <div class="sidebar-section" style="margin-top:auto">
-    <button class="nav-item" id="btn-install" style="display:none" onclick="installPortal()">
-      <i class="ti ti-device-mobile-down"></i>Add to home screen</button>
-  </div>
-  <div class="sidebar-footer">
-    Megawide Construction Corporation<br>EPC · Procurement · Vendor Portal
+  <!-- ⚠️ ONE bottom group, so only ONE margin-top:auto. This item and the
+       footer each used to claim it, and two flex children both claiming the
+       free space SPLIT it between them — which is why "Add to home screen"
+       floated in the middle of the rail, detached from the nav above and the
+       footer below. -->
+  <div class="sidebar-bottom">
+    <div class="sidebar-section">
+      <button class="nav-item" id="btn-install" style="display:none" onclick="installPortal()">
+        <i class="ti ti-device-mobile-down"></i>Add to home screen</button>
+    </div>
+    <div class="sidebar-footer">
+      Megawide Construction Corporation<br>EPC · Procurement · Vendor Portal
+    </div>
   </div>
 </aside>
 
@@ -603,7 +649,7 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
          render had not run yet. -->
     <span class="status-pill" id="statusPill" style="display:none"></span>
     <button class="portal-theme-toggle" id="portalThemeToggle" onclick="togglePortalTheme()" aria-label="Toggle dark mode"></button>
-    <button class="btn-logout" onclick="AppAuth.logout()">Sign out</button>
+    <button class="btn-logout" onclick="AppAuth.logout()" aria-label="Sign out" title="Sign out"><i class="ti ti-logout"></i><span class="logout-word">Sign out</span></button>
   </div>
 </div>
 
@@ -2674,16 +2720,34 @@ function registerVendorSW() {
    us offer a button at a sensible moment instead of relying on the vendor
    finding "Add to Home Screen" in a menu they have never opened. */
 let _installPrompt = null;
+/* ⚠️ A HOME SCREEN IS A PHONE THING, so this is offered on a phone or tablet
+   ONLY. Desktop Chrome and Edge DO fire beforeinstallprompt, so the button was
+   appearing on a laptop where "Add to home screen" means nothing and installs a
+   desktop window nobody asked for. `(pointer:coarse)` is the test rather than a
+   width: a narrowed desktop window is still a desktop, and a hybrid laptop
+   reports its mouse as the primary pointer. */
+function _canOfferInstall() {
+  if (_isStandalone()) return false;              // already installed
+  try { return window.matchMedia('(pointer:coarse)').matches; } catch (e) { return false; }
+}
+function _syncInstallBtn(show) {
+  const b = document.getElementById('btn-install');
+  if (b) b.style.display = show ? '' : 'none';
+}
 window.addEventListener('beforeinstallprompt', function (e) {
   e.preventDefault();
   _installPrompt = e;
-  const b = document.getElementById('btn-install');
-  if (b) b.style.display = '';
+  _syncInstallBtn(_canOfferInstall());
+});
+/* ⚠️ iOS NEVER FIRES THAT EVENT, so waiting for it would hide the button on the
+   one platform where the vendor most needs telling how — installing is what
+   makes notifications possible there at all. Offer it and explain. */
+window.addEventListener('load', function () {
+  if (_iosNeedsInstall() && _canOfferInstall()) _syncInstallBtn(true);
 });
 window.addEventListener('appinstalled', function () {
   _installPrompt = null;
-  const b = document.getElementById('btn-install');
-  if (b) b.style.display = 'none';
+  _syncInstallBtn(false);
 });
 async function installPortal() {
   if (!_installPrompt) {
@@ -2698,8 +2762,7 @@ async function installPortal() {
   _installPrompt.prompt();
   try { await _installPrompt.userChoice; } catch (e) {}
   _installPrompt = null;
-  const b = document.getElementById('btn-install');
-  if (b) b.style.display = 'none';
+  _syncInstallBtn(false);
 }
 
 /* ── Push notifications ────────────────────────────────────────────────────

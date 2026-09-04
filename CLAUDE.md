@@ -2847,6 +2847,46 @@ being unable to inject markup.
 subject are both dropped by their deploy guards, so the round works and nothing is lost, but
 neither is stored. Its section 5 verification `SELECT` must read true on all five columns.
 
+### The portal on a phone, and the install item (2026-09-05)
+
+Reported from a real iPhone, and every figure below was measured in a harness
+built from the real CSS + the real markup — not eyeballed.
+
+- **⚠️ THE TOPBAR WANTED 452px OF CONTENT IN A 375px BAR.** `Sign out` sat 77px
+  past the right edge and "Vendor Portal" broke into two lines. Two things go on
+  a phone, and the choice is about what a vendor cannot get elsewhere: the
+  **title** (they know which app they opened, and the sidebar header repeats it)
+  and the **word** on Sign out, which becomes `ti-logout`.
+  **⚠️ THE ACCREDITED PILL STAYS** — it is their standing, the one thing up there
+  they cannot read at a glance anywhere else, and the banner that also carries it
+  is dismissible. Verified one row at 430 / 390 / 375; a further `≤340px` rule
+  drops the mark, because at 320px it still needed 347px and a bar that scrolls
+  sideways is worse than one without the logo.
+- **⚠️ A SOURCE-ORDER BUG I INTRODUCED AND CAUGHT BY LOOKING AT THE RENDER, not by
+  reading the diff.** `.btn-logout .ti{display:none}` was placed AFTER the
+  `@media` that sets `display:block` — **a media query adds NO specificity**, so
+  the later equal rule won, the icon was hidden at every width, and the phone got
+  a 32×32 button with nothing in it. Base rule goes FIRST. Same trap as the
+  Excel grid's group-row `:hover`.
+- **The trade-category box was clipping "Plumbing Works" and "Fire Protection"
+  through the middle of their text.** `max-height:200px;overflow-y:auto` against
+  the 276px ten wrapped labels need in two columns — which reads as broken, not
+  as scrollable. On a phone the cap is removed so it grows: the page already
+  scrolls, and **a second scroller inside it is what this app avoids everywhere.**
+- **"Add to home screen" was showing on desktop, where a home screen is not a
+  thing.** Desktop Chrome and Edge DO fire `beforeinstallprompt`, so waiting for
+  that event was never a mobile test. It is now gated on **`(pointer:coarse)`**
+  rather than a width — a narrowed desktop window is still a desktop, and a
+  hybrid laptop reports its mouse as the primary pointer. **⚠️ iOS never fires
+  that event at all**, so there is a separate `load` branch that offers the item
+  on iOS regardless; installing is what makes notifications possible there, so
+  hiding it on the one platform that needs telling would be the worst outcome.
+- **It also floated detached in the middle of the rail.** Its wrapper had
+  `margin-top:auto` and `.sidebar-footer` had it too — **two flex children both
+  claiming the free space SPLIT it between them.** They are now one
+  `.sidebar-bottom` group with a single auto margin; measured, the install item
+  now sits 4px above the footer with the footer flush to the rail's bottom.
+
 ### Web push for the vendor portal (2026-09-05)
 
 `migrations/2026-09-05_vendor_push.sql`, `supabase/functions/send-bid-push/`,
