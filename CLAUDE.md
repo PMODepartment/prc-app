@@ -2683,12 +2683,17 @@ deadline, invitees and outcome, and the previous one must stay readable. That is
 uniqueness key moved from `(wp_id, vendor_id)` to **`(round_id, vendor_id)`**: the old one
 forbade inviting the same vendor to a re-tender of the same package.
 
-**⚠️ LETTERS ARE OUT OF SCOPE, AND THAT WAS A DECISION.** Megawide already has drafted NOA and
-Letter-of-Regret templates. The intention was never for the app to AUTHOR letters — only to
-merge facts it already holds (vendor, package, final amount, terms, dates, reference) into
-those existing templates so nobody retypes a figure. That is postponed, so the schema records
-**`notice_issued_at` / `notice_ref`** — THAT a notice went out and its reference — and models
-no letter content. **Do not "helpfully" generate letter prose here.**
+**⚠️⚠️ LETTERS ARE OUT OF SCOPE PERMANENTLY — decided 2026-09-04, not postponed.**
+The NOA and the Letter of Regret stay a **separate process**. They come from Megawide's own
+templates, which vary per package exactly as the cost comparison does: *"The procurement
+officer would just have to update the status of the bid and announce that to the app."*
+So the schema records **`notice_issued_at` / `notice_ref`** — THAT a notice went out and its
+reference — and models no letter content.
+
+**Do not author letter prose, and do not build a figure-merge into those templates "as a
+later step"** — that was offered and declined. The award panel shows how many notices are
+still to record, and notes that every bidder can already see the outcome on their own bid
+link, so the letter is the formal record rather than the first they hear of it.
 
 #### Answering without a login — the capability token
 

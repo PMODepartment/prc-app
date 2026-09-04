@@ -25,11 +25,14 @@
 --    vendor reach a work package it was not invited to. The token in §7 is a
 --    capability scoped to ONE invitation, not a login.
 --
--- ⚠️ LETTERS ARE OUT OF SCOPE, DELIBERATELY. Megawide already has drafted NOA
---    and Letter-of-Regret templates, so this records THAT a notice was issued
---    and its reference (§3 notice_*), and models no letter content. Merging the
---    figures into those existing templates is a later, additive step — do not
---    "helpfully" generate letter prose here.
+-- ⚠️⚠️ LETTERS ARE OUT OF SCOPE PERMANENTLY, NOT "NOT YET". Decided 2026-09-04:
+--    the NOA and the Letter of Regret stay a separate process. They come from
+--    Megawide's own templates, which vary per package the same way the cost
+--    comparison does. The officer issues them and then tells the app.
+--    So this records only THAT a notice went out and its reference (§3
+--    notice_*), and models no letter content at all.
+--    Do NOT generate letter prose here, and do NOT build a merge into those
+--    templates "as a later step" — that was considered and declined.
 --
 -- No temp tables and no state carried between statements — the Supabase SQL
 -- Editor does not run a script as one transaction.

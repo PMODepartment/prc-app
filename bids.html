@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904g"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904g"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904h"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904h"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -254,9 +254,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260904g"></script>
-<script src="assets/js/db.js?v=20260904g"></script>
-<script src="assets/js/ui.js?v=20260904g"></script>
+<script src="assets/js/auth.js?v=20260904h"></script>
+<script src="assets/js/db.js?v=20260904h"></script>
+<script src="assets/js/ui.js?v=20260904h"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -1292,8 +1292,27 @@ function awardPanel() {
     + '<div class="sec-note">' + (decided
         ? 'Awarded to <b>' + esc(winner.vendor_name) + '</b>' + (winner.decided_at ? ' on ' + esc(dOnly(winner.decided_at)) : '') + '.'
         : 'Awarding closes the round: the winner is marked awarded and every other bidder not awarded, so nobody is left un-notified.')
-    + ' <b>Policy N29: award only to accredited vendors.</b> The NOA and Letter of Regret are issued from your existing templates — '
-    + 'record the reference here once each goes out.</div>'
+    + ' <b>Policy N29: award only to accredited vendors.</b></div>'
+    /* ⚠️ THE APP DOES NOT WRITE THE LETTERS AND SHOULD NEVER TRY. The NOA and the
+       Letter of Regret come from Megawide's own templates, which vary per
+       package. The officer's job here is only to record that each one went out
+       and its reference — see the note in the migration. */
+    + (decided
+        ? (function () {
+            const noticed = INV.filter(i => i.outcome && i.notice_issued_at).length;
+            const owed = INV.filter(i => i.outcome).length;
+            return '<div class="sec-note" style="margin:-6px 0 12px">'
+              + 'Issue the <b>NOA</b> and the <b>Letters of Regret</b> from your own templates, then record '
+              + 'each reference below. '
+              + (owed
+                  ? (noticed >= owed
+                      ? '<span class="bm-low">All ' + owed + ' recorded.</span>'
+                      : '<b class="bm-high">' + (owed - noticed) + ' of ' + owed + ' still to record.</b>')
+                  : '')
+              + '<br>Every bidder can already see the outcome on their own bid link, so your letter is the '
+              + 'formal record rather than the first they hear of it.</div>';
+          })()
+        : '')
     + (decided ? '' :
         (canManage
           ? '<div class="bm-grid">'
