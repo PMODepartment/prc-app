@@ -60,6 +60,33 @@
     .sidebar-section{padding:16px 12px 4px}
     .sidebar-section-label{font-size:10px;font-weight:700;letter-spacing:.12em;
       color:rgba(255,255,255,.3);text-transform:uppercase;padding:0 8px;margin-bottom:4px}
+    /* A bare .field after an .itm-grid inherits no top gap, so the Notes label
+       sat hard against the Payment terms box above it. */
+    .bid-field{margin-top:14px}
+    .bid-field textarea{resize:vertical;max-height:220px;min-height:64px}
+    .per-flags{display:flex;flex-direction:column;gap:5px;padding-top:6px}
+    .per-flags label{display:flex;align-items:center;gap:6px;font-size:12px;color:#666;cursor:pointer}
+    .per-flag-help{font-size:11.5px;color:#888;line-height:1.6;margin-top:10px;
+      padding:9px 11px;background:var(--surface-2);border-radius:8px}
+    .prof-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+    .prof-tag-owner{background:#FDECEA;color:#9B1B1B}
+    .prof-toggles{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+    .prof-toggles button{font-size:11px;padding:3px 8px;border-radius:6px;cursor:pointer;
+      border:1px solid var(--border-md);background:var(--surface);color:var(--text-primary)}
+    .prof-toggles button:hover{border-color:var(--mw-red);color:var(--mw-red-ink)}
+    /* Mirror prompts — the Company Information boxes are read-only, so these say
+       where the value comes from and give the one-click way to set it. */
+    .mirror-prompt{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+      font-size:12px;line-height:1.55;border-radius:8px;padding:8px 11px;margin-bottom:10px}
+    .mirror-prompt i{font-size:15px;flex-shrink:0}
+    .mirror-prompt span{flex:1;min-width:170px}
+    .mirror-prompt.ok{background:var(--surface-2);color:var(--text-secondary)}
+    .mirror-prompt.need{background:#FDECEA;color:#9B1B1B}
+    .mirror-go{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;
+      border:1px solid var(--border-md);background:var(--surface);color:var(--text-primary);flex-shrink:0}
+    .mirror-go:hover{border-color:var(--mw-red);color:var(--mw-red-ink)}
+    html.dark-mode .prof-tag-owner{background:#4A2320;color:#FCA5A5}
+    html.dark-mode .mirror-prompt.need{background:#33211F;color:#FCA5A5}
     .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;
       color:rgba(255,255,255,.65);font-size:13px;font-weight:500;font-family:inherit;
       cursor:pointer;transition:all .15s;text-decoration:none;border:none;background:none;
@@ -631,25 +658,43 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       <div class="field"></div>
     </div>
 
+    <!-- ⚠️ PEOPLE ARE EDITED IN THE PERSONNEL TAB, NOT HERE.
+         These six boxes are MIRRORS of the personnel rows flagged primary
+         contact / owner. They were free text until 2026-09-04, which let a
+         vendor fill in a contact person on this tab and end up with an EMPTY
+         Personnel tab — two copies of the same person that never reconciled.
+         Grouped by WHOSE number it is: the mobile and email belong to the
+         contact person directly above them, which is what stopped the two
+         phone fields reading as a repeat of each other. -->
+    <div class="itm-legend" style="margin-top:16px">Primary contact</div>
+    <div id="contactPrompt"></div>
     <div class="field-row">
       <div class="field"><label>Contact Person <span style="color:#EE3124">*</span></label><input id="f-contact-person" type="text"></div>
       <div class="field"><label>Position <span style="color:#EE3124">*</span></label><input id="f-contact-position" type="text" placeholder="e.g. Sales Manager"></div>
     </div>
-    <!-- Owner is a DIFFERENT person from the day-to-day contact above, and the
-         accreditation email asks for both by name. -->
-    <div class="field-row">
-      <div class="field"><label>Owner / Proprietor <span style="color:#EE3124">*</span></label><input id="f-owner-name" type="text" placeholder="Full name"></div>
-      <div class="field"><label>Contact # of Owner <span style="color:#EE3124">*</span></label>
-        <input id="f-owner-contact-number" type="text" onblur="normalisePhone(this)"></div>
-    </div>
     <div class="field-row">
       <div class="field"><label>Contact Number (mobile) <span style="color:#EE3124">*</span></label>
-        <input id="f-contact-number" type="text" onblur="normalisePhone(this)"></div>
-      <div class="field"><label>Telephone</label>
-        <input id="f-telephone" type="text" onblur="normalisePhone(this)"></div>
-    </div>
-    <div class="field-row">
+        <input id="f-contact-number" type="text"></div>
       <div class="field"><label>Contact Email <span style="color:#EE3124">*</span></label><input id="f-contact-email" type="email"></div>
+    </div>
+
+    <!-- The owner is a DIFFERENT person from the day-to-day contact, the
+         accreditation email asks for both by name, and there can be SEVERAL
+         (a family-owned supplier routinely has two). Flag each of them in
+         Personnel and they all appear here. -->
+    <div class="itm-legend" style="margin-top:18px">Owner / proprietor</div>
+    <div id="ownerPrompt"></div>
+    <div class="field-row">
+      <div class="field"><label>Owner / Proprietor <span style="color:#EE3124">*</span></label><input id="f-owner-name" type="text"></div>
+      <div class="field"><label>Contact # of Owner <span style="color:#EE3124">*</span></label>
+        <input id="f-owner-contact-number" type="text"></div>
+    </div>
+
+    <!-- The company's own landline and site — not a person's. -->
+    <div class="itm-legend" style="margin-top:18px">Company</div>
+    <div class="field-row">
+      <div class="field"><label>Telephone (landline)</label>
+        <input id="f-telephone" type="text" onblur="normalisePhone(this)"></div>
       <div class="field"><label>Website</label><input id="f-website" type="text" placeholder="https://"></div>
     </div>
     <div class="itm-legend" style="margin-top:18px">What you are generally able to provide</div>
@@ -730,8 +775,16 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
         <div class="field"><label>Email</label><input id="np-email" placeholder="name@company.com"></div>
         <div class="field"><label>Photo</label><input id="np-photo" type="file" accept="image/*"></div>
         <div class="field"><label>&nbsp;</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#666;padding-top:9px">
-            <input type="checkbox" id="np-primary" style="width:auto"> Primary contact</label></div>
+          <div class="per-flags">
+            <label><input type="checkbox" id="np-primary" style="width:auto"> Primary contact</label>
+            <label><input type="checkbox" id="np-owner" style="width:auto"> Owner / proprietor</label>
+          </div></div>
+      </div>
+      <div class="per-flag-help">
+        <b>Primary contact</b> is whoever answers a request for quotation fastest — their name,
+        number and email fill in on Company Information. <b>Owner / proprietor</b> is who owns the
+        company; tick it for each owner if there is more than one. Megawide needs both on file to
+        accredit you.
       </div>
       <div class="itm-acts"><button class="btn-primary" onclick="addPersonnel()">Add contact</button></div>
     </div>
@@ -765,8 +818,8 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260904l"></script>
-<script src="assets/js/db.js?v=20260904l"></script>
+<script src="assets/js/auth.js?v=20260904m"></script>
+<script src="assets/js/db.js?v=20260904m"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -914,8 +967,14 @@ async function loadAll() {
 function _lockPreview() {
   const host = document.querySelector('.wrap');
   if (!host) return;
+  // ⚠️ NAVIGATION IS NOT AN EDIT. Disabling every button in .wrap also
+  //    disabled the tab buttons and the sidebar, so a preview opened on
+  //    Company Info could never reach any other tab — the whole point of
+  //    the preview. Anything that only CHANGES WHAT IS ON SCREEN is exempt.
   host.querySelectorAll('input, select, textarea, button').forEach(function (el) {
     if (el.closest('.topbar') || el.id === 'btn-menu') return;   // chrome stays usable
+    if (el.classList.contains('tab-btn') || el.classList.contains('nav-item')) return;
+    if (el.closest('.tabs') || el.closest('.sidebar')) return;
     el.disabled = true;
   });
   // Save bars and file pickers offer nothing here.
@@ -1179,12 +1238,21 @@ function dismissBanner() {
    TIN is fill-once: offered while blank, locked once on file, because it is
    tied to the BIR 2303 the vendor uploaded. */
 const OVERVIEW_FIELDS = {
-  'f-contact-person': 'contact_person', 'f-contact-position': 'contact_position',
-  'f-contact-number': 'contact_number', 'f-telephone': 'telephone',
-  'f-contact-email': 'contact_email', 'f-website': 'website',
+  'f-telephone': 'telephone', 'f-website': 'website',
   'f-address': 'address', 'f-city': 'city',
-  'f-owner-name': 'owner_name', 'f-owner-contact-number': 'owner_contact_number',
   'f-payment-terms': 'payment_terms', 'f-country': 'country',
+};
+/* ⚠️ MIRRORS, NOT INPUTS — deliberately OUT of OVERVIEW_FIELDS so they are
+   never part of the save payload. Personnel is the one editor for a named
+   person; these six boxes only display what is flagged there. Writing them
+   from this form is what produced a saved contact with an empty Personnel tab.
+   The vendors.* columns behind them are still the ones every other consumer
+   reads (accredReadiness, the staff cards, the analytics, the WP vendor
+   pickers, the RFQ composer) — syncPeopleMirror keeps them in step. */
+const MIRROR_FIELDS = {
+  'f-contact-person': 'contact_person', 'f-contact-position': 'contact_position',
+  'f-contact-number': 'contact_number', 'f-contact-email': 'contact_email',
+  'f-owner-name': 'owner_name', 'f-owner-contact-number': 'owner_contact_number',
 };
 // Capability the vendor declares about itself, answering the bond and submittal
 // requirements a work package carries. Vendor-owned, so NOT pinned in
@@ -1288,67 +1356,111 @@ async function uploadPortalLogo(input) {
 
 /* The country roster lives in db.js (window.COUNTRIES) so it can change without
    a migration; vendors.country stores only the ISO alpha-2. */
-/* The four Company Info contact fields mirror the primary contact from the
-   Personnel tab. When one exists they are read-only there — one place to edit,
-   so the two copies cannot drift. When none exists they stay editable, because
-   Contact person / Position / Contact number / Email address are required
-   accreditation items and a vendor must never be blocked on a field they are
-   not allowed to fill. */
-const CONTACT_MIRROR = {
+/* ── People come from Personnel ─────────────────────────────────────────────
+   Contact person / position / mobile / email mirror whoever is flagged PRIMARY
+   CONTACT; owner name / owner number mirror everyone flagged OWNER.
+
+   ⚠️ ALWAYS READ-ONLY — including when there is nobody flagged yet. That last
+      case is the one that mattered: the boxes used to stay editable "so the
+      vendor is never blocked on a field they cannot fill", and a vendor filled
+      them in, saved, and finished with a contact on the company record and an
+      EMPTY Personnel tab. They are not blocked — they fill these in by adding
+      the person, one click away, which is where the data has to live anyway. */
+const _MIRROR_PRIMARY = {
   'f-contact-person': 'name',
   'f-contact-position': 'role_title',
   'f-contact-number': 'contact_number',
   'f-contact-email': 'email',
 };
-function applyContactLock() {
-  const p = primaryPerson();
-  Object.keys(CONTACT_MIRROR).forEach(function (id) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const box = el.parentNode;
-    if (box) {
-      const old = box.querySelector('.mirror-note');
-      if (old) old.remove();
-    }
-    if (p) {
-      el.value = p[CONTACT_MIRROR[id]] || '';
-      el.disabled = true;
-      el.title = 'From your primary contact in the Personnel tab.';
-      if (box) {
-        const n = document.createElement('div');
-        n.className = 'locked-note mirror-note';
-        n.innerHTML = 'From <b>' + esc(p.name) + '</b> in Personnel. '
-          + '<a href="#" onclick="switchTab(' + Q + 'personnel' + Q + ');return false">Edit there</a>.';
-        box.appendChild(n);
-      }
-    } else {
-      el.disabled = false;
-      el.title = '';
-      if (box) {
-        const n = document.createElement('div');
-        n.className = 'locked-note mirror-note';
-        n.innerHTML = 'Tip: add this person under <a href="#" onclick="switchTab('
-          + Q + 'personnel' + Q + ');return false">Personnel</a> and mark them primary, '
-          + 'and this fills in from there.';
-        box.appendChild(n);
-      }
-    }
-  });
+/* Several owners is an ordinary shape here, so the mirror JOINS them rather
+   than picking one. Personnel stays the place to see them individually. */
+function ownerPeople() { return _perList.filter(function (p) { return p.is_owner; }); }
+function _joinPeople(list, key) {
+  return list.map(function (p) { return String(p[key] || '').trim(); })
+             .filter(Boolean).join('; ');
 }
 
-/* Keep vendors.contact_* in step with the primary contact. It stays the column
-   the checklist, the staff cards, the analytics and the WP vendor pickers read,
-   so it must not go stale — it just is not separately edited any more. Writes
-   only when something actually differs, so it does not raise a pointless
-   vendor-edit flag for staff on every personnel touch. */
-async function syncPrimaryContact() {
+function _mirrorPrompt(hostId, kind, people, fromStored) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  if (!people.length && fromStored) {
+    host.className = 'mirror-prompt need';
+    host.innerHTML = '<i class="ti ti-history"></i><span>This is what Megawide has on file. '
+      + 'Add them under Personnel and tick <b>' + esc(kind) + '</b> so you can keep it up to date '
+      + 'from here.</span>'
+      + '<button type="button" class="mirror-go" onclick="switchTab(' + Q + 'personnel' + Q + ')">Add in Personnel</button>';
+    return;
+  }
+  if (people.length) {
+    const names = people.map(function (p) { return esc(p.name); }).join(', ');
+    host.className = 'mirror-prompt ok';
+    host.innerHTML = '<i class="ti ti-user-check"></i><span>From <b>' + names
+      + '</b> in Personnel.</span>'
+      + '<button type="button" class="mirror-go" onclick="switchTab(' + Q + 'personnel' + Q + ')">Edit in Personnel</button>';
+  } else {
+    host.className = 'mirror-prompt need';
+    host.innerHTML = '<i class="ti ti-alert-circle"></i><span>Nobody is marked as the <b>'
+      + esc(kind) + '</b> yet. Add the person under Personnel and tick that box \u2014 '
+      + 'it fills in here and counts towards your accreditation.</span>'
+      + '<button type="button" class="mirror-go" onclick="switchTab(' + Q + 'personnel' + Q + ')">Add in Personnel</button>';
+  }
+}
+
+/* Named applyPeopleMirror (was applyContactLock) because it now covers the
+   owner fields too, and because it no longer ever UNLOCKS anything. */
+/* ⚠️ FALLS BACK TO WHAT IS ALREADY ON THE COMPANY RECORD, and that is not
+   belt-and-braces - it is what stops this looking like data loss. Two real
+   cases: 2026-09-04_vendor_personnel_owner.sql has not been run yet (is_owner
+   does not exist, so nobody reads as an owner), or the personnel fetch failed.
+   Either way the vendor would open a saved profile to blank read-only boxes.
+   Showing the stored value, and saying where it came from, is honest; blanking
+   it is not. Nothing is written from here, so a stale mirror cannot spread. */
+function _mirrorSet(id, derived, stored, emptyHint) {
+  const el = document.getElementById(id);
+  if (!el) return false;
+  const usedStored = !derived && !!stored;
+  el.value = derived || stored || '';
+  el.disabled = true;
+  el.placeholder = (derived || stored) ? '' : emptyHint;
+  el.title = 'Set in the Personnel tab.';
+  return usedStored;
+}
+function applyPeopleMirror() {
   const p = primaryPerson();
-  if (!p || !vendor) return;
+  const owners = ownerPeople();
+  const v = vendor || {};
+  let contactStored = false, ownerStored = false;
+  Object.keys(_MIRROR_PRIMARY).forEach(function (id) {
+    const derived = p ? (p[_MIRROR_PRIMARY[id]] || '') : '';
+    if (_mirrorSet(id, derived, v[MIRROR_FIELDS[id]] || '',
+                   'Add your primary contact in Personnel')) contactStored = true;
+  });
+  if (_mirrorSet('f-owner-name', _joinPeople(owners, 'name'), v.owner_name || '',
+                 'Mark an owner in Personnel')) ownerStored = true;
+  if (_mirrorSet('f-owner-contact-number', _joinPeople(owners, 'contact_number'),
+                 v.owner_contact_number || '',
+                 'From the owner\u2019s contact number in Personnel')) ownerStored = true;
+  _mirrorPrompt('contactPrompt', 'primary contact', p ? [p] : [], contactStored);
+  _mirrorPrompt('ownerPrompt', 'owner / proprietor', owners, ownerStored);
+  if (_staffPreview) _lockPreview();
+}
+
+/* Keep the vendors.* columns in step with Personnel. They stay the columns the
+   checklist, the staff cards, the analytics and the WP vendor pickers read, so
+   they must not go stale — they just are not separately edited any more.
+   Writes only when something actually differs, so a personnel touch does not
+   raise a pointless vendor-edit flag for staff every time. */
+async function syncPeopleMirror() {
+  if (!vendor) return;
+  const p = primaryPerson();
+  const owners = ownerPeople();
   const want = {
-    contact_person: p.name || '',
-    contact_position: p.role_title || '',
-    contact_number: p.contact_number || '',
-    contact_email: p.email || '',
+    contact_person: (p && p.name) || '',
+    contact_position: (p && p.role_title) || '',
+    contact_number: (p && p.contact_number) || '',
+    contact_email: (p && p.email) || '',
+    owner_name: _joinPeople(owners, 'name'),
+    owner_contact_number: _joinPeople(owners, 'contact_number'),
   };
   const changed = Object.keys(want).some(function (k) {
     return String(vendor[k] || '') !== String(want[k]);
@@ -1356,8 +1468,8 @@ async function syncPrimaryContact() {
   if (!changed) return;
   try {
     vendor = (await VendorDb.updateVendor(vendor.id, want)) || Object.assign(vendor, want);
-    applyContactLock();
-    await reloadAccreditation();   // those four are checklist items
+    applyPeopleMirror();
+    await reloadAccreditation();   // all six are checklist items
   } catch (e) {
     msg('Saved the contact, but could not copy it to Company Info: ' + (e.message || e), 'error');
   }
@@ -1382,7 +1494,10 @@ function buildCountryOptions() {
    app does it — the vendor should not have to remember +63. Only ever REPLACES
    a recognised prefix or fills an empty field: a number the vendor typed with
    some other prefix is left alone rather than mangled. */
-const PHONE_FIELDS = ['f-contact-number', 'f-telephone', 'f-owner-contact-number'];
+// ⚠️ Only the company landline. The mobile and the owner's number are
+//    read-only mirrors of Personnel — prefixing a disabled box would put a
+//    dial code on screen that the vendor has no way to complete.
+const PHONE_FIELDS = ['f-telephone'];
 function applyDialCode() {
   const sel = document.getElementById('f-country');
   const dial = window.countryDial ? window.countryDial(sel && sel.value) : '';
@@ -1394,7 +1509,7 @@ function applyDialCode() {
     const had = window.dialPrefixOf ? window.dialPrefixOf(v) : '';
     if (!v) el.value = dial + ' ';
     else if (had && had !== dial) el.value = (dial + ' ' + v.slice(had.length).trim()).trim();
-    el.placeholder = dial + ' 9xx xxx xxxx';
+    el.placeholder = dial + (id === 'f-telephone' ? ' 2 8xxx xxxx' : ' 9xx xxx xxxx');
   });
 }
 /* Turn what somebody actually typed into international form.
@@ -1588,6 +1703,10 @@ function collectOverview() {
   });
   const tin = document.getElementById(TIN_FIELD);
   if (tin && !tinIsLocked()) f.tin = tin.value.trim();
+  // ⚠️ applyDialCode() pre-fills the landline with "+63 ". Left untouched that
+  //    is what gets saved, so the directory fills up with rows whose telephone
+  //    is a country code and nothing else. No digits after the code => blank.
+  if (f.telephone && !/\d/.test(f.telephone.replace(/^\+\d+/, ''))) f.telephone = '';
   return f;
 }
 /* Tag every locked field with a short "Megawide sets this" note, once. */
@@ -1672,8 +1791,9 @@ function validateOverview() {
   clearFieldErrors();
   const val = id => (document.getElementById(id) || {}).value ? document.getElementById(id).value.trim() : '';
   const bad = [];
-  const email = val('f-contact-email');
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { fieldError('f-contact-email', 'That does not look like an email address.'); bad.push('f-contact-email'); }
+  // ⚠️ No check on the contact fields here any more — they are read-only
+  //    mirrors of Personnel, so an error on one would point at a box the
+  //    vendor cannot edit. Personnel validates its own email on entry.
   const site = val('f-website');
   if (site && !/^https?:\/\/\S+$/i.test(site) && !/^[\w-]+(\.[\w-]+)+/.test(site)) { fieldError('f-website', 'Use a full address, e.g. https://example.com'); bad.push('f-website'); }
   const tin = val('f-tin');
@@ -2082,10 +2202,10 @@ async function renderPersonnel() {
     el.innerHTML = '<div class="pf-empty"><i class="ti ti-users"></i><b>No contacts yet</b>'
       + 'Add the people Megawide should deal with — a sales contact, a technical contact, '
       + 'whoever answers a request for quotation fastest.</div>';
-    applyContactLock();          // no primary yet -> the Company Info fields stay editable
+    applyPeopleMirror();          // nobody flagged yet -> the prompts say so
     return;
   }
-  applyContactLock();
+  applyPeopleMirror();
   el.innerHTML = '<div class="prof-grid">' + list.map(function (p) {
     return '<div class="prof-card">'
       + '<button class="prof-del" onclick="removePersonnel(' + Q + p.id + Q + ')" title="Remove">&times;</button>'
@@ -2108,11 +2228,52 @@ async function renderPersonnel() {
       + (p.role_title ? '<div class="prof-role">' + esc(p.role_title) + '</div>' : '')
       + (p.contact_number ? '<div class="prof-meta">' + esc(p.contact_number) + '</div>' : '')
       + (p.email ? '<div class="prof-meta">' + esc(p.email) + '</div>' : '')
-      + (p.is_primary ? '<div class="prof-tag">PRIMARY CONTACT</div>' : '')
+      + '<div class="prof-tags">'
+      + (p.is_primary ? '<span class="prof-tag">PRIMARY CONTACT</span>' : '')
+      + (p.is_owner ? '<span class="prof-tag prof-tag-owner">OWNER</span>' : '')
+      + '</div>'
+      // ⚠️ Without these an existing contact could only be flagged by
+      //    deleting and re-adding them — which throws away their photo and
+      //    their audit trail. Toggling is the whole point on a directory that
+      //    already has people in it.
+      + '<div class="prof-toggles">'
+      + '<button onclick="togglePersonFlag(' + Q + p.id + Q + ',' + Q + 'is_primary' + Q + ')">'
+      + (p.is_primary ? 'Not the primary' : 'Make primary') + '</button>'
+      + '<button onclick="togglePersonFlag(' + Q + p.id + Q + ',' + Q + 'is_owner' + Q + ')">'
+      + (p.is_owner ? 'Not an owner' : 'Mark as owner') + '</button>'
+      + '</div>'
       + '</div></div>';
   }).join('') + '</div>';
   _perLoadPhotos();
 }
+/* Flip primary / owner on someone already on file.
+   ⚠️ PRIMARY IS EXCLUSIVE, OWNER IS NOT. There is one primary contact, so
+      setting it clears the others (primaryPerson() takes the first flagged and
+      two flagged rows would make which one wins arbitrary). Owner is a plain
+      per-person flag — several owners is an ordinary shape here. */
+async function togglePersonFlag(id, field) {
+  const row = _perList.find(function (x) { return x.id === id; });
+  if (!row || !vendor) return;
+  const on = !row[field];
+  try {
+    if (field === 'is_primary' && on) {
+      for (const other of _perList) {
+        if (other.id !== id && other.is_primary) {
+          await VendorDb.personnel.update(other.id, { is_primary: false });
+        }
+      }
+    }
+    await VendorDb.personnel.update(id, { [field]: on });
+    await renderPersonnel();
+    await syncPeopleMirror();
+    await flagEdited();
+  } catch (e) {
+    // is_owner arrives with 2026-09-04_vendor_personnel_owner.sql — say which,
+    // rather than failing in a way that reads as "the button is broken".
+    msg('Could not update: ' + (e.message || e), 'error');
+  }
+}
+
 async function replacePersonPhoto(id, input) {
   const file = input && input.files && input.files[0];
   if (!file || !vendor) return;
@@ -2122,7 +2283,7 @@ async function replacePersonPhoto(id, input) {
     const path = await VendorDb.uploadVendorFile(vendor.id, 'person_' + id, file);
     await VendorDb.personnel.update(id, { photo_path: path });
     await renderPersonnel();
-    await syncPrimaryContact();
+    await syncPeopleMirror();
     await flagEdited();
     msg('Photo updated.', 'success');
   } catch (e) {
@@ -2153,6 +2314,7 @@ async function addPersonnel() {
     contact_number: document.getElementById('np-number').value.trim(),
     email: document.getElementById('np-email').value.trim(),
     is_primary: document.getElementById('np-primary').checked,
+    is_owner: document.getElementById('np-owner').checked,
   };
   try {
     const row = await VendorDb.personnel.add(vendor.id, fields);
@@ -2163,9 +2325,10 @@ async function addPersonnel() {
     }
     ['np-name', 'np-role', 'np-number', 'np-email'].forEach(function (id) { document.getElementById(id).value = ''; });
     document.getElementById('np-primary').checked = false;
+    document.getElementById('np-owner').checked = false;
     if (ph) ph.value = '';
     await renderPersonnel();
-    await syncPrimaryContact();
+    await syncPeopleMirror();
     await flagEdited();
   } catch (e) { msg('Could not add: ' + (e.message || e), 'error'); }
 }
@@ -2438,9 +2601,9 @@ function _bidEditorHtml(i) {
     + _f('Price valid for (days)', 'bo-validity', i.validity_days, 'e.g. 30', 'number')
     + '</div>'
     + '<div class="itm-grid">' + _f('Payment terms', 'bo-terms', i.payment_terms, 'e.g. 30% DP, 70% on delivery') + '</div>'
-    + '<div class="field"><label>Notes to Megawide Procurement</label><textarea id="bo-notes" rows="2" '
+    + '<div class="field bid-field"><label>Notes to Megawide Procurement</label><textarea id="bo-notes" rows="3" '
     + 'placeholder="Anything Megawide Procurement should know">' + esc(i.vendor_notes || '') + '</textarea></div>'
-    + '<div class="field"><label>Attach your quotation</label><input id="bo-file" type="file" accept=".pdf,.jpg,.jpeg,.png">'
+    + '<div class="field bid-field"><label>Attach your quotation</label><input id="bo-file" type="file" accept=".pdf,.jpg,.jpeg,.png">'
     + (i.attachment_path ? '<div class="field-hint">A file is already on file'
       + (i.attachment_name ? ': ' + esc(i.attachment_name) : '') + ' — choosing a new one replaces it.</div>' : '') + '</div>'
     + '<div class="itm-acts">'

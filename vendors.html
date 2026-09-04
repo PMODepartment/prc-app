@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260904l"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260904l"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260904l"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260904m"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260904m"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260904m"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904l">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904m">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -783,6 +783,18 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
     }
 
     /* who made a change */
+    .hist-toggle{display:flex;align-items:center;gap:9px;width:100%;text-align:left;cursor:pointer;
+      font-size:0.8125rem;font-weight:600;color:var(--text-primary);background:var(--surface-2);
+      border:1px solid var(--border-md);border-radius:9px;padding:9px 12px;margin-bottom:10px}
+    .hist-toggle:hover{border-color:var(--mw-red)}
+    .hist-toggle i{font-size:0.95rem;color:var(--text-hint)}
+    .hist-toggle span:first-of-type{flex:1;min-width:0;font-weight:600}
+    .hist-toggle-cta{font-size:0.7143rem;font-weight:700;color:var(--mw-red-ink);flex-shrink:0}
+    .hist-more-btn{display:block;width:100%;cursor:pointer;margin-top:8px;padding:8px 12px;
+      font-size:0.7857rem;font-weight:600;color:var(--text-primary);background:var(--surface);
+      border:1px dashed var(--border-md);border-radius:9px}
+    .hist-more-btn:hover{border-color:var(--mw-red);color:var(--mw-red-ink)}
+    .sec-note{font-size:0.7857rem;line-height:1.6;color:var(--text-hint,#6E6C6C);margin:0 0 12px}
     .hist-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px}
     .hist-ftab{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;
       border:1px solid var(--border-md,#ddd);background:var(--surface,#fff);cursor:pointer;
@@ -1357,9 +1369,9 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260904l"></script>
-<script src="assets/js/db.js?v=20260904l"></script>
-<script src="assets/js/ui.js?v=20260904l"></script>
+<script src="assets/js/auth.js?v=20260904m"></script>
+<script src="assets/js/db.js?v=20260904m"></script>
+<script src="assets/js/ui.js?v=20260904m"></script>
 <script src="assets/js/vendor-guide.js?v=20260904a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -4666,7 +4678,11 @@ function renderDetailOverview() {
         ${v.vendor_category && !['Supplier', 'Subcon', 'Services'].includes(v.vendor_category)
           ? `<option value="${esc(v.vendor_category)}" selected>${esc(v.vendor_category)} (legacy)</option>` : ''}
       </select></div>
-    <div class="field"><label>Product / Vendor Group</label><input id="dov-vendor-group" type="text" value="${esc(v.vendor_group)}" placeholder="e.g. Ready Mix Concrete"></div>
+    <div class="field"><label>Product / Vendor Group</label>
+      <input id="dov-vendor-group" type="text" list="vendor-group-list" value="${esc(v.vendor_group)}" placeholder="e.g. Ready Mix Concrete">
+      <datalist id="vendor-group-list">${_vendorGroupOptions()}</datalist>
+      <div class="field-hint">SAP's grouping, imported with the masterlist. Pick one that already
+        exists rather than inventing a variant \u2014 the list is what the directory search matches on.</div></div>
     <div class="field"><label>Contact Person</label><input id="dov-contact-person" type="text" value="${esc(v.contact_person)}"></div>
     <div class="field"><label>Position</label><input id="dov-contact-position" type="text" value="${esc(v.contact_position)}" placeholder="e.g. Sales Manager"></div>
     <div class="field"><label>Contact Number</label><input id="dov-contact-number" type="text" value="${esc(v.contact_number)}"></div>
@@ -5187,45 +5203,54 @@ async function removeDetailPersonnel(id) {
   await VendorDb.personnel.remove(id);
   await renderDetailPersonnel();
 }
+/* \u26a0\ufe0f DERIVED, NOT TYPED. Reference rates are what this vendor has actually
+   been paid on awarded work packages \u2014 VendorDb.backfillVendorDataFromWPs
+   writes them from the award, keyed to the source WP by vendor_rates.wp_id.
+   A hand-typed rate is somebody's recollection sitting in the same list as a
+   contract figure, indistinguishable from it, and nothing downstream can tell
+   them apart. The add form and the per-row delete were removed 2026-09-04 for
+   that reason; a wrong rate is corrected by fixing the award it came from.
+   Rows created before that (wp_id null) are still shown, marked as entered by
+   hand so their weight is obvious. */
+/* Every group already in the directory, so staff choose from what SAP actually
+   uses instead of typing a near-duplicate. Free text is kept deliberately \u2014 the
+   masterlist can gain a group we have not imported yet \u2014 but a datalist makes
+   the existing value the path of least resistance. */
+function _vendorGroupOptions() {
+  const seen = Object.create(null);
+  (allVendors || []).forEach(function (v) {
+    const g = String(v.vendor_group || '').trim();
+    if (g) seen[g] = true;
+  });
+  return Object.keys(seen).sort(function (a, b) { return a.localeCompare(b); })
+    .map(function (g) { return '<option value="' + esc(g) + '">'; }).join('');
+}
+
 async function renderDetailRates() {
   const list = await VendorDb.getVendorRates(activeVendor.id);
   const el = document.getElementById('dtab-rates');
-  el.innerHTML = (list.length ? list.map(r =>
-    `<div class="row-item"><div><div class="row-item-title">${esc(r.item_description)} — ₱${Number(r.rate||0).toLocaleString()}${r.unit?'/'+esc(r.unit):''}</div>
-    <div class="row-item-sub">${esc(r.trade||'')}${r.project_id?' · '+esc(r.project_id):''}${r.date_quoted?' · '+esc(r.date_quoted):''}${r.source?' · '+esc(r.source):''}</div></div>
-    <button class="row-item-del" style="background:none;border:none;color:#EE3124;cursor:pointer" onclick="removeRate('${r.id}')"><i class="ti ti-trash"></i></button></div>`
-  ).join('') : '<div class="empty">No reference rates on file yet.</div>') + (!_canManage ? '' : `
-    <div class="add-form">
-      <input id="nr-desc" placeholder="Item description">
-      <input id="nr-trade" placeholder="Trade">
-      <input id="nr-rate" type="number" placeholder="Rate (₱)">
-      <input id="nr-unit" placeholder="Unit">
-      <input id="nr-date" type="date">
-      <select id="nr-source"><option value="quotation">Quotation</option><option value="negotiation">Negotiation</option><option value="awarded contract">Awarded Contract</option></select>
-      <button class="btn-primary" onclick="addRate()">Add</button>
-    </div>`);
-  if (!_canManage) _stripRowDeletes('dtab-rates');
+  const note = '<p class="sec-note">These come from work packages this vendor was awarded '
+    + '\u2014 there is nothing to type here. Run <b>Data Tools \u2192 Backfill Trade/Bid Data</b> '
+    + 'to pick up awards made since the last run.</p>';
+  if (!list.length) {
+    el.innerHTML = note + '<div class="empty">No awarded work packages with a rate yet.</div>';
+    return;
+  }
+  el.innerHTML = note + list.map(function (r) {
+    const manual = !r.wp_id;
+    return '<div class="row-item"><div>'
+      + '<div class="row-item-title">' + esc(r.item_description)
+      + ' \u2014 \u20b1' + Number(r.rate || 0).toLocaleString()
+      + (r.unit ? '/' + esc(r.unit) : '') + '</div>'
+      + '<div class="row-item-sub">' + esc(r.trade || '')
+      + (r.project_id ? ' \u00b7 ' + esc(r.project_id) : '')
+      + (r.date_quoted ? ' \u00b7 ' + esc(r.date_quoted) : '')
+      + (r.source ? ' \u00b7 ' + esc(r.source) : '')
+      + (manual ? ' \u00b7 <i>entered by hand</i>' : '')
+      + '</div></div></div>';
+  }).join('');
 }
-async function addRate() {
-  const item_description = document.getElementById('nr-desc').value.trim();
-  const rate = parseFloat(document.getElementById('nr-rate').value) || null;
-  if (!item_description) { AppNotify && AppNotify.warn('Enter an item description first.'); return; }
-  try {
-    await VendorDb.addVendorRate(activeVendor.id, {
-      item_description, rate,
-      trade: document.getElementById('nr-trade').value.trim(),
-      unit: document.getElementById('nr-unit').value.trim(),
-      date_quoted: document.getElementById('nr-date').value || null,
-      source: document.getElementById('nr-source').value,
-    }, userProfile);
-    await renderDetailRates();
-  } catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not add rate') : alert(e.message); }
-}
-async function removeRate(id) {
-  if (!confirm('Remove this rate entry?')) return;
-  await VendorDb.deleteVendorRate(id);
-  await renderDetailRates();
-}
+
 // Project id → name cache (WPs store project_id like 'AVR101'; show the name).
 let _projNameCache = null;
 async function _projName(pid) {
@@ -6147,7 +6172,13 @@ function jumpToHistory() {
    Session-only and deliberately not persisted — it is a lens on one vendor's
    page, not a preference. */
 let _histFilter = 'all';
-window.setHistFilter = function (v) { _histFilter = v; renderDetailHistory(); };
+window.setHistFilter = function (v) { _histFilter = v; _histShown = _HIST_PAGE; renderDetailHistory(); };
+/* Collapsed by default, and paged once open \u2014 see the note in renderDetailHistory. */
+const _HIST_PAGE = 8;
+let _histOpen = false;
+let _histShown = _HIST_PAGE;
+window.toggleHistory = function () { _histOpen = !_histOpen; _histShown = _HIST_PAGE; renderDetailHistory(); };
+window.showMoreHistory = function () { _histShown += _HIST_PAGE; renderDetailHistory(); };
 
 const _HIST_ACTOR_META = {
   vendor: { label: 'Vendor', icon: 'ti-building-store', cls: 'ha-vendor' },
@@ -6155,9 +6186,13 @@ const _HIST_ACTOR_META = {
   system: { label: 'System',   icon: 'ti-settings',      cls: 'ha-system' },
 };
 
+let _histForVendor = null;
 async function renderDetailHistory() {
   const box = document.getElementById('dtab-history');
   if (!box || !activeVendor) return;
+  // A different vendor starts at page 1 \u2014 carrying a "show 40" over from the
+  // last one would dump forty unrelated entries on screen.
+  if (_histForVendor !== activeVendor.id) { _histForVendor = activeVendor.id; _histShown = _HIST_PAGE; }
   box.innerHTML = '<div class="empty">Loading&hellip;</div>';
   try { _histRows = await VendorDb.history.forVendor(activeVendor.id, 60); }
   catch (e) { _histRows = []; }
@@ -6202,7 +6237,24 @@ async function renderDetailHistory() {
     return;
   }
 
-  box.innerHTML = bar + rows.map(function (t) {
+  // A vendor with any history at all runs to dozens of entries, and the section
+  // sits in the middle of the profile — so it opens CLOSED with a one-line
+  // summary, and shows a page at a time once opened. Nothing is hidden that
+  // cannot be reached; the entries are just not the first thing in the way.
+  const newest = rows[0] ? _fmtAuditDate(rows[0].h.changed_at) : '';
+  const head = '<button class="hist-toggle' + (_histOpen ? ' on' : '') + '" onclick="toggleHistory()">'
+    + '<i class="ti ti-chevron-' + (_histOpen ? 'down' : 'right') + '"></i>'
+    + '<span>' + rows.length + (rows.length === 1 ? ' change' : ' changes')
+    + (newest ? ' \u00b7 latest ' + esc(newest) : '') + '</span>'
+    + '<span class="hist-toggle-cta">' + (_histOpen ? 'Hide' : 'Show') + '</span></button>';
+  if (!_histOpen) {
+    box.innerHTML = bar + head + rollback;
+    _renderVendorChangeSummary();
+    return;
+  }
+  const shown = rows.slice(0, _histShown);
+  const more = rows.length - shown.length;
+  box.innerHTML = bar + head + shown.map(function (t) {
     const h = t.h, i = t.i;
     const fields = _histChangedFields(h);
     const op = _histOpLabel(h);
@@ -6241,7 +6293,10 @@ async function renderDetailHistory() {
       + '</div>'
       + '<div class="hist-entry-preview" id="histPrev-' + i + '"></div>'
       + '</div>';
-  }).join('') + rollback;
+  }).join('')
+    + (more > 0 ? '<button class="hist-more-btn" onclick="showMoreHistory()">Show '
+        + Math.min(more, _HIST_PAGE) + ' more (' + more + ' older)</button>' : '')
+    + rollback;
 
   // The banner's summary reads from _histRows, which only just landed.
   _renderVendorChangeSummary();

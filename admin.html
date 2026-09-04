@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260904l"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260904l"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260904l"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260904m"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260904m"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260904m"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904l">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904m">
   <style>
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
     .modal{background:#fff;border-radius:12px;width:100%;max-width:420px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden}
@@ -188,9 +188,6 @@
             <button class="tab-btn" id="tabPerf" onclick="switchTab('perf')"><i class="ti ti-chart-bar" style="margin-right:4px;font-size:0.9286rem"></i>Performance</button>
           </div>
           <div class="section-card">
-            <!-- Vendor logins are not internal staff and are not managed here.
-                 Filled by renderVendorLoginNote(); hidden when there are none. -->
-            <div id="vendor-login-note" style="display:none"></div>
             <!-- Search + Bulk Assign Bar -->
             <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
               <div style="position:relative;flex:1;min-width:200px">
@@ -406,9 +403,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260904l"></script>
-<script src="assets/js/db.js?v=20260904l"></script>
-<script src="assets/js/ui.js?v=20260904l"></script>
+<script src="assets/js/auth.js?v=20260904m"></script>
+<script src="assets/js/db.js?v=20260904m"></script>
+<script src="assets/js/ui.js?v=20260904m"></script>
 <script>
   let currentTab = 'all';
   let allUsers = [], allProjects = [], allAdmins = [];
@@ -882,28 +879,13 @@
      KPIs, the table, the Pending queue, the bulk bar and the Performance tab
      all inherit it.
 
-     ⚠️ NOT SILENTLY. Dropping rows from a management screen with no trace is
-        how someone concludes the record was lost. renderVendorLoginNote says
-        how many there are and links to where they are managed. */
-  let vendorLogins = [];
+     Admin → Vendor Registrations in the sidebar is the standing signpost for
+     where they ARE managed. The banner that repeated that above the table was
+     removed 2026-09-04 — it said the same thing on every visit and carried no
+     information after the first read. */
   function isVendorLogin(u) { return !!u && (u.role === 'vendor' || !!u.vendor_id); }
   function splitVendorLogins(users) {
-    const all = users || [];
-    vendorLogins = all.filter(isVendorLogin);
-    return all.filter(u => !isVendorLogin(u));
-  }
-  function renderVendorLoginNote() {
-    const host = document.getElementById('vendor-login-note');
-    if (!host) return;
-    if (!vendorLogins.length) { host.style.display = 'none'; host.innerHTML = ''; return; }
-    const n = vendorLogins.length;
-    host.style.display = 'block';
-    host.innerHTML = `<div class="vendor-login-note">
-      <i class="ti ti-building-store"></i>
-      <div><b>${n} vendor ${n === 1 ? 'login' : 'logins'}</b> ${n === 1 ? 'is' : 'are'} not listed here.
-        Vendor accounts are external and are managed in the vendor directory, not with Megawide staff.</div>
-      <a class="vln-link" href="vendor-registrations.html"><i class="ti ti-user-check"></i>Vendor Registrations</a>
-    </div>`;
+    return (users || []).filter(u => !isVendorLogin(u));
   }
 
   async function loadData() {
@@ -916,7 +898,6 @@
       ]);
       // One choke point: everything downstream reads allUsers.
       allUsers = splitVendorLogins(_users);
-      renderVendorLoginNote();
       // Populate sidebar project links — respect the user's assigned projects (role + profile.projects)
       const activeProjects = AppAuth.getPermittedProjects(currentProfile, allProjects).filter(p=>p.status!=='archived');
       window._sidebarProjects = activeProjects;
