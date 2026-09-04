@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260904b"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260904b"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260904b"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260904c"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260904c"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260904c"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904b">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904c">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1064,8 +1064,7 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
                 <option value="problematic">Problematic</option>
                 <option value="none">Not accredited</option>
               </select>
-              <button onclick="bulkPrepareInvites()" title="Use each vendor's contact email as their invite address so they can register">Enable self-service</button>
-              <button onclick="exportInviteList()" title="Download name + email + registration link for the selected vendors">Invite list (CSV)</button>
+              <button onclick="exportInviteList()" title="Download company, contact email, and registration link for the selected vendors — for a mail-merge invite">Invite list (CSV)</button>
               <button onclick="bulkGenerateQr()" title="Download one QR image per selected vendor (with a Vendor Code), named for a mail-merge">QR Codes (ZIP)</button>
               <button class="b-delete" id="bulkDeleteBtn" onclick="bulkDelete()">Delete</button>
               <button onclick="clearVendorSel()">Clear</button>
@@ -1350,10 +1349,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260904b"></script>
-<script src="assets/js/db.js?v=20260904b"></script>
-<script src="assets/js/ui.js?v=20260904b"></script>
-<script src="assets/js/vendor-guide.js?v=20260902a"></script>
+<script src="assets/js/auth.js?v=20260904c"></script>
+<script src="assets/js/db.js?v=20260904c"></script>
+<script src="assets/js/ui.js?v=20260904c"></script>
+<script src="assets/js/vendor-guide.js?v=20260904a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -1993,44 +1992,21 @@ async function bulkSetAccreditation(value) {
     else if (AppNotify) AppNotify.fromError(e, 'Could not set accreditation'); else alert(e.message);
   }
 }
-/* A vendor can only register with the address sitting in vendors.invite_email
-   (RLS matches it against their sign-in email). Everything the imports created
-   carries a synthesized placeholder, so self-service is unreachable until a
-   real address is promoted — which is what this does, in bulk. */
-async function bulkPrepareInvites() {
-  const ids = [..._selectedVendors]; if (!ids.length) return;
-  if (!confirm(`Enable self-service for ${ids.length} selected vendor(s)?\n\nEach one's contact email becomes their registration address. Vendors with no email, an already-claimed login, or an address another vendor is using are skipped and reported.\n\nNo email is sent — use "Invite list (CSV)" afterwards to send the links.`)) return;
-  const prog = AppNotify && AppNotify.progress ? AppNotify.progress(`Preparing invites for ${ids.length} vendor(s)…`) : null;
-  try {
-    const r = await VendorDb.prepareInvites(ids);
-    await loadAll();
-    const skips = [
-      r.noEmail ? `${r.noEmail} no contact email` : '',
-      r.duplicate ? `${r.duplicate} email already used by another vendor` : '',
-      r.alreadySet ? `${r.alreadySet} already set` : '',
-      r.alreadyClaimed ? `${r.alreadyClaimed} already registered` : '',
-      r.failed ? `${r.failed} failed` : '',
-    ].filter(Boolean).join(', ');
-    const msg = `${r.set} vendor(s) can now register${skips ? ` — skipped: ${skips}` : ''}.`;
-    if (prog) prog.done(msg, { title: 'Self-service enabled' }); else AppNotify && AppNotify.success(msg);
-  } catch (e) {
-    if (prog) prog.fail((e && e.message) || 'Failed', { title: 'Could not prepare invites' });
-    else if (AppNotify) AppNotify.fromError(e, 'Could not prepare invites'); else alert(e.message);
-  }
-}
 /* The app has no mail transport, so the practical way to send hundreds of
-   invites is a CSV to mail-merge from. Only rows that can actually be claimed
-   are included — a placeholder address or a claimed login would just bounce. */
+   invites is a CSV to mail-merge from. Registration no longer depends on
+   vendors.invite_email (the identity-matched claim flow ignores it — see
+   migrations/2026-09-01_vendor_self_registration.sql), so this just needs a
+   real contact address to write to and a vendor who hasn't registered yet. */
 function exportInviteList() {
   const ids = new Set(_selectedVendors);
-  const rows = allVendors.filter(v => ids.has(v.id) && !v.invite_claimed_at && !_placeholderEmail(v.invite_email));
+  const rows = allVendors.filter(v => ids.has(v.id) && !v.invite_claimed_at && _displayEmail(v));
   const skipped = ids.size - rows.length;
   if (!rows.length) {
-    AppNotify && AppNotify.warn('None of the selected vendors have a usable invite email yet — run "Enable self-service" first.');
+    AppNotify && AppNotify.warn('None of the selected vendors have a contact email on file (or they have all registered already). Add a contact email in the vendor profile first.');
     return;
   }
   const head = ['company', 'email', 'registration_link', 'accreditation'];
-  const body = rows.map(v => [v.name, v.invite_email, _vendorInviteLink(v.id), _accredLabel(v)].map(_csvCell).join(',')).join('\n');
+  const body = rows.map(v => [v.name, _displayEmail(v), _vendorInviteLink(v.id), _accredLabel(v)].map(_csvCell).join(',')).join('\n');
   const blob = new Blob(['﻿' + head.join(',') + '\n' + body], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

@@ -3122,49 +3122,6 @@ const VendorDb = (() => {
     }
     return out;
   }
-  /* Turn a vendor's real contact address into their INVITE address.
-     vendor-register.html can only be claimed by the address sitting in
-     vendors.invite_email (RLS: users_insert_vendor matches it against the
-     JWT email, and requires invite_claimed_at to be null). Every row created
-     by the WP import, quick-create or the masterlist seed carries a synthesized
-     `…@no-invite.local` placeholder instead — so as things stand NO vendor can
-     register at all, and self-service is unreachable. The masterlist did bring
-     a real contact_email for over half the directory, so this promotes it.
-
-     `lower(invite_email)` is UNIQUE, so two vendors sharing one address cannot
-     both take it: the second is reported as a skip rather than throwing. */
-  async function prepareInvites(ids) {
-    const res = { set: 0, noEmail: 0, alreadyClaimed: 0, alreadySet: 0, duplicate: 0, failed: 0, examples: [] };
-    if (!ids || !ids.length) return res;
-    const sb = await getSB();
-    // Every address already in use anywhere in the directory, so a promotion
-    // cannot collide with a vendor outside the selection either.
-    const taken = new Set();
-    (await _pagedSelect(() => sb.from('vendors').select('id,invite_email')))
-      .forEach(v => { if (v.invite_email) taken.add(String(v.invite_email).trim().toLowerCase()); });
-
-    const CH = 150; const rows = [];
-    for (let i = 0; i < ids.length; i += CH) {
-      const { data, error } = await sb.from('vendors')
-        .select('id,name,contact_email,invite_email,invite_claimed_at').in('id', ids.slice(i, i + CH));
-      if (error) throw error;
-      rows.push(...(data || []));
-    }
-    for (const v of rows) {
-      if (v.invite_claimed_at) { res.alreadyClaimed++; continue; }
-      const email = String(v.contact_email || '').trim().toLowerCase();
-      const current = String(v.invite_email || '').trim().toLowerCase();
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { res.noEmail++; continue; }
-      if (current === email) { res.alreadySet++; continue; }
-      if (taken.has(email)) { res.duplicate++; if (res.examples.length < 5) res.examples.push(v.name); continue; }
-      try {
-        await updateVendor(v.id, { invite_email: email });
-        taken.delete(current); taken.add(email);
-        res.set++;
-      } catch (e) { res.failed++; console.error('[prepareInvites]', v.name, e.message); }
-    }
-    return res;
-  }
   async function bulkDeleteVendors(ids) {
     if (!ids || !ids.length) return;
     const sb = await getSB();
@@ -3842,7 +3799,7 @@ const VendorDb = (() => {
     bidBoard, bidRounds, bidClarifications,
     searchApprovedVendors, quickCreateVendor, getVendorsByIds,
     importVendorsFromWPs, getAllVendorProducts, mergeVendors, deleteVendorCascade,
-    bulkSetVendorStatus, bulkSetAccreditation, findExactDuplicateGroups, mergeExactDuplicates, bulkDeleteVendors, getDeletionImpact, prepareInvites,
+    bulkSetVendorStatus, bulkSetAccreditation, findExactDuplicateGroups, mergeExactDuplicates, bulkDeleteVendors, getDeletionImpact,
     backfillVendorDataFromWPs, getWorkPackagesForVendor,
     getVendorSchedulePerf,
   };
