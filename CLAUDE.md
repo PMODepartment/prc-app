@@ -2979,6 +2979,47 @@ way: this door is the vendors' and must not name the internal app to anyone
 standing at it. A super_admin who wants to SEE a vendor's portal uses **Preview
 portal** on the staff vendor page, which is read-only. Do not "fix" the redirect.
 
+### ⚠️ `access_token` was in `vendor_bid_board_view` — found by its own verification (2026-09-05)
+
+`migrations/2026-09-05_board_view_drop_token.sql` (**RUN ME**, after
+`_bid_reference_docs.sql`).
+
+The verification `SELECT` at the end of `2026-09-05_bid_reference_docs.sql`
+returned **`token_still_withheld: false`**. It was right:
+**`migrations/2026-09-04_bid_process.sql` selected `i.access_token` into
+`vendor_bid_board_view`** and had done since that migration was run. The 09-05
+migration did not add it — it detected it.
+
+- **⚠️ NOT a cross-vendor leak.** The view is scoped to
+  `i.vendor_id = internal.get_my_vendor_id()`, so a vendor only ever saw their
+  OWN invitation tokens — the same ones already emailed to them. Nothing was
+  exposed to a third party and there is nothing to revoke.
+- **⚠️ BUT A TOKEN IS A BEARER CAPABILITY THAT NEEDS NO LOGIN, AND IT OUTLIVES
+  THE SESSION.** In the portal's JavaScript it can be scraped by anything on
+  that page, it lands in memory and screenshots, and it **keeps working after a
+  password change** — disabling a vendor's login does nothing to a token they,
+  or anyone they forwarded the email to, still hold. A page that already has a
+  session has no need of one.
+- **Nothing read it from the view.** `bids.html` builds the RFQ link from the
+  **base table** as staff; `vendor-portal.html` deliberately reads the reference
+  pack by `round_id` through RLS. Checked across the whole client before
+  removing it.
+- **⚠️ DROP + CREATE, not `CREATE OR REPLACE`** — a replace can only APPEND a
+  column, never remove one. **No CASCADE**: a dependency that has appeared since
+  should fail loudly, not be taken down. And **`security_barrier` has to be
+  restated**, because `pg_get_viewdef` returns only the SELECT and losing the
+  barrier would let the planner push a leaky outer predicate ahead of the vendor
+  scope.
+- The select-list line was also removed from `2026-09-04_bid_process.sql` so a
+  fresh deploy cannot reintroduce it, with a **DO NOT PUT IT BACK** marker. That
+  file is already run, so the edit changes nothing live — the fix migration
+  does.
+
+**The lesson worth keeping: a verification `SELECT` that asserts an ABSENCE is
+worth as much as one asserting a presence.** This was caught by a check written
+to defend a rule, against a violation of that rule committed a day earlier in a
+different file, by a query nobody expected to fail.
+
 ### Personnel owns the people; one quotation; the negotiation gets a document (2026-09-04)
 
 `migrations/2026-09-04_vendor_personnel_owner.sql`, `_bid_one_quotation.sql`,

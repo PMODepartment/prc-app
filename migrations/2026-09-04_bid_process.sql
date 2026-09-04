@@ -702,7 +702,14 @@ select
   i.submitted_at,
   i.declined_reason,
   i.vendor_id,
-  i.access_token,
+  -- ⚠️ access_token WAS SELECTED HERE AND WAS REMOVED 2026-09-05.
+  --    It is a bearer capability that needs no login and keeps working after a
+  --    password change, so a page that already holds a session must never be
+  --    handed one. It was never a cross-vendor leak (the view is scoped to the
+  --    caller's own vendor_id) and nothing read it from here — bids.html builds
+  --    the RFQ link from the BASE TABLE as staff. Caught by the verification
+  --    SELECT at the end of 2026-09-05_bid_reference_docs.sql; the live view is
+  --    corrected by 2026-09-05_board_view_drop_token.sql. DO NOT PUT IT BACK.
   i.outcome,
   i.decided_at,
   i.notice_ref,
