@@ -129,7 +129,7 @@
 
     // 2 — Two views
     s.push({
-      icon: 'ti-binoculars',
+      icon: 'ti-eyeglass',
       title: 'Two ways to look at the data',
       lead: 'After signing in you pick where to go. You can switch any time from the sidebar.',
       body:

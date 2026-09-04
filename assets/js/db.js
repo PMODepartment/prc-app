@@ -1640,7 +1640,7 @@ if (typeof window !== 'undefined') { window.CanonTrade = CanonTrade; window.Cano
 const ACCREDITATIONS = ['accredited', 'problematic'];
 const ACCRED_NONE = 'none';   // filter/group key for a blank accreditation
 const _ACCRED_META = {
-  accredited:   { label: 'Accredited',     color: '#065F46', bg: '#D1FAE5', darkColor: '#6EE7B7', darkBg: '#102B1F', icon: 'ti-rosette-discount-check' },
+  accredited:   { label: 'Accredited',     color: '#065F46', bg: '#D1FAE5', darkColor: '#6EE7B7', darkBg: '#102B1F', icon: 'ti-discount-check' },
   problematic:  { label: 'Problematic',    color: '#991B1B', bg: '#FEE2E2', darkColor: '#FCA5A5', darkBg: '#3D1A19', icon: 'ti-alert-triangle' },
   none:         { label: 'Not Accredited', color: '#6B6A6A', bg: '#F3F4F6', darkColor: 'var(--text-hint)', darkBg: 'var(--surface-2)', icon: 'ti-circle-dashed' },
 };

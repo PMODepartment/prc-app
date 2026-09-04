@@ -405,7 +405,7 @@ function formHtml() {
   return '<div class="panel"><div class="panel-title">Your bid</div>'
     + '<div class="legend">Quotation</div>'
     + '<div class="grid">'
-    + fld('Offer amount <span class="req">*</span>', 'f-amount', b.offer_amount, 'e.g. 250000', 'number')
+    + fldMoney('Offer amount <span class="req">*</span>', 'f-amount', b.offer_amount, 'e.g. 250,000')
     + fld('Currency', 'f-currency', b.offer_currency || 'PHP', 'PHP')
     + fld('Lead time (days)', 'f-lead', b.lead_time_days, 'e.g. 14', 'number')
     + fld('Quotation validity (days)', 'f-validity', b.validity_days, 'e.g. 30', 'number')
@@ -430,6 +430,53 @@ function formHtml() {
     + '<button class="btn btn-primary" id="btnSubmit" onclick="submitBid()">'
     + (BID.status === 'submitted' ? 'Save revised bid' : 'Submit bid') + '</button>'
     + '</div></div>';
+}
+/* ── Thousands separators in the cost fields ───────────────────────────────
+   ⚠️ type="number" CANNOT DO THIS. A browser number input rejects the comma
+      outright and normalises its own value, so a money field has to be
+      type="text" with inputmode="decimal" (which still gives a phone the
+      numeric keypad). Every read already strips commas — num() does — so
+      nothing downstream changes.
+   Grouped live rather than on blur, because on a phone seeing 250,000 form as
+   you type is the whole point; that means putting the caret back afterwards. */
+function grp(v) {
+  if (v == null || v === '') return '';
+  const s = String(v).replace(/,/g, '');
+  const neg = s.charAt(0) === '-';
+  const parts = s.replace(/^-/, '').split('.');
+  const whole = (parts[0] || '').replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  // Keep a decimal point the user has typed, even with no digits after it yet,
+  // or the point would be swallowed the instant they press it.
+  const dec = parts.length > 1 ? '.' + (parts[1] || '').replace(/\D/g, '') : '';
+  if (!whole && !dec) return neg ? '-' : '';
+  return (neg ? '-' : '') + whole + dec;
+}
+/* ⚠️ Re-writing the value moves the caret to the end, which makes editing the
+   middle of a figure impossible. Count the significant characters before the
+   caret, reformat, then put it back after that same count — separators are not
+   counted, so inserting one does not shift the caret. */
+function onMoneyInput(el) {
+  const caret = el.selectionStart == null ? el.value.length : el.selectionStart;
+  const sigBefore = (el.value.slice(0, caret).match(/[0-9.]/g) || []).length;
+  el.value = grp(el.value);
+  let seen = 0, pos = sigBefore === 0 ? 0 : el.value.length;
+  if (sigBefore > 0) {
+    for (let k = 0; k < el.value.length; k++) {
+      if (/[0-9.]/.test(el.value.charAt(k))) {
+        seen++;
+        if (seen === sigBefore) { pos = k + 1; break; }
+      }
+    }
+  }
+  try { el.setSelectionRange(pos, pos); } catch (e) { /* not a text input */ }
+}
+function fldMoney(label, id, val, ph) {
+  // ⚠️ label is interpolated RAW here, matching fld() — it carries markup
+  //    (the required-field asterisk span). Do not esc() it.
+  return '<div class="field"><label>' + label + '</label>'
+    + '<input id="' + id + '" type="text" inputmode="decimal" autocomplete="off"'
+    + ' value="' + esc(grp(val)) + '" placeholder="' + esc(ph || '') + '"'
+    + ' oninput="onMoneyInput(this)"></div>';
 }
 function fld(label, id, val, ph, type) {
   return '<div class="field"><label>' + label + '</label>'

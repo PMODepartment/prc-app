@@ -990,12 +990,12 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260905e"></script>
-<script src="assets/js/db.js?v=20260905e"></script>
+<script src="assets/js/auth.js?v=20260905f"></script>
+<script src="assets/js/db.js?v=20260905f"></script>
 <!-- Self-contained: this page loads no ui.js, so the guide injects its own
      CSS and its own "?" button. Versioned independently of the shared assets. -->
-<script src="assets/js/coachmarks.js?v=20260905e"></script>
-<script src="assets/js/portal-guide.js?v=20260905e"></script>
+<script src="assets/js/coachmarks.js?v=20260905f"></script>
+<script src="assets/js/portal-guide.js?v=20260905f"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -2406,6 +2406,51 @@ function closeProductEditor() {
   _catEditId = null; _catPicker = null;
 }
 
+/* ── Thousands separators in the cost fields ───────────────────────────────
+   ⚠️ type="number" CANNOT DO THIS. A browser number input rejects the comma
+      outright and normalises its own value, so a money field has to be
+      type="text" with inputmode="decimal" (which still gives a phone the
+      numeric keypad). Every read already strips commas — _num() does — so
+      nothing downstream changes.
+   Grouped live rather than on blur, because on a phone seeing 250,000 form as
+   you type is the whole point; that means putting the caret back afterwards. */
+function _grp(v) {
+  if (v == null || v === '') return '';
+  const s = String(v).replace(/,/g, '');
+  const neg = s.charAt(0) === '-';
+  const parts = s.replace(/^-/, '').split('.');
+  const whole = (parts[0] || '').replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  // Keep a decimal point the user has typed, even with no digits after it yet,
+  // or the point would be swallowed the instant they press it.
+  const dec = parts.length > 1 ? '.' + (parts[1] || '').replace(/\D/g, '') : '';
+  if (!whole && !dec) return neg ? '-' : '';
+  return (neg ? '-' : '') + whole + dec;
+}
+/* ⚠️ Re-writing the value moves the caret to the end, which makes editing the
+   middle of a figure impossible. Count the significant characters before the
+   caret, reformat, then put it back after that same count — separators are not
+   counted, so inserting one does not shift the caret. */
+function _onMoneyInput(el) {
+  const caret = el.selectionStart == null ? el.value.length : el.selectionStart;
+  const sigBefore = (el.value.slice(0, caret).match(/[0-9.]/g) || []).length;
+  el.value = _grp(el.value);
+  let seen = 0, pos = sigBefore === 0 ? 0 : el.value.length;
+  if (sigBefore > 0) {
+    for (let k = 0; k < el.value.length; k++) {
+      if (/[0-9.]/.test(el.value.charAt(k))) {
+        seen++;
+        if (seen === sigBefore) { pos = k + 1; break; }
+      }
+    }
+  }
+  try { el.setSelectionRange(pos, pos); } catch (e) { /* not a text input */ }
+}
+function _fMoney(label, id, val, ph) {
+  return '<div class="field"><label>' + esc(label) + '</label>'
+    + '<input id="' + id + '" type="text" inputmode="decimal" autocomplete="off"'
+    + ' value="' + esc(_grp(val)) + '" placeholder="' + esc(ph || '') + '"'
+    + ' oninput="_onMoneyInput(this)"></div>';
+}
 function _f(label, id, val, ph, type) {
   return '<div class="field"><label>' + esc(label) + '</label>'
     + '<input id="' + id + '" type="' + (type || 'text') + '" value="' + esc(val == null ? '' : val)
@@ -2448,7 +2493,7 @@ function _catEditorHtml(p) {
     + '</div>'
     + '<div class="itm-legend">Indicative price <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#888">— optional, for early budgeting only. Not a quotation.</span></div>'
     + '<div class="itm-grid">'
-    + _f('Indicative price', 'ce-price', p.indicative_price, 'e.g. 4200', 'number')
+    + _fMoney('Indicative price', 'ce-price', p.indicative_price, 'e.g. 4,200')
     + _f('Currency', 'ce-currency', p.price_currency || 'PHP', 'PHP')
     + _f('Valid until', 'ce-valid', p.price_valid_until, '', 'date')
     + '</div>'
@@ -3254,7 +3299,7 @@ function _bidEditorHtml(i) {
   return '<div class="itm-editor" style="margin-top:10px">'
     + '<div class="itm-legend">Your offer</div>'
     + '<div class="itm-grid">'
-    + _f('Offer amount *', 'bo-amount', i.offer_amount, 'e.g. 250000', 'number')
+    + _fMoney('Offer amount *', 'bo-amount', i.offer_amount, 'e.g. 250,000')
     + _f('Currency', 'bo-currency', i.offer_currency || 'PHP', 'PHP')
     + _f('Lead time (days)', 'bo-lead', i.lead_time_days, 'e.g. 14', 'number')
     + _f('Quotation validity (days)', 'bo-validity', i.validity_days, 'e.g. 30', 'number')

@@ -17,7 +17,7 @@
  * ========================================================================== */
 (function () {
   var SLIDES = [
-    { icon: 'ti-hand-wave', title: 'Welcome', body:
+    { icon: 'ti-mood-smile', title: 'Welcome', body:
       'This is where you keep your company details current and answer Megawide\u2019s requests for quotation.<br><br>Two places: <b>Company Profile</b> and <b>Bid Board</b>.' },
     { icon: 'ti-building', title: 'Company Profile', body:
       'Your contact details, what you supply, your people and your documents.<br><br>Megawide procurement works from what is here \u2014 if it is out of date, so are they.' },
@@ -25,7 +25,7 @@
       'Add each person once under <b>Personnel</b>, then tick <b>Primary contact</b> or <b>Owner</b>.<br><br>Those boxes on Company Information fill in from there \u2014 that is why they are not typed directly.' },
     { icon: 'ti-package', title: 'Products / Services', body:
       'List what you actually supply, with a category and a photo where you have one.<br><br>This is how buyers find you when they are looking for what you sell.' },
-    { icon: 'ti-rosette-discount-check', title: 'Accreditation', body:
+    { icon: 'ti-discount-check', title: 'Accreditation', body:
       'The <b>Accreditation</b> tab shows exactly what is still missing.<br><br>Upload the four documents, fill the gaps, and the <b>Request accreditation</b> button turns on.' },
     { icon: 'ti-clipboard-list', title: 'Bid Board', body:
       'Packages Megawide has invited you to quote. You only see the ones addressed to you.<br><br>The <b>reference pack</b> on each one is what to price against \u2014 read it before you quote.' },

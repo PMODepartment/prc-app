@@ -19,7 +19,7 @@
       '<b>Cards</b> to browse \u00b7 <b>Grid</b> to bulk-edit \u00b7 <b>Analytics</b> for spend.<br><br>Search matches the company, its trades <i>and</i> its products.' },
     { icon: 'ti-filter', title: 'The tiles are the filter', body:
       'Click <b>Accredited</b>, <b>Not accredited</b>, <b>Problematic</b> or <b>Requests to review</b> to narrow the list.' },
-    { icon: 'ti-rosette-discount-check', title: 'Accreditation', body:
+    { icon: 'ti-discount-check', title: 'Accreditation', body:
       'Staff-owned \u2014 a vendor can never set it about themselves.<br><br>It lasts <b>12 months</b>. The directory flags <b>Renewal due</b> and <b>Expired</b>.' },
     { icon: 'ti-alert-triangle', title: 'Problematic vendors', body:
       'Red border, reason shown, warning in every vendor picker.<br><br>Awarding to one <b>asks you to confirm first</b>.' },
@@ -51,7 +51,11 @@
          vertical space — otherwise a taller (bulleted) slide pushes the
          footer down and the "Next" button jumps between clicks. Taller
          content scrolls inside the body instead. */
-      '.vg-body{padding:30px 30px 8px;text-align:center;height:260px;overflow-y:auto}',
+      /* height is a FALLBACK only — fitBody() measures the tallest slide and
+         sets it. A fixed 260px was reserved so the Next button could not move
+         between slides, but the deck was later rewritten to one short idea per
+         slide, and the reservation became mostly empty space on every one. */
+      '.vg-body{padding:26px 28px 6px;text-align:center;height:260px;overflow-y:auto}',
       '.vg-ic{width:60px;height:60px;border-radius:15px;background:var(--mw-red-light,#FDECEA);color:var(--mw-red,#EE3124);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}',
       '.vg-ic i{font-size:30px}',
       '.vg-title{font-size:20px;font-weight:800;margin-bottom:10px}',
@@ -112,8 +116,41 @@
     root.querySelector('#vg-dots').innerHTML = dots;
   }
 
+  /* ⚠️ KEEPS THE FOOTER STILL WITHOUT WASTING SPACE. Every slide has to occupy
+     the same height or the Next button jumps as you page through — but that
+     height should be the tallest slide's, not a number picked in advance.
+     Measured by rendering each slide into the real body with height:auto and
+     taking the largest scrollHeight, which only works once the card is laid
+     out, so it runs from open() rather than build(). Re-run on resize because
+     the text reflows at a different width. */
+  var _fitW = 0;
+  function fitBody() {
+    if (!root) return;
+    var body = root.querySelector('.vg-body');
+    var title = root.querySelector('.vg-title');
+    var text = root.querySelector('.vg-text');
+    if (!body || !title || !text) return;
+    var keepT = title.textContent, keepH = text.innerHTML;
+    body.style.height = 'auto';
+    var max = 0;
+    for (var i = 0; i < SLIDES.length; i++) {
+      title.textContent = SLIDES[i].title;
+      text.innerHTML = SLIDES[i].body;
+      if (body.scrollHeight > max) max = body.scrollHeight;
+    }
+    title.textContent = keepT;
+    text.innerHTML = keepH;
+    if (max > 0) body.style.height = max + 'px';
+    _fitW = window.innerWidth;
+  }
   function go(n) { if (n < 0 || n >= SLIDES.length) return; idx = n; render(); }
-  function open(n) { if (!built) build(); idx = n || 0; render(); root.style.display = 'flex'; }
+  function open(n) {
+    if (!built) build();
+    idx = n || 0;
+    render();
+    root.style.display = 'flex';
+    fitBody();                       // needs the card laid out, so after display
+  }
   function close() {
     if (root) root.style.display = 'none';
     try { if (window.__vgUser) localStorage.setItem('wpm_vendorguide_' + window.__vgUser, '1'); } catch (e) {}
@@ -146,6 +183,10 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectButton);
   else injectButton();
+
+  window.addEventListener('resize', function () {
+    if (root && root.style.display !== 'none' && window.innerWidth !== _fitW) fitBody();
+  });
 
   window.VendorGuide = { open: open, close: close, maybeAutoOpen: maybeAutoOpen, _go: go };
 })();
