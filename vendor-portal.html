@@ -122,6 +122,7 @@
     .doc-row:last-child{border-bottom:none}
     .doc-name{flex:1;min-width:150px;font-size:12.5px;font-weight:600}
     .doc-missing{font-size:11.5px;color:#991B1B;font-weight:600}
+    .ready-missing{color:#991B1B}
     .doc-have{font-size:11.5px;color:#065F46;font-weight:600}
     @media(max-width:640px){.ready-grid{grid-template-columns:1fr}}
     .tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
@@ -187,7 +188,7 @@
     .field-err.on{display:block}
     .field input:disabled,.field select:disabled{background:#F4F4F4;color:#6B6A6A;cursor:not-allowed;border-color:#e9e9e9}
     .doc-rule{font-size:10.5px;color:#999;flex-basis:100%;margin-top:2px}
-    html.dark-mode .doc-rule{color:#777}
+    html.dark-mode .doc-rule{color:#9D9B9B}   /* was #777 = 3.13:1 */
     .locked-note{font-size:11px;color:#888;margin-top:5px;line-height:1.6;
       position:relative;padding-left:17px}
     /* Small helper text under a field. Was being used before it existed here
@@ -435,7 +436,7 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     .bid-past > summary{cursor:pointer;font-size:12.5px;font-weight:700;color:#666;
       list-style:none;display:flex;align-items:center;gap:6px;padding:4px 0}
     .bid-past > summary::-webkit-details-marker{display:none}
-    .bid-past > summary::before{content:'b8';font-size:11px;transition:transform .15s;display:inline-block}
+    .bid-past > summary::before{content:'▸';font-size:11px;transition:transform .15s;display:inline-block}
     .bid-past[open] > summary::before{transform:rotate(90deg)}
     html.dark-mode .bid-past{border-color:#3a3a3a}
     html.dark-mode .bid-past > summary{color:#9D9B9B}
@@ -463,7 +464,37 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       .cat-photo{height:104px}
       .sec-head .btn-primary{margin-left:0;width:100%}
     }
-  </style>
+  
+    /* ══ DARK-MODE CONTRAST PASS — vendor portal ══════════════════════════
+       Found by driving the LIVE page as a real vendor, not by reading: the
+       "Still needed before you can request…" line — the single most actionable
+       thing a vendor is told — rendered at 1.69:1 and was effectively
+       invisible. The staff side got this pass earlier; this page only got the
+       --mw-red-ink token, so its own hardcoded colours were still light-page
+       values. Every ratio below is measured against --surface (#2B2C2B).
+
+       ⚠️ Rules that paint their OWN background (the status pills, the banners,
+          the .tick chips) are deliberately absent — they carry their backdrop
+          with them. Only add a rule here when it sets `color` alone.
+
+       ⚠️ .sidebar-logo .app-label is NOT here: the sidebar is near-black in
+          BOTH themes, so its red sits on #231F20 (3.96:1), not on --surface. */
+    html.dark-mode .ready-missing,
+    html.dark-mode .field-err{color:#FCA5A5}          /* was 1.69:1 → 7.39:1 */
+    html.dark-mode .save-state.dirty{color:#FBBF24}   /* was 1.98:1 → 8.40:1 */
+    html.dark-mode .cat-price,
+    html.dark-mode .itm-legend,
+    html.dark-mode .prof-tag,
+    html.dark-mode .prof-del:hover{color:#FF8B80}     /* was 2.40/3.40:1 → 6.18:1 */
+    html.dark-mode .cat-brand,
+    html.dark-mode .pf-empty b{color:#A8A7A7}         /* was 2.44:1 → 5.84:1 */
+    html.dark-mode .logo-hint,
+    html.dark-mode .locked-note,
+    html.dark-mode .save-state,
+    html.dark-mode .sec-count,
+    html.dark-mode .field-hint,
+    html.dark-mode .doc-name{color:#9D9B9B}           /* was 3.95:1 → 5.07:1 */
+</style>
   <script>
     /* Anti-flash: apply the saved (or system) theme to <html> before first paint. */
     (function(){ try {
@@ -952,7 +983,7 @@ function renderRequestBox(rd) {
     ? `<div class="banner banner-rejected" style="margin-bottom:12px"><b>Your last request was not approved</b>${decided.decision_notes ? esc(decided.decision_notes) : 'Contact Megawide Procurement for details.'} You can fix the points above and submit again.</div>`
     : '';
   const blocked = ready ? '' :
-    `<div style="font-size:12.5px;color:#991B1B;margin-bottom:10px">Still needed before you can request: <b>${esc(rd.missing.join(', '))}</b></div>`;
+    `<div class="ready-missing" style="font-size:12.5px;margin-bottom:10px">Still needed before you can request: <b>${esc(rd.missing.join(', '))}</b></div>`;
   box.innerHTML = `${declined}${blocked}
     <button class="btn-primary" id="btnRequest" ${ready ? '' : 'disabled'} onclick="submitRequest()">
       ${decided ? 'Request accreditation again' : 'Request accreditation'}
