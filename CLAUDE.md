@@ -2847,6 +2847,151 @@ being unable to inject markup.
 subject are both dropped by their deploy guards, so the round works and nothing is lost, but
 neither is stored. Its section 5 verification `SELECT` must read true on all five columns.
 
+### Personnel owns the people; one quotation; the negotiation gets a document (2026-09-04)
+
+`migrations/2026-09-04_vendor_personnel_owner.sql`, `_bid_one_quotation.sql`,
+`_bid_negotiated_quotation.sql` — **all three RUN ME**, in that order, after the
+existing 2026-09-04 bid migrations.
+
+**⚠️ THE PORTAL ASKED FOR THE SAME PERSON TWICE.** Contact Person / Position /
+Number / Email were free text on Company Information **and** rows in Personnel,
+and `syncPrimaryContact` only ever pushed Personnel → `vendors`. So a vendor
+filled them in on Company Information, saved, and finished with a contact on the
+company record and an **empty Personnel tab** — reported from the live portal.
+
+- Those six boxes are **read-only MIRRORS** now (`MIRROR_FIELDS`, deliberately
+  **out of `OVERVIEW_FIELDS`** so they are never in the save payload).
+  `applyPeopleMirror()` replaces `applyContactLock()`; `syncPeopleMirror()`
+  replaces `syncPrimaryContact()`.
+- **⚠️ ALWAYS read-only, including when nobody is flagged yet.** They used to
+  stay editable "so the vendor is never blocked on a field they cannot fill" —
+  that reasoning is what produced the bug. They are not blocked: they fill it in
+  by adding the person, one click away, which is where it has to live anyway.
+- **⚠️ IT FALLS BACK TO THE STORED `vendors.*` VALUE AND SAYS SO.** Not
+  belt-and-braces — pre-migration (`is_owner` absent) or on a failed personnel
+  fetch, a saved profile would otherwise open to blank read-only boxes and read
+  as data loss.
+- **`vendor_personnel.is_owner`** is a per-person flag, so a vendor with two
+  owners can say so; the mirror joins them. `role_title` stays free text for
+  everyone else — Owner is the one designation Megawide must read reliably.
+- **⚠️ THE MIGRATION BACKFILLS BOTH DIRECTIONS.** Without it every vendor whose
+  contact or owner lives only on the company record opens to blank boxes with no
+  row to edit them from. Conservative and idempotent: flag a name-matching row,
+  else create one.
+- Existing people can be toggled primary/owner **in place** (`togglePersonFlag`).
+  Previously the only way to flag someone was delete-and-re-add, losing their
+  photo and audit trail. **Primary is exclusive, owner is not.**
+- Fields are grouped by **whose number it is** — Primary contact / Owner /
+  Company — which is what stopped the two phone fields reading as a repeat.
+  Telephone is the company landline, gets a landline placeholder, and
+  **a value that is only a dial code is no longer stored**.
+
+**⚠️ THE STAFF PREVIEW COULD NOT NAVIGATE.** `_lockPreview()` disabled every
+button in `.wrap`, tab buttons included, so it opened on Company Info and stayed
+there. **Navigation is not an edit** — `.tab-btn` / `.nav-item` / `.tabs` /
+`.sidebar` are exempt.
+
+#### One quotation, and the buyer could not see half of them
+
+**⚠️ TWO VENDOR SURFACES WROTE DIFFERENT COLUMNS.** `vendor-portal.html` wrote
+`attachment_path` (a direct update); `bid-response.html` wrote `commercial_path`
+(via `submit_bid_by_token`); `bids.html` read **only** `commercial_path` /
+`technical_path`. A quotation sent from the portal gave the buyer **no button at
+all**. `_bid_one_quotation.sql` recovers those and the portal now writes both.
+
+The Technical/Commercial split is retired: the quotation already describes what
+it is pricing. One upload everywhere, one **Quotation** button, plus an "Also
+attached" button only when a genuinely different file exists under the old model
+so nothing already sent becomes unreachable.
+
+**⚠️ `submit_bid_by_token` KEEPS ITS SIGNATURE, twice over.** PostgREST resolves
+an overload by ARGUMENT NAMES, so adding `p_attachment_*` would leave two
+candidates and every vendor's submit would start failing. `p_commercial_*` keeps
+its name and now means "the quotation".
+
+#### The negotiated price is a document, not a typed number
+
+**⚠️ REVISING WAS DESTROYING THE ORIGINAL OFFER.** A vendor resubmitting
+overwrote `offer_amount` and replaced the attachment, so *initial → negotiated*
+could not be reconstructed for the award record, for reporting, or for the
+vendor's own history. And staff typed `negotiated_amount` into a bare number box
+with nothing tying it to anything the vendor sent.
+
+`_bid_negotiated_quotation.sql`: **the FIRST submission is the offer; every later
+one negotiates**, kept alongside it with `negotiated_doc_path/_name`,
+`negotiated_at`, `revision_count`. The portal mirrors that client-side (a vendor
+overwriting their own original is a data-quality problem, not a security one).
+Staff can attach a revision that arrived by email (`uploadNegotiated`).
+**`bid_by_token` gains the four negotiated keys** — its field list IS the access
+control, and these are the vendor's own figures, but they still had to be added
+deliberately or a vendor resubmits and sees their old number.
+
+#### Bids at a glance, and one picture for reporting
+
+- **Every column sorts.** **⚠️ The "lowest" chip is keyed to the AMOUNT, not the
+  row position** — it was drawn on row 0, correct only while the table was always
+  in price order. **⚠️ Unknown sorts last in BOTH directions**: a missing lead
+  time is not "0 days", and sorting it as zero puts the bids we know least about
+  at the top of a table someone awards from.
+- "Validity" → **"Quotation validity"** on the screen, in the CSV, and on both
+  vendor pages.
+- **`negotiationViz()`** — one horizontal bar per bidder on a shared scale, the
+  original behind the negotiated figure so **the gap IS the saving**, the BCB
+  across it as a dashed line, and the winner's position vs BCB as the reporting
+  headline. **⚠️ Plain divs, NOT Chart.js** — this page loads no charting library
+  and one proportional bar does not justify a dependency; it also means the panel
+  prints and themes. It uses **charts.js's own two series colours** (brand ink =
+  Budget/original, brand red = Awarded/negotiated) so it reads like the period
+  charts rather than a new chart language.
+
+#### Clarifications, the stranded award, and section nav
+
+- The dropdown said **"Thread"**, which read as picking an existing one. It is
+  the **SUBJECT** that groups: messages sharing a subject ARE the thread, and
+  there is nothing to create or name. Relabelled, with the rule stated in the
+  panel and beside the box. The question box could be dragged to any size;
+  capped. A four-message exchange rendered as four identical boxes — the
+  vendor's replies are now offset and paler with a MEGAWIDE / VENDOR chip.
+- **⚠️ `wpStatusLine()` EXPLICITLY SKIPPED THE AWARDED CASE** on the reasoning
+  that `doAward()` writes it. When that write fails the screen shows "5 Awarded"
+  in red directly above "procurement status: Not Started" and says nothing —
+  seen live. That is the one mismatch worth shouting about: the award has not
+  reached the record every dashboard reads. `finishAwardOnWp()` runs exactly
+  `doAward`'s work-package write from the winner on record, safe to press twice.
+- **Section nav** (`buildBidNav`) — eight panels on one scroll. Sticky rail with
+  scroll-spy, horizontal strip under 900px, the shape `wp-form.html` and the
+  dashboards already use. **⚠️ Built from the panels actually on screen**, since
+  several render nothing until the round reaches them.
+
+#### Elsewhere
+
+- **The "N vendor logins are not listed here" banner is gone** from User
+  Management — it repeated the same sentence on every visit and Admin → Vendor
+  Registrations is the standing signpost. `splitVendorLogins` stays (vendor
+  logins must not sit in the staff list). Its CSS **moved into
+  `vendor-registrations.html`**, the one page still using it, whose strip
+  reports a real access fault and carries the one-click fix.
+- **Change History opens collapsed** with a one-line summary and pages 8 at a
+  time (`_histOpen` / `_HIST_PAGE` / `_histForVendor`).
+- **Reference Rates are derived only.** The hand-entry form and per-row delete
+  are gone: a typed rate sits in the same list as a contract figure with nothing
+  to tell them apart. Rows with a null `wp_id` are marked "entered by hand".
+- **Product / Vendor Group is a datalist** of the groups already in the
+  directory. Kept, not removed: for the ~2,400 masterlist vendors with no
+  catalogue entries it is the only machine-readable hint of what they sell, and
+  it is in the directory search predicate. Free text still allowed — the
+  masterlist can gain a group we have not imported — but the existing value is
+  now the path of least resistance.
+
+**⚠️ STILL OPEN after this batch** (asked for, not built): the Vendor Management
+guide is still too text-heavy; there is no Vendor Portal guide; PWA install +
+badge for bid invitations is unexplored; the portal sidebar still has only two
+items; `vendor-login.html` and `login.html` still look different; the bid board
+carries no terms of reference / design criteria / MPSS attachment for vendors to
+price against; and reference rates are not yet keyed to the Planning app's class
+codes (`EPC. FIN. Class Code Mapping Template` — a real 3-level hierarchy,
+Level 1 trade → Level 2 group → Level 3 item, 727 rows).
+
 ### Vendor portal review batch (2026-09-04)
 
 - **⚠️ FAILED SIGN-INS WERE SILENT (`vendor-login.html`).** `signIn()` sets an inline
