@@ -104,6 +104,43 @@ also how you diagnose a database where an older migration has been re-run on top
 
 ---
 
+## ⚠️ Three of these were never actually run (found 2026-09-05)
+
+Established by **probing the live schema** for the objects each migration
+creates, not by reading the notes above — which is how two of them stayed missed.
+`migrations/2026-09-05_pending_consolidated.sql` bundles all three in run order;
+it is a convenience file, not a new migration, and all three are idempotent.
+
+| # | File | How it was detected | What it had been costing |
+|---|---|---|---|
+| 11 | `2026-07-23_bcb_baselines.sql` | `work_packages.budget_bcb0/1/2` all absent | **⚠️ THE WORST OF THE THREE.** `db.js`'s `_isMissingBcbCol` / `_stripBcb` guard drops those columns from a write and lets it report success, so every per-baseline budget typed into the WP form or the review grid was **silently discarded** and the BCB0/1/2 switcher showed the single `approved_budget_bcb` figure at every level |
+| 28 | `2026-08-20_planners_need_by.sql` | table absent (`PGRST205`) | `WPDb.getNeedBy()` returns `{}` on any failure *including* a missing table, so the Planners need-by columns and the WP-form advisory panel were simply never shown — no error anywhere |
+| — | `2026-09-05_board_view_round_id_fix.sql` | `vendor_bid_board_view.round_id` absent | `vendor-portal.html` reads the reference pack (TOR / MPSS / drawings / BOQ) **by `round_id`**, so a vendor could never see what to price against |
+
+`2026-09-05_board_view_drop_token.sql` needs no action: `access_token` is already
+absent from the view (a later rebuild removed it), and that file's own guard
+early-exits when the string is gone.
+
+### ⚠️ What probing cannot tell you
+
+Policies, triggers, function **bodies** and pure data fixes are invisible from
+outside the database, so these could be neither confirmed nor ruled out:
+`2026-06-29_update_status_align_2026`, `2026-07-02_update_remove_partially_awarded`,
+`2026-07-08_rls_hardening`, `2026-07-08_seed_demo_project`,
+`2026-07-09_update_wpno_strip_prefix`, `2026-07-14_contributor_wp_delete`,
+`2026-08-03_viewer_budget_role`, `2026-08-10_vendor_rates_wp_link_fix`,
+`2026-08-10_vendor_invite_rls_fix`, `2026-08-20_vendor_field_ownership`.
+
+Use `CHECK_migration_status.sql` and each file's own verification `SELECT` from
+inside the SQL Editor. All are idempotent — but re-running any file that defines
+`internal.vendor_edit_guard` must be followed by the consolidated guard again.
+
+**The general lesson: a migration that has not run does not announce itself.**
+Every one of these three was hidden by a guard or a graceful degradation that was
+working exactly as designed.
+
+---
+
 ## Conventions
 
 - **Idempotent.** Everything here is written to be safe to re-run (`if not exists`,

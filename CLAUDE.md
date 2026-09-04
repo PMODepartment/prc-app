@@ -116,7 +116,25 @@ meaningless. The redundant `MIGRATION_` prefix was dropped (the folder says it);
 `update_` / `add_` were kept lowercase because they still say something the folder does not.
 `supabase-schema.sql` stays in the repo root — it is the reference schema, not a migration.
 
-- **⚠️ FILENAME ORDER IS NOT RUN ORDER — `migrations/README.md` is authoritative.** Sorting the
+- **⚠️⚠️ THREE MIGRATIONS HAD NEVER BEEN RUN — found 2026-09-05 by PROBING THE LIVE
+SCHEMA, not by reading these notes.** `migrations/2026-09-05_pending_consolidated.sql`
+bundles them in run order (a convenience file, not a new migration; all three are
+idempotent). **`2026-07-23_bcb_baselines.sql` is the costly one:** `budget_bcb0/1/2`
+did not exist, and `db.js`'s `_stripBcb` guard drops them from a write and reports
+success — so **every per-baseline budget ever entered was silently discarded** and
+the BCB0/1/2 switcher showed the one `approved_budget_bcb` figure at all three
+levels. Also missing: `2026-08-20_planners_need_by.sql` (so the need-by columns and
+the WP-form advisory never appeared — `getNeedBy()` returns `{}` on a missing table)
+and `2026-09-05_board_view_round_id_fix.sql` (so a vendor could never see the
+reference pack, which the portal reads by `round_id`).
+**⚠️ A MIGRATION THAT HAS NOT RUN DOES NOT ANNOUNCE ITSELF** — all three were hidden
+by a deploy guard or a graceful degradation working exactly as designed. Probe the
+schema (`information_schema`, or a REST `select=<column>` which returns `42703` for a
+missing column and `PGRST205` for a missing table); do not trust a note.
+**⚠️ Policies, triggers, function BODIES and data fixes cannot be probed from
+outside** — ten migrations remain unverifiable either way; see `migrations/README.md`.
+
+**⚠️ FILENAME ORDER IS NOT RUN ORDER — `migrations/README.md` is authoritative.** Sorting the
   folder is wrong in at least one place: eight files share `2026-08-10` and alphabetically
   `vendor_invite_rls_fix` sorts BEFORE `vendor_management`, yet it depends on the tables that
   file creates. A date prefix cannot encode within-day sequence. The README carries the ordered
