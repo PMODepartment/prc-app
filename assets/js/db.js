@@ -3843,6 +3843,14 @@ window.initVendorNav = function (profile) {
   if (sec) sec.style.display = readOnly ? 'none' : '';
   return !readOnly;
 };
+/* The Admin section holds User Management (admin-only) AND Vendor Registrations
+   (every contributor). Each item is gated on its own, so the SECTION has to show
+   when EITHER does — otherwise a contributor's queue sits inside a hidden block,
+   which is exactly the bug that pulled Registrations out of Admin the first time. */
+window.showAdminSection = function () {
+  const sec = document.getElementById('sidebar-admin-section');
+  if (sec) sec.style.display = '';
+};
 window.initVendorClaimsNav = function (profile) {
   const el = document.getElementById('nav-vendor-claims');
   if (!el) return;
@@ -3852,6 +3860,7 @@ window.initVendorClaimsNav = function (profile) {
   // withheld from the stripped-down `viewer` exactly like Vendor Management.
   if (['viewer', 'viewer_budget', 'vendor'].includes(role)) { target.style.display = 'none'; return; }
   target.style.display = '';
+  window.showAdminSection();          // the queue lives under Admin now
   if (!(window.VendorDb && VendorDb.claims)) return;
   // Fire-and-forget. One indexed query on a small table, and it must never sit
   // on a dashboard's render path; returns [] when the migration has not run.

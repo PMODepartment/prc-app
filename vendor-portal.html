@@ -558,9 +558,8 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     <div class="panel-title">Company Information</div>
     <div class="draft-note" id="draftNote" style="display:none"></div>
     <p style="font-size:12.5px;color:#888;margin:-4px 0 16px;line-height:1.6">
-      Keep your contact details, address and trades up to date here. A few fields are greyed
-      out — company name, payment terms and how Megawide classifies you are set by Megawide
-      Procurement; contact them if any of those look wrong.
+      Keep your contact details, address, trades and terms up to date here. Only your
+      company name is set by Megawide Procurement — contact them if it looks wrong.
     </p>
     <!-- The logo is the vendor's own asset, so they set it here. Stored in the
          PRIVATE vendor-certs bucket, which means it can only be shown through a
@@ -735,14 +734,15 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260904c"></script>
-<script src="assets/js/db.js?v=20260904c"></script>
+<script src="assets/js/auth.js?v=20260904d"></script>
+<script src="assets/js/db.js?v=20260904d"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
 let vendor = null, myProfile = null, selectedTrades = new Set();
 let myDocs = [], myRequests = [];
 let formDirty = false, formLoaded = false, draftTimer = null;
+let _staffPreview = false;   // super_admin viewing a vendor's portal read-only
 const draftKey = () => 'wpm_vendorprofile_' + (vendor ? vendor.id : 'x');
 
 AppAuth.requireLogin((user, profile) => {
@@ -751,13 +751,34 @@ AppAuth.requireLogin((user, profile) => {
   // already established a valid session, so login.html just re-authenticates
   // them and drops them on the dashboard chooser — a loop that reads like the
   // portal is broken. Say plainly whose account this is and where to go.
-  if (profile.role !== 'vendor' || !profile.vendor_id) { showWrongAccount(profile); return; }
+  /* ── Staff preview ──────────────────────────────────────────────────────
+     A super_admin can open ?vendor=<id> to SEE a vendor's own portal, for
+     troubleshooting "it looks wrong on my side" without asking for their
+     password.
+
+     ⚠️ READ-ONLY, DELIBERATELY. A staff save here would NOT fire
+        internal.vendor_edit_guard — it would write as staff, skip the
+        pending_review flag and be attributed to the wrong person, so the
+        vendor's own record would quietly diverge from what they think they
+        submitted. Editing a vendor is what the staff page in vendors.html is
+        for. This is a window, not a way in.
+     ⚠️ Nothing is bypassed server-side: a super_admin already has full SELECT on
+        vendors, so this shows what THEY can read. It is not impersonation, and
+        the vendor's own vendor_self_view is untouched. */
+  const _previewId = new URLSearchParams(location.search).get('vendor');
+  _staffPreview = !!(_previewId && profile.role === 'super_admin');
+  if (!_staffPreview && (profile.role !== 'vendor' || !profile.vendor_id)) {
+    showWrongAccount(profile); return;
+  }
   // ⚠️ MUST be set before any VendorDb call. db.js's _vendorRel() reads these to
   // route a vendor to vendor_self_view; without them it falls back to the
   // `vendors` table, which a vendor has had no SELECT on since
   // 2026-08-20_vendor_self_view.sql — every read then returns zero rows.
+  // In preview the role stays super_admin on purpose, so the read goes through
+  // the base table the staff account actually has access to.
   window.__wpmRole = profile.role;
   window.__profile = profile;
+  if (_staffPreview) myProfile = Object.assign({}, profile, { vendor_id: _previewId });
   loadAll();
 });
 
@@ -842,13 +863,47 @@ async function loadAll() {
     _step('personnel', renderPersonnel, 'personnelList'),
     _step('bid invitations', renderBidBoard, 'bidBoardList'),
   ]);
+  if (_staffPreview) _lockPreview();   // panels were rebuilt above — lock again
   // Only now do keystrokes count as edits — several render paths above write
   // into the form, and treating those as a change would arm the unload prompt
   // before the vendor has touched anything.
   formLoaded = true;
   formDirty = false;
   syncSaveState();
+  if (_staffPreview) { _lockPreview(); return; }   // never offer a draft in preview
   maybeOfferDraft();
+}
+
+/* ⚠️ THE LOCK IS APPLIED AFTER EVERY RENDER, not once at load. The panels are
+   rebuilt by innerHTML as the vendor's data arrives, so anything locked earlier
+   would come back editable — the same trap that let a read-only role toggle the
+   trade checkboxes on the staff page (they were injected after the lock ran).
+   Blunt on purpose: disable every control inside the panels rather than
+   enumerate them, so a control added later is covered without being remembered. */
+function _lockPreview() {
+  const host = document.querySelector('.wrap');
+  if (!host) return;
+  host.querySelectorAll('input, select, textarea, button').forEach(function (el) {
+    if (el.closest('.topbar') || el.id === 'btn-menu') return;   // chrome stays usable
+    el.disabled = true;
+  });
+  // Save bars and file pickers offer nothing here.
+  host.querySelectorAll('.save-bar, .logo-btn, .prof-photo-btn, .prof-del').forEach(function (el) {
+    el.style.display = 'none';
+  });
+  const b = document.getElementById('statusBanner');
+  if (b && !document.getElementById('previewNote')) {
+    const n = document.createElement('div');
+    n.id = 'previewNote';
+    n.className = 'banner banner-pending';
+    n.style.cssText = 'display:block;margin-bottom:12px';
+    n.innerHTML = '<b>Staff preview — read-only.</b>You are seeing '
+      + esc((vendor && vendor.name) || 'this vendor') + '’s own view of the portal. '
+      + 'Nothing here can be changed — edit them on the '
+      + '<a href="vendors.html?vendor=' + esc((vendor && vendor.id) || '') + '" '
+      + 'style="color:inherit;text-decoration:underline">staff vendor page</a>.';
+    b.parentNode.insertBefore(n, b);
+  }
 }
 
 /* ── Accreditation: readiness, documents, request ──────────────────────────

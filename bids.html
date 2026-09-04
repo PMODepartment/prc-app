@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904c"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904c"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904d"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904d"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -127,15 +127,9 @@
          from read-only roles — every action in it is a write. The page-level
          bounce on each of these pages is the real enforcement. -->
     <div class="sidebar-section" id="sidebar-vendor-section" style="display:none">
-      <div class="sidebar-section-label">Vendors</div>
+      <div class="sidebar-section-label">Sourcing</div>
       <a class="nav-item" href="vendors.html"><i class="ti ti-building-store"></i>Vendor Management</a>
       <a class="nav-item active" id="nav-bids" href="bids.html"><i class="ti ti-gavel"></i>Bid Management</a>
-      <span id="sidebar-vendor-claims" style="display:none">
-        <a class="nav-item" id="nav-vendor-claims" href="vendor-registrations.html">
-          <i class="ti ti-user-check"></i>Vendor Registrations
-          <span class="nbadge" id="nav-claim-count" style="display:none">0</span>
-        </a>
-      </span>
     </div>
     <!-- Navigation only, like admin.html's — vendors are not project-scoped.
          Rendered by window.initSidebarProjects in db.js; hidden until it
@@ -153,9 +147,21 @@
       </div>
       <div id="nav-projects-list"></div>
     </div>
-    <div class="sidebar-section" id="nav-admin-section" style="display:none">
+    <div class="sidebar-section" id="sidebar-admin-section" style="display:none">
       <div class="sidebar-section-label">Admin</div>
-      <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+      <span id="nav-admin-section" style="display:none">
+        <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+      </span>
+      <!-- ⚠️ SIBLING of the admin-only items, NOT nested inside them. The queue is
+           open to every contributor role, while User Management / New Project are
+           admin-only — nesting it would hide it from the contributors who work it.
+           Each item is gated on its own; the SECTION shows if either does. -->
+      <span id="sidebar-vendor-claims" style="display:none">
+        <a class="nav-item" id="nav-vendor-claims" href="vendor-registrations.html">
+          <i class="ti ti-user-check"></i>Vendor Registrations
+          <span class="nbadge" id="nav-claim-count" style="display:none">0</span>
+        </a>
+      </span>
     </div>
     <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
@@ -247,9 +253,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260904c"></script>
-<script src="assets/js/db.js?v=20260904c"></script>
-<script src="assets/js/ui.js?v=20260904c"></script>
+<script src="assets/js/auth.js?v=20260904d"></script>
+<script src="assets/js/db.js?v=20260904d"></script>
+<script src="assets/js/ui.js?v=20260904d"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -282,7 +288,7 @@ AppAuth.requireLogin(async (user, p) => {
   canManage = !['viewer', 'viewer_budget'].includes(p.role);
   window.__wpmRole = p.role;
   window.__profile = p;
-  if (AppAuth.isAdmin(p)) document.getElementById('nav-admin-section').style.display = '';
+  if (AppAuth.isAdmin(p)) { document.getElementById('nav-admin-section').style.display = ''; showAdminSection(); }
   if (typeof initVendorNav === 'function') initVendorNav(p);
   if (typeof initVendorClaimsNav === 'function') initVendorClaimsNav(p);
   if (typeof initSidebarProjects === 'function') initSidebarProjects(p);
