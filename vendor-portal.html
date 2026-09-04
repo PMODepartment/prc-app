@@ -62,6 +62,26 @@
       color:rgba(255,255,255,.3);text-transform:uppercase;padding:0 8px;margin-bottom:4px}
     /* A bare .field after an .itm-grid inherits no top gap, so the Notes label
        sat hard against the Payment terms box above it. */
+    .refpack{border:1px solid var(--border-md);border-radius:11px;padding:13px 15px;margin:12px 0;
+      background:var(--surface-2)}
+    .refpack-h{font-size:0.7143rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+      color:var(--text-hint);margin-bottom:9px}
+    .refpack-sub{font-size:0.7143rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+      color:var(--text-hint);margin:14px 0 7px}
+    .refpack-doc{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:6px 0;
+      border-bottom:1px solid var(--border)}
+    .refpack-doc:last-child{border-bottom:none}
+    .refpack-kind{font-size:0.6429rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+      background:var(--surface);color:var(--text-secondary);border-radius:6px;padding:2px 7px}
+    .refpack-title{flex:1;min-width:120px;font-size:0.8571rem;font-weight:600}
+    .refpack-doc a{font-size:0.7857rem;font-weight:700;color:var(--mw-red-ink)}
+    .refpack-nofile{font-size:0.7143rem;color:var(--text-hint)}
+    .refpack-tw{overflow-x:auto}
+    .refpack-t{width:100%;border-collapse:collapse;font-size:0.8125rem}
+    .refpack-t th{text-align:left;font-size:0.6786rem;font-weight:800;letter-spacing:.03em;
+      text-transform:uppercase;color:var(--text-hint);padding:5px 8px;border-bottom:1px solid var(--border-md)}
+    .refpack-t td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+    .refpack-note{font-size:0.7143rem;color:var(--text-hint);line-height:1.55;margin-top:9px}
     .bid-field{margin-top:14px}
     .bid-field textarea{resize:vertical;max-height:220px;min-height:64px}
     .per-flags{display:flex;flex-direction:column;gap:5px;padding-top:6px}
@@ -818,8 +838,8 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260904m"></script>
-<script src="assets/js/db.js?v=20260904m"></script>
+<script src="assets/js/auth.js?v=20260905a"></script>
+<script src="assets/js/db.js?v=20260905a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -2506,6 +2526,83 @@ function _bidDueInfo(i) {
   return { text: 'Due ' + dateStr, cls: '' };
 }
 
+/* The reference pack, as the bidder sees it. Read-only: these are what
+   Megawide issued, and they are the same for every bidder on the round.
+   ⚠️ The files come from a PUBLIC-read bucket precisely because most bidders
+      answer from the token link with no login — a private bucket would need a
+      signed URL per file per anonymous page load. Nothing vendor-submitted is
+      in there. */
+function refPackHtml(ref) {
+  const docs = (ref && ref.documents) || [];
+  const items = (ref && ref.items) || [];
+  if (!docs.length && !items.length) return '';
+  const KIND = { tor: 'Terms of reference', design_criteria: 'Design criteria',
+                 drawing: 'Drawing', boq: 'Bill of quantities', other: 'Other',
+                 reference: 'Reference' };
+  let out = '<div class="refpack"><div class="refpack-h">What to price against</div>';
+  if (docs.length) {
+    out += '<div class="refpack-docs">' + docs.map(function (d) {
+      const url = d.file_path ? _refUrl(d.file_path) : '';
+      return '<div class="refpack-doc">'
+        + '<span class="refpack-kind">' + esc(KIND[d.kind] || 'Reference') + '</span>'
+        + '<span class="refpack-title">' + esc(d.title) + '</span>'
+        + (url ? '<a href="' + esc(url) + '" target="_blank" rel="noopener">Open</a>'
+               : '<span class="refpack-nofile">no file</span>')
+        + '</div>';
+    }).join('') + '</div>';
+  }
+  if (items.length) {
+    out += '<div class="refpack-sub">Line items to price</div>'
+      + '<div class="refpack-tw"><table class="refpack-t"><thead><tr>'
+      + '<th>Item</th><th>Description</th><th>Specification</th><th>Unit</th><th>Qty</th>'
+      + '</tr></thead><tbody>'
+      + items.map(function (it) {
+          return '<tr><td>' + esc(it.item_no || '') + '</td>'
+            + '<td>' + esc(it.description) + '</td>'
+            + '<td>' + esc(it.spec || '\u2014') + '</td>'
+            + '<td>' + esc(it.unit || '\u2014') + '</td>'
+            + '<td style="text-align:right">'
+            + (it.quantity == null ? '\u2014' : Number(it.quantity).toLocaleString()) + '</td></tr>';
+        }).join('')
+      + '</tbody></table></div>'
+      + '<div class="refpack-note">Price every line. If you are quoting an alternative to any of '
+      + 'them, say so in your notes so it is not read as the same thing.</div>';
+  }
+  return out + '</div>';
+}
+
+function _refUrl(path) {
+  try {
+    const sb = window.__sb;
+    const { data } = sb.storage.from('bid-reference').getPublicUrl(path);
+    return (data && data.publicUrl) || '';
+  } catch (e) { return ''; }
+}
+/* invitation_id -> {documents, items}. Loaded lazily when a card is opened:
+   fetching every pack up front would put N round-trips on the Bid Board's
+   first paint for something most vendors read once. */
+const _refCache = {};
+async function loadRefPack(inv) {
+  if (!inv || _refCache[inv.invitation_id]) return;
+  let ref = { documents: [], items: [] };
+  try {
+    // ⚠️ BY ROUND ID, THROUGH RLS — never by access_token. That token is the
+    //    anonymous link's bearer capability and is deliberately withheld from
+    //    this view; a logged-in vendor does not need it and handing it to a
+    //    page would make a session forwardable. The policies still require an
+    //    invitation of THEIRS on that round, so the id alone grants nothing.
+    if (inv.round_id && VendorDb.bidReference) {
+      const [documents, items] = await Promise.all([
+        VendorDb.bidReference.documents(inv.round_id),
+        VendorDb.bidReference.items(inv.round_id),
+      ]);
+      ref = { documents: documents, items: items };
+    }
+  } catch (e) { /* the pack is an aid; never break the board over it */ }
+  _refCache[inv.invitation_id] = ref;
+  if ((ref.documents || []).length || (ref.items || []).length) _renderBidList();
+}
+
 function _bidCard(i) {
   const st = _bidStatusMeta(i);
   const due = _bidDueInfo(i);
@@ -2520,6 +2617,9 @@ function _bidCard(i) {
 
   let body = '';
   if (i.scope_note) body += '<div class="bid-scope">' + esc(i.scope_note).replace(/\n/g, '<br>') + '</div>';
+  // Rendered from the cache; _bidCard is synchronous, so the pack appears on
+  // the next render after loadRefPack() resolves rather than blocking this one.
+  body += refPackHtml(_refCache[i.invitation_id]);
   if (chips.length) body += '<div class="bid-chips">' + chips.map(c => '<span class="bid-chip">' + esc(c) + '</span>').join('') + '</div>';
 
   if (i.status === 'submitted' || i.status === 'closed') {
@@ -2567,6 +2667,8 @@ function _bidCard(i) {
    form (switchBidMode), so there is one entry point, not two competing ones. */
 function openBidResponse(id) {
   _bidOpenId = id; _bidMode = 'offer';
+  // Fire-and-forget: it re-renders itself once the pack lands.
+  loadRefPack(_bidItems.find(function (x) { return x.invitation_id === id; }));
   _renderBidList();
   const card = document.getElementById('bid-card-' + id);
   if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

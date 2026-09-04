@@ -3957,6 +3957,99 @@ const VendorDb = (() => {
      ⚠️ Scoped per INVITATION, never per round: a clarification is between us
         and one vendor and must never be visible to the others. Immutable by
         design — the table has no update or delete policy. */
+  /* ── The ask: reference documents and priced line items ──────────────────
+     2026-09-05_bid_reference_docs.sql. Two different things:
+       documents — terms of reference / design criteria / drawings / BOQ, files
+                   issued with the RFQ, the same set to every bidder;
+       items     — the MPSS: per line, the specification and quantity a bidder
+                   prices against, which is what makes two quotations comparable.
+     ⚠️ Reads return [] on ANY failure including "table does not exist" — the
+        bid workspace must render before the migration is run. Writes THROW. */
+  const bidReference = {
+    async documents(roundId) {
+      try {
+        const sb = await getSB();
+        const { data, error } = await sb.from('vendor_bid_documents')
+          .select('*').eq('round_id', roundId).order('sort_order').order('created_at');
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (_isMissingTable(e, 'vendor_bid_documents')) return [];
+        console.warn('[bidReference.documents]', e && e.message); return [];
+      }
+    },
+    async addDocument(roundId, fields, profile) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_documents')
+        .insert({ round_id: roundId, ...fields,
+                  created_by: profile?.id || null,
+                  created_by_name: profile?.name || profile?.email || null })
+        .select().single();
+      if (error) throw error;
+      return data;
+    },
+    async removeDocument(id) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_bid_documents').delete().eq('id', id);
+      if (error) throw error;
+    },
+    async items(roundId) {
+      try {
+        const sb = await getSB();
+        const { data, error } = await sb.from('vendor_bid_items')
+          .select('*').eq('round_id', roundId).order('sort_order').order('created_at');
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (_isMissingTable(e, 'vendor_bid_items')) return [];
+        console.warn('[bidReference.items]', e && e.message); return [];
+      }
+    },
+    async addItem(roundId, fields) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_items')
+        .insert({ round_id: roundId, ...fields }).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async removeItem(id) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_bid_items').delete().eq('id', id);
+      if (error) throw error;
+    },
+    /* The anonymous bidder's read. ⚠️ Most bidders answer from the token link
+       with no login, so RLS reaches none of them — this RPC is their only path. */
+    async byToken(token) {
+      try {
+        const sb = await getSB();
+        const { data, error } = await sb.rpc('bid_reference_by_token', { p_token: token });
+        if (error) throw error;
+        return data || { documents: [], items: [] };
+      } catch (e) {
+        console.warn('[bidReference.byToken]', e && e.message);
+        return { documents: [], items: [] };
+      }
+    },
+    /* ⚠️ PUBLIC-READ BUCKET, and only ever for what Megawide ISSUES. Anonymous
+       bidders have to open these; nothing vendor-submitted goes here. */
+    async upload(roundId, file) {
+      const sb = await getSB();
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${roundId}/${Date.now()}_${safe}`;
+      const { error } = await sb.storage.from('bid-reference').upload(path, file, { upsert: false });
+      if (error) throw error;
+      return path;
+    },
+    publicUrl(path) {
+      if (!path) return '';
+      try {
+        const sb = window.__sb;
+        const { data } = sb.storage.from('bid-reference').getPublicUrl(path);
+        return (data && data.publicUrl) || '';
+      } catch (e) { return ''; }
+    },
+  };
+
   const bidClarifications = {
     async forInvitation(invitationId) {
       const sb = await getSB();
@@ -4012,6 +4105,7 @@ const VendorDb = (() => {
     taxonomyNodeForWP, findVendorsForWP,
     getVendorRates, addVendorRate, deleteVendorRate, upsertRate,
     getClassCodes, classCodeIndex, normClassCode,
+    bidReference,
     uploadCertFile, getCertFileUrl, deleteCertFile,
     documents: vendorDocuments, uploadVendorDoc, uploadVendorFile, requests: accreditationRequests, claims: vendorClaims, history: vendorHistory,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,

@@ -91,6 +91,26 @@
     .field input:focus,.field textarea:focus{border-color:var(--mw-red)}
     .field textarea{resize:vertical;min-height:76px}
     .field input.bad,.field textarea.bad{border-color:var(--mw-red);background:var(--mw-red-light)}
+    .refpack{border:1px solid var(--border-md);border-radius:11px;padding:13px 15px;margin:12px 0;
+      background:var(--surface-2)}
+    .refpack-h{font-size:0.7143rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+      color:var(--text-hint);margin-bottom:9px}
+    .refpack-sub{font-size:0.7143rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+      color:var(--text-hint);margin:14px 0 7px}
+    .refpack-doc{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:6px 0;
+      border-bottom:1px solid var(--border)}
+    .refpack-doc:last-child{border-bottom:none}
+    .refpack-kind{font-size:0.6429rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+      background:var(--surface);color:var(--text-secondary);border-radius:6px;padding:2px 7px}
+    .refpack-title{flex:1;min-width:120px;font-size:0.8571rem;font-weight:600}
+    .refpack-doc a{font-size:0.7857rem;font-weight:700;color:var(--mw-red-ink)}
+    .refpack-nofile{font-size:0.7143rem;color:var(--text-hint)}
+    .refpack-tw{overflow-x:auto}
+    .refpack-t{width:100%;border-collapse:collapse;font-size:0.8125rem}
+    .refpack-t th{text-align:left;font-size:0.6786rem;font-weight:800;letter-spacing:.03em;
+      text-transform:uppercase;color:var(--text-hint);padding:5px 8px;border-bottom:1px solid var(--border-md)}
+    .refpack-t td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+    .refpack-note{font-size:0.7143rem;color:var(--text-hint);line-height:1.55;margin-top:9px}
     .field-hint{font-size:11px;color:var(--text-hint);margin-top:5px;line-height:1.5}
     .field-err{font-size:11px;color:var(--mw-red-ink);margin-top:5px;font-weight:600}
     .legend{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
@@ -252,6 +272,12 @@ async function load() {
     const { data } = await sb.rpc('bid_clarifications_by_token', { p_token: TOKEN });
     THREAD = Array.isArray(data) ? data : [];
   } catch (e) { THREAD = []; }
+  // The reference pack. Returns empty when 2026-09-05_bid_reference_docs.sql
+  // has not been run, so the page still works — it just shows no pack.
+  try {
+    const { data } = await sb.rpc('bid_reference_by_token', { p_token: TOKEN });
+    if (data) REF = { documents: data.documents || [], items: data.items || [] };
+  } catch (e) { REF = { documents: [], items: [] }; }
   render();
 }
 
@@ -297,6 +323,7 @@ function render() {
     + (chips.length ? '<div class="chips">' + chips.map(function (c) {
         return '<span class="chip">' + esc(c) + '</span>'; }).join('') + '</div>' : '')
     + (b.scope_note ? '<div class="scope">' + esc(b.scope_note) + '</div>' : '')
+    + refPackHtml(REF)
     + (b.detailed_description ? '<div class="scope">' + esc(b.detailed_description) + '</div>' : '')
     + '<dl class="kv">'
     + (b.boq_note ? '<dt>Bill of quantities</dt><dd>' + esc(b.boq_note) + '</dd>' : '')
@@ -317,6 +344,59 @@ function render() {
     if (el) el.focus();
   }
 }
+
+/* The reference pack, as the bidder sees it. Read-only: these are what
+   Megawide issued, and they are the same for every bidder on the round.
+   ⚠️ The files come from a PUBLIC-read bucket precisely because most bidders
+      answer from the token link with no login — a private bucket would need a
+      signed URL per file per anonymous page load. Nothing vendor-submitted is
+      in there. */
+function refPackHtml(ref) {
+  const docs = (ref && ref.documents) || [];
+  const items = (ref && ref.items) || [];
+  if (!docs.length && !items.length) return '';
+  const KIND = { tor: 'Terms of reference', design_criteria: 'Design criteria',
+                 drawing: 'Drawing', boq: 'Bill of quantities', other: 'Other',
+                 reference: 'Reference' };
+  let out = '<div class="refpack"><div class="refpack-h">What to price against</div>';
+  if (docs.length) {
+    out += '<div class="refpack-docs">' + docs.map(function (d) {
+      const url = d.file_path ? _refUrl(d.file_path) : '';
+      return '<div class="refpack-doc">'
+        + '<span class="refpack-kind">' + esc(KIND[d.kind] || 'Reference') + '</span>'
+        + '<span class="refpack-title">' + esc(d.title) + '</span>'
+        + (url ? '<a href="' + esc(url) + '" target="_blank" rel="noopener">Open</a>'
+               : '<span class="refpack-nofile">no file</span>')
+        + '</div>';
+    }).join('') + '</div>';
+  }
+  if (items.length) {
+    out += '<div class="refpack-sub">Line items to price</div>'
+      + '<div class="refpack-tw"><table class="refpack-t"><thead><tr>'
+      + '<th>Item</th><th>Description</th><th>Specification</th><th>Unit</th><th>Qty</th>'
+      + '</tr></thead><tbody>'
+      + items.map(function (it) {
+          return '<tr><td>' + esc(it.item_no || '') + '</td>'
+            + '<td>' + esc(it.description) + '</td>'
+            + '<td>' + esc(it.spec || '\u2014') + '</td>'
+            + '<td>' + esc(it.unit || '\u2014') + '</td>'
+            + '<td style="text-align:right">'
+            + (it.quantity == null ? '\u2014' : Number(it.quantity).toLocaleString()) + '</td></tr>';
+        }).join('')
+      + '</tbody></table></div>'
+      + '<div class="refpack-note">Price every line. If you are quoting an alternative to any of '
+      + 'them, say so in your notes so it is not read as the same thing.</div>';
+  }
+  return out + '</div>';
+}
+
+function _refUrl(path) {
+  try {
+    const { data } = sb.storage.from('bid-reference').getPublicUrl(path);
+    return (data && data.publicUrl) || '';
+  } catch (e) { return ''; }
+}
+let REF = { documents: [], items: [] };
 
 function formHtml() {
   const b = BID;

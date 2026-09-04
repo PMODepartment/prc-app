@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904m"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904m"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260905a"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260905a"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -246,6 +246,15 @@
       .bid-nav a.on{border-left:0;border-bottom-color:var(--mw-red)}
       #roundHost .panel{scroll-margin-top:108px}
     }
+    .ref-sub{font-size:0.7143rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+      color:var(--text-hint);margin:14px 0 8px}
+    .ref-kind{flex:0 0 auto;font-size:0.6429rem;font-weight:800;letter-spacing:.04em;
+      text-transform:uppercase;background:var(--surface-2);color:var(--text-secondary);
+      border-radius:6px;padding:2px 7px}
+    .ref-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;
+      padding-top:11px;border-top:1px dashed var(--border-md)}
+    .ref-fname{font-size:0.7143rem;color:var(--text-hint);max-width:180px;overflow:hidden;
+      text-overflow:ellipsis;white-space:nowrap}
     .bm-wpstat-bad{color:var(--mw-red-ink)}
     .bm-behind-bad{background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);font-weight:700}
     .cmp-th{cursor:pointer;user-select:none;white-space:nowrap}
@@ -428,9 +437,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260904m"></script>
-<script src="assets/js/db.js?v=20260904m"></script>
-<script src="assets/js/ui.js?v=20260904m"></script>
+<script src="assets/js/auth.js?v=20260905a"></script>
+<script src="assets/js/db.js?v=20260905a"></script>
+<script src="assets/js/ui.js?v=20260905a"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -790,6 +799,12 @@ async function openRound(id) {
     THREADS = {};
     const all = await VendorDb.bidClarifications.forRound(id);
     all.forEach(m => { (THREADS[m.invitation_id] = THREADS[m.invitation_id] || []).push(m); });
+    // Both return [] when 2026-09-05_bid_reference_docs.sql has not been run,
+    // so the workspace still opens — the panel just shows nothing attached.
+    [REFDOCS, REFITEMS] = await Promise.all([
+      VendorDb.bidReference.documents(id),
+      VendorDb.bidReference.items(id),
+    ]);
   } catch (e) {
     AppNotify.fromError(e, 'Could not open that bid round');
     return;
@@ -1008,6 +1023,148 @@ function _wireBidNavSpy(nav, items) {
   });
 }
 
+/* ── Reference pack ────────────────────────────────────────────────────────
+   What the bidder prices AGAINST. A scope paragraph is enough for a materials
+   enquiry; for anything with a specification it is not — the pumps case
+   (diameter, material, length, capacity, quantity) does not fit in a sentence,
+   and without it every bidder prices something slightly different and the
+   comparison is worthless.
+
+   ⚠️ THIS IS THE ASK, NOT THE ANALYSIS. The cost comparison itself is still
+      prepared outside the app, in the per-package template. */
+let REFDOCS = [], REFITEMS = [];
+const REF_KINDS = [
+  ['tor', 'Terms of reference'], ['design_criteria', 'Design criteria'],
+  ['drawing', 'Drawing'], ['boq', 'Bill of quantities'], ['other', 'Other'],
+];
+function refKindLabel(k) {
+  const f = REF_KINDS.find(function (x) { return x[0] === k; });
+  return f ? f[1] : 'Reference';
+}
+function refDocsHtml(ro) {
+  return REFDOCS.map(function (d) {
+    const url = VendorDb.bidReference.publicUrl(d.file_path);
+    return '<div class="rfq-row">'
+      + '<span class="ref-kind">' + esc(refKindLabel(d.kind)) + '</span>'
+      + '<div style="flex:1;min-width:140px"><b>' + esc(d.title) + '</b>'
+      + (d.note ? '<small style="display:block;color:var(--text-hint)">' + esc(d.note) + '</small>' : '')
+      + '</div>'
+      + (url ? '<a class="btn btn-sm" href="' + esc(url) + '" target="_blank" rel="noopener">'
+             + '<i class="ti ti-external-link"></i> Open</a>' : '')
+      + (ro ? '' : '<button class="btn btn-sm" onclick="removeRefDoc(' + Q + d.id + Q + ')">'
+             + '<i class="ti ti-trash"></i></button>')
+      + '</div>';
+  }).join('');
+}
+function refItemsHtml(ro) {
+  if (!REFITEMS.length) {
+    return '<div class="sec-note" style="margin:0">No priced line items yet. For anything with a '
+      + 'specification \u2014 a pump diameter, a steel grade, a quantity \u2014 add the lines here so every '
+      + 'bidder prices the same thing.</div>';
+  }
+  return '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
+    + '<th style="width:60px">Item</th><th>Description</th><th>Specification</th>'
+    + '<th style="width:70px">Unit</th><th style="width:80px;text-align:right">Qty</th>'
+    + (ro ? '' : '<th style="width:40px"></th>') + '</tr></thead><tbody>'
+    + REFITEMS.map(function (it) {
+        return '<tr><td>' + esc(it.item_no || '') + '</td>'
+          + '<td><b>' + esc(it.description) + '</b>'
+          + (it.remarks ? '<small style="display:block;color:var(--text-hint)">' + esc(it.remarks) + '</small>' : '')
+          + '</td>'
+          + '<td style="white-space:pre-wrap">' + esc(it.spec || '\u2014') + '</td>'
+          + '<td>' + esc(it.unit || '\u2014') + '</td>'
+          + '<td style="text-align:right">' + (it.quantity == null ? '\u2014' : Number(it.quantity).toLocaleString()) + '</td>'
+          + (ro ? '' : '<td><button class="btn btn-sm" onclick="removeRefItem(' + Q + it.id + Q + ')">'
+                 + '<i class="ti ti-trash"></i></button></td>')
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+function referencePanel() {
+  const ro = !canManage || R.stage === 'awarded' || R.stage === 'cancelled';
+  return '<div class="panel"><div class="panel-title">2 \u00b7 Reference pack</div>'
+    + '<div class="sec-note">The terms of reference, design criteria and drawings a bidder prices '
+    + 'against, and the line items they price. Issued with the RFQ and visible on every bidder\u2019s '
+    + 'own link \u2014 the same set to all of them.</div>'
+    + '<div class="ref-sub">Documents</div>'
+    + (refDocsHtml(ro) || '<div class="sec-note" style="margin:0">Nothing attached yet.</div>')
+    + (ro ? '' :
+        '<div class="ref-add">'
+        + '<select id="rf-kind" class="bm-in" style="flex:0 0 160px">'
+        + REF_KINDS.map(function (k) { return '<option value="' + k[0] + '">' + esc(k[1]) + '</option>'; }).join('')
+        + '</select>'
+        + '<input id="rf-title" class="bm-in" style="flex:1;min-width:150px" placeholder="Title, e.g. Pump schedule Rev C">'
+        + '<label class="btn" style="cursor:pointer"><i class="ti ti-upload"></i> Choose file'
+        + '<input type="file" id="rf-file" style="display:none" onchange="onRefFilePicked(this)"></label>'
+        + '<span id="rf-fname" class="ref-fname"></span>'
+        + '<button class="btn btn-primary" onclick="addRefDoc()">Add</button></div>')
+    + '<div class="ref-sub" style="margin-top:16px">Line items priced (MPSS)</div>'
+    + refItemsHtml(ro)
+    + (ro ? '' :
+        '<div class="ref-add">'
+        + '<input id="ri-no" class="bm-in" style="flex:0 0 70px" placeholder="No.">'
+        + '<input id="ri-desc" class="bm-in" style="flex:1;min-width:130px" placeholder="Description">'
+        + '<input id="ri-spec" class="bm-in" style="flex:1;min-width:150px" placeholder="Spec, e.g. 150mm dia, CI, 45 L/s">'
+        + '<input id="ri-unit" class="bm-in" style="flex:0 0 80px" placeholder="Unit">'
+        + '<input id="ri-qty" class="bm-in" type="number" step="0.001" style="flex:0 0 90px" placeholder="Qty">'
+        + '<button class="btn btn-primary" onclick="addRefItem()">Add line</button></div>')
+    + '</div>';
+}
+function onRefFilePicked(input) {
+  const el = document.getElementById('rf-fname');
+  const f = input.files && input.files[0];
+  if (el) el.textContent = f ? f.name : '';
+}
+async function addRefDoc() {
+  const title = val('rf-title');
+  const fi = document.getElementById('rf-file');
+  const file = fi && fi.files && fi.files[0];
+  if (!title && !file) { AppNotify.warn('Give it a title, or choose a file.'); return; }
+  if (file && file.size > 25 * 1024 * 1024) { AppNotify.warn('That file is over 25 MB.'); return; }
+  const prog = AppNotify.progress('Adding\u2026');
+  try {
+    let path = null, name = null;
+    if (file) { path = await VendorDb.bidReference.upload(R.id, file); name = file.name; }
+    await VendorDb.bidReference.addDocument(R.id, {
+      kind: val('rf-kind') || 'reference',
+      title: title || name,
+      file_path: path, file_name: name,
+      sort_order: REFDOCS.length,
+    }, profile);
+    REFDOCS = await VendorDb.bidReference.documents(R.id);
+    prog.done('Added to the reference pack.');
+    renderRound();
+  } catch (e) { prog.fail('Could not add it: ' + (e.message || e)); }
+}
+async function removeRefDoc(id) {
+  if (!confirm('Remove this from the reference pack?\n\nBidders will no longer see it.')) return;
+  try {
+    await VendorDb.bidReference.removeDocument(id);
+    REFDOCS = await VendorDb.bidReference.documents(R.id);
+    renderRound();
+  } catch (e) { AppNotify.fromError(e, 'Could not remove it'); }
+}
+async function addRefItem() {
+  const desc = val('ri-desc');
+  if (!desc) { AppNotify.warn('A line item needs a description.'); return; }
+  try {
+    await VendorDb.bidReference.addItem(R.id, {
+      item_no: val('ri-no') || null, description: desc,
+      spec: val('ri-spec') || null, unit: val('ri-unit') || null,
+      quantity: num(val('ri-qty')), sort_order: REFITEMS.length,
+    });
+    REFITEMS = await VendorDb.bidReference.items(R.id);
+    renderRound();
+  } catch (e) { AppNotify.fromError(e, 'Could not add the line'); }
+}
+async function removeRefItem(id) {
+  try {
+    await VendorDb.bidReference.removeItem(id);
+    REFITEMS = await VendorDb.bidReference.items(R.id);
+    renderRound();
+  } catch (e) { AppNotify.fromError(e, 'Could not remove the line'); }
+}
+
 function renderRound() {
   const w = WPBYID[R.wp_id] || {};
   document.getElementById('page-title').textContent = wpLabel(w);
@@ -1034,7 +1191,7 @@ function renderRound() {
          + 'This round was cancelled' + (R.cancelled_reason ? ': ' + esc(R.cancelled_reason) : '.') + '</div>'
        : '')
     + '</div>'
-    + deadlineNudge() + askPanel() + biddersPanel() + responsesPanel() + clarifyPanel()
+    + deadlineNudge() + askPanel() + referencePanel() + biddersPanel() + responsesPanel() + clarifyPanel()
     + comparisonPanel() + evaluationPanel() + negotiationPanel() + negotiationViz() + awardPanel();
 
   buildBidNav();
