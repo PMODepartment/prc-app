@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904e"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904e"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904f"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904f"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -201,6 +201,7 @@
                 style="width:100%;padding:8px 11px;border:1.5px solid var(--border-md);border-radius:8px;font-family:inherit;font-size:0.9286rem;background:var(--surface);color:var(--text-primary)">
             </div>
           </div>
+          <div id="listNote" class="sec-note" style="display:none;margin:-4px 0 12px;color:var(--mw-red-ink);font-weight:600"></div>
           <div id="listHost"></div>
         </div>
       </div>
@@ -253,9 +254,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260904e"></script>
-<script src="assets/js/db.js?v=20260904e"></script>
-<script src="assets/js/ui.js?v=20260904e"></script>
+<script src="assets/js/auth.js?v=20260904f"></script>
+<script src="assets/js/db.js?v=20260904f"></script>
+<script src="assets/js/ui.js?v=20260904f"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -398,6 +399,17 @@ function renderList() {
     return (wpLabel(w) + ' ' + projName(r.project_id)).toLowerCase().includes(q);
   });
   const host = document.getElementById('listHost');
+  // Surface the passed deadlines here too — the nudge inside a round is no use
+  // if you have to open the round to discover it.
+  const over = _overdueCount();
+  const note = document.getElementById('listNote');
+  if (note) {
+    note.innerHTML = over
+      ? '<i class="ti ti-clock-exclamation"></i> <b>' + over + '</b> round'
+        + (over === 1 ? '' : 's') + ' past the bid deadline and still marked out for bid.'
+      : '';
+    note.style.display = over ? '' : 'none';
+  }
   if (!rows.length) {
     host.innerHTML = '<div class="empty-state"><i class="ti ti-gavel"></i>'
       + '<b>' + (ROUNDS.length ? 'Nothing matches those filters' : 'No bid rounds yet') + '</b>'
@@ -415,7 +427,9 @@ function renderList() {
           + (r.round_no > 1 ? ' <span class="bstat bstat-invited">Round ' + r.round_no + '</span>' : '') + '</td>'
           + '<td>' + esc(projName(r.project_id)) + '</td>'
           + '<td>' + esc(r.doc_type || 'RFQ') + '</td>'
-          + '<td>' + esc(VendorDb.bidRounds.stageLabel(r.stage)) + '</td>'
+          + '<td>' + esc(VendorDb.bidRounds.stageLabel(r.stage))
+          + (_deadlinePassed(r) ? ' <span class="bm-high" title="The bid deadline has passed">· deadline passed</span>' : '')
+          + '</td>'
           + '<td>' + (function () {
               const c = COUNTS[r.id];
               if (!c || !c.total) return '<span style="color:var(--text-hint)">none yet</span>';
@@ -534,7 +548,7 @@ function renderRound() {
          + 'This round was cancelled' + (R.cancelled_reason ? ': ' + esc(R.cancelled_reason) : '.') + '</div>'
        : '')
     + '</div>'
-    + askPanel() + biddersPanel() + responsesPanel() + clarifyPanel()
+    + deadlineNudge() + askPanel() + biddersPanel() + responsesPanel() + clarifyPanel()
     + comparisonPanel() + evaluationPanel() + negotiationPanel() + awardPanel();
 }
 
@@ -664,12 +678,15 @@ function biddersPanel() {
       + '<small>' + esc(i.vendor_contact_email || 'no contact email on file') + '</small></div>'
       + (acc ? '<span class="bstat bstat-invited" title="Accreditation">' + esc(acc.label) + '</span>' : '')
       + '<span class="bstat bstat-' + esc(i.status === 'closed' ? 'closed' : i.status) + '">'
-      + esc(i.status === 'invited' ? 'Invited' : i.status === 'viewed' ? 'Opened'
-            : i.status === 'submitted' ? 'Bid in' : i.status === 'declined' ? 'Declined'
-            : i.status === 'withdrawn' ? 'Withdrawn' : 'Closed') + '</span>'
-      + (canManage && R.stage === 'draft'
-          ? '<button class="btn btn-sm" onclick="dropBidder(' + Q + i.id + Q + ')" title="Remove"><i class="ti ti-x"></i></button>'
-          : '')
+      + esc(_bidderState(i)) + '</span>'
+      + (!canManage ? ''
+         : R.stage === 'draft'
+          // Nothing has been sent yet, so this really is a deletion.
+          ? '<button class="btn btn-sm" onclick="dropBidder(' + Q + i.id + Q + ')" title="Remove — nothing has been sent yet"><i class="ti ti-x"></i></button>'
+         : i.status === 'withdrawn'
+          ? '<button class="btn btn-sm" onclick="reinstateBidder(' + Q + i.id + Q + ')" title="Put them back in this round"><i class="ti ti-arrow-back-up"></i> Reinstate</button>'
+         : (R.stage === 'awarded' || R.stage === 'cancelled' || i.status === 'closed') ? ''
+          : '<button class="btn btn-sm" onclick="withdrawBidder(' + Q + i.id + Q + ')" title="Take them out of this round — their bid link stops working"><i class="ti ti-user-off"></i> Withdraw</button>')
       + '</div>';
   }).join('');
 
@@ -978,7 +995,13 @@ function comparisonPanel() {
       }).join('')
     + '</tbody></table></div>'
     + '<div class="sec-note" style="margin-top:12px">Lowest is not the same as best value — BP 2.3.3 weighs technical, '
-    + 'commercial and financial together.</div></div>';
+    + 'commercial and financial together.</div>'
+    /* BP 2.3.2 calls this a PRESENTED deliverable, so it has to leave the screen.
+       Both outputs carry the BCB and are internal — the print view says so on it. */
+    + '<div class="bm-actions">'
+    + '<button class="btn" onclick="exportComparisonCsv()"><i class="ti ti-file-spreadsheet"></i> Download CSV</button>'
+    + '<button class="btn" onclick="printComparison()"><i class="ti ti-printer"></i> Print / PDF</button>'
+    + '</div></div>';
 }
 
 /* 2.3.3 — Evaluation. */
@@ -1062,6 +1085,253 @@ async function saveNegotiation() {
     renderRound();
     AppNotify.success('Negotiation saved.');
   } catch (e) { AppNotify.fromError(e, 'Could not save'); }
+}
+
+/* ── Withdrawing one bidder mid-round ─────────────────────────────────────
+   Removing a bidder and withdrawing one are different acts and must stay apart:
+
+     REMOVE   (draft only) — the invitation was a mistake and nothing was sent,
+              so the row is deleted and leaves no trace.
+     WITHDRAW (once issued) — the bidder is out of THIS round but the record
+              stays. They pulled out, went unresponsive, or were disqualified.
+
+   ⚠️ WITHDRAWING ALSO KILLS THEIR LINK. internal.bid_token_open excludes
+      'withdrawn', so the bid-response page stops accepting anything from them
+      the moment this is set — which is the point, and why it must not be used
+      as a tidy-up for a bidder who is merely quiet.
+   ⚠️ A withdrawn bidder is NOT "not awarded". bidRounds.award() skips them
+      deliberately: they never stood, so they get no outcome and no regret
+      letter. */
+function _bidderState(i) {
+  return i.status === 'invited' ? 'Invited' : i.status === 'viewed' ? 'Opened'
+       : i.status === 'submitted' ? 'Bid in' : i.status === 'declined' ? 'Declined'
+       : i.status === 'withdrawn' ? 'Withdrawn' : 'Closed';
+}
+
+async function withdrawBidder(id) {
+  const inv = invById(id);
+  if (!inv) return;
+  const reason = window.prompt(
+    'Withdraw ' + inv.vendor_name + ' from this round?\n\n'
+    + 'Their bid link stops working immediately, and they will not receive a '
+    + 'Letter of Regret — a withdrawn bidder never stood.\n\n'
+    + 'The reason is recorded on their clarification thread.\n\nReason:', '');
+  if (reason === null) return;
+  try {
+    await VendorDb.bidBoard.update(id, { status: 'withdrawn' }, profile);
+    /* The reason goes on the bidder's own clarification thread rather than a new
+       column: that thread is already the immutable, per-bidder record of what
+       passed between us, and it is where anyone auditing this would look. */
+    try {
+      await VendorDb.bidClarifications.add(id,
+        'Withdrawn from this round by Megawide Procurement.'
+        + (reason.trim() ? ' Reason: ' + reason.trim() : ''), profile);
+    } catch (e) { console.error('[bids] could not record the withdrawal reason', e); }
+    await _reloadRound();
+    AppNotify.success(inv.vendor_name + ' withdrawn.');
+  } catch (e) { AppNotify.fromError(e, 'Could not withdraw that bidder'); }
+}
+
+async function reinstateBidder(id) {
+  const inv = invById(id);
+  if (!inv) return;
+  if (!confirm('Put ' + inv.vendor_name + ' back into this round?\n\n'
+    + 'Their bid link starts working again.')) return;
+  try {
+    // Back to where they actually were: if an offer is already on file they are
+    // a submitted bidder again, otherwise they are simply invited.
+    await VendorDb.bidBoard.update(id,
+      { status: inv.offer_amount != null ? 'submitted' : 'invited' }, profile);
+    try {
+      await VendorDb.bidClarifications.add(id,
+        'Reinstated into this round by Megawide Procurement.', profile);
+    } catch (e) { /* the status is the fact; the note is a courtesy */ }
+    await _reloadRound();
+    AppNotify.success(inv.vendor_name + ' reinstated.');
+  } catch (e) { AppNotify.fromError(e, 'Could not reinstate that bidder'); }
+}
+
+/* One reload path for every bidder-level action, so none of them can forget to
+   refresh the clarification threads and leave the panel showing stale state. */
+async function _reloadRound() {
+  INV = await VendorDb.bidRounds.invitations(R.id);
+  THREADS = {};
+  const all = await VendorDb.bidClarifications.forRound(R.id);
+  all.forEach(m => { (THREADS[m.invitation_id] = THREADS[m.invitation_id] || []).push(m); });
+  renderRound();
+}
+
+/* ── The deadline nudge ───────────────────────────────────────────────────
+   ⚠️ DELIBERATELY NOT AUTOMATIC. Moving a round on is a decision an officer
+      makes, and a stage that changes itself overnight is a stage nobody trusts.
+      There is also no data risk in leaving it: the vendor side already treats a
+      passed deadline as closed for pricing (internal.bid_token_open), so this is
+      purely a signal to the person running the bid, not a control. */
+function _deadlinePassed(r) {
+  if (!r || r.stage !== 'issued' || !r.bid_due_at) return false;
+  const d = new Date(r.bid_due_at);
+  return !isNaN(d.getTime()) && d < new Date();
+}
+function _overdueCount() { return ROUNDS.filter(_deadlinePassed).length; }
+
+function deadlineNudge() {
+  if (!_deadlinePassed(R)) return '';
+  const c = COUNTS[R.id] || { total: 0, submitted: 0 };
+  return '<div class="panel" style="border-left:3px solid var(--mw-red)">'
+    + '<div class="bm-head" style="margin-bottom:8px">'
+    + '<h2 style="font-size:1rem">The bid deadline has passed'
+    + '<small>Closed ' + esc(dt(R.bid_due_at)) + ' — '
+    + (c.total ? c.submitted + ' of ' + c.total + ' invited bidders submitted' : 'no bidders were invited')
+    + '. Bidders can no longer price this package, but they can still answer clarifications.</small></h2>'
+    + '</div>'
+    + (canManage
+        ? '<div class="bm-actions" style="margin-top:0">'
+          + '<button class="btn btn-primary" onclick="setStage(' + Q + 'clarification' + Q + ')">'
+          + '<i class="ti ti-arrow-right"></i> Move to Clarification</button></div>'
+        : '')
+    + '</div>';
+}
+
+/* ── 2.3.2 Cost Comparison as a DELIVERABLE ───────────────────────────────
+   The BP calls this a "Presentation of Cost Comparison" — an artefact that gets
+   circulated and filed, not just a table on a screen. Two outputs, because they
+   are used differently: CSV is what a buyer reworks in Excel, the print view is
+   what goes into the pack.
+
+   ⚠️ BOTH CARRY THE BCB, so both are INTERNAL. The budget is the ceiling we are
+      willing to pay and is deliberately absent from every vendor-facing surface
+      (see vendor_bid_board_view). It is suppressed here too for a cost-hidden
+      role, the same rule as the on-screen table. */
+function _comparisonRows() {
+  return bidsInPlay().slice().sort((a, b) => (a.offer_amount || 0) - (b.offer_amount || 0));
+}
+function _comparisonMeta() {
+  const w = WPBYID[R.wp_id] || {};
+  return {
+    w: w,
+    bcb: window.__hideBudget ? null : (w.approved_budget_bcb || null),
+    title: wpLabel(w),
+    project: projName(R.project_id),
+    when: new Date().toLocaleString(),
+    by: (profile && (profile.name || profile.email)) || '',
+  };
+}
+
+function exportComparisonCsv() {
+  const rows = _comparisonRows();
+  if (!rows.length) { AppNotify.warn('No offers to compare yet.'); return; }
+  const m = _comparisonMeta();
+  const low = rows[0].offer_amount;
+  const out = [];
+  // A header block, so the file still makes sense months later on its own.
+  out.push(['Cost Comparison']);
+  out.push(['Work package', m.title]);
+  out.push(['Project', m.project]);
+  out.push([(R.doc_type || 'RFQ') + ' round', R.round_no]);
+  if (R.bid_due_at) out.push(['Bid deadline', dt(R.bid_due_at)]);
+  if (m.bcb != null) out.push(['Budget (BCB)', m.bcb]);
+  out.push(['Prepared', m.when + (m.by ? ' by ' + m.by : '')]);
+  out.push([]);
+  const head = ['Rank', 'Bidder', 'Accreditation', 'Offer', 'Currency', 'vs lowest'];
+  if (m.bcb != null) head.push('vs BCB');
+  head.push('Lead time (days)', 'Validity (days)', 'Payment terms',
+            'Technical', 'Score', 'Evaluation rank', 'Negotiated', 'Notes');
+  out.push(head);
+  rows.forEach((i, n) => {
+    const r = [n + 1, i.vendor_name,
+      (window.accredLabel ? accredLabel(i.vendor_accreditation) : (i.vendor_accreditation || '')),
+      i.offer_amount, i.offer_currency || 'PHP', (i.offer_amount || 0) - low];
+    if (m.bcb != null) r.push((i.offer_amount || 0) - m.bcb);
+    r.push(i.lead_time_days == null ? '' : i.lead_time_days,
+           i.validity_days == null ? '' : i.validity_days,
+           i.payment_terms || '', i.technical_result || '',
+           i.technical_score == null ? '' : i.technical_score,
+           i.rank == null ? '' : i.rank,
+           i.negotiated_amount == null ? '' : i.negotiated_amount,
+           i.evaluation_notes || '');
+    out.push(r);
+  });
+  // ﻿ so Excel opens a UTF-8 file with the peso sign and names intact.
+  const csv = '﻿' + out.map(r => r.map(csvCell).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'Cost-Comparison-' + (m.w.wp_no ? 'WP' + m.w.wp_no + '-' : '')
+    + (R.project_id || '') + '-R' + R.round_no + '.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  AppNotify.success('Cost comparison downloaded.');
+}
+
+function printComparison() {
+  const rows = _comparisonRows();
+  if (!rows.length) { AppNotify.warn('No offers to compare yet.'); return; }
+  const m = _comparisonMeta();
+  const low = rows[0].offer_amount;
+  const cell = (v, right) => '<td' + (right ? ' style="text-align:right"' : '') + '>' + esc(v) + '</td>';
+
+  const body = rows.map((i, n) => {
+    const diff = (i.offer_amount || 0) - low;
+    const vsB = m.bcb != null ? (i.offer_amount || 0) - m.bcb : null;
+    return '<tr>' + cell(n + 1, true)
+      + '<td><b>' + esc(i.vendor_name) + '</b>'
+      + (window.accredKey && accredKey(i.vendor_accreditation) !== 'accredited'
+          ? '<br><span class="warn">not accredited</span>' : '')
+      + '</td>'
+      + cell(money(i.offer_amount, i.offer_currency), true)
+      + cell(diff ? '+' + money(diff, i.offer_currency) : '—', true)
+      + (m.bcb != null ? '<td style="text-align:right" class="' + (vsB > 0 ? 'warn' : 'good') + '">'
+          + (vsB > 0 ? '+' : '') + esc(money(vsB)) + '</td>' : '')
+      + cell(i.lead_time_days != null ? i.lead_time_days + ' d' : '—')
+      + cell(i.validity_days != null ? i.validity_days + ' d' : '—')
+      + cell(i.payment_terms || '—')
+      + cell(i.negotiated_amount != null ? money(i.negotiated_amount, i.offer_currency) : '—', true)
+      + '</tr>';
+  }).join('');
+
+  const doc = [
+    '<!doctype html><meta charset="utf-8"><title>Cost Comparison</title>',
+    '<style>',
+    'body{font-family:Segoe UI,Arial,sans-serif;color:#231F20;margin:28px;font-size:12px}',
+    'h1{font-size:17px;margin:0 0 2px}h2{font-size:12px;font-weight:500;color:#666;margin:0 0 18px}',
+    '.meta{border-collapse:collapse;margin-bottom:16px}.meta td{padding:2px 14px 2px 0;font-size:11.5px}',
+    '.meta td:first-child{color:#666}',
+    'table.cmp{border-collapse:collapse;width:100%}',
+    'table.cmp th{background:#231F20;color:#fff;text-align:left;padding:7px 9px;font-size:11px;',
+    'text-transform:uppercase;letter-spacing:.04em}',
+    'table.cmp td{border-bottom:1px solid #e5e5e5;padding:7px 9px;vertical-align:top}',
+    'table.cmp tr:nth-child(even) td{background:#fafafa}',
+    '.warn{color:#C42127;font-weight:600}.good{color:#0F7A46;font-weight:600}',
+    '.foot{margin-top:20px;font-size:10.5px;color:#777;line-height:1.7;border-top:1px solid #e5e5e5;padding-top:10px}',
+    '@media print{body{margin:12mm}}',
+    '</style>',
+    '<h1>Cost Comparison</h1>',
+    '<h2>' + esc(m.title) + '</h2>',
+    '<table class="meta">',
+    '<tr><td>Project</td><td><b>' + esc(m.project) + '</b></td></tr>',
+    '<tr><td>Solicitation</td><td>' + esc(R.doc_type || 'RFQ') + ' &middot; round ' + esc(R.round_no) + '</td></tr>',
+    R.bid_due_at ? '<tr><td>Bid deadline</td><td>' + esc(dt(R.bid_due_at)) + '</td></tr>' : '',
+    m.bcb != null ? '<tr><td>Budget (BCB)</td><td><b>' + esc(money(m.bcb)) + '</b></td></tr>' : '',
+    '<tr><td>Prepared</td><td>' + esc(m.when) + (m.by ? ' by ' + esc(m.by) : '') + '</td></tr>',
+    '</table>',
+    '<table class="cmp"><thead><tr><th>#</th><th>Bidder</th><th style="text-align:right">Offer</th>',
+    '<th style="text-align:right">vs lowest</th>',
+    m.bcb != null ? '<th style="text-align:right">vs BCB</th>' : '',
+    '<th>Lead time</th><th>Validity</th><th>Payment terms</th>',
+    '<th style="text-align:right">Negotiated</th></tr></thead><tbody>',
+    body,
+    '</tbody></table>',
+    '<div class="foot">',
+    'Lowest is not the same as best value — BP 2.3.3 weighs technical, commercial and financial together.<br>',
+    m.bcb != null ? 'Contains Megawide budget information. Internal use only — not for release to bidders.' : '',
+    '</div>',
+  ].join('');
+
+  const wnd = window.open('', '_blank');
+  if (!wnd) { AppNotify.warn('Allow pop-ups for this site to print the comparison.'); return; }
+  wnd.document.write(doc);
+  wnd.document.close();
+  // Let the styles settle before the print dialog, or the first page renders unstyled.
+  setTimeout(() => { try { wnd.focus(); wnd.print(); } catch (e) {} }, 250);
 }
 
 /* 2.4.2 — Award: NOA to the winner, Letter of Regret to the rest.
