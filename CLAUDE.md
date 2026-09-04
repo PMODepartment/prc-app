@@ -2496,11 +2496,17 @@ so it *is* that UI rather than an imitation of it.
 - **Every sidebar link across `index.html` / `project.html` / `admin.html` / `vendors.html` /
   `bids.html` was repointed**, and **`vendors.html?claims=1` now `location.replace()`s here** so
   an old bookmark or an already-sent link cannot dangle. `_vdBootClaims` is hard-`false`.
-- **⚠️ The old claims view is still in `vendors.html` and is now DEAD** — `openClaimsPage`,
-  `closeClaimsPage`, `renderClaims`, `_claimSearch`, `_claimChoose`, the decision handlers and the
-  `#claimsModalBody` markup are unreachable (no link, and `_vdBootClaims` is false).
-  `updateClaimsBadge()` is still live and still wanted — it fills the sidebar `#nav-claim-count`.
-  Deliberately left rather than deleted at the end of a large change; it is flagged for removal.
+- **The old in-page claims view has been REMOVED** (2026-09-04) — `openClaimsPage`/`openClaimsModal`,
+  `closeClaimsPage`/`closeClaimsModal`, `renderClaims`, `_claimSearch`, `_claimChoose`,
+  `_claimResync`, `_claimStale`, `_claimHandledStale`, `_confBadge`, `_claimVendorName`, the three
+  decision handlers, the `_claims`/`_claimPick`/`_vdBootClaims` state, the `#claimsModalBody`
+  markup and its `.vd-back` button, `_vdShow()`'s third route and the `.claim-*` CSS are all gone;
+  **`_vdShow()` now has TWO states, `directory` | `detail`.** **`updateClaimsBadge()` STAYS** — it is
+  still live and still wanted, filling the sidebar `#nav-claim-count` on this page. Verified after
+  removal: all four inline `<script>` blocks pass `node --check`, zero repo-wide references to any
+  removed identifier, every JS-referenced `id` still resolves (the six that do not are concatenated
+  prefixes like `'split-add-' + vid` and the JS-created `#vxl-fill-handle`/`#vxl-colmenu`), and the
+  file carries zero stray control bytes.
 - **⚠️ The modal hides via a `hidden` CLASS, matching `admin.html` — not a `.show` class.**
   `.modal-overlay` is `display:flex`, so an overlay with no hide class renders **open over the
   page on load**. The first cut used `.show` and did exactly that. `.hidden{display:none!important}`
