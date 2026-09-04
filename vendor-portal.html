@@ -574,12 +574,6 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     <button class="nav-item" data-sec="bidboard" onclick="switchSection('bidboard')">
       <i class="ti ti-clipboard-list"></i>Bid Board
       <span class="nbadge" id="bidBadge" style="display:none">0</span></button>
-    <!-- Accreditation is the vendor's main job and carries its own outstanding
-         count, so it is a destination rather than the fifth tab inside a page
-         they may never scroll to. It still opens the same panels. -->
-    <button class="nav-item" data-sec="accreditation" onclick="switchSection('accreditation')">
-      <i class="ti ti-rosette-discount-check"></i>Accreditation
-      <span class="nbadge" id="accBadge" style="display:none">0</span></button>
   </div>
   <div class="sidebar-section" style="margin-top:auto">
     <button class="nav-item" id="btn-install" style="display:none" onclick="installPortal()">
@@ -1063,7 +1057,6 @@ function renderReadiness() {
   document.getElementById('readyInfo').innerHTML = rd.items.filter(i => i.group === 'info').map(item).join('');
   document.getElementById('readyDocs').innerHTML = rd.items.filter(i => i.group === 'docs').map(item).join('');
   renderRequestBox(rd);
-  syncAccBadge();
 }
 
 function renderRequestBox(rd) {
@@ -1878,22 +1871,9 @@ function switchSection(sec) {
   // would say they are views of it.
   if (tabs) tabs.style.display = sec === 'profile' ? '' : 'none';
   if (sec === 'bidboard') _showOnlyPanels(['bidboard']);
-  else if (sec === 'accreditation') _showOnlyPanels(PROFILE_PANELS.accreditation);
   else switchTab(_activeTab);
 }
-/* Outstanding checklist items, from the SAME window.accredReadiness the panel
-   itself uses — so the badge and the checklist can never disagree. */
-function syncAccBadge() {
-  const b = document.getElementById('accBadge');
-  if (!b || !vendor || !window.accredReadiness) return;
-  let n = 0;
-  try {
-    const rd = window.accredReadiness(vendor, myDocs);
-    n = Math.max(0, rd.total - rd.done);
-  } catch (e) { return; }
-  b.textContent = n ? String(n) : '';
-  b.style.display = n ? '' : 'none';
-}
+
 function switchTab(t) {
   _activeTab = t;
   _showOnlyPanels(PROFILE_PANELS[t] || PROFILE_PANELS.overview);

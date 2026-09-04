@@ -2953,9 +2953,11 @@ outside the app, in the per-package template.
   packages, no BCB, no role names. Auto-opens once per vendor and **never in a
   staff preview** — that is for troubleshooting, and it would burn their first
   run. Versioned independently.
-- **Accreditation is a sidebar DESTINATION**, not the fifth tab inside a page a
-  vendor may never scroll to. It is their main job and carries its own
-  outstanding count, from the same `window.accredReadiness` the checklist uses.
+- **Accreditation was briefly promoted to a sidebar destination and REVERTED
+  the same day** (2026-09-05, seen live: it rendered without its icon and read
+  as misaligned against the other two). It stays a tab inside Company Profile.
+  **Two items plus Add to home screen is the settled shape — do not add a third
+  nav item to make the rail look fuller.**
 
 #### The Vendor Management guide was paragraphs
 

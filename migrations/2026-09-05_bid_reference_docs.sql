@@ -190,7 +190,15 @@ begin
   if src is null then
     raise exception 'vendor_bid_board_view not found — run 2026-09-03_vendor_bid_board.sql first';
   end if;
-  if position('round_id' in src) > 0 then
+  -- ⚠️ AGAINST information_schema, NOT the definition text. The first version
+  --    asked position('round_id' in src) — and round_id appears in that text
+  --    regardless, in `left join vendor_bid_rounds r on r.id = i.round_id`. So
+  --    this guard matched on the FIRST run, reported "nothing to do", and the
+  --    column was never added. Silent, and the verification agreed because it
+  --    made exactly the same mistake.
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'vendor_bid_board_view'
+                and column_name = 'round_id') then
     raise notice 'vendor_bid_board_view already exposes round_id — nothing to do';
     return;
   end if;
@@ -198,15 +206,29 @@ begin
     raise exception 'vendor_bid_board_view has been edited — add i.round_id by hand';
   end if;
   src := replace(src, 'i.invited_at,', 'i.invited_at,' || chr(10) || '    i.round_id,');
-  execute 'create or replace view public.vendor_bid_board_view as ' || src;
+  -- ⚠️ DROP + CREATE, NOT `create or replace`. A replace may only APPEND
+  --    columns; it cannot change the POSITION of an existing one, so injecting
+  --    round_id here shifted every later column and failed with 42P16 the
+  --    first time this ran. security_barrier has to be restated too, because
+  --    pg_get_viewdef returns only the SELECT.
+  drop view public.vendor_bid_board_view;
+  execute 'create view public.vendor_bid_board_view with (security_barrier = true) as ' || src;
   raise notice 'vendor_bid_board_view now exposes round_id';
 end;
 $mig$;
 
 grant select on public.vendor_bid_board_view to authenticated;
 
+-- ⚠️ AGAINST information_schema.columns, NOT the definition text. The first
+--    version of this asked position('round_id' in pg_get_viewdef(...)) and got a
+--    FALSE PASS: round_id appears in that definition anyway, in the join
+--    `left join vendor_bid_rounds r on r.id = i.round_id`. The companion
+--    access_token check was right only by luck — that string happens to appear
+--    nowhere else. Never verify a view's columns by string-matching its SQL.
 select
-  (select position('round_id' in pg_get_viewdef('public.vendor_bid_board_view'::regclass, true)) > 0)
-                                                                              as board_view_has_round_id,
-  (select position('access_token' in pg_get_viewdef('public.vendor_bid_board_view'::regclass, true)) = 0)
-                                                                              as token_still_withheld;
+  (select count(*) = 1 from information_schema.columns
+    where table_schema='public' and table_name='vendor_bid_board_view'
+      and column_name='round_id')                                             as board_view_has_round_id,
+  (select count(*) = 0 from information_schema.columns
+    where table_schema='public' and table_name='vendor_bid_board_view'
+      and column_name='access_token')                                         as token_still_withheld;
