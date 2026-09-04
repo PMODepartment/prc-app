@@ -37,7 +37,7 @@ self.addEventListener('fetch', function () { return; });
    not a secret — the browser needs it to subscribe. A service worker cannot
    read the page's constant (separate script, and it is restarted between
    events), so the value genuinely has to be in both files. */
-const VAPID_PUBLIC_KEY = '';
+const VAPID_PUBLIC_KEY = 'BHtcZB917UhLQS5xItFmm8Q91i6-0W3ci7VKUMXV2z9CRN4-O28jm5hKIsDoVxhCC-W8w_WYgqA69MGLtOOTakU';
 
 const TITLE = 'Megawide Procurement';
 const BODY  = 'Something is waiting on your Bid Board.';
