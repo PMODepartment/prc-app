@@ -11,7 +11,7 @@
 -- slightly different and the comparison is meaningless.
 --
 -- Two things, and they are NOT the same:
---   1. DOCUMENTS — the terms of reference, design criteria, drawings, the BOQ.
+--   1. DOCUMENTS — the terms of reference (TOR), the MPSS, drawings, the BOQ.
 --      Files, issued with the RFQ, the same set to every bidder.
 --   2. LINE ITEMS — the MPSS: per item, the specification and quantity a bidder
 --      prices against. Structured, because it is what makes two quotations
@@ -27,7 +27,7 @@ create table if not exists public.vendor_bid_documents (
   id          uuid primary key default gen_random_uuid(),
   round_id    uuid not null references public.vendor_bid_rounds(id) on delete cascade,
   kind        text not null default 'reference'
-              check (kind in ('reference','tor','design_criteria','drawing','boq','other')),
+              check (kind in ('reference','tor','mpss','drawing','boq','other')),
   title       text not null,
   file_path   text,
   file_name   text,

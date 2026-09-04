@@ -3959,7 +3959,7 @@ const VendorDb = (() => {
         design — the table has no update or delete policy. */
   /* ── The ask: reference documents and priced line items ──────────────────
      2026-09-05_bid_reference_docs.sql. Two different things:
-       documents — terms of reference / design criteria / drawings / BOQ, files
+       documents — terms of reference (TOR) / MPSS / drawings / BOQ, files
                    issued with the RFQ, the same set to every bidder;
        items     — the MPSS: per line, the specification and quantity a bidder
                    prices against, which is what makes two quotations comparable.

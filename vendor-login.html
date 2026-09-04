@@ -30,76 +30,113 @@
   })();
 </script>
 <style>
-  :root{--mw-red:#EE3124;--mw-black:#231F20;--bg:#F4F4F4;--surface:#fff;
-        --text:#231F20;--text-2:#5A5A5A;--border:rgba(0,0,0,.10);--field:#EEF1F8}
-  html.dark-mode{--bg:#1C1C1C;--surface:#2B2C2B;--text:#F0EFEF;--text-2:#9B9999;
-                 --border:rgba(255,255,255,.12);--field:#333433;color-scheme:dark}
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);
-       font-family:'Montserrat',sans-serif;display:flex;flex-direction:column;
-       align-items:center;justify-content:center;padding:32px 20px;overflow-x:hidden}
-  .brand{text-align:center;margin-bottom:26px}
-  .brand img{width:64px;height:64px;object-fit:contain;margin-bottom:14px}
-  .brand h1{margin:0;font-size:1.9rem;font-weight:800;color:var(--mw-red);letter-spacing:-.5px}
-  .brand p{margin:6px 0 0;font-size:0.95rem;color:var(--text-2)}
-  .card{width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);
-        border-radius:14px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,.07)}
-  label{display:block;font-size:0.72rem;font-weight:700;letter-spacing:.06em;
-        text-transform:uppercase;color:var(--text-2);margin-bottom:6px}
-  input{width:100%;padding:13px 14px;border:1.5px solid transparent;border-radius:9px;
-        background:var(--field);color:var(--text);font-family:inherit;font-size:1rem;outline:none}
-  input:focus{border-color:var(--mw-red)}
-  .field{margin-bottom:16px}
-  .btn{width:100%;min-height:50px;border:none;border-radius:9px;background:var(--mw-red);color:#fff;
-       font-family:inherit;font-size:1rem;font-weight:700;cursor:pointer}
-  .btn:disabled{opacity:.6;cursor:not-allowed}
-  .msg{margin-bottom:16px;padding:11px 13px;border-radius:9px;font-size:0.88rem;display:none;line-height:1.45}
-  .msg.error{display:block;background:#FDECEA;border:1px solid #F5B8B3;color:#9B1B1B}
-  .msg.info{display:block;background:#FDECEA;border:1px solid #F5B8B3;color:#C42127}
-  html.dark-mode .msg.error{background:#3D1A19;border-color:#5A2E2A;color:#FFB4AC}
+  /* ⚠️ THE SAME FRAME AS login.html, on purpose. These are two front doors to
+     one organisation; a vendor who has seen the staff page, or a colleague who
+     lands here by mistake, should recognise it instantly. The tokens, the
+     spacing, the card, the button and the mobile behaviour are lifted from
+     login.html — only the title and the links differ.
+     Rules are scoped to html.dark-mode (this page sets no body class). */
+  html, body { overflow-x: hidden; }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  img, canvas, svg { max-width: 100% !important; }
+  html,body{height:100%;font-family:'Montserrat',sans-serif;background:#fff}
+
+  .page{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100vh;padding:40px 20px}
+
+  /* Brand header, above the card */
+  .brand{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:26px}
+  .brand-logo{width:72px;height:auto;display:block;background:transparent}
+  .brand-text h1{font-size:30px;font-weight:800;color:#EE3124;line-height:1.15;margin-top:16px;letter-spacing:-.4px}
+  .brand-text p{font-size:13px;color:#888;margin-top:6px}
+
+  .form-wrap{width:100%;max-width:480px;background:#fff;border:1px solid #ececec;
+    border-radius:14px;padding:30px 32px;box-shadow:0 4px 24px rgba(0,0,0,.06)}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;color:#888;margin-bottom:5px}
+  .field input{width:100%;padding:11px 14px;border:1.5px solid #e8e8e8;border-radius:8px;
+    font-size:14px;font-family:'Montserrat',sans-serif;color:#231F20;background:#fff;
+    outline:none;transition:border-color .15s;-webkit-appearance:none}
+  .field input:focus{border-color:#EE3124}
+  .btn-primary{width:100%;padding:13px;background:#EE3124;color:#fff;border:none;border-radius:8px;
+    font-size:14px;font-weight:700;font-family:'Montserrat',sans-serif;cursor:pointer;
+    transition:background .15s;margin-top:4px;-webkit-appearance:none}
+  .btn-primary:hover{background:#C42127}
+  .btn-primary:disabled{background:#e8a09b;cursor:default}
+  .msg{font-size:13px;padding:10px 14px;border-radius:8px;margin-bottom:14px;line-height:1.5;
+    display:none;border:1px solid #FFD0D0;background:#FEE2E2;color:#991B1B}
+  .msg.error,.msg.show{display:block}
+  .msg.info{display:block;border-color:#F5B8B3;background:#FDECEA;color:#9B1B1B}
+  .form-links{display:flex;flex-direction:column;align-items:center;gap:9px;margin-top:18px;
+    font-size:13px;color:#999;text-align:center}
+  .form-links a{color:#EE3124;text-decoration:none;font-weight:600}
+  .form-links a:hover{text-decoration:underline}
+
+  .login-theme-toggle{position:fixed;top:16px;right:16px;z-index:60;width:40px;height:40px;border-radius:50%;border:1px solid #e5e5e5;background:#fff;color:#231F20;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.1);transition:background .18s,color .18s,border-color .18s}
+  .login-theme-toggle:hover{background:#f5f5f5}
+
+  /* Dark mode */
+  html.dark-mode body{background:#1C1C1C;color:#F0EFEF}
+  html.dark-mode{color-scheme:dark}
+  html.dark-mode .form-wrap{background:#2B2C2B;border-color:rgba(255,255,255,.12);
+    box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  html.dark-mode .field label{color:#9B9999}
+  html.dark-mode .field input{background:#333433;border-color:rgba(255,255,255,.12);color:#F0EFEF}
+  html.dark-mode .field input:focus{border-color:#EE3124}
+  .field input::placeholder{color:#bbb}
+  html.dark-mode .field input::placeholder{color:#6E6C6C}
+  html.dark-mode .brand-text p{color:#9B9999}
+  html.dark-mode .form-links{color:#9B9999}
+  html.dark-mode .msg{background:#3D1A19;border-color:#5A2E2A;color:#FFB4AC}
   html.dark-mode .msg.info{background:#33211F;border-color:#5A2E2A;color:#FF9C92}
-  .foot{margin-top:20px;padding-top:16px;border-top:1px solid var(--border);
-        text-align:center;font-size:0.88rem;color:var(--text-2);line-height:1.9}
-  .foot a{color:var(--mw-red);text-decoration:none;font-weight:600}
-  .foot a:hover{text-decoration:underline}
-  /* The employee door, kept deliberately quiet: a vendor should not be nudged
-     toward it, but a Megawide colleague who lands here needs a way across. */
-  .theme{position:fixed;top:16px;right:16px;width:38px;height:38px;border-radius:50%;
-         border:1px solid var(--border);background:var(--surface);color:var(--text-2);
-         cursor:pointer;display:flex;align-items:center;justify-content:center}
+  html.dark-mode .login-theme-toggle{background:#2B2C2B;color:#DCDBDB;border-color:rgba(255,255,255,.16)}
+  html.dark-mode .login-theme-toggle:hover{background:#333433}
+
+  /* ⚠️ Mobile drops the card chrome entirely, exactly as login.html does — a
+     boxed card inside a 375px viewport just wastes horizontal space. */
   @media (max-width:640px){
-    .card{background:none;border:none;box-shadow:none;padding:0;max-width:none}
-    body{justify-content:flex-start;padding-top:44px}
+    .page{justify-content:flex-start;padding:44px 16px}
+    .form-wrap{background:none;border:none;box-shadow:none;padding:0;max-width:none}
+    html.dark-mode .form-wrap{background:none;box-shadow:none}
+    .field input{font-size:16px}   /* 16px stops iOS zooming on focus */
+    .btn-primary{min-height:50px}
   }
 </style>
 </head>
 <body>
 
-<button class="theme" onclick="toggleTheme()" aria-label="Toggle dark mode"><i class="ti ti-sun"></i></button>
+<button class="login-theme-toggle" id="loginThemeToggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Switch theme"></button>
+<div class="page">
 
-<div class="brand">
-  <img src="assets/img/megawide-mark.png" alt="Megawide">
-  <h1>Vendor Portal</h1>
-  <p>Megawide Construction Corporation</p>
-</div>
-
-<div class="card">
-  <div class="msg" id="msg"></div>
-  <form id="form" onsubmit="signIn(event)">
-    <div class="field">
-      <label for="email">Email</label>
-      <input type="email" id="email" autocomplete="username" required>
+  <!-- Brand header — same shape as login.html: mark, red app title, grey org line. -->
+  <div class="brand">
+    <img class="brand-logo" src="assets/img/megawide-mark.png" alt="Megawide Construction">
+    <div class="brand-text">
+      <h1>Vendor Portal</h1>
+      <p>Megawide Construction Corporation</p>
     </div>
-    <div class="field">
-      <label for="pw">Password</label>
-      <input type="password" id="pw" autocomplete="current-password" required>
-    </div>
-    <button class="btn" id="btn" type="submit">Sign In</button>
-  </form>
-  <div class="foot">
-    <a href="forgot-password.html">Forgot password?</a><br>
-    Not registered yet? <a href="vendor-register.html">Register your company</a>
   </div>
+
+  <div class="form-wrap">
+    <div class="msg" id="msg"></div>
+    <form id="form" onsubmit="signIn(event)">
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="username" placeholder="you@yourcompany.com" required>
+      </div>
+      <div class="field">
+        <label for="pw">Password</label>
+        <input type="password" id="pw" autocomplete="current-password" placeholder="••••••••" required>
+      </div>
+      <button class="btn-primary" id="btn" type="submit">Sign In</button>
+    </form>
+    <div class="form-links">
+      <a href="forgot-password.html">Forgot password?</a>
+      <span>Not registered yet? <a href="vendor-register.html">Register your company</a></span>
+    </div>
+  </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -108,10 +145,20 @@ const SB_URL = 'https://cayjeqeleenizbdzrums.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNheWplcWVsZWVuaXpiZHpydW1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTE5NzUsImV4cCI6MjA5NTM2Nzk3NX0.xWF6mSMTYSL65S56FTUSWFN0udJSY_yzUedU2CwFwpw';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
 
-function toggleTheme() {
-  const dark = document.documentElement.classList.toggle('dark-mode');
-  try { localStorage.setItem('wpm_theme_last', dark ? 'dark' : 'light'); } catch (e) {}
+/* Lifted verbatim from login.html so the two front doors behave identically,
+   including the icon. Shares the wpm_theme_last key, so a theme chosen on
+   either door carries into the app. */
+var _SUN='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg>';
+var _MOON='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+function _vlApply(dark, persist){
+  document.documentElement.classList.toggle('dark-mode', dark);
+  document.body.classList.toggle('dark-mode', dark);
+  var b=document.getElementById('loginThemeToggle');
+  if(b){ b.innerHTML = dark?_SUN:_MOON; b.title = dark?'Switch to light mode':'Switch to dark mode'; }
+  if(persist){ try{ localStorage.setItem('wpm_theme_last', dark?'dark':'light'); }catch(e){} }
 }
+function toggleTheme(){ _vlApply(!document.documentElement.classList.contains('dark-mode'), true); }
+_vlApply(document.documentElement.classList.contains('dark-mode'), false);
 function msg(text, kind) {
   const b = document.getElementById('msg');
   b.className = 'msg ' + (kind || 'error');

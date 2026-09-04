@@ -7,31 +7,36 @@
  *   window.VendorGuide.open()  /  .maybeAutoOpen(userId)
  * ========================================================================== */
 (function () {
+  /* ⚠️ SHORT ON PURPOSE. These slides used to be paragraphs — six or seven
+     lines each, several with nested bullet lists — and nobody reads a tour
+     that reads like documentation. One idea per slide, a handful of words,
+     bold on the thing you would actually click. The detail lives in the app,
+     where it is in front of you when you need it. */
   var SLIDES = [
     { icon: 'ti-building-store', title: 'Vendor Management', body:
-      'A central directory of every vendor, subcontractor and supplier — their <b>accreditation standing</b>, <b>trades</b>, <b>products &amp; services</b>, <b>certifications</b>, <b>personnel</b>, <b>bid history</b> and <b>reference rates</b>. It plugs into Work Packages: the Awarded Vendor and Proposed Vendors on a WP link here.' },
-    { icon: 'ti-layout-grid', title: 'Finding vendors', body:
-      '<ul><li><b>Cards / Grid / Analytics</b> — cards to browse, grid to bulk-edit like a spreadsheet, analytics for spend and performance.</li><li><b>Search</b> matches company name, trade, <i>and</i> product/service.</li><li>The <b>KPI tiles are the filter</b> — click Accredited, Not accredited, Problematic or Requests to review.</li><li>Click any vendor to open its full profile.</li></ul>' },
+      'Every vendor, subcontractor and supplier in one directory \u2014 who they are, what they supply, and whether they are accredited.' },
+    { icon: 'ti-layout-grid', title: 'Three ways to look', body:
+      '<b>Cards</b> to browse \u00b7 <b>Grid</b> to bulk-edit \u00b7 <b>Analytics</b> for spend.<br><br>Search matches the company, its trades <i>and</i> its products.' },
+    { icon: 'ti-filter', title: 'The tiles are the filter', body:
+      'Click <b>Accredited</b>, <b>Not accredited</b>, <b>Problematic</b> or <b>Requests to review</b> to narrow the list.' },
     { icon: 'ti-rosette-discount-check', title: 'Accreditation', body:
-      'Accreditation is the standing that matters — <b>Accredited</b>, <b>Problematic</b>, or not accredited (no value). It is <i>separate</i> from any old approval flag, and it is staff-owned: a vendor can never set it about themselves.<br><br>An accreditation stands for <b>12 months</b> from its accreditation date. The directory flags <b>Renewal due</b> and <b>Expired</b> so a lapsed vendor never quietly reads as current.' },
+      'Staff-owned \u2014 a vendor can never set it about themselves.<br><br>It lasts <b>12 months</b>. The directory flags <b>Renewal due</b> and <b>Expired</b>.' },
     { icon: 'ti-alert-triangle', title: 'Problematic vendors', body:
-      'A vendor flagged <b>Problematic</b> (e.g. blacklisted) shows a red card border with the reason, a warning badge in every vendor picker, and — critically — <b>awarding a work package to one asks you to confirm first</b>. The flag follows the vendor everywhere, so it can’t be missed at the point of award.' },
-    { icon: 'ti-clock-hour-4', title: 'Accreditation requests', body:
-      'A vendor with a portal login can submit their documents (BIR 2303, company profile, business permit, sample invoice) and <b>request accreditation</b>. Those land in <b>Requests to review</b>. Open the vendor and you get their message, the same readiness checklist they saw, their uploaded files, and <b>Approve</b> / <b>Decline</b>. Declining requires a reason — the vendor sees it.' },
+      'Red border, reason shown, warning in every vendor picker.<br><br>Awarding to one <b>asks you to confirm first</b>.' },
+    { icon: 'ti-clock-hour-4', title: 'Requests to review', body:
+      'A vendor uploads their documents and asks to be accredited.<br><br>You see their checklist and files, then <b>Approve</b> or <b>Decline</b>. A decline needs a reason \u2014 they see it.' },
+    { icon: 'ti-qrcode', title: 'Getting vendors in', body:
+      '<b>Add Vendor</b> for one you have vetted.<br><br>Share the <b>Registration QR</b> \u2014 one link, every vendor. They self-identify; you confirm the match under <b>Vendor Registrations</b>.' },
     { icon: 'ti-category', title: 'Product categories', body:
-      'Offerings are filed against a shared tree: <b>Trade → Works</b> (locked, and identical to the Work Package form, which is what lets the app match vendors to a WP) then <b>your own sub-categories to any depth</b> — e.g. Structural Works › Rebar › Deformed Bars › 16mm.<br><br>Add sub-categories under <b>Data Tools → Manage Product Categories</b>. On a work package, <b>Suggest vendors</b> uses this to list who supplies that trade/works, accredited first.' },
-    { icon: 'ti-user-plus', title: 'Adding vendors', body:
-      '<ul><li><b>Add Vendor</b> — create a vendor you’ve vetted; it goes straight into the directory.</li><li>Print or share the <b>Registration QR code</b> (Data Tools) — one public link works for every vendor, or scan a vendor’s own QR (from their profile) to pre-fill their code. Vendors self-identify by company name, Vendor Code and TIN; the address they type is never checked against anything here.</li><li><b>Invite list (CSV)</b> (bulk bar) — pick vendors with a contact email and download company + email + link for a mail-merge invite.</li></ul>' },
-    { icon: 'ti-qrcode', title: 'Vendor Registrations', body:
-      'Anyone can register at the public link or QR code — they type their company name, and their <b>Vendor Code</b> and <b>TIN</b> if they have them. The match (strong / partial / none) shows up here for you to confirm, never to them.<br><br>Find the queue in the sidebar under <b>User Management</b>. <b>Approve access</b> links the login to the matched vendor; <b>Create new vendor</b> is for a company genuinely not in the directory yet — it refuses if that name already exists, so it can’t create a duplicate.' },
+      'Offerings file under <b>Trade \u2192 Works</b>, the same tree the WP form uses.<br><br>That is what makes <b>Suggest vendors</b> work on a work package.' },
     { icon: 'ti-tool', title: 'Data Tools', body:
-      '<ul><li><b>Import from WPs</b> / <b>Backfill Trade/Bid Data</b> — build the directory from existing work packages.</li><li><b>Merge</b> and <b>Remove Exact Duplicates</b> — combine records for one company.</li><li><b>Needs Splitting</b> — break apart garbled multi-name imports.</li><li><b>Manage Product Categories</b> — curate the offering tree.</li></ul>' },
+      'Build the directory from work packages, <b>Merge</b> duplicates, <b>Split</b> garbled names, and curate the category tree.' },
     { icon: 'ti-list-check', title: 'Bulk actions', body:
-      'Tick the checkbox on cards or grid rows to select vendors — the selection survives paging and filtering. Use <b>Select all matching</b> to grab a whole filtered set, then set accreditation, export an invite list, download registration QR codes, or delete. Delete is admin-only and shows you exactly what would be lost, with a CSV backup first.' },
-    { icon: 'ti-id-badge-2', title: 'Inside a vendor profile', body:
-      'One scrolling page with a jump-nav: <b>Overview</b> (contact, accreditation, registration link/QR), <b>Work Packages</b> — which opens with a <b>scorecard</b>: win rate, awarded spend, award slip and savings delivered — plus <b>Products &amp; Services</b>, <b>Certifications</b>, <b>Personnel</b>, <b>Rates</b>, <b>Bid History</b> and <b>Change History</b>. Staff can edit every section on the vendor’s behalf.<br><br>A document a vendor uploaded to support an <i>approved</i> accreditation is <b>locked</b> — the vendor can’t alter or remove it, only staff can unlock one filed in error. <b>Change History</b> shows every edit with an old/new diff, restores a single field, and (admins) can roll the whole vendor back to any point in time.' },
-    { icon: 'ti-circle-check', title: 'You’re set', body:
-      'That’s the tour. Reopen it any time from the <b>?</b> button in the top bar. Start by reviewing <b>Requests to review</b>, or search for a vendor.' },
+      'Tick vendors \u2014 the selection survives paging and filtering.<br><br>Set accreditation, export an invite list, or delete. Delete is admin-only and backs up to CSV first.' },
+    { icon: 'ti-id-badge-2', title: 'Inside a profile', body:
+      'One page: contact, work packages with a <b>scorecard</b>, products, certifications, personnel, rates, bid history.<br><br><b>Change History</b> shows every edit and can undo it.' },
+    { icon: 'ti-circle-check', title: 'That\u2019s it', body:
+      'Reopen this any time from <b>?</b> in the top bar.<br><br>Start with <b>Requests to review</b>.' },
   ];
 
   var idx = 0, built = false, root = null;
@@ -46,7 +51,7 @@
          vertical space — otherwise a taller (bulleted) slide pushes the
          footer down and the "Next" button jumps between clicks. Taller
          content scrolls inside the body instead. */
-      '.vg-body{padding:30px 30px 8px;text-align:center;height:300px;overflow-y:auto}',
+      '.vg-body{padding:30px 30px 8px;text-align:center;height:260px;overflow-y:auto}',
       '.vg-ic{width:60px;height:60px;border-radius:15px;background:var(--mw-red-light,#FDECEA);color:var(--mw-red,#EE3124);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}',
       '.vg-ic i{font-size:30px}',
       '.vg-title{font-size:20px;font-weight:800;margin-bottom:10px}',
