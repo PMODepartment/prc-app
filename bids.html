@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904k"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904k"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904l"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904l"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -24,12 +24,18 @@
     .bm-head h2{font-size:1.2857rem;font-weight:700;margin:0;flex:1;min-width:200px;line-height:1.3}
     .bm-head h2 small{display:block;font-size:0.8571rem;font-weight:500;color:var(--text-hint);margin-top:3px}
 
-    /* The stepper IS the business process (BP 2.2.1 -> 2.4.2). */
+    /* The stepper reads in the approved Procurement Status words, never a
+       vocabulary of its own — see BID_STAGE_PROC in db.js. */
     .bm-steps{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:18px}
     .bm-step{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;
-      border:1px solid var(--border-md);background:var(--surface);cursor:pointer;
+      border:1px solid var(--border-md);background:var(--surface);cursor:default;
       font-size:0.7857rem;font-weight:600;color:var(--text-hint);font-family:inherit;white-space:nowrap}
-    .bm-step:hover{border-color:var(--mw-red);color:var(--mw-red-ink)}
+    .bm-stepsub{font-style:normal;font-size:0.6429rem;font-weight:700;opacity:.85;
+      padding-left:7px;margin-left:1px;border-left:1px solid rgba(255,255,255,.45)}
+    .bm-wpstat{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:-8px 0 18px;
+      font-size:0.7857rem;color:var(--text-secondary)}
+    .bm-wpstat .ti{color:var(--text-hint)}
+    .bm-behind{font-size:0.7143rem;font-weight:700;color:var(--mw-red-ink)}
     .bm-step.done{color:#0F7A46;border-color:#BEEBD3;background:#E7F7EF}
     .bm-step.now{background:var(--mw-red);border-color:var(--mw-red);color:#fff}
     body.dark-mode .bm-step.done{background:#0F2E20;color:#6EE7B7;border-color:#0F7A46}
@@ -83,7 +89,15 @@
     body.dark-mode .bm-low{color:#6EE7B7}
     .bm-high{font-size:0.7143rem;font-weight:700;color:var(--mw-red-ink)}
 
-    /* clarification thread */
+    /* clarification threads — one per subject, per bidder */
+    .cl-vendor{padding:12px 0;border-top:1px solid var(--border)}
+    .cl-vendor:first-of-type{border-top:0;padding-top:0}
+    .cl-thread{border-left:2px solid var(--border-md);padding-left:11px;margin:0 0 12px}
+    .cl-thread-head{display:flex;align-items:center;gap:7px;font-size:0.7143rem;font-weight:800;
+      letter-spacing:.04em;text-transform:uppercase;color:var(--text-hint);margin-bottom:7px}
+    .cl-n{font-size:0.6429rem;font-weight:800;background:var(--surface-2);color:var(--text-secondary);
+      border-radius:9px;padding:1px 7px}
+    .cl-ask{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-top:4px}
     .cl-msg{border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px;
       background:var(--surface-2)}
     .cl-msg.staff{border-left:3px solid var(--mw-red)}
@@ -266,7 +280,7 @@
             <div class="filter-group">
               <label>Stage</label>
               <select id="fStage" onchange="renderList()">
-                <option value="">All stages</option>
+                <option value="">All statuses</option>
               </select>
             </div>
             <div style="flex:1 1 200px;min-width:160px">
@@ -343,9 +357,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260904k"></script>
-<script src="assets/js/db.js?v=20260904k"></script>
-<script src="assets/js/ui.js?v=20260904k"></script>
+<script src="assets/js/auth.js?v=20260904l"></script>
+<script src="assets/js/db.js?v=20260904l"></script>
+<script src="assets/js/ui.js?v=20260904l"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -400,9 +414,9 @@ AppAuth.requireLogin(async (user, p) => {
   }
   // Stage filter options come from the one roster in db.js.
   const sel = document.getElementById('fStage');
-  VendorDb.bidRounds.stages.forEach(s => {
+  VendorDb.bidRounds.procSteps.concat(['Cancelled']).forEach(st => {
     const o = document.createElement('option');
-    o.value = s; o.textContent = VendorDb.bidRounds.stageLabel(s);
+    o.value = st; o.textContent = st;
     sel.appendChild(o);
   });
   await loadAll();
@@ -488,10 +502,18 @@ function showList() {
   if (location.search) history.replaceState(null, '', location.pathname);
   renderList();
 }
+/* The list speaks the same approved vocabulary as the round it opens.
+   Cancelled has no procurement status, so it keeps its own word. */
+function listStatus(r) {
+  if (r.stage === 'cancelled') return 'Cancelled';
+  const c = COUNTS[r.id] || {};
+  return VendorDb.bidRounds.procStatus(r, c.total || 0) || '—';
+}
+
 function renderList() {
   const stage = val('fStage'), q = val('fSearch').toLowerCase();
   const rows = ROUNDS.filter(r => {
-    if (stage && r.stage !== stage) return false;
+    if (stage && listStatus(r) !== stage) return false;
     if (!q) return true;
     const w = WPBYID[r.wp_id] || {};
     return (wpLabel(w) + ' ' + projName(r.project_id)).toLowerCase().includes(q);
@@ -511,12 +533,12 @@ function renderList() {
   if (!rows.length) {
     host.innerHTML = '<div class="empty-state"><i class="ti ti-gavel"></i>'
       + '<b>' + (ROUNDS.length ? 'Nothing matches those filters' : 'No bid rounds yet') + '</b>'
-      + (ROUNDS.length ? 'Clear the stage or search to see the rest.'
+      + (ROUNDS.length ? 'Clear the status or search to see the rest.'
          : 'Start one from a work package and the app will issue the RFQ for you.') + '</div>';
     return;
   }
   host.innerHTML = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
-    + '<th>Work package</th><th>Project</th><th>Type</th><th>Stage</th>'
+    + '<th>Work package</th><th>Project</th><th>Type</th><th>Procurement status</th>'
     + '<th>Bidders</th><th>Deadline</th></tr></thead><tbody>'
     + rows.map(r => {
         const w = WPBYID[r.wp_id] || {};
@@ -525,7 +547,7 @@ function renderList() {
           + (r.round_no > 1 ? ' <span class="bstat bstat-invited">Round ' + r.round_no + '</span>' : '') + '</td>'
           + '<td>' + esc(projName(r.project_id)) + '</td>'
           + '<td>' + esc(r.doc_type || 'RFQ') + '</td>'
-          + '<td>' + esc(VendorDb.bidRounds.stageLabel(r.stage))
+          + '<td>' + esc(listStatus(r))
           + (_deadlinePassed(r) ? ' <span class="bm-high" title="The bid deadline has passed">· deadline passed</span>' : '')
           + '</td>'
           + '<td>' + (function () {
@@ -689,15 +711,90 @@ async function openRound(id) {
   renderRound();
 }
 
+/* ⚠️ THE STEPPER IS A READ-OUT, NOT A CONTROL.
+   It used to be seven clickable chips in a vocabulary of their own (Preparing,
+   Out for bid, Clarification, Cost comparison, Evaluation, Negotiation), which
+   asked the officer to declare where the round was — a status you have to
+   remember to click is a status nobody can trust, and it left the round and its
+   work package telling two different stories.
+   It now shows the APPROVED Procurement Status roster and is DERIVED from what
+   has actually happened: bidders named, RFQ issued, deadline closed, awarded.
+   The round's own finer activity is a caption under the live step. */
+function roundBidderCount() { return INV.filter(i => i.status !== 'withdrawn').length; }
+function roundProcStatus() { return VendorDb.bidRounds.procStatus(R, roundBidderCount()); }
+
+function stepperHtml() {
+  const steps = VendorDb.bidRounds.procSteps;
+  const cancelled = R.stage === 'cancelled';
+  const now = roundProcStatus();
+  const at = steps.indexOf(now);
+  return '<div class="bm-steps">'
+    + steps.map((s, i) =>
+        '<div class="bm-step' + (cancelled ? '' : (i === at ? ' now' : (at > i ? ' done' : ''))) + '">'
+        + '<span class="bm-stepn">' + (i + 1) + '</span>' + esc(s)
+        + (i === at && !cancelled
+            ? '<em class="bm-stepsub">' + esc(VendorDb.bidRounds.stageLabel(R.stage)) + '</em>' : '')
+        + '</div>').join('')
+    + '</div>' + wpStatusLine();
+}
+
+/* The work package's own Procurement Status, shown so it is visibly the same
+   fact — and, when it is behind, put right in one click rather than by hand on
+   another page. It can legitimately be AHEAD (a package awarded through an
+   earlier round), which is why nothing here ever pulls it back. */
+function wpStatusLine() {
+  const w = WPBYID[R.wp_id] || {};
+  const cur = w.procurement_status || '—';
+  const want = roundProcStatus();
+  const behind = want && want !== 'Awarded'
+    && VendorDb.bidRounds.procRank(want) > VendorDb.bidRounds.procRank(w.procurement_status);
+  return '<div class="bm-wpstat">'
+    + '<i class="ti ti-package"></i> Work package procurement status: <b>' + esc(cur) + '</b>'
+    + (behind
+        ? ' <span class="bm-behind">behind this round</span>'
+          + (canManage ? ' <button class="btn btn-sm" onclick="syncWpStatus(true)">'
+                         + 'Set to ' + esc(want) + '</button>' : '')
+        : '')
+    + '</div>';
+}
+
+/* ⚠️ MONOTONIC — a round may only ever push its work package FORWARD.
+   Without that rule, opening a re-tender on an awarded package would drag it
+   back to Solicited and wipe the award off every dashboard.
+   It also stops SHORT of Awarded on purpose: doAward() writes that one, along
+   with the cost, the vendor and the award date. Writing 'Awarded' here would
+   leave a package reading as awarded with no cost and no contractor. */
+async function syncWpStatus(loud) {
+  const w = WPBYID[R.wp_id];
+  if (!canManage || !w) return;
+  const want = roundProcStatus();
+  if (!want || want === 'Awarded') return;
+  if (VendorDb.bidRounds.procRank(want) <= VendorDb.bidRounds.procRank(w.procurement_status)) return;
+  if (!AppAuth.canEditProject(profile, R.project_id)) {
+    if (loud) AppNotify.warn('You are not assigned to ' + projName(R.project_id)
+      + ', so the work package status has to be set by someone who is.');
+    return;
+  }
+  try {
+    await WPDb.updateWPDirect(w.id, { procurement_status: want });
+    w.procurement_status = want;
+    // Or the dashboards keep serving the old status for the cache's lifetime.
+    try {
+      Object.keys(sessionStorage).forEach(k => {
+        if (k.indexOf('wpm_wps_idx') === 0) sessionStorage.removeItem(k);
+      });
+    } catch (_) { /* private window / storage disabled */ }
+    if (loud) AppNotify.success('Work package set to ' + want + '.');
+    renderRound();
+  } catch (e) {
+    if (loud) AppNotify.fromError(e, 'Could not update the work package');
+    else console.warn('[bids] work package status not synced:', e && e.message);
+  }
+}
+
 function renderRound() {
   const w = WPBYID[R.wp_id] || {};
   document.getElementById('page-title').textContent = wpLabel(w);
-  const stages = VendorDb.bidRounds.stages.filter(s => s !== 'cancelled');
-  const at = stages.indexOf(R.stage);
-  const steps = stages.map((s, i) =>
-    '<button class="bm-step ' + (s === R.stage ? 'now' : (at >= 0 && i < at ? 'done' : '')) + '"'
-    + (canManage ? ' onclick="setStage(' + Q + s + Q + ')"' : ' disabled')
-    + '><span class="bm-stepn">' + (i + 1) + '</span>' + esc(VendorDb.bidRounds.stageLabel(s)) + '</button>').join('');
 
   document.getElementById('roundHost').innerHTML =
       '<div class="panel">'
@@ -705,7 +802,7 @@ function renderRound() {
     + '<span class="bm-doc">' + esc(R.doc_type || 'RFQ') + (R.round_no > 1 ? ' · Round ' + R.round_no : '') + '</span>'
     + '<h2>' + esc(wpLabel(w)) + '<small>' + esc(projName(R.project_id))
     + (w.trade ? ' · ' + esc(w.trade) : '') + '</small></h2></div>'
-    + '<div class="bm-steps">' + steps + '</div>'
+    + stepperHtml()
     + (canManage && R.stage !== 'awarded' && R.stage !== 'cancelled'
         ? '<div class="bm-actions" style="margin-top:-4px">'
           + '<button class="btn" onclick="cancelRound()"><i class="ti ti-ban"></i> Cancel this round</button>'
@@ -733,6 +830,7 @@ async function setStage(s) {
     const i = ROUNDS.findIndex(x => x.id === R.id);
     if (i >= 0) ROUNDS[i] = R;
     renderRound();
+    syncWpStatus();
   } catch (e) { AppNotify.fromError(e, 'Could not move the stage'); }
   finally { _busy = false; }
 }
@@ -787,15 +885,16 @@ function askPanel() {
     + ['RFQ', 'RFP', 'ITB'].map(t => '<option value="' + t + '"' + (R.doc_type === t ? ' selected' : '') + '>' + t
         + (t === 'RFQ' ? ' — materials' : t === 'RFP' ? ' — labor / services' : ' — formal tender') + '</option>').join('')
     + '</select></div>'
-    + '<div class="field"><label>Bid deadline (BAC)</label>'
+    + '<div class="field"><label>Bid deadline</label>'
     + '<input id="a-due" type="datetime-local" value="' + esc(toLocalInput(R.bid_due_at)) + '"' + ro + '></div>'
     + '<div class="field"><label>Pre-bid</label>'
     + '<input id="a-prebid" type="datetime-local" value="' + esc(toLocalInput(R.prebid_at)) + '"' + ro + '></div>'
-    + '<div class="field"><label>Two envelopes</label>'
+    + '<div class="field"><label>What to submit</label>'
     + '<select id="a-two"' + ro + '>'
-    + '<option value="1"' + (R.two_envelope ? ' selected' : '') + '>Technical + Commercial</option>'
-    + '<option value="0"' + (R.two_envelope ? '' : ' selected') + '>Commercial only</option></select>'
-    + '<div class="field-hint">BP 2.2.3 asks for both. A simple materials RFQ is legitimately one quotation.</div></div>'
+    + '<option value="1"' + (R.two_envelope ? ' selected' : '') + '>Technical submission and quotation</option>'
+    + '<option value="0"' + (R.two_envelope ? '' : ' selected') + '>Quotation only</option></select>'
+    + '<div class="field-hint">Ask for a technical submission when compliance with the design criteria has to be '
+    + 'checked. A simple materials enquiry is legitimately just a quotation.</div></div>'
     + '</div>'
     + '<div class="field" style="margin-top:12px"><label>Scope of works</label>'
     + '<textarea id="a-scope"' + ro + ' placeholder="What you want quoted, in words.">' + esc(R.scope_note || '') + '</textarea></div>'
@@ -947,6 +1046,7 @@ async function addBidder(vendorId) {
     INV = await VendorDb.bidRounds.invitations(R.id);
     const s = document.getElementById('vSearch'); if (s) s.value = '';
     renderRound();
+    syncWpStatus();
   } catch (e) { AppNotify.fromError(e, 'Could not add that bidder'); }
   finally { _busy = false; }
 }
@@ -984,7 +1084,7 @@ function rfqBody(inv) {
   L.push('Project : ' + projName(R.project_id));
   if (R.bid_due_at) L.push('Deadline: ' + dt(R.bid_due_at));
   if (R.prebid_at) L.push('Pre-bid : ' + dt(R.prebid_at));
-  if (R.two_envelope) L.push('Envelopes: Technical Bid and Commercial Bid are both required.');
+  if (R.two_envelope) L.push('Please send both a technical submission and your quotation.');
   L.push('');
   L.push('Full details, and the form to submit your bid:');
   L.push(bidLink(inv));
@@ -1067,6 +1167,7 @@ async function markIssued() {
     if (i >= 0) ROUNDS[i] = R;
     closeRfq();
     renderRound();
+    syncWpStatus();
     AppNotify.success('Round issued. Bidders can now respond from their link.');
   } catch (e) { AppNotify.fromError(e, 'Could not mark it issued'); }
 }
@@ -1076,7 +1177,7 @@ function responsesPanel() {
   const inPlay = INV.filter(i => i.status === 'submitted' || i.status === 'closed');
   return '<div class="panel"><div class="panel-title">3 · Bids received</div>'
     + '<div class="sec-note">' + inPlay.length + ' of ' + INV.length + ' invited bidders have submitted.'
-    + (R.two_envelope ? ' This round is two-envelope, so each bid carries a Technical and a Commercial document.' : '') + '</div>'
+    + (R.two_envelope ? ' Each bid carries a technical submission as well as its quotation.' : '') + '</div>'
     + (inPlay.length
         ? inPlay.map(i =>
             '<div class="bidder"><div class="bidder-name">' + esc(i.vendor_name)
@@ -1104,40 +1205,70 @@ async function openFile(path) {
   } catch (e) { AppNotify.fromError(e, 'Could not open that file'); }
 }
 
-/* 2.3.1 — Clarification. One thread per bidder; a bidder never sees another's. */
+/* Clarifications — one thread PER CATEGORY per bidder.
+   It used to be a single flat stream per bidder, so a technical question and a
+   payment-terms question interleaved and neither could be followed. Messages
+   sharing a category ARE the thread; nothing has a thread id to maintain.
+   Rows written before the category column exist as NULL and are filed under
+   Other rather than hidden. */
+const CLAR_CATS = (window.VendorDb && VendorDb.bidClarifications && VendorDb.bidClarifications.categories)
+  || ['technical', 'commercial', 'schedule', 'documents', 'other'];
+function clarCatLabel(c) {
+  return (window.VendorDb && VendorDb.bidClarifications && VendorDb.bidClarifications.categoryLabel)
+    ? VendorDb.bidClarifications.categoryLabel(c)
+    : (c ? c.charAt(0).toUpperCase() + c.slice(1) : 'Other');
+}
 function clarifyPanel() {
   const rows = INV.filter(i => i.status === 'submitted' || (THREADS[i.id] || []).length);
   if (!rows.length) return '';
   return '<div class="panel"><div class="panel-title">4 · Clarifications</div>'
-    + '<div class="sec-note">Questions to one bidder about their proposal. Each thread is private to that bidder, '
-    + 'and they answer from the same link they bid with — no login.</div>'
+    + '<div class="sec-note">Questions to one bidder about their proposal, kept in a thread per subject. '
+    + 'Each thread is private to that bidder, and they answer from the same link they bid with — no login. '
+    + 'The whole exchange is kept, so the back-and-forth stays on the record.</div>'
     + rows.map(i => {
         const th = THREADS[i.id] || [];
-        return '<div style="margin-bottom:18px">'
-          + '<div class="bidder-name" style="margin-bottom:8px">' + esc(i.vendor_name) + '</div>'
-          + (th.length ? th.map(m =>
-              '<div class="cl-msg' + (m.author === 'staff' ? ' staff' : '') + '">'
-              + '<div class="cl-from">' + esc(m.author === 'staff' ? (m.created_by_name || 'Megawide Procurement') : i.vendor_name)
-              + ' · ' + esc(dt(m.created_at)) + '</div>'
-              + '<div class="cl-body">' + esc(m.message) + '</div></div>').join('')
+        // group into threads, newest-active first, but only categories in use
+        const by = {};
+        th.forEach(m => { const c = m.category || 'other'; (by[c] = by[c] || []).push(m); });
+        const used = CLAR_CATS.filter(c => by[c] && by[c].length);
+        return '<div class="cl-vendor">'
+          + '<div class="bidder-name" style="margin-bottom:8px">' + esc(i.vendor_name)
+          + (th.length ? '<small>' + th.length + (th.length === 1 ? ' message' : ' messages')
+              + ' · ' + used.length + (used.length === 1 ? ' thread' : ' threads') + '</small>' : '')
+          + '</div>'
+          + (used.length ? used.map(c =>
+              '<div class="cl-thread"><div class="cl-thread-head">' + esc(clarCatLabel(c))
+              + '<span class="cl-n">' + by[c].length + '</span></div>'
+              + by[c].map(m =>
+                  '<div class="cl-msg' + (m.author === 'staff' ? ' staff' : '') + '">'
+                  + '<div class="cl-from">' + esc(m.author === 'staff' ? (m.created_by_name || 'Megawide Procurement') : i.vendor_name)
+                  + ' · ' + esc(dt(m.created_at)) + '</div>'
+                  + '<div class="cl-body">' + esc(m.message) + '</div></div>').join('')
+              + '</div>').join('')
             : '<div class="sec-note" style="margin:0 0 8px">No clarifications yet.</div>')
           + (canManage
-              ? '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">'
-                + '<textarea id="cl-' + i.id + '" placeholder="Ask this bidder something…" '
-                + 'style="flex:1;min-width:200px;min-height:56px;padding:9px 11px;border:1.5px solid var(--border-md);'
-                + 'border-radius:8px;font-family:inherit;font-size:0.9286rem;background:var(--surface);color:var(--text-primary)"></textarea>'
+              ? '<div class="cl-ask">'
+                + '<div class="bm-cell" style="flex:0 0 150px"><label class="bm-cl" for="cc-' + i.id + '">Thread</label>'
+                + '<select id="cc-' + i.id + '" class="bm-in">'
+                + CLAR_CATS.map(c => '<option value="' + c + '">' + esc(clarCatLabel(c)) + '</option>').join('')
+                + '</select></div>'
+                + '<div class="bm-cell" style="flex:1;min-width:200px"><label class="bm-cl" for="cl-' + i.id + '">Question</label>'
+                + '<textarea id="cl-' + i.id + '" class="bm-in" placeholder="Ask this bidder something…" '
+                + 'style="min-height:56px"></textarea></div>'
                 + '<button class="btn" onclick="sendClarify(' + Q + i.id + Q + ')">Send</button></div>'
               : '')
           + '</div>';
       }).join('')
     + '</div>';
 }
+
 async function sendClarify(invId) {
   const el = document.getElementById('cl-' + invId);
+  const cs = document.getElementById('cc-' + invId);
   const text = el ? el.value.trim() : '';
   if (!text) return;
   try {
-    await VendorDb.bidClarifications.add(invId, text, profile);
+    await VendorDb.bidClarifications.add(invId, text, profile, cs ? cs.value : null, R.id);
     const all = await VendorDb.bidClarifications.forRound(R.id);
     THREADS = {};
     all.forEach(m => { (THREADS[m.invitation_id] = THREADS[m.invitation_id] || []).push(m); });
@@ -1179,8 +1310,9 @@ function comparisonPanel() {
           + '<td>' + esc(i.payment_terms || '—') + '</td></tr>';
       }).join('')
     + '</tbody></table></div>'
-    + '<div class="sec-note" style="margin-top:12px">Lowest is not the same as best value — BP 2.3.3 weighs technical, '
-    + 'commercial and financial together.</div>'
+    + '<div class="sec-note" style="margin-top:12px">The award goes to the <b>lowest bid that meets the '
+    + 'technical requirements</b> — the design criteria or terms of reference. A cheaper bid that does not '
+    + 'comply is not the lowest.</div>'
     /* BP 2.3.2 calls this a PRESENTED deliverable, so it has to leave the screen.
        Both outputs carry the BCB and are internal — the print view says so on it. */
     + '<div class="sec-note" style="margin-top:10px">The <b>cost comparison itself is prepared outside '
@@ -1192,57 +1324,62 @@ function comparisonPanel() {
     + '</div></div>';
 }
 
-/* 2.3.3 — Evaluation.
-   ⚠️ NO SCORE FIELD, DELIBERATELY. This carried a free "Score" number with no
-   defined scale, no criteria and no weighting recorded anywhere — not in the BP
-   mapping, not in the migration, nowhere. A number nobody can explain is worse
-   than no number: two officers would key it differently and the ranking would
-   look authoritative while resting on nothing. Removed at the user's decision
-   (2026-09-04): the ranking comes from the cost comparison workbook, which is
-   where line items, inclusions, duties and FX are actually weighed.
-   vendor_bid_invitations.technical_score is left in place but is no longer
-   read or written — dropping a column is destructive and buys nothing. */
+/* Evaluation — the two bases Megawide actually awards on.
+   ⚠️ NO GRADED "technical result" AND NO SCORE. This carried
+   pass/conditional/fail plus a free score, and neither is traceable to the
+   process mapping — they appear nowhere but this page's own code. Procurement
+   confirmed the real basis is (1) compliance with the technical requirements,
+   i.e. the design criteria / terms of reference, and (2) the lowest bid in the
+   cost comparison. So compliance is a yes/no fact and the ranking comes from
+   the comparison workbook. The old columns are still in the table but are no
+   longer read or written. */
 function evaluationPanel() {
   const rows = bidsInPlay();
   if (!rows.length) return '';
   const ro = canManage ? '' : ' disabled';
+  const comp = rows.filter(i => i.technical_compliant === true);
+  const lowComp = comp.length
+    ? Math.min.apply(null, comp.map(i => i.offer_amount == null ? Infinity : i.offer_amount)) : null;
   return '<div class="panel"><div class="panel-title">6 · Evaluation</div>'
-    + '<div class="sec-note">Record the outcome of the cost comparison. <b>The ranking comes from that '
-    + 'workbook</b> — line items, inclusions and exclusions, duties, FX and total landed cost — not from '
-    + 'anything typed here. Rank 1 is the best overall position, which is not always the lowest offer.</div>'
+    + '<div class="sec-note">A package is awarded on two things: it <b>meets the technical requirements</b> '
+    + '(design criteria / terms of reference), and it is the <b>lowest bid in the cost comparison</b>. '
+    + 'Mark compliance here; the ranking comes from the comparison workbook.</div>'
     + rows.map(i =>
         '<div class="bidder" style="align-items:flex-end">'
         + '<div class="bm-cell" style="flex:0 0 190px"><span class="bm-cl">Bidder</span>'
         + '<div class="bidder-name">' + esc(i.vendor_name)
         + '<small>' + esc(money(i.offer_amount, i.offer_currency)) + '</small></div></div>'
-        + '<div class="bm-cell" style="flex:0 0 150px"><label class="bm-cl" for="ev-r-' + i.id + '">Technical result</label>'
-        + '<select id="ev-r-' + i.id + '" class="bm-in"' + ro + '>'
-        + '<option value="">Not assessed</option>'
-        + ['pass', 'conditional', 'fail'].map(o => '<option value="' + o + '"' + (i.technical_result === o ? ' selected' : '') + '>'
-            + (o === 'pass' ? 'Pass' : o === 'conditional' ? 'Conditional' : 'Fail') + '</option>').join('')
+        + '<div class="bm-cell" style="flex:0 0 220px"><label class="bm-cl" for="ev-c-' + i.id + '">Meets the technical requirements</label>'
+        + '<select id="ev-c-' + i.id + '" class="bm-in"' + ro + '>'
+        + '<option value=""' + (i.technical_compliant == null ? ' selected' : '') + '>Not assessed</option>'
+        + '<option value="yes"' + (i.technical_compliant === true ? ' selected' : '') + '>Yes — compliant</option>'
+        + '<option value="no"' + (i.technical_compliant === false ? ' selected' : '') + '>No — not compliant</option>'
         + '</select></div>'
-        + '<div class="bm-cell" style="flex:0 0 130px"><label class="bm-cl" for="ev-k-' + i.id + '">Rank</label>'
+        + '<div class="bm-cell" style="flex:0 0 110px"><label class="bm-cl" for="ev-k-' + i.id + '">Rank</label>'
         + '<input id="ev-k-' + i.id + '" class="bm-in" type="number" min="1" step="1" inputmode="numeric"'
-        + ' title="Overall standing from the cost comparison. 1 is the best position."'
+        + ' title="Standing in the cost comparison. 1 is the lowest compliant bid."'
         + ' value="' + esc(i.rank == null ? '' : i.rank) + '"' + ro + '></div>'
-        + '<div class="bm-cell" style="flex:1;min-width:170px"><label class="bm-cl" for="ev-n-' + i.id + '">Notes</label>'
+        + '<div class="bm-cell" style="flex:1;min-width:160px"><label class="bm-cl" for="ev-n-' + i.id + '">Notes</label>'
         + '<input id="ev-n-' + i.id + '" class="bm-in" value="' + esc(i.evaluation_notes || '') + '"' + ro
-        + ' placeholder="Why this position"></div>'
+        + ' placeholder="What the comparison showed"></div>'
         + '</div>').join('')
+    + (lowComp != null && isFinite(lowComp)
+        ? '<div class="sec-note" style="margin-top:12px">Lowest <b>compliant</b> bid: <b>'
+          + esc(money(lowComp, (comp[0] || {}).offer_currency)) + '</b> — '
+          + esc(comp.filter(i => i.offer_amount === lowComp).map(i => i.vendor_name).join(', ')) + '.</div>'
+        : '<div class="sec-note" style="margin-top:12px">No bid is marked compliant yet.</div>')
     + (canManage ? '<div class="bm-actions"><button class="btn btn-primary" onclick="saveEvaluation()">Save evaluation</button></div>' : '')
     + '</div>';
 }
 
-
-/* ⚠️ technical_score is deliberately NOT sent any more — the field was removed
-   because it had no defined scale or criteria. The ranking is recorded from the
-   cost comparison workbook instead. Existing rows keep whatever score they
-   already held; nothing here overwrites it. */
 async function saveEvaluation() {
   try {
     for (const i of bidsInPlay()) {
+      const c = val('ev-c-' + i.id);
       await VendorDb.bidBoard.update(i.id, {
-        technical_result: val('ev-r-' + i.id) || null,
+        // '' is "not assessed" and must stay NULL — false would assert the bid
+        // FAILS the technical requirements when nobody has looked yet.
+        technical_compliant: c === 'yes' ? true : c === 'no' ? false : null,
         rank: intOf(val('ev-k-' + i.id)),
         evaluation_notes: val('ev-n-' + i.id) || null,
       }, profile);
@@ -1261,7 +1398,7 @@ function negotiationPanel() {
   const short = rows.filter(i => i.shortlisted).length;
   return '<div class="panel"><div class="panel-title">7 · Negotiation</div>'
     + '<div class="sec-note">Shortlist the top bidders and record the negotiated price — the handshake figure. '
-    + '<b>BP 2.4.1 says 1 to 3 bidders.</b>' + (short > 3 ? ' <span class="bm-high">' + short + ' are shortlisted.</span>' : '') + '</div>'
+    + '<b>Negotiate with one to three.</b>' + (short > 3 ? ' <span class="bm-high">' + short + ' are shortlisted.</span>' : '') + '</div>'
     + rows.map(i =>
         '<div class="bidder">'
         + '<label style="display:flex;align-items:center;gap:7px;flex:0 0 190px;font-size:0.9286rem;font-weight:600;cursor:pointer">'
@@ -1392,7 +1529,7 @@ function deadlineNudge() {
     + (canManage
         ? '<div class="bm-actions" style="margin-top:0">'
           + '<button class="btn btn-primary" onclick="setStage(' + Q + 'clarification' + Q + ')">'
-          + '<i class="ti ti-arrow-right"></i> Move to Clarification</button></div>'
+          + '<i class="ti ti-arrow-right"></i> Close for pricing and start evaluating</button></div>'
         : '')
     + '</div>';
 }
@@ -1454,7 +1591,7 @@ function exportBidders() {
   const head = ['Rank', 'Bidder', 'Accreditation', 'Offer', 'Currency', 'vs lowest'];
   if (m.bcb != null) head.push('vs BCB');
   head.push('Lead time (days)', 'Validity (days)', 'Payment terms',
-            'Technical', 'Rank', 'Negotiated', 'Notes');
+            'Meets technical requirements', 'Rank', 'Negotiated', 'Notes');
   out.push(head);
   rows.forEach((i, n) => {
     const r = [n + 1, i.vendor_name,
@@ -1463,7 +1600,8 @@ function exportBidders() {
     if (m.bcb != null) r.push((i.offer_amount || 0) - m.bcb);
     r.push(i.lead_time_days == null ? '' : i.lead_time_days,
            i.validity_days == null ? '' : i.validity_days,
-           i.payment_terms || '', i.technical_result || '',
+           i.payment_terms || '',
+           i.technical_compliant == null ? '' : (i.technical_compliant ? 'Compliant' : 'Not compliant'),
            i.rank == null ? '' : i.rank,
            i.negotiated_amount == null ? '' : i.negotiated_amount,
            i.evaluation_notes || '');

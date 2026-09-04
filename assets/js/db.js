@@ -3602,9 +3602,56 @@ const VendorDb = (() => {
     negotiation: 'Negotiation', awarded: 'Awarded', cancelled: 'Cancelled',
   };
 
+
+  /* ⚠️ THE BID ROUND DOES NOT GET A VOCABULARY OF ITS OWN.
+     The stage keys above are internal plumbing (RLS, the token RPCs, which
+     panel is emphasised). What an officer READS is the approved Procurement
+     Status roster — the same five words the WP form, the Status Tracker and
+     every dashboard KPI already use — because a round and its work package
+     must never tell two different stories about where the package is.
+     ⚠️ Keep in step with ST_PROC_OPTS (project.html) and XL_PROC (review.html). */
+  const BID_PROC_STEPS = ['Not Started', 'Sourced', 'Solicited', 'Evaluated', 'Awarded'];
+  const BID_STAGE_PROC = {
+    draft: 'Not Started',   // → 'Sourced' once bidders are on it, see procStatus()
+    issued: 'Solicited',
+    // Clarification, cost comparison, evaluation and negotiation are all steps
+    // WITHIN Evaluated — the approved roster has no finer state, and inventing
+    // one is exactly what put two vocabularies on the screen.
+    clarification: 'Evaluated', comparison: 'Evaluated',
+    evaluation: 'Evaluated', negotiation: 'Evaluated',
+    awarded: 'Awarded',
+    cancelled: null,        // cancelling is not a procurement status
+  };
+  // Values written before the 2026-07 rename, so a legacy row is not mistaken
+  // for "further back than Not Started" and quietly overwritten.
+  const BID_PROC_LEGACY = {
+    'sourcing': 1, 'solicitation': 2,
+    'evaluation & negotiation': 3, 'evaluation and negotiation': 3, 'evaluation': 3,
+  };
   const bidRounds = {
     stages: BID_STAGES,
     stageLabel(s) { return BID_STAGE_LABEL[s] || s || '—'; },
+    procSteps: BID_PROC_STEPS,
+    /* This round in the approved vocabulary. `bidders` is the live invitation
+       count: a package with vendors named on it HAS been sourced even though
+       the RFQ has not gone out, which is precisely the Not Started/Sourced
+       distinction. Returns null for a cancelled round. */
+    procStatus(round, bidders) {
+      if (!round) return null;
+      const s = BID_STAGE_PROC[round.stage];
+      if (s === undefined) return null;
+      if (s === 'Not Started' && bidders > 0) return 'Sourced';
+      return s;
+    },
+    /* How far along a status is. Drives the ONE rule that keeps this safe: a
+       round may only ever push a work package FORWARD (see syncWpStatus in
+       bids.html) — never back, or opening a re-tender would wipe an award. */
+    procRank(s) {
+      const i = BID_PROC_STEPS.indexOf(s);
+      if (i >= 0) return i;
+      const k = String(s || '').trim().toLowerCase();
+      return BID_PROC_LEGACY[k] === undefined ? -1 : BID_PROC_LEGACY[k];
+    },
 
     async forWP(wpId) {
       const sb = await getSB();
@@ -3835,13 +3882,32 @@ const VendorDb = (() => {
     },
     // author/created_by are stamped SERVER-SIDE by internal.bid_clarification_guard,
     // so a vendor cannot post a message attributed to Megawide.
-    async add(invitationId, message, profile) {
+    /* Categories turn one flat stream per bidder into threads: messages sharing
+       a category ARE the thread, so there is no thread id to mint or maintain.
+       Roster and CHECK live in migrations/2026-09-04_bid_simplify.sql. */
+    categories: ['technical', 'commercial', 'schedule', 'documents', 'other'],
+    categoryLabel(c) {
+      return { technical: 'Technical', commercial: 'Commercial', schedule: 'Schedule',
+               documents: 'Documents', other: 'Other' }[c] || 'Other';
+    },
+    async add(invitationId, message, profile, category, roundId) {
       const sb = await getSB();
-      const { data, error } = await sb.from('vendor_bid_clarifications')
-        .insert({ invitation_id: invitationId, author: 'staff', message: message,
-                  created_by: (profile && profile.id) || null,
-                  created_by_name: (profile && (profile.name || profile.email)) || null })
-        .select().single();
+      const row = { invitation_id: invitationId, author: 'staff', message: message,
+                    created_by: (profile && profile.id) || null,
+                    created_by_name: (profile && (profile.name || profile.email)) || null };
+      if (roundId) row.round_id = roundId;
+      // An unrecognised category is filed under 'other' rather than rejected —
+      // losing a question to a vocabulary mismatch would be worse.
+      row.category = this.categories.indexOf(category) >= 0 ? category : 'other';
+      let { data, error } = await sb.from('vendor_bid_clarifications').insert(row).select().single();
+      // Deploy-safe: before 2026-09-04_bid_simplify.sql there is no category column.
+      if (error && _isMissingCol(error, /category/)) {
+        const d2 = { ...row }; delete d2.category;
+        // NOT _warnDropped(): that helper lives in the WPDb closure and is out of
+        // scope here — the exact cross-closure fault fixed twice today.
+        console.warn('[clarifications] category column not present yet; message saved without it.');
+        ({ data, error } = await sb.from('vendor_bid_clarifications').insert(d2).select().single());
+      }
       if (error) throw error;
       return data;
     },

@@ -110,6 +110,13 @@
     html.dark-mode .banner.ok{background:#0F2E20;color:#6EE7B7;border-color:#0F7A46}
     html.dark-mode .banner.warn{background:#3A2E10;color:#FBBF24;border-color:#92400E}
     /* ── clarification thread ── */
+    .cthread{border-left:2px solid var(--border);padding-left:12px;margin-bottom:16px}
+    .cthread-head{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+      color:var(--text-hint);margin-bottom:7px}
+    .btn-ghost{background:transparent;border-color:transparent;color:var(--mw-red-ink);padding:4px 0;
+      font-size:12px}
+    .field select{width:100%;padding:10px 12px;border:1px solid var(--border-md);border-radius:8px;
+      background:var(--surface);color:var(--text-primary);font-family:inherit;font-size:14px}
     .msg{border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:9px;
       background:var(--surface-2)}
     .msg.staff{border-left:3px solid var(--mw-red)}
@@ -316,10 +323,10 @@ function formHtml() {
   const two = !!b.two_envelope;
   return '<div class="panel"><div class="panel-title">Your bid</div>'
     + (two
-      ? '<div class="banner warn" style="margin-bottom:14px">This package is bid in <b>two envelopes</b>: '
-        + 'a <b>Technical Bid</b> and a <b>Commercial Bid</b>. Both are required.</div>'
+      ? '<div class="banner warn" style="margin-bottom:14px">This package needs <b>both</b> a '
+        + '<b>technical submission</b> and your <b>quotation</b>.</div>'
       : '')
-    + '<div class="legend">Commercial bid</div>'
+    + '<div class="legend">Quotation</div>'
     + '<div class="grid">'
     + fld('Offer amount <span class="req">*</span>', 'f-amount', b.offer_amount, 'e.g. 250000', 'number')
     + fld('Currency', 'f-currency', b.offer_currency || 'PHP', 'PHP')
@@ -360,28 +367,70 @@ function fld(label, id, val, ph, type) {
     + '" placeholder="' + esc(ph || '') + '"></div>';
 }
 
-/* BP 2.3.1 — the clarification thread. Shown once there is something in it, or
-   once a bid is in, since that is when clarification actually happens. */
+/* The clarification threads. Shown once there is something in them, or once a
+   bid is in, since that is when clarification actually happens.
+   Grouped by subject: a technical question and a payment-terms question used to
+   run down one flat stream, and neither could be followed. Messages sharing a
+   subject ARE the thread — nothing carries a thread id. Rows written before
+   subjects existed come back with none and are filed under Other. */
+const CLAR_LABEL = {
+  technical: 'Technical', commercial: 'Commercial', schedule: 'Schedule',
+  documents: 'Documents', other: 'Other',
+};
+const CLAR_ORDER = ['technical', 'commercial', 'schedule', 'documents', 'other'];
+function clarLabel(c) { return CLAR_LABEL[c] || 'Other'; }
+
 function threadHtml() {
   const b = BID;
   const canWrite = b.outcome == null;
   if (!THREAD.length && b.status !== 'submitted') return '';
+  const by = {};
+  THREAD.forEach(function (m) {
+    const c = CLAR_LABEL[m.category] ? m.category : 'other';
+    (by[c] = by[c] || []).push(m);
+  });
+  const used = CLAR_ORDER.filter(function (c) { return by[c] && by[c].length; });
   return '<div class="panel"><div class="panel-title">Clarifications</div>'
     + '<div class="muted" style="margin-bottom:12px">Questions from Megawide Procurement about your '
-    + 'submission, and your replies. Only your company sees this thread.</div>'
-    + (THREAD.length
-        ? THREAD.map(function (m) {
-            return '<div class="msg' + (m.author === 'staff' ? ' staff' : '') + '">'
-              + '<div class="msg-from">' + esc(m.from) + ' · ' + esc(fmtDate(m.created_at)) + '</div>'
-              + '<div class="msg-body">' + esc(m.message) + '</div></div>';
+    + 'submission, and your replies, kept in a thread per subject. Only your company sees these.</div>'
+    + (used.length
+        ? used.map(function (c) {
+            return '<div class="cthread"><div class="cthread-head">' + esc(clarLabel(c)) + '</div>'
+              + by[c].map(function (m) {
+                  return '<div class="msg' + (m.author === 'staff' ? ' staff' : '') + '">'
+                    + '<div class="msg-from">' + esc(m.from) + ' · ' + esc(fmtDate(m.created_at)) + '</div>'
+                    + '<div class="msg-body">' + esc(m.message) + '</div></div>';
+                }).join('')
+              + (canWrite
+                  ? '<div class="acts" style="margin-top:2px">'
+                    + '<button class="btn btn-ghost" onclick="replyTo(' + "'" + c + "'" + ')">'
+                    + 'Reply in ' + esc(clarLabel(c)) + '</button></div>'
+                  : '')
+              + '</div>';
           }).join('')
         : '<div class="muted">Nothing yet.</div>')
     + (canWrite
-        ? '<div class="field" style="margin-top:14px"><label>Reply</label>'
+        ? '<div class="field" style="margin-top:14px"><label for="f-clarify-cat">Subject</label>'
+          + '<select id="f-clarify-cat">'
+          + CLAR_ORDER.map(function (c) {
+              return '<option value="' + c + '">' + esc(clarLabel(c)) + '</option>';
+            }).join('')
+          + '</select></div>'
+          + '<div class="field"><label for="f-clarify">Message</label>'
           + '<textarea id="f-clarify" placeholder="Answer a question, or raise one of your own"></textarea></div>'
-          + '<div class="acts"><button class="btn" id="btnClarify" onclick="sendClarification()">Send reply</button></div>'
+          + '<div class="acts"><button class="btn" id="btnClarify" onclick="sendClarification()">Send</button></div>'
         : '')
     + '</div>';
+}
+
+/* Replying "in" a thread is just picking its subject and putting the cursor in
+   the box — the subject is what threads the messages, so there is nothing else
+   to carry. */
+function replyTo(cat) {
+  const s = document.getElementById('f-clarify-cat');
+  if (s) s.value = cat;
+  const t = document.getElementById('f-clarify');
+  if (t) { t.focus(); t.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
 
 /* ── Offer the portal account, without making it a toll gate ──────────────
@@ -505,7 +554,18 @@ async function sendClarification() {
   const btn = document.getElementById('btnClarify');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   try {
-    const { error } = await sb.rpc('clarify_bid_by_token', { p_token: TOKEN, p_message: text });
+    const cs = document.getElementById('f-clarify-cat');
+    let { error } = await sb.rpc('clarify_bid_by_token',
+      { p_token: TOKEN, p_message: text, p_category: cs ? cs.value : 'other' });
+    // ⚠️ PostgREST resolves an overload by ARGUMENT NAMES, so before the
+    // subject migration runs the three-argument form simply does not exist.
+    // A vendor must never lose a reply to a migration that has not been
+    // applied yet — fall back to the original call and let it land unfiled.
+    if (error && /PGRST202|could not find|does not exist|schema cache/i.test(
+          (error.message || '') + ' ' + (error.code || ''))) {
+      const r2 = await sb.rpc('clarify_bid_by_token', { p_token: TOKEN, p_message: text });
+      error = r2.error;
+    }
     if (error) throw error;
     await load();
   } catch (e) {
