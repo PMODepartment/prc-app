@@ -2324,10 +2324,13 @@ const VendorDb = (() => {
        (vendor_claims_select); a claimant still sees only their own row. */
     async all() {
       try {
-        return await _pagedSelect(async () => {
-          const sb = await getSB();
-          return sb.from('vendor_claims').select('*').order('created_at', { ascending: false });
-        });
+        // ⚠️ getSB() is awaited HERE, not inside the callback: _pagedSelect does
+        //    makeQuery().range(...), so makeQuery must hand back a builder
+        //    synchronously. An async callback returns a Promise and throws
+        //    ".range is not a function".
+        const sb = await getSB();
+        return await _pagedSelect(() =>
+          sb.from('vendor_claims').select('*').order('created_at', { ascending: false }));
       } catch (e) {
         if (_isMissingTable(e, 'vendor_claims')) return [];
         throw e;
@@ -3587,11 +3590,11 @@ const VendorDb = (() => {
     // pass 1000 rounds eventually, and that cap has bitten three times.
     async list() {
       try {
-        return await _pagedSelect(async () => {
-          const sb = await getSB();
-          return sb.from('vendor_bid_rounds').select('*')
-            .order('created_at', { ascending: false });
-        });
+        // See the note in claims.all(): the client is resolved before the
+        // callback, because _pagedSelect needs a builder, not a Promise.
+        const sb = await getSB();
+        return await _pagedSelect(() =>
+          sb.from('vendor_bid_rounds').select('*').order('created_at', { ascending: false }));
       } catch (e) {
         if (_isMissingTable(e, 'vendor_bid_rounds')) return [];
         throw e;
@@ -3818,6 +3821,28 @@ window.VendorDb = VendorDb;
 // #sidebar-vendor-claims — must be toggled independently of that container.
 // admin.html has no such wrapper (nothing there hides the item's ancestor),
 // so this falls back to the bare <a> when the wrapper is absent.
+/* ══ Shared sidebar: the Vendor group ══════════════════════════════════════
+   Vendor Management, Bid Management and Vendor Registrations are one family and
+   now live in ONE labelled section, separate from the work-package navigation
+   above it and the Admin block below. Six pages carry that sidebar, so the rule
+   lives here rather than being copied six times and drifting.
+
+   ⚠️ WITHHELD FROM READ-ONLY ROLES ENTIRELY. Every action in this group is a
+      write — issuing an RFQ, approving a registration, editing a vendor — so a
+      `viewer` or `viewer_budget` has nothing to do in any of it. Same audience
+      rule initVendorClaimsNav already applied to Registrations on its own.
+
+   ⚠️ HIDING THE LINK IS NOT THE ENFORCEMENT. vendors.html and bids.html bounce
+      these roles themselves, because a direct URL would otherwise still load the
+      page. If you change the audience here, change it there too — those guards
+      must keep agreeing. */
+window.initVendorNav = function (profile) {
+  const role = (profile && profile.role) || '';
+  const readOnly = ['viewer', 'viewer_budget', 'vendor'].includes(role);
+  const sec = document.getElementById('sidebar-vendor-section');
+  if (sec) sec.style.display = readOnly ? 'none' : '';
+  return !readOnly;
+};
 window.initVendorClaimsNav = function (profile) {
   const el = document.getElementById('nav-vendor-claims');
   if (!el) return;

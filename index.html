@@ -46,20 +46,37 @@
       <div class="app-label">Procurement Dashboard</div>
     </div>
 
+    <!-- ⚠️ WORK-PACKAGE NAVIGATION ONLY. Vendor Management and Bid Management
+         used to sit in this block, which mixed two unrelated jobs under one
+         label. They moved to their own section below. Navigation stays the top
+         section and Portfolio Overview stays first within it. -->
     <div class="sidebar-section">
-      <div class="sidebar-section-label">Portfolio</div>
+      <div class="sidebar-section-label">Navigation</div>
       <a class="nav-item active" href="index.html?view=consolidated">
         <i class="ti ti-layout-dashboard"></i>Portfolio Overview
       </a>
+      <div style="margin:4px 12px 2px;padding:5px 8px;background:rgba(255,255,255,.06);border-radius:6px;font-size:0.7143rem;color:rgba(255,255,255,.38);letter-spacing:.05em;text-transform:uppercase;line-height:1.6;border-left:2px solid rgba(238,49,36,.5)">
+        Read-only view<br>Select a project below<br>to manage work packages
+      </div>
+    </div>
+
+    <!-- ⚠️ ONE FAMILY, ONE SECTION, hidden wholesale from read-only roles by
+         initVendorNav() — every action in here is a write. The page-level
+         bounces in vendors.html / bids.html are the actual enforcement. -->
+    <div class="sidebar-section" id="sidebar-vendor-section" style="display:none">
+      <div class="sidebar-section-label">Vendors</div>
       <a class="nav-item" id="nav-vendors" href="vendors.html">
         <i class="ti ti-building-store"></i>Vendor Management
       </a>
       <a class="nav-item" id="nav-bids" href="bids.html">
         <i class="ti ti-gavel"></i>Bid Management
       </a>
-      <div style="margin:4px 12px 2px;padding:5px 8px;background:rgba(255,255,255,.06);border-radius:6px;font-size:0.7143rem;color:rgba(255,255,255,.38);letter-spacing:.05em;text-transform:uppercase;line-height:1.6;border-left:2px solid rgba(238,49,36,.5)">
-        Read-only view<br>Select a project below<br>to manage work packages
-      </div>
+      <span id="sidebar-vendor-claims" style="display:none">
+        <a class="nav-item" id="nav-vendor-claims" href="vendor-registrations.html">
+          <i class="ti ti-user-check"></i>Vendor Registrations
+          <span class="nbadge" id="nav-claim-count" style="display:none">0</span>
+        </a>
+      </span>
     </div>
 
     <div class="sidebar-section">
@@ -77,20 +94,6 @@
         <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
         <button class="nav-item" onclick="openNewProjectModal()"><i class="ti ti-folder-plus"></i>New Project</button>
       </div>
-    </div>
-    <!-- ⚠️ ITS OWN LABELLED SECTION, placed right after the Admin block so it
-         reads directly below User Management for an admin. It cannot go INSIDE
-         that block: the queue is open to every contributor role, and #sidebar-admin is
-         revealed on AppAuth.isAdmin alone, which would also expose User
-         Management / New Project / the project tools to them. The label is what
-         stops it being the unlabelled orphan it used to be for a contributor,
-         who never sees the Admin block. initVendorClaimsNav() toggles this. -->
-    <div class="sidebar-section" id="sidebar-vendor-claims" style="display:none">
-      <div class="sidebar-section-label">Approvals</div>
-      <a class="nav-item" id="nav-vendor-claims" href="vendor-registrations.html">
-        <i class="ti ti-user-check"></i>Vendor Registrations
-        <span class="nbadge" id="nav-claim-count" style="display:none">0</span>
-      </a>
     </div>
     <div id="sidebar-manager" style="display:none">
       <div class="sidebar-section">
@@ -836,7 +839,8 @@
     // Vendor Management is withheld from the stripped-down `viewer` only; viewer_budget gets
     // it read-only, like every other contributor feature. vendors.html enforces the same rule,
     // so a direct URL matches the link.
-    if (window.__isViewer) { const _nv = document.getElementById('nav-vendors'); if (_nv) _nv.style.display = 'none'; }
+    // The whole Vendors group is withheld from read-only roles (initVendorNav).
+    if (typeof initVendorNav === 'function') initVendorNav(profile);
     // Same audience as Vendor Management: withheld from the stripped-down
     // `viewer` only. bids.html enforces the same rule on a direct URL.
     if (window.__isViewer) { const _nb = document.getElementById('nav-bids'); if (_nb) _nb.style.display = 'none'; }

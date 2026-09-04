@@ -130,21 +130,29 @@
         <i class="ti ti-folder-plus"></i>New Project
       </button>
     </div>
+    <!-- ⚠️ Navigation first, Portfolio Overview at the top of it. This block used
+         to hold the vendor links and Portfolio under the "Admin" label, which
+         put three unrelated jobs in one section. -->
     <div class="sidebar-section">
-      <div class="sidebar-section-label">Admin</div>
-      <a class="nav-item active" href="admin.html"><i class="ti ti-users"></i>User Management</a>
-      <!-- Directly below User Management, inside the page's single labelled
-           Admin section. admin.html is already restricted to
-           admin/super_admin/manager, so nothing here hides its ancestor. -->
-      <div id="sidebar-vendor-claims" style="display:none">
+      <div class="sidebar-section-label">Navigation</div>
+      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Portfolio Overview</a>
+    </div>
+
+    <div class="sidebar-section" id="sidebar-vendor-section" style="display:none">
+      <div class="sidebar-section-label">Vendors</div>
+      <a class="nav-item" id="nav-vendors" href="vendors.html"><i class="ti ti-building-store"></i>Vendor Management</a>
+      <a class="nav-item" id="nav-bids" href="bids.html"><i class="ti ti-gavel"></i>Bid Management</a>
+      <span id="sidebar-vendor-claims" style="display:none">
         <a class="nav-item" id="nav-vendor-claims" href="vendor-registrations.html">
           <i class="ti ti-user-check"></i>Vendor Registrations
           <span class="nbadge" id="nav-claim-count" style="display:none">0</span>
         </a>
-      </div>
-      <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Portfolio Overview</a>
-      <a class="nav-item" id="nav-vendors" href="vendors.html"><i class="ti ti-building-store"></i>Vendor Management</a>
-      <a class="nav-item" id="nav-bids" href="bids.html"><i class="ti ti-gavel"></i>Bid Management</a>
+      </span>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Admin</div>
+      <a class="nav-item active" href="admin.html"><i class="ti ti-users"></i>User Management</a>
     </div>
     <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
@@ -1061,23 +1069,71 @@
           style="width:100%;padding:6px 10px 6px 28px;border:1px solid #e5e5e5;border-radius:7px;font-size:0.8571rem;font-family:inherit;outline:none">
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap">
+        <!-- ⚠️ ASSIGNING BY GROUP HEAD REUSES THE EXISTING BUTTONS rather than
+             adding its own. Picking a head FILTERS the list, and "Select all"
+             already acts on the visible rows only — so head + Select all is
+             "give this user every project under Rodrin", with no new selection
+             semantics to reason about, and the count's "K shown" note already
+             says how many that is. -->
+        <select onchange="projChecksSetGh(this.value,'${containerId}')"
+          style="padding:5px 8px;border:1px solid #e5e5e5;border-radius:7px;font-size:0.8571rem;font-family:inherit;background:#fff;color:#231F20;outline:none">
+          ${projGhOptionsHtml()}
+        </select>
         <button type="button" class="proj-bulk-btn" onclick="projChecksSetAll('${containerId}',true)">Select all</button>
         <button type="button" class="proj-bulk-btn" onclick="projChecksSetAll('${containerId}',false)">None</button>
         <span id="${containerId}-count" class="proj-bulk-count"></span>
       </div>
       <div id="${containerId}-list" style="display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto">
         ${allProjects.map(p=>`
-          <div class="project-checkbox-item" onclick="this.querySelector('input').click()">
+          <div class="project-checkbox-item" data-gh="${esc((window.ghLabel?ghLabel(p.group_head):(p.group_head||'Unassigned')))}" onclick="this.querySelector('input').click()">
             <input type="checkbox" id="p_${containerId}_${p.id}" value="${p.id}" ${checkedIds.includes(p.id)?'checked':''}>
             <label for="p_${containerId}_${p.id}" onclick="event.preventDefault()">${esc(p.name||p.id)} <span style="font-size:0.7143rem;color:#bbb">${esc(p.id)}</span></label>
           </div>`).join('')}
       </div>`;
     // ONE delegated listener rather than an onchange attribute per row -- this list can run
     // to 100+ projects. Re-attached on every build because innerHTML replaces the children.
+    _projQ[containerId] = ''; _projGh[containerId] = '';   // fresh list, fresh filters
     const _l = document.getElementById(containerId + '-list');
     if (_l) _l.addEventListener('change', () => projChecksSyncCount(containerId));
     projChecksSyncCount(containerId);
   }
+
+  /* Only the heads that actually own a project here, in the roster's order, then
+     any off-roster/legacy value, then Unassigned. Same shape as the portfolio's
+     own picker — a head with nothing under them would just be a dead option. */
+  function projGhOptionsHtml() {
+    const present = new Set(allProjects.map(p =>
+      (window.ghLabel ? ghLabel(p.group_head) : (p.group_head || 'Unassigned'))));
+    const roster = (window.GROUP_HEADS || []).filter(h => present.has(h));
+    const unassigned = (window.GH_UNASSIGNED || 'Unassigned');
+    const extra = [...present].filter(h => h !== unassigned && roster.indexOf(h) < 0).sort();
+    const opts = ['<option value="">All group heads</option>']
+      .concat(roster.concat(extra).map(h => `<option value="${esc(h)}">${esc(h)}</option>`));
+    if (present.has(unassigned)) opts.push(`<option value="${esc(unassigned)}">${esc(unassigned)}</option>`);
+    return opts.join('');
+  }
+
+  /* The head filter and the search box both narrow the same list, so they are
+     stored per container and applied together — picking a head must not wipe a
+     search the admin already typed, or vice versa. */
+  const _projGh = {}, _projQ = {};
+  window.projChecksSetGh = function(gh, containerId) {
+    _projGh[containerId] = gh || '';
+    projChecksApplyFilter(containerId);
+  };
+  window.projChecksApplyFilter = function(containerId) {
+    const list = document.getElementById(containerId + '-list');
+    if (!list) return;
+    const q = (_projQ[containerId] || '').toLowerCase();
+    const gh = _projGh[containerId] || '';
+    list.querySelectorAll('.project-checkbox-item').forEach(item => {
+      const label = item.querySelector('label');
+      const okQ = !q || (label && label.textContent.toLowerCase().includes(q));
+      const okG = !gh || item.dataset.gh === gh;
+      item.style.display = (okQ && okG) ? '' : 'none';
+    });
+    projChecksSyncCount(containerId);
+  };
 
   // Select all / None act on the VISIBLE (search-filtered) rows, not the whole list. With an
   // empty search that is every project -- the "this user gets everything" case, which is why
@@ -1108,13 +1164,8 @@
   };
 
   window.filterProjectCheckboxes = function(q, containerId) {
-    const list = document.getElementById(containerId+'-list');
-    if (!list) return;
-    list.querySelectorAll('.project-checkbox-item').forEach(item => {
-      const label = item.querySelector('label');
-      item.style.display = label && label.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
-    });
-    projChecksSyncCount(containerId);   // the "K shown" note tracks the search
+    _projQ[containerId] = q || '';
+    projChecksApplyFilter(containerId);   // combines with the group-head filter
   };
 
   window.rejectUser = async function(userId) {
@@ -1431,6 +1482,7 @@ window.addEventListener('beforeunload', function(e) {
     currentProfile = profile;
     window.__wpmRole = profile.role;
     renderUserBar('user-bar', profile);
+    if (typeof initVendorNav === 'function') initVendorNav(profile);
     if (typeof initVendorClaimsNav === 'function') initVendorClaimsNav(profile);
 
     const isManager = profile.role === 'manager';

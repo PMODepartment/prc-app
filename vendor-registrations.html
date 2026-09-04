@@ -182,11 +182,28 @@
       <img src="assets/img/megawide-logo.png" alt="Megawide Construction"/>
       <div class="app-label">Procurement Dashboard</div>
     </div>
+    <!-- ⚠️ WORK-PACKAGE NAVIGATION ONLY — the vendor links moved to their
+         own section below. Navigation stays the top section, and Portfolio
+         Overview stays first within it. -->
     <div class="sidebar-section">
       <div class="sidebar-section-label">Navigation</div>
       <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Portfolio Overview</a>
+    </div>
+    <!-- ⚠️ ONE FAMILY, ONE SECTION. Vendor Management, Bid Management and the
+         registration queue are the same job and now sit together, separate from
+         the work-package navigation above. initVendorNav() hides the whole group
+         from read-only roles — every action in it is a write. The page-level
+         bounce on each of these pages is the real enforcement. -->
+    <div class="sidebar-section" id="sidebar-vendor-section" style="display:none">
+      <div class="sidebar-section-label">Vendors</div>
       <a class="nav-item" href="vendors.html"><i class="ti ti-building-store"></i>Vendor Management</a>
-      <a class="nav-item" href="bids.html"><i class="ti ti-gavel"></i>Bid Management</a>
+      <a class="nav-item" id="nav-bids" href="bids.html"><i class="ti ti-gavel"></i>Bid Management</a>
+      <span id="sidebar-vendor-claims" style="display:none">
+        <a class="nav-item active" id="nav-vendor-claims" href="vendor-registrations.html">
+          <i class="ti ti-user-check"></i>Vendor Registrations
+          <span class="nbadge" id="nav-claim-count" style="display:none">0</span>
+        </a>
+      </span>
     </div>
     <!-- Navigation only. Rendered by window.initSidebarProjects in db.js. -->
     <div class="sidebar-section" id="sidebar-projects-section" style="display:none">
@@ -203,13 +220,6 @@
     <div class="sidebar-section" id="nav-admin-section" style="display:none">
       <div class="sidebar-section-label">Admin</div>
       <a class="nav-item" href="admin.html"><i class="ti ti-users"></i>User Management</a>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-section-label">Approvals</div>
-      <a class="nav-item active" href="vendor-registrations.html">
-        <i class="ti ti-user-check"></i>Vendor Registrations
-        <span class="nbadge" id="nav-claim-count" style="display:none">0</span>
-      </a>
     </div>
     <div class="sidebar-footer">Megawide Construction Corporation<br>EPC · Procurement · WPM System</div>
   </aside>
@@ -732,6 +742,7 @@ AppAuth.requireLogin(function (user, p) {
   window.__wpmRole = p.role;
   window.__profile = p;
   if (isAdmin) document.getElementById('nav-admin-section').style.display = '';
+  if (typeof initVendorNav === 'function') initVendorNav(p);
   if (typeof initSidebarProjects === 'function') initSidebarProjects(p);
   renderUserBar('user-bar', p);
   initMobileMenu();
