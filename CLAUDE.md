@@ -2994,6 +2994,29 @@ first thing in this project that lives outside the repo — not money.
   the outbox row (`sent_at` / `attempts` / `last_error`) — that is the thing to
   read, not the HTTP status. A **404/410 deletes that device**: the browser threw
   the subscription away, and keeping it means retrying a dead endpoint forever.
+- **⚠⚠ THE ROW COULD NEVER APPEAR ON AN iPHONE, and the message written for
+  exactly that case was unreachable (fixed 2026-09-05).** iOS exposes
+  `window.PushManager` **only once the portal is installed to the Home Screen**
+  — in a Safari tab it does not exist. `pushSupported()` tests for it, and
+  `renderPushRow()` returned on `!pushSupported()` BEFORE reaching its own
+  `_iosNeedsInstall()` branch, so a vendor on an iPhone saw nothing whatsoever.
+  Split in two: **`pushOffered()`** asks "should this device be offered
+  notifications" (key + service worker + touch) and deliberately does NOT test
+  PushManager; **`pushSupported()`** adds PushManager + Notification, i.e. "can
+  we subscribe right now". The row is shown on `pushOffered()`, the iOS note is
+  reached, and a non-iOS browser with no push API still bails after it.
+  **Order matters here — do not put a `pushSupported()` guard back on top.**
+  14 assertions over the shipped functions cover iPhone-in-a-tab,
+  iPhone-installed, Android, already-subscribed, permission-denied, desktop, a
+  narrowed desktop window, no push API and no service worker.
+- **⚠️ "Add to home screen" did nothing at all when tapped.** It called
+  `msg(..., 'info')` — and **`.msg.info` was set by two call sites and had no CSS
+  rule**, so `display` stayed `none` and the click produced literally nothing.
+  Even styled, `#msgBox` sits up in the profile section, behind the drawer the
+  button lives in. There is now a `.msg.info` rule AND a **`portalToast()`**
+  fixed to the bottom of the viewport (above the drawer, inside the safe area);
+  the handler also closes the drawer first so the Share button is reachable.
+  **A message about something in the side panel cannot live in `#msgBox`.**
 - **⚠️ THE ROW IS OFFERED ON PHONES AND TABLETS ONLY — `PUSH_ON_DESKTOP = false`
   in `vendor-portal.html`. That is a PRODUCT decision, not a technical limit:**
   desktop Chrome and Edge support web push perfectly well, and a vendor at their
