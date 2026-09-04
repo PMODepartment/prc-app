@@ -192,6 +192,36 @@
        row) keeps working when the row wraps on a narrow screen and when there
        are several bidders. */
     .bm-cell{display:flex;flex-direction:column;gap:3px;min-width:0}
+    /* Offer → negotiated. Plain divs on a shared scale: no chart library is
+       loaded on this page and one bar does not justify adding one. */
+    .nv-wrap{display:flex;flex-direction:column;gap:13px;margin-top:4px}
+    .nv-row{display:grid;grid-template-columns:minmax(120px,1.1fr) minmax(160px,3fr) minmax(150px,1.2fr);
+      gap:12px;align-items:center}
+    .nv-name{font-size:0.8125rem;font-weight:700;line-height:1.35;min-width:0;
+      overflow-wrap:anywhere}
+    .nv-tag{display:inline-block;margin-left:6px;font-size:0.6071rem;font-weight:800;letter-spacing:.05em;
+      background:var(--mw-red);color:#fff;border-radius:5px;padding:1px 6px;vertical-align:middle}
+    .nv-track{position:relative;height:22px;background:var(--surface-2);border-radius:6px}
+    .nv-orig{position:absolute;left:0;top:0;height:100%;border-radius:6px;
+      background:repeating-linear-gradient(45deg,var(--border-md) 0 5px,transparent 5px 10px)}
+    .nv-fin{position:absolute;left:0;top:0;height:100%;border-radius:6px;background:var(--mw-red);opacity:.85}
+    .nv-won .nv-fin{opacity:1}
+    /* z-index so it stays readable where a bar runs past the budget — which is
+       exactly the case a reader most needs to see. */
+    .nv-bcb{position:absolute;top:-4px;bottom:-4px;width:0;z-index:2;
+      border-left:2px dashed var(--text-primary)}
+    .nv-figs{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;font-size:0.8125rem;justify-content:flex-end}
+    .nv-was{text-decoration:line-through;color:var(--text-hint);font-size:0.75rem}
+    .nv-cut{font-size:0.7143rem;font-weight:700;color:#2D9B6F}
+    .nv-flat{color:var(--text-hint);font-weight:600}
+    .nv-total{margin-top:14px;padding-top:11px;border-top:1px solid var(--border);
+      font-size:0.8125rem;color:var(--text-secondary)}
+    @media (max-width:700px){.nv-row{grid-template-columns:1fr;gap:5px}
+      .nv-figs{justify-content:flex-start}}
+    .cmp-th{cursor:pointer;user-select:none;white-space:nowrap}
+    .cmp-th:hover{color:var(--mw-red-ink)}
+    .cmp-th.on{color:var(--mw-red-ink)}
+    .cmp-arrow{font-size:0.6429rem}
     .bm-hint{font-size:0.6786rem;color:var(--text-hint);margin-top:5px;line-height:1.5}
     .bm-cl{font-size:0.6429rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
       color:var(--text-hint);white-space:nowrap}
@@ -845,7 +875,7 @@ function renderRound() {
        : '')
     + '</div>'
     + deadlineNudge() + askPanel() + biddersPanel() + responsesPanel() + clarifyPanel()
-    + comparisonPanel() + evaluationPanel() + negotiationPanel() + awardPanel();
+    + comparisonPanel() + evaluationPanel() + negotiationPanel() + negotiationViz() + awardPanel();
 }
 
 async function setStage(s) {
@@ -1309,6 +1339,43 @@ async function sendClarify(invId) {
   } catch (e) { AppNotify.fromError(e, 'Could not send that'); }
 }
 
+/* Sorting the glance table. The bidder list is short, so this re-renders rather
+   than mutating rows in place — the same shape every other sortable table in
+   this app uses.
+   ⚠️ DEFAULT STAYS CHEAPEST-FIRST. _comparisonRows() already sorts by amount and
+      the award turns on that order, so an unsorted table must not arrive in
+      whatever order the rows came back from PostgREST. */
+let _cmpSort = { key: null, dir: 1 };
+function _cmpTh(key, label, align) {
+  const on = _cmpSort.key === key;
+  const arrow = on ? (_cmpSort.dir === 1 ? ' \u25b2' : ' \u25bc') : '';
+  return '<th class="cmp-th' + (on ? ' on' : '') + '" style="text-align:' + align + '" '
+    + 'onclick="cmpSort(' + Q + key + Q + ')" title="Sort by ' + esc(label) + '">'
+    + esc(label) + '<span class="cmp-arrow">' + arrow + '</span></th>';
+}
+window.cmpSort = function (key) {
+  if (_cmpSort.key === key) _cmpSort.dir = -_cmpSort.dir;
+  else { _cmpSort.key = key; _cmpSort.dir = 1; }
+  renderRound();
+};
+/* Applied on top of the cheapest-first base order, so an equal pair keeps the
+   price ordering rather than shuffling on every render. */
+function _cmpApplySort(rows) {
+  if (!_cmpSort.key) return rows;
+  const k = _cmpSort.key, d = _cmpSort.dir;
+  return rows.slice().sort(function (a, b) {
+    const x = a[k], y = b[k];
+    // A missing lead time or validity is not "0 days" — it is unknown, and
+    // unknown sorts last whichever direction you are reading.
+    const xn = x == null || x === '', yn = y == null || y === '';
+    if (xn && yn) return 0;
+    if (xn) return 1;
+    if (yn) return -1;
+    if (typeof x === 'number' && typeof y === 'number') return (x - y) * d;
+    return String(x).localeCompare(String(y)) * d;
+  });
+}
+
 /* 2.3.2 — Summarization (Cost Comparison). */
 function bidsInPlay() {
   return INV.filter(i => i.status === 'submitted' || i.status === 'closed')
@@ -1325,14 +1392,22 @@ function comparisonPanel() {
   return '<div class="panel"><div class="panel-title">5 · Bids at a glance</div>'
     + (bcb ? '<div class="sec-note">Budget (BCB) for this package: <b>' + esc(money(bcb)) + '</b></div>' : '')
     + '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
-    + '<th>Bidder</th><th style="text-align:right">Offer</th><th style="text-align:right">vs lowest</th>'
+    + _cmpTh('vendor_name', 'Bidder', 'left')
+    + _cmpTh('offer_amount', 'Offer', 'right')
+    + '<th style="text-align:right">vs lowest</th>'
     + (bcb ? '<th style="text-align:right">vs BCB</th>' : '')
-    + '<th>Lead time</th><th>Validity</th><th>Payment terms</th></tr></thead><tbody>'
-    + rows.map((i, n) => {
+    + _cmpTh('lead_time_days', 'Lead time', 'left')
+    + _cmpTh('validity_days', 'Quotation validity', 'left')
+    + _cmpTh('payment_terms', 'Payment terms', 'left')
+    + '</tr></thead><tbody>'
+    + _cmpApplySort(rows).map((i, n) => {
         const diff = (i.offer_amount || 0) - low;
         const vsB = bcb ? (i.offer_amount || 0) - bcb : null;
         return '<tr><td><b>' + esc(i.vendor_name) + '</b>'
-          + (n === 0 ? ' <span class="bm-low">lowest</span>' : '') + '</td>'
+          // ⚠️ Keyed to the AMOUNT, not to the row position. Once the table
+          //    can be sorted by lead time the first row is not the cheapest, and
+          //    a "lowest" chip sitting on it would simply be a lie.
+          + ((i.offer_amount || 0) === low ? ' <span class="bm-low">lowest</span>' : '') + '</td>'
           + '<td style="text-align:right"><b>' + esc(money(i.offer_amount, i.offer_currency)) + '</b></td>'
           + '<td style="text-align:right">' + (diff ? '+' + esc(money(diff, i.offer_currency)) : '—') + '</td>'
           + (bcb ? '<td style="text-align:right" class="' + (vsB > 0 ? 'bm-high' : 'bm-low') + '">'
@@ -1344,7 +1419,7 @@ function comparisonPanel() {
     + '</tbody></table></div>'
     + '<div class="sec-note" style="margin-top:12px">The award goes to the <b>lowest bid that meets the '
     + 'technical requirements</b> — the design criteria or terms of reference. A cheaper bid that does not '
-    + 'comply is not the lowest.</div>'
+    + 'comply is not the lowest. Click a column heading to sort.</div>'
     /* BP 2.3.2 calls this a PRESENTED deliverable, so it has to leave the screen.
        Both outputs carry the BCB and are internal — the print view says so on it. */
     + '<div class="sec-note" style="margin-top:10px">The <b>cost comparison itself is prepared outside '
@@ -1622,7 +1697,7 @@ function exportBidders() {
   out.push([]);
   const head = ['Rank', 'Bidder', 'Accreditation', 'Offer', 'Currency', 'vs lowest'];
   if (m.bcb != null) head.push('vs BCB');
-  head.push('Lead time (days)', 'Validity (days)', 'Payment terms',
+  head.push('Lead time (days)', 'Quotation validity (days)', 'Payment terms',
             'Meets technical requirements', 'Rank', 'Negotiated', 'Notes');
   out.push(head);
   rows.forEach((i, n) => {
@@ -1650,6 +1725,85 @@ function exportBidders() {
   AppNotify.success('Bidder list downloaded — use it to fill in your cost-comparison template.');
 }
 
+
+/* ── What the negotiation actually achieved ────────────────────────────────
+   Asked for 2026-09-04: "a visualization of the bid history from initial offer
+   to negotiated offer, not a step-by-step chart which is difficult to
+   appreciate during reporting."
+
+   So it is ONE horizontal bar per bidder, drawn to a shared scale: the original
+   offer as the full bar, the negotiated figure as a filled section inside it,
+   and the saving as the gap. A reader takes the whole picture in without
+   reading a single number — which is the point when it is on a projector.
+
+   ⚠️ NOT Chart.js. bids.html loads no charting library at all, and pulling one
+      in for a proportional bar would be a dependency for the sake of it. Plain
+      divs, so it prints and it themes with the rest of the page. */
+function _negoRows() {
+  return bidsInPlay().filter(function (i) { return i.offer_amount != null; });
+}
+function negotiationViz() {
+  const rows = _negoRows();
+  if (!rows.length) return '';
+  // Anything to show only once at least one figure has actually moved.
+  const moved = rows.filter(function (i) {
+    return i.negotiated_amount != null && Number(i.negotiated_amount) !== Number(i.offer_amount);
+  });
+  const max = Math.max.apply(null, rows.map(function (i) {
+    return Math.max(Number(i.offer_amount) || 0, Number(i.negotiated_amount) || 0);
+  })) || 1;
+  const w = WPBYID[R.wp_id] || {};
+  const bcb = window.__hideBudget ? null : (w.approved_budget_bcb || null);
+  const bcbPct = bcb ? Math.min(100, (bcb / max) * 100) : null;
+
+  let totalSaved = 0;
+  const bars = rows.slice().sort(function (a, b) {
+    return (Number(a.negotiated_amount != null ? a.negotiated_amount : a.offer_amount) || 0)
+         - (Number(b.negotiated_amount != null ? b.negotiated_amount : b.offer_amount) || 0);
+  }).map(function (i) {
+    const orig = Number(i.offer_amount) || 0;
+    const neg = i.negotiated_amount != null ? Number(i.negotiated_amount) : null;
+    const fin = neg != null ? neg : orig;
+    const saved = neg != null ? orig - neg : 0;
+    totalSaved += saved > 0 ? saved : 0;
+    const pctOrig = (orig / max) * 100;
+    const pctFin = (fin / max) * 100;
+    const cut = orig > 0 && saved > 0 ? (saved / orig) * 100 : 0;
+    const won = i.outcome === 'awarded';
+    return '<div class="nv-row' + (won ? ' nv-won' : '') + '">'
+      + '<div class="nv-name">' + esc(i.vendor_name)
+      + (won ? '<span class="nv-tag">AWARDED</span>' : '') + '</div>'
+      + '<div class="nv-track">'
+      // The original offer is the full bar; the negotiated figure is drawn
+      // inside it, so the gap between them IS the saving.
+      + '<div class="nv-orig" style="width:' + pctOrig.toFixed(2) + '%"></div>'
+      + '<div class="nv-fin" style="width:' + pctFin.toFixed(2) + '%"></div>'
+      + (bcbPct != null ? '<div class="nv-bcb" style="left:' + bcbPct.toFixed(2) + '%" '
+          + 'title="Budget (BCB) ' + esc(money(bcb)) + '"></div>' : '')
+      + '</div>'
+      + '<div class="nv-figs">'
+      + (neg != null && saved !== 0
+          ? '<span class="nv-was">' + esc(money(orig, i.offer_currency)) + '</span>'
+            + '<b>' + esc(money(fin, i.offer_currency)) + '</b>'
+            + '<span class="nv-cut">' + (saved > 0 ? '\u2212' : '+') + esc(money(Math.abs(saved), i.offer_currency))
+            + ' \u00b7 ' + Math.abs(cut).toFixed(1) + '%</span>'
+          : '<b>' + esc(money(orig, i.offer_currency)) + '</b>'
+            + '<span class="nv-cut nv-flat">not negotiated</span>')
+      + '</div></div>';
+  }).join('');
+
+  return '<div class="panel"><div class="panel-title">Offer \u2192 negotiated</div>'
+    + '<div class="sec-note">Each bar is that bidder\u2019s original offer; the solid part is where it '
+    + 'landed after negotiation, so the gap is what was taken off.'
+    + (bcb ? ' The dashed line is the budget (BCB).' : '')
+    + (moved.length ? '' : ' <b>Nothing has been negotiated yet</b> \u2014 the bars show the offers as they stand.')
+    + '</div>'
+    + '<div class="nv-wrap">' + bars + '</div>'
+    + (totalSaved > 0
+        ? '<div class="nv-total">Taken off across all bidders: <b>' + esc(money(totalSaved)) + '</b></div>'
+        : '')
+    + '</div>';
+}
 
 /* 2.4.2 — Award: NOA to the winner, Letter of Regret to the rest.
    ⚠️ The letters themselves stay with Megawide's existing templates. This
