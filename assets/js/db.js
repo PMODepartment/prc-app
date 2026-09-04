@@ -3556,6 +3556,14 @@ const VendorDb = (() => {
       if (inv.payment_terms) bits.push('terms: ' + inv.payment_terms);
       return upsertBid(inv.wp_id, inv.vendor_id, inv.project_id, {
         original_offer: inv.offer_amount,
+        /* ⚠️ The negotiated figure has to travel with the offer. vendor_bids
+           carries the whole chain — original_offer -> negotiated_offer ->
+           final_amount — and the vendor's Bid History renders it as that chain.
+           Only original_offer was written here, and reconcileBidsOnAward then
+           set final_amount, so the NEGOTIATION step was silently dropped: a
+           round that moved 250,000 -> 235,000 showed the two ends and a blank
+           middle, losing the fact that a negotiation happened at all. */
+        negotiated_offer: inv.negotiated_amount == null ? null : inv.negotiated_amount,
         status: 'participated',
         bid_date: (inv.submitted_at || '').slice(0, 10) || null,
         notes: 'From the vendor portal submission' + (bits.length ? ' · ' + bits.join(' · ') : ''),

@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904j"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904j"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260904k"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260904k"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -162,6 +162,20 @@
     .nr-back:hover{color:var(--mw-red-ink)}
     .nr-crumb{display:flex;align-items:center;gap:8px;font-size:0.9286rem;font-weight:600;
       color:var(--text-primary);margin-bottom:10px}
+
+    /* ── Per-field captions on the evaluation / negotiation rows ──────────
+       ⚠️ These fields used to be identified ONLY by a placeholder, which
+       disappears the moment a value is typed — so a saved row read as
+       "Pass | 92 | 1 | notes" with nothing saying what 92 and 1 were.
+       Reported from the live page. A caption per cell (rather than one header
+       row) keeps working when the row wraps on a narrow screen and when there
+       are several bidders. */
+    .bm-cell{display:flex;flex-direction:column;gap:3px;min-width:0}
+    .bm-cl{font-size:0.6429rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+      color:var(--text-hint);white-space:nowrap}
+    .bm-in{width:100%;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;
+      font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)}
+    .bm-in:focus{border-color:var(--mw-red);outline:none}
 </style>
 </head>
 <body>
@@ -329,9 +343,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260904j"></script>
-<script src="assets/js/db.js?v=20260904j"></script>
-<script src="assets/js/ui.js?v=20260904j"></script>
+<script src="assets/js/auth.js?v=20260904k"></script>
+<script src="assets/js/db.js?v=20260904k"></script>
+<script src="assets/js/ui.js?v=20260904k"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -766,7 +780,7 @@ async function reTender() {
 /* 2.2.1 — Preparation of Scope of Works (BOQ) and TOR. */
 function askPanel() {
   const ro = canManage ? '' : ' disabled';
-  return '<div class="panel"><div class="panel-title">1 · The ask <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.2.1</span></div>'
+  return '<div class="panel"><div class="panel-title">1 · The ask</div>'
     + '<div class="sec-note">Scope, deadline and terms. Everything here goes to the bidders exactly as written.</div>'
     + '<div class="bm-grid">'
     + '<div class="field"><label>Document type</label><select id="a-doc"' + ro + '>'
@@ -849,7 +863,7 @@ function biddersPanel() {
       + '</div>';
   }).join('');
 
-  return '<div class="panel"><div class="panel-title">2 · Bidders <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.2.2</span></div>'
+  return '<div class="panel"><div class="panel-title">2 · Bidders</div>'
     + '<div class="sec-note">Who is being asked to quote. '
     + '<b>Unaccredited vendors may be invited</b> — BP policy N29 runs accreditation in parallel; only the AWARD requires it.</div>'
     + (INV.length ? rows : '<div class="empty-state"><i class="ti ti-users"></i><b>No bidders yet</b>Add the vendors you want to quote this package.</div>')
@@ -895,24 +909,36 @@ async function suggestVendors() {
   try {
     const rows = await VendorDb.findVendorsForWP(w.trade, w.works);
     const have = new Set(INV.map(i => i.vendor_id));
-    const list = (rows || []).filter(v => !have.has(v.id)).slice(0, 25);
+    /* ⚠️ findVendorsForWP returns { vendor, node, products } — the vendor is
+       NESTED. Reading v.id / v.name / v.accreditation straight off the row gave
+       undefined for all three, so every suggestion rendered with a BLANK NAME,
+       an unconditional "Not accredited" badge, and a + button that called
+       addBidder(undefined). Reported from the live page. `r.vendor || r` also
+       tolerates a future flat shape rather than breaking again. */
+    const list = (rows || [])
+      .map(r => ({ v: (r && r.vendor) || r, n: (r && r.products ? r.products.length : 0) }))
+      .filter(x => x.v && x.v.id && !have.has(x.v.id))
+      .slice(0, 25);
     host.innerHTML = list.length
       ? '<div class="sec-note" style="margin:8px 0 4px">Vendors whose catalogue covers '
-        + esc(w.works || w.trade) + ', accredited first:</div>' + list.map(v => vendorOption(v)).join('')
+        + esc(w.works || w.trade) + ', accredited first:</div>'
+        + list.map(x => vendorOption(x.v, x.n ? x.n + (x.n === 1 ? ' item' : ' items') : '')).join('')
       : '<div class="sec-note" style="margin:8px 0 0">Nobody is filed under that works yet.</div>';
   } catch (e) {
     host.innerHTML = '<div class="sec-note" style="margin:8px 0 0">Could not search the catalogue.</div>';
   }
 }
-function vendorOption(v) {
+function vendorOption(v, note) {
   const acc = window.accredMeta ? window.accredMeta(v.accreditation) : null;
   // ⚠️ Only the id goes into the handler — a company name can contain an
   //    apostrophe and would break out of the inline argument (Known Issues #23).
   return '<div class="bidder" style="padding:8px 0;cursor:pointer" onclick="addBidder(' + Q + v.id + Q + ')">'
-    + '<div class="bidder-name">' + esc(v.name) + '</div>'
+    + '<div class="bidder-name">' + esc(v.name || '(unnamed vendor)')
+    + (note ? '<small>' + esc(note) + ' in their catalogue</small>' : '') + '</div>'
     + (acc ? '<span class="bstat bstat-invited">' + esc(acc.label) + '</span>' : '')
     + '<button class="btn btn-sm"><i class="ti ti-plus"></i></button></div>';
 }
+
 async function addBidder(vendorId) {
   if (_busy) return;
   _busy = true;
@@ -1048,7 +1074,7 @@ async function markIssued() {
 /* 2.2.3 — Receipt of Proposal. */
 function responsesPanel() {
   const inPlay = INV.filter(i => i.status === 'submitted' || i.status === 'closed');
-  return '<div class="panel"><div class="panel-title">3 · Bids received <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.2.3</span></div>'
+  return '<div class="panel"><div class="panel-title">3 · Bids received</div>'
     + '<div class="sec-note">' + inPlay.length + ' of ' + INV.length + ' invited bidders have submitted.'
     + (R.two_envelope ? ' This round is two-envelope, so each bid carries a Technical and a Commercial document.' : '') + '</div>'
     + (inPlay.length
@@ -1082,7 +1108,7 @@ async function openFile(path) {
 function clarifyPanel() {
   const rows = INV.filter(i => i.status === 'submitted' || (THREADS[i.id] || []).length);
   if (!rows.length) return '';
-  return '<div class="panel"><div class="panel-title">4 · Clarifications <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.3.1</span></div>'
+  return '<div class="panel"><div class="panel-title">4 · Clarifications</div>'
     + '<div class="sec-note">Questions to one bidder about their proposal. Each thread is private to that bidder, '
     + 'and they answer from the same link they bid with — no login.</div>'
     + rows.map(i => {
@@ -1133,7 +1159,7 @@ function comparisonPanel() {
   // ⚠️ The BCB is OURS and is shown to staff only — it is deliberately absent
   //    from every vendor-facing surface (see the migration's view).
   const bcb = window.__hideBudget ? null : (w.approved_budget_bcb || null);
-  return '<div class="panel"><div class="panel-title">5 · Bids at a glance <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.3.2</span></div>'
+  return '<div class="panel"><div class="panel-title">5 · Bids at a glance</div>'
     + (bcb ? '<div class="sec-note">Budget (BCB) for this package: <b>' + esc(money(bcb)) + '</b></div>' : '')
     + '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
     + '<th>Bidder</th><th style="text-align:right">Offer</th><th style="text-align:right">vs lowest</th>'
@@ -1166,40 +1192,57 @@ function comparisonPanel() {
     + '</div></div>';
 }
 
-/* 2.3.3 — Evaluation. */
+/* 2.3.3 — Evaluation.
+   ⚠️ NO SCORE FIELD, DELIBERATELY. This carried a free "Score" number with no
+   defined scale, no criteria and no weighting recorded anywhere — not in the BP
+   mapping, not in the migration, nowhere. A number nobody can explain is worse
+   than no number: two officers would key it differently and the ranking would
+   look authoritative while resting on nothing. Removed at the user's decision
+   (2026-09-04): the ranking comes from the cost comparison workbook, which is
+   where line items, inclusions, duties and FX are actually weighed.
+   vendor_bid_invitations.technical_score is left in place but is no longer
+   read or written — dropping a column is destructive and buys nothing. */
 function evaluationPanel() {
   const rows = bidsInPlay();
   if (!rows.length) return '';
   const ro = canManage ? '' : ' disabled';
-  return '<div class="panel"><div class="panel-title">6 · Evaluation <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.3.3</span></div>'
-    + '<div class="sec-note">Technical result and ranking. Offshore packages should also weigh lead time, freight, '
-    + 'duties and total landed cost.</div>'
+  return '<div class="panel"><div class="panel-title">6 · Evaluation</div>'
+    + '<div class="sec-note">Record the outcome of the cost comparison. <b>The ranking comes from that '
+    + 'workbook</b> — line items, inclusions and exclusions, duties, FX and total landed cost — not from '
+    + 'anything typed here. Rank 1 is the best overall position, which is not always the lowest offer.</div>'
     + rows.map(i =>
-        '<div class="bidder" style="align-items:flex-start">'
-        + '<div class="bidder-name" style="flex:0 0 170px">' + esc(i.vendor_name)
-        + '<small>' + esc(money(i.offer_amount, i.offer_currency)) + '</small></div>'
-        + '<div style="flex:0 0 130px"><select id="ev-r-' + i.id + '"' + ro
-        + ' style="width:100%;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
-        + '<option value="">Technical…</option>'
+        '<div class="bidder" style="align-items:flex-end">'
+        + '<div class="bm-cell" style="flex:0 0 190px"><span class="bm-cl">Bidder</span>'
+        + '<div class="bidder-name">' + esc(i.vendor_name)
+        + '<small>' + esc(money(i.offer_amount, i.offer_currency)) + '</small></div></div>'
+        + '<div class="bm-cell" style="flex:0 0 150px"><label class="bm-cl" for="ev-r-' + i.id + '">Technical result</label>'
+        + '<select id="ev-r-' + i.id + '" class="bm-in"' + ro + '>'
+        + '<option value="">Not assessed</option>'
         + ['pass', 'conditional', 'fail'].map(o => '<option value="' + o + '"' + (i.technical_result === o ? ' selected' : '') + '>'
             + (o === 'pass' ? 'Pass' : o === 'conditional' ? 'Conditional' : 'Fail') + '</option>').join('')
         + '</select></div>'
-        + '<input id="ev-s-' + i.id + '" type="number" step="0.01" placeholder="Score" value="' + esc(i.technical_score == null ? '' : i.technical_score) + '"' + ro
-        + ' style="flex:0 0 90px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
-        + '<input id="ev-k-' + i.id + '" type="number" placeholder="Rank" value="' + esc(i.rank == null ? '' : i.rank) + '"' + ro
-        + ' style="flex:0 0 80px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
-        + '<input id="ev-n-' + i.id + '" placeholder="Notes" value="' + esc(i.evaluation_notes || '') + '"' + ro
-        + ' style="flex:1;min-width:150px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+        + '<div class="bm-cell" style="flex:0 0 130px"><label class="bm-cl" for="ev-k-' + i.id + '">Rank</label>'
+        + '<input id="ev-k-' + i.id + '" class="bm-in" type="number" min="1" step="1" inputmode="numeric"'
+        + ' title="Overall standing from the cost comparison. 1 is the best position."'
+        + ' value="' + esc(i.rank == null ? '' : i.rank) + '"' + ro + '></div>'
+        + '<div class="bm-cell" style="flex:1;min-width:170px"><label class="bm-cl" for="ev-n-' + i.id + '">Notes</label>'
+        + '<input id="ev-n-' + i.id + '" class="bm-in" value="' + esc(i.evaluation_notes || '') + '"' + ro
+        + ' placeholder="Why this position"></div>'
         + '</div>').join('')
     + (canManage ? '<div class="bm-actions"><button class="btn btn-primary" onclick="saveEvaluation()">Save evaluation</button></div>' : '')
     + '</div>';
 }
+
+
+/* ⚠️ technical_score is deliberately NOT sent any more — the field was removed
+   because it had no defined scale or criteria. The ranking is recorded from the
+   cost comparison workbook instead. Existing rows keep whatever score they
+   already held; nothing here overwrites it. */
 async function saveEvaluation() {
   try {
     for (const i of bidsInPlay()) {
       await VendorDb.bidBoard.update(i.id, {
         technical_result: val('ev-r-' + i.id) || null,
-        technical_score: num(val('ev-s-' + i.id)),
         rank: intOf(val('ev-k-' + i.id)),
         evaluation_notes: val('ev-n-' + i.id) || null,
       }, profile);
@@ -1216,7 +1259,7 @@ function negotiationPanel() {
   if (!rows.length) return '';
   const ro = canManage ? '' : ' disabled';
   const short = rows.filter(i => i.shortlisted).length;
-  return '<div class="panel"><div class="panel-title">7 · Negotiation <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.4.1</span></div>'
+  return '<div class="panel"><div class="panel-title">7 · Negotiation</div>'
     + '<div class="sec-note">Shortlist the top bidders and record the negotiated price — the handshake figure. '
     + '<b>BP 2.4.1 says 1 to 3 bidders.</b>' + (short > 3 ? ' <span class="bm-high">' + short + ' are shortlisted.</span>' : '') + '</div>'
     + rows.map(i =>
@@ -1411,7 +1454,7 @@ function exportBidders() {
   const head = ['Rank', 'Bidder', 'Accreditation', 'Offer', 'Currency', 'vs lowest'];
   if (m.bcb != null) head.push('vs BCB');
   head.push('Lead time (days)', 'Validity (days)', 'Payment terms',
-            'Technical', 'Score', 'Evaluation rank', 'Negotiated', 'Notes');
+            'Technical', 'Rank', 'Negotiated', 'Notes');
   out.push(head);
   rows.forEach((i, n) => {
     const r = [n + 1, i.vendor_name,
@@ -1421,7 +1464,6 @@ function exportBidders() {
     r.push(i.lead_time_days == null ? '' : i.lead_time_days,
            i.validity_days == null ? '' : i.validity_days,
            i.payment_terms || '', i.technical_result || '',
-           i.technical_score == null ? '' : i.technical_score,
            i.rank == null ? '' : i.rank,
            i.negotiated_amount == null ? '' : i.negotiated_amount,
            i.evaluation_notes || '');
@@ -1447,7 +1489,7 @@ function awardPanel() {
   if (!rows.length) return '';
   const winner = INV.find(i => i.outcome === 'awarded');
   const decided = !!winner;
-  return '<div class="panel"><div class="panel-title">8 · Award <span style="font-weight:500;color:var(--text-hint);font-size:0.7857rem">BP 2.4.2</span></div>'
+  return '<div class="panel"><div class="panel-title">8 · Award</div>'
     + '<div class="sec-note">' + (decided
         ? 'Awarded to <b>' + esc(winner.vendor_name) + '</b>' + (winner.decided_at ? ' on ' + esc(dOnly(winner.decided_at)) : '') + '.'
         : 'Awarding closes the round: the winner is marked awarded and every other bidder not awarded, so nobody is left un-notified.')
