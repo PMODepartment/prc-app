@@ -84,6 +84,12 @@
     .refpack-note{font-size:0.7143rem;color:var(--text-hint);line-height:1.55;margin-top:9px}
     .bid-field{margin-top:14px}
     .bid-field textarea{resize:vertical;max-height:220px;min-height:64px}
+    .push-note{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+      font-size:12.5px;line-height:1.55;border-radius:10px;padding:10px 13px;margin-bottom:14px;
+      background:var(--surface-2);border:1px solid var(--border-md);color:var(--text-secondary)}
+    .push-note i{font-size:16px;flex-shrink:0;color:var(--mw-red-ink)}
+    .push-note span{flex:1;min-width:190px}
+    .push-note .btn-ghost{flex-shrink:0}
     .per-flags{display:flex;flex-direction:column;gap:5px;padding-top:6px}
     .per-flags label{display:flex;align-items:center;gap:6px;font-size:12px;color:#666;cursor:pointer}
     .per-flag-help{font-size:11.5px;color:#888;line-height:1.6;margin-top:10px;
@@ -826,6 +832,10 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
       Work packages Megawide Procurement has invited you to quote. You only see the packages
       addressed to you — not the wider pipeline.
     </p>
+    <!-- Notifications belong here, next to the thing they are about, rather
+         than in a settings page nobody opens. Hidden until the portal knows
+         push is actually available on this device. -->
+    <div id="pushRow" style="display:none"></div>
     <div id="bidBoardList"></div>
   </div>
 </div><!-- /.wrap -->
@@ -844,11 +854,11 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260905b"></script>
-<script src="assets/js/db.js?v=20260905b"></script>
+<script src="assets/js/auth.js?v=20260905c"></script>
+<script src="assets/js/db.js?v=20260905c"></script>
 <!-- Self-contained: this page loads no ui.js, so the guide injects its own
      CSS and its own "?" button. Versioned independently of the shared assets. -->
-<script src="assets/js/portal-guide.js?v=20260905b"></script>
+<script src="assets/js/portal-guide.js?v=20260905c"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -2457,6 +2467,7 @@ function _renderBidList() {
   if (badge) { badge.textContent = actionable; badge.style.display = actionable ? '' : 'none'; }
   // The installed app's icon carries the same number.
   syncAppBadge(actionable);
+  renderPushRow();   // async, and it owns its own host element
 
   if (!live.length) {
     el.innerHTML = '<div class="pf-empty"><i class="ti ti-clipboard-list"></i>'
@@ -2690,6 +2701,129 @@ async function installPortal() {
   const b = document.getElementById('btn-install');
   if (b) b.style.display = 'none';
 }
+
+/* ── Push notifications ────────────────────────────────────────────────────
+   The badge above only updates while the portal is OPEN. This is the real
+   thing: a notification that arrives when it is closed.
+
+   ⚠️ SET THIS to the PUBLIC key from `node gen_vapid_keys.mjs`. It is not a
+      secret — the browser needs it to subscribe. Left empty, the portal simply
+      never offers notifications and nothing breaks.
+      Deploy steps: supabase/functions/send-bid-push/README.md */
+const VAPID_PUBLIC_KEY = '';
+
+function _b64uToU8(s) {
+  const pad = (s + '='.repeat((4 - (s.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(pad);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+/* iOS only allows this once the portal is on the Home Screen, and in a normal
+   Safari tab there is no prompt at all — so say that rather than showing a
+   button that appears to do nothing. */
+function _isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+function _iosNeedsInstall() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !_isStandalone();
+}
+function pushSupported() {
+  return !!(VAPID_PUBLIC_KEY && 'serviceWorker' in navigator
+            && 'PushManager' in window && 'Notification' in window);
+}
+
+async function renderPushRow() {
+  const host = document.getElementById('pushRow');
+  if (!host) return;
+  if (!pushSupported()) { host.style.display = 'none'; return; }
+  host.style.display = '';
+  if (_iosNeedsInstall()) {
+    host.innerHTML = '<div class="push-note"><i class="ti ti-bell"></i><span>'
+      + 'To get notified about new bid invitations on iPhone or iPad, first add this '
+      + 'portal to your Home Screen (Share \u2192 Add to Home Screen), then turn '
+      + 'notifications on from there.</span></div>';
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    host.innerHTML = '<div class="push-note"><i class="ti ti-bell-off"></i><span>'
+      + 'Notifications are blocked for this site in your browser settings. '
+      + 'Allow them there and reload if you would like to be told about new bids.'
+      + '</span></div>';
+    return;
+  }
+  let sub = null;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    sub = await reg.pushManager.getSubscription();
+  } catch (e) { /* treat as not subscribed */ }
+  host.innerHTML = '<div class="push-note"><i class="ti ti-bell"></i>'
+    + '<span>' + (sub
+        ? 'Notifications are <b>on</b> for this device. You will be told when a new bid '
+          + 'invitation arrives, when we ask you a question, and when a round is decided.'
+        : 'Get told when a new bid invitation arrives, even when the portal is closed.')
+    + '</span>'
+    + '<button class="btn-ghost" onclick="' + (sub ? 'disablePush()' : 'enablePush()') + '">'
+    + (sub ? 'Turn off' : 'Turn on') + '</button></div>';
+}
+
+/* ⚠️ ONLY EVER FROM A CLICK. A portal that asks for notification permission on
+   load gets denied, and a denial is permanent until the vendor digs into
+   browser settings — there is no second chance to ask. */
+async function enablePush() {
+  if (!pushSupported()) return;
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { await renderPushRow(); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,                       // required; the SW always shows one
+      applicationServerKey: _b64uToU8(VAPID_PUBLIC_KEY),
+    });
+    await savePushSubscription(sub.toJSON());
+    msg('Notifications are on for this device.', 'success');
+  } catch (e) {
+    msg('Could not turn notifications on: ' + (e.message || e), 'error');
+  }
+  await renderPushRow();
+}
+
+async function disablePush() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      // Drop OUR row first: if unsubscribe() succeeds and the delete then fails,
+      // the endpoint is dead but still on file and every later push 410s.
+      try { await VendorDb.push.remove(sub.endpoint); } catch (e) {}
+      await sub.unsubscribe();
+    }
+    if (navigator.clearAppBadge) navigator.clearAppBadge();
+    msg('Notifications are off for this device.', 'info');
+  } catch (e) {
+    msg('Could not turn notifications off: ' + (e.message || e), 'error');
+  }
+  await renderPushRow();
+}
+
+async function savePushSubscription(json, oldEndpoint) {
+  if (!vendor || !json || !json.endpoint) return;
+  await VendorDb.push.save(vendor.id, {
+    endpoint: json.endpoint,
+    p256dh: (json.keys && json.keys.p256dh) || null,
+    auth: (json.keys && json.keys.auth) || null,
+    user_agent: navigator.userAgent.slice(0, 300),
+  }, myProfile, oldEndpoint);
+}
+
+/* The browser can rotate a subscription on its own; vendor-sw.js re-subscribes
+   and posts the new one here so the stored endpoint does not go stale. */
+navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', function (e) {
+  const d = e.data || {};
+  if (d.type === 'push-resubscribed' && d.subscription) {
+    savePushSubscription(d.subscription, d.oldEndpoint).catch(function () {});
+  }
+});
 
 function _bidCard(i) {
   const st = _bidStatusMeta(i);

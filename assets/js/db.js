@@ -4050,6 +4050,55 @@ const VendorDb = (() => {
     },
   };
 
+  /* ── Push subscriptions ──────────────────────────────────────────────────
+     2026-09-05_vendor_push.sql. One row per DEVICE that agreed to
+     notifications. RLS scopes every one of these to the caller's own vendor.
+     ⚠️ save() UPSERTS ON endpoint, which is unique. A browser reissues the same
+        endpoint for the same device, so a vendor who turns notifications on
+        twice gets one row, not two — and would otherwise be buzzed twice for
+        every event. */
+  const push = {
+    async save(vendorId, fields, profile, oldEndpoint) {
+      const sb = await getSB();
+      // A rotated subscription leaves the old endpoint on file; nothing would
+      // ever clean it up, and every later push to it would 410.
+      if (oldEndpoint && oldEndpoint !== fields.endpoint) {
+        try { await sb.from('vendor_push_subscriptions').delete().eq('endpoint', oldEndpoint); }
+        catch (e) { /* best effort */ }
+      }
+      const row = {
+        vendor_id: vendorId,
+        user_id: (profile && profile.id) || null,
+        last_seen_at: new Date().toISOString(),
+        ...fields,
+      };
+      const { data, error } = await sb.from('vendor_push_subscriptions')
+        .upsert(row, { onConflict: 'endpoint' }).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async remove(endpoint) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_push_subscriptions').delete().eq('endpoint', endpoint);
+      if (error) throw error;
+    },
+    /* Returns [] on ANY failure including "table does not exist" — the portal
+       must render before the migration is run. */
+    async list(vendorId) {
+      try {
+        const sb = await getSB();
+        const { data, error } = await sb.from('vendor_push_subscriptions')
+          .select('id,endpoint,user_agent,created_at').eq('vendor_id', vendorId);
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (_isMissingTable(e, 'vendor_push_subscriptions')) return [];
+        console.warn('[push.list]', e && e.message);
+        return [];
+      }
+    },
+  };
+
   const bidClarifications = {
     async forInvitation(invitationId) {
       const sb = await getSB();
@@ -4106,6 +4155,7 @@ const VendorDb = (() => {
     getVendorRates, addVendorRate, deleteVendorRate, upsertRate,
     getClassCodes, classCodeIndex, normClassCode,
     bidReference,
+    push,
     uploadCertFile, getCertFileUrl, deleteCertFile,
     documents: vendorDocuments, uploadVendorDoc, uploadVendorFile, requests: accreditationRequests, claims: vendorClaims, history: vendorHistory,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
