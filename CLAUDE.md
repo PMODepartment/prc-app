@@ -3086,6 +3086,36 @@ reinstate picks the right status, a garbage date is never "passed", a withdrawn 
 is absent from the comparison, and the BCB really is suppressed for a cost-hidden role.
 The print view was rendered and read back.
 
+### There is ONE registration link, and the per-vendor QR machinery is gone (2026-09-04)
+
+Asked whether a general QR/link exists so officers do not copy a different one per
+existing vendor. **It already did** — `2026-09-01_vendor_self_registration.sql` replaced
+per-vendor invites with one public URL, and `2026-09-03_vendor_claim_tin_only.sql` then
+removed the Vendor Code from the form, so `_regLinkFor()` ignores its argument and every
+path returns the same `vendor-register.html` with **no query string at all**. Nothing in
+it identifies a company, which is why it is safe on a PO, an RFQ or a notice.
+
+**But three vestiges still implied otherwise, and one was actively broken.**
+- **`bulkGenerateQr()` was writing N IDENTICAL QR images** into a ZIP — one per selected
+  vendor, all encoding the same URL — and *skipping* vendors with no Vendor Code, a rule
+  that stopped meaning anything when the code left the registration form. **Removed**,
+  along with `_loadJsZip()`, its only consumer.
+- The mail-merge CSV's `registration_link` column is the same value on every row. That is
+  correct and it stays (a merge needs it beside each address), but the header now says
+  **"(same for all)"** so nobody hunts for the per-vendor one.
+- The per-vendor **View QR / Copy link** in a vendor's profile stay — handy when you are
+  already looking at that vendor — and the modal already says *"It is the same code every
+  vendor uses."*
+
+**Where to find it:** Vendor Management → **Data Tools → Registration QR Code**. For
+mailing the existing directory in bulk: select vendors → **Mail-merge list (CSV)**.
+
+**⚠️ Do not reintroduce a per-vendor registration link or QR.** Registration is matched
+server-side on the TIN and company name the vendor types (`submit_vendor_claim`), so
+there is nothing per-vendor to encode — and a link that looked personal would imply an
+authority it does not carry. It is not a password: every claim still lands in Vendor
+Registrations for review.
+
 ## Claims & Change Orders (HIDDEN â€” not yet active)
 
 To re-enable: remove `style="display:none"` from sidebar section + tab button in `project.html`; Claims tab button in `index.html`; restore Claims/CO cards in template picker modals.
