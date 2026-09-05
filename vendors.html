@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260905f"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260905f"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260905f"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260905g"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260905g"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260905g"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260905f">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260905g">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1378,10 +1378,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260905f"></script>
-<script src="assets/js/db.js?v=20260905f"></script>
-<script src="assets/js/ui.js?v=20260905f"></script>
-<script src="assets/js/coachmarks.js?v=20260905f"></script>
+<script src="assets/js/auth.js?v=20260905g"></script>
+<script src="assets/js/db.js?v=20260905g"></script>
+<script src="assets/js/ui.js?v=20260905g"></script>
+<script src="assets/js/coachmarks.js?v=20260905g"></script>
 <script src="assets/js/vendor-guide.js?v=20260905c"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1429,6 +1429,13 @@ AppAuth.requireLogin((user, profile) => {
   loadAll().then(function () {
     // Deep link straight to a profile. Only now is allVendors populated.
     if (_vdBootVendor) openVendorPage(_vdBootVendor, { noPush: true });
+    /* ⚠️ THE TOUR STARTS HERE, INSIDE .then(), AND THAT IS LOAD-BEARING.
+       CoachTour freezes its step set at start() and skips anything not VISIBLE
+       right then. Started beside loadAll() instead of after it, the directory is
+       still behind #loading, so every step in the main content is invisible and
+       the tour opens on the first thing that is not — the sidebar. Seen live:
+       it began at "Step 8 of 9" on Vendor Registrations. */
+    startVendorGuidance();
   }).catch(function (e) {
     // Without this a rejected loadAll left the page on "Loading vendors…"
     // forever with nothing on screen explaining why.
@@ -1441,12 +1448,16 @@ AppAuth.requireLogin((user, profile) => {
       + '<button class="btn-cancel" style="margin-top:14px" onclick="location.reload()">Try again</button></div>';
   });
   configureVendorTour();
-  /* ⚠️ ONE auto-open, not two. The coach tour is the first-run experience — the
-     slide deck stays behind the "?" for anyone who wants to read rather than be
-     shown. Auto-opening both would stack two modals on a first login. */
-  if (window.CoachTour && CoachTour.available()) CoachTour.maybeAutoStart();
-  else if (typeof VendorGuide !== 'undefined') VendorGuide.maybeAutoOpen(profile.id);
 });
+
+/* ⚠️ ONE auto-open, not two. The coach tour is the first-run experience — the
+   slide deck stays behind the "?" for anyone who wants to read rather than be
+   shown. Auto-opening both would stack two modals on a first login.
+   Called from loadAll().then(), never beside it — see the note there. */
+function startVendorGuidance() {
+  if (window.CoachTour && CoachTour.available()) CoachTour.maybeAutoStart();
+  else if (typeof VendorGuide !== 'undefined' && profile) VendorGuide.maybeAutoOpen(profile.id);
+}
 
 /* ── the guided tour ─────────────────────────────────────────────────────────
    Points at the real directory rather than describing it. Steps whose element

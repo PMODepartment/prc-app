@@ -26,7 +26,16 @@
     var s = document.createElement('style');
     s.id = 'ct-css';
     s.textContent =
-      '.ct-spot{position:fixed;border-radius:10px;box-shadow:0 0 0 9999px rgba(15,16,22,.60);border:2px solid #EE3124;z-index:100000;pointer-events:none;transition:all .22s ease}' +
+      /* ⚠️ THE DIMMING IS FOUR SMALL PANELS, NOT ONE 9999px BOX-SHADOW SPREAD.
+         The shadow version asked the compositor for a layer thousands of pixels
+         wider than the screen on every step, and on a content-heavy page it
+         wedged the renderer outright — measured live on vendors.html, where a
+         screenshot timed out at 30s repeatedly with the shadow and returned
+         instantly without it, and the overlay painted as tiled copies of the
+         page. Four fixed rectangles around the target paint the identical
+         result at a fraction of the cost. Do not go back to the shadow. */
+      '.ct-spot{position:fixed;border-radius:10px;border:2px solid #EE3124;z-index:100000;pointer-events:none;transition:all .22s ease}' +
+      '.ct-dim{position:fixed;background:rgba(15,16,22,.60);z-index:99999;pointer-events:none}' +
       '.ct-card{position:fixed;z-index:100001;width:300px;max-width:calc(100vw - 24px);background:var(--surface,#fff);color:var(--text-primary,#231F20);border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.30);padding:16px 18px 14px;font-family:Montserrat,system-ui,sans-serif;transition:top .22s ease,left .22s ease}' +
       '.ct-card h4{margin:0 6px 6px 0;font-size:14px;font-weight:700;color:#EE3124}' +
       '.ct-card p{margin:0;font-size:12.5px;line-height:1.55;color:var(--text-secondary,#555)}' +
@@ -102,8 +111,16 @@
     try { return !!st.when(); } catch (e) { return false; }
   }
 
+  var _dims = [];
   function build() {
     injectCSS();
+    _dims = [];
+    for (var d = 0; d < 4; d++) {                 // top, bottom, left, right
+      var n = document.createElement('div');
+      n.className = 'ct-dim';
+      document.body.appendChild(n);
+      _dims.push(n);
+    }
     _spot = document.createElement('div'); _spot.className = 'ct-spot';
     _card = document.createElement('div'); _card.className = 'ct-card';
     document.body.appendChild(_spot); document.body.appendChild(_card);
@@ -116,7 +133,8 @@
     window.removeEventListener('resize', reposition, true);
     window.removeEventListener('scroll', reposition, true);
     document.removeEventListener('keydown', onKey, true);
-    [_spot, _card].forEach(function (n) { if (n && n.parentNode) n.parentNode.removeChild(n); });
+    [_spot, _card].concat(_dims).forEach(function (n) { if (n && n.parentNode) n.parentNode.removeChild(n); });
+    _dims = [];
     _spot = _card = null;
   }
   function onKey(e) {
@@ -208,6 +226,22 @@
     var h = r.height + pad * 2;
     _spot.style.top = top + 'px'; _spot.style.left = left + 'px';
     _spot.style.width = w + 'px'; _spot.style.height = h + 'px';
+    /* The four dim panels butt up against the spotlight. Written as explicit
+       px so they can never inherit a transition and lag the ring. */
+    if (_dims.length === 4) {
+      var vw = window.innerWidth, vh = window.innerHeight;
+      var bot = top + h, rgt = left + w;
+      _dims[0].style.cssText = 'position:fixed;background:rgba(15,16,22,.60);z-index:99999;'
+        + 'pointer-events:none;left:0;top:0;width:' + vw + 'px;height:' + Math.max(0, top) + 'px';
+      _dims[1].style.cssText = 'position:fixed;background:rgba(15,16,22,.60);z-index:99999;'
+        + 'pointer-events:none;left:0;top:' + bot + 'px;width:' + vw + 'px;height:'
+        + Math.max(0, vh - bot) + 'px';
+      _dims[2].style.cssText = 'position:fixed;background:rgba(15,16,22,.60);z-index:99999;'
+        + 'pointer-events:none;left:0;top:' + top + 'px;width:' + Math.max(0, left) + 'px;height:' + h + 'px';
+      _dims[3].style.cssText = 'position:fixed;background:rgba(15,16,22,.60);z-index:99999;'
+        + 'pointer-events:none;left:' + rgt + 'px;top:' + top + 'px;width:'
+        + Math.max(0, vw - rgt) + 'px;height:' + h + 'px';
+    }
     // On a phone the sheet is owned by CSS (see the media query above); clear
     // anything the desktop branch wrote so the two cannot fight.
     if (mob()) {
