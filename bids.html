@@ -352,8 +352,6 @@
       vertical-align:top;text-align:left}
     .cc-table thead th{background:var(--surface-2);font-weight:800;font-size:0.7143rem;
       position:sticky;top:0;z-index:2}
-    .cc-table thead .cc-sub th{top:auto;font-weight:700;color:var(--text-hint);
-      font-size:0.6786rem;text-transform:uppercase;letter-spacing:.03em}
     .cc-vh small{display:block;font-weight:600;color:var(--text-hint);margin-top:2px;
       text-transform:none;letter-spacing:0}
     /* ⚠️ The frozen first column needs an OPAQUE background of its own, or the
@@ -369,6 +367,20 @@
     .cc-qty{width:74px;white-space:nowrap;color:var(--text-secondary)}
     .cc-qty small{display:block;color:var(--text-hint)}
     .cc-cell{min-width:96px}
+    /* ⚠️ COMPACT MUST NARROW THE TABLE. The first cut only dropped the amount
+       sub-line inside a cell, which changed neither the width (set by the cell
+       minimum and the header) nor the row height (set by the item column) —
+       measured 2521px before and after, i.e. it did nothing. It now shrinks the
+       cells and strips the header detail down to the VAT chip, which is what
+       lets ten columns be read at once. */
+    .cc-dense-on{font-size:0.7143rem}
+    .cc-dense-on .cc-cell{min-width:66px}
+    .cc-dense-on .cc-stick{min-width:150px;max-width:190px}
+    .cc-dense-on .cc-stick small,.cc-dense-on .cc-qty small{display:none}
+    .cc-dense-on .cc-vh{max-width:120px}
+    .cc-dense-on .cc-vh small .cc-bad,.cc-dense-on .cc-vh small .cc-none{display:none}
+    .cc-dense-on th,.cc-dense-on td{padding:4px 6px}
+    .cc-dense-on .req-must{display:none}
     .cc-in{width:100%;padding:4px 6px;font-size:0.7857rem;text-align:right}
     .cc-basis{width:100%;margin-top:2px;padding:1px 2px;font-size:0.6786rem;
       color:var(--text-hint);border:none;background:transparent;text-align:right}
@@ -386,6 +398,10 @@
        small bold TEXT on the header band — below AA. Darker ink here; every
        green FILL (bars, tints, swatches) stays #2D9B6F so the palette holds. */
     .cc-good{color:#1E7A54;font-weight:700}
+    /* Neither clean nor blocking: every mandatory line met, something optional
+       short. Amber, because it is a caveat rather than a pass or a failure. */
+    .cc-warnish{color:#B45309;font-weight:700}
+    html.dark-mode .cc-warnish,body.dark-mode .cc-warnish{color:#F0B45C}
     .cc-bad{color:var(--mw-red-ink);font-weight:700}
     html.dark-mode .cc-good,body.dark-mode .cc-good{color:#5FD3A3}
     html.dark-mode .cc-low,body.dark-mode .cc-low{background:rgba(95,211,163,.14)}
@@ -397,6 +413,81 @@
     html.dark-mode .cc-met,body.dark-mode .cc-met{background:rgba(95,211,163,.13)}
     html.dark-mode .cc-partial,body.dark-mode .cc-partial{background:rgba(245,158,11,.15)}
     html.dark-mode .cc-not_met,body.dark-mode .cc-not_met{background:rgba(255,122,110,.15)}
+    /* Read-mode cells: two short lines of TEXT, which is what keeps a row at
+       ~34px instead of the 114px the all-inputs version produced. */
+    .cc-r{font-weight:700;text-align:right;white-space:nowrap}
+    .cc-a{font-size:0.7143rem;color:var(--text-hint);text-align:right;white-space:nowrap}
+    .cc-word{font-size:0.7143rem;font-weight:700;color:var(--mw-red-ink);text-align:right}
+    .cc-none{color:var(--text-hint);font-weight:600}
+    .cc-lowmark{color:#1E7A54;font-size:0.7857rem;margin-left:3px;vertical-align:-1px}
+    html.dark-mode .cc-lowmark,body.dark-mode .cc-lowmark{color:#5FD3A3}
+    .cc-verdict{font-weight:700}
+    .cc-in2{margin-top:3px}
+    /* The one column being edited is tinted, so it is obvious which bidder the
+       inputs belong to on a table this wide. */
+    .cc-editing{background:var(--mw-red-light,#FDECEA)}
+    html.dark-mode .cc-editing,body.dark-mode .cc-editing{background:rgba(255,122,110,.10)}
+    .cc-table thead th.cc-editing{background:var(--mw-red-mid,#FBD9D5)}
+    html.dark-mode .cc-table thead th.cc-editing,
+    body.dark-mode .cc-table thead th.cc-editing{background:rgba(255,122,110,.20)}
+    /* A band row names each half of the one table — priced lines, then the
+       technical requirements. Same idea as the WP grid's trade group rows. */
+    .cc-band td{background:#F3F3F3;font-size:0.7143rem;font-weight:800;letter-spacing:.05em;
+      text-transform:uppercase;color:var(--text-secondary);
+      border-top:2px solid var(--border-md);position:sticky;left:0}
+    .cc-band td span{margin-left:9px;font-weight:600;letter-spacing:0;text-transform:none;
+      color:var(--text-hint)}
+    html.dark-mode .cc-band td,body.dark-mode .cc-band td{background:#3a3a3a}
+    .cc-tot-net td{border-top:none}
+    .cc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 4px}
+    .cc-bar-sp{flex:1}
+    .cc-mode{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+    .cc-mode label{font-size:0.7143rem;font-weight:800;letter-spacing:.04em;
+      text-transform:uppercase;color:var(--text-hint)}
+    .cc-mode select{width:auto;min-width:170px;padding:5px 8px;font-size:0.8125rem}
+    .cc-hint{margin-top:2px}
+    .cc-hidden-note{margin-top:2px}
+    .cc-dense{display:inline-flex;align-items:center;gap:5px;font-size:0.7857rem;
+      color:var(--text-secondary);cursor:pointer}
+    .cc-dense input{width:auto}
+    /* The bidder column picker. A <details> so it needs no outside-click
+       handler of its own. */
+    .cc-cols{position:relative}
+    .cc-cols summary{cursor:pointer;font-size:0.7857rem;padding:5px 9px;border-radius:7px;
+      border:1.5px solid var(--border-md);background:var(--surface);list-style:none}
+    .cc-cols summary::-webkit-details-marker{display:none}
+    .cc-cols summary:hover{border-color:var(--mw-red);color:var(--mw-red-ink)}
+    .cc-cols-pop{position:absolute;z-index:30;top:calc(100% + 5px);left:0;min-width:290px;
+      background:var(--surface);border:1px solid var(--border-md);border-radius:10px;
+      box-shadow:0 10px 26px rgba(0,0,0,.16);padding:8px;max-height:340px;overflow-y:auto}
+    .cc-cols-pop label{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;
+      font-size:0.8125rem;cursor:pointer}
+    .cc-cols-pop label:hover{background:var(--mw-red-light,#FDECEA)}
+    .cc-cols-pop label span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cc-cols-pop label b{font-size:0.75rem;color:var(--text-secondary);white-space:nowrap}
+    .cc-cols-pop label input{width:auto}
+    .cc-sl{font-style:normal;font-size:0.6429rem;font-weight:800;letter-spacing:.04em;
+      text-transform:uppercase;background:var(--surface-2);color:var(--text-hint);
+      border-radius:5px;padding:1px 5px}
+    .cc-cols-act{display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
+    /* VAT basis, wherever an amount is shown. Muted when it is only inherited
+       from the round, so an unconfirmed basis does not read as a fact. */
+    .vat-chip{display:inline-block;font-size:0.6429rem;font-weight:800;letter-spacing:.03em;
+      background:var(--surface-2);color:var(--text-secondary);border-radius:5px;padding:1px 5px}
+    .vat-chip-assumed{opacity:.62;font-weight:700}
+    /* Present mode: the same table, bigger, with the chrome out of the way. */
+    body.cc-present .sidebar,body.cc-present .topbar,body.cc-present .bid-nav,
+    body.cc-present .panel:not(#bp-costcompare),body.cc-present .cc-bar,
+    body.cc-present .cc-hint{display:none!important}
+    body.cc-present .main{margin-left:0!important}
+    body.cc-present .content{padding:14px!important}
+    body.cc-present #bp-costcompare{margin:0}
+    body.cc-present .cc-table{font-size:1rem}
+    body.cc-present .cc-table th,body.cc-present .cc-table td{padding:10px 12px}
+    body.cc-present .cc-a{font-size:0.8571rem}
+    body.cc-present .cc-wrap{max-height:none}
+    #cc-present-exit{position:fixed;right:16px;bottom:16px;z-index:400}
+    body:not(.cc-present) #cc-present-exit{display:none}
     .req-must{display:inline-block;font-size:0.6429rem;font-weight:800;letter-spacing:.04em;
       text-transform:uppercase;background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);
       border-radius:5px;padding:1px 6px;margin-top:3px}
@@ -1577,10 +1668,15 @@ function bcbStrip() {
 }
 /* One amount measured against the budget. Empty string when there is no BCB, so
    callers can drop it in without guarding. */
-function vsBcbHtml(amount) {
+/* ⚠️ THE BCB IS VAT-EXCLUSIVE, so the figure measured against it must be too.
+   Pass the invitation and the amount is netted first; omit it (a figure already
+   net, e.g. a total the caller has converted) and it is used as given. */
+function vsBcbHtml(amount, inv) {
   const b = bcbOf();
   if (!b || amount == null || amount === '') return '';
-  const d = b - Number(amount);
+  const net = inv ? netOf(amount, inv) : Number(amount);
+  if (net == null) return '';
+  const d = b - net;
   const pct = Math.abs(d / b) * 100;
   return d >= 0
     ? '<span class="nv-under">' + esc(money(d)) + ' under · ' + pct.toFixed(1) + '%</span>'
@@ -1788,7 +1884,7 @@ function renderRound() {
     + phaseSection('Solicited', '',
         responsesPanel() + clarifyPanel())
     + phaseSection('Evaluated', '',
-        comparisonPanel() + costComparePanel() + techComparePanel()
+        comparisonPanel() + costComparePanel()
         + evaluationPanel() + negotiationPanel() + negotiationViz())
     + phaseSection('Awarded', '',
         awardPanel());
@@ -1874,6 +1970,20 @@ function askPanel() {
     + '<input id="a-boq" value="' + esc(R.boq_note || '') + '" placeholder="BOQ reference"' + ro + '></div>'
     + '<div class="field"><label>Payment terms</label>'
     + '<input id="a-terms" value="' + esc(R.payment_terms || '') + '" placeholder="e.g. 30% DP, 70% on delivery"' + ro + '></div>'
+    /* ⚠️ WHAT THE LETTER ASKS FOR, WHICH IS NOT WHAT EVERY BIDDER SENDS. The
+       template says quotations are VAT-inclusive, so that is the default; a
+       bidder who quotes on another basis is set individually where their offer
+       is recorded. Everything is compared net, because the BCB is net. */
+    + '<div class="field"><label>Quotations are</label><select id="a-tax"' + ro + '>'
+    + VAT_BASES.map(function (t) {
+        return '<option value="' + t[0] + '"' + (roundBasis() === t[0] ? ' selected' : '') + '>'
+          + t[1] + ' — ' + t[2] + '</option>';
+      }).join('')
+    + '</select></div>'
+    + '<div class="field"><label>VAT rate</label>'
+    + '<input id="a-vat" type="number" step="0.1" min="0" max="100" value="'
+    + esc(Math.round(roundVatRate() * 1000) / 10) + '" placeholder="12"' + ro + '>'
+    + '<span class="field-hint">Per cent. 12 in the Philippines; zero-rated and exempt work differs.</span></div>'
     + '<div class="field"><label>Contact person</label>'
     + '<input id="a-contact" value="' + esc(R.contact_person || '') + '"' + ro + '></div>'
     + '<div class="field"><label>Contact email</label>'
@@ -1892,6 +2002,9 @@ async function saveAsk() {
   try {
     R = await VendorDb.bidRounds.update(R.id, {
       doc_type: val('a-doc') || 'RFQ',
+      tax_basis: val('a-tax') || 'vat_inclusive',
+      // Entered as a percentage, stored as a fraction — like dp_percent.
+      vat_rate: (function () { const v = num(val('a-vat')); return v == null ? 0.12 : v / 100; })(),
       bid_due_at: fromLocalInput(val('a-due')),
       prebid_at: fromLocalInput(val('a-prebid')),
       scope_note: val('a-scope') || null,
@@ -2572,6 +2685,10 @@ function _pendingQuoteRows() {
         + '<input id="rq-l-' + i.id + '" type="number" placeholder="Lead time (days)" '
         + 'style="flex:0 0 140px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;'
         + 'font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+        /* The basis this vendor actually quoted on. Left as asked unless they
+           say otherwise — a non-VAT vendor is common and their figure is not on
+           the round's basis however clearly the letter asked. */
+        + '<span style="flex:0 0 190px">' + vatSelect('rq-t-' + i.id, '', false) + '</span>'
         + '<label class="btn btn-sm" style="cursor:pointer" title="Attach the quotation you were sent">'
         + '<i class="ti ti-paperclip"></i> Attach'
         + '<input type="file" style="display:none" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx" '
@@ -2585,6 +2702,7 @@ async function recordQuote(id) {
   try {
     await VendorDb.bidBoard.update(id, {
       offer_amount: amt,
+      tax_basis: val('rq-t-' + id) || null,   // null = follow the round
       lead_time_days: num(val('rq-l-' + id)),
       status: 'submitted',
       submitted_at: new Date().toISOString(),
@@ -2750,6 +2868,11 @@ function comparisonPanel() {
   const rows = bidsInPlay().slice().sort((a, b) => (a.offer_amount || 0) - (b.offer_amount || 0));
   if (!rows.length) return '';
   const low = rows[0].offer_amount;
+  // Lowest on the comparable basis, which is not always the lowest as quoted.
+  const lowNet = Math.min.apply(null, rows.map(function (i) {
+    const n = netOf(i.offer_amount, i);
+    return n == null ? Infinity : n;
+  }));
   const w = WPBYID[R.wp_id] || {};
   // ⚠️ The BCB is OURS and is shown to staff only — it is deliberately absent
   //    from every vendor-facing surface (see the migration's view).
@@ -2763,6 +2886,10 @@ function comparisonPanel() {
     + '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
     + _cmpTh('vendor_name', 'Bidder', 'left')
     + _cmpTh('offer_amount', 'Offer', 'right')
+    /* ⚠️ THE ONLY HONEST BASIS FOR COMPARING TWO BIDDERS. One may be VAT-
+       inclusive, another non-VAT registered; ranking on the quoted figure ranks
+       them on numbers that were never the same thing. */
+    + '<th style="text-align:right">Net of VAT</th>'
     + '<th style="text-align:right">vs lowest</th>'
     + (bcb ? '<th style="text-align:right">vs BCB</th>' : '')
     + _cmpTh('lead_time_days', 'Lead time', 'left')
@@ -2770,15 +2897,19 @@ function comparisonPanel() {
     + _cmpTh('payment_terms', 'Payment terms', 'left')
     + '</tr></thead><tbody>'
     + _cmpApplySort(rows).map((i, n) => {
-        const diff = (i.offer_amount || 0) - low;
-        const vsB = bcb ? (i.offer_amount || 0) - bcb : null;
+        // Ranked and measured on net, for the reason in the header comment.
+        const net = netOf(i.offer_amount, i);
+        const diff = (net || 0) - lowNet;
+        const vsB = bcb ? (net || 0) - bcb : null;
         return '<tr><td><b>' + esc(i.vendor_name) + '</b>'
           // ⚠️ Keyed to the AMOUNT, not to the row position. Once the table
           //    can be sorted by lead time the first row is not the cheapest, and
           //    a "lowest" chip sitting on it would simply be a lie.
-          + ((i.offer_amount || 0) === low ? ' <span class="bm-low">lowest</span>' : '') + '</td>'
-          + '<td style="text-align:right"><b>' + esc(money(i.offer_amount, i.offer_currency)) + '</b></td>'
-          + '<td style="text-align:right">' + (diff ? '+' + esc(money(diff, i.offer_currency)) : '—') + '</td>'
+          + (net != null && Math.abs(net - lowNet) < 0.5 ? ' <span class="bm-low">lowest net</span>' : '')
+          + '<div>' + vatChip(i) + '</div></td>'
+          + '<td style="text-align:right">' + esc(money(i.offer_amount, i.offer_currency)) + '</td>'
+          + '<td style="text-align:right"><b>' + esc(money(net, i.offer_currency)) + '</b></td>'
+          + '<td style="text-align:right">' + (diff > 0.5 ? '+' + esc(money(diff, i.offer_currency)) : '—') + '</td>'
           + (bcb ? '<td style="text-align:right" class="' + (vsB > 0 ? 'bm-high' : 'bm-low') + '">'
               + (vsB > 0 ? '+' : '') + esc(money(vsB)) + '</td>' : '')
           + '<td>' + (i.lead_time_days != null ? i.lead_time_days + ' d' : '—') + '</td>'
@@ -2830,7 +2961,9 @@ function evaluationPanel() {
               + '<div style="font-size:0.8125rem;font-weight:700">'
               + (s.blocked ? '<span class="cc-bad">' + s.blocked + ' mandatory not met</span>'
                  : (s.unanswered ? '<span class="bm-high">' + s.unanswered + ' unanswered</span>'
-                    : '<span class="cc-good">meets every line</span>'))
+                    : (s.met + s.na === s.total
+                       ? '<span class="cc-good">meets every line</span>'
+                       : '<span class="cc-warnish">all mandatory met</span>')))
               + '</div><small style="color:var(--text-hint)">' + s.met + ' of ' + s.total + ' met</small></div>';
           })() : '')
         + '<div class="bm-cell" style="flex:0 0 220px"><label class="bm-cl" for="ev-c-' + i.id + '">Meets the technical requirements</label>'
@@ -3259,90 +3392,174 @@ async function removeReq(id) {
   } catch (e) { AppNotify.fromError(e, 'Could not remove that requirement'); }
 }
 
-/* ── the technical comparison ─────────────────────────────────────────────── */
-function techComparePanel() {
-  const rows = bidsInPlay();
-  if (!rows.length) return '';
-  const ro = !canManage || R.stage === 'awarded' || R.stage === 'cancelled';
-  if (!REQS.length) {
-    return '<div class="panel" id="bp-tech"><div class="panel-title">Technical comparison</div>'
-      + '<div class="empty-state"><i class="ti ti-checklist"></i>'
-      + '<b>No technical requirements on this round</b>'
-      + 'Add them under <b>Documents and priced items</b> and every bidder can be marked against them here.</div>'
-      + '</div>';
-  }
-  const head = '<tr><th class="cc-stick">Requirement</th>'
-    + rows.map(function (i) {
-        const s = techScore(i.id);
-        return '<th class="cc-vh">' + esc(i.vendor_name)
-          + '<small>' + (s.blocked
-              ? '<span class="cc-bad">' + s.blocked + ' mandatory not met</span>'
-              : (s.unanswered ? s.unanswered + ' unanswered'
-                              : '<span class="cc-good">meets every line</span>')) + '</small></th>';
-      }).join('') + '</tr>';
-  const body = REQS.map(function (q) {
-    return '<tr><td class="cc-stick"><b>' + esc(q.requirement) + '</b>'
-      + (q.mandatory ? '<span class="req-must">Mandatory</span>' : '')
-      + (q.detail ? '<small>' + esc(q.detail) + '</small>' : '')
-      + '</td>'
-      + rows.map(function (i) {
-          const r = reqResult(i.id, q.id) || {};
-          const v = r.result || '';
-          return '<td class="cc-cell cc-' + (v || 'none') + '">'
-            + '<select id="tc-' + i.id + '-' + q.id + '" class="bm-in cc-sel"' + (ro ? ' disabled' : '') + '>'
-            + REQ_RESULTS.map(function (o) {
-                return '<option value="' + o[0] + '"' + (v === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
-              }).join('')
-            + '</select>'
-            + '<input id="tn-' + i.id + '-' + q.id + '" class="bm-in cc-note" value="' + esc(r.note || '') + '"'
-            + (ro ? ' disabled' : '') + ' placeholder="What they offered">'
-            + '</td>';
-        }).join('')
-      + '</tr>';
-  }).join('');
-  const summary = '<tr class="cc-tot"><td class="cc-stick">Summary</td>'
-    + rows.map(function (i) {
-        const s = techScore(i.id);
-        return '<td class="cc-cell">' + s.met + ' met'
-          + (s.partial ? ' \u00b7 ' + s.partial + ' partial' : '')
-          + (s.notMet ? ' \u00b7 ' + s.notMet + ' not met' : '')
-          + (s.unanswered ? ' \u00b7 ' + s.unanswered + ' unanswered' : '')
-          + '</td>';
-      }).join('') + '</tr>';
-  return '<div class="panel" id="bp-tech"><div class="panel-title">Technical comparison</div>'
-    + '<div class="sec-note">Every bidder against every line of the TOR. A <b>mandatory</b> line '
-    + 'not met disqualifies the bid whatever it costs.</div>'
-    + '<div class="cc-wrap"><table class="cc-table"><thead>' + head + '</thead>'
-    + '<tbody>' + body + summary + '</tbody></table></div>'
-    + (ro ? '' : '<div class="bm-actions"><button class="btn btn-primary" onclick="saveTechCompare()">'
-        + '<i class="ti ti-device-floppy"></i> Save technical comparison</button></div>')
-    + '</div>';
+/* ══ VAT — what a quoted figure actually MEANS ══════════════════════════════
+   2026-09-05_bid_vat_basis.sql.
+
+   ⚠️⚠️ THIS FIXED A LIVE 12% ERROR, it is not a nicety. Megawide's own RFQ
+      template says "The price indicated in the quotation shall be inclusive of
+      VAT", so bidders quote GROSS — while everything the figure is measured
+      against and written into is NET:
+        · approved_budget_bcb  — the sheets head it "BUDGET (BCB) (NET)"
+        · awarded_cost         — the WP form labels it "Awarded Cost (Net)"
+      So doAward() was writing a VAT-inclusive figure into a VAT-exclusive
+      column, overstating cost — and every savings figure, KPI and variance
+      derived from it — by the VAT rate, on every package awarded here.
+
+   ⚠️ NET IS DERIVED, NEVER STORED. A stored net goes stale the moment somebody
+      corrects a basis, leaving two disagreeing numbers and nothing to say which
+      is right. The single exception is work_packages.awarded_cost, which is the
+      record of the award rather than a working figure.
+
+   ⚠️ NON-VAT IS TREATED AS ALREADY NET, on a stated assumption: input VAT on a
+      VAT-registered vendor's invoice is creditable against Megawide's output
+      VAT, so a gross 112 and a non-VAT 100 cost the same 100. The CASH differs
+      (112 vs 100) and the PO carries the gross, which is why both figures are
+      shown rather than only the one the ranking uses. */
+const VAT_BASES = [
+  ['vat_inclusive', 'VAT-inclusive', 'the quoted figure already includes VAT'],
+  ['vat_exclusive', 'VAT-exclusive', 'VAT is added on top of the quoted figure'],
+  ['non_vat',       'Non-VAT / exempt', 'the vendor is not VAT-registered'],
+];
+function vatLabel(b) {
+  const f = VAT_BASES.find(function (x) { return x[0] === b; });
+  return f ? f[1] : 'VAT-inclusive';
 }
-async function saveTechCompare() {
-  try {
-    for (const i of bidsInPlay()) {
-      for (const q of REQS) {
-        const v = val('tc-' + i.id + '-' + q.id);
-        const n = val('tn-' + i.id + '-' + q.id);
-        const cur = reqResult(i.id, q.id);
-        // Nothing to write for a cell nobody has touched — an empty verdict
-        // with an empty note is the absence of an answer, not an answer.
-        if (!v && !n && !cur) continue;
-        await VendorDb.bidComparison.setResult(i.id, q.id, { result: v || null, note: n || null }, profile);
-      }
-    }
-    await reloadComparison();
-    renderRound();
-    AppNotify.success('Technical comparison saved.');
-  } catch (e) { AppNotify.fromError(e, 'Could not save the technical comparison'); }
+function roundBasis() { return R && R.tax_basis ? R.tax_basis : 'vat_inclusive'; }
+function roundVatRate() { return (R && R.vat_rate != null) ? Number(R.vat_rate) : 0.12; }
+/* ⚠️ NULL on the invitation means "follow the round" — it is deliberately not
+   defaulted in the database, so a bidder nobody has confirmed reads as
+   unconfirmed rather than as agreeing with the letter. */
+function invBasis(i) { return (i && i.tax_basis) ? i.tax_basis : roundBasis(); }
+function invRate(i) { return (i && i.vat_rate != null) ? Number(i.vat_rate) : roundVatRate(); }
+function invBasisConfirmed(i) { return !!(i && i.tax_basis); }
+
+/* The VAT-exclusive figure — the basis the BCB, awarded_cost and every KPI in
+   this app are on. THE ONLY FIGURE ANYTHING SHOULD BE RANKED OR MEASURED ON. */
+function netOf(amount, i) {
+  if (amount == null || amount === '') return null;
+  const v = Number(amount);
+  if (!isFinite(v)) return null;
+  const b = invBasis(i);
+  if (b !== 'vat_inclusive') return v;      // vat_exclusive and non_vat are already net
+  const r = invRate(i);
+  return r > -1 ? v / (1 + r) : v;
+}
+/* What the PO will say and what Megawide actually pays out. */
+function grossOf(amount, i) {
+  if (amount == null || amount === '') return null;
+  const v = Number(amount);
+  if (!isFinite(v)) return null;
+  return invBasis(i) === 'vat_exclusive' ? v * (1 + invRate(i)) : v;
+}
+/* The figure on record for a bidder: negotiated if there is one, else the offer. */
+function standing(i) {
+  if (!i) return null;
+  const v = (i.negotiated_amount != null && i.negotiated_amount !== '')
+    ? i.negotiated_amount : i.offer_amount;
+  return (v == null || v === '') ? null : Number(v);
+}
+function netStanding(i) { return netOf(standing(i), i); }
+
+function vatChip(i) {
+  const b = invBasis(i);
+  const pct = Math.round(invRate(i) * 1000) / 10;
+  const txt = b === 'vat_inclusive' ? 'VAT-in ' + pct + '%'
+            : b === 'vat_exclusive' ? 'VAT-ex +' + pct + '%'
+            : 'Non-VAT';
+  return '<span class="vat-chip' + (invBasisConfirmed(i) ? '' : ' vat-chip-assumed') + '" title="'
+    + (invBasisConfirmed(i) ? 'Confirmed for this bidder' : 'Not confirmed — following the round')
+    + '">' + esc(txt) + '</span>';
+}
+/* A basis select for one bidder. Blank = follow the round, which is what NULL
+   means in the database. */
+function vatSelect(id, cur, ro) {
+  return '<select id="' + id + '" class="bm-in"' + (ro ? ' disabled' : '') + '>'
+    + '<option value=""' + (cur ? '' : ' selected') + '>As asked (' + esc(vatLabel(roundBasis())) + ')</option>'
+    + VAT_BASES.map(function (o) {
+        return '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+      }).join('')
+    + '</select>';
 }
 
-/* ── the cost comparison, line by line ───────────────────────────────────────
-   The workbook's shape: one row per priced item, one column block per bidder,
-   holding the RATE and the AMOUNT. Rate is what makes two bids comparable when
-   they quote different quantities; amount is what they actually charge.
-   ⚠️ The lowest rate on a line is marked, but nothing here declares the lowest
-      TOTAL the winner — that is what the technical comparison is for. */
+/* ⚠️ TEN BIDDERS DO NOT FIT SIDE BY SIDE, AND THAT IS NOT HYPOTHETICAL — the
+   4PH Busducts round went out to EIGHT and its Final sheet compares five. The
+   workbook's own answer is that the comparison NARROWS, so the panel does the
+   same rather than rendering a 1,500px table nobody can read across.
+
+   The rule always INCLUDES the lowest net bidder, so "lowest" marked inside the
+   shown set can never be contradicted by something hidden. */
+const CC_AUTO_MAX = 6;
+let _ccShow = null;      // null = automatic · else a Set of invitation ids
+let _ccCompact = false;  // rate / verdict only, for when you do want all ten
+
+function _ccAuto(all) {
+  if (all.length <= CC_AUTO_MAX) return all.map(function (i) { return i.id; });
+  const byNet = all.slice().sort(function (a, b) {
+    const x = netStanding(a), y = netStanding(b);
+    return (x == null ? Infinity : x) - (y == null ? Infinity : y);
+  });
+  const short = all.filter(function (i) { return i.shortlisted; });
+  const keep = short.length ? short.map(function (i) { return i.id; })
+                            : byNet.slice(0, CC_AUTO_MAX).map(function (i) { return i.id; });
+  // The cheapest on the comparable basis is never hidden.
+  const lowest = byNet[0];
+  if (lowest && keep.indexOf(lowest.id) < 0) keep.push(lowest.id);
+  return keep;
+}
+function _ccVisible(all) {
+  const keep = _ccShow ? all.filter(function (i) { return _ccShow.has(i.id); }) : null;
+  if (keep && keep.length) return keep;
+  const ids = _ccAuto(all);
+  return all.filter(function (i) { return ids.indexOf(i.id) >= 0; });
+}
+function ccToggleBidder(id) {
+  const all = bidsInPlay();
+  if (!_ccShow) _ccShow = new Set(_ccAuto(all));
+  if (_ccShow.has(id)) { if (_ccShow.size > 1) _ccShow.delete(id); }
+  else _ccShow.add(id);
+  renderRound();
+}
+function ccShowAll() { _ccShow = new Set(bidsInPlay().map(function (i) { return i.id; })); renderRound(); }
+function ccShowAuto() { _ccShow = null; renderRound(); }
+function ccSetCompact(on) { _ccCompact = !!on; renderRound(); }
+function ccBidderMenu() {
+  const all = bidsInPlay();
+  if (all.length <= CC_AUTO_MAX && !_ccShow) return '';
+  const vis = _ccVisible(all);
+  const isVis = function (i) { return vis.indexOf(i) >= 0; };
+  return '<div class="cc-cols"><details><summary>Bidders shown: <b>' + vis.length + ' of ' + all.length
+    + '</b></summary><div class="cc-cols-pop">'
+    + all.map(function (i) {
+        return '<label><input type="checkbox"' + (isVis(i) ? ' checked' : '')
+          + ' onchange="ccToggleBidder(&#39;' + esc(i.id) + '&#39;)">'
+          + '<span>' + esc(i.vendor_name) + '</span>'
+          + (i.shortlisted ? '<i class="cc-sl">shortlisted</i>' : '')
+          + '<b>' + esc(_amt(netStanding(i))) + '</b></label>';
+      }).join('')
+    + '<div class="cc-cols-act"><button class="btn btn-sm" onclick="ccShowAll()">Show all</button>'
+    + '<button class="btn btn-sm" onclick="ccShowAuto()">Auto</button></div>'
+    + '</div></details></div>';
+}
+
+/* ── ONE comparison: the priced lines and the technical requirements ─────────
+   ⚠️⚠️ COST AND TECHNICAL ARE THE SAME TABLE, NOT TWO PANELS. They were built
+      as two, and that was wrong twice over: Megawide's own cost-comparison
+      workbooks carry the commercial and technical attribute rows (downpayment,
+      payment terms, warranty, IP rating, brand) UNDER the priced lines in one
+      sheet, one column per bidder — and reading a bidder's price in one panel
+      and their compliance in another is exactly the split that lets a cheaper
+      non-compliant bid look like the winner.
+
+   ⚠️ READ FIRST, EDIT ONE BIDDER AT A TIME. The first cut made every cell an
+      input: EIGHT boxes per row, rows at 114px of mostly empty space, one
+      bidder barely on screen, and a panel that read as a spreadsheet to fill in
+      rather than a comparison to read. It is plain text by default, and the
+      picker turns exactly ONE column into inputs — which is also how the work
+      is done, transcribing from one quotation at a time. */
+let _ccEdit = null;   // null = reading · 'budget' = our rates · else an invitation id
+
+function ccSetEdit(v) { _ccEdit = v || null; renderRound(); }
+
 function _lowRate(itemId, rows) {
   let low = null;
   rows.forEach(function (i) {
@@ -3354,38 +3571,90 @@ function _lowRate(itemId, rows) {
   });
   return low;
 }
+/* A rate reads plainly; it is not money-with-a-currency, and prefixing every one
+   with PHP across a wide table is noise. */
+function _rate(v) {
+  if (v == null || v === '') return '\u2014';
+  const n = Number(v);
+  return isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '\u2014';
+}
+function _amt(v) {
+  if (v == null || v === '') return '';
+  return Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+function _basisWord(st) {
+  return st === 'included' ? 'included' : st === 'excluded' ? 'excluded'
+       : st === 'no_bid' ? 'no bid' : '';
+}
+const REQ_SHORT = { met: 'Met', partial: 'Partial', not_met: 'Not met', na: 'N/A' };
+
 function costComparePanel() {
-  const rows = bidsInPlay();
-  if (!rows.length) return '';
-  const ro = !canManage || R.stage === 'awarded' || R.stage === 'cancelled';
-  if (!REFITEMS.length) {
-    return '<div class="panel" id="bp-costcompare"><div class="panel-title">Cost comparison</div>'
+  const allRows = bidsInPlay();
+  if (!allRows.length) return '';
+  const rows = _ccVisible(allRows);
+  const locked = !canManage || R.stage === 'awarded' || R.stage === 'cancelled';
+  if (locked) _ccEdit = null;
+  if (!REFITEMS.length && !REQS.length) {
+    return '<div class="panel" id="bp-costcompare"><div class="panel-title">Cost &amp; technical comparison</div>'
       + '<div class="empty-state"><i class="ti ti-table"></i>'
-      + '<b>No priced items on this round</b>'
-      + 'Add the lines under <b>Documents and priced items</b> and each bidder rate can be compared here.</div>'
+      + '<b>Nothing to compare against yet</b>'
+      + 'Add the priced lines and the technical requirements under <b>Documents and priced items</b>.</div>'
       + '</div>';
   }
   const showBudget = !window.__hideBudget;
-  const head = '<tr><th class="cc-stick">Item</th>'
+  const editingBudget = _ccEdit === 'budget';
+  const editingInv = _ccEdit && _ccEdit !== 'budget' ? _ccEdit : null;
+  const nCols = 2 + (showBudget ? 1 : 0) + rows.length;
+
+  const picker = locked ? '' :
+      '<div class="cc-mode"><label for="cc-edit">Enter answers for</label>'
+    + '<select id="cc-edit" class="bm-in" onchange="ccSetEdit(this.value)">'
+    + '<option value=""' + (_ccEdit ? '' : ' selected') + '>\u2014 reading \u2014</option>'
+    + (showBudget ? '<option value="budget"' + (editingBudget ? ' selected' : '') + '>Budget (our rates)</option>' : '')
+    + rows.map(function (i) {
+        return '<option value="' + esc(i.id) + '"' + (editingInv === i.id ? ' selected' : '') + '>'
+          + esc(i.vendor_name) + '</option>';
+      }).join('')
+    + '</select>'
+    + (_ccEdit ? '<button class="btn btn-primary btn-sm" onclick="saveComparison()">'
+        + '<i class="ti ti-device-floppy"></i> Save</button>'
+        + '<button class="btn btn-sm" onclick="ccSetEdit(&#39;&#39;)">Done</button>' : '')
+    + '</div>';
+
+  const head = '<tr><th class="cc-stick">Item / requirement</th>'
     + '<th class="cc-qty">Qty</th>'
-    + (showBudget ? '<th class="cc-vh cc-budcol">Budget<small>our rate</small></th>' : '')
+    + (showBudget ? '<th class="cc-vh cc-budcol">Budget<small>our rate &middot; VAT-ex</small></th>' : '')
     + rows.map(function (i) {
         const pt = pricedTotal(i.id);
-        const gap = (pt.total != null && i.offer_amount != null)
-          ? Number(i.offer_amount) - pt.total : null;
-        return '<th class="cc-vh" colspan="2">' + esc(i.vendor_name)
-          + '<small>' + (pt.total == null ? 'no lines priced'
-              : esc(money(pt.total, i.offer_currency))
+        const ts = REQS.length ? techScore(i.id) : null;
+        const gap = (pt.total != null && standing(i) != null) ? standing(i) - pt.total : null;
+        return '<th class="cc-vh' + (editingInv === i.id ? ' cc-editing' : '') + '">' + esc(i.vendor_name)
+          + '<small>' + vatChip(i)
+          + (pt.total == null ? ' <span class="cc-none">no lines priced</span>'
+              : ' ' + esc(_amt(pt.total))
                 + (gap != null && Math.abs(gap) > 0.5
-                    ? ' <span class="cc-bad">' + (gap > 0 ? '+' : '\u2212')
-                      + esc(money(Math.abs(gap), i.offer_currency)) + ' vs quote</span>'
-                    : '')) + '</small></th>';
-      }).join('') + '</tr>'
-    + '<tr class="cc-sub"><th class="cc-stick"></th><th class="cc-qty"></th>'
-    + (showBudget ? '<th class="cc-budcol">Rate</th>' : '')
-    + rows.map(function () { return '<th>Rate</th><th>Amount</th>'; }).join('') + '</tr>';
+                    ? ' <span class="cc-bad" title="The lines do not add up to the quoted figure">'
+                      + (gap > 0 ? '+' : '\u2212') + esc(_amt(Math.abs(gap))) + ' vs quote</span>' : ''))
+          /* ⚠️ "meets every line" MUST MEAN EVERY LINE. `blocked` counts only
+             MANDATORY failures, so reading it as full compliance told a reader
+             a bidder met everything while it carried a Partial on a preferred
+             line — seen live. A clean bid is met + n/a across the whole list. */
+          + (ts ? '<br>' + (ts.blocked
+              ? '<span class="cc-bad">' + ts.blocked + ' mandatory not met</span>'
+              : (ts.unanswered ? '<span class="cc-none">' + ts.unanswered + ' unanswered</span>'
+                 : (ts.met + ts.na === ts.total
+                    ? '<span class="cc-good">meets every line</span>'
+                    : '<span class="cc-warnish">all mandatory met</span>'))) : '')
+          + '</small></th>';
+      }).join('') + '</tr>';
 
-  const body = REFITEMS.map(function (it) {
+  function band(txt, sub) {
+    return '<tr class="cc-band"><td colspan="' + nCols + '">' + esc(txt)
+      + (sub ? '<span>' + esc(sub) + '</span>' : '') + '</td></tr>';
+  }
+
+  /* ── the priced lines ──────────────────────────────────────────────────── */
+  const itemRows = !REFITEMS.length ? '' : REFITEMS.map(function (it, rowIdx) {
     const low = _lowRate(it.id, rows);
     const b = ITEMBUDGET[it.id] || {};
     return '<tr><td class="cc-stick"><b>' + esc((it.item_no ? it.item_no + '. ' : '') + it.description) + '</b>'
@@ -3394,62 +3663,363 @@ function costComparePanel() {
       + '<td class="cc-qty">' + (it.quantity == null ? '\u2014' : Number(it.quantity).toLocaleString())
       + (it.unit ? '<small>' + esc(it.unit) + '</small>' : '') + '</td>'
       + (showBudget
-          ? '<td class="cc-budcol"><input ' + moneyAttrs('cb-' + it.id, b.budget_rate, 'rate')
-            + ' class="bm-in cc-in"' + (ro ? ' disabled' : '') + '></td>' : '')
+          ? '<td class="cc-budcol">' + (editingBudget
+              ? '<input ' + moneyAttrs('cb-' + it.id, b.budget_rate, 'rate')
+                + ' class="bm-in cc-in" data-ccrow="' + rowIdx + '" data-ccpaste="budget">'
+              : '<div class="cc-r">' + esc(_rate(b.budget_rate)) + '</div>'
+                + (b.budget_amount != null ? '<div class="cc-a">' + esc(_amt(b.budget_amount)) + '</div>' : ''))
+            + '</td>' : '')
       + rows.map(function (i) {
           const p = priceOf(i.id, it.id) || {};
           const isLow = low != null && p.unit_rate != null && Number(p.unit_rate) === low;
+          const word = _basisWord(p.status);
+          if (editingInv === i.id) {
+            return '<td class="cc-cell cc-editing">'
+              + '<input ' + moneyAttrs('cr-' + i.id + '-' + it.id, p.unit_rate, 'rate')
+              + ' class="bm-in cc-in" data-qty="' + esc(it.quantity == null ? '' : it.quantity) + '"'
+              + ' data-amt="ca-' + i.id + '-' + it.id + '"'
+              + ' data-ccrow="' + rowIdx + '" data-ccpaste="rate" oninput="onRateInput(this)">'
+              + '<input ' + moneyAttrs('ca-' + i.id + '-' + it.id, p.amount, 'amount')
+              + ' class="bm-in cc-in cc-in2" data-ccrow="' + rowIdx + '" data-ccpaste="amount">'
+              + '<select id="cs-' + i.id + '-' + it.id + '" class="bm-in cc-basis'
+              + ((p.status || 'quoted') === 'quoted' ? '' : ' cc-basis-on') + '">'
+              + PRICE_BASIS.map(function (o) {
+                  return '<option value="' + o[0] + '"'
+                    + ((p.status || 'quoted') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+                }).join('')
+              + '</select></td>';
+          }
           return '<td class="cc-cell' + (isLow ? ' cc-low' : '') + '">'
-            + '<input ' + moneyAttrs('cr-' + i.id + '-' + it.id, p.unit_rate, 'rate')
-            + ' class="bm-in cc-in" data-qty="' + esc(it.quantity == null ? '' : it.quantity) + '"'
-            + ' data-amt="ca-' + i.id + '-' + it.id + '" oninput="onRateInput(this)"'
-            + (ro ? ' disabled' : '') + '></td>'
-            + '<td class="cc-cell' + (isLow ? ' cc-low' : '') + '">'
-            + '<input ' + moneyAttrs('ca-' + i.id + '-' + it.id, p.amount, 'amount')
-            + ' class="bm-in cc-in"' + (ro ? ' disabled' : '') + '>'
-            /* ⚠️ QUIET UNTIL IT SAYS SOMETHING. "Quoted" is the answer on almost
-               every cell, and a bordered select repeating it on all of them read
-               as noise across a table this wide. It only takes on a border and
-               colour once the basis is Included / Excluded / No bid — which are
-               the ones a reader has to notice. */
-            + '<select id="cs-' + i.id + '-' + it.id + '" class="bm-in cc-basis'
-            + ((p.status || 'quoted') === 'quoted' ? '' : ' cc-basis-on') + '"' + (ro ? ' disabled' : '') + '>'
-            + PRICE_BASIS.map(function (o) {
-                return '<option value="' + o[0] + '"'
-                  + ((p.status || 'quoted') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
-              }).join('')
-            + '</select></td>';
+            + (word ? '<div class="cc-word">' + word + '</div>'
+                : '<div class="cc-r">' + esc(_rate(p.unit_rate))
+                  + (isLow ? '<i class="ti ti-caret-down-filled cc-lowmark" title="lowest rate"></i>' : '')
+                  + '</div>'
+                  + (!_ccCompact && p.amount != null ? '<div class="cc-a">' + esc(_amt(p.amount)) + '</div>' : ''))
+            + '</td>';
         }).join('')
       + '</tr>';
   }).join('');
 
   const budTotal = REFITEMS.reduce(function (t, it) {
-    const b = ITEMBUDGET[it.id] || {};
-    return t + (Number(b.budget_amount) || 0);
+    const bb = ITEMBUDGET[it.id] || {};
+    return t + (Number(bb.budget_amount) || 0);
   }, 0);
-  const totals = '<tr class="cc-tot"><td class="cc-stick">Total of the lines</td><td class="cc-qty"></td>'
-    + (showBudget ? '<td class="cc-budcol">' + (budTotal > 0 ? esc(money(budTotal)) : '\u2014') + '</td>' : '')
+  /* ⚠️ TWO TOTAL ROWS, AND THE SECOND IS THE ONE THAT DECIDES ANYTHING.
+     "As quoted" is what the PO will say; "net of VAT" is the only basis on
+     which two bidders — or a bidder and the BCB — can honestly be compared. */
+  const netLow = (function () {
+    let lo = null;
+    rows.forEach(function (i) {
+      const pt = pricedTotal(i.id);
+      const n = pt.total == null ? null : netOf(pt.total, i);
+      if (n != null && (lo == null || n < lo)) lo = n;
+    });
+    return lo;
+  })();
+  const totals = !REFITEMS.length ? '' :
+      '<tr class="cc-tot"><td class="cc-stick">Total of the lines<small>as quoted</small></td>'
+    + '<td class="cc-qty"></td>'
+    + (showBudget ? '<td class="cc-budcol">' + (budTotal > 0 ? esc(_amt(budTotal)) : '\u2014') + '</td>' : '')
     + rows.map(function (i) {
         const pt = pricedTotal(i.id);
-        return '<td class="cc-cell" colspan="2"><b>'
-          + (pt.total == null ? '\u2014' : esc(money(pt.total, i.offer_currency))) + '</b>'
+        return '<td class="cc-cell"><b>' + (pt.total == null ? '\u2014' : esc(_amt(pt.total))) + '</b>'
           + (pt.total != null ? '<small>' + pt.lines + ' of ' + REFITEMS.length + ' lines</small>' : '')
+          + '</td>';
+      }).join('') + '</tr>'
+    + '<tr class="cc-tot cc-tot-net"><td class="cc-stick">Comparable total'
+    + '<small>net of VAT \u2014 the basis the BCB uses</small></td><td class="cc-qty"></td>'
+    + (showBudget ? '<td class="cc-budcol">' + (budTotal > 0 ? esc(_amt(budTotal)) : '\u2014') + '</td>' : '')
+    + rows.map(function (i) {
+        const pt = pricedTotal(i.id);
+        const n = pt.total == null ? null : netOf(pt.total, i);
+        const best = n != null && netLow != null && Math.abs(n - netLow) < 0.5;
+        return '<td class="cc-cell' + (best ? ' cc-low' : '') + '"><b>'
+          + (n == null ? '\u2014' : esc(_amt(n))) + '</b>'
+          + (best ? '<small class="cc-good">lowest net</small>' : '') + '</td>';
+      }).join('') + '</tr>';
+
+  /* ── the technical requirements, in the SAME table ─────────────────────── */
+  const reqRows = !REQS.length ? '' : REQS.map(function (q, n) {
+    return '<tr><td class="cc-stick"><b>' + esc(q.requirement) + '</b>'
+      + (q.mandatory ? '<span class="req-must">Mandatory</span>' : '')
+      + (q.detail ? '<small>' + esc(q.detail) + '</small>' : '')
+      + '</td><td class="cc-qty"></td>'
+      + (showBudget ? '<td class="cc-budcol"></td>' : '')
+      + rows.map(function (i) {
+          const r = reqResult(i.id, q.id) || {};
+          const v = r.result || '';
+          if (editingInv === i.id) {
+            return '<td class="cc-cell cc-editing">'
+              + '<select id="tc-' + i.id + '-' + q.id + '" class="bm-in cc-sel">'
+              + REQ_RESULTS.map(function (o) {
+                  return '<option value="' + o[0] + '"' + (v === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+                }).join('')
+              + '</select>'
+              + '<input id="tn-' + i.id + '-' + q.id + '" class="bm-in cc-note" value="' + esc(r.note || '') + '"'
+              + ' placeholder="What they offered"></td>';
+          }
+          return '<td class="cc-cell cc-' + (v || 'none') + '">'
+            + '<div class="cc-verdict">' + esc(REQ_SHORT[v] || '\u2014') + '</div>'
+            + (!_ccCompact && r.note ? '<div class="cc-a">' + esc(r.note) + '</div>' : '')
+            + '</td>';
+        }).join('')
+      + '</tr>';
+  }).join('');
+  const reqSummary = !REQS.length ? '' :
+      '<tr class="cc-tot"><td class="cc-stick">Technical standing</td><td class="cc-qty"></td>'
+    + (showBudget ? '<td class="cc-budcol"></td>' : '')
+    + rows.map(function (i) {
+        const t = techScore(i.id);
+        // Only a genuinely clean bid gets the green row tint.
+        return '<td class="cc-cell' + (!t.blocked && !t.unanswered && t.met + t.na === t.total
+            ? ' cc-low' : '') + '"><b>'
+          + t.met + ' of ' + t.total + ' met</b>'
+          + (t.blocked ? '<small class="cc-bad">' + t.blocked + ' mandatory not met</small>'
+             : (t.unanswered ? '<small class="cc-none">' + t.unanswered + ' unanswered</small>'
+                : (t.met + t.na === t.total
+                   ? '<small class="cc-good">fully compliant</small>'
+                   : '<small class="cc-warnish">all mandatory met</small>')))
           + '</td>';
       }).join('') + '</tr>';
 
-  return '<div class="panel" id="bp-costcompare"><div class="panel-title">Cost comparison</div>'
-    + '<div class="sec-note">Rate and amount per line, so two bids can be read against each other '
-    + 'even when they quote different quantities. The <b>lowest rate</b> on each line is marked. '
-    + 'Type the rate and the amount fills from the quantity in the ask &mdash; overwrite it for a '
-    + 'lump sum or a different quantity.'
-    + (showBudget ? ' The budget column is <b>ours and internal</b> &mdash; no vendor ever sees it.' : '')
+  return '<div class="panel" id="bp-costcompare"><div class="panel-title">Cost &amp; technical comparison</div>'
+    + '<div class="sec-note">Every bidder against the same lines and the same requirements. '
+    + 'The <b>lowest rate</b> on a line is marked; the totals are compared <b>net of VAT</b>, '
+    + 'because the budget is. A <b>mandatory</b> requirement not met disqualifies a bid whatever it costs.'
+    + (showBudget ? ' The budget column is <b>ours</b> \u2014 no vendor sees it.' : '') + '</div>'
+    + '<div class="cc-bar">' + picker
+    + ccBidderMenu()
+    + (allRows.length > 3 ? '<label class="cc-dense"><input type="checkbox"'
+        + (_ccCompact ? ' checked' : '') + ' onchange="ccSetCompact(this.checked)"> Compact</label>' : '')
+    + '<span class="cc-bar-sp"></span>'
+    + '<button class="btn btn-sm" onclick="exportComparisonXlsx()" title="A workbook laid out like your own cost-comparison sheet">'
+    + '<i class="ti ti-file-spreadsheet"></i> Export to Excel</button>'
+    + '<button class="btn btn-sm" onclick="presentComparison()" title="Large type, no chrome \u2014 for projecting in a meeting">'
+    + '<i class="ti ti-presentation"></i> Present</button>'
     + '</div>'
-    + '<div class="cc-wrap"><table class="cc-table"><thead>' + head + '</thead>'
-    + '<tbody>' + body + totals + '</tbody></table></div>'
-    + (ro ? '' : '<div class="bm-actions"><button class="btn btn-primary" onclick="saveCostCompare()">'
-        + '<i class="ti ti-device-floppy"></i> Save cost comparison</button></div>')
+    + (editingInv || editingBudget
+        ? '<div class="sec-note cc-hint">Type the rate and the amount fills from the quantity in the ask '
+          + '\u2014 overwrite it for a lump sum. You can <b>paste a whole column</b> straight from the '
+          + 'vendor\u2019s spreadsheet. <b>Save</b> before switching to another bidder.</div>' : '')
+    + (rows.length < allRows.length
+        ? '<div class="sec-note cc-hidden-note">Showing <b>' + rows.length + ' of ' + allRows.length
+          + '</b> bidders — the shortlist, and always the lowest net. Use <b>Bidders shown</b> to change it.</div>'
+        : '')
+    + '<div class="cc-wrap" id="cc-wrap"><table class="cc-table'
+    + (_ccCompact ? ' cc-dense-on' : '') + '">'
+    + '<thead>' + head + '</thead><tbody>'
+    + (REFITEMS.length ? band('Priced items', 'rate and amount per line') + itemRows + totals : '')
+    + (REQS.length ? band('Technical requirements', 'from the terms of reference') + reqRows + reqSummary : '')
+    + '</tbody></table></div>'
     + '</div>';
 }
+
+
+/* ── the comparison as a real workbook ───────────────────────────────────────
+   ⚠️ THE MEETING RUNS ON THE EXCEL, so the app's job is to hand over one that
+      is already built rather than to be a prettier screen. Everything the app
+      holds goes in — the item list, every bidder's rate and amount, our budget
+      column, both totals and the technical matrix — and the officer adds what
+      the app deliberately does NOT model: incoterms and per-bidder tax
+      build-ups, per-line inclusions and exclusions, FX, a purchase split across
+      projects, and a supplier's alternative technical variants.
+   ⚠️ EVERY BIDDER, not just the columns currently shown. The screen narrows
+      because ten columns cannot be read side by side; a workbook has no such
+      limit, and dropping bidders from the record would be wrong.
+   SheetJS is lazy-loaded from the CSP-allowed CDN, as project.html already does. */
+function _loadSheetJS() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return new Promise(function (res, rej) {
+    const t = document.createElement('script');
+    t.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    t.onload = function () { res(window.XLSX); };
+    t.onerror = function () { rej(new Error('Could not load the spreadsheet library')); };
+    document.head.appendChild(t);
+  });
+}
+async function exportComparisonXlsx() {
+  const rows = bidsInPlay();
+  if (!rows.length) { AppNotify.warn('No quotations to export yet.'); return; }
+  const prog = AppNotify.progress('Building the workbook\u2026');
+  try {
+    const XLSX = await _loadSheetJS();
+    const w = WPBYID[R.wp_id] || {};
+    const showBudget = !window.__hideBudget;
+    const A = [];
+    A.push(['COST COMPARISON \u2014 ' + wpLabel(w)]);
+    A.push([projName(R.project_id), '', 'Round ' + (R.round_no || 1),
+            R.bid_due_at ? 'Bid due ' + dOnly(R.bid_due_at) : '']);
+    if (showBudget) A.push(['Budget (BCB), VAT-ex', bcbOf() == null ? 'not set' : Number(bcbOf())]);
+    A.push([]);
+
+    const h1 = ['Item', 'Description', 'Spec', 'Unit', 'Qty'];
+    const h2 = ['', '', '', '', ''];
+    const h3 = ['', '', '', '', ''];
+    if (showBudget) { h1.push('BUDGET', ''); h2.push('Rate', 'Amount'); h3.push('VAT-ex', ''); }
+    rows.forEach(function (i) {
+      h1.push(i.vendor_name, '');
+      h2.push('Rate', 'Amount');
+      h3.push(vatLabel(invBasis(i)), '');
+    });
+    A.push(h1); A.push(h2); A.push(h3);
+
+    REFITEMS.forEach(function (it) {
+      const r = [it.item_no || '', it.description, it.spec || '', it.unit || '',
+                 it.quantity == null ? '' : Number(it.quantity)];
+      if (showBudget) {
+        const b = ITEMBUDGET[it.id] || {};
+        r.push(b.budget_rate == null ? '' : Number(b.budget_rate),
+               b.budget_amount == null ? '' : Number(b.budget_amount));
+      }
+      rows.forEach(function (i) {
+        const p = priceOf(i.id, it.id) || {};
+        const word = _basisWord(p.status);
+        r.push(p.unit_rate == null ? (word || '') : Number(p.unit_rate),
+               p.amount == null ? (word || '') : Number(p.amount));
+      });
+      A.push(r);
+    });
+
+    const budTotal = REFITEMS.reduce(function (t, it) {
+      return t + (Number((ITEMBUDGET[it.id] || {}).budget_amount) || 0);
+    }, 0);
+    const tq = ['', 'TOTAL OF THE LINES (as quoted)', '', '', ''];
+    const tn = ['', 'COMPARABLE TOTAL (net of VAT)', '', '', ''];
+    if (showBudget) { tq.push('', budTotal || ''); tn.push('', budTotal || ''); }
+    rows.forEach(function (i) {
+      const pt = pricedTotal(i.id);
+      tq.push('', pt.total == null ? '' : Number(pt.total));
+      tn.push('', pt.total == null ? '' : Number(netOf(pt.total, i)));
+    });
+    A.push([]); A.push(tq); A.push(tn);
+
+    if (REQS.length) {
+      A.push([]);
+      A.push(['TECHNICAL REQUIREMENTS']);
+      const rh = ['', 'Requirement', 'Detail', 'Mandatory', ''];
+      if (showBudget) rh.push('', '');
+      rows.forEach(function (i) { rh.push(i.vendor_name, 'Notes'); });
+      A.push(rh);
+      REQS.forEach(function (q) {
+        const r = ['', q.requirement, q.detail || '', q.mandatory ? 'Yes' : 'No', ''];
+        if (showBudget) r.push('', '');
+        rows.forEach(function (i) {
+          const x = reqResult(i.id, q.id) || {};
+          r.push(REQ_SHORT[x.result] || '', x.note || '');
+        });
+        A.push(r);
+      });
+      const rs = ['', 'TECHNICAL STANDING', '', '', ''];
+      if (showBudget) rs.push('', '');
+      rows.forEach(function (i) {
+        const t = techScore(i.id);
+        rs.push(t.met + ' of ' + t.total + ' met',
+                t.blocked ? t.blocked + ' mandatory not met'
+                  : (t.unanswered ? t.unanswered + ' unanswered' : 'compliant'));
+      });
+      A.push([]); A.push(rs);
+    }
+
+    A.push([]);
+    A.push(['Prepared from the Procurement Dashboard on ' + new Date().toLocaleString()]);
+    A.push(['Incoterms, per-bidder tax build-ups, inclusions and exclusions, FX and technical '
+      + 'variants are NOT held in the app \u2014 add them here.']);
+
+    const ws = XLSX.utils.aoa_to_sheet(A);
+    const pair = [];
+    for (let n = 0; n < (showBudget ? 1 : 0) + rows.length; n++) pair.push({ wch: 13 }, { wch: 15 });
+    ws['!cols'] = [{ wch: 7 }, { wch: 34 }, { wch: 26 }, { wch: 8 }, { wch: 10 }].concat(pair);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Cost Comparison');
+    const name = 'Cost Comparison. ' + (w.wp_no ? 'WP ' + w.wp_no + '. ' : '')
+      + projName(R.project_id) + '. ' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    XLSX.writeFile(wb, name.replace(/[/:*?"<>|]/g, '-'));
+    prog.done('Workbook downloaded.');
+  } catch (e) {
+    prog.fail('Could not build the workbook: ' + (e.message || e));
+  }
+}
+
+/* ── present mode ────────────────────────────────────────────────────────────
+   The same table, larger, with the chrome out of the way — for projecting in
+   the meeting. Deliberately NOT a second rendering: a separate layout would
+   drift from the one the decision is actually made on. */
+function presentComparison() {
+  document.body.classList.add('cc-present');
+  const p = document.getElementById('bp-costcompare');
+  if (p) p.scrollIntoView({ block: 'start' });
+  if (!document.getElementById('cc-present-exit')) {
+    const b = document.createElement('button');
+    b.id = 'cc-present-exit';
+    b.className = 'btn';
+    b.innerHTML = '<i class="ti ti-x"></i> Exit present';
+    b.onclick = exitPresent;
+    document.body.appendChild(b);
+  }
+  document.addEventListener('keydown', _ccPresentKey);
+}
+function exitPresent() {
+  document.body.classList.remove('cc-present');
+  document.removeEventListener('keydown', _ccPresentKey);
+}
+function _ccPresentKey(e) { if (e.key === 'Escape') exitPresent(); }
+
+/* ── paste a whole column straight from the vendor's spreadsheet ─────────────
+   ⚠️ THIS IS THE ONE THING THE All-Work-Packages GRID GIVES THAT IS WORTH
+      HAVING HERE, and it does not need that engine. That grid is a STATIC
+      column list where a row is a record; this table is transposed — a column
+      is a BIDDER, 2 to 10 of them, and a cell holds three things. Rebuilding
+      2,500 lines of `_xl` for it would be the wrong shape (vendors.html had to
+      reimplement that engine once already, and shipped bugs doing it). Column
+      paste is forty lines and covers the actual work: an officer with the
+      quotation open in Excel selects a column of rates and pastes.
+   ⚠️ Scoped to the column that was pasted INTO — never across bidders. */
+function _ccPaste(e) {
+  const el = e.target;
+  if (!el || !el.getAttribute || !el.getAttribute('data-ccpaste')) return;
+  const txt = (e.clipboardData || window.clipboardData).getData('text') || '';
+  // One value is an ordinary paste; let the browser do it.
+  const cells = txt.replace(/\r/g, '').split('\n').filter(function (x, n, a) {
+    return x.trim() !== '' || n < a.length - 1;
+  });
+  if (cells.length < 2) return;
+  e.preventDefault();
+  const kind = el.getAttribute('data-ccpaste');
+  const start = parseInt(el.getAttribute('data-ccrow'), 10) || 0;
+  // Same column, in row order — the inputs carry their own row index, so this
+  // does not depend on DOM order surviving a re-render.
+  const col = Array.prototype.slice.call(
+    document.querySelectorAll('[data-ccpaste="' + kind + '"]'))
+    .filter(function (x) { return x.closest('td') === el.closest('td')
+      || x.getAttribute('data-ccpaste') === kind; })
+    .filter(function (x) { return _ccSameColumn(x, el); })
+    .sort(function (a, b) {
+      return (parseInt(a.getAttribute('data-ccrow'), 10) || 0)
+           - (parseInt(b.getAttribute('data-ccrow'), 10) || 0);
+    });
+  let filled = 0;
+  cells.forEach(function (raw, n) {
+    const target = col[start + n];
+    if (!target) return;
+    // A pasted cell can carry a currency symbol, thousands separators or
+    // parentheses for a negative — take the number and leave the rest.
+    const v = String(raw).replace(/[()]/g, '').replace(/[^0-9.\-]/g, '');
+    if (v === '') return;
+    target.value = _grp(v);
+    if (target.getAttribute('data-amt')) onRateInput(target);
+    filled++;
+  });
+  AppNotify.success('Pasted ' + filled + ' value' + (filled === 1 ? '' : 's')
+    + ' \u2014 check them, then Save.');
+}
+/* Two inputs are in the same column when they share the column INDEX of their
+   cell within its row. Comparing the <td> itself would only ever match one. */
+function _ccSameColumn(a, b) {
+  const ta = a.closest('td'), tb = b.closest('td');
+  if (!ta || !tb) return false;
+  return ta.cellIndex === tb.cellIndex;
+}
+document.addEventListener('paste', _ccPaste, true);
 
 /* Rate typed -> amount filled from the ask's quantity. ⚠️ Only when the amount
    is still EMPTY: a figure already there was either typed by the officer or
@@ -3463,10 +4033,16 @@ function onRateInput(el) {
   if (r == null) return;
   amt.value = _grp((r * qty).toFixed(2).replace(/\.00$/, ''));
 }
-async function saveCostCompare() {
+/* ⚠️ SAVES ONLY THE COLUMN BEING EDITED. Looping every bidder would rewrite
+   rows nobody touched — and, worse, would read the inputs of columns that are
+   not rendered at all in reading mode, staging nulls over real figures. */
+async function saveComparison() {
+  const editingBudget = _ccEdit === 'budget';
+  const editingInv = _ccEdit && _ccEdit !== 'budget' ? invById(_ccEdit) : null;
+  if (!editingBudget && !editingInv) { AppNotify.warn('Pick whose rates you are entering first.'); return; }
   try {
     for (const it of REFITEMS) {
-      if (!window.__hideBudget) {
+      if (editingBudget && !window.__hideBudget) {
         const br = num(val('cb-' + it.id));
         const cur = ITEMBUDGET[it.id];
         if (br != null || cur) {
@@ -3476,7 +4052,8 @@ async function saveCostCompare() {
           });
         }
       }
-      for (const i of bidsInPlay()) {
+      if (editingInv) {
+        const i = editingInv;
         const rate = num(val('cr-' + i.id + '-' + it.id));
         const amt = num(val('ca-' + i.id + '-' + it.id));
         const st = val('cs-' + i.id + '-' + it.id) || 'quoted';
@@ -3489,10 +4066,23 @@ async function saveCostCompare() {
         }, profile);
       }
     }
+    /* The technical answers belong to the same bidder and the same Save —
+       they are one comparison, so splitting the write would let a round hold a
+       saved price against an unsaved verdict. */
+    if (editingInv) {
+      for (const q of REQS) {
+        const v = val('tc-' + editingInv.id + '-' + q.id);
+        const n = val('tn-' + editingInv.id + '-' + q.id);
+        const cur = reqResult(editingInv.id, q.id);
+        if (!v && !n && !cur) continue;
+        await VendorDb.bidComparison.setResult(editingInv.id, q.id,
+          { result: v || null, note: n || null }, profile);
+      }
+    }
     await reloadComparison();
     renderRound();
-    AppNotify.success('Cost comparison saved.');
-  } catch (e) { AppNotify.fromError(e, 'Could not save the cost comparison'); }
+    AppNotify.success('Comparison saved.');
+  } catch (e) { AppNotify.fromError(e, 'Could not save the comparison'); }
 }
 
 /* One read for all four tables. ⚠️ The budget is skipped outright for a

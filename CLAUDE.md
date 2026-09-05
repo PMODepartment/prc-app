@@ -3082,6 +3082,132 @@ back to one work package**. Half-doing that would put the award write-back at ri
 the most consequential path in the app. The composer today groups the requirement under one
 package heading, which is the shape a multi-package version grows into.
 
+### One comparison — cost AND technical, netted for VAT, and it fixes a live 12% error (2026-09-05)
+
+`migrations/2026-09-05_bid_vat_basis.sql` (**RUN ME**, after
+`2026-09-05_bid_cost_comparison.sql`), `bids.html`.
+
+#### ⚠️⚠️ THE 12% ERROR — this was live, not theoretical
+
+Megawide's own RFQ template says *"The price indicated in the quotation shall be
+inclusive of VAT"*, so bidders quote GROSS. Everything the figure is measured
+against and written into is NET:
+
+- `approved_budget_bcb` — the monitoring sheets head it `BUDGET (BCB) (NET)` / `BUDGET (VAT EX)`
+- `awarded_cost` — the WP form labels it **"Awarded Cost (Net)"**; the importer maps `AWARDED COST (NET)` / `AWARDED (VAT EX)`
+
+So `doAward()` was writing a VAT-inclusive figure into a VAT-exclusive column —
+overstating cost, and therefore every savings figure, KPI and variance derived
+from it, by the VAT rate on **every package awarded through Bid Management**.
+The battery compared a VAT-in bid against a VAT-ex budget with the same error,
+and a VAT-registered bidder was ranked against a non-VAT one on figures that
+were never the same thing.
+
+- **`vendor_bid_rounds.tax_basis` / `vat_rate`** — what the letter ASKED for
+  (defaults VAT-inclusive at 12%, because the template does).
+- **`vendor_bid_invitations.tax_basis` / `vat_rate`** — what THIS bidder quoted.
+  **⚠️ NULL means "follow the round" and is deliberately NOT back-filled**: a
+  bidder nobody has confirmed must read as unconfirmed, not as agreeing with the
+  letter. `vatChip()` renders an inherited basis at reduced opacity for exactly
+  that reason.
+- **⚠️ NET IS DERIVED, NEVER STORED.** A stored net goes stale the moment
+  somebody corrects a basis, leaving two disagreeing numbers and nothing to say
+  which is right. The one exception is `work_packages.awarded_cost`, which is
+  the record of the award rather than a working figure.
+- **⚠️ NON-VAT IS TREATED AS ALREADY NET, on a stated assumption**: input VAT on
+  a VAT-registered vendor's invoice is creditable against Megawide's output VAT,
+  so a gross 112 and a non-VAT 100 cost the same 100. The CASH differs and the
+  PO carries the gross, which is why both figures are shown rather than only the
+  one the ranking uses.
+- **⚠️ THE RATE IS A COLUMN, NOT A CONSTANT** — zero-rated and exempt work
+  exists and rates change. A tax rate hardcoded into a comparison goes stale
+  silently.
+- Wired through `netOf()` into the headline table (a **Net of VAT** column, and
+  "lowest" now means lowest NET), `vsBcbHtml()`, the phase chips and the battery.
+
+#### One table, not two panels
+
+**⚠️ COST AND TECHNICAL ARE THE SAME COMPARISON.** They shipped as two panels
+and that was wrong twice over: the real workbooks carry the commercial and
+technical attribute rows (downpayment, payment terms, warranty, IP rating,
+brand) UNDER the priced lines in one sheet, one column per bidder — and reading
+a bidder's price in one panel and their compliance in another is exactly the
+split that lets a cheaper non-compliant bid look like the winner. There is now
+one table with two bands, one edit mode and one Save.
+
+#### ⚠️ READ FIRST, EDIT ONE BIDDER AT A TIME
+
+The first cut made every cell an input: **eight boxes per row, rows at 114px of
+mostly empty space, one bidder barely on screen**, and a panel that read as a
+spreadsheet to fill in rather than a comparison to read. It is plain text by
+default — measured **114px → 47px** per row — and a picker turns exactly ONE
+column into inputs. That is also how the work is done: transcribing from one
+quotation at a time. `saveComparison()` writes **only the column being edited**;
+looping every bidder would read inputs that are not rendered at all in reading
+mode and stage nulls over real figures.
+
+#### ⚠️ TEN BIDDERS DO NOT FIT, and that is not hypothetical
+
+The 4PH Busducts round went out to **eight** bidders and its Final sheet
+compares five. The workbook's own answer is that the comparison NARROWS, so the
+panel does too rather than rendering a table nobody can read across.
+
+- `_ccAuto()` shows all bidders up to `CC_AUTO_MAX` (6); beyond that, the
+  shortlist if any, else the six lowest by net.
+- **⚠️ THE RULE ALWAYS INCLUDES THE LOWEST NET BIDDER**, so "lowest" marked
+  inside the shown set can never be contradicted by something hidden. Unit-
+  tested against the case that matters — a shortlist that EXCLUDES the cheapest.
+- The hidden count is stated in the panel, never silent, and a `<details>`
+  column picker overrides it.
+- **⚠️ COMPACT MUST NARROW THE TABLE.** The first cut only dropped a sub-line
+  inside a cell, which changed neither the width (set by the cell minimum and
+  the header) nor the row height (set by the item column) — **measured 2521px
+  before and after, i.e. it did nothing.** It now shrinks the cells and strips
+  the header to the VAT chip: **2521px → 1541px, nine of ten columns readable
+  at once.**
+
+#### ⚠️ "MEETS EVERY LINE" MUST MEAN EVERY LINE
+
+`techScore().blocked` counts only MANDATORY failures, and rendering that as full
+compliance told a reader a bidder met everything while it carried a *Partial* on
+a preferred line — **seen live in the harness**. A clean bid is `met + na ===
+total`; anything else with no mandatory failure now reads **"all mandatory met"**
+in amber. Fixed in three places, including the Evaluation panel which repeats
+the phrase.
+
+#### Is this the All-Work-Packages grid? No — but paste is
+
+Asked directly. That grid is a STATIC column list where a row is a record; this
+table is transposed — a column is a BIDDER (2–10, dynamic) and a cell holds
+three things. It was never extracted into a shared module either: `vendors.html`
+had to reimplement it as ~1,500 lines of `_vxl*` and shipped bugs doing so. At
+3 bidders × 15 lines it would not pay for itself. **What it genuinely gives here
+is paste-a-column-from-Excel, and that is forty lines** — `_ccPaste` fills down
+the column that was pasted into, scoped by `cellIndex` so it can never cross
+bidders, tolerating currency symbols, separators and parenthesised negatives.
+
+#### The meeting runs on the Excel, so export one
+
+**Export to Excel** builds a workbook laid out like their own sheet — items
+down, a Rate/Amount pair per bidder, our budget column, both totals, then the
+technical matrix — so nobody retypes it, and it ends with a line naming what the
+app deliberately does NOT hold (incoterms, per-bidder tax build-ups, inclusions
+and exclusions, FX, multi-project allocation, technical variants).
+**⚠️ It exports EVERY bidder, not the narrowed set** — the screen narrows
+because ten columns cannot be read side by side; a workbook has no such limit
+and dropping bidders from the record would be wrong. SheetJS is lazy-loaded from
+the CSP-allowed CDN exactly as `project.html` does.
+
+**Present** is the same table, larger, with the chrome hidden — deliberately not
+a second rendering, which would drift from the one the decision was made on.
+
+**Verified: 20 assertions against the VERBATIM shipped source** under `node:vm`
+(netOf on all three bases, a non-VAT 100 tying a VAT-in 112, the narrowing rule
+including the not-shortlisted cheapest, no duplicate column when it is
+shortlisted, and every `techScore` branch), plus the panel rendered against the
+real CSS with 10 bidders in light and dark, and the compact/present measurements
+above. **⚠️ NOT yet exercised against a live round.**
+
 ### Each bid against the budget — the battery, not the biggest bar (2026-09-05, `bids.html`)
 
 `negotiationViz()` scaled its track to the **largest offer**, which said almost
