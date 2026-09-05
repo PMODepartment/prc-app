@@ -2370,12 +2370,29 @@ const VendorDb = (() => {
       const cx = cv.getContext('2d');
       cx.drawImage(bmp, 0, 0, w, h);
       bmp.close && bmp.close();
-      const blob = await new Promise(function (res) {
-        cv.toBlob(res, 'image/jpeg', SHRINK_QUALITY);
-      });
+      /* WebP is 25–30% smaller than JPEG at the same quality and is supported
+         everywhere current — but a browser that cannot encode it silently hands
+         back a PNG from toBlob, which would be BIGGER. So take whichever of the
+         two actually came out smaller, and let the size guard below catch the
+         rest. */
+      /* ⚠️ ENCODE BOTH AND KEEP THE SMALLER. WebP beats JPEG on a typical
+         photograph by 25–30%, but NOT on everything — measured 1274 KB against
+         JPEG's 990 KB on a high-noise image, so picking WebP whenever the
+         browser can encode it would have made some uploads BIGGER. A browser
+         that cannot encode WebP silently returns a PNG from toBlob, which the
+         type check below catches. Two encodes cost a few hundred ms, once, at
+         upload — cheap for a guarantee that this never regresses a file. */
+      const enc = function (type) {
+        return new Promise(function (res) { cv.toBlob(res, type, SHRINK_QUALITY); });
+      };
+      const jpg = await enc('image/jpeg');
+      let webp = await enc('image/webp');
+      if (webp && webp.type !== 'image/webp') webp = null;   // a PNG in disguise
+      let blob = jpg, mime = 'image/jpeg', ext = '.jpg';
+      if (webp && (!jpg || webp.size < jpg.size)) { blob = webp; mime = 'image/webp'; ext = '.webp'; }
       if (!blob || blob.size >= file.size) return file;   // never make it bigger
-      const name = String(file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg';
-      const out = new File([blob], name, { type: 'image/jpeg', lastModified: Date.now() });
+      const name = String(file.name || 'image').replace(/\.[^.]+$/, '') + ext;
+      const out = new File([blob], name, { type: mime, lastModified: Date.now() });
       console.info('[shrinkImage]', file.name, Math.round(file.size / 1024) + 'KB',
         '->', Math.round(out.size / 1024) + 'KB');
       return out;
@@ -2408,15 +2425,63 @@ const VendorDb = (() => {
     if (error) throw error;
     return path;
   }
-  async function getCertFileUrl(path) {
+  /* ── signed URLs: cached, and sized to what is actually displayed ─────────
+     ⚠️ TWO SOURCES OF PURE EGRESS WASTE, both fixed here because every image in
+        the app goes through this one function.
+
+     1. A NEW SIGNED URL WAS MINTED ON EVERY RENDER. A fresh URL is a fresh
+        cache key, so the browser re-downloaded the same photo each time a panel
+        redrew — and the staff vendor page redraws on every save. The memo below
+        hands back the same URL for as long as it has comfortable life left, so
+        the browser cache can do its job.
+
+     2. NOTHING ASKED FOR A THUMBNAIL. A 350 KB photo was being downloaded in
+        full to fill a 46px avatar. Supabase Storage can resize server-side, so
+        a caller that renders a thumbnail says so and gets ~4 KB instead.
+
+     ⚠️ THE TRANSFORM IS A PRO FEATURE AND MUST DEGRADE, NOT BREAK. If it is not
+        enabled the request errors, and every avatar in the app would vanish —
+        so a failure falls back to the plain, untransformed URL.
+     ⚠️ NEVER pass a size for a DOCUMENT. A resized BIR 2303 is not the evidence
+        anybody uploaded; only decorative images (logos, personnel and product
+        photos) may be transformed. */
+  const _URL_TTL = 300;              // seconds — matches the signing call
+  const _URL_SAFE = 60;              // re-mint when less than this is left
+  const _urlMemo = new Map();        // cacheKey -> { url, exp }
+  function _urlKey(path, w) { return w ? path + '|w' + w : path; }
+  function _evictUrl(path) {
+    Array.from(_urlMemo.keys()).forEach(function (k) {
+      if (k === path || k.indexOf(path + '|') === 0) _urlMemo.delete(k);
+    });
+  }
+  async function getCertFileUrl(path, opts) {
     if (!path) return null;
+    const w = opts && opts.width ? Math.round(opts.width) : 0;
+    const key = _urlKey(path, w);
+    const hit = _urlMemo.get(key);
+    if (hit && hit.exp - Date.now() > _URL_SAFE * 1000) return hit.url;
+
     const sb = await getSB();
-    const { data, error } = await sb.storage.from('vendor-certs').createSignedUrl(path, 300);
-    if (error) throw error;
-    return data?.signedUrl || null;
+    let url = null;
+    if (w) {
+      // resize:'contain' keeps the aspect ratio; quality trims a little more.
+      const t = await sb.storage.from('vendor-certs').createSignedUrl(path, _URL_TTL, {
+        transform: { width: w, height: w, resize: 'contain', quality: 75 },
+      });
+      if (!t.error) url = t.data && t.data.signedUrl;
+      else console.warn('[getCertFileUrl] transform unavailable, serving full size:', t.error.message);
+    }
+    if (!url) {
+      const { data, error } = await sb.storage.from('vendor-certs').createSignedUrl(path, _URL_TTL);
+      if (error) throw error;
+      url = data && data.signedUrl;
+    }
+    if (url) _urlMemo.set(key, { url: url, exp: Date.now() + _URL_TTL * 1000 });
+    return url || null;
   }
   async function deleteCertFile(path) {
     if (!path) return;
+    _evictUrl(path);
     const sb = await getSB();
     await sb.storage.from('vendor-certs').remove([path]);
   }

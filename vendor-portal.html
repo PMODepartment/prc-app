@@ -990,12 +990,12 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260905k"></script>
-<script src="assets/js/db.js?v=20260905k"></script>
+<script src="assets/js/auth.js?v=20260905l"></script>
+<script src="assets/js/db.js?v=20260905l"></script>
 <!-- Self-contained: this page loads no ui.js, so the guide injects its own
      CSS and its own "?" button. Versioned independently of the shared assets. -->
-<script src="assets/js/coachmarks.js?v=20260905k"></script>
-<script src="assets/js/portal-guide.js?v=20260905k"></script>
+<script src="assets/js/coachmarks.js?v=20260905l"></script>
+<script src="assets/js/portal-guide.js?v=20260905l"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -1627,7 +1627,8 @@ async function renderPortalLogo() {
   }
   if (lbl) lbl.textContent = 'Replace logo';
   try {
-    const url = await VendorDb.getCertFileUrl(vendor.logo_path);
+    // A logo renders at ~120px; downloading the full file for it is waste.
+    const url = await VendorDb.getCertFileUrl(vendor.logo_path, { width: 240 });
     if (url) box.innerHTML = '<img src="' + esc(url) + '" alt="Company logo">';
   } catch (e) { /* a missing file must not blank the form */ }
 }
@@ -2377,7 +2378,9 @@ async function _catLoadPhotos() {
     const path = n.getAttribute('data-photo');
     if (!path) continue;
     try {
-      const url = await VendorDb.getCertFileUrl(path);
+      // Catalogue cards show a small photo; the click opens this same sized
+      // copy, which is fine — it is a product shot, not evidence.
+      const url = await VendorDb.getCertFileUrl(path, { width: 480 });
       if (url) n.innerHTML = '<img src="' + url + '" alt="" onclick="window.open(this.src,' + Q + '_blank' + Q + ')">'
         + n.innerHTML.replace(/<i class="ti ti-photo cat-noimg"><\/i>/, '');
     } catch (_) { /* a missing file must not break the grid */ }
@@ -2685,7 +2688,7 @@ async function _perLoadPhotos() {
     const path = n.getAttribute('data-photo');
     if (!path) continue;
     try {
-      const url = await VendorDb.getCertFileUrl(path);
+      const url = await VendorDb.getCertFileUrl(path, { width: 200 });   // an avatar
       if (url) n.innerHTML = '<img src="' + url + '" alt="" onclick="window.open(this.src,' + Q + '_blank' + Q + ')">';
     } catch (_) { /* keep the initials */ }
   }
