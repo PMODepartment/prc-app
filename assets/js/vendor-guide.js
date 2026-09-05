@@ -163,17 +163,66 @@
 
   /* Topbar "?" button — injected idempotently, before #user-bar (same slot as
      onboarding.js's). Only vendors.html loads this file, so no clash. */
+  /* ⚠️ THE MENU IS BUILT AT CLICK TIME, NOT HERE. coachmarks.js and the page's
+     own configure() call both run after this file, so asking whether a tour
+     exists at injection time always answers no. Same reason onboarding.js
+     builds its menu in the toggle. */
+  function toggleMenu() {
+    var m = document.getElementById('vg-menu');
+    if (!m) return;
+    if (m.style.display === 'block') { closeMenu(); return; }
+    var hasTour = !!(window.CoachTour && window.CoachTour.available());
+    m.innerHTML =
+      (hasTour ? '<a href="#" data-a="tour"><i class="ti ti-route"></i> Show me around</a>' : '')
+      + '<a href="#" data-a="deck"><i class="ti ti-book"></i> Read the guide</a>';
+    m.querySelectorAll('a').forEach(function (a) {
+      a.onclick = function (e) {
+        e.preventDefault(); closeMenu();
+        if (a.dataset.a === 'tour') window.CoachTour.start(true); else open(0);
+      };
+    });
+    m.style.display = 'block';
+    setTimeout(function () { document.addEventListener('click', outside); }, 0);
+  }
+  function closeMenu() {
+    var m = document.getElementById('vg-menu');
+    if (m) m.style.display = 'none';
+    document.removeEventListener('click', outside);
+  }
+  function outside(e) {
+    var w = document.getElementById('vg-menu-wrap');
+    if (w && !w.contains(e.target)) closeMenu();
+  }
+
   function injectButton() {
     var tr = document.querySelector('.topbar-right');
     if (!tr || document.getElementById('btn-guide')) return;
+    var wrap = document.createElement('div');
+    wrap.id = 'vg-menu-wrap';
+    wrap.style.cssText = 'position:relative;display:inline-flex;flex-shrink:0';
     var b = document.createElement('button');
     b.className = 'btn-guide'; b.id = 'btn-guide';
-    b.title = 'Vendor Management guide';
-    b.setAttribute('aria-label', 'Open Vendor Management guide');
+    b.title = 'Vendor Management help';
+    b.setAttribute('aria-label', 'Vendor Management help');
     b.innerHTML = '<i class="ti ti-help"></i>';
-    b.onclick = function () { open(0); };
+    b.onclick = function (e) { e.stopPropagation(); toggleMenu(); };
+    var menu = document.createElement('div');
+    menu.id = 'vg-menu';
+    menu.style.cssText = 'display:none;position:absolute;top:calc(100% + 6px);right:0;min-width:186px;'
+      + 'background:var(--surface,#fff);border:1px solid var(--border-md,rgba(0,0,0,.14));'
+      + 'border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.16);padding:5px;z-index:400';
+    wrap.appendChild(b); wrap.appendChild(menu);
     var ub = document.getElementById('user-bar');
-    if (ub) tr.insertBefore(b, ub); else tr.appendChild(b);
+    if (ub) tr.insertBefore(wrap, ub); else tr.appendChild(wrap);
+    if (!document.getElementById('vg-menu-css')) {
+      var ms = document.createElement('style'); ms.id = 'vg-menu-css';
+      ms.textContent = '#vg-menu a{display:flex;align-items:center;gap:9px;padding:8px 11px;'
+        + 'border-radius:7px;font-size:12.5px;font-weight:600;text-decoration:none;'
+        + 'color:var(--text-primary,#231F20);font-family:Montserrat,system-ui,sans-serif}'
+        + '#vg-menu a:hover{background:var(--mw-red-light,#FDECEA);color:var(--mw-red,#EE3124)}'
+        + '#vg-menu a i{font-size:15px}';
+      document.head.appendChild(ms);
+    }
     // Reuse onboarding.js's .btn-guide styling if present; otherwise add a minimal one.
     if (!document.getElementById('ob-css') && !document.getElementById('vg-btnguide-css')) {
       var s = document.createElement('style'); s.id = 'vg-btnguide-css';

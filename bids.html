@@ -448,6 +448,7 @@
 <script src="assets/js/auth.js?v=20260905f"></script>
 <script src="assets/js/db.js?v=20260905f"></script>
 <script src="assets/js/ui.js?v=20260905f"></script>
+<script src="assets/js/coachmarks.js?v=20260905f"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -508,7 +509,109 @@ AppAuth.requireLogin(async (user, p) => {
     sel.appendChild(o);
   });
   await loadAll();
+  configureBidTour();
+  if (window.CoachTour) CoachTour.maybeAutoStart();
 });
+
+/* ── the guided tour ─────────────────────────────────────────────────────────
+   A coach-mark tour over the REAL workspace rather than a deck of screenshots —
+   the same call the portal's tour was rebuilt on, after a slide-show modal was
+   reported as "just a pop up window with texts".
+   ⚠️ ONE STEP LIST COVERS BOTH SCREENS. CoachTour freezes its set at start()
+      from what is actually in the DOM, so on the rounds list you get the list
+      steps and inside a round you get the workspace ones, with no branching
+      here. That also means a panel that has not appeared yet — no comparison
+      before a bid arrives — is simply not part of the tour that run.
+   ⚠️ NO before() OPENS A MODAL. A tour that leaves the new-round dialog or the
+      RFQ composer open behind it has changed the page it was explaining. */
+function configureBidTour() {
+  if (!window.CoachTour) return;
+  CoachTour.configure({
+    key: 'coach_bids',
+    steps: [
+      { sel: '#btnNewRound', title: 'One round, one solicitation',
+        body: 'A round is one work package going out to bid. Re-tendering never reopens a round '
+            + '&mdash; it starts a new one, so the attempt that failed stays readable exactly as it was. '
+            + 'You pick the project first, then its work package.' },
+      { sel: '#bidListPage .data-table', pad: 4, title: 'Every round, and where it is',
+        body: 'The status column is the <b>approved Procurement Status</b> &mdash; Not Started, Sourced, '
+            + 'Solicited, Evaluated, Awarded &mdash; the same words the work package itself uses, so the '
+            + 'two can never tell different stories.' },
+      { sel: '.bm-steps', title: 'The stage is derived, not clicked',
+        body: 'It follows what has actually happened: bidders named &rarr; Sourced, RFQ issued &rarr; '
+            + 'Solicited, closed for pricing &rarr; Evaluated, awarded &rarr; Awarded. There is nothing '
+            + 'to remember to set. Underneath it you can see the work package’s own status, and put '
+            + 'it right in one click if it has fallen behind.' },
+      { sel: '#bp-ask', title: '1 &middot; The ask',
+        body: 'Scope, deadline, payment terms and conditions. Everything here goes to the bidders '
+            + 'exactly as written, and it is what fills in the RFQ letter further down.' },
+      { sel: '#bp-reference', title: '2 &middot; The reference pack',
+        body: 'The TOR, the MPSS, the drawings &mdash; and the priced line items. This is what makes two '
+            + 'quotations comparable: every bidder prices the same list, and the line items become the '
+            + 'itemised requirement in the RFQ email.' },
+      { sel: '#bp-bidders', title: '3 &middot; Bidders',
+        body: 'Each invited vendor shows their accreditation. Policy N29 lets you invite an unaccredited '
+            + 'vendor &mdash; awarding to a problematic one only asks you to confirm, because a hard block '
+            + 'would just get worked around.' },
+      { sel: '#btnIssueRfq', title: 'Issuing the RFQ',
+        body: 'Drafted on <b>Megawide’s own template</b>, filled in from this round. It copies the '
+            + 'formatted letter and opens an addressed, empty draft &mdash; press Ctrl+V. Each bidder gets '
+            + 'their own private link, so each is a separate email; there is a mail-merge CSV for a big round.' },
+      { sel: '#bp-responses', title: '4 &middot; Bids received',
+        body: 'Quotations as they arrive, through the link or attached by you from an email. A vendor may '
+            + 'revise up to the deadline; the first submission is kept as their original offer.' },
+      { sel: '#bp-clarify', title: '5 &middot; Clarifications',
+        body: 'Questions to <b>one</b> bidder, never visible to the others, grouped by subject &mdash; '
+            + 'technical, commercial, schedule, documents. Messages sharing a subject are the thread.' },
+      { sel: '#bp-comparison', title: '6 &middot; Bids at a glance',
+        body: 'Every column sorts, and the lowest offer is chipped. <b>This is not the cost comparison</b> '
+            + '&mdash; that document is prepared outside the app from your own template. Export the '
+            + 'bidders and offers as CSV to start it.' },
+      { sel: '#bp-evaluation', title: '7 &middot; Evaluation',
+        body: 'Technical compliance against the TOR. Award rests on two things only: compliance, and the '
+            + 'lowest bid in the cost comparison.' },
+      { sel: '#bp-negotiation', title: '8 &middot; Negotiation',
+        body: 'Shortlist the top bidders and record the revised offer. The original is kept alongside it, '
+            + 'so the saving is the gap between the two &mdash; and that is what the chart below draws.' },
+      { sel: '#bp-award', title: '9 &middot; Award closes the loop',
+        body: 'Awarding writes the cost, the vendor and the award date <b>back to the work package</b>, '
+            + 'promotes every offer into that vendor’s bid history, and marks the others not awarded. '
+            + 'The NOA and the Letter of Regret stay a separate process &mdash; the app records that a '
+            + 'notice went out and its reference.' },
+      { sel: '#bid-nav', title: 'Jumping about',
+        body: 'The rail follows the sections that are actually on screen, so it grows as the round '
+            + 'progresses. That is the whole tour &mdash; reopen it any time from the <b>?</b> button.' },
+    ],
+  });
+}
+
+/* The "?" button. bids.html has no slide deck, so it starts the tour directly. */
+(function injectBidGuideBtn() {
+  function add() {
+    var tr = document.querySelector('.topbar-right');
+    if (!tr || document.getElementById('btn-guide')) return;
+    var b = document.createElement('button');
+    b.className = 'btn-guide'; b.id = 'btn-guide';
+    b.title = 'Show me around Bid Management';
+    b.setAttribute('aria-label', 'Show me around Bid Management');
+    b.innerHTML = '<i class="ti ti-help"></i>';
+    b.onclick = function () { if (window.CoachTour) CoachTour.start(true); };
+    var ub = document.getElementById('user-bar');
+    if (ub) tr.insertBefore(b, ub); else tr.appendChild(b);
+    if (!document.getElementById('bg-btn-css')) {
+      var s = document.createElement('style'); s.id = 'bg-btn-css';
+      s.textContent = '.btn-guide{width:34px;height:34px;border-radius:8px;'
+        + 'border:1px solid var(--border-md,rgba(0,0,0,.14));background:var(--surface,#fff);'
+        + 'color:var(--text-secondary,#5A5858);cursor:pointer;display:inline-flex;'
+        + 'align-items:center;justify-content:center;flex-shrink:0}'
+        + '.btn-guide:hover{color:var(--mw-red,#EE3124);border-color:var(--mw-red,#EE3124)}'
+        + '.btn-guide i{font-size:17px}';
+      document.head.appendChild(s);
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', add);
+  else add();
+})();
 
 async function loadAll() {
   try {
@@ -1351,7 +1454,7 @@ function biddersPanel() {
         + '<div class="bm-actions">'
         + (WPBYID[R.wp_id] && WPBYID[R.wp_id].trade
             ? '<button class="btn" onclick="suggestVendors()"><i class="ti ti-wand"></i> Suggest from the catalogue</button>' : '')
-        + '<button class="btn btn-primary" onclick="openRfq()"' + (INV.length ? '' : ' disabled') + '>'
+        + '<button class="btn btn-primary" id="btnIssueRfq" onclick="openRfq()"' + (INV.length ? '' : ' disabled') + '>'
         + '<i class="ti ti-mail-forward"></i> ' + (R.issued_at ? 'Send again' : 'Issue the ' + esc(R.doc_type || 'RFQ')) + '</button>'
         + '</div>' : '')
     + (R.issued_at ? '<div class="sec-note" style="margin:10px 0 0">Issued ' + esc(dt(R.issued_at))

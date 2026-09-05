@@ -2881,6 +2881,41 @@ being unable to inject markup.
 
 **✅ RUN 2026-09-05.** The compliance field and the clarification subject are both stored.
 
+### Guided tours for Vendor Management and Bid Management (2026-09-05)
+
+`assets/js/coachmarks.js` on `vendors.html` + `bids.html`, and `vendor-guide.js` (`?v=20260905c`).
+
+Contributors had no guidance on either page. **Coach-mark tours over the REAL UI, not another
+slide deck** — the same call the vendor portal's tour was rebuilt on, after a text modal was
+reported as *"just a pop up window with texts"*. `coachmarks.js` was reused unchanged; only step
+data is new.
+
+- **⚠️ ONE STEP LIST COVERS BOTH SCREENS OF `bids.html`.** `CoachTour` freezes its set at
+  `start()` from what is actually in the DOM, so on the rounds list you get the list steps and
+  inside a round you get the workspace ones — **with no branching in the page**. It also means a
+  panel that has not appeared yet (no comparison before a bid arrives) is simply not in that
+  run, and a read-only role on `vendors.html` gets a shorter tour for free.
+- **This is exactly why the panels needed stable ids** (`#bp-ask` … `#bp-award`, added in the
+  RFQ pass below). `buildBidNav`'s positional `bsec-N` would have pointed a tour step at a
+  different section depending on how far the round had got.
+- **⚠️ NO `before()` OPENS A MODAL.** A tour that leaves the new-round dialog or the RFQ
+  composer open behind it has changed the page it was explaining.
+- **⚠️ A STEP WHOSE SELECTOR IS WRONG IS SILENTLY SKIPPED** — no error, just a shorter tour.
+  That is how `#btn-guide` vs `#btn-portal-guide` slipped through on the portal. So
+  `scratchpad/check_tours.py` looks every selector up in its own page (markup *or* the JS that
+  builds it) and asserts each step has a title and a body: **24/24 resolve.**
+- **`vendors.html`'s "?" is now a two-item menu — Show me around / Read the guide** (the portal's
+  pattern). The slide deck is kept: some people would rather read than be walked. **⚠️ The menu
+  is built at CLICK time, not at injection** — `coachmarks.js` and the page's own `configure()`
+  both run after `vendor-guide.js`, so asking whether a tour exists at injection always answers
+  no. Same reason `onboarding.js` builds its menu in the toggle.
+- **⚠️ ONE auto-open, not two.** The tour is the first-run experience; the deck only auto-opens
+  if no tour is configured. Otherwise a first login stacks two modals.
+- `bids.html` has no deck, so its own injected "?" starts the tour directly.
+- **Not verified against a live authenticated session** — both pages need a real login. The
+  engine is already proven on four pages and the step data is statically checked, but flag
+  anything that reads oddly on the first real run.
+
 ### The RFQ email is Megawide's own template, formatted (2026-09-05)
 
 `migrations/2026-09-05_officer_signature.sql` (**RUN ME**), `bids.html`.

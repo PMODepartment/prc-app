@@ -1381,7 +1381,8 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <script src="assets/js/auth.js?v=20260905f"></script>
 <script src="assets/js/db.js?v=20260905f"></script>
 <script src="assets/js/ui.js?v=20260905f"></script>
-<script src="assets/js/vendor-guide.js?v=20260905b"></script>
+<script src="assets/js/coachmarks.js?v=20260905f"></script>
+<script src="assets/js/vendor-guide.js?v=20260905c"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -1439,8 +1440,59 @@ AppAuth.requireLogin((user, profile) => {
       + '<p style="margin:0;font-size:0.85rem;color:var(--text-hint)">' + esc((e && e.message) || String(e)) + '</p>'
       + '<button class="btn-cancel" style="margin-top:14px" onclick="location.reload()">Try again</button></div>';
   });
-  if (typeof VendorGuide !== 'undefined') VendorGuide.maybeAutoOpen(profile.id);
+  configureVendorTour();
+  /* ⚠️ ONE auto-open, not two. The coach tour is the first-run experience — the
+     slide deck stays behind the "?" for anyone who wants to read rather than be
+     shown. Auto-opening both would stack two modals on a first login. */
+  if (window.CoachTour && CoachTour.available()) CoachTour.maybeAutoStart();
+  else if (typeof VendorGuide !== 'undefined') VendorGuide.maybeAutoOpen(profile.id);
 });
+
+/* ── the guided tour ─────────────────────────────────────────────────────────
+   Points at the real directory rather than describing it. Steps whose element
+   is missing or hidden are skipped, so a read-only role (no Data Tools, no bulk
+   bar) simply gets a shorter tour with no branching here. */
+function configureVendorTour() {
+  if (!window.CoachTour) return;
+  CoachTour.configure({
+    key: 'coach_vendors',
+    steps: [
+      { sel: '.vm-head', title: 'The vendor directory',
+        body: 'Every company Megawide buys from &mdash; about 2,400 of them, from the SAP masterlist '
+            + 'and from work-package history. This is the list every bid round picks its bidders from.' },
+      { sel: '#kpi-accredited', pad: 6, title: 'The tiles are the filter',
+        body: 'They are not just counters. Click one to filter the directory to it &mdash; accredited, '
+            + 'not accredited, problematic, awaiting review, or edited by the vendor.' },
+      { sel: '#kpi-problematic', pad: 6, title: 'Problematic means blacklisted',
+        body: 'A problematic vendor keeps a live record <b>on purpose</b>, so officers can see the flag '
+            + 'and the reason behind it. Awarding to one asks you to confirm rather than blocking you.' },
+      { sel: '#vendor-search', title: 'Search reaches further than the name',
+        body: 'Company, trade, product or service, vendor code and TIN. Searching &ldquo;labor&rdquo; or '
+            + 'a material finds the vendors who actually supply it.' },
+      { sel: '#vv-grid', pad: 6, title: 'Cards, grid, analytics',
+        body: '<b>Cards</b> to browse. <b>Grid</b> is a spreadsheet you can bulk-edit like Excel &mdash; '
+            + 'select, fill down, paste, undo, then Save. <b>Analytics</b> shows spend, win rates, '
+            + 'accreditation risk and cycle time.' },
+      { sel: '#btn-tools-menu', title: 'Data Tools',
+        body: 'The cleanup kit: import vendors from work packages, merge duplicates, split records that '
+            + 'ran several companies together, normalise trades, and the registration QR code.' },
+      { sel: '#vendorSelAll', pad: 10, title: 'Bulk actions',
+        body: 'Tick vendors to set accreditation on many at once, or export a mail-merge list. '
+            + '&ldquo;Select all matching&rdquo; reaches the whole filtered set, not just this page.' },
+      { sel: '#vendorCards .vcard', pad: 4, title: 'Inside a profile',
+        body: 'Opening a vendor gives you their accreditation and documents, catalogue, personnel, '
+            + 'reference rates, bid history, the work packages they are on, and a full change history '
+            + 'you can roll back.' },
+      { sel: '#nav-vendor-claims', title: 'Vendor Registrations',
+        body: 'Vendors register themselves from one public link or QR code. They identify by TIN and '
+            + 'company name, the server matches them, and every claim lands here for you to approve '
+            + '&mdash; nobody gets access without review.' },
+      { sel: '#nav-bids', title: 'Bid Management is next door',
+        body: 'That is where a work package goes out to bid, using these vendors. It has its own tour '
+            + 'behind the same <b>?</b> button. Reopen this one there too, any time.' },
+    ],
+  });
+}
 
 function _initBulkUI() {
   if (!_canManage) return;
