@@ -2914,14 +2914,19 @@ data is new.
 - `bids.html` has no deck, so its own injected "?" starts the tour directly.
 **Driven live as super_admin, which found two real bugs the static checks could not.**
 
-- **⚠️⚠️ THE 9999px BOX-SHADOW SPOTLIGHT WEDGED THE RENDERER — fixed in `coachmarks.js`, so
-  this affected index / project / wp-form too.** `.ct-spot` dimmed the page with
-  `box-shadow: 0 0 0 9999px`, asking the compositor for a layer thousands of pixels wider than
-  the screen on every step. On `vendors.html` the page locked up for 30s+ each time the tour
-  started or advanced, and the overlay painted as **tiled copies of the page**. Measured, not
-  guessed: a screenshot timed out at 30s repeatedly with the shadow and returned instantly the
-  moment it was removed. It is now **four small fixed panels** butted against the spotlight —
-  identical appearance, a fraction of the paint. **Do not go back to the shadow.**
+- **The dim overlay is four fixed panels, not a 9999px `box-shadow` spread** (`coachmarks.js`,
+  so it applies to index / project / wp-form too). Identical appearance, and it does not ask the
+  compositor for a layer thousands of pixels wider than the screen on every step.
+  **⚠️ CORRECTION, AND THE LESSON MATTERS MORE THAN THE CHANGE.** This was first written up as
+  a fix for a renderer freeze, on the strength of an A/B where a screenshot timed out at 30s
+  repeatedly with the shadow and returned instantly once it was removed. **That conclusion was
+  wrong.** Screenshots were later seen timing out the same way with **no tour open at all**,
+  on a different page, while `javascript_tool` kept answering instantly — so the stall was in
+  the extension's capture path, not the page, and the "tiled copies of the page" artifact was
+  most likely from that same failing capture. The four-panel version is kept because it is
+  cheaper and no worse, **not** because it fixed a proven bug. **A screenshot timing out is not
+  evidence about the page — confirm the renderer is actually stalled (try `javascript_tool`
+  first) before blaming code for it.**
 - **⚠️ THE TOUR MUST START INSIDE `loadAll().then()`, NEVER BESIDE IT.** `CoachTour` freezes its
   step set at `start()` and skips whatever is not VISIBLE right then. Started alongside the
   fetch, the directory is still behind `#loading`, so every main-content step is invisible and
@@ -2930,8 +2935,11 @@ data is new.
   `await loadAll()`); `vendors.html` now calls `startVendorGuidance()` from the `.then()`.
 - Confirmed working live: the two-item **?** menu renders and positions correctly, the tour
   opens at **Step 1 of 10**, and the spotlight framed `.vm-head` accurately.
-- **Still not walked end-to-end on a real bid round** — `bids.html`'s workspace steps need a
-  round open at each stage. Flag anything that reads oddly.
+- **⚠️ NOT walked past step 1, and `bids.html`'s tour was never opened at all.** The session
+  ended with BOTH pages stuck on `#loading` — `loadAll()` never resolving, no console error,
+  while JS kept responding — so the remaining steps are still unverified against real content.
+  `vendors.html` legitimately takes tens of seconds to load ~2,400 vendors, which is worth
+  remembering when judging any "the page is frozen" report against it.
 
 ### The RFQ email is Megawide's own template, formatted (2026-09-05)
 
