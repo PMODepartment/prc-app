@@ -23,6 +23,16 @@
 --
 -- ⚠️ Rows marked `body` inspect a function's SOURCE TEXT. That proves the
 --    definition currently installed, not that a particular file installed it.
+--
+-- ⚠️⚠️ A DATA CHECK MUST NEVER NAME A COLUMN ITS OWN MIGRATION ADDS.
+--    Postgres resolves the ENTIRE statement at parse time, so one missing
+--    column aborts all 66 checks with a single `42703` and reports nothing —
+--    the exact blindness this file exists to remove. It happened: `11b` named
+--    `budget_bcb0` directly and the whole checker failed on a database that was
+--    missing `2026-07-23_bcb_baselines` (2026-09-05).
+--    Read such a column as `to_jsonb(w) ->> 'the_column'` instead — a missing
+--    key yields NULL rather than a parse error — and reach a possibly-missing
+--    TABLE only through the catalogs, never by naming it.
 -- ============================================================================
 
 with t as (
@@ -86,9 +96,11 @@ select ord, migration, note, applied from (
     (select count(*) = 3 from c where table_name='work_packages'
        and column_name in ('budget_bcb0','budget_bcb1','budget_bcb2'))
 
+  -- ⚠️ budget_bcb0 is read through to_jsonb, NOT named. See the header: naming a
+  --    column #11 adds makes the whole file unparseable when #11 has not run.
   union all select '11b', '  budget_bcb0 backfilled', 'part of #11',
-    (select count(*) = 0 from public.work_packages
-      where budget_bcb0 is null and approved_budget_bcb is not null)
+    (select count(*) = 0 from public.work_packages w
+      where (to_jsonb(w) ->> 'budget_bcb0') is null and w.approved_budget_bcb is not null)
 
   union all select '11c', '  money kept OUT of wp_view_public', 'viewers must never see it',
     (select count(*) = 0 from c
@@ -279,8 +291,13 @@ select ord, migration, note, applied from (
      and (select count(*) = 1 from c
            where table_name='work_packages' and column_name='class_code'))
 
+  -- ⚠️ Counted from the statistics catalog, NOT `select count(*) from class_codes`
+  --    — naming the table breaks the whole file when #47i has not run. This is a
+  --    live-row ESTIMATE, so a stats reset can read 0 on a seeded table; if this
+  --    says f while #47i says t, count the table by hand before re-seeding.
   union all select '47j', '  class codes are SEEDED', 'SEED_class_codes.sql, git-ignored',
-    (select count(*) > 100 from public.class_codes)
+    (select coalesce((select n_live_tup from pg_stat_user_tables
+                       where schemaname = 'public' and relname = 'class_codes'), 0) > 100)
 
   union all select '47k', '2026-09-05_vendor_push', 'web push',
     (select count(*) = 2 from t

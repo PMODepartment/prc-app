@@ -134,6 +134,18 @@ missing column and `PGRST205` for a missing table); do not trust a note.
 **⚠️ Policies, triggers, function BODIES and data fixes cannot be probed from
 outside** — ten migrations remain unverifiable either way; see `migrations/README.md`.
 
+**`migrations/CHECK_migration_status.sql` answers "what has actually run" in one
+read-only statement** — 66 checks, one row per migration, `applied` must read `t`.
+**⚠️⚠️ A CHECK MUST NEVER NAME A COLUMN OR TABLE ITS OWN MIGRATION ADDS.** Postgres
+resolves the whole statement at parse time, so ONE missing object aborts all 66 with
+a single `42703`/`42P01` and reports nothing — precisely the blindness the file exists
+to remove. **It happened (2026-09-05):** check `11b` named `budget_bcb0` directly, so
+on the database that was actually missing `2026-07-23_bcb_baselines` the checker died
+instead of reporting it. Read such a column as **`to_jsonb(w) ->> 'the_column'`** (a
+missing key yields NULL, not an error) and reach a possibly-missing TABLE only through
+the catalogs — `47j` counts `class_codes` via `pg_stat_user_tables.n_live_tup`, which
+is a live-row ESTIMATE, so a stats reset can read `f` on a seeded table.
+
 **⚠️ FILENAME ORDER IS NOT RUN ORDER — `migrations/README.md` is authoritative.** Sorting the
   folder is wrong in at least one place: eight files share `2026-08-10` and alphabetically
   `vendor_invite_rls_fix` sorts BEFORE `vendor_management`, yet it depends on the tables that
