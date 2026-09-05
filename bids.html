@@ -1555,12 +1555,25 @@ function phaseStats(label) {
       + _chip(threads, threads === 1 ? 'clarification' : 'clarifications');
   }
   if (label === 'Evaluated') {
-    const amts = inPlay.map(i => i.offer_amount).filter(v => v != null && v !== '');
-    const low = amts.length ? Math.min.apply(null, amts) : null;
+    /* ⚠️ THE HEADLINE IS THE LOWEST COMPLIANT BID, NOT THE LOWEST BID. This
+       panel's own rule is that a cheaper non-compliant offer is not the lowest,
+       and the first cut contradicted it: on a sample round where the cheapest
+       bidder was marked non-compliant, the card quoted that bidder's price and
+       measured IT against the budget — a figure nobody can actually award.
+       Once anything is marked compliant the headline follows compliance; before
+       that it is the lowest offer, and says so. */
+    const amt = i => (i.offer_amount == null || i.offer_amount === '') ? null : Number(i.offer_amount);
+    const priced = inPlay.filter(i => amt(i) != null);
+    const compliant = priced.filter(i => i.technical_compliant === true);
+    const anyAssessed = inPlay.some(i => i.technical_compliant != null);
+    const pool = compliant.length ? compliant : priced;
+    const low = pool.length ? Math.min.apply(null, pool.map(amt)) : null;
+    const lowLabel = compliant.length ? 'lowest compliant' : 'lowest offer';
     const comp = inPlay.filter(i => i.technical_compliant === true).length;
     const shortl = inPlay.filter(i => i.shortlisted).length;
-    return (low != null ? _chip(money(low), 'lowest offer') : '')
-      + _chip(comp + ' / ' + inPlay.length, 'compliant', comp ? 'ok' : 'warn')
+    return (low != null ? _chip(money(low), lowLabel) : '')
+      + _chip(comp + ' / ' + inPlay.length, 'compliant',
+              comp ? 'ok' : (anyAssessed ? 'warn' : ''))
       + _chip(shortl, 'shortlisted')
       + (low != null && bcbOf() ? _chip(vsBcbHtml(low) || '&mdash;', 'against budget') : '');
   }
