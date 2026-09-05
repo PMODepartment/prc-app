@@ -1429,7 +1429,12 @@ function phaseSection(label, hint, bodyHtml) {
   if (!bodyHtml || !bodyHtml.trim()) return '';
   const steps = VendorDb.bidRounds.procSteps;
   const at = steps.indexOf(label);
-  const cur = steps.indexOf(roundProcStatus());
+  /* ⚠️ 'Not Started' OWNS NO PHASE, so a draft round used to render with no phase
+     marked live at all — every heading grey, nothing saying where you are.
+     Clamping to 1 makes Sourced the live phase while the round is still being
+     prepared, which is true: the ask and the bidders ARE the Sourced work. Any
+     later status indexes normally. */
+  const cur = Math.max(1, steps.indexOf(roundProcStatus()));
   const state = R.stage === 'cancelled' ? '' : (at === cur ? ' now' : (cur > at ? ' done' : ''));
   return '<section class="bm-phase' + state + '" id="ph-' + label.toLowerCase() + '">'
     + '<div class="bm-phase-head">'
