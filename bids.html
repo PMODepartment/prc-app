@@ -279,12 +279,15 @@
        screens — the shape wp-form.html and the dashboards already use. */
     .bid-layout{display:flex;gap:18px;align-items:flex-start}
     .bid-layout > #roundHost{flex:1;min-width:0}
-    .bid-nav{position:sticky;top:76px;flex:0 0 178px;max-height:calc(100vh - 96px);overflow-y:auto;
-      display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:11px;
-      background:var(--surface);border:1px solid var(--border)}
-    .bid-nav a{display:block;padding:7px 10px;border-radius:7px;text-decoration:none;
-      font-size:0.7857rem;font-weight:600;color:var(--text-secondary);
-      border-left:3px solid transparent;line-height:1.35}
+    /* Matches wp-form.html's #form-nav exactly - same width, offset, radius, shadow
+       and type - so the two rails in this app are the same component. */
+    .bid-nav{position:sticky;top:72px;flex:0 0 210px;max-height:calc(100vh - 88px);overflow-y:auto;
+      display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:12px;
+      background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+    .bid-nav a{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;
+      text-decoration:none;font-size:0.8571rem;font-weight:600;color:var(--text-secondary);
+      border-left:2.5px solid transparent;line-height:1.35;white-space:nowrap;
+      transition:background .15s,color .15s}
     .bid-nav a:hover{background:var(--surface-2);color:var(--text-primary)}
     .bid-nav a.on{background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);
       border-left-color:var(--mw-red)}
@@ -1462,8 +1465,12 @@ function vsBcbHtml(amount) {
    Label first, then the value — the order the dashboards use. */
 function _chip(value, label, cls) {
   if (value == null || value === '') return '';
-  const accent = cls === 'ok' ? 'accent-green' : cls === 'warn' ? 'accent-amber'
-               : cls === 'muted' ? 'accent-gray' : 'accent-red';
+  /* ⚠️ NEUTRAL IS THE DEFAULT, AND RED IS NOT USED HERE AT ALL. The first cut
+     fell through to accent-red for anything with no state, so a fresh round was
+     a wall of red zeros — brand red reading as an alarm on figures that are
+     merely counts. Red is reserved for things that are actually wrong; a plain
+     number gets the grey accent. */
+  const accent = cls === 'ok' ? 'accent-green' : cls === 'warn' ? 'accent-amber' : 'accent-gray';
   const vc = cls === 'ok' ? ' green' : cls === 'warn' ? ' amber' : '';
   return '<div class="metric-card ' + accent + '">'
     + '<div class="metric-label">' + esc(label) + '</div>'
