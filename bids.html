@@ -90,6 +90,21 @@
     .bm-high{font-size:0.7143rem;font-weight:700;color:var(--mw-red-ink)}
 
     /* clarification threads — one per subject, per bidder */
+    /* One collapsed row per bidder — see clarifyPanel's own note. */
+    .cl-sum{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;
+      flex-wrap:wrap;padding:9px 10px;border-radius:9px}
+    .cl-sum::-webkit-details-marker{display:none}
+    .cl-sum::before{content:'b8';color:var(--text-hint);font-size:0.7857rem;
+      transition:transform .15s}
+    details[open] > .cl-sum::before{transform:rotate(90deg)}
+    .cl-sum:hover{background:var(--surface-2)}
+    .cl-name{font-weight:700;font-size:0.8571rem}
+    .cl-meta{font-size:0.75rem;color:var(--text-hint)}
+    .cl-none{font-style:italic}
+    .cl-wait{margin-left:auto;font-size:0.6429rem;font-weight:800;letter-spacing:.04em;
+      text-transform:uppercase;background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);
+      border-radius:5px;padding:2px 7px}
+    html.dark-mode .cl-wait,body.dark-mode .cl-wait{background:rgba(255,122,110,.16)}
     .cl-vendor{padding:12px 0;border-top:1px solid var(--border)}
     .cl-vendor:first-of-type{border-top:0;padding-top:0}
     .cl-thread{border-left:2px solid var(--border-md);padding-left:11px;margin:0 0 12px}
@@ -157,8 +172,27 @@
        class names against the stylesheets rather than by looking at it. */
     .bm-wait{padding:14px 16px;border:1px dashed var(--border-md);border-radius:10px;
       color:var(--text-hint);font-size:0.8571rem;background:var(--surface-2)}
-    .bm-stats{margin:12px 0 16px}
-    .bm-stats .metric-value{font-size:1.0714rem}
+    /* ⚠️ ONE ROW, HOWEVER MANY THERE ARE. The shared .metrics-grid is hardcoded
+       to repeat(4, 1fr) — right for a Cost Overview of exactly four cards, but a
+       phase carries five or six, so the fifth wrapped onto a line of its own and
+       sat there alone at a quarter width. `grid-auto-flow:column` with equal
+       auto-columns puts every chip on one row and shares the width evenly, for
+       any count, with no per-phase arithmetic.
+       ⚠️ minmax(0,1fr), NOT 1fr — a grid item's automatic minimum is its content,
+       so a long value like "PHP 3,750,000 under · 14.4%" would push the row wider
+       than its container and reintroduce the overflow. */
+    .bm-stats{margin:12px 0 16px;grid-template-columns:none;
+      grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:10px}
+    .bm-stats .metric-card{min-width:0}
+    .bm-stats .metric-value{font-size:1.0714rem;overflow-wrap:anywhere;line-height:1.25}
+    .bm-stats .metric-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    /* Below the desktop breakpoint one row of six is unreadable, so let them
+       wrap two-up again — the shared rule already does that, this just puts the
+       flow back. */
+    @media (max-width:900px){
+      .bm-stats{grid-auto-flow:row;grid-template-columns:repeat(2,1fr)}
+      .bm-stats .metric-label{white-space:normal}
+    }
     /* A filled track behind the stepper, so progress is a shape and not only
        five words. Width is set inline from the current step. */
     .bm-track{height:4px;border-radius:3px;background:var(--surface-2);margin:0 2px 14px;overflow:hidden}
@@ -888,8 +922,8 @@ function configureBidTour() {
       { sel: '#bp-costcompare', title: 'One comparison, not two',
         body: 'Cost <b>and</b> technical in the same table, because they are one decision: a cheaper bid '
             + 'that misses a <b>mandatory</b> requirement is not the lowest. Three bands &mdash; the '
-            + 'priced lines, the commercial terms, then the TOR requirements &mdash; laid out like your '
-            + 'own cost-comparison workbook, one column per bidder.' },
+            + 'TOR requirements first, then the priced lines, then the commercial terms &mdash; so you '
+            + 'read who <b>qualifies</b> before you read what they cost.' },
       { sel: '#bp-costcompare .cc-tot-net', pad: 3, title: 'Everything is compared net of VAT',
         body: 'Your letter asks for VAT-inclusive quotations, but the <b>budget and the awarded cost are '
             + 'VAT-ex</b> &mdash; so comparing the quoted figures would overstate every bid by the VAT '
@@ -2983,23 +3017,40 @@ function clarCatLabel(c) {
 function clarifyPanel() {
   const rows = INV.filter(i => i.status === 'submitted' || (THREADS[i.id] || []).length);
   if (!rows.length) return '';
+  const total = rows.reduce((n, i) => n + (THREADS[i.id] || []).length, 0);
+  /* ⚠️ ONE ROW PER BIDDER, CLOSED. This panel rendered every thread of every
+     bidder expanded PLUS a full ask form each — with eight bidders it was the
+     bulk of the page, and almost all of it was empty forms.
+     ⚠️ A BIDDER WHOSE LAST MESSAGE IS THEIRS OPENS BY DEFAULT: that is a question
+        waiting on us, and collapsing it by default would hide the only thing on
+        this panel that needs doing. */
+  const waiting = rows.filter(i => {
+    const th = THREADS[i.id] || [];
+    return th.length && th[th.length - 1].author !== 'staff';
+  }).length;
   return '<div class="panel" id="bp-clarify"><div class="panel-title">Clarifications</div>'
-    + '<div class="sec-note">Questions to one bidder about their proposal. '
-    + '<b>Messages with the same subject are one thread</b> \u2014 to start another, just pick a '
-    + 'different subject and send. There is no thread to create or name. '
-    + 'Each thread is private to that bidder, and they answer from the same link they bid with, '
-    + 'with no login. The whole exchange is kept, so the back-and-forth stays on the record.</div>'
+    + '<div class="sec-note">Private to one bidder, answered from the same link they bid with. '
+    + '<b>Messages sharing a subject are one thread</b> &mdash; pick a different subject to start another.'
+    + (total ? ' <b>' + total + '</b> message' + (total === 1 ? '' : 's') + ' so far'
+        + (waiting ? ', <b class="cc-bad">' + waiting + ' awaiting your reply</b>' : '') + '.' : '')
+    + '</div>'
     + rows.map(i => {
         const th = THREADS[i.id] || [];
-        // group into threads, newest-active first, but only categories in use
         const by = {};
         th.forEach(m => { const c = m.category || 'other'; (by[c] = by[c] || []).push(m); });
         const used = CLAR_CATS.filter(c => by[c] && by[c].length);
-        return '<div class="cl-vendor">'
-          + '<div class="bidder-name" style="margin-bottom:8px">' + esc(i.vendor_name)
-          + (th.length ? '<small>' + th.length + (th.length === 1 ? ' message' : ' messages')
-              + ' · ' + used.length + (used.length === 1 ? ' thread' : ' threads') + '</small>' : '')
-          + '</div>'
+        const last = th.length ? th[th.length - 1] : null;
+        const theirTurn = !!(last && last.author !== 'staff');
+        return '<details class="cl-vendor"' + (theirTurn ? ' open' : '') + '>'
+          + '<summary class="cl-sum">'
+          + '<span class="cl-name">' + esc(i.vendor_name) + '</span>'
+          + (th.length
+              ? '<span class="cl-meta">' + th.length + (th.length === 1 ? ' message' : ' messages')
+                + ' &middot; ' + used.length + (used.length === 1 ? ' thread' : ' threads')
+                + ' &middot; ' + esc(dt(last.created_at)) + '</span>'
+              : '<span class="cl-meta cl-none">no questions yet</span>')
+          + (theirTurn ? '<span class="cl-wait">awaiting your reply</span>' : '')
+          + '</summary>'
           + (used.length ? used.map(c =>
               '<div class="cl-thread"><div class="cl-thread-head">' + esc(clarCatLabel(c))
               + '<span class="cl-n">' + by[c].length + '</span></div>'
@@ -3013,8 +3064,7 @@ function clarifyPanel() {
                   + '<div class="cl-body">' + esc(m.message) + '</div></div>';
                 }).join('')
               + '</div>').join('')
-            : '<div class="sec-note" style="margin:0 0 8px">No clarifications yet \u2014 '
-              + 'pick a subject below and send the first question.</div>')
+            : '')
           + (canManage
               ? '<div class="cl-ask">'
                 + '<div class="bm-cell" style="flex:0 0 150px"><label class="bm-cl" for="cc-' + i.id + '">Subject</label>'
@@ -3027,7 +3077,7 @@ function clarifyPanel() {
                 + '<div class="bm-hint">Same subject as an earlier question &rarr; it joins that thread.</div></div>'
                 + '<button class="btn" onclick="sendClarify(' + Q + i.id + Q + ')">Send</button></div>'
               : '')
-          + '</div>';
+          + '</details>';
       }).join('')
     + '</div>';
 }
@@ -3910,7 +3960,7 @@ function costComparePanel() {
     return lo;
   })();
   const totals = !REFITEMS.length ? '' :
-      '<tr class="cc-tot"><td class="cc-stick">Total of the lines<small>as quoted</small></td>'
+      '<tr class="cc-tot"><td class="cc-stick">GRAND TOTAL<small>as quoted</small></td>'
     + '<td class="cc-qty"></td>'
     + (showBudget ? '<td class="cc-budcol">' + (budTotal > 0 ? esc(_amt(budTotal)) : '\u2014') + '</td>' : '')
     + rows.map(function (i) {
@@ -3919,7 +3969,7 @@ function costComparePanel() {
           + (pt.total != null ? '<small>' + pt.lines + ' of ' + REFITEMS.length + ' lines</small>' : '')
           + '</td>';
       }).join('') + '</tr>'
-    + '<tr class="cc-tot cc-tot-net"><td class="cc-stick">Comparable total'
+    + '<tr class="cc-tot cc-tot-net"><td class="cc-stick">GRAND TOTAL'
     + '<small>net of VAT \u2014 the basis the BCB uses</small></td><td class="cc-qty"></td>'
     + (showBudget ? '<td class="cc-budcol">' + (budTotal > 0 ? esc(_amt(budTotal)) : '\u2014') + '</td>' : '')
     + rows.map(function (i) {
@@ -4050,9 +4100,14 @@ function costComparePanel() {
     + '<div class="cc-wrap" id="cc-wrap"><table class="cc-table'
     + (_ccCompact ? ' cc-dense-on' : '') + '">'
     + '<thead>' + head + '</thead><tbody>'
+    /* ⚠️ REQUIREMENTS FIRST, THEN PRICES. Reading the money before knowing who
+       qualifies is how a cheaper non-compliant bid comes to look like the
+       winner — the panel's own rule, now also its reading order: qualify, then
+       compare among those who qualify, then the commercial summary. The totals
+       stay directly under the lines they total. */
+    + (REQS.length ? band('Technical requirements', 'from the terms of reference') + reqRows + reqSummary : '')
     + (REFITEMS.length ? band('Priced items', 'rate and amount per line') + itemRows + totals : '')
     + commercial
-    + (REQS.length ? band('Technical requirements', 'from the terms of reference') + reqRows + reqSummary : '')
     + '</tbody></table></div>'
     + '</div>';
 }
