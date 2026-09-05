@@ -2958,6 +2958,52 @@ data is new.
   that time the tour would open on the sidebar if it were not gated behind `loadAll().then()`.
   Worth remembering before treating a "the page is frozen" report there as a bug.
 
+### The round workspace: four phases, a visible BCB, and a much lighter load (2026-09-05)
+
+**Grouped under the approved Procurement Status.** Nine numbered panels was a sequence an officer
+had to learn on top of the status the rest of the app already speaks, and it is what made the page
+read as cluttered. Panels now sit under **Sourced / Solicited / Evaluated / Awarded**, numbered to
+match the stepper above them, and the per-panel numbers are gone — the phase is the organiser.
+- **⚠️ A PHASE WITH NOTHING IN IT RENDERS NOTHING.** Most panels return `''` until the round
+  reaches them (there is no comparison before a bid arrives), and a heading promising a section
+  that is not there is worse than silence. `phaseSection()` returns `''` on empty content.
+- **Every panel keeps its `#bp-*` id**, so the guided tour was untouched by the regrouping.
+- The section rail lists the **four phases**, not nine panels — and it no longer auto-assigns
+  positional `bsec-N` ids, which used to make a link mean a different section before and after a
+  bid arrived. Phases carry their own `ph-*` ids.
+
+**The BCB is visible, and its absence is stated.** Reported as "the BCB reference cannot be seen".
+The code was already right — it was read in the comparison table, the offer→negotiated chart and
+both exports. **The round it was tried on simply has no budget on file** (NIA101 WP 1, all four
+budget columns null). The real defect was that every BCB read was `bcb ? …show… : ''`, so on such
+a package the figure, the "vs BCB" column and the whole comparison **silently vanished** —
+indistinguishable from the feature not existing. It now says **"None on file"** and why.
+- The budget is pinned in the round header (`bcbStrip()`), so it reads from every phase.
+- **⚠️ STILL STAFF-ONLY BY CONSTRUCTION.** `bcbStrip()` returns `''` for a cost-hidden role, and
+  the BCB continues never to reach `vendor_bid_board_view`, the bid page or the RFQ letter — our
+  budget IS the ceiling we will pay.
+
+**The page stopped loading the whole portfolio to list its rounds.** Measured live: `getProjects`
+306ms, `bidRounds.list` 251ms, `invitationCounts` 251ms — and **`getAllApprovedWPs` 4,606ms for
+1,870 rows**, all four awaited in sequence before `#loading` was hidden. Every one of those rows
+was fetched to render a list of bid rounds, and `WPS` is read in exactly two places, both inside
+the New-round picker. Now the three small reads run in **parallel**, the rounds' own packages are
+fetched by id (new **`WPDb.getWPsByIds`**, chunked — a long id list blows the PostgREST URL
+length), and the portfolio-wide set is pulled only when the picker is opened.
+
+**⚠️⚠️ CORRECTION — THE "PAGE NEVER FINISHES LOADING" WAS THE TEST TAB, NOT THE APP.** It was
+written up as a hang this change fixed. It was not. The tab driving the test was a **hidden
+background tab** (`document.visibilityState === 'hidden'`), where Chrome's intensive throttling
+stalls timers *and* network: proven by `await setTimeout(500)` never returning while `1+1`
+answered instantly, then by **a plain `fetch()` to the page's own GitHub Pages origin sitting
+pending for 9s**. A tab created fresh loaded the same round completely. The `?round=` deep link,
+also suspected, works. The 4.6s measurement was taken while the tab was live and is real, so the
+optimisation stands **as a performance fix, not a hang fix**.
+- **⚠️ CHECK `document.visibilityState` FIRST when the browser harness appears to hang.** This is
+  the SECOND time in one session that a harness artefact was attributed to the app (the first was
+  the coach-mark box-shadow). A screenshot timing out, a "frozen renderer", and a promise that
+  never settles are all symptoms a hidden tab produces on its own.
+
 ### The RFQ email is Megawide's own template, formatted (2026-09-05)
 
 `migrations/2026-09-05_officer_signature.sql` (**RUN ME**), `bids.html`.
