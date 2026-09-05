@@ -1291,8 +1291,8 @@ function refDocsHtml(ro) {
 }
 function refItemsHtml(ro) {
   if (!REFITEMS.length) {
-    return '<div class="sec-note" style="margin:0">Nothing to price yet. '
-      + 'Add a line for each item, with its quantity.</div>';
+    return '<div class="empty-state"><i class="ti ti-list-numbers"></i>'
+      + '<b>No priced items yet</b>Add a line for each item, with its quantity.</div>';
   }
   return '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
     + '<th style="width:60px">Item</th><th>Description</th><th>Specification</th>'
@@ -1321,7 +1321,8 @@ function referencePanel() {
        that is what it is called, and each half says what it is for in six words
        rather than a paragraph about TOR and MPSS. */
     + '<div class="ref-sub">Documents <span>every vendor gets these</span></div>'
-    + (refDocsHtml(ro) || '<div class="sec-note" style="margin:0">Nothing attached yet.</div>')
+    + (refDocsHtml(ro) || '<div class="empty-state"><i class="ti ti-paperclip"></i>'
+        + '<b>No documents yet</b>Attach the drawings and specifications vendors price against.</div>')
     + (ro ? '' :
         '<div class="ref-add">'
         + '<select id="rf-kind" class="bm-in" style="flex:0 0 160px">'
@@ -1419,13 +1420,14 @@ function bcbOf() {
 function bcbStrip() {
   if (window.__hideBudget) return '';
   const b = bcbOf();
+  /* One line either way. It used to spend three on the empty case, which made
+     a missing budget look like an error rather than a field to fill in. */
   if (!b) {
     return '<div class="bm-bcb bm-bcb-none"><span>Budget (BCB)</span>'
-      + '<b>None on file</b>'
-      + '<small>There is nothing to compare the offers against. Add it on the work package.</small></div>';
+      + '<b>Not set</b><small>on the work package</small></div>';
   }
   return '<div class="bm-bcb"><span>Budget (BCB)</span><b>' + esc(money(b)) + '</b>'
-    + '<small>Internal only &mdash; never sent to bidders.</small></div>';
+    + '<small>internal only</small></div>';
 }
 /* One amount measured against the budget. Empty string when there is no BCB, so
    callers can drop it in without guarding. */
@@ -1538,8 +1540,24 @@ function phaseStats(label) {
   return '';
 }
 
+/* What unlocks a phase that has not been reached yet. */
+const PHASE_WAIT = {
+  Sourced:   'Set the scope and add the vendors you want to quote.',
+  Solicited: 'Issue the RFQ and the quotations land here.',
+  Evaluated: 'Comparison, compliance and negotiation open once a quotation arrives.',
+  Awarded:   'Record the award once you have chosen a quotation.',
+};
 function phaseSection(label, hint, bodyHtml) {
-  if (!bodyHtml || !bodyHtml.trim()) return '';
+  /* ⚠️ EVERY PHASE ALWAYS RENDERS, EVEN AN EMPTY ONE — REVERSED ON PURPOSE.
+     It used to return '' with nothing in it, on the reasoning that a heading
+     promising an absent section is worse than silence. In use that reads as
+     controls going missing: on a draft round the rail showed only Sourced and
+     Solicited, and Evaluated and Award looked like they had disappeared.
+     Seeing the whole sequence, with what you have not reached yet greyed out,
+     is what makes the process legible. So an unreached phase shows one muted
+     line saying what unlocks it, and the rail always lists all four. */
+  const empty = !bodyHtml || !bodyHtml.trim();
+  if (empty) bodyHtml = '<div class="bm-wait">' + esc(PHASE_WAIT[label] || '') + '</div>';
   const steps = VendorDb.bidRounds.procSteps;
   const at = steps.indexOf(label);
   /* ⚠️ 'Not Started' OWNS NO PHASE, so a draft round used to render with no phase
@@ -1739,7 +1757,7 @@ function biddersPanel() {
 
   return '<div class="panel" id="bp-bidders"><div class="panel-title">Proposed vendors</div>'
     + '<div class="sec-note">Who is being asked to quote. '
-    + '<b>Unaccredited vendors may be invited</b> — BP policy N29 runs accreditation in parallel; only the AWARD requires it.</div>'
+    + '<b>Unaccredited vendors may be invited</b> &mdash; only the award requires accreditation.</div>'
     + (INV.length ? rows : '<div class="empty-state"><i class="ti ti-users"></i><b>No bidders yet</b>Add the vendors you want to quote this package.</div>')
     + (canManage ? '<div class="field" style="margin-top:14px"><label>Add a bidder</label>'
         + '<input id="vSearch" type="text" placeholder="Search the vendor directory…" oninput="searchVendors()" autocomplete="off">'
@@ -2315,8 +2333,76 @@ function responsesPanel() {
             + '</div>'
             + (i.vendor_notes ? '<div class="sec-note" style="margin:-4px 0 10px 2px">' + esc(i.vendor_notes) + '</div>' : ''))
           .join('')
-        : '<div class="empty-state"><i class="ti ti-inbox"></i><b>Nothing in yet</b>Bids appear here as they are submitted.</div>')
+        : '<div class="empty-state"><i class="ti ti-inbox"></i><b>Nothing in yet</b>Quotations appear here as they arrive.</div>')
+    + _pendingQuoteRows()
     + '</div>';
+}
+/* ── quotations that arrived by email ────────────────────────────────────────
+   ⚠️⚠️ MOST QUOTATIONS WILL NOT COME THROUGH THE LINK, AND THIS PANEL USED TO
+      HAVE NO WAY IN. Megawide's own RFQ template tells the vendor to email the
+      quotation to the officer, and the bid link is offered second — so the
+      common case was the one the app could not record. Everything downstream
+      reads offer_amount: with no way to enter it, the comparison, the
+      evaluation and the award were all unreachable on an email-only round.
+   ⚠️ NO FAKED PROVENANCE. Nothing here pretends the vendor submitted it: the
+      attached file is the evidence, and the audit columns already record which
+      officer entered it. */
+function _pendingQuoteRows() {
+  if (!canManage || R.stage === 'awarded' || R.stage === 'cancelled') return '';
+  const waiting = INV.filter(i => i.status !== 'submitted' && i.status !== 'closed'
+    && i.status !== 'withdrawn' && i.status !== 'declined');
+  if (!waiting.length) return '';
+  return '<div class="ref-sub" style="margin-top:16px">Received by email '
+    + '<span>enter a quotation a vendor sent you directly</span></div>'
+    + waiting.map(i =>
+        '<div class="bidder">'
+        + '<div class="bidder-name" style="flex:0 0 180px">' + esc(i.vendor_name) + '</div>'
+        + '<input id="rq-a-' + i.id + '" type="number" step="0.01" placeholder="Quoted amount" '
+        + 'style="flex:0 0 160px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;'
+        + 'font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+        + '<input id="rq-l-' + i.id + '" type="number" placeholder="Lead time (days)" '
+        + 'style="flex:0 0 140px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;'
+        + 'font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
+        + '<label class="btn btn-sm" style="cursor:pointer" title="Attach the quotation you were sent">'
+        + '<i class="ti ti-paperclip"></i> Attach'
+        + '<input type="file" style="display:none" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx" '
+        + 'onchange="uploadQuote(' + Q + i.id + Q + ', this)"></label>'
+        + '<button class="btn btn-sm btn-primary" onclick="recordQuote(' + Q + i.id + Q + ')">Record</button>'
+        + '</div>').join('');
+}
+async function recordQuote(id) {
+  const amt = num(val('rq-a-' + id));
+  if (amt == null || !(amt > 0)) { AppNotify.warn('Enter the quoted amount first.'); return; }
+  try {
+    await VendorDb.bidBoard.update(id, {
+      offer_amount: amt,
+      lead_time_days: num(val('rq-l-' + id)),
+      status: 'submitted',
+      submitted_at: new Date().toISOString(),
+    }, profile);
+    INV = await VendorDb.bidRounds.invitations(R.id);
+    renderRound();
+    AppNotify.success('Quotation recorded.');
+  } catch (e) { AppNotify.fromError(e, 'Could not record that quotation'); }
+}
+/* The emailed file itself, stored exactly like a vendor's own upload. */
+async function uploadQuote(invId, input) {
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 15 * 1024 * 1024) { AppNotify.warn('That file is over 15 MB.'); input.value = ''; return; }
+  const inv = invById(invId);
+  if (!inv) return;
+  const prog = AppNotify.progress('Uploading the quotation…');
+  try {
+    const path = await VendorDb.uploadVendorFile(inv.vendor_id, 'quote_' + invId, file);
+    await VendorDb.bidBoard.update(invId, {
+      commercial_path: path, commercial_name: file.name,
+    }, profile);
+    INV = await VendorDb.bidRounds.invitations(R.id);
+    prog.done('Quotation attached.');
+    renderRound();
+  } catch (e) { prog.fail('Could not attach it: ' + (e.message || e)); }
+  input.value = '';
 }
 /* Submissions live in the private bid-submissions bucket, so each needs a
    signed URL — staff read is allowed by policy, anonymous read is not. */
@@ -2491,15 +2577,12 @@ function comparisonPanel() {
           + '<td>' + esc(i.payment_terms || '—') + '</td></tr>';
       }).join('')
     + '</tbody></table></div>'
-    + '<div class="sec-note" style="margin-top:12px">The award goes to the <b>lowest bid that meets the '
-    + 'technical requirements</b> — the TOR and the MPSS. A cheaper bid that does not '
-    + 'comply is not the lowest. Click a column heading to sort.</div>'
+    + '<div class="sec-note" style="margin-top:12px">Lowest <b>compliant</b> bid wins &mdash; a cheaper '
+    + 'non-compliant one does not. Sort by any column.</div>'
     /* BP 2.3.2 calls this a PRESENTED deliverable, so it has to leave the screen.
        Both outputs carry the BCB and are internal — the print view says so on it. */
-    + '<div class="sec-note" style="margin-top:10px">The <b>cost comparison itself is prepared outside '
-    + 'this app</b>, in the per-package template — line-by-line quantities and rates, inclusions and '
-    + 'exclusions, duties and FX, and matched technical specifications. This screen is the headline '
-    + 'position; export the bidders below to start that workbook without retyping them.</div>'
+    + '<div class="sec-note" style="margin-top:8px">Headline figures only. The full cost comparison is '
+    + 'built in your own template &mdash; export to start it.</div>'
     + '<div class="bm-actions">'
     + '<button class="btn" onclick="exportBidders()"><i class="ti ti-file-spreadsheet"></i> Export bidders &amp; offers (CSV)</button>'
     + '</div></div>';
@@ -2522,9 +2605,7 @@ function evaluationPanel() {
   const lowComp = comp.length
     ? Math.min.apply(null, comp.map(i => i.offer_amount == null ? Infinity : i.offer_amount)) : null;
   return '<div class="panel" id="bp-evaluation"><div class="panel-title">Evaluation</div>'
-    + '<div class="sec-note">A package is awarded on two things: it <b>meets the technical requirements</b> '
-    + '(the TOR and the MPSS), and it is the <b>lowest bid in the cost comparison</b>. '
-    + 'Mark compliance here; the ranking comes from the comparison workbook.</div>'
+    + '<div class="sec-note">Mark each bidder compliant or not. Ranking comes from your cost comparison.</div>'
     + rows.map(i =>
         '<div class="bidder" style="align-items:flex-end">'
         + '<div class="bm-cell" style="flex:0 0 190px"><span class="bm-cl">Bidder</span>'
@@ -2538,10 +2619,10 @@ function evaluationPanel() {
         + '<option value="yes"' + (i.technical_compliant === true ? ' selected' : '') + '>Yes — compliant</option>'
         + '<option value="no"' + (i.technical_compliant === false ? ' selected' : '') + '>No — not compliant</option>'
         + '</select></div>'
-        + '<div class="bm-cell" style="flex:0 0 110px"><label class="bm-cl" for="ev-k-' + i.id + '">Rank</label>'
-        + '<input id="ev-k-' + i.id + '" class="bm-in" type="number" min="1" step="1" inputmode="numeric"'
-        + ' title="Standing in the cost comparison. 1 is the lowest compliant bid."'
-        + ' value="' + esc(i.rank == null ? '' : i.rank) + '"' + ro + '></div>'
+    /* no Rank field: the line above says ranking comes from the cost
+       comparison, and an editable Rank box contradicted it - inviting an
+       officer to type a standing the app has no basis for. The column still
+       exists in the table and is simply no longer written. */
         + '<div class="bm-cell" style="flex:1;min-width:160px"><label class="bm-cl" for="ev-n-' + i.id + '">Notes</label>'
         + '<input id="ev-n-' + i.id + '" class="bm-in" value="' + esc(i.evaluation_notes || '') + '"' + ro
         + ' placeholder="What the comparison showed"></div>'
@@ -2563,7 +2644,6 @@ async function saveEvaluation() {
         // '' is "not assessed" and must stay NULL — false would assert the bid
         // FAILS the technical requirements when nobody has looked yet.
         technical_compliant: c === 'yes' ? true : c === 'no' ? false : null,
-        rank: intOf(val('ev-k-' + i.id)),
         evaluation_notes: val('ev-n-' + i.id) || null,
       }, profile);
     }
