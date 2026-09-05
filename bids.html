@@ -698,7 +698,12 @@ async function ensureWps() {
   const seesAll = ['super_admin', 'admin', 'specialist'].includes(profile.role);
   const all = seesAll ? await WPDb.getAllApprovedWPs()
                       : await WPDb.getApprovedWPsForProjects(profile.projects || []);
-  WPS = (all || []).filter(w => w.project_id !== 'DEMO');
+  /* ⚠️ DEMO IS KEPT HERE, unlike on the portfolio. index.html excludes it so its
+     sample figures cannot skew real KPIs — a bid round skews nothing, and DEMO
+     is the project that exists precisely so somebody can run the whole process
+     end to end without touching a live package. Practising on a real work
+     package is the alternative, and that is worse. */
+  WPS = all || [];
   WPS.forEach(w => { WPBYID[w.id] = w; });
   _wpsLoaded = true;
 }
