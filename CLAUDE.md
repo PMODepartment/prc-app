@@ -116,7 +116,13 @@ meaningless. The redundant `MIGRATION_` prefix was dropped (the folder says it);
 `update_` / `add_` were kept lowercase because they still say something the folder does not.
 `supabase-schema.sql` stays in the repo root — it is the reference schema, not a migration.
 
-- **⚠️⚠️ THREE MIGRATIONS HAD NEVER BEEN RUN — found 2026-09-05 by PROBING THE LIVE
+- **✅ ALL THREE ARE NOW RUN — `migrations/2026-09-05_pending_consolidated.sql` was executed
+2026-09-05 and its verification returned true on all nine columns** (BCB columns present,
+BCB0 back-filled, money kept out of `wp_view_public`, the need-by table + column + RLS +
+read-only check, and the board view carrying `round_id` while withholding `access_token`).
+The history below is kept because the FAILURE MODE is the lesson, not the fix.
+
+**⚠️⚠️ THREE MIGRATIONS HAD NEVER BEEN RUN — found 2026-09-05 by PROBING THE LIVE
 SCHEMA, not by reading these notes.** `migrations/2026-09-05_pending_consolidated.sql`
 bundles them in run order (a convenience file, not a new migration; all three are
 idempotent). **`2026-07-23_bcb_baselines.sql` is the costly one:** `budget_bcb0/1/2`
@@ -2873,9 +2879,85 @@ every branch of the monotonic guard — an awarded package not being dragged bac
 overwritten, no rights producing a warning rather than a silent failure, and a stored status
 being unable to inject markup.
 
-**⚠️ THE MIGRATION HAS NOT BEEN RUN.** Until it is: the compliance field and the clarification
-subject are both dropped by their deploy guards, so the round works and nothing is lost, but
-neither is stored. Its section 5 verification `SELECT` must read true on all five columns.
+**✅ RUN 2026-09-05.** The compliance field and the clarification subject are both stored.
+
+### The RFQ email is Megawide's own template, formatted (2026-09-05)
+
+`migrations/2026-09-05_officer_signature.sql` (**RUN ME**), `bids.html`.
+
+The composer drafted its own short note — "Megawide Construction Corporation invites you to
+quote the following work package", a Package/Project/Deadline block, a link, "Thank you".
+Perfectly clear, and **nothing like the letter Procurement actually sends.** Against the real
+template it was missing the company preamble, the "most competitive price proposal" request,
+the itemised requirement, the bid-breakdown / warranty / company-profile asks, **the VAT
+clause**, **the non-obligation disclaimer**, and the signature block.
+
+- **⚠️⚠️ THE WORDING IS THE TEMPLATE'S, CLAUSE FOR CLAUSE. Several clauses are COMMERCIAL OR
+  LEGAL TERMS** — "The price indicated in the quotation shall be inclusive of VAT. Costs not
+  indicated in the quotation should not be charged to, and will not be paid by Megawide", and
+  the paragraph beginning "This Request for Quotation does not constitute an offer to
+  contract". **Do not reword them because they read awkwardly.** Change them when Procurement
+  changes the template, not before. What the app supplies is the DATA: scope, project, the
+  priced line items, the reference pack, the deadline and the contact.
+- **⚠️ The salutation is the template's own "Gentlemen/Mesdames:" and is deliberately NOT
+  personalised.** It is a formal solicitation, and each bidder already gets their own link.
+- **⚠️⚠️ mailto: CANNOT CARRY THIS, which is why the delivery changed.** A mailto body is
+  plain text by definition, so the bold, the underline, the indented requirement and every
+  hyperlink die on the way through — and the Windows shell caps the whole command line at
+  ~8 KB besides. So **`mailTo()` copies the FORMATTED letter to the clipboard and opens an
+  ADDRESSED, EMPTY draft** to paste into. One click, then Ctrl+V. **The old code had a
+  `url.length > 1900` fallback that silently did a clipboard copy instead** — under this
+  template that threshold is exceeded every single time, so "Open in Outlook" would have
+  quietly stopped opening Outlook on every send.
+- **⚠️ The clipboard carries BOTH flavours** (`text/html` + `text/plain` in one
+  `ClipboardItem`). Outlook takes the HTML; a plain-text target falls back by itself. Writing
+  only HTML pastes raw tags into Notepad. `_copyHtmlFallback` covers browsers without
+  `ClipboardItem` by selecting a live off-screen node — **it must be off-screen, not
+  `display:none`, or the selection API skips it and copies nothing.**
+- **⚠️ INLINE STYLES ONLY, and a dull old-fashioned set.** Outlook renders with Word: a
+  `<style>` block is stripped, class names go with it, and flex / grid / CSS variables are
+  ignored. Points, not px. Calibri 11pt is Outlook's own default so the letter matches what
+  the officer types around it. Asserted in the tests: no `<style>`, no `class=`, no modern CSS.
+- **⚠️ BOTH submission routes, per the decision.** The template says email the officer; the
+  bid link is this app's no-login alternative. The letter names **email first, as the template
+  does**, then the link. Offering only the link would contradict the letter Procurement sends;
+  offering only email would waste the bid page.
+- **The signature block lives on the OFFICER, not the round** — `users.job_title /
+  mobile_number / viber_number / whatsapp_number`, edited in the composer itself (where you
+  discover you need it, rather than a settings page nobody visits before their first RFQ).
+  **A blank field is omitted, never printed empty** — an invented mobile number is worse than
+  an absent one, because a vendor would ring it. Saving busts the `wpm_prof_<uid>`
+  sessionStorage cache, or the letter would use the new signature now and the old one after a
+  reload. Self-service is safe: `users_update` already forbids changing role/status/projects.
+- **⚠️ THE BID LINK IS A LABEL IN THE FORMATTED LETTER, NOT 95 CHARACTERS OF RAW UUID** — it
+  reads "Open your bid page" and hyperlinks the URL. **The token itself must stay long:** it is
+  an unguessable capability that lets a vendor answer with no login, so shortening it would
+  cost exactly the entropy protecting it. What was unpresentable was PRINTING it. The
+  plain-text flavour still carries the bare URL, because plain text has nowhere to hide it.
+- **The plain-text `rfqBody()` is NOT dead code** — the mail-merge CSV and the plain clipboard
+  flavour use it, so the two builders must stay in step.
+- **The reference pack is what makes this work.** Line items become the itemised requirement
+  ("LVSG1 x 1 set"), documents become the attachment links. **They travel as LINKS, never as
+  content** — keep it that way, and keep the 25-item cap, or the letter stops being an email.
+- **Panels gained stable ids** (`#bp-ask`, `#bp-reference`, `#bp-bidders`, `#bp-responses`,
+  `#bp-clarify`, `#bp-comparison`, `#bp-evaluation`, `#bp-negotiation`, `#bp-negoviz`,
+  `#bp-award`) and **the duplicate numbering was fixed** — the reference pack and Bidders were
+  BOTH "2". `buildBidNav` only auto-assigns `bsec-N` to a panel with no id, and those are
+  positional, so an anchor meant a different section before and after a bid arrived.
+- **Verified: 74 assertions against the VERBATIM shipped functions** (extracted from
+  `bids.html` by name, run under node) — every template clause in BOTH flavours, the round's
+  data reaching the letter, both submission routes, the signature block, **a blank signature
+  field being omitted**, the formatting the template calls for, that vendor-authored line-item
+  text cannot inject markup, and that the old invented prose is gone.
+
+**⚠️ NOT BUILT — one RFQ covering SEVERAL work packages.** The decision was taken (the sample
+letter covers Main Panel Boards for Carbon Market Phase 1B *and* MCIA Cargo Warehouse, grouped
+by project), but `vendor_bid_rounds.wp_id` is a single FK and the change is not cosmetic: it
+needs a join table, and it ripples through `renderRound`, `syncWpStatus`, the comparison, the
+board view, the bid page and — the part that decides it — **`doAward()`, which writes the award
+back to one work package**. Half-doing that would put the award write-back at risk, which is
+the most consequential path in the app. The composer today groups the requirement under one
+package heading, which is the shape a multi-package version grows into.
 
 ### Thousands separators, a guide sized to its content, and 8 blank icons (2026-09-05)
 

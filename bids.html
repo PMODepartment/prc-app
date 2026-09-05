@@ -118,6 +118,14 @@
     .rfq-link{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.7143rem;
       color:var(--text-hint);word-break:break-all;flex:1;min-width:180px}
     .rfq-noemail{font-size:0.7143rem;color:var(--mw-red-ink);font-weight:600}
+    /* ⚠️ The preview shows the letter as OUTLOOK will render it, so it is
+       deliberately on a white page with black text in BOTH themes — recolouring
+       it for dark mode would preview something the recipient never sees. */
+    .rfq-preview{max-height:340px;overflow:auto;background:#fff;color:#000;
+      border:1px solid var(--border-md);border-radius:8px;padding:16px 18px}
+    .sig-box{margin-top:14px;border:1px solid var(--border-md);border-radius:8px;
+      padding:10px 14px;background:var(--surface-2)}
+    .sig-box>summary{cursor:pointer;font-weight:700;font-size:0.7857rem}
 
     .empty-state{text-align:center;padding:34px 18px;color:var(--text-hint);font-size:0.9286rem;
       line-height:1.7;border:1.5px dashed var(--border-md);border-radius:10px}
@@ -1082,7 +1090,7 @@ function refItemsHtml(ro) {
 }
 function referencePanel() {
   const ro = !canManage || R.stage === 'awarded' || R.stage === 'cancelled';
-  return '<div class="panel"><div class="panel-title">2 \u00b7 Reference pack</div>'
+  return '<div class="panel" id="bp-reference"><div class="panel-title">2 \u00b7 Reference pack</div>'
     + '<div class="sec-note">The terms of reference (TOR), the MPSS and the drawings a bidder prices '
     + 'against, and the line items they price. Issued with the RFQ and visible on every bidder\u2019s '
     + 'own link \u2014 the same set to all of them.</div>'
@@ -1253,7 +1261,7 @@ async function reTender() {
 /* 2.2.1 — Preparation of Scope of Works (BOQ) and TOR. */
 function askPanel() {
   const ro = canManage ? '' : ' disabled';
-  return '<div class="panel"><div class="panel-title">1 · The ask</div>'
+  return '<div class="panel" id="bp-ask"><div class="panel-title">1 · The ask</div>'
     + '<div class="sec-note">Scope, deadline and terms. Everything here goes to the bidders exactly as written.</div>'
     + '<div class="bm-grid">'
     + '<div class="field"><label>Document type</label><select id="a-doc"' + ro + '>'
@@ -1333,7 +1341,7 @@ function biddersPanel() {
       + '</div>';
   }).join('');
 
-  return '<div class="panel"><div class="panel-title">2 · Bidders</div>'
+  return '<div class="panel" id="bp-bidders"><div class="panel-title">3 · Bidders</div>'
     + '<div class="sec-note">Who is being asked to quote. '
     + '<b>Unaccredited vendors may be invited</b> — BP policy N29 runs accreditation in parallel; only the AWARD requires it.</div>'
     + (INV.length ? rows : '<div class="empty-state"><i class="ti ti-users"></i><b>No bidders yet</b>Add the vendors you want to quote this package.</div>')
@@ -1444,37 +1452,293 @@ function bidLink(inv) {
   const base = location.origin + location.pathname.replace(/[^/]*$/, '');
   return base + 'bid-response.html?t=' + encodeURIComponent(inv.access_token);
 }
+/* ⚠️⚠️ THE WORDING BELOW IS MEGAWIDE'S OWN RFQ / RFP TEMPLATE, NOT PROSE THIS
+      APP INVENTED. It follows the letter Procurement actually sends, clause for
+      clause: the company preamble, the "most competitive price proposal"
+      request, the itemised requirement, the bid-breakdown and company-profile
+      asks, the VAT clause, the deadline, the non-obligation disclaimer, the
+      contact line and the sign-off.
+      Several of those are COMMERCIAL OR LEGAL TERMS — the VAT sentence and the
+      disclaimer in particular — so do not reword them because they read
+      awkwardly. Change them only when Procurement changes the template.
+      What the app supplies is the DATA: the scope, the project, the priced line
+      items, the reference-pack attachments, the deadline and the contact.
+   ⚠️ The salutation is the template's own "Gentlemen/Mesdames:" and is
+      deliberately NOT personalised — this is a formal solicitation, and each
+      bidder already gets their own link. */
+const DOC_LONG = { RFQ: 'Request for Quotation', RFP: 'Request for Proposal', ITB: 'Invitation to Bid' };
+const RFQ_MAX_ITEMS = 25;
+function docLong() { return DOC_LONG[R.doc_type] || DOC_LONG.RFQ; }
+
+/* The requirement, itemised the way the template lists it ("LVSG1 x 1"), taken
+   from the reference pack so the email and the bid page cannot disagree. */
+function rfqItemLines() {
+  const L = [];
+  REFITEMS.slice(0, RFQ_MAX_ITEMS).forEach(function (it) {
+    const qty = it.quantity == null ? ''
+      : ' x ' + Number(it.quantity).toLocaleString() + (it.unit ? ' ' + it.unit : '');
+    L.push('    ' + (it.item_no ? it.item_no + '  ' : '') + it.description + qty);
+    if (it.spec) L.push('        ' + String(it.spec).replace(/\s*\n\s*/g, '; '));
+  });
+  if (REFITEMS.length > RFQ_MAX_ITEMS) {
+    L.push('    ...and ' + (REFITEMS.length - RFQ_MAX_ITEMS)
+      + ' more. The complete list is on the bid page linked below.');
+  }
+  return L;
+}
+
+/* The officer's own signature block, kept ONCE on their profile rather than per
+   round — it is the same block on every letter they send, and a per-round copy
+   would guarantee the copies drift. See migrations/2026-09-05_officer_signature.sql.
+   ⚠️ A FIELD THAT IS BLANK IS OMITTED, never printed empty. An invented mobile
+      number is worse than an absent one, because a vendor would ring it. */
+function sigFields() {
+  const p = profile || {};
+  return {
+    name: R.contact_person || p.name || '',
+    title: p.job_title || '',
+    email: R.contact_email || p.email || '',
+    mobile: p.mobile_number || '',
+    viber: p.viber_number || '',
+    whatsapp: p.whatsapp_number || '',
+  };
+}
+function sigPlain() {
+  const s = sigFields(), L = [];
+  if (s.name) L.push(s.name);
+  if (s.title) L.push(s.title);
+  L.push('Megawide Construction Corporation');
+  if (s.email) L.push('Email: ' + s.email);
+  if (s.mobile) L.push('Mobile: ' + s.mobile);
+  if (s.viber) L.push('Viber: ' + s.viber);
+  if (s.whatsapp) L.push('WhatsApp: ' + s.whatsapp);
+  L.push('Website: www.megawide.com.ph');
+  return L;
+}
+/* "reach out to X at name@… or +63 … (Text/Call/Viber)" — the template's own
+   line, with whichever halves we actually hold. */
+function contactSentence() {
+  const s = sigFields();
+  if (!s.name) return '';
+  const ways = [];
+  if (s.email) ways.push(s.email);
+  if (s.mobile) ways.push(s.mobile + ' (Text/Call/Viber)');
+  return 'For questions or concerns, you may reach out to ' + s.name
+    + (ways.length ? ' at ' + ways.join(' or ') : '') + '.';
+}
+
 function rfqBody(inv) {
   const w = WPBYID[R.wp_id] || {};
+  const who = R.contact_person || profile.name || '';
+  const mail = R.contact_email || profile.email || '';
+  const scope = (R.scope_note || wpLabel(w) || '').trim();
   const L = [];
-  L.push('Dear ' + (inv.vendor_contact_person || inv.vendor_name) + ',');
+
+  /* ⚠️ ONE LINE PER PARAGRAPH — the mail client wraps it. Hard-wrapping the
+     prose here looked tidy in the source and ragged in Outlook, because every
+     line carrying injected data (the scope, the deadline) blew past the wrap
+     the fixed lines around it were set to. */
+  L.push('Gentlemen/Mesdames:');
   L.push('');
-  L.push('Megawide Construction Corporation invites you to quote the following work package.');
+  L.push('Megawide Construction Corporation is one of the largest construction companies in the '
+    + 'Philippines. The company is engaged in major residential, commercial, and infrastructure '
+    + 'developments nationwide. Qualified vendors are invited to submit quotations for the project '
+    + 'requirements.');
   L.push('');
-  L.push('Package : ' + wpLabel(w));
-  L.push('Project : ' + projName(R.project_id));
-  if (R.bid_due_at) L.push('Deadline: ' + dt(R.bid_due_at));
-  if (R.prebid_at) L.push('Pre-bid : ' + dt(R.prebid_at));
-  L.push('Please attach your quotation with the offer.');
+  L.push('As such, the company ("Megawide") requests from the vendor to submit a quotation containing '
+    + 'its most competitive price proposal for the ' + scope + ' for Megawide\'s '
+    + projName(R.project_id) + ' as follows:');
   L.push('');
-  L.push('Full details, and the form to submit your bid:');
+  L.push(wpLabel(w));
+  const items = rfqItemLines();
+  if (items.length) items.forEach(function (x) { L.push(x); });
+  L.push('');
+
+  if (REFDOCS.length) {
+    L.push('Kindly refer to the attachments below to see the complete drawings of the corresponding '
+      + 'project as well as the file containing the complete technical specifications.');
+    L.push('');
+  }
+  L.push('Please provide a detailed bid breakdown with complete payment terms, warranty conditions, '
+    + 'and terms and references. Please submit also your company profile along with any '
+    + 'certifications from principals.');
+  if (R.payment_terms) { L.push(''); L.push('Payment terms: ' + R.payment_terms); }
+  if (R.boq_note) { L.push(''); L.push('Bill of quantities: ' + R.boq_note); }
+  if (R.conditions) { L.push(''); L.push(R.conditions); }
+  L.push('');
+  L.push('The price indicated in the quotation shall be inclusive of VAT. Costs not indicated in the '
+    + 'quotation should not be charged to, and will not be paid by Megawide.');
+  L.push('');
+  /* ⚠️ BOTH ROUTES, DELIBERATELY. The template tells the vendor to email the
+     quotation to the officer; the bid link is this app's no-login alternative.
+     Offering only the link would contradict the letter Procurement sends, and
+     offering only email would waste the bid page — so the letter names email
+     first, as the template does, and the link as the easier option. */
+  L.push('Kindly submit the quotation'
+    + (R.bid_due_at ? ' not later than ' + dt(R.bid_due_at) : '')
+    + (mail ? ', via email, to ' + who + ' at ' + mail : '') + '.');
+  L.push('');
+  L.push('You may also submit it through the link below. You do not need an account: open it, enter '
+    + 'your price and attach your quotation.');
+  L.push('');
   L.push(bidLink(inv));
   L.push('');
-  L.push('The link is personal to your company — please do not forward it. You do not need');
-  L.push('an account: open it, enter your price and attach your quotation.');
+  L.push('The link is personal to your company. Please do not forward it.');
+  if (R.prebid_at) { L.push(''); L.push('Pre-bid conference: ' + dt(R.prebid_at)); }
   L.push('');
-  L.push('Thank you,');
-  L.push(R.contact_person || profile.name || '');
-  L.push('Megawide Procurement' + (R.contact_email ? ' · ' + R.contact_email : ''));
+  L.push('This ' + docLong() + ' does not constitute an offer to contract and does not obligate '
+    + 'Megawide to enter into a contract with the Supplier. Megawide reserves the right to reject '
+    + 'any and all proposals, or to negotiate with one or more parties.');
+  const cs = contactSentence();
+  if (cs) { L.push(''); L.push(cs); }
+  if (REFDOCS.length) {
+    L.push('');
+    REFDOCS.forEach(function (d) {
+      const u = VendorDb.bidReference.publicUrl(d.file_path);
+      L.push(d.title + (u ? '\n' + u : ''));
+    });
+  }
+  L.push('');
+  L.push('We are looking forward to your continuous support. Thank you.');
+  L.push('');
+  L.push('Yours sincerely,');
+  L.push('');
+  sigPlain().forEach(function (x) { L.push(x); });
   return L.join('\n');
+}
+
+/* ── the same letter, formatted ──────────────────────────────────────────────
+   ⚠️⚠️ mailto: CANNOT CARRY THIS, and that is why the delivery changed. A
+      mailto body is plain text by definition, so the bold, the underline, the
+      indented requirement and every hyperlink die on the way through — and the
+      Windows shell caps the whole command line at about 8 KB besides. So the
+      composer puts the FORMATTED letter on the clipboard and opens an ADDRESSED
+      BLANK draft for the officer to paste into. One click, then Ctrl+V.
+   ⚠️ INLINE STYLES ONLY, and a dull, old-fashioned set of them. Outlook renders
+      with Word: a <style> block is stripped, class names go with it, and
+      anything modern (flex, grid, CSS variables) is ignored. Points, not px.
+      Anything that must survive the paste has to ride on the element itself.
+   ⚠️ The plain-text rfqBody() is NOT dead code — it is what the mail-merge CSV
+      and the plain-copy fallback use, so the two must stay in step. */
+function _h(s) { return esc(s == null ? '' : String(s)); }
+function _hlink(url, label) {
+  return '<a href="' + _h(url) + '" style="color:#0563C1">' + _h(label || url) + '</a>';
+}
+function _hp(html) { return '<p style="margin:0 0 11pt 0">' + html + '</p>'; }
+
+function rfqHtml(inv) {
+  const w = WPBYID[R.wp_id] || {};
+  const s = sigFields();
+  const scope = (R.scope_note || wpLabel(w) || '').trim();
+  const H = [];
+
+  H.push(_hp('Gentlemen/Mesdames:'));
+  H.push(_hp('Megawide Construction Corporation is one of the largest construction companies in the '
+    + 'Philippines. The company is engaged in major residential, commercial, and infrastructure '
+    + 'developments nationwide. Qualified vendors are invited to submit quotations for the project '
+    + 'requirements.'));
+  H.push(_hp('As such, the company (&ldquo;Megawide&rdquo;) requests from the vendor to submit a '
+    + 'quotation containing its most competitive price proposal for the ' + _h(scope)
+    + ' for Megawide&rsquo;s ' + _h(projName(R.project_id)) + ' as follows:'));
+
+  // The requirement, under a bold underlined heading and indented, as the template lays it out.
+  H.push('<p style="margin:0 0 6pt 0"><b><u>' + _h(wpLabel(w)) + '</u></b></p>');
+  if (REFITEMS.length) {
+    H.push('<div style="margin:0 0 11pt 36pt">'
+      + REFITEMS.slice(0, RFQ_MAX_ITEMS).map(function (it) {
+          const qty = it.quantity == null ? ''
+            : ' x ' + Number(it.quantity).toLocaleString() + (it.unit ? ' ' + _h(it.unit) : '');
+          return '<div style="margin:0 0 6pt 0">'
+            + (it.item_no ? _h(it.item_no) + '&nbsp;&nbsp;' : '') + _h(it.description) + qty
+            + (it.spec ? '<div style="margin:2pt 0 0 18pt;color:#444;font-size:10pt">'
+                + _h(String(it.spec).replace(/\s*\n\s*/g, '; ')) + '</div>' : '')
+            + '</div>';
+        }).join('')
+      + (REFITEMS.length > RFQ_MAX_ITEMS
+          ? '<div>&hellip;and ' + (REFITEMS.length - RFQ_MAX_ITEMS)
+            + ' more. The complete list is on the bid page linked below.</div>' : '')
+      + '</div>');
+  }
+
+  if (REFDOCS.length) {
+    H.push(_hp('Kindly refer to the attachments below to see the complete drawings of the '
+      + 'corresponding project as well as the file containing the complete technical specifications.'));
+  }
+  H.push(_hp('Please provide a detailed bid breakdown with complete payment terms, warranty '
+    + 'conditions, and terms and references. Please submit also your company profile along with any '
+    + 'certifications from principals.'));
+  if (R.payment_terms) H.push(_hp('<b>Payment terms:</b> ' + _h(R.payment_terms)));
+  if (R.boq_note) H.push(_hp('<b>Bill of quantities:</b> ' + _h(R.boq_note)));
+  if (R.conditions) H.push(_hp(_h(R.conditions).replace(/\n/g, '<br>')));
+  H.push(_hp('The price indicated in the quotation shall be inclusive of VAT. Costs not indicated '
+    + 'in the quotation should not be charged to, and will not be paid by Megawide.'));
+
+  H.push(_hp('<b>Kindly submit the quotation'
+    + (R.bid_due_at ? ' not later than ' + _h(dt(R.bid_due_at)) : '')
+    + (s.email ? ', via email, to ' + _h(s.name) + ' at ' + _hlink('mailto:' + s.email, s.email) : '')
+    + '.</b>'));
+  /* ⚠️ THE LINK IS A LABEL HERE, NOT 95 CHARACTERS OF RAW UUID. The token has to
+     stay long — it is an unguessable capability that lets a vendor answer with
+     no login, and shortening it would cost exactly the entropy protecting it.
+     What was unpresentable was PRINTING it, so the formatted flavour hyperlinks
+     a sentence instead. The plain-text flavour still carries the bare URL,
+     because plain text has nowhere to hide it. */
+  H.push(_hp('You may also submit it online. You do not need an account: open your bid page, enter '
+    + 'your price and attach your quotation.'));
+  H.push(_hp('<b>' + _hlink(bidLink(inv), 'Open your bid page') + '</b>'
+    + '<br><span style="font-size:10pt;color:#444">This page is personal to your company. '
+    + 'Please do not forward it.</span>'));
+  if (R.prebid_at) H.push(_hp('<b>Pre-bid conference:</b> ' + _h(dt(R.prebid_at))));
+
+  H.push(_hp('This ' + _h(docLong()) + ' does not constitute an offer to contract and does not '
+    + 'obligate Megawide to enter into a contract with the Supplier. Megawide reserves the right to '
+    + 'reject any and all proposals, or to negotiate with one or more parties.'));
+
+  if (s.name) {
+    const ways = [];
+    if (s.email) ways.push(_hlink('mailto:' + s.email, s.email));
+    if (s.mobile) ways.push(_h(s.mobile) + ' (Text/Call/Viber)');
+    H.push(_hp('For questions or concerns, you may reach out to ' + _h(s.name)
+      + (ways.length ? ' at ' + ways.join(' or ') : '') + '.'));
+  }
+  if (REFDOCS.length) {
+    H.push('<p style="margin:0 0 11pt 0">' + REFDOCS.map(function (d) {
+      const u = VendorDb.bidReference.publicUrl(d.file_path);
+      return u ? _hlink(u, d.title) : _h(d.title);
+    }).join('<br>') + '</p>');
+  }
+  H.push(_hp('We are looking forward to your continuous support. Thank you.'));
+  H.push(_hp('Yours sincerely,'));
+
+  const sig = [];
+  if (s.name) sig.push('<b>' + _h(s.name) + '</b>');
+  if (s.title) sig.push(_h(s.title));
+  sig.push('Megawide Construction Corporation');
+  if (s.email) sig.push('Email: ' + _hlink('mailto:' + s.email, s.email));
+  if (s.mobile) sig.push('Mobile: ' + _h(s.mobile));
+  if (s.viber) sig.push('Viber: ' + _h(s.viber));
+  if (s.whatsapp) sig.push('WhatsApp: ' + _h(s.whatsapp));
+  sig.push('Website: ' + _hlink('https://www.megawide.com.ph', 'www.megawide.com.ph'));
+  H.push('<p style="margin:0">' + sig.join('<br>') + '</p>');
+
+  return H.join('');
+}
+/* Calibri 11pt is Outlook's own default, so a pasted letter matches whatever the
+   officer types around it instead of arriving in a different typeface. */
+function rfqHtmlDoc(inv) {
+  return '<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#000000;'
+    + 'line-height:1.35">' + rfqHtml(inv) + '</div>';
 }
 function openRfq() {
   document.getElementById('rfqDocType').textContent = R.doc_type || 'RFQ';
   const withEmail = INV.filter(i => i.vendor_contact_email);
   const without = INV.filter(i => !i.vendor_contact_email);
   document.getElementById('rfqBody').innerHTML =
-      '<div class="sec-note">The app has written the invitation. Each bidder gets their own link, so '
-    + 'each is a separate email — open them in Outlook and send. Nothing here sends mail on your behalf.</div>'
+      '<div class="sec-note">Drafted on Megawide\'s own ' + esc(docLong()) + ' template, filled in from '
+    + 'this round — the scope, the line items, the reference pack, the deadline and your contact details. '
+    + 'Read it before you send it: the app supplies the facts, not the judgement. Each bidder gets their '
+    + 'own link, so each is a separate email — open them in Outlook and send. '
+    + 'Nothing here sends mail on your behalf.</div>'
     + '<div class="field"><label>Subject</label><input id="rfqSubj" value="' + esc(rfqSubject()) + '" readonly></div>'
     + INV.map(i =>
         '<div class="rfq-row">'
@@ -1483,13 +1747,22 @@ function openRfq() {
             : '<span class="rfq-noemail">no email on file</span>') + '</small></div>'
         + '<div class="rfq-link">' + esc(bidLink(i)) + '</div>'
         + '<button class="btn btn-sm" onclick="copyLink(' + Q + i.id + Q + ')" title="Copy just the link"><i class="ti ti-link"></i></button>'
+        + '<button class="btn btn-sm" onclick="copyRich(' + Q + i.id + Q + ')" title="Copy the formatted letter"><i class="ti ti-clipboard-text"></i> Copy</button>'
         + (i.vendor_contact_email
-            ? '<button class="btn btn-sm btn-primary" onclick="mailTo(' + Q + i.id + Q + ')"><i class="ti ti-mail"></i> Open in Outlook</button>'
-            : '<button class="btn btn-sm" onclick="copyMail(' + Q + i.id + Q + ')"><i class="ti ti-copy"></i> Copy email</button>')
+            ? '<button class="btn btn-sm btn-primary" onclick="mailTo(' + Q + i.id + Q + ')"><i class="ti ti-mail"></i> Copy &amp; open Outlook</button>'
+            : '')
         + '</div>').join('')
     + (without.length
         ? '<div class="sec-note" style="margin-top:12px"><b>' + without.length + '</b> bidder(s) have no contact '
-          + 'email on file — copy their message and address it yourself, or add the email to their vendor profile.</div>'
+          + 'email on file — copy their letter and address it yourself, or add the email to their vendor profile.</div>'
+        : '')
+    + _sigEditorHtml()
+    + (INV.length
+        ? '<div class="field" style="margin-top:14px"><label>Preview &mdash; '
+          + esc(INV[0].vendor_name) + '</label>'
+          + '<div class="rfq-preview">' + rfqHtmlDoc(INV[0]) + '</div>'
+          + '<div class="sec-note" style="margin:6px 0 0">This is exactly what Copy puts on the '
+          + 'clipboard. Every bidder gets the same letter with their own link.</div></div>'
         : '')
     + '<div class="bm-actions">'
     + '<button class="btn" onclick="copyMergeCsv()"><i class="ti ti-table-export"></i> Copy mail-merge list (CSV)</button>'
@@ -1499,25 +1772,110 @@ function openRfq() {
   document.getElementById('rfqModal').style.display = 'flex';
 }
 function closeRfq() { document.getElementById('rfqModal').style.display = 'none'; }
+
+/* The signature block is the officer's own and is edited here, where they
+   discover they need it — the alternative was a settings page nobody would
+   visit before their first RFQ. Saved to their `users` row; see
+   migrations/2026-09-05_officer_signature.sql. */
+function _sigEditorHtml() {
+  const p = profile || {};
+  const bare = !p.job_title && !p.mobile_number;
+  return '<details class="sig-box"' + (bare ? ' open' : '') + '>'
+    + '<summary>Your signature block' + (bare ? ' — not set up yet' : '') + '</summary>'
+    + '<div class="sec-note" style="margin:8px 0">Saved once on your profile and used on every '
+    + 'letter you send. A field left blank is simply left out of the letter.</div>'
+    + '<div class="bm-grid">'
+    + '<div class="field"><label>Job title</label>'
+    + '<input id="sig-title" value="' + esc(p.job_title || '') + '" placeholder="e.g. Portfolio Planning Engineer"></div>'
+    + '<div class="field"><label>Mobile</label>'
+    + '<input id="sig-mobile" value="' + esc(p.mobile_number || '') + '" placeholder="+63 ..."></div>'
+    + '<div class="field"><label>Viber</label>'
+    + '<input id="sig-viber" value="' + esc(p.viber_number || '') + '" placeholder="usually the same"></div>'
+    + '<div class="field"><label>WhatsApp</label>'
+    + '<input id="sig-whatsapp" value="' + esc(p.whatsapp_number || '') + '" placeholder="usually the same"></div>'
+    + '</div>'
+    + '<div class="bm-actions"><button class="btn" onclick="saveSignature()">'
+    + '<i class="ti ti-device-floppy"></i> Save signature</button></div>'
+    + '</details>';
+}
+async function saveSignature() {
+  const patch = {
+    job_title: val('sig-title') || null,
+    mobile_number: val('sig-mobile') || null,
+    viber_number: val('sig-viber') || null,
+    whatsapp_number: val('sig-whatsapp') || null,
+  };
+  try {
+    await WPDb.updateUser(profile.id, patch);
+    Object.assign(profile, patch);
+    /* ⚠️ The profile is cached in sessionStorage by auth.js — without busting it
+       the letter would use the new signature now and the old one after a reload. */
+    try { sessionStorage.removeItem('wpm_prof_' + profile.id); } catch (e) {}
+    openRfq();
+    AppNotify.success('Signature saved.');
+  } catch (e) {
+    AppNotify.fromError(e, 'Could not save your signature — if it names a missing column, '
+      + 'migrations/2026-09-05_officer_signature.sql has not been run yet');
+  }
+}
 function invById(id) { return INV.find(i => i.id === id); }
 function copyLink(id) {
   const i = invById(id); if (!i) return;
   navigator.clipboard.writeText(bidLink(i)).then(() => AppNotify.success('Link copied.'));
 }
-function copyMail(id) {
-  const i = invById(id); if (!i) return;
-  navigator.clipboard.writeText(rfqSubject() + '\n\n' + rfqBody(i))
-    .then(() => AppNotify.success('Email copied — paste it into Outlook.'));
+/* ⚠️ THE CLIPBOARD CARRIES TWO FLAVOURS AT ONCE. Outlook takes the text/html
+   one and keeps the formatting; anything that cannot (Notepad, a plain-text
+   reply, a chat box) falls back to text/plain by itself. Writing only HTML
+   would paste raw tags into a plain-text target. */
+async function copyRich(id, quiet) {
+  const i = invById(id); if (!i) return false;
+  const html = rfqHtmlDoc(i);
+  const text = rfqSubject() + '\n\n' + rfqBody(i);
+  try {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+      })]);
+    } else {
+      _copyHtmlFallback(html);
+    }
+    if (!quiet) AppNotify.success('Copied with its formatting — paste into Outlook with Ctrl+V.');
+    return true;
+  } catch (e) {
+    try {
+      _copyHtmlFallback(html);
+      if (!quiet) AppNotify.success('Copied — paste into Outlook with Ctrl+V.');
+      return true;
+    } catch (e2) { AppNotify.fromError(e2, 'Could not copy the letter'); return false; }
+  }
 }
-function mailTo(id) {
+/* ⚠️ The fallback selects a LIVE node and uses execCommand — still the only way
+   to get HTML onto the clipboard where ClipboardItem is unavailable. The node
+   has to be in the document and selectable, so it is parked off-screen;
+   display:none would make the selection API skip it and copy nothing. */
+function _copyHtmlFallback(html) {
+  const d = document.createElement('div');
+  d.setAttribute('style', 'position:fixed;left:-9999px;top:0;width:600px');
+  d.innerHTML = html;
+  document.body.appendChild(d);
+  const r = document.createRange();
+  r.selectNodeContents(d);
+  const sel = window.getSelection();
+  sel.removeAllRanges(); sel.addRange(r);
+  document.execCommand('copy');
+  sel.removeAllRanges();
+  document.body.removeChild(d);
+}
+/* Copy the formatted letter, then open an ADDRESSED, EMPTY draft to paste into.
+   The body is deliberately left out of the mailto — see rfqHtml's note. */
+async function mailTo(id) {
   const i = invById(id); if (!i) return;
-  // mailto has a practical URL length limit, so the body is deliberately short
-  // and the detail lives behind the link.
-  const url = 'mailto:' + encodeURIComponent(i.vendor_contact_email)
-    + '?subject=' + encodeURIComponent(rfqSubject())
-    + '&body=' + encodeURIComponent(rfqBody(i));
-  if (url.length > 1900) { copyMail(id); return; }
-  window.location.href = url;
+  const ok = await copyRich(id, true);
+  window.location.href = 'mailto:' + encodeURIComponent(i.vendor_contact_email)
+    + '?subject=' + encodeURIComponent(rfqSubject());
+  if (ok) AppNotify.success('Letter copied. Outlook is opening addressed to '
+    + i.vendor_contact_email + ' — press Ctrl+V to paste it in.');
 }
 function csvCell(v) {
   const s = String(v == null ? '' : v);
@@ -1546,7 +1904,7 @@ async function markIssued() {
 /* 2.2.3 — Receipt of Proposal. */
 function responsesPanel() {
   const inPlay = INV.filter(i => i.status === 'submitted' || i.status === 'closed');
-  return '<div class="panel"><div class="panel-title">3 · Bids received</div>'
+  return '<div class="panel" id="bp-responses"><div class="panel-title">4 · Bids received</div>'
     + '<div class="sec-note">' + inPlay.length + ' of ' + INV.length + ' invited bidders have submitted.'
     + '</div>'
     + (inPlay.length
@@ -1594,7 +1952,7 @@ function clarCatLabel(c) {
 function clarifyPanel() {
   const rows = INV.filter(i => i.status === 'submitted' || (THREADS[i.id] || []).length);
   if (!rows.length) return '';
-  return '<div class="panel"><div class="panel-title">4 · Clarifications</div>'
+  return '<div class="panel" id="bp-clarify"><div class="panel-title">5 · Clarifications</div>'
     + '<div class="sec-note">Questions to one bidder about their proposal. '
     + '<b>Messages with the same subject are one thread</b> \u2014 to start another, just pick a '
     + 'different subject and send. There is no thread to create or name. '
@@ -1708,7 +2066,7 @@ function comparisonPanel() {
   // ⚠️ The BCB is OURS and is shown to staff only — it is deliberately absent
   //    from every vendor-facing surface (see the migration's view).
   const bcb = window.__hideBudget ? null : (w.approved_budget_bcb || null);
-  return '<div class="panel"><div class="panel-title">5 · Bids at a glance</div>'
+  return '<div class="panel" id="bp-comparison"><div class="panel-title">6 · Bids at a glance</div>'
     + (bcb ? '<div class="sec-note">Budget (BCB) for this package: <b>' + esc(money(bcb)) + '</b></div>' : '')
     + '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
     + _cmpTh('vendor_name', 'Bidder', 'left')
@@ -1766,7 +2124,7 @@ function evaluationPanel() {
   const comp = rows.filter(i => i.technical_compliant === true);
   const lowComp = comp.length
     ? Math.min.apply(null, comp.map(i => i.offer_amount == null ? Infinity : i.offer_amount)) : null;
-  return '<div class="panel"><div class="panel-title">6 · Evaluation</div>'
+  return '<div class="panel" id="bp-evaluation"><div class="panel-title">7 · Evaluation</div>'
     + '<div class="sec-note">A package is awarded on two things: it <b>meets the technical requirements</b> '
     + '(the TOR and the MPSS), and it is the <b>lowest bid in the cost comparison</b>. '
     + 'Mark compliance here; the ranking comes from the comparison workbook.</div>'
@@ -1822,7 +2180,7 @@ function negotiationPanel() {
   if (!rows.length) return '';
   const ro = canManage ? '' : ' disabled';
   const short = rows.filter(i => i.shortlisted).length;
-  return '<div class="panel"><div class="panel-title">7 · Negotiation</div>'
+  return '<div class="panel" id="bp-negotiation"><div class="panel-title">8 · Negotiation</div>'
     + '<div class="sec-note">Shortlist the top bidders and record the negotiated price. '
     + '<b>Negotiate with one to three.</b> Where the bidder resubmitted through their bid link, '
     + 'their revised quotation is here and the figure comes with it; where you agreed it by email, '
@@ -2164,7 +2522,7 @@ function negotiationViz() {
   })[0];
   const leadFin = lead ? Number(lead.negotiated_amount != null ? lead.negotiated_amount : lead.offer_amount) : null;
   const vsBcb = (bcb && leadFin != null) ? bcb - leadFin : null;
-  return '<div class="panel"><div class="panel-title">Offer \u2192 negotiated</div>'
+  return '<div class="panel" id="bp-negoviz"><div class="panel-title">Offer \u2192 negotiated</div>'
     + '<div class="sec-note">Each bar is that bidder\u2019s original offer; the solid part is where it '
     + 'landed after negotiation, so the gap is what was taken off.'
     + (bcb ? ' The dashed line is the budget (BCB).' : '')
@@ -2193,7 +2551,7 @@ function awardPanel() {
   if (!rows.length) return '';
   const winner = INV.find(i => i.outcome === 'awarded');
   const decided = !!winner;
-  return '<div class="panel"><div class="panel-title">8 · Award</div>'
+  return '<div class="panel" id="bp-award"><div class="panel-title">9 · Award</div>'
     + '<div class="sec-note">' + (decided
         ? 'Awarded to <b>' + esc(winner.vendor_name) + '</b>' + (winner.decided_at ? ' on ' + esc(dOnly(winner.decided_at)) : '') + '.'
         : 'Awarding closes the round: the winner is marked awarded and every other bidder not awarded, so nobody is left un-notified.')
