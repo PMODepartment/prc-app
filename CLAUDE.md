@@ -2933,13 +2933,30 @@ data is new.
   the tour opens on the first thing that is not — the sidebar. **Seen live: it opened on
   "Step 8 of 9", Vendor Registrations.** `bids.html` was already correct (it starts after
   `await loadAll()`); `vendors.html` now calls `startVendorGuidance()` from the `.then()`.
-- Confirmed working live: the two-item **?** menu renders and positions correctly, the tour
-  opens at **Step 1 of 10**, and the spotlight framed `.vm-head` accurately.
-- **⚠️ NOT walked past step 1, and `bids.html`'s tour was never opened at all.** The session
-  ended with BOTH pages stuck on `#loading` — `loadAll()` never resolving, no console error,
-  while JS kept responding — so the remaining steps are still unverified against real content.
-  `vendors.html` legitimately takes tens of seconds to load ~2,400 vendors, which is worth
-  remembering when judging any "the page is frozen" report against it.
+- **⚠️ A STEP TITLE IS ESCAPED; A BODY IS NOT.** `coachmarks.js` runs the title through `esc()`
+  and inserts the body as raw HTML, so an entity in a title renders **literally** — the numbered
+  bid steps displayed as `1 &middot; The ask`. **Titles take the real character, bodies take
+  entities.**
+- **⚠️ A HIDDEN-BUT-PRESENT ELEMENT IS COUNTED AND THEN SKIPPED, so it needs `when()`.**
+  `computeLive()` counts on EXISTENCE (deliberately — visibility moves as the tour walks), but
+  `#bidListPage` and `#bid-nav` are authored into the page and merely hidden rather than
+  generated. Both list steps were therefore counted and skipped: inside a round the card read
+  **"Step 3 of 14" and delivered twelve**, and on the list it read "Step 1 of 3" and delivered
+  two. Those three steps now carry a `when()` that checks their own page is shown. Every other
+  workspace panel is built by `innerHTML`, so it is genuinely absent until it exists and needs
+  no predicate. **A step added against static-but-hidden markup needs the same treatment.**
+
+**Verified live as super_admin, on both pages:**
+- `vendors.html` — all **10 steps land pixel-exact** on their target (0px offset once the
+  transition settles) and are fully on screen, including the sidebar step, where
+  `scrollIntoView` correctly scrolls the **sidebar's own overflow** (`scrollTop 690`) rather
+  than the page. "Done" on the last step, closes cleanly.
+- `bids.html` — against a real awarded round, **all 12 workspace steps** render in order with
+  the spotlight fully visible, and all 10 panels carry their stable ids. The `when()` and
+  entity fixes were then proven against the live DOM.
+- **⚠️ `vendors.html` legitimately takes tens of seconds to load ~2,400 vendors**, and during
+  that time the tour would open on the sidebar if it were not gated behind `loadAll().then()`.
+  Worth remembering before treating a "the page is frozen" report there as a bug.
 
 ### The RFQ email is Megawide's own template, formatted (2026-09-05)
 

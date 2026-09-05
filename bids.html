@@ -118,6 +118,20 @@
     .rfq-link{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.7143rem;
       color:var(--text-hint);word-break:break-all;flex:1;min-width:180px}
     .rfq-noemail{font-size:0.7143rem;color:var(--mw-red-ink);font-weight:600}
+    /* The budget, pinned in the round header so it is readable from every step
+       rather than only inside the comparison. Staff-only by construction —
+       bcbStrip() returns nothing at all for a cost-hidden role. */
+    .bm-bcb{margin-top:12px;padding:9px 13px;border-radius:9px;background:var(--surface-2);
+      border-left:3px solid var(--mw-red);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+    .bm-bcb>span{font-size:0.6875rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+      color:var(--text-hint)}
+    .bm-bcb>b{font-size:1.0714rem;font-weight:800;color:var(--text-primary)}
+    .bm-bcb>small{font-size:0.7143rem;color:var(--text-hint)}
+    .bm-bcb-none{border-left-color:#B45309}
+    .bm-bcb-none>b{color:#B45309}
+    .bm-warn{color:#B45309}
+    body.dark-mode .bm-bcb-none{border-left-color:#FBBF24}
+    body.dark-mode .bm-bcb-none>b,body.dark-mode .bm-warn{color:#FBBF24}
     /* ⚠️ The preview shows the letter as OUTLOOK will render it, so it is
        deliberately on a white page with black text in BOTH themes — recolouring
        it for dark mode would preview something the recipient never sees. */
@@ -1294,6 +1308,45 @@ async function removeRefItem(id) {
   } catch (e) { AppNotify.fromError(e, 'Could not remove the line'); }
 }
 
+/* ── the budget, and saying so when there isn't one ──────────────────────────
+   ⚠️ THE BCB IS OURS AND IS STAFF-ONLY. It never reaches vendor_bid_board_view,
+      the bid page or the RFQ letter: our budget IS the ceiling we will pay, and
+      handing it to the vendor quoting against it destroys the negotiation.
+      window.__hideBudget is the cost-hiding flag, so a cost-hidden role sees
+      none of this — same rule as everywhere else in the app. */
+function bcbOf() {
+  if (window.__hideBudget) return null;
+  const w = WPBYID[R.wp_id] || {};
+  return w.approved_budget_bcb || null;
+}
+/* ⚠️ SAY SO WHEN THERE IS NO BUDGET, rather than rendering nothing at all.
+   Every BCB read here used to be `bcb ? …show… : ''`, so on a package with no
+   budget on file the figure, the "vs BCB" column and the whole comparison just
+   silently vanished — indistinguishable from the app not having the feature.
+   Seen live on NIA101 WP 1, where all four budget columns are empty. */
+function bcbStrip() {
+  if (window.__hideBudget) return '';
+  const b = bcbOf();
+  if (!b) {
+    return '<div class="bm-bcb bm-bcb-none"><span>Budget (BCB)</span>'
+      + '<b>None on file</b>'
+      + '<small>There is nothing to compare the offers against. Add it on the work package.</small></div>';
+  }
+  return '<div class="bm-bcb"><span>Budget (BCB)</span><b>' + esc(money(b)) + '</b>'
+    + '<small>Internal only &mdash; never sent to bidders.</small></div>';
+}
+/* One amount measured against the budget. Empty string when there is no BCB, so
+   callers can drop it in without guarding. */
+function vsBcbHtml(amount) {
+  const b = bcbOf();
+  if (!b || amount == null || amount === '') return '';
+  const d = b - Number(amount);
+  const pct = Math.abs(d / b) * 100;
+  return d >= 0
+    ? '<span class="nv-under">' + esc(money(d)) + ' under · ' + pct.toFixed(1) + '%</span>'
+    : '<span class="nv-over">' + esc(money(-d)) + ' over · ' + pct.toFixed(1) + '%</span>';
+}
+
 function renderRound() {
   const w = WPBYID[R.wp_id] || {};
   document.getElementById('page-title').textContent = wpLabel(w);
@@ -1303,7 +1356,8 @@ function renderRound() {
     + '<div class="bm-head">'
     + '<span class="bm-doc">' + esc(R.doc_type || 'RFQ') + (R.round_no > 1 ? ' · Round ' + R.round_no : '') + '</span>'
     + '<h2>' + esc(wpLabel(w)) + '<small>' + esc(projName(R.project_id))
-    + (w.trade ? ' · ' + esc(w.trade) : '') + '</small></h2></div>'
+    + (w.trade ? ' · ' + esc(w.trade) : '') + '</small></h2>'
+    + bcbStrip() + '</div>'
     + stepperHtml()
     + (canManage && R.stage !== 'awarded' && R.stage !== 'cancelled'
         ? '<div class="bm-actions" style="margin-top:-4px">'
@@ -2188,7 +2242,11 @@ function comparisonPanel() {
   //    from every vendor-facing surface (see the migration's view).
   const bcb = window.__hideBudget ? null : (w.approved_budget_bcb || null);
   return '<div class="panel" id="bp-comparison"><div class="panel-title">6 · Bids at a glance</div>'
-    + (bcb ? '<div class="sec-note">Budget (BCB) for this package: <b>' + esc(money(bcb)) + '</b></div>' : '')
+    + (bcb
+        ? '<div class="sec-note">Measured against the budget (BCB) of <b>' + esc(money(bcb)) + '</b>.</div>'
+        : (window.__hideBudget ? ''
+            : '<div class="sec-note bm-warn">No budget (BCB) on file for this package, so there is '
+              + 'nothing to measure these offers against.</div>'))
     + '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
     + _cmpTh('vendor_name', 'Bidder', 'left')
     + _cmpTh('offer_amount', 'Offer', 'right')
@@ -2253,7 +2311,9 @@ function evaluationPanel() {
         '<div class="bidder" style="align-items:flex-end">'
         + '<div class="bm-cell" style="flex:0 0 190px"><span class="bm-cl">Bidder</span>'
         + '<div class="bidder-name">' + esc(i.vendor_name)
-        + '<small>' + esc(money(i.offer_amount, i.offer_currency)) + '</small></div></div>'
+        + '<small>' + esc(money(i.offer_amount, i.offer_currency))
+        + (vsBcbHtml(i.offer_amount) ? ' &middot; ' + vsBcbHtml(i.offer_amount) : '')
+        + '</small></div></div>'
         + '<div class="bm-cell" style="flex:0 0 220px"><label class="bm-cl" for="ev-c-' + i.id + '">Meets the technical requirements</label>'
         + '<select id="ev-c-' + i.id + '" class="bm-in"' + ro + '>'
         + '<option value=""' + (i.technical_compliant == null ? ' selected' : '') + '>Not assessed</option>'
@@ -2302,10 +2362,12 @@ function negotiationPanel() {
   const ro = canManage ? '' : ' disabled';
   const short = rows.filter(i => i.shortlisted).length;
   return '<div class="panel" id="bp-negotiation"><div class="panel-title">8 · Negotiation</div>'
-    + '<div class="sec-note">Shortlist the top bidders and record the negotiated price. '
-    + '<b>Negotiate with one to three.</b> Where the bidder resubmitted through their bid link, '
-    + 'their revised quotation is here and the figure comes with it; where you agreed it by email, '
-    + 'attach that quotation so the number is not standing on its own.'
+    /* ⚠️ ONE SENTENCE, THEN THE CONTROLS. These notes had grown into three-line
+       paragraphs that pushed the actual inputs below the fold and made every
+       card read as dense. The reasoning behind each rule lives in CLAUDE.md and
+       in the tour; the panel states the rule and gets out of the way. */
+    + '<div class="sec-note">Shortlist the top bidders &mdash; <b>one to three</b> &mdash; record the '
+    + 'negotiated price, and attach the revised quotation so the figure is not standing on its own.'
     + (short > 3 ? ' <span class="bm-high">' + short + ' are shortlisted.</span>' : '') + '</div>'
     + rows.map(i =>
         '<div class="bidder">'
@@ -2646,7 +2708,8 @@ function negotiationViz() {
   return '<div class="panel" id="bp-negoviz"><div class="panel-title">Offer \u2192 negotiated</div>'
     + '<div class="sec-note">Each bar is that bidder\u2019s original offer; the solid part is where it '
     + 'landed after negotiation, so the gap is what was taken off.'
-    + (bcb ? ' The dashed line is the budget (BCB).' : '')
+    + (bcb ? ' The dashed line is the budget (BCB).'
+           : (window.__hideBudget ? '' : ' There is no budget (BCB) on file, so there is no budget line.'))
     + (moved.length ? '' : ' <b>Nothing has been negotiated yet</b> \u2014 the bars show the offers as they stand.')
     + '</div>'
     + '<div class="nv-wrap">' + bars + '</div>'
