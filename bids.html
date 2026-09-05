@@ -4431,7 +4431,12 @@ function negotiationViz() {
   })[0];
   const leadFin = lead ? Number(lead.negotiated_amount != null ? lead.negotiated_amount : lead.offer_amount) : null;
   const vsBcb = (bcb && leadFin != null) ? bcb - leadFin : null;
-  return '<div class="panel" id="bp-negoviz"><div class="panel-title">Each bid against the budget</div>'
+  /* ⚠️ A SECTION, NOT A PANEL. This used to return its own `.panel`, so folding
+     it into the negotiation panel produced a panel nested inside a panel and a
+     THIRD heading in a phase that was just cut to two. Seen live. It is now a
+     sub-heading in the same card, like the reference pack's own halves. */
+  return '<div class="ref-sub" id="bp-negoviz" style="margin-top:18px">Each bid against the budget'
+    + '<span>how far under, or over</span></div>'
     + '<div class="sec-note">'
     + (bcb ? 'The dashed line is the <b>budget (BCB)</b> for this work package. A bar that stops '
              + '<b>short</b> of it is under budget \u2014 the gap is the saving. A bar that '
@@ -4459,8 +4464,7 @@ function negotiationViz() {
                   : 'Best position is <b class="nv-over">' + esc(money(-vsBcb)) + ' over</b> the budget')
               : '')
           + '</div>'
-        : '')
-    + '</div>';
+        : '');
 }
 
 /* 2.4.2 — Award: NOA to the winner, Letter of Regret to the rest.
