@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260905h"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260905h"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260905i"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260905i"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -152,6 +152,11 @@
        this only tightens the spacing between the heading and the cards. A long
        value (a vendor name, "PHP 15,000 under · 7.8%") wraps instead of forcing
        the grid wider. */
+    /* The one line an unreached phase shows. It had no rule at all when it was
+       added, so it rendered as unstyled body text — caught by auditing emitted
+       class names against the stylesheets rather than by looking at it. */
+    .bm-wait{padding:14px 16px;border:1px dashed var(--border-md);border-radius:10px;
+      color:var(--text-hint);font-size:0.8571rem;background:var(--surface-2)}
     .bm-stats{margin:12px 0 16px}
     .bm-stats .metric-value{font-size:1.0714rem}
     /* A filled track behind the stepper, so progress is a shape and not only
@@ -495,10 +500,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260905h"></script>
-<script src="assets/js/db.js?v=20260905h"></script>
-<script src="assets/js/ui.js?v=20260905h"></script>
-<script src="assets/js/coachmarks.js?v=20260905h"></script>
+<script src="assets/js/auth.js?v=20260905i"></script>
+<script src="assets/js/db.js?v=20260905i"></script>
+<script src="assets/js/ui.js?v=20260905i"></script>
+<script src="assets/js/coachmarks.js?v=20260905i"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -1562,7 +1567,15 @@ function phaseStats(label) {
        measured IT against the budget — a figure nobody can actually award.
        Once anything is marked compliant the headline follows compliance; before
        that it is the lowest offer, and says so. */
-    const amt = i => (i.offer_amount == null || i.offer_amount === '') ? null : Number(i.offer_amount);
+    /* ⚠️ WHERE THE FIGURE STANDS NOW, so a negotiated price wins over the
+       original — negotiation happens INSIDE this phase, and doAward() defaults
+       the final amount the same way. Showing the opening offer after it has
+       been negotiated down states a number that is no longer on the table. */
+    const amt = i => {
+      const v = (i.negotiated_amount != null && i.negotiated_amount !== '')
+        ? i.negotiated_amount : i.offer_amount;
+      return (v == null || v === '') ? null : Number(v);
+    };
     const priced = inPlay.filter(i => amt(i) != null);
     const compliant = priced.filter(i => i.technical_compliant === true);
     const anyAssessed = inPlay.some(i => i.technical_compliant != null);

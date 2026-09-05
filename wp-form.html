@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260905h"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260905h"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260905h"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260905h"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260905i"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260905i"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260905i"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260905i"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260905h"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260905i"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -820,10 +820,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260905h"></script>
-<script src="assets/js/ui.js?v=20260905h"></script>
-<script src="assets/js/db.js?v=20260905h"></script>
-<script src="assets/js/coachmarks.js?v=20260905h"></script>
+<script src="assets/js/auth.js?v=20260905i"></script>
+<script src="assets/js/ui.js?v=20260905i"></script>
+<script src="assets/js/db.js?v=20260905i"></script>
+<script src="assets/js/coachmarks.js?v=20260905i"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -1089,6 +1089,16 @@
   // the vendor's amount is taken from it at save time.
   function _avIsMulti() { return _avChips.length >= 2; }
   function _avParse(v) { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isNaN(n) ? null : n; }
+    /* Thousands separators for the per-vendor amounts. A trailing '.' survives
+       so it is not eaten the instant it is typed. */
+    function _avGroup(v) {
+      let s = String(v == null ? '' : v).replace(/[^0-9.]/g, '');
+      const d = s.indexOf('.');
+      let whole = d < 0 ? s : s.slice(0, d);
+      const frac = d < 0 ? '' : s.slice(d).replace(/\.(?=.*\.)/g, '');
+      whole = whole.replace(/^0+(?=\d)/, '');
+      return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + frac;
+    }
   function _avTotal() { return _avChips.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0); }
   function _avSyncCost() {
     const costEl = document.getElementById('f-contract');
@@ -1138,7 +1148,7 @@
         const warn = _accIsProblem(c) ? '<span class="pv-chip-warn" title="Flagged problematic in the vendor directory">&#9888;</span>' : '';
         return `<div class="av-row">
           <span class="pv-chip${legacy ? ' pv-chip-legacy' : ''}" style="margin:0">${warn}${nm}${legacy ? '<span class="pv-chip-legacy-tag">unlinked</span>' : ''}</span>
-          <input type="number" class="av-amt" min="0" step="0.01" placeholder="Awarded amount (₱)" data-av-amt="${i}" value="${amt}"/>
+          <input type="text" inputmode="decimal" class="av-amt" placeholder="Awarded amount (₱)" data-av-amt="${i}" value="${_avGroup(amt)}"/>
           <span class="pv-chip-x av-row-x" data-av-remove="${i}" title="Remove">&times;</span>
         </div>`;
       }).join('') + `<div class="av-total">Total awarded: <strong>₱${_avTotal().toLocaleString('en-US', { maximumFractionDigits: 2 })}</strong> <span style="color:var(--text-hint)">→ auto-fills Awarded Cost</span></div>`;
@@ -1246,6 +1256,18 @@
         const a = e.target.closest('[data-av-amt]');
         if (!a) return;
         const i = parseInt(a.dataset.avAmt, 10);
+        /* ⚠️ Group as you type, and put the caret back by counting the
+           SIGNIFICANT characters before it, so inserting a separator cannot
+           shift it. The field had to leave type="number" for this: a number
+           input rejects the comma outright. _avParse already strips them. */
+        const sig = a.value.slice(0, a.selectionStart || 0).replace(/[^0-9.]/g, '').length;
+        a.value = _avGroup(a.value);
+        let seen = 0, pos = 0;
+        while (pos < a.value.length && seen < sig) {
+          if (/[0-9.]/.test(a.value[pos])) seen++;
+          pos++;
+        }
+        try { a.setSelectionRange(pos, pos); } catch (err) {}
         if (_avChips[i]) _avChips[i].amount = _avParse(a.value);
         _avSyncCost();
         const tot = chips.querySelector('.av-total strong');
