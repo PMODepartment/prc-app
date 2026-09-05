@@ -130,6 +130,24 @@
     .bm-bcb-none{border-left-color:#B45309}
     .bm-bcb-none>b{color:#B45309}
     .bm-warn{color:#B45309}
+    /* The four phases of the round, named for the approved Procurement Status.
+       The heading is the organiser now, so the panels inside it carry no numbers. */
+    .bm-phase{margin:26px 0 0}
+    .bm-phase-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+      padding:0 2px 9px;margin-bottom:2px;border-bottom:2px solid var(--border-md)}
+    .bm-phase-n{width:22px;height:22px;flex-shrink:0;border-radius:50%;display:inline-flex;
+      align-items:center;justify-content:center;font-size:0.6875rem;font-weight:800;
+      background:var(--surface-2);color:var(--text-hint);align-self:center}
+    .bm-phase-head h3{margin:0;font-size:0.9286rem;font-weight:800;letter-spacing:.04em;
+      text-transform:uppercase;color:var(--text-hint)}
+    .bm-phase-head small{font-size:0.75rem;color:var(--text-hint);font-weight:500}
+    /* The phase the round is actually in reads as the live one; earlier phases
+       are done and stay legible but quiet. Mirrors the stepper above. */
+    .bm-phase.now>.bm-phase-head{border-bottom-color:var(--mw-red)}
+    .bm-phase.now .bm-phase-head h3{color:var(--mw-red-ink)}
+    .bm-phase.now .bm-phase-n{background:var(--mw-red);color:#fff}
+    .bm-phase.done .bm-phase-n{background:#2D9B6F;color:#fff}
+    @media(max-width:640px){ .bm-phase-head small{flex-basis:100%} }
     body.dark-mode .bm-bcb-none{border-left-color:#FBBF24}
     body.dark-mode .bm-bcb-none>b,body.dark-mode .bm-warn{color:#FBBF24}
     /* ⚠️ The preview shows the letter as OUTLOOK will render it, so it is
@@ -567,14 +585,14 @@ function configureBidTour() {
             + 'Solicited, closed for pricing &rarr; Evaluated, awarded &rarr; Awarded. There is nothing '
             + 'to remember to set. Underneath it you can see the work package’s own status, and put '
             + 'it right in one click if it has fallen behind.' },
-      { sel: '#bp-ask', title: '1 · The ask',
+      { sel: '#bp-ask', title: 'The ask',
         body: 'Scope, deadline, payment terms and conditions. Everything here goes to the bidders '
             + 'exactly as written, and it is what fills in the RFQ letter further down.' },
-      { sel: '#bp-reference', title: '2 · The reference pack',
+      { sel: '#bp-reference', title: 'The reference pack',
         body: 'The TOR, the MPSS, the drawings &mdash; and the priced line items. This is what makes two '
             + 'quotations comparable: every bidder prices the same list, and the line items become the '
             + 'itemised requirement in the RFQ email.' },
-      { sel: '#bp-bidders', title: '3 · Bidders',
+      { sel: '#bp-bidders', title: 'Bidders',
         body: 'Each invited vendor shows their accreditation. Policy N29 lets you invite an unaccredited '
             + 'vendor &mdash; awarding to a problematic one only asks you to confirm, because a hard block '
             + 'would just get worked around.' },
@@ -582,23 +600,23 @@ function configureBidTour() {
         body: 'Drafted on <b>Megawide’s own template</b>, filled in from this round. It copies the '
             + 'formatted letter and opens an addressed, empty draft &mdash; press Ctrl+V. Each bidder gets '
             + 'their own private link, so each is a separate email; there is a mail-merge CSV for a big round.' },
-      { sel: '#bp-responses', title: '4 · Bids received',
+      { sel: '#bp-responses', title: 'Bids received',
         body: 'Quotations as they arrive, through the link or attached by you from an email. A vendor may '
             + 'revise up to the deadline; the first submission is kept as their original offer.' },
-      { sel: '#bp-clarify', title: '5 · Clarifications',
+      { sel: '#bp-clarify', title: 'Clarifications',
         body: 'Questions to <b>one</b> bidder, never visible to the others, grouped by subject &mdash; '
             + 'technical, commercial, schedule, documents. Messages sharing a subject are the thread.' },
-      { sel: '#bp-comparison', title: '6 · Bids at a glance',
+      { sel: '#bp-comparison', title: 'Bids at a glance',
         body: 'Every column sorts, and the lowest offer is chipped. <b>This is not the cost comparison</b> '
             + '&mdash; that document is prepared outside the app from your own template. Export the '
             + 'bidders and offers as CSV to start it.' },
-      { sel: '#bp-evaluation', title: '7 · Evaluation',
+      { sel: '#bp-evaluation', title: 'Evaluation',
         body: 'Technical compliance against the TOR. Award rests on two things only: compliance, and the '
             + 'lowest bid in the cost comparison.' },
-      { sel: '#bp-negotiation', title: '8 · Negotiation',
+      { sel: '#bp-negotiation', title: 'Negotiation',
         body: 'Shortlist the top bidders and record the revised offer. The original is kept alongside it, '
             + 'so the saving is the gap between the two &mdash; and that is what the chart below draws.' },
-      { sel: '#bp-award', title: '9 · Award closes the loop',
+      { sel: '#bp-award', title: 'Award closes the loop',
         body: 'Awarding writes the cost, the vendor and the award date <b>back to the work package</b>, '
             + 'promotes every offer into that vendor’s bid history, and marks the others not awarded. '
             + 'The NOA and the Letter of Regret stay a separate process &mdash; the app records that a '
@@ -1163,18 +1181,19 @@ function buildBidNav() {
   const nav = document.getElementById('bid-nav');
   if (!nav) return;
   const host = document.getElementById('roundHost');
-  const panels = host ? Array.prototype.slice.call(host.querySelectorAll('.panel')) : [];
+  /* the rail lists PHASES now, not panels. It used to list all nine, which is
+     the same long sequence the regrouping exists to remove - and it auto-assigned
+     POSITIONAL bsec-N ids to panels that had none, so a link meant a different
+     section before and after a bid arrived. Four phase links; the sections carry
+     their own ph-* ids. */
+  const secs = host ? Array.prototype.slice.call(host.querySelectorAll('.bm-phase')) : [];
   const items = [];
-  panels.forEach(function (p, n) {
-    const t = p.querySelector('.panel-title');
-    if (!t) return;
-    // "4 · Clarifications" -> "Clarifications"; the number is already the order
-    const label = t.textContent.replace(/^\s*\d+\s*[\u00b7.\u2014-]\s*/, '').trim();
-    if (!label) return;
-    if (!p.id) p.id = 'bsec-' + n;
-    items.push({ id: p.id, label: label });
+  secs.forEach(function (s) {
+    const h = s.querySelector('h3');
+    if (!h || !s.id) return;
+    items.push({ id: s.id, label: h.textContent.trim() });
   });
-  if (items.length < 3) { nav.style.display = 'none'; return; }
+  if (items.length < 2) { nav.style.display = 'none'; return; }
   nav.style.display = '';
   nav.innerHTML = items.map(function (it) {
     return '<a href="#' + it.id + '" data-sec="' + it.id + '">' + esc(it.label) + '</a>';
@@ -1273,7 +1292,7 @@ function refItemsHtml(ro) {
 }
 function referencePanel() {
   const ro = !canManage || R.stage === 'awarded' || R.stage === 'cancelled';
-  return '<div class="panel" id="bp-reference"><div class="panel-title">2 \u00b7 Reference pack</div>'
+  return '<div class="panel" id="bp-reference"><div class="panel-title">Reference pack</div>'
     + '<div class="sec-note">The terms of reference (TOR), the MPSS and the drawings a bidder prices '
     + 'against, and the line items they price. Issued with the RFQ and visible on every bidder\u2019s '
     + 'own link \u2014 the same set to all of them.</div>'
@@ -1395,6 +1414,31 @@ function vsBcbHtml(amount) {
     : '<span class="nv-over">' + esc(money(-d)) + ' over · ' + pct.toFixed(1) + '%</span>';
 }
 
+/* ── the workspace, grouped by the approved Procurement Status ───────────────
+   ⚠️ THE PHASES ARE THE APPROVED ROSTER, NOT A FOURTH VOCABULARY. The workspace
+      was nine numbered panels — a sequence an officer had to learn on top of the
+      status the rest of the app already speaks, and the thing that made the page
+      read as cluttered. Each panel now sits under the phase it belongs to, named
+      exactly as the stepper above it and the work package itself name them.
+      The panels keep their own #bp-* ids, so the tour and the section rail are
+      unaffected by the regrouping.
+   ⚠️ A PHASE WITH NOTHING IN IT RENDERS NOTHING. Most panels return '' until the
+      round reaches them (there is no comparison before a bid arrives), and an
+      empty heading promising a section that is not there is worse than silence. */
+function phaseSection(label, hint, bodyHtml) {
+  if (!bodyHtml || !bodyHtml.trim()) return '';
+  const steps = VendorDb.bidRounds.procSteps;
+  const at = steps.indexOf(label);
+  const cur = steps.indexOf(roundProcStatus());
+  const state = R.stage === 'cancelled' ? '' : (at === cur ? ' now' : (cur > at ? ' done' : ''));
+  return '<section class="bm-phase' + state + '" id="ph-' + label.toLowerCase() + '">'
+    + '<div class="bm-phase-head">'
+    + '<span class="bm-phase-n">' + (at >= 0 ? at + 1 : '') + '</span>'
+    + '<h3>' + esc(label) + '</h3>'
+    + '<small>' + hint + '</small></div>'
+    + bodyHtml + '</section>';
+}
+
 function renderRound() {
   const w = WPBYID[R.wp_id] || {};
   document.getElementById('page-title').textContent = wpLabel(w);
@@ -1422,8 +1466,15 @@ function renderRound() {
          + 'This round was cancelled' + (R.cancelled_reason ? ': ' + esc(R.cancelled_reason) : '.') + '</div>'
        : '')
     + '</div>'
-    + deadlineNudge() + askPanel() + referencePanel() + biddersPanel() + responsesPanel() + clarifyPanel()
-    + comparisonPanel() + evaluationPanel() + negotiationPanel() + negotiationViz() + awardPanel();
+    + deadlineNudge()
+    + phaseSection('Sourced', 'What you are asking for, and who you are asking.',
+        askPanel() + referencePanel() + biddersPanel())
+    + phaseSection('Solicited', 'The RFQ is out. Quotations and questions come back here.',
+        responsesPanel() + clarifyPanel())
+    + phaseSection('Evaluated', 'Compare the offers, check compliance, then negotiate.',
+        comparisonPanel() + evaluationPanel() + negotiationPanel() + negotiationViz())
+    + phaseSection('Awarded', 'Record the award and the notices that go out.',
+        awardPanel());
 
   buildBidNav();
 }
@@ -1484,7 +1535,7 @@ async function reTender() {
 /* 2.2.1 — Preparation of Scope of Works (BOQ) and TOR. */
 function askPanel() {
   const ro = canManage ? '' : ' disabled';
-  return '<div class="panel" id="bp-ask"><div class="panel-title">1 · The ask</div>'
+  return '<div class="panel" id="bp-ask"><div class="panel-title">The ask</div>'
     + '<div class="sec-note">Scope, deadline and terms. Everything here goes to the bidders exactly as written.</div>'
     + '<div class="bm-grid">'
     + '<div class="field"><label>Document type</label><select id="a-doc"' + ro + '>'
@@ -1564,7 +1615,7 @@ function biddersPanel() {
       + '</div>';
   }).join('');
 
-  return '<div class="panel" id="bp-bidders"><div class="panel-title">3 · Bidders</div>'
+  return '<div class="panel" id="bp-bidders"><div class="panel-title">Bidders</div>'
     + '<div class="sec-note">Who is being asked to quote. '
     + '<b>Unaccredited vendors may be invited</b> — BP policy N29 runs accreditation in parallel; only the AWARD requires it.</div>'
     + (INV.length ? rows : '<div class="empty-state"><i class="ti ti-users"></i><b>No bidders yet</b>Add the vendors you want to quote this package.</div>')
@@ -2127,7 +2178,7 @@ async function markIssued() {
 /* 2.2.3 — Receipt of Proposal. */
 function responsesPanel() {
   const inPlay = INV.filter(i => i.status === 'submitted' || i.status === 'closed');
-  return '<div class="panel" id="bp-responses"><div class="panel-title">4 · Bids received</div>'
+  return '<div class="panel" id="bp-responses"><div class="panel-title">Bids received</div>'
     + '<div class="sec-note">' + inPlay.length + ' of ' + INV.length + ' invited bidders have submitted.'
     + '</div>'
     + (inPlay.length
@@ -2175,7 +2226,7 @@ function clarCatLabel(c) {
 function clarifyPanel() {
   const rows = INV.filter(i => i.status === 'submitted' || (THREADS[i.id] || []).length);
   if (!rows.length) return '';
-  return '<div class="panel" id="bp-clarify"><div class="panel-title">5 · Clarifications</div>'
+  return '<div class="panel" id="bp-clarify"><div class="panel-title">Clarifications</div>'
     + '<div class="sec-note">Questions to one bidder about their proposal. '
     + '<b>Messages with the same subject are one thread</b> \u2014 to start another, just pick a '
     + 'different subject and send. There is no thread to create or name. '
@@ -2289,7 +2340,7 @@ function comparisonPanel() {
   // ⚠️ The BCB is OURS and is shown to staff only — it is deliberately absent
   //    from every vendor-facing surface (see the migration's view).
   const bcb = window.__hideBudget ? null : (w.approved_budget_bcb || null);
-  return '<div class="panel" id="bp-comparison"><div class="panel-title">6 · Bids at a glance</div>'
+  return '<div class="panel" id="bp-comparison"><div class="panel-title">Bids at a glance</div>'
     + (bcb
         ? '<div class="sec-note">Measured against the budget (BCB) of <b>' + esc(money(bcb)) + '</b>.</div>'
         : (window.__hideBudget ? ''
@@ -2351,7 +2402,7 @@ function evaluationPanel() {
   const comp = rows.filter(i => i.technical_compliant === true);
   const lowComp = comp.length
     ? Math.min.apply(null, comp.map(i => i.offer_amount == null ? Infinity : i.offer_amount)) : null;
-  return '<div class="panel" id="bp-evaluation"><div class="panel-title">7 · Evaluation</div>'
+  return '<div class="panel" id="bp-evaluation"><div class="panel-title">Evaluation</div>'
     + '<div class="sec-note">A package is awarded on two things: it <b>meets the technical requirements</b> '
     + '(the TOR and the MPSS), and it is the <b>lowest bid in the cost comparison</b>. '
     + 'Mark compliance here; the ranking comes from the comparison workbook.</div>'
@@ -2409,7 +2460,7 @@ function negotiationPanel() {
   if (!rows.length) return '';
   const ro = canManage ? '' : ' disabled';
   const short = rows.filter(i => i.shortlisted).length;
-  return '<div class="panel" id="bp-negotiation"><div class="panel-title">8 · Negotiation</div>'
+  return '<div class="panel" id="bp-negotiation"><div class="panel-title">Negotiation</div>'
     /* ⚠️ ONE SENTENCE, THEN THE CONTROLS. These notes had grown into three-line
        paragraphs that pushed the actual inputs below the fold and made every
        card read as dense. The reasoning behind each rule lives in CLAUDE.md and
@@ -2783,7 +2834,7 @@ function awardPanel() {
   if (!rows.length) return '';
   const winner = INV.find(i => i.outcome === 'awarded');
   const decided = !!winner;
-  return '<div class="panel" id="bp-award"><div class="panel-title">9 · Award</div>'
+  return '<div class="panel" id="bp-award"><div class="panel-title">Award</div>'
     + '<div class="sec-note">' + (decided
         ? 'Awarded to <b>' + esc(winner.vendor_name) + '</b>' + (winner.decided_at ? ' on ' + esc(dOnly(winner.decided_at)) : '') + '.'
         : 'Awarding closes the round: the winner is marked awarded and every other bidder not awarded, so nobody is left un-notified.')
