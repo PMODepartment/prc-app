@@ -148,6 +148,29 @@
     .bm-phase.now .bm-phase-n{background:var(--mw-red);color:#fff}
     .bm-phase.done .bm-phase-n{background:#2D9B6F;color:#fff}
     @media(max-width:640px){ .bm-phase-head small{flex-basis:100%} }
+    /* What the phase is holding, as figures. Reads at a glance; the prose above
+       it is there for the first time only. */
+    .bm-stats{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px}
+    .bm-stat{flex:0 0 auto;min-width:96px;padding:8px 12px;border-radius:9px;
+      background:var(--surface-2);border:1px solid var(--border-md);
+      display:flex;flex-direction:column;gap:1px}
+    .bm-stat>b{font-size:1.0714rem;font-weight:800;line-height:1.15;color:var(--text-primary)}
+    .bm-stat>span{font-size:0.6875rem;font-weight:700;letter-spacing:.05em;
+      text-transform:uppercase;color:var(--text-hint)}
+    .bm-stat.wide{min-width:150px}
+    .bm-stat.wide>b{font-size:0.9286rem}
+    .bm-stat.ok{border-color:#2D9B6F}
+    .bm-stat.ok>b{color:#2D9B6F}
+    .bm-stat.warn{border-color:#B45309}
+    .bm-stat.warn>b{color:#B45309}
+    .bm-stat.muted>b{color:var(--text-hint)}
+    body.dark-mode .bm-stat.ok{border-color:#5FD3A3} body.dark-mode .bm-stat.ok>b{color:#5FD3A3}
+    body.dark-mode .bm-stat.warn{border-color:#FBBF24} body.dark-mode .bm-stat.warn>b{color:#FBBF24}
+    /* A filled track behind the stepper, so progress is a shape and not only
+       five words. Width is set inline from the current step. */
+    .bm-track{height:4px;border-radius:3px;background:var(--surface-2);margin:0 2px 14px;overflow:hidden}
+    .bm-track>i{display:block;height:100%;background:var(--mw-red);border-radius:3px;
+      transition:width .3s ease}
     body.dark-mode .bm-bcb-none{border-left-color:#FBBF24}
     body.dark-mode .bm-bcb-none>b,body.dark-mode .bm-warn{color:#FBBF24}
     /* ⚠️ The preview shows the letter as OUTLOOK will render it, so it is
@@ -1048,7 +1071,12 @@ function stepperHtml() {
         + (i === at && !cancelled
             ? '<em class="bm-stepsub">' + esc(VendorDb.bidRounds.stageLabel(R.stage)) + '</em>' : '')
         + '</div>').join('')
-    + '</div>' + wpStatusLine();
+    + '</div>'
+    /* The same progress as a shape. A cancelled round shows an empty track —
+       it did not reach anywhere, and a part-filled bar would say it did. */
+    + '<div class="bm-track"><i style="width:'
+    + (cancelled || at < 0 ? 0 : Math.round((at / (steps.length - 1)) * 100)) + '%"></i></div>'
+    + wpStatusLine();
 }
 
 /* The work package's own Procurement Status, shown so it is visibly the same
@@ -1425,6 +1453,68 @@ function vsBcbHtml(amount) {
    ⚠️ A PHASE WITH NOTHING IN IT RENDERS NOTHING. Most panels return '' until the
       round reaches them (there is no comparison before a bid arrives), and an
       empty heading promising a section that is not there is worse than silence. */
+/* ── what each phase is actually holding, as figures ─────────────────────────
+   ⚠️ THE HEADER CARRIES NUMBERS, NOT A SENTENCE. A phase used to be introduced
+      by a line of prose, which every officer reads once and never again; what
+      they come back for is how many bidders, how many replied, how long is
+      left, what the lowest offer is. All of it is already in memory — INV,
+      THREADS, REFDOCS/REFITEMS — so none of this costs a query.
+   ⚠️ A chip whose value is unknown is OMITTED rather than shown as 0. "0 days
+      left" on a round with no deadline set is a statement we cannot make. */
+function _chip(value, label, cls) {
+  if (value == null || value === '') return '';
+  return '<div class="bm-stat' + (cls ? ' ' + cls : '') + '">'
+    + '<b>' + value + '</b><span>' + esc(label) + '</span></div>';
+}
+function _daysLeft() {
+  if (!R.bid_due_at) return null;
+  const ms = new Date(R.bid_due_at).getTime() - Date.now();
+  if (isNaN(ms)) return null;
+  const d = Math.ceil(ms / 86400000);
+  return d < 0 ? { n: 'Closed', cls: 'muted', lbl: 'for pricing' }
+       : { n: d, cls: d <= 3 ? 'warn' : '', lbl: d === 1 ? 'day left' : 'days left' };
+}
+function phaseStats(label) {
+  const inPlay = INV.filter(i => i.status === 'submitted' || i.status === 'closed');
+  const live = INV.filter(i => i.status !== 'withdrawn' && i.status !== 'declined');
+  if (label === 'Sourced') {
+    const acc = INV.filter(i => (i.vendor_accreditation || '') === 'accredited').length;
+    return _chip(INV.length, INV.length === 1 ? 'bidder' : 'bidders', INV.length ? '' : 'warn')
+      + _chip(acc, 'accredited', INV.length && acc === INV.length ? 'ok' : (INV.length ? 'warn' : ''))
+      + _chip(REFITEMS.length, REFITEMS.length === 1 ? 'line item' : 'line items')
+      + _chip(REFDOCS.length, REFDOCS.length === 1 ? 'attachment' : 'attachments');
+  }
+  if (label === 'Solicited') {
+    const dl = _daysLeft();
+    const threads = Object.values(THREADS).reduce((a, m) => a + (m.length ? 1 : 0), 0);
+    return _chip(inPlay.length + ' / ' + live.length, 'submitted',
+                 live.length && inPlay.length === live.length ? 'ok' : '')
+      + (dl ? _chip(dl.n, dl.lbl, dl.cls) : '')
+      + _chip(threads, threads === 1 ? 'clarification' : 'clarifications');
+  }
+  if (label === 'Evaluated') {
+    const amts = inPlay.map(i => i.offer_amount).filter(v => v != null && v !== '');
+    const low = amts.length ? Math.min.apply(null, amts) : null;
+    const comp = inPlay.filter(i => i.technical_compliant === true).length;
+    const shortl = inPlay.filter(i => i.shortlisted).length;
+    return (low != null ? _chip(money(low), 'lowest offer') : '')
+      + _chip(comp + ' / ' + inPlay.length, 'compliant', comp ? 'ok' : 'warn')
+      + _chip(shortl, 'shortlisted')
+      + (low != null && bcbOf() ? _chip(vsBcbHtml(low) || '&mdash;', 'against budget', 'wide') : '');
+  }
+  if (label === 'Awarded') {
+    const win = INV.find(i => i.outcome === 'awarded');
+    if (!win) return _chip(inPlay.length, 'awaiting a decision', 'warn');
+    const fin = win.final_amount != null ? win.final_amount
+              : (win.negotiated_amount != null ? win.negotiated_amount : win.offer_amount);
+    return _chip(esc(win.vendor_name), 'awarded to', 'wide')
+      + (fin != null ? _chip(money(fin), 'final amount', 'ok') : '')
+      + (fin != null && bcbOf() ? _chip(vsBcbHtml(fin) || '&mdash;', 'against budget', 'wide') : '')
+      + _chip(INV.filter(i => i.notice_issued_at).length + ' / ' + INV.length, 'notices recorded');
+  }
+  return '';
+}
+
 function phaseSection(label, hint, bodyHtml) {
   if (!bodyHtml || !bodyHtml.trim()) return '';
   const steps = VendorDb.bidRounds.procSteps;
@@ -1441,6 +1531,7 @@ function phaseSection(label, hint, bodyHtml) {
     + '<span class="bm-phase-n">' + (at >= 0 ? at + 1 : '') + '</span>'
     + '<h3>' + esc(label) + '</h3>'
     + '<small>' + hint + '</small></div>'
+    + (function (s) { return s ? '<div class="bm-stats">' + s + '</div>' : ''; })(phaseStats(label))
     + bodyHtml + '</section>';
 }
 
