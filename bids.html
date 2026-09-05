@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260905g"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260905g"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260905h"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260905h"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -459,10 +459,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260905g"></script>
-<script src="assets/js/db.js?v=20260905g"></script>
-<script src="assets/js/ui.js?v=20260905g"></script>
-<script src="assets/js/coachmarks.js?v=20260905g"></script>
+<script src="assets/js/auth.js?v=20260905h"></script>
+<script src="assets/js/db.js?v=20260905h"></script>
+<script src="assets/js/ui.js?v=20260905h"></script>
+<script src="assets/js/coachmarks.js?v=20260905h"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -645,18 +645,43 @@ function configureBidTour() {
   else add();
 })();
 
+/* ⚠️⚠️ THE FULL WORK-PACKAGE SET IS NOT LOADED AT PAGE LOAD, DELIBERATELY.
+   It used to be, and it was the whole reason this page was slow: measured live,
+   getAllApprovedWPs() took 4.6s and returned 1,870 rows, against ~250ms each for
+   projects, rounds and counts. Every one of those rows was fetched to render a
+   list of bid rounds — and WPS is read in exactly two places, both inside the
+   New-round picker. Worse, all four calls were awaited in sequence before
+   #loading was hidden, so that one slow call held the entire page behind a
+   spinner, and when it stalled the page never appeared at all.
+   Now: the three small reads run in PARALLEL, the rounds' OWN work packages are
+   fetched by id for their labels, and the portfolio-wide set is pulled only when
+   somebody actually opens the picker. */
+let _wpsLoaded = false;
+async function ensureWps() {
+  if (_wpsLoaded) return;
+  const seesAll = ['super_admin', 'admin', 'specialist'].includes(profile.role);
+  const all = seesAll ? await WPDb.getAllApprovedWPs()
+                      : await WPDb.getApprovedWPsForProjects(profile.projects || []);
+  WPS = (all || []).filter(w => w.project_id !== 'DEMO');
+  WPS.forEach(w => { WPBYID[w.id] = w; });
+  _wpsLoaded = true;
+}
 async function loadAll() {
   try {
-    const projects = await WPDb.getProjects();
+    const [projects, rounds, counts] = await Promise.all([
+      WPDb.getProjects(),
+      VendorDb.bidRounds.list(),
+      VendorDb.bidRounds.invitationCounts(),
+    ]);
     (projects || []).forEach(pr => { PROJECTS[pr.id] = pr; });
-    // The work packages this user may actually bid out.
-    const seesAll = ['super_admin', 'admin', 'specialist'].includes(profile.role);
-    WPS = seesAll ? await WPDb.getAllApprovedWPs()
-                  : await WPDb.getApprovedWPsForProjects(profile.projects || []);
-    WPS = (WPS || []).filter(w => w.project_id !== 'DEMO');
-    WPS.forEach(w => { WPBYID[w.id] = w; });
-    ROUNDS = await VendorDb.bidRounds.list();
-    COUNTS = await VendorDb.bidRounds.invitationCounts();
+    ROUNDS = rounds || [];
+    COUNTS = counts || {};
+    // Only the packages these rounds are actually about — a handful, not 1,870.
+    // ⚠️ Its own try/catch: a label lookup failing must not cost you the page.
+    try {
+      const wps = await WPDb.getWPsByIds(ROUNDS.map(r => r.wp_id));
+      (wps || []).forEach(w => { WPBYID[w.id] = w; });
+    } catch (e) { console.error('[bids] round work packages', e); }
   } catch (e) {
     AppNotify.fromError(e, 'Could not load bid rounds');
   }
@@ -673,6 +698,13 @@ async function refreshAll() {
   try {
     ROUNDS = await VendorDb.bidRounds.list();
     COUNTS = await VendorDb.bidRounds.invitationCounts();
+    // A round created elsewhere may name a package we hold no label for.
+    const missing = ROUNDS.map(r => r.wp_id).filter(id => id && !WPBYID[id]);
+    if (missing.length) {
+      try {
+        (await WPDb.getWPsByIds(missing)).forEach(w => { WPBYID[w.id] = w; });
+      } catch (e) { console.error('[bids] refresh work packages', e); }
+    }
     if (R) { await openRound(R.id); } else { renderList(); }
   } catch (e) { AppNotify.fromError(e, 'Could not refresh'); }
   if (i) i.classList.remove('spin');
@@ -810,7 +842,10 @@ function renderList() {
    composed and issued. */
 let _nrProject = null;
 
-function openNewRound() {
+/* ⚠️ THIS is where the portfolio-wide work-package set is finally needed — the
+   only place, along with the WP step it leads to. Fetching it here costs a few
+   seconds ONCE, on a deliberate click, instead of on every page load. */
+async function openNewRound() {
   _nrPick = null;
   _nrProject = null;
   const ps = document.getElementById('nrProjSearch'); if (ps) ps.value = '';
@@ -818,8 +853,21 @@ function openNewRound() {
   document.getElementById('nrPicked').textContent = '';
   document.getElementById('nrCreate').disabled = true;
   nrShowStep('project');
-  renderNrProjects();
   document.getElementById('newRoundModal').style.display = 'flex';
+  if (!_wpsLoaded) {
+    document.getElementById('nrProjects').innerHTML =
+      '<div class="sec-note" style="padding:14px 2px"><i class="ti ti-loader-2 spin"></i> '
+      + 'Loading work packages…</div>';
+    try { await ensureWps(); }
+    catch (e) {
+      AppNotify.fromError(e, 'Could not load work packages');
+      document.getElementById('nrProjects').innerHTML =
+        '<div class="sec-note bm-warn" style="padding:14px 2px">Could not load work packages. '
+        + 'Close this and try again.</div>';
+      return;
+    }
+  }
+  renderNrProjects();
   setTimeout(() => { const e = document.getElementById('nrProjSearch'); if (e) e.focus(); }, 60);
 }
 function closeNewRound() { document.getElementById('newRoundModal').style.display = 'none'; }

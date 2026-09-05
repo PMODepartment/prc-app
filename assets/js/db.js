@@ -1,4 +1,4 @@
-﻿
+
 /* ── WPDb ─────────────────────────────────────────────────────────── */
 /* Audit stamp: who last changed a row and when, from the logged-in profile.
    updated_by_name is a snapshot so the display survives if that user is later removed.
@@ -278,6 +278,21 @@ const WPDb = (() => {
   async function getAllWPsForProjects(ids) { if(!ids||!ids.length) return []; const sb=await getSB(); const rows=await _pagedSelect(()=>sb.from('work_packages').select('*').in('project_id',ids).order('created_at',{ascending:false})); return rows.map(mapWP); }
   async function getOfficerWPs(uid) { const sb=await getSB(); const {data}=await sb.from('work_packages').select('*').eq('assigned_officer',uid).order('wp_no'); return (data||[]).map(mapWP); }
   async function getWP(id) { const sb=await getSB(); const {data}=await sb.from(await _wpRel()).select('*').eq('id',id).single(); return mapWP(data); }
+  /* Just the work packages named, for a page that needs a handful of labels and
+     has no business pulling the whole portfolio to get them.
+     ⚠️ CHUNKED — a long id list blows the PostgREST URL length, the same reason
+        getVendorsByIds and getDeletionImpact chunk theirs. */
+  async function getWPsByIds(ids) {
+    const list = Array.from(new Set((ids || []).filter(Boolean)));
+    if (!list.length) return [];
+    const sb = await getSB(); const rel = await _wpRel(); const out = [];
+    for (let i = 0; i < list.length; i += 150) {
+      const { data, error } = await sb.from(rel).select('*').in('id', list.slice(i, i + 150));
+      if (error) throw error;
+      (data || []).forEach(r => out.push(mapWP(r)));
+    }
+    return out;
+  }
   async function getProjectWPs(pid) { return getAllWPs(pid); }
   async function submitWP(d,p) {
     const sb=await getSB(); const base={...unmap(d),review_status:'pending_review',assigned_officer:p?.id||null};
@@ -392,7 +407,7 @@ const WPDb = (() => {
   }
   async function deleteProject(id) { const sb=await getSB(); await sb.from('work_packages').delete().eq('project_id',id); const {error}=await sb.from('projects').delete().eq('id',id); if(error) throw error; }
   async function seedWP(d) { return submitWP(d,null); }
-  return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getNeedBy,getPlannerPackages,getAllApprovedWPs,getApprovedWPsForProjects,getPendingWPs,getAllWPsForAdmin,getAllWPsForProjects,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,deleteWP,getAllUsers,getUsersForAdmin,getAdminUsers,getManagerUsers,updateUser,updateLastLogin,deleteUser,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
+  return { getProjects,getProject,saveProject,createProject,getApprovedWPs,getAllWPs,getNeedBy,getPlannerPackages,getAllApprovedWPs,getApprovedWPsForProjects,getWPsByIds,getPendingWPs,getAllWPsForAdmin,getAllWPsForProjects,getOfficerWPs,getWP,getProjectWPs,submitWP,updateWP,updateWPDirect,approveWP,rejectWP,assignOfficer,deleteWP,getAllUsers,getUsersForAdmin,getAdminUsers,getManagerUsers,updateUser,updateLastLogin,deleteUser,archiveProject,unarchiveProject,updateProject,deleteProject,seedWP };
 })();
 
 /* ── Stats ─────────────────────────────────────────────────────────── */
