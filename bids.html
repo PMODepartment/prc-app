@@ -524,16 +524,27 @@ AppAuth.requireLogin(async (user, p) => {
       before a bid arrives — is simply not part of the tour that run.
    ⚠️ NO before() OPENS A MODAL. A tour that leaves the new-round dialog or the
       RFQ composer open behind it has changed the page it was explaining. */
+function _shown(id) {
+  const n = document.getElementById(id);
+  return !!n && getComputedStyle(n).display !== 'none';
+}
+function _onBidList() { return _shown('bidListPage'); }
+
 function configureBidTour() {
   if (!window.CoachTour) return;
   CoachTour.configure({
     key: 'coach_bids',
     steps: [
-      { sel: '#btnNewRound', title: 'One round, one solicitation',
+      /* ⚠️ THE LIST STEPS NEED when() FOR THE SAME REASON #bid-nav DOES.
+         #bidListPage and everything in it is authored into the page and merely
+         hidden while a round is open, so computeLive() — which counts on
+         EXISTENCE, deliberately — counted both and then skipped them: opening
+         the tour inside a round read "Step 3 of 14" and delivered twelve. */
+      { sel: '#btnNewRound', title: 'One round, one solicitation', when: _onBidList,
         body: 'A round is one work package going out to bid. Re-tendering never reopens a round '
             + '&mdash; it starts a new one, so the attempt that failed stays readable exactly as it was. '
             + 'You pick the project first, then its work package.' },
-      { sel: '#bidListPage .data-table', pad: 4, title: 'Every round, and where it is',
+      { sel: '#bidListPage .data-table', pad: 4, title: 'Every round, and where it is', when: _onBidList,
         body: 'The status column is the <b>approved Procurement Status</b> &mdash; Not Started, Sourced, '
             + 'Solicited, Evaluated, Awarded &mdash; the same words the work package itself uses, so the '
             + 'two can never tell different stories.' },
@@ -542,14 +553,14 @@ function configureBidTour() {
             + 'Solicited, closed for pricing &rarr; Evaluated, awarded &rarr; Awarded. There is nothing '
             + 'to remember to set. Underneath it you can see the work package’s own status, and put '
             + 'it right in one click if it has fallen behind.' },
-      { sel: '#bp-ask', title: '1 &middot; The ask',
+      { sel: '#bp-ask', title: '1 · The ask',
         body: 'Scope, deadline, payment terms and conditions. Everything here goes to the bidders '
             + 'exactly as written, and it is what fills in the RFQ letter further down.' },
-      { sel: '#bp-reference', title: '2 &middot; The reference pack',
+      { sel: '#bp-reference', title: '2 · The reference pack',
         body: 'The TOR, the MPSS, the drawings &mdash; and the priced line items. This is what makes two '
             + 'quotations comparable: every bidder prices the same list, and the line items become the '
             + 'itemised requirement in the RFQ email.' },
-      { sel: '#bp-bidders', title: '3 &middot; Bidders',
+      { sel: '#bp-bidders', title: '3 · Bidders',
         body: 'Each invited vendor shows their accreditation. Policy N29 lets you invite an unaccredited '
             + 'vendor &mdash; awarding to a problematic one only asks you to confirm, because a hard block '
             + 'would just get worked around.' },
@@ -557,28 +568,35 @@ function configureBidTour() {
         body: 'Drafted on <b>Megawide’s own template</b>, filled in from this round. It copies the '
             + 'formatted letter and opens an addressed, empty draft &mdash; press Ctrl+V. Each bidder gets '
             + 'their own private link, so each is a separate email; there is a mail-merge CSV for a big round.' },
-      { sel: '#bp-responses', title: '4 &middot; Bids received',
+      { sel: '#bp-responses', title: '4 · Bids received',
         body: 'Quotations as they arrive, through the link or attached by you from an email. A vendor may '
             + 'revise up to the deadline; the first submission is kept as their original offer.' },
-      { sel: '#bp-clarify', title: '5 &middot; Clarifications',
+      { sel: '#bp-clarify', title: '5 · Clarifications',
         body: 'Questions to <b>one</b> bidder, never visible to the others, grouped by subject &mdash; '
             + 'technical, commercial, schedule, documents. Messages sharing a subject are the thread.' },
-      { sel: '#bp-comparison', title: '6 &middot; Bids at a glance',
+      { sel: '#bp-comparison', title: '6 · Bids at a glance',
         body: 'Every column sorts, and the lowest offer is chipped. <b>This is not the cost comparison</b> '
             + '&mdash; that document is prepared outside the app from your own template. Export the '
             + 'bidders and offers as CSV to start it.' },
-      { sel: '#bp-evaluation', title: '7 &middot; Evaluation',
+      { sel: '#bp-evaluation', title: '7 · Evaluation',
         body: 'Technical compliance against the TOR. Award rests on two things only: compliance, and the '
             + 'lowest bid in the cost comparison.' },
-      { sel: '#bp-negotiation', title: '8 &middot; Negotiation',
+      { sel: '#bp-negotiation', title: '8 · Negotiation',
         body: 'Shortlist the top bidders and record the revised offer. The original is kept alongside it, '
             + 'so the saving is the gap between the two &mdash; and that is what the chart below draws.' },
-      { sel: '#bp-award', title: '9 &middot; Award closes the loop',
+      { sel: '#bp-award', title: '9 · Award closes the loop',
         body: 'Awarding writes the cost, the vendor and the award date <b>back to the work package</b>, '
             + 'promotes every offer into that vendor’s bid history, and marks the others not awarded. '
             + 'The NOA and the Letter of Regret stay a separate process &mdash; the app records that a '
             + 'notice went out and its reference.' },
-      { sel: '#bid-nav', title: 'Jumping about',
+      /* ⚠️ `when()` IS REQUIRED HERE, and only here. computeLive() counts a step
+         if its element EXISTS, deliberately — visibility moves as the tour walks.
+         But #bid-nav is authored into the page with style="display:none" and only
+         revealed once a round is open, so on the rounds list it was counted and
+         then skipped: the card read "Step 1 of 3" and delivered two. Every other
+         workspace panel is generated by innerHTML, so it is genuinely absent
+         until it exists and needs no predicate. */
+      { sel: '#bid-nav', title: 'Jumping about', when: function () { return _shown('bid-nav'); },
         body: 'The rail follows the sections that are actually on screen, so it grows as the round '
             + 'progresses. That is the whole tour &mdash; reopen it any time from the <b>?</b> button.' },
     ],
