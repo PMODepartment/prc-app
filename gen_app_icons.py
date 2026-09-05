@@ -30,6 +30,28 @@ def _white_mark():
 
 _MARK = _white_mark()
 
+def favicon(px):
+    """The browser-tab icon: a RED MARK ON TRANSPARENT, not the red tile.
+
+    ⚠️ THIS IS A DELIBERATE, PRE-EXISTING CHOICE — commit ffd9efc made the
+       favicon a bare red mark to match the Planning app's tab icon, and
+       regenerating the tiles overwrote it with a white-on-red square. That was
+       reported ("it changed to a white M logo version"), and it ALSO made the
+       procurement favicon byte-identical to the vendor portal's, so the two
+       apps were indistinguishable in a tab strip.
+       The installed app TILES stay white-on-red; only the favicon is the mark.
+       The vendor favicon deliberately KEEPS the tile, so the two differ.
+    """
+    src = Image.open(MARK).convert('RGBA')
+    red = Image.new('RGBA', src.size, RED + (0,))
+    red.putalpha(src.getchannel('A'))
+    im = Image.new('RGBA', (px, px), (0, 0, 0, 0))
+    mw = max(1, int(px * 0.92))
+    mh = max(1, int(mw * src.size[1] / src.size[0]))
+    m = red.resize((mw, mh), Image.LANCZOS)
+    im.paste(m, ((px - mw) // 2, (px - mh) // 2), m)
+    return im
+
 def _fit_font(draw, lines, max_w, start):
     """Largest size at which every line fits max_w."""
     size = start
@@ -82,8 +104,6 @@ SETS = {
         ('icon-512-maskable.png', 512, 0.18, ['PROCUREMENT', 'DASHBOARD']),
         ('apple-touch-icon.png',  180, 0.10, ['PROCUREMENT', 'DASHBOARD']),
         ('icon-180.png',          180, 0.10, ['PROCUREMENT', 'DASHBOARD']),
-        ('favicon-32.png',         32, 0.06, []),
-        ('favicon-16.png',         16, 0.04, []),
     ],
     'vendor': [
         ('vendor-icon-192.png',          192, 0.10, ['VENDOR', 'PORTAL']),
@@ -104,6 +124,11 @@ if __name__ == '__main__':
             tile(px, pad, lines).save(p, optimize=True)
             print('  %-32s %4dpx  %5.1f KB  %s' % (fn, px, os.path.getsize(p) / 1024,
                                                    '/'.join(lines) or '(mark only)'))
-    # the 32px favicon the pages reference from assets/img
-    tile(32, 0.06, []).save('assets/img/favicon.png', optimize=True)
-    print('\n  assets/img/favicon.png            32px  (mark only)')
+    # Browser-tab icons — the bare red mark, NOT the tile. See favicon().
+    print('\nprocurement favicons (red mark on transparent)')
+    for fn, px in (('favicon-32.png', 32), ('favicon-16.png', 16)):
+        p = os.path.join(OUT, fn)
+        favicon(px).save(p, optimize=True)
+        print('  %-32s %4dpx  %5.1f KB' % (fn, px, os.path.getsize(p) / 1024))
+    favicon(32).save('assets/img/favicon.png', optimize=True)
+    print('  %-32s %4dpx' % ('assets/img/favicon.png', 32))
