@@ -487,8 +487,13 @@
     .rq-table td{vertical-align:top}
     .rq-sub{display:block;margin-top:2px;font-weight:400}
     .rq-note{display:block;color:var(--text-hint);font-weight:400;font-size:0.7143rem;margin-top:2px}
-    .rq-terms{font-size:0.7857rem;white-space:normal;max-width:200px}
-    .rq-when{font-size:0.7857rem;color:var(--text-hint);white-space:nowrap}
+    /* ⚠️ SCOPED `.rq-table td.x`, NOT a bare `.x`. dashboard.css's
+       `.data-table td` sets white-space:nowrap and scores (0,1,1); a lone
+       class is (0,1,0), so `.rq-terms{white-space:normal}` was SILENTLY
+       INERT and a long payment term pushed the whole table wide. */
+    .rq-table td.rq-name{white-space:normal;min-width:170px}
+    .rq-table td.rq-terms{font-size:0.7857rem;white-space:normal;max-width:190px}
+    .rq-table td.rq-when{font-size:0.7857rem;color:var(--text-hint);white-space:nowrap}
     /* Zoom, like the workbook's own. See ccApplyZoom for why it is CSS `zoom`
        and not a transform. */
     .cc-zoom{display:inline-flex;border:1.5px solid var(--border-md);border-radius:8px;overflow:hidden}
@@ -2829,7 +2834,7 @@ async function markIssued() {
 let _rqSort = { key: 'net', dir: 1 };
 function rqSortBy(key) {
   if (_rqSort.key === key) _rqSort.dir = -_rqSort.dir;
-  else { _rqSort.key = key; _rqSort.dir = key === 'vendor_name' ? 1 : 1; }
+  else { _rqSort.key = key; _rqSort.dir = 1; }
   renderRound();
 }
 function _rqTh(key, label, align) {
@@ -2877,7 +2882,7 @@ function responsesPanel() {
           + '<th></th></tr></thead><tbody>'
           + sorted.map(function (i) {
               const net = _rqVal(i, 'net');
-              return '<tr><td><b>' + esc(i.vendor_name) + '</b>'
+              return '<tr><td class="rq-name"><b>' + esc(i.vendor_name) + '</b>'
                 + (isFinite(low) && Math.abs(net - low) < 0.5 ? ' <span class="bm-low">lowest net</span>' : '')
                 + (i.vendor_notes ? '<small class="rq-note">' + esc(i.vendor_notes) + '</small>' : '')
                 + '</td>'
@@ -4118,8 +4123,13 @@ function costComparePanel() {
   }));
   const commercial =
       band('comm', 'Commercial terms', 'what was quoted, and on what terms', 6)
+    /* ⚠️ NO UNARY + AFTER THE `:` — a stray one here made this branch
+       `+commRow(...)`, i.e. Number("<tr>…") = NaN, which SILENTLY DROPPED the
+       "Quoted in the letter" row (the vendor's own headline figure) and
+       foster-parented a literal NaN out of the table, where nothing could
+       see it. node --check passes: it is valid JS, just wrong. */
     + (_ccBandShut.comm ? '' :
-    + commRow('Quoted in the letter', 'the figure the vendor sent', function (i) {
+      commRow('Quoted in the letter', 'the figure the vendor sent', function (i) {
         const v = standing(i);
         return '<div class="cc-r">' + (v == null ? '\u2014' : esc(_amt(v))) + '</div>'
           + (i.negotiated_amount != null && Number(i.negotiated_amount) !== Number(i.offer_amount)
@@ -4224,8 +4234,13 @@ function costComparePanel() {
        winner — the panel's own rule, now also its reading order: qualify, then
        compare among those who qualify, then the commercial summary. The totals
        stay directly under the lines they total. */
+    /* ⚠️ THE CONCLUSION SURVIVES THE COLLAPSE, in both bands. Collapsing the
+       priced lines keeps their GRAND TOTAL; collapsing the requirements has to
+       keep the standing the same way, or the one row that says who qualifies
+       disappears with the detail — on the panel whose whole rule is that
+       compliance gates the price. */
     + (REQS.length ? band('reqs', 'Technical requirements', 'from the terms of reference', REQS.length)
-        + (_ccBandShut.reqs ? '' : reqRows + reqSummary) : '')
+        + (_ccBandShut.reqs ? '' : reqRows) + reqSummary : '')
     + (REFITEMS.length ? band('items', 'Priced items', 'rate and amount per line', REFITEMS.length)
         + (_ccBandShut.items ? '' : itemRows) + totals : '')
     + commercial
