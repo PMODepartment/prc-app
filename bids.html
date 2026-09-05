@@ -799,6 +799,38 @@ function wpLabel(w) {
   return (w.wp_no ? 'WP ' + w.wp_no : 'Work package') + (w.description ? ' — ' + w.description : '');
 }
 function projName(pid) { return (PROJECTS[pid] || {}).name || pid || ''; }
+/* ── money fields group as you type ──────────────────────────────────────────
+   ⚠️ type="number" CANNOT DO THIS — a number input rejects the comma outright
+      and normalises its own value, so a money field has to be type="text" with
+      inputmode="decimal", which still gives a phone the numeric keypad.
+      num() already strips commas, so every existing reader works unchanged.
+   ⚠️ Grouped LIVE, not on blur: watching 250,000 form as you type is the point,
+      which means putting the caret back afterwards. The caret is restored by
+      counting the SIGNIFICANT characters before it — separators are not
+      counted, so inserting one cannot shift it. A trailing "." is preserved, or
+      it would be eaten the instant it is typed. Same as the vendor portal. */
+function _grp(s) {
+  s = String(s == null ? '' : s).replace(/[^0-9.]/g, '');
+  const i = s.indexOf('.');
+  let whole = i < 0 ? s : s.slice(0, i);
+  const frac = i < 0 ? '' : s.slice(i).replace(/\./g, function (m, o) { return o === 0 ? '.' : ''; });
+  whole = whole.replace(/^0+(?=\d)/, '');
+  return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + frac;
+}
+function onMoneyInput(el) {
+  const before = el.value.slice(0, el.selectionStart || 0).replace(/[^0-9.]/g, '').length;
+  el.value = _grp(el.value);
+  let seen = 0, pos = 0;
+  while (pos < el.value.length && seen < before) {
+    if (/[0-9.]/.test(el.value[pos])) seen++;
+    pos++;
+  }
+  try { el.setSelectionRange(pos, pos); } catch (e) {}
+}
+function moneyAttrs(id, v, ph) {
+  return 'id="' + id + '" type="text" inputmode="decimal" placeholder="' + esc(ph) + '"'
+    + ' value="' + (v == null || v === '' ? '' : esc(_grp(v))) + '" oninput="onMoneyInput(this)"';
+}
 function val(id) { const e = document.getElementById(id); return e ? e.value.trim() : ''; }
 function checked(id) { const e = document.getElementById(id); return !!(e && e.checked); }
 
@@ -2357,7 +2389,7 @@ function _pendingQuoteRows() {
     + waiting.map(i =>
         '<div class="bidder">'
         + '<div class="bidder-name" style="flex:0 0 180px">' + esc(i.vendor_name) + '</div>'
-        + '<input id="rq-a-' + i.id + '" type="number" step="0.01" placeholder="Quoted amount" '
+        + '<input ' + moneyAttrs('rq-a-' + i.id, '', 'Quoted amount') + ' '
         + 'style="flex:0 0 160px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;'
         + 'font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
         + '<input id="rq-l-' + i.id + '" type="number" placeholder="Lead time (days)" '
@@ -2673,8 +2705,7 @@ function negotiationPanel() {
         + '<input type="checkbox" id="ng-s-' + i.id + '"' + (i.shortlisted ? ' checked' : '') + ro
         + ' style="width:auto">' + esc(i.vendor_name) + '</label>'
         + '<small style="flex:0 0 130px;color:var(--text-hint)">was ' + esc(money(i.offer_amount, i.offer_currency)) + '</small>'
-        + '<input id="ng-a-' + i.id + '" type="number" step="0.01" placeholder="Negotiated amount" value="'
-        + esc(i.negotiated_amount == null ? '' : i.negotiated_amount) + '"' + ro
+        + '<input ' + moneyAttrs('ng-a-' + i.id, i.negotiated_amount, 'Negotiated amount') + ro
         + ' style="flex:0 0 170px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
         + '<input id="ng-n-' + i.id + '" placeholder="Notes" value="' + esc(i.negotiation_notes || '') + '"' + ro
         + ' style="flex:1;min-width:140px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
@@ -3068,7 +3099,7 @@ function awardPanel() {
                 + (window.accredKey && window.accredKey(i.vendor_accreditation) !== 'accredited' ? ' (not accredited)' : '')
                 + '</option>').join('')
             + '</select></div>'
-            + '<div class="field"><label>Final amount</label><input id="aw-amt" type="number" step="0.01" placeholder="Final negotiated amount"></div>'
+            + '<div class="field"><label>Final amount</label><input ' + moneyAttrs('aw-amt','','Final negotiated amount') + '></div>'
             + '<div class="field"><label>NOA reference</label><input id="aw-ref" placeholder="e.g. NOA-2026-0142"></div>'
             + '</div>'
             + '<div class="bm-actions"><button class="btn btn-primary" onclick="doAward()"><i class="ti ti-award"></i> Record the award</button></div>'
