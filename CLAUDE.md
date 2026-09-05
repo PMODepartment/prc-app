@@ -3125,6 +3125,92 @@ python check_tours.py
 - Proven: planting `#bp-comparison` and `#bp-evaluation` back gives
   `2 problem(s)`; the real tree gives 0 across **53 steps on six pages**.
 
+### Zoom, collapsible bands, and a sortable quotations table (2026-09-06)
+
+Following the workbook, at the user's direction: *"During excel cost comparison
+presentations excel can be zoomed out to see all comparisons. Details can be
+collapsed as well"*, and *"Quotations received can also be presented in a better
+way… I also need to have a sorter based on the details i.e. sort by highest"*.
+
+- **A zoom control — Fit · 100% · 85% · 70% · 55%.** **⚠️ CSS `zoom`, NOT
+  `transform: scale()`.** A transform shrinks what you SEE but leaves the
+  original layout box, so the wrapper keeps its old scroll width and you still
+  have a scrollbar for space no longer used — which is the entire thing being
+  fixed. `zoom` shrinks the layout box itself.
+  - **⚠️ Fit MEASURES, and resets to 1 before measuring** — otherwise it fits
+    the ALREADY-SCALED width and creeps smaller on every press. Proven: two
+    consecutive Fits both land on 0.69.
+  - **It never magnifies** (a table that already fits stays at 100%) and
+    **clamps at 0.4** — below that nobody can read it, so the scrollbar is the
+    honest fallback. Measured with 8 bidders: overflow 486px → **0 from a 1440
+    viewport up**; under ~1200 the floor bites and a little overflow remains.
+- **Every band collapses from its own header** — Technical requirements, Priced
+  items, Commercial terms — session-only, like the WP grid's trade groups. A
+  collapse is a reading aid, not a preference.
+- **⚠️ THE CONCLUSION SURVIVES THE COLLAPSE, in both bands.** Collapsing the
+  priced lines already kept their GRAND TOTAL; collapsing the requirements was
+  hiding the **technical standing** along with the detail — on the panel whose
+  whole rule is that compliance gates the price. With all three shut you are
+  now left with exactly the standing and the two totals.
+- **The column header carries the vendor and the VAT basis only.** It also had
+  the priced total, the gap to the quoted figure and the technical standing —
+  all three already rows in the same table. The gap moved onto the GRAND TOTAL
+  row it disagrees with.
+- **Quotations received is a sortable table**, not eight ~85px cards with the
+  details in a run-on subtitle. Bidder · Quoted · Net of VAT · Lead time ·
+  Validity · Payment terms · Submitted · file.
+  - **⚠️ IT DEFAULTS TO NET ASCENDING.** Sorting on the quoted figure would put
+    a non-VAT bidder behind a VAT-inclusive one that costs exactly the same.
+    Seen in the harness: a ₱24.1M VAT-inclusive quote nets to ₱21.52M and is
+    the cheapest, while a ₱22.3M non-VAT quote is only third.
+  - **⚠️ The "lowest net" chip is keyed to the AMOUNT, never the row position** —
+    sort by lead time and it stays on the cheapest bidder, two rows down.
+
+#### ⚠️ Three real bugs the harness found, none of which any syntax check can
+
+1. **A stray unary `+` was dropping the vendor's own quoted figure.** The
+   commercial band read `(_ccBandShut.comm ? '' : + commRow('Quoted in the
+   letter', …) + commRow(…))` — that leading `+` makes it `Number("<tr>…")` =
+   **NaN**, so the row vanished and a literal `NaN` was **foster-parented out of
+   the `<tbody>` by the HTML parser**, where `table.textContent` could not even
+   see it. **`node --check` passes: it is valid JS, just wrong.** What exposed
+   it was the band claiming "6 hidden" while five rows disappeared — *count what
+   a label promises against what actually happens.*
+2. **`.rq-terms{white-space:normal}` never applied.** `dashboard.css`'s
+   `.data-table td` scores **(0,1,1)** and a bare class **(0,1,0)**, so the
+   shared `nowrap` won and a long payment term pushed the table wide. Scoped to
+   `.rq-table td.rq-terms`; the bidder name wraps too. Natural width **981 →
+   827px**, no overflow from 1440 up. **A page-local class cannot override a
+   shared `element.class` rule — scope it.**
+3. A dead `key === 'vendor_name' ? 1 : 1` ternary in `rqSortBy`.
+
+#### `scratchpad/mk_bid_harness.py` — the round page with only the network stubbed
+
+**⚠️ IT KEEPS THE PAGE'S INLINE `<script>` BYTE-FOR-BYTE.** `AppAuth.requireLogin`
+is stubbed to never invoke its callback, so the boot block is inert without a
+line being cut out of the shipped source, and **`auth.js` / `db.js` / `ui.js` are
+the REAL files** served from the same origin — a harness that stubbed `esc`,
+`Fmt` or `bidRounds.procSteps` would be testing itself.
+
+- **⚠️ `Object.assign` onto the object `db.js` exported, never a reassignment.**
+  A top-level `const` in a classic script is a global LEXICAL binding, so the
+  page's bare `VendorDb` resolves to db.js's const; reassigning `window.VendorDb`
+  would leave the page holding the original. Same trap as `Charts` having no
+  `window.Charts`.
+- **⚠️ Front the tab and `resize_window` before measuring anything.** A hidden
+  Browser-pane tab reports `innerWidth: 0`, so every width is 0 and Fit clamps to
+  its floor — a "failure" with nothing wrong with the code. Third time this class
+  of harness artifact has cost time in this file.
+- **⚠️ Two of my own test failures were the TEST, not the page**: the band key is
+  `reqs` not `req`, and the sort keys are `offer` / `lead_time_days`, not
+  `quoted` / `lead`. Read the keys out of the source before asserting on them.
+- The stub round is deliberately awkward — 8 bidders, mixed VAT bases, the
+  cheapest failing two mandatory lines, nobody cheapest on every line, one line
+  folded into another lot — so a comparison where the lowest price simply wins
+  can never pass by accident.
+- Written to `_preview_bid.html` at the repo root (git-ignored by `_preview_*`)
+  and **deleted before commit**.
+
 ### ⚠️ The round page rendered its title and then nothing — `bidsInPlay` was deleted with a panel (2026-09-06)
 
 Found by loading the live round, and only by that.
