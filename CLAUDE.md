@@ -3205,6 +3205,29 @@ basis, lead time, validity, payment terms, and attach what they sent.
 - The upload is inline rather than through `uploadQuote()`, which owns its own
   progress toast and re-render and would stack with this one.
 
+#### ⚠️ The phase chips were still comparing GROSS against the VAT-EX budget (2026-09-06)
+
+Found by opening all five DEMO rounds after the consolidation. `vsBcbHtml(amount,
+inv)` nets only when an invitation is passed, and both `phaseStats` call sites
+passed none — so the summary chips carried the very error the VAT basis exists
+to remove:
+
+- **Awarded** read **"PHP 1,080,000 under · 4.2%"** on the DEMO fire-sprinkler
+  round: a **₱24,920,000 VAT-inclusive** award measured against a **₱26,000,000
+  VAT-ex** budget. The truth is **₱3,750,000 under**, because `doAward()` wrote
+  ₱22,250,000 net to the work package. The chip disagreed with the record the
+  app itself had written.
+- **Evaluated** ranked bidders on the **quoted** figure, which puts a non-VAT
+  bidder behind a VAT-inclusive one that costs the same, and then measured that
+  gross figure against the net budget as well.
+
+Fixed: Evaluated picks the lowest **net** (and says "(net)" in the label);
+Awarded passes the winning invitation so the comparison nets, and shows **both**
+figures — the gross is what the PO carries.
+
+**⚠️ `low` in the Evaluated branch is ALREADY net, so it is passed to
+`vsBcbHtml` WITHOUT an invitation** — passing one would net it a second time.
+
 ### DEMO rounds at every stage (2026-09-05)
 
 Five bid rounds now live in the DEMO project, one per stage, so the workspace

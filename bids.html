@@ -1867,8 +1867,13 @@ function phaseStats(label) {
     const compliant = priced.filter(i => i.technical_compliant === true);
     const anyAssessed = inPlay.some(i => i.technical_compliant != null);
     const pool = compliant.length ? compliant : priced;
-    const low = pool.length ? Math.min.apply(null, pool.map(amt)) : null;
-    const lowLabel = compliant.length ? 'lowest compliant' : 'lowest offer';
+    /* ⚠️ LOWEST ON THE COMPARABLE BASIS, NOT AS QUOTED. Ranking gross figures
+       puts a non-VAT bidder behind a VAT-inclusive one that actually costs the
+       same, and measuring a gross figure against the VAT-EX budget overstates
+       it by the VAT rate — the error this whole basis exists to stop. */
+    const netOfBid = i => netOf(amt(i), i);
+    const low = pool.length ? Math.min.apply(null, pool.map(netOfBid)) : null;
+    const lowLabel = compliant.length ? 'lowest compliant (net)' : 'lowest offer (net)';
     const comp = inPlay.filter(i => i.technical_compliant === true).length;
     const shortl = inPlay.filter(i => i.shortlisted).length;
     /* Straight off the technical comparison: how many bidders fail a MANDATORY
@@ -1883,6 +1888,8 @@ function phaseStats(label) {
                                                     : 'fail a mandatory line',
                              blocked ? 'warn' : 'ok') : '')
       + _chip(shortl, 'shortlisted')
+      // `low` is ALREADY net, so no invitation is passed — vsBcbHtml would
+      // otherwise net it a second time.
       + (low != null && bcbOf() ? _chip(vsBcbHtml(low) || '&mdash;', 'against budget') : '');
   }
   if (label === 'Awarded') {
@@ -1890,9 +1897,18 @@ function phaseStats(label) {
     if (!win) return _chip(inPlay.length, 'awaiting a decision', 'warn');
     const fin = win.final_amount != null ? win.final_amount
               : (win.negotiated_amount != null ? win.negotiated_amount : win.offer_amount);
+    /* ⚠️ THE BUDGET IS VAT-EX AND SO IS THE awarded_cost doAward() WROTE, so
+       the comparison has to be netted too. Seen live on the awarded DEMO round:
+       a PHP 24,920,000 VAT-inclusive award read "1,080,000 under" against a
+       PHP 26,000,000 budget when the truth is 3,750,000 under — the gross
+       measured against a net budget, the exact 12% error the basis exists to
+       stop. Both figures are shown, because the PO carries the gross. */
+    const finNet = netOf(fin, win);
     return _chip(esc(win.vendor_name), 'awarded to')
       + (fin != null ? _chip(money(fin), 'final amount', 'ok') : '')
-      + (fin != null && bcbOf() ? _chip(vsBcbHtml(fin) || '&mdash;', 'against budget') : '')
+      + (finNet != null && Math.abs(finNet - fin) > 0.5
+          ? _chip(money(finNet), 'net of VAT') : '')
+      + (fin != null && bcbOf() ? _chip(vsBcbHtml(fin, win) || '&mdash;', 'against budget') : '')
       + _chip(INV.filter(i => i.notice_issued_at).length + ' / ' + INV.length, 'notices recorded');
   }
   return '';
