@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260905i"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260905i"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260905j"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260905j"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -265,6 +265,28 @@
     .nv-orig{position:absolute;left:0;top:0;height:100%;border-radius:6px;
       background:var(--mw-black,#231F20);opacity:.28}
     .nv-fin{position:absolute;left:0;top:0;height:100%;border-radius:6px;background:var(--mw-red)}
+    /* Battery colours. Green while the bid sits within the budget; the part
+       that runs past the budget line is drawn separately in red, so an overrun
+       reads as its own block and not merely as a longer bar. */
+    .nv-fin-ok{background:#2D9B6F}
+    .nv-fin-part{background:#2D9B6F;border-radius:6px 0 0 6px}
+    .nv-ovr{position:absolute;top:0;height:100%;border-radius:0 6px 6px 0;background:var(--mw-red)}
+    html.dark-mode .nv-fin-ok,body.dark-mode .nv-fin-ok,
+    html.dark-mode .nv-fin-part,body.dark-mode .nv-fin-part{background:#5FD3A3}
+    .nv-vs{font-size:0.7143rem;font-weight:800;letter-spacing:.01em;white-space:nowrap}
+    .nv-vs-under{color:#1E7A54}   /* text, not a fill — see .cc-good */
+    .nv-vs-over{color:var(--mw-red-ink)}
+    html.dark-mode .nv-vs-under,body.dark-mode .nv-vs-under{color:#5FD3A3}
+    .nv-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:2px 0 12px;
+      font-size:0.7143rem;color:var(--text-secondary)}
+    .nv-legend span{display:inline-flex;align-items:center;gap:6px}
+    .nv-sw{width:14px;height:9px;border-radius:2px;display:inline-block;flex:0 0 auto}
+    .nv-sw-ok{background:#2D9B6F}
+    .nv-sw-over{background:var(--mw-red)}
+    .nv-sw-orig{background:var(--mw-black,#231F20);opacity:.28}
+    .nv-sw-bcb{width:0;height:13px;border-radius:0;border-left:2px dashed var(--text-primary)}
+    html.dark-mode .nv-sw-ok,body.dark-mode .nv-sw-ok{background:#5FD3A3}
+    html.dark-mode .nv-sw-orig,body.dark-mode .nv-sw-orig{background:#DCDBDB;opacity:.30}
     html.dark-mode .nv-orig,body.dark-mode .nv-orig{background:#DCDBDB;opacity:.30}
     /* z-index so it stays readable where a bar runs past the budget — which is
        exactly the case a reader most needs to see. */
@@ -318,6 +340,70 @@
       padding-top:11px;border-top:1px dashed var(--border-md)}
     .ref-fname{font-size:0.7143rem;color:var(--text-hint);max-width:180px;overflow:hidden;
       text-overflow:ellipsis;white-space:nowrap}
+    /* ── the cost / technical comparison matrices ─────────────────────────────
+       A bidder is a COLUMN and a line of the ask is a ROW, which is the shape
+       Megawide's own cost-comparison workbooks use. Wide by construction, so
+       the wrapper scrolls sideways and the first column is frozen — without
+       that you lose which line you are reading the moment you scroll. */
+    .cc-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;margin-top:6px}
+    .cc-table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;
+      font-size:0.7857rem}
+    .cc-table th,.cc-table td{padding:7px 9px;border-bottom:1px solid var(--border);
+      vertical-align:top;text-align:left}
+    .cc-table thead th{background:var(--surface-2);font-weight:800;font-size:0.7143rem;
+      position:sticky;top:0;z-index:2}
+    .cc-table thead .cc-sub th{top:auto;font-weight:700;color:var(--text-hint);
+      font-size:0.6786rem;text-transform:uppercase;letter-spacing:.03em}
+    .cc-vh small{display:block;font-weight:600;color:var(--text-hint);margin-top:2px;
+      text-transform:none;letter-spacing:0}
+    /* ⚠️ The frozen first column needs an OPAQUE background of its own, or the
+       scrolling cells show through it. z-index above the sticky header row's
+       body cells but below the header itself. */
+    /* A hairline on the freeze boundary. Without it the pinned column and the
+       cells sliding under it read as one continuous row and you cannot tell
+       where the scroll begins. */
+    .cc-stick{position:sticky;left:0;z-index:1;background:var(--surface);
+      min-width:190px;max-width:260px;box-shadow:1px 0 0 var(--border-md)}
+    .cc-table thead .cc-stick{background:var(--surface-2);z-index:3}
+    .cc-stick small{display:block;color:var(--text-hint);font-weight:600;margin-top:2px}
+    .cc-qty{width:74px;white-space:nowrap;color:var(--text-secondary)}
+    .cc-qty small{display:block;color:var(--text-hint)}
+    .cc-cell{min-width:96px}
+    .cc-in{width:100%;padding:4px 6px;font-size:0.7857rem;text-align:right}
+    .cc-basis{width:100%;margin-top:2px;padding:1px 2px;font-size:0.6786rem;
+      color:var(--text-hint);border:none;background:transparent;text-align:right}
+    .cc-basis:hover,.cc-basis:focus{border:1px solid var(--border-md);background:var(--surface)}
+    .cc-basis-on{border:1px solid var(--border-md);background:var(--surface);
+      color:var(--mw-red-ink);font-weight:700}
+    .cc-sel{width:100%;padding:4px 6px;font-size:0.7857rem}
+    .cc-note{width:100%;margin-top:3px;padding:3px 6px;font-size:0.7143rem}
+    /* The budget column is OURS. Tinted so it can never be mistaken for a bid. */
+    .cc-budcol{background:var(--surface-2);min-width:104px}
+    .cc-low{background:rgba(45,155,111,.10)}
+    .cc-tot td{background:var(--surface-2);font-weight:700;border-top:2px solid var(--border-md)}
+    .cc-tot small{display:block;font-weight:600;color:var(--text-hint)}
+    /* ⚠️ NOT #2D9B6F. That is the app's green FILL and it measures 3.14 as
+       small bold TEXT on the header band — below AA. Darker ink here; every
+       green FILL (bars, tints, swatches) stays #2D9B6F so the palette holds. */
+    .cc-good{color:#1E7A54;font-weight:700}
+    .cc-bad{color:var(--mw-red-ink);font-weight:700}
+    html.dark-mode .cc-good,body.dark-mode .cc-good{color:#5FD3A3}
+    html.dark-mode .cc-low,body.dark-mode .cc-low{background:rgba(95,211,163,.14)}
+    /* The verdict tints the whole cell, so a row of "not met" reads across the
+       table without having to read every select. */
+    .cc-met{background:rgba(45,155,111,.09)}
+    .cc-partial{background:rgba(217,119,6,.11)}
+    .cc-not_met{background:var(--mw-red-light,#FDECEA)}
+    html.dark-mode .cc-met,body.dark-mode .cc-met{background:rgba(95,211,163,.13)}
+    html.dark-mode .cc-partial,body.dark-mode .cc-partial{background:rgba(245,158,11,.15)}
+    html.dark-mode .cc-not_met,body.dark-mode .cc-not_met{background:rgba(255,122,110,.15)}
+    .req-must{display:inline-block;font-size:0.6429rem;font-weight:800;letter-spacing:.04em;
+      text-transform:uppercase;background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);
+      border-radius:5px;padding:1px 6px;margin-top:3px}
+    .req-pref{display:inline-block;font-size:0.6429rem;font-weight:800;letter-spacing:.04em;
+      text-transform:uppercase;background:var(--surface-2);color:var(--text-hint);
+      border-radius:5px;padding:1px 6px}
+    html.dark-mode .req-must,body.dark-mode .req-must{background:rgba(255,122,110,.16)}
     .bm-wpstat-bad{color:var(--mw-red-ink)}
     .bm-behind-bad{background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);font-weight:700}
     .cmp-th{cursor:pointer;user-select:none;white-space:nowrap}
@@ -500,10 +586,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260905i"></script>
-<script src="assets/js/db.js?v=20260905i"></script>
-<script src="assets/js/ui.js?v=20260905i"></script>
-<script src="assets/js/coachmarks.js?v=20260905i"></script>
+<script src="assets/js/auth.js?v=20260905j"></script>
+<script src="assets/js/db.js?v=20260905j"></script>
+<script src="assets/js/ui.js?v=20260905j"></script>
+<script src="assets/js/coachmarks.js?v=20260905j"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -1074,6 +1160,10 @@ async function openRound(id) {
       VendorDb.bidReference.documents(id),
       VendorDb.bidReference.items(id),
     ]);
+    // The comparison tables. Every read returns [] when
+    // 2026-09-05_bid_cost_comparison.sql has not been run, so the workspace
+    // still opens and the two panels simply say there is nothing to compare.
+    await reloadComparison();
   } catch (e) {
     AppNotify.fromError(e, 'Could not open that bid round');
     return;
@@ -1386,6 +1476,20 @@ function referencePanel() {
         + '<input id="ri-unit" class="bm-in" style="flex:0 0 80px" placeholder="Unit">'
         + '<input id="ri-qty" class="bm-in" type="number" step="0.001" style="flex:0 0 90px" placeholder="Qty">'
         + '<button class="btn btn-primary" onclick="addRefItem()">Add line</button></div>')
+    /* The TOR lines a bid is judged against. They belong with the ask, not with
+       the evaluation: a bidder cannot meet a requirement nobody told them
+       about, so these go out in the RFQ and come back as the technical
+       comparison. */
+    + '<div class="ref-sub" style="margin-top:16px">Technical requirements '
+    + '<span>what a bid has to meet, from the TOR</span></div>'
+    + reqsHtml(ro)
+    + (ro ? '' :
+        '<div class="ref-add">'
+        + '<input id="rq-text" class="bm-in" style="flex:1;min-width:170px" placeholder="Requirement, e.g. IP66 enclosure">'
+        + '<input id="rq-detail" class="bm-in" style="flex:1;min-width:150px" placeholder="Detail or acceptance basis">'
+        + '<select id="rq-must" class="bm-in" style="flex:0 0 140px">'
+        + '<option value="yes">Mandatory</option><option value="no">Preferred</option></select>'
+        + '<button class="btn btn-primary" onclick="addReq()">Add requirement</button></div>')
     + '</div>';
 }
 function onRefFilePicked(input) {
@@ -1540,6 +1644,7 @@ function phaseStats(label) {
     return _chip(INV.length, INV.length === 1 ? 'bidder' : 'bidders', INV.length ? '' : 'warn')
       + _chip(acc, 'accredited', INV.length && acc === INV.length ? 'ok' : (INV.length ? 'warn' : ''))
       + _chip(REFITEMS.length, REFITEMS.length === 1 ? 'line item' : 'line items')
+      + _chip(REQS.length, REQS.length === 1 ? 'requirement' : 'requirements')
       + _chip(REFDOCS.length, REFDOCS.length === 1 ? 'attachment' : 'attachments');
   }
   if (label === 'Solicited') {
@@ -1584,9 +1689,17 @@ function phaseStats(label) {
     const lowLabel = compliant.length ? 'lowest compliant' : 'lowest offer';
     const comp = inPlay.filter(i => i.technical_compliant === true).length;
     const shortl = inPlay.filter(i => i.shortlisted).length;
+    /* Straight off the technical comparison: how many bidders fail a MANDATORY
+       line. That is the finding the headline figure cannot show, and it is the
+       reason a cheaper bid may not be awardable. */
+    const blocked = REQS.length
+      ? inPlay.filter(i => techScore(i.id).blocked > 0).length : 0;
     return (low != null ? _chip(money(low), lowLabel) : '')
       + _chip(comp + ' / ' + inPlay.length, 'compliant',
               comp ? 'ok' : (anyAssessed ? 'warn' : ''))
+      + (REQS.length ? _chip(blocked, blocked === 1 ? 'fails a mandatory line'
+                                                    : 'fail a mandatory line',
+                             blocked ? 'warn' : 'ok') : '')
       + _chip(shortl, 'shortlisted')
       + (low != null && bcbOf() ? _chip(vsBcbHtml(low) || '&mdash;', 'against budget') : '');
   }
@@ -1675,7 +1788,8 @@ function renderRound() {
     + phaseSection('Solicited', '',
         responsesPanel() + clarifyPanel())
     + phaseSection('Evaluated', '',
-        comparisonPanel() + evaluationPanel() + negotiationPanel() + negotiationViz())
+        comparisonPanel() + costComparePanel() + techComparePanel()
+        + evaluationPanel() + negotiationPanel() + negotiationViz())
     + phaseSection('Awarded', '',
         awardPanel());
 
@@ -2031,6 +2145,19 @@ function rfqBody(inv) {
   if (items.length) items.forEach(function (x) { L.push(x); });
   L.push('');
 
+  // The TOR lines, in the letter, for the same reason as the HTML flavour.
+  if (REQS.length) {
+    L.push('Technical requirements');
+    REQS.slice(0, RFQ_MAX_ITEMS).forEach(function (q) {
+      L.push('    ' + q.requirement + (q.mandatory ? ' (mandatory)' : ''));
+      if (q.detail) L.push('        ' + String(q.detail).replace(/\s*\n\s*/g, '; '));
+    });
+    if (REQS.length > RFQ_MAX_ITEMS) {
+      L.push('    ...and ' + (REQS.length - RFQ_MAX_ITEMS) + ' more, on the bid page linked below.');
+    }
+    L.push('');
+  }
+
   if (REFDOCS.length) {
     L.push('Kindly refer to the attachments below to see the complete drawings of the corresponding '
       + 'project as well as the file containing the complete technical specifications.');
@@ -2134,6 +2261,25 @@ function rfqHtml(inv) {
       + (REFITEMS.length > RFQ_MAX_ITEMS
           ? '<div>&hellip;and ' + (REFITEMS.length - RFQ_MAX_ITEMS)
             + ' more. The complete list is on the bid page linked below.</div>' : '')
+      + '</div>');
+  }
+
+  /* The TOR lines, in the letter. A bidder cannot meet a requirement nobody
+     told them about, and these are the same lines the technical comparison
+     later marks them against. */
+  if (REQS.length) {
+    H.push('<p style="margin:0 0 6pt 0"><b><u>Technical requirements</u></b></p>');
+    H.push('<div style="margin:0 0 11pt 36pt">'
+      + REQS.slice(0, RFQ_MAX_ITEMS).map(function (q) {
+          return '<div style="margin:0 0 5pt 0">' + _h(q.requirement)
+            + (q.mandatory ? ' <b>(mandatory)</b>' : '')
+            + (q.detail ? '<div style="margin:2pt 0 0 18pt;color:#444;font-size:10pt">'
+                + _h(q.detail) + '</div>' : '')
+            + '</div>';
+        }).join('')
+      + (REQS.length > RFQ_MAX_ITEMS
+          ? '<div>&hellip;and ' + (REQS.length - RFQ_MAX_ITEMS)
+            + ' more, on the bid page linked below.</div>' : '')
       + '</div>');
   }
 
@@ -2676,6 +2822,17 @@ function evaluationPanel() {
         + '<small>' + esc(money(i.offer_amount, i.offer_currency))
         + (vsBcbHtml(i.offer_amount) ? ' &middot; ' + vsBcbHtml(i.offer_amount) : '')
         + '</small></div></div>'
+        /* What the technical comparison actually found, beside the verdict, so
+           the officer is not asked to remember it from a panel above. */
+        + (REQS.length ? (function () {
+            const s = techScore(i.id);
+            return '<div class="bm-cell" style="flex:0 0 165px"><span class="bm-cl">From the comparison</span>'
+              + '<div style="font-size:0.8125rem;font-weight:700">'
+              + (s.blocked ? '<span class="cc-bad">' + s.blocked + ' mandatory not met</span>'
+                 : (s.unanswered ? '<span class="bm-high">' + s.unanswered + ' unanswered</span>'
+                    : '<span class="cc-good">meets every line</span>'))
+              + '</div><small style="color:var(--text-hint)">' + s.met + ' of ' + s.total + ' met</small></div>';
+          })() : '')
         + '<div class="bm-cell" style="flex:0 0 220px"><label class="bm-cl" for="ev-c-' + i.id + '">Meets the technical requirements</label>'
         + '<select id="ev-c-' + i.id + '" class="bm-in"' + ro + '>'
         + '<option value=""' + (i.technical_compliant == null ? ' selected' : '') + '>Not assessed</option>'
@@ -2991,6 +3148,369 @@ function exportBidders() {
 }
 
 
+
+/* ══ The cost comparison and the technical comparison ═══════════════════════
+   2026-09-05_bid_cost_comparison.sql.
+
+   ⚠️ THE LOWEST OFFER IS NOT AUTOMATICALLY THE WINNER, and until now the
+      workspace could not say anything else: a bidder was one headline figure
+      and one boolean. A package is awarded on TWO readings —
+
+        · the technical comparison — does the bid meet each line of the TOR?
+        · the cost comparison      — line by line, rate by rate, not just the total
+
+      A vendor who meets everything but is dear, and one who is cheaper but
+      misses three requirements, are a real decision. These two panels put both
+      readings on the same screen so the decision is made against evidence
+      rather than against a single number.
+
+   ⚠️ THE BUDGETED RATE PER LINE IS STAFF-ONLY. It lives in its own table for
+      that reason (RLS filters rows, never columns) — never render it on a
+      vendor-facing surface, and never move it onto vendor_bid_items. */
+let REQS = [];        // the round's technical requirements
+let REQRES = {};      // invitationId + '|' + requirementId -> result row
+let PRICES = {};      // invitationId + '|' + itemId        -> price row
+let ITEMBUDGET = {};  // itemId -> budget row
+
+const REQ_RESULTS = [
+  ['', '—'], ['met', 'Met'], ['partial', 'Partial'], ['not_met', 'Not met'], ['na', 'N/A'],
+];
+const PRICE_BASIS = [
+  ['quoted', 'Quoted'], ['included', 'Incl.'], ['excluded', 'Excl.'], ['no_bid', 'No bid'],
+];
+
+function _ccKey(a, b) { return a + '|' + b; }
+function reqResult(invId, reqId) { return REQRES[_ccKey(invId, reqId)] || null; }
+function priceOf(invId, itemId) { return PRICES[_ccKey(invId, itemId)] || null; }
+
+/* One bidder's standing against the requirements. `blocked` is the one that
+   decides anything: a MANDATORY line not met disqualifies the bid however
+   cheap it is, which is precisely the case the headline figure hides. */
+function techScore(invId) {
+  let met = 0, partial = 0, notMet = 0, na = 0, blocked = 0, unanswered = 0;
+  REQS.forEach(function (q) {
+    const r = reqResult(invId, q.id);
+    const v = r && r.result;
+    if (v === 'met') met++;
+    else if (v === 'partial') { partial++; if (q.mandatory) blocked++; }
+    else if (v === 'not_met') { notMet++; if (q.mandatory) blocked++; }
+    else if (v === 'na') na++;
+    else unanswered++;
+  });
+  return { met: met, partial: partial, notMet: notMet, na: na,
+           blocked: blocked, unanswered: unanswered, total: REQS.length };
+}
+
+/* A bidder's priced total. ⚠️ Deliberately NOT the headline offer_amount: this
+   is what the LINES add up to, and a gap between the two is a finding — a
+   missed line, a lump sum quoted outside the schedule, or a transcription
+   error. The panel reports the gap rather than hiding it. */
+function pricedTotal(invId) {
+  let t = 0, quoted = 0;
+  REFITEMS.forEach(function (it) {
+    const p = priceOf(invId, it.id);
+    if (!p) return;
+    if (p.status === 'excluded' || p.status === 'no_bid') return;
+    if (p.amount != null) { t += Number(p.amount) || 0; quoted++; }
+    else if (p.status === 'included') quoted++;
+  });
+  return { total: quoted ? t : null, lines: quoted };
+}
+
+/* ── the requirements, authored with the rest of the ask ──────────────────── */
+function reqsHtml(ro) {
+  if (!REQS.length) {
+    return '<div class="empty-state"><i class="ti ti-checklist"></i>'
+      + '<b>No requirements yet</b>Add the lines of the TOR a bid is judged against.</div>';
+  }
+  return '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
+    + '<th>Requirement</th><th>Detail</th><th style="width:110px">Mandatory</th>'
+    + (ro ? '' : '<th style="width:40px"></th>') + '</tr></thead><tbody>'
+    + REQS.map(function (q) {
+        return '<tr><td><b>' + esc(q.requirement) + '</b></td>'
+          + '<td style="white-space:pre-wrap">' + esc(q.detail || '\u2014') + '</td>'
+          + '<td>' + (q.mandatory
+              ? '<span class="req-must">Mandatory</span>'
+              : '<span class="req-pref">Preferred</span>') + '</td>'
+          + (ro ? '' : '<td><button class="btn btn-sm" onclick="removeReq(' + Q + q.id + Q + ')">'
+                 + '<i class="ti ti-trash"></i></button></td>')
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+async function addReq() {
+  const t = val('rq-text');
+  if (!t) { AppNotify.warn('Give the requirement a name.'); return; }
+  try {
+    await VendorDb.bidComparison.addRequirement(R.id, {
+      requirement: t, detail: val('rq-detail') || null,
+      mandatory: val('rq-must') !== 'no', sort_order: REQS.length,
+    });
+    REQS = await VendorDb.bidComparison.requirements(R.id);
+    renderRound();
+  } catch (e) { AppNotify.fromError(e, 'Could not add that requirement'); }
+}
+async function removeReq(id) {
+  if (!confirm('Remove this requirement? Every bidder\u2019s answer to it goes too.')) return;
+  try {
+    await VendorDb.bidComparison.removeRequirement(id);
+    REQS = await VendorDb.bidComparison.requirements(R.id);
+    renderRound();
+  } catch (e) { AppNotify.fromError(e, 'Could not remove that requirement'); }
+}
+
+/* ── the technical comparison ─────────────────────────────────────────────── */
+function techComparePanel() {
+  const rows = bidsInPlay();
+  if (!rows.length) return '';
+  const ro = !canManage || R.stage === 'awarded' || R.stage === 'cancelled';
+  if (!REQS.length) {
+    return '<div class="panel" id="bp-tech"><div class="panel-title">Technical comparison</div>'
+      + '<div class="empty-state"><i class="ti ti-checklist"></i>'
+      + '<b>No technical requirements on this round</b>'
+      + 'Add them under <b>Documents and priced items</b> and every bidder can be marked against them here.</div>'
+      + '</div>';
+  }
+  const head = '<tr><th class="cc-stick">Requirement</th>'
+    + rows.map(function (i) {
+        const s = techScore(i.id);
+        return '<th class="cc-vh">' + esc(i.vendor_name)
+          + '<small>' + (s.blocked
+              ? '<span class="cc-bad">' + s.blocked + ' mandatory not met</span>'
+              : (s.unanswered ? s.unanswered + ' unanswered'
+                              : '<span class="cc-good">meets every line</span>')) + '</small></th>';
+      }).join('') + '</tr>';
+  const body = REQS.map(function (q) {
+    return '<tr><td class="cc-stick"><b>' + esc(q.requirement) + '</b>'
+      + (q.mandatory ? '<span class="req-must">Mandatory</span>' : '')
+      + (q.detail ? '<small>' + esc(q.detail) + '</small>' : '')
+      + '</td>'
+      + rows.map(function (i) {
+          const r = reqResult(i.id, q.id) || {};
+          const v = r.result || '';
+          return '<td class="cc-cell cc-' + (v || 'none') + '">'
+            + '<select id="tc-' + i.id + '-' + q.id + '" class="bm-in cc-sel"' + (ro ? ' disabled' : '') + '>'
+            + REQ_RESULTS.map(function (o) {
+                return '<option value="' + o[0] + '"' + (v === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+              }).join('')
+            + '</select>'
+            + '<input id="tn-' + i.id + '-' + q.id + '" class="bm-in cc-note" value="' + esc(r.note || '') + '"'
+            + (ro ? ' disabled' : '') + ' placeholder="What they offered">'
+            + '</td>';
+        }).join('')
+      + '</tr>';
+  }).join('');
+  const summary = '<tr class="cc-tot"><td class="cc-stick">Summary</td>'
+    + rows.map(function (i) {
+        const s = techScore(i.id);
+        return '<td class="cc-cell">' + s.met + ' met'
+          + (s.partial ? ' \u00b7 ' + s.partial + ' partial' : '')
+          + (s.notMet ? ' \u00b7 ' + s.notMet + ' not met' : '')
+          + (s.unanswered ? ' \u00b7 ' + s.unanswered + ' unanswered' : '')
+          + '</td>';
+      }).join('') + '</tr>';
+  return '<div class="panel" id="bp-tech"><div class="panel-title">Technical comparison</div>'
+    + '<div class="sec-note">Every bidder against every line of the TOR. A <b>mandatory</b> line '
+    + 'not met disqualifies the bid whatever it costs.</div>'
+    + '<div class="cc-wrap"><table class="cc-table"><thead>' + head + '</thead>'
+    + '<tbody>' + body + summary + '</tbody></table></div>'
+    + (ro ? '' : '<div class="bm-actions"><button class="btn btn-primary" onclick="saveTechCompare()">'
+        + '<i class="ti ti-device-floppy"></i> Save technical comparison</button></div>')
+    + '</div>';
+}
+async function saveTechCompare() {
+  try {
+    for (const i of bidsInPlay()) {
+      for (const q of REQS) {
+        const v = val('tc-' + i.id + '-' + q.id);
+        const n = val('tn-' + i.id + '-' + q.id);
+        const cur = reqResult(i.id, q.id);
+        // Nothing to write for a cell nobody has touched — an empty verdict
+        // with an empty note is the absence of an answer, not an answer.
+        if (!v && !n && !cur) continue;
+        await VendorDb.bidComparison.setResult(i.id, q.id, { result: v || null, note: n || null }, profile);
+      }
+    }
+    await reloadComparison();
+    renderRound();
+    AppNotify.success('Technical comparison saved.');
+  } catch (e) { AppNotify.fromError(e, 'Could not save the technical comparison'); }
+}
+
+/* ── the cost comparison, line by line ───────────────────────────────────────
+   The workbook's shape: one row per priced item, one column block per bidder,
+   holding the RATE and the AMOUNT. Rate is what makes two bids comparable when
+   they quote different quantities; amount is what they actually charge.
+   ⚠️ The lowest rate on a line is marked, but nothing here declares the lowest
+      TOTAL the winner — that is what the technical comparison is for. */
+function _lowRate(itemId, rows) {
+  let low = null;
+  rows.forEach(function (i) {
+    const p = priceOf(i.id, itemId);
+    if (!p || p.unit_rate == null || p.status === 'excluded' || p.status === 'no_bid') return;
+    const v = Number(p.unit_rate);
+    if (!isFinite(v) || v <= 0) return;
+    if (low == null || v < low) low = v;
+  });
+  return low;
+}
+function costComparePanel() {
+  const rows = bidsInPlay();
+  if (!rows.length) return '';
+  const ro = !canManage || R.stage === 'awarded' || R.stage === 'cancelled';
+  if (!REFITEMS.length) {
+    return '<div class="panel" id="bp-costcompare"><div class="panel-title">Cost comparison</div>'
+      + '<div class="empty-state"><i class="ti ti-table"></i>'
+      + '<b>No priced items on this round</b>'
+      + 'Add the lines under <b>Documents and priced items</b> and each bidder rate can be compared here.</div>'
+      + '</div>';
+  }
+  const showBudget = !window.__hideBudget;
+  const head = '<tr><th class="cc-stick">Item</th>'
+    + '<th class="cc-qty">Qty</th>'
+    + (showBudget ? '<th class="cc-vh cc-budcol">Budget<small>our rate</small></th>' : '')
+    + rows.map(function (i) {
+        const pt = pricedTotal(i.id);
+        const gap = (pt.total != null && i.offer_amount != null)
+          ? Number(i.offer_amount) - pt.total : null;
+        return '<th class="cc-vh" colspan="2">' + esc(i.vendor_name)
+          + '<small>' + (pt.total == null ? 'no lines priced'
+              : esc(money(pt.total, i.offer_currency))
+                + (gap != null && Math.abs(gap) > 0.5
+                    ? ' <span class="cc-bad">' + (gap > 0 ? '+' : '\u2212')
+                      + esc(money(Math.abs(gap), i.offer_currency)) + ' vs quote</span>'
+                    : '')) + '</small></th>';
+      }).join('') + '</tr>'
+    + '<tr class="cc-sub"><th class="cc-stick"></th><th class="cc-qty"></th>'
+    + (showBudget ? '<th class="cc-budcol">Rate</th>' : '')
+    + rows.map(function () { return '<th>Rate</th><th>Amount</th>'; }).join('') + '</tr>';
+
+  const body = REFITEMS.map(function (it) {
+    const low = _lowRate(it.id, rows);
+    const b = ITEMBUDGET[it.id] || {};
+    return '<tr><td class="cc-stick"><b>' + esc((it.item_no ? it.item_no + '. ' : '') + it.description) + '</b>'
+      + (it.spec ? '<small>' + esc(it.spec) + '</small>' : '')
+      + '</td>'
+      + '<td class="cc-qty">' + (it.quantity == null ? '\u2014' : Number(it.quantity).toLocaleString())
+      + (it.unit ? '<small>' + esc(it.unit) + '</small>' : '') + '</td>'
+      + (showBudget
+          ? '<td class="cc-budcol"><input ' + moneyAttrs('cb-' + it.id, b.budget_rate, 'rate')
+            + ' class="bm-in cc-in"' + (ro ? ' disabled' : '') + '></td>' : '')
+      + rows.map(function (i) {
+          const p = priceOf(i.id, it.id) || {};
+          const isLow = low != null && p.unit_rate != null && Number(p.unit_rate) === low;
+          return '<td class="cc-cell' + (isLow ? ' cc-low' : '') + '">'
+            + '<input ' + moneyAttrs('cr-' + i.id + '-' + it.id, p.unit_rate, 'rate')
+            + ' class="bm-in cc-in" data-qty="' + esc(it.quantity == null ? '' : it.quantity) + '"'
+            + ' data-amt="ca-' + i.id + '-' + it.id + '" oninput="onRateInput(this)"'
+            + (ro ? ' disabled' : '') + '></td>'
+            + '<td class="cc-cell' + (isLow ? ' cc-low' : '') + '">'
+            + '<input ' + moneyAttrs('ca-' + i.id + '-' + it.id, p.amount, 'amount')
+            + ' class="bm-in cc-in"' + (ro ? ' disabled' : '') + '>'
+            /* ⚠️ QUIET UNTIL IT SAYS SOMETHING. "Quoted" is the answer on almost
+               every cell, and a bordered select repeating it on all of them read
+               as noise across a table this wide. It only takes on a border and
+               colour once the basis is Included / Excluded / No bid — which are
+               the ones a reader has to notice. */
+            + '<select id="cs-' + i.id + '-' + it.id + '" class="bm-in cc-basis'
+            + ((p.status || 'quoted') === 'quoted' ? '' : ' cc-basis-on') + '"' + (ro ? ' disabled' : '') + '>'
+            + PRICE_BASIS.map(function (o) {
+                return '<option value="' + o[0] + '"'
+                  + ((p.status || 'quoted') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+              }).join('')
+            + '</select></td>';
+        }).join('')
+      + '</tr>';
+  }).join('');
+
+  const budTotal = REFITEMS.reduce(function (t, it) {
+    const b = ITEMBUDGET[it.id] || {};
+    return t + (Number(b.budget_amount) || 0);
+  }, 0);
+  const totals = '<tr class="cc-tot"><td class="cc-stick">Total of the lines</td><td class="cc-qty"></td>'
+    + (showBudget ? '<td class="cc-budcol">' + (budTotal > 0 ? esc(money(budTotal)) : '\u2014') + '</td>' : '')
+    + rows.map(function (i) {
+        const pt = pricedTotal(i.id);
+        return '<td class="cc-cell" colspan="2"><b>'
+          + (pt.total == null ? '\u2014' : esc(money(pt.total, i.offer_currency))) + '</b>'
+          + (pt.total != null ? '<small>' + pt.lines + ' of ' + REFITEMS.length + ' lines</small>' : '')
+          + '</td>';
+      }).join('') + '</tr>';
+
+  return '<div class="panel" id="bp-costcompare"><div class="panel-title">Cost comparison</div>'
+    + '<div class="sec-note">Rate and amount per line, so two bids can be read against each other '
+    + 'even when they quote different quantities. The <b>lowest rate</b> on each line is marked. '
+    + 'Type the rate and the amount fills from the quantity in the ask &mdash; overwrite it for a '
+    + 'lump sum or a different quantity.'
+    + (showBudget ? ' The budget column is <b>ours and internal</b> &mdash; no vendor ever sees it.' : '')
+    + '</div>'
+    + '<div class="cc-wrap"><table class="cc-table"><thead>' + head + '</thead>'
+    + '<tbody>' + body + totals + '</tbody></table></div>'
+    + (ro ? '' : '<div class="bm-actions"><button class="btn btn-primary" onclick="saveCostCompare()">'
+        + '<i class="ti ti-device-floppy"></i> Save cost comparison</button></div>')
+    + '</div>';
+}
+
+/* Rate typed -> amount filled from the ask's quantity. ⚠️ Only when the amount
+   is still EMPTY: a figure already there was either typed by the officer or
+   loaded from the bid, and quietly recomputing it would overwrite a lump sum. */
+function onRateInput(el) {
+  onMoneyInput(el);
+  const qty = parseFloat(el.getAttribute('data-qty'));
+  const amt = document.getElementById(el.getAttribute('data-amt'));
+  if (!amt || amt.value.trim() !== '' || !isFinite(qty)) return;
+  const r = num(el.value);
+  if (r == null) return;
+  amt.value = _grp((r * qty).toFixed(2).replace(/\.00$/, ''));
+}
+async function saveCostCompare() {
+  try {
+    for (const it of REFITEMS) {
+      if (!window.__hideBudget) {
+        const br = num(val('cb-' + it.id));
+        const cur = ITEMBUDGET[it.id];
+        if (br != null || cur) {
+          await VendorDb.bidComparison.setItemBudget(R.id, it.id, {
+            budget_rate: br,
+            budget_amount: (br != null && it.quantity != null) ? br * Number(it.quantity) : null,
+          });
+        }
+      }
+      for (const i of bidsInPlay()) {
+        const rate = num(val('cr-' + i.id + '-' + it.id));
+        const amt = num(val('ca-' + i.id + '-' + it.id));
+        const st = val('cs-' + i.id + '-' + it.id) || 'quoted';
+        const cur = priceOf(i.id, it.id);
+        // A cell nobody filled in, holding nothing, is not an answer.
+        if (rate == null && amt == null && st === 'quoted' && !cur) continue;
+        await VendorDb.bidComparison.setPrice(i.id, it.id, {
+          quantity: it.quantity, unit: it.unit || null,
+          unit_rate: rate, amount: amt, status: st,
+        }, profile);
+      }
+    }
+    await reloadComparison();
+    renderRound();
+    AppNotify.success('Cost comparison saved.');
+  } catch (e) { AppNotify.fromError(e, 'Could not save the cost comparison'); }
+}
+
+/* One read for all four tables. ⚠️ The budget is skipped outright for a
+   cost-hidden role rather than fetched and then not rendered. */
+async function reloadComparison() {
+  const ids = INV.map(function (i) { return i.id; });
+  const out = await Promise.all([
+    VendorDb.bidComparison.requirements(R.id),
+    VendorDb.bidComparison.results(ids),
+    VendorDb.bidComparison.prices(ids),
+    window.__hideBudget ? Promise.resolve([]) : VendorDb.bidComparison.itemBudget(R.id),
+  ]);
+  REQS = out[0];
+  REQRES = {}; out[1].forEach(function (r) { REQRES[_ccKey(r.invitation_id, r.requirement_id)] = r; });
+  PRICES = {}; out[2].forEach(function (p) { PRICES[_ccKey(p.invitation_id, p.item_id)] = p; });
+  ITEMBUDGET = {}; out[3].forEach(function (b) { ITEMBUDGET[b.item_id] = b; });
+}
+
 /* ── What the negotiation actually achieved ────────────────────────────────
    Asked for 2026-09-04: "a visualization of the bid history from initial offer
    to negotiated offer, not a step-by-step chart which is difficult to
@@ -3014,12 +3534,29 @@ function negotiationViz() {
   const moved = rows.filter(function (i) {
     return i.negotiated_amount != null && Number(i.negotiated_amount) !== Number(i.offer_amount);
   });
+  const w = WPBYID[R.wp_id] || {};
+  const bcb = window.__hideBudget ? null : (w.approved_budget_bcb || null);
+  /* ⚠️⚠️ THE TRACK IS THE BUDGET, NOT THE BIGGEST OFFER — and that is the whole
+     point of the change. Scaled to the largest bid, three offers within 7% of
+     each other drew three near-identical full-width bars that said nothing, and
+     an over-budget round looked exactly like an under-budget one.
+     The track is now 1.25 × BCB with the budget marked at 80% of it, so:
+       · under budget  → the bar stops SHORT of the line, and the gap is the saving
+       · over budget   → the bar CROSSES the line into red, and the overrun is
+                         visible as the part beyond it
+     An offer more than 25% over budget is clamped to the end of the track and
+     still states its true percentage in the figures — a bar cannot run off the
+     page, but the number must never be softened. Same principle as the WP
+     dashboard's "% by Value" battery, which was fixed the same way after it
+     filled past 100% on an overrun. */
+  const BCB_AT = 80;                    // where the budget line sits, in % of track
+  const CAP = 1.25;                     // track spans 1.25 x BCB
   const max = Math.max.apply(null, rows.map(function (i) {
     return Math.max(Number(i.offer_amount) || 0, Number(i.negotiated_amount) || 0);
   })) || 1;
-  const w = WPBYID[R.wp_id] || {};
-  const bcb = window.__hideBudget ? null : (w.approved_budget_bcb || null);
-  const bcbPct = bcb ? Math.min(100, (bcb / max) * 100) : null;
+  const scale = bcb ? (bcb * CAP) : max; // no budget on file → fall back to the widest bid
+  const bcbPct = bcb ? BCB_AT : null;
+  const pctOf = v => Math.max(0, Math.min(100, (Number(v) || 0) / scale * 100));
 
   let totalSaved = 0;
   const bars = rows.slice().sort(function (a, b) {
@@ -3031,18 +3568,30 @@ function negotiationViz() {
     const fin = neg != null ? neg : orig;
     const saved = neg != null ? orig - neg : 0;
     totalSaved += saved > 0 ? saved : 0;
-    const pctOrig = (orig / max) * 100;
-    const pctFin = (fin / max) * 100;
+    const pctOrig = pctOf(orig);
+    const pctFin = pctOf(fin);
     const cut = orig > 0 && saved > 0 ? (saved / orig) * 100 : 0;
     const won = i.outcome === 'awarded';
+    // Where this bidder sits against the budget \u2014 the number that gets reported.
+    const over = bcb ? fin > bcb : false;
+    const vsPct = bcb ? Math.abs(bcb - fin) / bcb * 100 : null;
+    /* The battery: filled to the budget line and no further. An over-budget bar
+       is drawn in TWO segments so the overrun is its own red block rather than
+       just a longer bar of the same colour \u2014 the same reading as the WP
+       dashboard's battery, where every segment is a slice of one total. */
+    const pctGreen = over ? Math.min(pctFin, bcbPct) : pctFin;
+    const pctRed = over ? Math.max(0, pctFin - bcbPct) : 0;
     return '<div class="nv-row' + (won ? ' nv-won' : '') + '">'
       + '<div class="nv-name">' + esc(i.vendor_name)
       + (won ? '<span class="nv-tag">AWARDED</span>' : '') + '</div>'
       + '<div class="nv-track">'
-      // The original offer is the full bar; the negotiated figure is drawn
-      // inside it, so the gap between them IS the saving.
+      // The original offer is the ghost bar; the negotiated figure is drawn
+      // inside it, so the gap between them IS what negotiation took off.
       + '<div class="nv-orig" style="width:' + pctOrig.toFixed(2) + '%"></div>'
-      + '<div class="nv-fin" style="width:' + pctFin.toFixed(2) + '%"></div>'
+      + '<div class="nv-fin' + (bcb ? (over ? ' nv-fin-part' : ' nv-fin-ok') : '')
+        + '" style="width:' + pctGreen.toFixed(2) + '%"></div>'
+      + (pctRed > 0 ? '<div class="nv-ovr" style="left:' + bcbPct.toFixed(2) + '%;width:'
+          + pctRed.toFixed(2) + '%"></div>' : '')
       + (bcbPct != null ? '<div class="nv-bcb" style="left:' + bcbPct.toFixed(2) + '%" '
           + 'title="Budget (BCB) ' + esc(money(bcb)) + '"></div>' : '')
       + '</div>'
@@ -3054,6 +3603,13 @@ function negotiationViz() {
             + ' \u00b7 ' + Math.abs(cut).toFixed(1) + '%</span>'
           : '<b>' + esc(money(orig, i.offer_currency)) + '</b>'
             + '<span class="nv-cut nv-flat">not negotiated</span>')
+      /* The headline this panel exists for: where the bid lands against the
+         budget, as a percentage, in words that cannot be misread. */
+      + (vsPct != null
+          ? '<span class="nv-vs ' + (over ? 'nv-vs-over' : 'nv-vs-under') + '">'
+            + (over ? '&#9650; ' : '&#9660; ') + vsPct.toFixed(1) + '% '
+            + (over ? 'over budget' : 'under budget') + '</span>'
+          : '')
       + '</div></div>';
   }).join('');
 
@@ -3065,13 +3621,23 @@ function negotiationViz() {
   })[0];
   const leadFin = lead ? Number(lead.negotiated_amount != null ? lead.negotiated_amount : lead.offer_amount) : null;
   const vsBcb = (bcb && leadFin != null) ? bcb - leadFin : null;
-  return '<div class="panel" id="bp-negoviz"><div class="panel-title">Offer \u2192 negotiated</div>'
-    + '<div class="sec-note">Each bar is that bidder\u2019s original offer; the solid part is where it '
-    + 'landed after negotiation, so the gap is what was taken off.'
-    + (bcb ? ' The dashed line is the budget (BCB).'
-           : (window.__hideBudget ? '' : ' There is no budget (BCB) on file, so there is no budget line.'))
+  return '<div class="panel" id="bp-negoviz"><div class="panel-title">Each bid against the budget</div>'
+    + '<div class="sec-note">'
+    + (bcb ? 'The dashed line is the <b>budget (BCB)</b> for this work package. A bar that stops '
+             + '<b>short</b> of it is under budget \u2014 the gap is the saving. A bar that '
+             + '<b>crosses</b> it is over budget, and the red part is the overrun.'
+           : (window.__hideBudget ? 'Each bar is that bidder' + '\\u2019' + 's offer.'
+                : 'There is <b>no budget (BCB)</b> on file for this work package, so the bars are '
+                  + 'scaled to the highest bid and there is no budget line to read them against.'))
+    + ' The faint bar behind is the original offer, so the gap to the solid bar is what negotiation took off.'
     + (moved.length ? '' : ' <b>Nothing has been negotiated yet</b> \u2014 the bars show the offers as they stand.')
     + '</div>'
+    + (bcb ? '<div class="nv-legend">'
+        + '<span><i class="nv-sw nv-sw-ok"></i>Within budget</span>'
+        + '<span><i class="nv-sw nv-sw-over"></i>Over budget</span>'
+        + '<span><i class="nv-sw nv-sw-orig"></i>Original offer</span>'
+        + '<span><i class="nv-sw nv-sw-bcb"></i>Budget ' + esc(money(bcb)) + '</span>'
+        + '</div>' : '')
     + '<div class="nv-wrap">' + bars + '</div>'
     + ((totalSaved > 0 || vsBcb != null)
         ? '<div class="nv-total">'
@@ -3194,6 +3760,29 @@ async function doAward() {
   if (finalAmt == null || finalAmt < 0) {
     AppNotify.warn('Enter the final amount before recording the award.');
     return;
+  }
+
+  /* ⚠️ THE TECHNICAL COMPARISON GETS A SAY AT THE AWARD, not just on screen.
+     A bidder failing a MANDATORY line of the TOR is not awardable however
+     cheap the bid is — that is the whole reason the matrix exists — so the
+     finding is put in front of the officer here. A WARNING, not a block: the
+     same reasoning as N29 below, since a requirement can be waived by a human
+     with a reason and the app has no standing to refuse. */
+  if (REQS.length) {
+    const ts = techScore(win.id);
+    if (ts.blocked > 0) {
+      const missed = REQS.filter(function (q) {
+        if (!q.mandatory) return false;
+        const r = reqResult(win.id, q.id);
+        return r && (r.result === 'not_met' || r.result === 'partial');
+      }).map(function (q) { return '  \u2022 ' + q.requirement; }).join('\n');
+      if (!confirm(win.vendor_name + ' does not meet ' + ts.blocked + ' mandatory requirement'
+        + (ts.blocked === 1 ? '' : 's') + ':\n\n' + missed
+        + '\n\nA mandatory line not met normally disqualifies the bid.\n\nRecord the award anyway?')) return;
+    } else if (ts.unanswered === REQS.length) {
+      if (!confirm('Nobody has marked ' + win.vendor_name + ' against the technical requirements yet.'
+        + '\n\nRecord the award anyway?')) return;
+    }
   }
 
   // N29 is a policy, not a database rule — so warn clearly and let a human

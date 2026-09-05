@@ -4065,6 +4065,140 @@ const VendorDb = (() => {
     },
   };
 
+  /* ── The cost comparison and the technical comparison ─────────────────────
+     2026-09-05_bid_cost_comparison.sql.
+
+     A bidder used to be one headline figure and one boolean, which cannot
+     answer "meets everything but is dear" against "cheaper but misses three
+     lines". This is the line-item BOQ and the requirement matrix behind that
+     judgement — the shape Megawide's own cost-comparison workbooks already use.
+
+     ⚠️ THREE OF THE FOUR TABLES ARE STAFF-ONLY BY POLICY, and the fourth
+        (requirements) is the ask, so a bidder may read it. In particular
+        `itemBudget` holds OUR budgeted rate per line: it is deliberately not a
+        column on vendor_bid_items, because an invited vendor holds SELECT on
+        that table and RLS filters rows, never columns.
+
+     Reads return [] on a missing table so the panel renders before the
+     migration is run; writes throw, because a silent no-op on an evaluation is
+     worse than an error. */
+  const bidComparison = {
+    async requirements(roundId) {
+      try {
+        const sb = await getSB();
+        const { data, error } = await sb.from('vendor_bid_requirements')
+          .select('*').eq('round_id', roundId).order('sort_order').order('created_at');
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (_isMissingTable(e, 'vendor_bid_requirements')) return [];
+        console.warn('[bidComparison.requirements]', e && e.message); return [];
+      }
+    },
+    async addRequirement(roundId, fields) {
+      const sb = await getSB();
+      const { data, error } = await sb.from('vendor_bid_requirements')
+        .insert({ round_id: roundId, ...fields }).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async updateRequirement(id, fields) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_bid_requirements').update(fields).eq('id', id);
+      if (error) throw error;
+    },
+    async removeRequirement(id) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_bid_requirements').delete().eq('id', id);
+      if (error) throw error;
+    },
+
+    /* Every bidder's verdict on every requirement, for one round. Read by
+       invitation id rather than by round, because the results table has no
+       round column — the invitation is what ties it to the round. */
+    async results(invitationIds) {
+      const ids = (invitationIds || []).filter(Boolean);
+      if (!ids.length) return [];
+      try {
+        const sb = await getSB();
+        const { data, error } = await sb.from('vendor_bid_requirement_results')
+          .select('*').in('invitation_id', ids);
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (_isMissingTable(e, 'vendor_bid_requirement_results')) return [];
+        console.warn('[bidComparison.results]', e && e.message); return [];
+      }
+    },
+    /* ⚠️ UPSERT ON (invitation_id, requirement_id) — the unique key. Without
+       the conflict target a second save would insert a duplicate verdict and
+       the matrix would start showing two answers for one cell. */
+    async setResult(invitationId, requirementId, fields, profile) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_bid_requirement_results')
+        .upsert({ invitation_id: invitationId, requirement_id: requirementId, ...fields,
+                  updated_at: new Date().toISOString(),
+                  updated_by: profile?.id || null,
+                  updated_by_name: profile?.name || profile?.email || null },
+                { onConflict: 'invitation_id,requirement_id' });
+      if (error) throw error;
+    },
+
+    /* The priced lines, per bidder. */
+    async prices(invitationIds) {
+      const ids = (invitationIds || []).filter(Boolean);
+      if (!ids.length) return [];
+      try {
+        const sb = await getSB();
+        const { data, error } = await sb.from('vendor_bid_item_prices')
+          .select('*').in('invitation_id', ids);
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (_isMissingTable(e, 'vendor_bid_item_prices')) return [];
+        console.warn('[bidComparison.prices]', e && e.message); return [];
+      }
+    },
+    async setPrice(invitationId, itemId, fields, profile) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_bid_item_prices')
+        .upsert({ invitation_id: invitationId, item_id: itemId, ...fields,
+                  updated_at: new Date().toISOString(),
+                  updated_by: profile?.id || null,
+                  updated_by_name: profile?.name || profile?.email || null },
+                { onConflict: 'invitation_id,item_id' });
+      if (error) throw error;
+    },
+    async removePrice(invitationId, itemId) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_bid_item_prices').delete()
+        .eq('invitation_id', invitationId).eq('item_id', itemId);
+      if (error) throw error;
+    },
+
+    /* ⚠️ OUR BUDGETED RATE PER LINE. Staff-only by policy — never render it on
+       any vendor-facing surface, and never move it onto vendor_bid_items. */
+    async itemBudget(roundId) {
+      try {
+        const sb = await getSB();
+        const { data, error } = await sb.from('vendor_bid_item_budget')
+          .select('*').eq('round_id', roundId);
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (_isMissingTable(e, 'vendor_bid_item_budget')) return [];
+        console.warn('[bidComparison.itemBudget]', e && e.message); return [];
+      }
+    },
+    async setItemBudget(roundId, itemId, fields) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_bid_item_budget')
+        .upsert({ item_id: itemId, round_id: roundId, ...fields,
+                  updated_at: new Date().toISOString() }, { onConflict: 'item_id' });
+      if (error) throw error;
+    },
+  };
+
   /* ── Push subscriptions ──────────────────────────────────────────────────
      2026-09-05_vendor_push.sql. One row per DEVICE that agreed to
      notifications. RLS scopes every one of these to the caller's own vendor.
@@ -4169,7 +4303,7 @@ const VendorDb = (() => {
     taxonomyNodeForWP, findVendorsForWP,
     getVendorRates, addVendorRate, deleteVendorRate, upsertRate,
     getClassCodes, classCodeIndex, normClassCode,
-    bidReference,
+    bidReference, bidComparison,
     push,
     uploadCertFile, getCertFileUrl, deleteCertFile,
     documents: vendorDocuments, uploadVendorDoc, uploadVendorFile, requests: accreditationRequests, claims: vendorClaims, history: vendorHistory,
