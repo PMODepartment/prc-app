@@ -1756,6 +1756,19 @@ function vsBcbHtml(amount, inv) {
     : '<span class="nv-over">' + esc(money(-d)) + ' over · ' + pct.toFixed(1) + '%</span>';
 }
 
+/* ⚠️ THE ONE SURVIVOR OF A BLOCK DELETE. bidsInPlay() lived immediately above
+   the old headline panel, so removing that panel by LINE RANGE took it too, and
+   every panel in the Evaluated phase calls it, so the round page rendered its
+   title and then nothing at all. `node --check` passes an undefined function
+   happily; only loading the page catches it.
+   The set every panel here works from: a bidder who has actually put a number
+   in. `closed` is included because awarding closes the round without unmaking
+   the quotation. */
+function bidsInPlay() {
+  return INV.filter(i => i.status === 'submitted' || i.status === 'closed')
+            .filter(i => i.offer_amount != null);
+}
+
 /* ── the workspace, grouped by the approved Procurement Status ───────────────
    ⚠️ THE PHASES ARE THE APPROVED ROSTER, NOT A FOURTH VOCABULARY. The workspace
       was nine numbered panels — a sequence an officer had to learn on top of the

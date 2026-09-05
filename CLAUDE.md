@@ -3082,6 +3082,53 @@ back to one work package**. Half-doing that would put the award write-back at ri
 the most consequential path in the app. The composer today groups the requirement under one
 package heading, which is the shape a multi-package version grows into.
 
+### ⚠️ The round page rendered its title and then nothing — `bidsInPlay` was deleted with a panel (2026-09-06)
+
+Found by loading the live round, and only by that.
+
+Consolidating the Evaluated phase removed `comparisonPanel` by **line range**.
+**`bidsInPlay()` lived immediately above it**, so it went too — and every panel
+in that phase calls it. `renderRound()` sets the page title on its first line
+and builds the panels on the next, so the page showed
+`WP DEMO-07 — HVAC equipment supply & install` and then an empty body.
+
+- **⚠️ `node --check` CANNOT CATCH THIS.** An undefined identifier is a RUNTIME
+  error; the file parses perfectly. Every syntax check in this session passed.
+- **⚠️ Nor did the harnesses**, because each one stubs `bidsInPlay` itself — a
+  harness verifies the function it extracts, not the page's own wiring.
+- The fix restored the function verbatim from the previous commit.
+
+**`check_removed.py` (repo root) is the guard. Run it after any edit that
+deletes a range of lines:**
+
+```
+python check_removed.py            # vs HEAD
+python check_removed.py <ref>      # vs any revision
+```
+
+It diffs the symbol table of each page's inline JS between a git ref and the
+working tree and reports **anything removed that is still called**. Proven
+against the real bug: it prints `bidsInPlay was REMOVED but is still called 14
+time(s)`.
+
+- **⚠️ IT DELIBERATELY DOES NOT TRY TO BE AN UNDEFINED-REFERENCE ANALYSER.** That
+  was attempted first and abandoned: you cannot reliably strip JS strings and
+  comments with a scanner, because a regex literal such as `/[^'"]/` contains
+  quotes and a naive stripper swallows whole functions — it produced **seven
+  false positives** on `bids.html`, reporting `doAward`, `awardPanel` and
+  `negotiationViz` as undefined when all three are plainly defined. Asking the
+  narrower question — *what did this edit remove, and is it still used* — needs
+  no JS parsing at all and has a precise answer.
+- A mention inside a comment can still be reported; `_real_calls()` drops the
+  common shapes (`//` earlier on the line, a `*`-led block-comment line). A
+  spare line of output for a human to dismiss is the right trade against a false
+  negative.
+
+**⚠️ THE REAL LESSON: DELETE BY SYMBOL, NOT BY LINE RANGE — and load the page.**
+Four verification layers passed this bug: `node --check`, the class/handler
+audit, the icon check and two rendering harnesses. Only opening the live round
+found it.
+
 ### The Evaluated phase: five panels become two (2026-09-06)
 
 Reported as "the whole evaluation section looks complicated". It was: **five
