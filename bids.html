@@ -148,24 +148,12 @@
     .bm-phase.now .bm-phase-n{background:var(--mw-red);color:#fff}
     .bm-phase.done .bm-phase-n{background:#2D9B6F;color:#fff}
     @media(max-width:640px){ .bm-phase-head small{flex-basis:100%} }
-    /* What the phase is holding, as figures. Reads at a glance; the prose above
-       it is there for the first time only. */
-    .bm-stats{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px}
-    .bm-stat{flex:0 0 auto;min-width:96px;padding:8px 12px;border-radius:9px;
-      background:var(--surface-2);border:1px solid var(--border-md);
-      display:flex;flex-direction:column;gap:1px}
-    .bm-stat>b{font-size:1.0714rem;font-weight:800;line-height:1.15;color:var(--text-primary)}
-    .bm-stat>span{font-size:0.6875rem;font-weight:700;letter-spacing:.05em;
-      text-transform:uppercase;color:var(--text-hint)}
-    .bm-stat.wide{min-width:150px}
-    .bm-stat.wide>b{font-size:0.9286rem}
-    .bm-stat.ok{border-color:#2D9B6F}
-    .bm-stat.ok>b{color:#2D9B6F}
-    .bm-stat.warn{border-color:#B45309}
-    .bm-stat.warn>b{color:#B45309}
-    .bm-stat.muted>b{color:var(--text-hint)}
-    body.dark-mode .bm-stat.ok{border-color:#5FD3A3} body.dark-mode .bm-stat.ok>b{color:#5FD3A3}
-    body.dark-mode .bm-stat.warn{border-color:#FBBF24} body.dark-mode .bm-stat.warn>b{color:#FBBF24}
+    /* The phase figures use the dashboard's own .metrics-grid / .metric-card, so
+       this only tightens the spacing between the heading and the cards. A long
+       value (a vendor name, "PHP 15,000 under · 7.8%") wraps instead of forcing
+       the grid wider. */
+    .bm-stats{margin:12px 0 16px}
+    .bm-stats .metric-value{font-size:1.0714rem}
     /* A filled track behind the stepper, so progress is a shape and not only
        five words. Width is set inline from the current step. */
     .bm-track{height:4px;border-radius:3px;background:var(--surface-2);margin:0 2px 14px;overflow:hidden}
@@ -309,6 +297,10 @@
       .bid-nav a.on{border-left:0;border-bottom-color:var(--mw-red)}
       #roundHost .panel{scroll-margin-top:108px}
     }
+    /* A sub-heading carries its own six-word explanation, so the panel needs no
+       paragraph above it. */
+    .ref-sub>span{font-weight:600;letter-spacing:0;text-transform:none;
+      color:var(--text-hint);font-size:0.75rem;margin-left:8px}
     .ref-sub{font-size:0.7143rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
       color:var(--text-hint);margin:14px 0 8px}
     .ref-kind{flex:0 0 auto;font-size:0.6429rem;font-weight:800;letter-spacing:.04em;
@@ -608,14 +600,14 @@ function configureBidTour() {
             + 'Solicited, closed for pricing &rarr; Evaluated, awarded &rarr; Awarded. There is nothing '
             + 'to remember to set. Underneath it you can see the work package’s own status, and put '
             + 'it right in one click if it has fallen behind.' },
-      { sel: '#bp-ask', title: 'The ask',
+      { sel: '#bp-ask', title: 'Scope and terms',
         body: 'Scope, deadline, payment terms and conditions. Everything here goes to the bidders '
             + 'exactly as written, and it is what fills in the RFQ letter further down.' },
-      { sel: '#bp-reference', title: 'The reference pack',
+      { sel: '#bp-reference', title: 'Documents and priced items',
         body: 'The TOR, the MPSS, the drawings &mdash; and the priced line items. This is what makes two '
             + 'quotations comparable: every bidder prices the same list, and the line items become the '
             + 'itemised requirement in the RFQ email.' },
-      { sel: '#bp-bidders', title: 'Bidders',
+      { sel: '#bp-bidders', title: 'Proposed vendors',
         body: 'Each invited vendor shows their accreditation. Policy N29 lets you invite an unaccredited '
             + 'vendor &mdash; awarding to a problematic one only asks you to confirm, because a hard block '
             + 'would just get worked around.' },
@@ -623,13 +615,13 @@ function configureBidTour() {
         body: 'Drafted on <b>Megawide’s own template</b>, filled in from this round. It copies the '
             + 'formatted letter and opens an addressed, empty draft &mdash; press Ctrl+V. Each bidder gets '
             + 'their own private link, so each is a separate email; there is a mail-merge CSV for a big round.' },
-      { sel: '#bp-responses', title: 'Bids received',
+      { sel: '#bp-responses', title: 'Quotations received',
         body: 'Quotations as they arrive, through the link or attached by you from an email. A vendor may '
             + 'revise up to the deadline; the first submission is kept as their original offer.' },
       { sel: '#bp-clarify', title: 'Clarifications',
         body: 'Questions to <b>one</b> bidder, never visible to the others, grouped by subject &mdash; '
             + 'technical, commercial, schedule, documents. Messages sharing a subject are the thread.' },
-      { sel: '#bp-comparison', title: 'Bids at a glance',
+      { sel: '#bp-comparison', title: 'Quotation comparison',
         body: 'Every column sorts, and the lowest offer is chipped. <b>This is not the cost comparison</b> '
             + '&mdash; that document is prepared outside the app from your own template. Export the '
             + 'bidders and offers as CSV to start it.' },
@@ -1296,9 +1288,8 @@ function refDocsHtml(ro) {
 }
 function refItemsHtml(ro) {
   if (!REFITEMS.length) {
-    return '<div class="sec-note" style="margin:0">No priced line items yet. For anything with a '
-      + 'specification \u2014 a pump diameter, a steel grade, a quantity \u2014 add the lines here so every '
-      + 'bidder prices the same thing.</div>';
+    return '<div class="sec-note" style="margin:0">Nothing to price yet. '
+      + 'Add a line for each item, with its quantity.</div>';
   }
   return '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
     + '<th style="width:60px">Item</th><th>Description</th><th>Specification</th>'
@@ -1320,11 +1311,13 @@ function refItemsHtml(ro) {
 }
 function referencePanel() {
   const ro = !canManage || R.stage === 'awarded' || R.stage === 'cancelled';
-  return '<div class="panel" id="bp-reference"><div class="panel-title">Reference pack</div>'
-    + '<div class="sec-note">The terms of reference (TOR), the MPSS and the drawings a bidder prices '
-    + 'against, and the line items they price. Issued with the RFQ and visible on every bidder\u2019s '
-    + 'own link \u2014 the same set to all of them.</div>'
-    + '<div class="ref-sub">Documents</div>'
+  return '<div class="panel" id="bp-reference"><div class="panel-title">Documents and priced items</div>'
+    /* \u26a0\ufe0f NAMED FOR WHAT IS IN IT, NOT FOR A CONCEPT. This was "Reference pack",
+       which drew the question "what is this?" \u2014 fair, since nothing on the work
+       package is called that. It holds the documents and the priced items, so
+       that is what it is called, and each half says what it is for in six words
+       rather than a paragraph about TOR and MPSS. */
+    + '<div class="ref-sub">Documents <span>every vendor gets these</span></div>'
     + (refDocsHtml(ro) || '<div class="sec-note" style="margin:0">Nothing attached yet.</div>')
     + (ro ? '' :
         '<div class="ref-add">'
@@ -1336,7 +1329,8 @@ function referencePanel() {
         + '<input type="file" id="rf-file" style="display:none" onchange="onRefFilePicked(this)"></label>'
         + '<span id="rf-fname" class="ref-fname"></span>'
         + '<button class="btn btn-primary" onclick="addRefDoc()">Add</button></div>')
-    + '<div class="ref-sub" style="margin-top:16px">Line items to price</div>'
+    + '<div class="ref-sub" style="margin-top:16px">Priced items '
+    + '<span>what each vendor quotes against, line by line</span></div>'
     + refItemsHtml(ro)
     + (ro ? '' :
         '<div class="ref-add">'
@@ -1461,18 +1455,31 @@ function vsBcbHtml(amount) {
       THREADS, REFDOCS/REFITEMS — so none of this costs a query.
    ⚠️ A chip whose value is unknown is OMITTED rather than shown as 0. "0 days
       left" on a round with no deadline set is a statement we cannot make. */
+/* ⚠️ THE DASHBOARD'S OWN KPI CARD, NOT A BESPOKE CHIP. `.metric-card` /
+   `.metric-label` / `.metric-value` with the accent and colour variants are what
+   every Cost Overview on the WP dashboards is built from, so a bid round now
+   reads as the same product rather than a page with its own invented widgets.
+   Label first, then the value — the order the dashboards use. */
 function _chip(value, label, cls) {
   if (value == null || value === '') return '';
-  return '<div class="bm-stat' + (cls ? ' ' + cls : '') + '">'
-    + '<b>' + value + '</b><span>' + esc(label) + '</span></div>';
+  const accent = cls === 'ok' ? 'accent-green' : cls === 'warn' ? 'accent-amber'
+               : cls === 'muted' ? 'accent-gray' : 'accent-red';
+  const vc = cls === 'ok' ? ' green' : cls === 'warn' ? ' amber' : '';
+  return '<div class="metric-card ' + accent + '">'
+    + '<div class="metric-label">' + esc(label) + '</div>'
+    + '<div class="metric-value' + vc + '">' + value + '</div></div>';
 }
 function _daysLeft() {
   if (!R.bid_due_at) return null;
   const ms = new Date(R.bid_due_at).getTime() - Date.now();
   if (isNaN(ms)) return null;
   const d = Math.ceil(ms / 86400000);
-  return d < 0 ? { n: 'Closed', cls: 'muted', lbl: 'for pricing' }
-       : { n: d, cls: d <= 3 ? 'warn' : '', lbl: d === 1 ? 'day left' : 'days left' };
+  /* ⚠️ THIS IS THE ROUND'S BID DEADLINE, NOT THE WORK PACKAGE'S PLANNED AWARD
+     DATE. It was labelled just "days left" and was read as the planned award —
+     a fair reading, since that is the date the work package itself carries. Both
+     are shown now, each saying which it is. */
+  return d < 0 ? { n: 'Closed', cls: 'muted', lbl: 'quotations closed' }
+       : { n: d, cls: d <= 3 ? 'warn' : '', lbl: d === 1 ? 'day to quote' : 'days to quote' };
 }
 function phaseStats(label) {
   const inPlay = INV.filter(i => i.status === 'submitted' || i.status === 'closed');
@@ -1487,9 +1494,18 @@ function phaseStats(label) {
   if (label === 'Solicited') {
     const dl = _daysLeft();
     const threads = Object.values(THREADS).reduce((a, m) => a + (m.length ? 1 : 0), 0);
-    return _chip(inPlay.length + ' / ' + live.length, 'submitted',
+    /* The work package's own planned award date, beside the round's deadline —
+       and amber when quoting closes after the package was meant to be awarded,
+       which is the one thing those two dates together can tell you. */
+    const w = WPBYID[R.wp_id] || {};
+    const plan = w.awarding_date ? new Date(w.awarding_date).getTime() : null;
+    const due = R.bid_due_at ? new Date(R.bid_due_at).getTime() : null;
+    const late = plan && due && due > plan;
+    return _chip(inPlay.length + ' / ' + live.length, 'quotations in',
                  live.length && inPlay.length === live.length ? 'ok' : '')
       + (dl ? _chip(dl.n, dl.lbl, dl.cls) : '')
+      + (w.awarding_date ? _chip(dOnly(w.awarding_date), 'planned award (WP)',
+                                 late ? 'warn' : '') : '')
       + _chip(threads, threads === 1 ? 'clarification' : 'clarifications');
   }
   if (label === 'Evaluated') {
@@ -1500,16 +1516,16 @@ function phaseStats(label) {
     return (low != null ? _chip(money(low), 'lowest offer') : '')
       + _chip(comp + ' / ' + inPlay.length, 'compliant', comp ? 'ok' : 'warn')
       + _chip(shortl, 'shortlisted')
-      + (low != null && bcbOf() ? _chip(vsBcbHtml(low) || '&mdash;', 'against budget', 'wide') : '');
+      + (low != null && bcbOf() ? _chip(vsBcbHtml(low) || '&mdash;', 'against budget') : '');
   }
   if (label === 'Awarded') {
     const win = INV.find(i => i.outcome === 'awarded');
     if (!win) return _chip(inPlay.length, 'awaiting a decision', 'warn');
     const fin = win.final_amount != null ? win.final_amount
               : (win.negotiated_amount != null ? win.negotiated_amount : win.offer_amount);
-    return _chip(esc(win.vendor_name), 'awarded to', 'wide')
+    return _chip(esc(win.vendor_name), 'awarded to')
       + (fin != null ? _chip(money(fin), 'final amount', 'ok') : '')
-      + (fin != null && bcbOf() ? _chip(vsBcbHtml(fin) || '&mdash;', 'against budget', 'wide') : '')
+      + (fin != null && bcbOf() ? _chip(vsBcbHtml(fin) || '&mdash;', 'against budget') : '')
       + _chip(INV.filter(i => i.notice_issued_at).length + ' / ' + INV.length, 'notices recorded');
   }
   return '';
@@ -1530,8 +1546,11 @@ function phaseSection(label, hint, bodyHtml) {
     + '<div class="bm-phase-head">'
     + '<span class="bm-phase-n">' + (at >= 0 ? at + 1 : '') + '</span>'
     + '<h3>' + esc(label) + '</h3>'
-    + '<small>' + hint + '</small></div>'
-    + (function (s) { return s ? '<div class="bm-stats">' + s + '</div>' : ''; })(phaseStats(label))
+    /* ⚠️ NO SENTENCE UNDER THE HEADING. Each phase used to carry a line of prose
+       explaining itself; the figures below say the same thing faster, and the
+       complaint was that there is too much to read before the app makes sense. */
+    + (hint ? '<small>' + hint + '</small>' : '') + '</div>'
+    + (function (s) { return s ? '<div class="metrics-grid bm-stats">' + s + '</div>' : ''; })(phaseStats(label))
     + bodyHtml + '</section>';
 }
 
@@ -1563,13 +1582,13 @@ function renderRound() {
        : '')
     + '</div>'
     + deadlineNudge()
-    + phaseSection('Sourced', 'What you are asking for, and who you are asking.',
+    + phaseSection('Sourced', '',
         askPanel() + referencePanel() + biddersPanel())
-    + phaseSection('Solicited', 'The RFQ is out. Quotations and questions come back here.',
+    + phaseSection('Solicited', '',
         responsesPanel() + clarifyPanel())
-    + phaseSection('Evaluated', 'Compare the offers, check compliance, then negotiate.',
+    + phaseSection('Evaluated', '',
         comparisonPanel() + evaluationPanel() + negotiationPanel() + negotiationViz())
-    + phaseSection('Awarded', 'Record the award and the notices that go out.',
+    + phaseSection('Awarded', '',
         awardPanel());
 
   buildBidNav();
@@ -1631,8 +1650,8 @@ async function reTender() {
 /* 2.2.1 — Preparation of Scope of Works (BOQ) and TOR. */
 function askPanel() {
   const ro = canManage ? '' : ' disabled';
-  return '<div class="panel" id="bp-ask"><div class="panel-title">The ask</div>'
-    + '<div class="sec-note">Scope, deadline and terms. Everything here goes to the bidders exactly as written.</div>'
+  return '<div class="panel" id="bp-ask"><div class="panel-title">Scope and terms</div>'
+    + ''
     + '<div class="bm-grid">'
     + '<div class="field"><label>Document type</label><select id="a-doc"' + ro + '>'
     + ['RFQ', 'RFP', 'ITB'].map(t => '<option value="' + t + '"' + (R.doc_type === t ? ' selected' : '') + '>' + t
@@ -1711,7 +1730,7 @@ function biddersPanel() {
       + '</div>';
   }).join('');
 
-  return '<div class="panel" id="bp-bidders"><div class="panel-title">Bidders</div>'
+  return '<div class="panel" id="bp-bidders"><div class="panel-title">Proposed vendors</div>'
     + '<div class="sec-note">Who is being asked to quote. '
     + '<b>Unaccredited vendors may be invited</b> — BP policy N29 runs accreditation in parallel; only the AWARD requires it.</div>'
     + (INV.length ? rows : '<div class="empty-state"><i class="ti ti-users"></i><b>No bidders yet</b>Add the vendors you want to quote this package.</div>')
@@ -2104,11 +2123,8 @@ function openRfq() {
   const withEmail = INV.filter(i => i.vendor_contact_email);
   const without = INV.filter(i => !i.vendor_contact_email);
   document.getElementById('rfqBody').innerHTML =
-      '<div class="sec-note">Drafted on Megawide\'s own ' + esc(docLong()) + ' template, filled in from '
-    + 'this round — the scope, the line items, the reference pack, the deadline and your contact details. '
-    + 'Read it before you send it: the app supplies the facts, not the judgement. Each bidder gets their '
-    + 'own link, so each is a separate email — open them in Outlook and send. '
-    + 'Nothing here sends mail on your behalf.</div>'
+      '<div class="sec-note">Megawide\'s own ' + esc(docLong()) + ' template, filled in from this round. '
+    + 'One email per vendor — read it before you send.</div>'
     + '<div class="field"><label>Subject</label><input id="rfqSubj" value="' + esc(rfqSubject()) + '" readonly></div>'
     + INV.map(i =>
         '<div class="rfq-row">'
@@ -2274,7 +2290,7 @@ async function markIssued() {
 /* 2.2.3 — Receipt of Proposal. */
 function responsesPanel() {
   const inPlay = INV.filter(i => i.status === 'submitted' || i.status === 'closed');
-  return '<div class="panel" id="bp-responses"><div class="panel-title">Bids received</div>'
+  return '<div class="panel" id="bp-responses"><div class="panel-title">Quotations received</div>'
     + '<div class="sec-note">' + inPlay.length + ' of ' + INV.length + ' invited bidders have submitted.'
     + '</div>'
     + (inPlay.length
@@ -2436,7 +2452,7 @@ function comparisonPanel() {
   // ⚠️ The BCB is OURS and is shown to staff only — it is deliberately absent
   //    from every vendor-facing surface (see the migration's view).
   const bcb = window.__hideBudget ? null : (w.approved_budget_bcb || null);
-  return '<div class="panel" id="bp-comparison"><div class="panel-title">Bids at a glance</div>'
+  return '<div class="panel" id="bp-comparison"><div class="panel-title">Quotation comparison</div>'
     + (bcb
         ? '<div class="sec-note">Measured against the budget (BCB) of <b>' + esc(money(bcb)) + '</b>.</div>'
         : (window.__hideBudget ? ''
