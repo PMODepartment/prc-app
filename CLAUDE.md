@@ -3146,6 +3146,34 @@ quotation at a time. `saveComparison()` writes **only the column being edited**;
 looping every bidder would read inputs that are not rendered at all in reading
 mode and stage nulls over real figures.
 
+#### ⚠️ FIFTY NUMBERS OF EQUAL WEIGHT IS NOT A COMPARISON (2026-09-05, same day)
+
+The first readable version put every bidder's rate on screen in the same type at
+the same size, so the eye had no entry point and every judgement — who is
+cheapest on this line, by how much, how does that sit against our budget — was
+left to the reader's head, ten columns at a time. Three changes, none of which
+adds any data:
+
+- **HEAT, per row.** Each cell is tinted on a green→red scale between the
+  cheapest and dearest rate **in its own row**, so a row's shape is legible
+  without reading a digit. **⚠️ PER ROW, NEVER PER TABLE** — a busduct at ₱650k
+  and a tie wire at ₱95 share no scale, and tinting across the whole table would
+  paint every cheap line green and say nothing. Deliberately pale (7–16% alpha):
+  it has to sit under the verdict tints in the technical band without fighting
+  them.
+- **A VIEW SWITCH** — one figure per cell at a time: **Rate · Amount · vs
+  cheapest · vs budget**. `vs cheapest` reads `cheapest / +3.7% / +10.5%`;
+  `vs budget` reads `−1.7%` green / `+8.6%` red. Those are the two comparisons
+  an officer actually makes, and they were previously arithmetic the reader had
+  to do per line.
+- **TABULAR FIGURES** (`font-variant-numeric: tabular-nums`). Proportional
+  digits do not line up in a column, so `5,957.72` and `6,024.20` sat visibly
+  off each other down a price column — the whole reason a printed price list
+  uses them.
+- Plus a **row hover** tint that reaches under the frozen first column, which
+  paints its own opaque background and would otherwise stay unhighlighted while
+  you read across ten columns.
+
 #### ⚠️ TEN BIDDERS DO NOT FIT, and that is not hypothetical
 
 The 4PH Busducts round went out to **eight** bidders and its Final sheet

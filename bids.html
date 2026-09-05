@@ -415,6 +415,39 @@
     html.dark-mode .cc-not_met,body.dark-mode .cc-not_met{background:rgba(255,122,110,.15)}
     /* Read-mode cells: two short lines of TEXT, which is what keeps a row at
        ~34px instead of the 114px the all-inputs version produced. */
+    /* ⚠️ TABULAR FIGURES. Proportional digits do not line up in a column, so
+       5,957.72 and 6,024.20 sat visibly off each other down a price column —
+       the whole reason a printed price list uses tabular numerals. */
+    .cc-table{font-variant-numeric:tabular-nums}
+    /* Heat: cheapest to dearest WITHIN A ROW. Deliberately pale — it is meant
+       to give a row a readable shape at a glance, not to shout, and it has to
+       sit under the verdict tints in the technical band without fighting them. */
+    .cc-h0{background:rgba(45,155,111,.16)}
+    .cc-h1{background:rgba(45,155,111,.08)}
+    .cc-h2{background:rgba(217,119,6,.07)}
+    .cc-h3{background:rgba(238,49,36,.07)}
+    .cc-h4{background:rgba(238,49,36,.14)}
+    html.dark-mode .cc-h0,body.dark-mode .cc-h0{background:rgba(95,211,163,.20)}
+    html.dark-mode .cc-h1,body.dark-mode .cc-h1{background:rgba(95,211,163,.10)}
+    html.dark-mode .cc-h2,body.dark-mode .cc-h2{background:rgba(245,158,11,.10)}
+    html.dark-mode .cc-h3,body.dark-mode .cc-h3{background:rgba(255,122,110,.10)}
+    html.dark-mode .cc-h4,body.dark-mode .cc-h4{background:rgba(255,122,110,.18)}
+    .cc-best .cc-r{color:#1E7A54}
+    html.dark-mode .cc-best .cc-r,body.dark-mode .cc-best .cc-r{color:#5FD3A3}
+    .cc-r-over{color:var(--mw-red-ink)}
+    .cc-r-best{color:#1E7A54}
+    html.dark-mode .cc-r-best,body.dark-mode .cc-r-best{color:#5FD3A3}
+    /* Reading ACROSS ten columns is the hard part, so the row you are on is
+       tinted — including under the frozen first column, which paints its own
+       opaque background and would otherwise stay unhighlighted. */
+    .cc-table tbody tr:hover td{background:var(--surface-2)}
+    .cc-table tbody tr:hover td.cc-stick{background:var(--surface-2)}
+    .cc-table tbody tr.cc-band:hover td{background:#F3F3F3}
+    html.dark-mode .cc-table tbody tr.cc-band:hover td,
+    body.dark-mode .cc-table tbody tr.cc-band:hover td{background:#3a3a3a}
+    .cc-views{display:inline-flex;border:1.5px solid var(--border-md);border-radius:8px;overflow:hidden}
+    .cc-views .seg-btn{border:none;border-radius:0;padding:5px 10px;font-size:0.7857rem}
+    .cc-views .seg-btn + .seg-btn{border-left:1px solid var(--border)}
     .cc-r{font-weight:700;text-align:right;white-space:nowrap}
     .cc-a{font-size:0.7143rem;color:var(--text-hint);text-align:right;white-space:nowrap}
     .cc-word{font-size:0.7143rem;font-weight:700;color:var(--mw-red-ink);text-align:right}
@@ -3588,6 +3621,82 @@ function _basisWord(st) {
 }
 const REQ_SHORT = { met: 'Met', partial: 'Partial', not_met: 'Not met', na: 'N/A' };
 
+/* ── how the table READS ─────────────────────────────────────────────────────
+   ⚠️ FIFTY NUMBERS OF EQUAL WEIGHT IS NOT A COMPARISON. The first readable
+      version put every bidder's rate on screen in the same type at the same
+      size, so the eye had no entry point and every judgement — who is cheapest
+      on this line, by how much, how does that sit against our budget — had to
+      be done in the reader's head, ten columns at a time. Three things fix it,
+      and none of them adds any data:
+
+        · HEAT   — each cell tinted on a green→red scale within its OWN row, so
+                   the shape of a row is legible without reading a digit
+        · a VIEW — one figure per cell at a time: the rate, the amount, the gap
+                   to the cheapest, or the gap to our budget
+        · TABULAR FIGURES — digits align in a column, which is the whole reason
+                   a printed price list uses them
+
+   ⚠️ HEAT IS PER ROW, NEVER PER TABLE. A busduct at ₱650k and a tie wire at ₱95
+      share no scale; tinting across the whole table would paint every cheap
+      line green and every expensive one red and say nothing at all. */
+const CC_VIEWS = [
+  ['rate', 'Rate'], ['amount', 'Amount'], ['vslow', 'vs cheapest'], ['vsbud', 'vs budget'],
+];
+let _ccView = 'rate';
+function ccSetView(v) { _ccView = v || 'rate'; renderRound(); }
+
+/* 0 at the cheapest, 1 at the dearest, within one row. Returns null when there
+   is nothing to compare — one bidder, or every rate identical. */
+function _ccHeat(v, lo, hi) {
+  if (v == null || lo == null || hi == null || hi <= lo) return null;
+  return (Number(v) - lo) / (hi - lo);
+}
+function _ccHeatClass(t) {
+  if (t == null) return '';
+  if (t <= 0.001) return ' cc-h0';
+  if (t < 0.25) return ' cc-h1';
+  if (t < 0.55) return ' cc-h2';
+  if (t < 0.85) return ' cc-h3';
+  return ' cc-h4';
+}
+/* The row's rate range across the bidders shown. Lines nobody priced, and lines
+   quoted as included/excluded, are not part of the spread. */
+function _ccRowRange(itemId, rows) {
+  let lo = null, hi = null;
+  rows.forEach(function (i) {
+    const p = priceOf(i.id, itemId);
+    if (!p || p.unit_rate == null || p.status === 'excluded' || p.status === 'no_bid') return;
+    const v = Number(p.unit_rate);
+    if (!isFinite(v) || v <= 0) return;
+    if (lo == null || v < lo) lo = v;
+    if (hi == null || v > hi) hi = v;
+  });
+  return { lo: lo, hi: hi };
+}
+/* What one cell shows under the current view. `main` is the figure that carries
+   the heat; `sub` is the quieter second line. */
+function _ccCellFigures(p, it, low, budRate) {
+  const rate = p.unit_rate == null ? null : Number(p.unit_rate);
+  const amt = p.amount == null ? null : Number(p.amount);
+  if (_ccView === 'amount') {
+    return { main: amt == null ? '\u2014' : _amt(amt),
+             sub: rate == null ? '' : _rate(rate) + (it.unit ? ' / ' + it.unit : '') };
+  }
+  if (_ccView === 'vslow') {
+    if (rate == null || low == null || low <= 0) return { main: '\u2014', sub: '' };
+    const d = (rate - low) / low * 100;
+    return { main: d < 0.05 ? 'cheapest' : '+' + d.toFixed(1) + '%',
+             sub: _rate(rate), best: d < 0.05 };
+  }
+  if (_ccView === 'vsbud') {
+    if (rate == null || budRate == null || budRate <= 0) return { main: '\u2014', sub: _rate(rate) };
+    const d = (rate - budRate) / budRate * 100;
+    return { main: (d > 0 ? '+' : '\u2212') + Math.abs(d).toFixed(1) + '%',
+             sub: _rate(rate), over: d > 0 };
+  }
+  return { main: _rate(rate), sub: amt == null ? '' : _amt(amt) };
+}
+
 function costComparePanel() {
   const allRows = bidsInPlay();
   if (!allRows.length) return '';
@@ -3656,6 +3765,7 @@ function costComparePanel() {
   /* ── the priced lines ──────────────────────────────────────────────────── */
   const itemRows = !REFITEMS.length ? '' : REFITEMS.map(function (it, rowIdx) {
     const low = _lowRate(it.id, rows);
+    const range = _ccRowRange(it.id, rows);
     const b = ITEMBUDGET[it.id] || {};
     return '<tr><td class="cc-stick"><b>' + esc((it.item_no ? it.item_no + '. ' : '') + it.description) + '</b>'
       + (it.spec ? '<small>' + esc(it.spec) + '</small>' : '')
@@ -3689,12 +3799,16 @@ function costComparePanel() {
                 }).join('')
               + '</select></td>';
           }
-          return '<td class="cc-cell' + (isLow ? ' cc-low' : '') + '">'
-            + (word ? '<div class="cc-word">' + word + '</div>'
-                : '<div class="cc-r">' + esc(_rate(p.unit_rate))
-                  + (isLow ? '<i class="ti ti-caret-down-filled cc-lowmark" title="lowest rate"></i>' : '')
-                  + '</div>'
-                  + (!_ccCompact && p.amount != null ? '<div class="cc-a">' + esc(_amt(p.amount)) + '</div>' : ''))
+          if (word) return '<td class="cc-cell"><div class="cc-word">' + word + '</div></td>';
+          const f = _ccCellFigures(p, it, low, (ITEMBUDGET[it.id] || {}).budget_rate);
+          const heat = _ccHeatClass(_ccHeat(p.unit_rate, range.lo, range.hi));
+          return '<td class="cc-cell' + heat + (isLow ? ' cc-best' : '') + '">'
+            + '<div class="cc-r' + (f.over ? ' cc-r-over' : (f.best ? ' cc-r-best' : '')) + '">'
+            + esc(f.main)
+            + (isLow && _ccView === 'rate'
+                ? '<i class="ti ti-caret-down-filled cc-lowmark" title="cheapest on this line"></i>' : '')
+            + '</div>'
+            + (!_ccCompact && f.sub ? '<div class="cc-a">' + esc(f.sub) + '</div>' : '')
             + '</td>';
         }).join('')
       + '</tr>';
@@ -3792,6 +3906,10 @@ function costComparePanel() {
     + (allRows.length > 3 ? '<label class="cc-dense"><input type="checkbox"'
         + (_ccCompact ? ' checked' : '') + ' onchange="ccSetCompact(this.checked)"> Compact</label>' : '')
     + '<span class="cc-bar-sp"></span>'
+    + '<span class="cc-views">' + CC_VIEWS.map(function (v) {
+        return '<button class="seg-btn' + (_ccView === v[0] ? ' active' : '') + '"'
+          + ' onclick="ccSetView(&#39;' + v[0] + '&#39;)">' + v[1] + '</button>';
+      }).join('') + '</span>'
     + '<button class="btn btn-sm" onclick="exportComparisonXlsx()" title="A workbook laid out like your own cost-comparison sheet">'
     + '<i class="ti ti-file-spreadsheet"></i> Export to Excel</button>'
     + '<button class="btn btn-sm" onclick="presentComparison()" title="Large type, no chrome \u2014 for projecting in a meeting">'
