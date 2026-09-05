@@ -3082,6 +3082,54 @@ back to one work package**. Half-doing that would put the award write-back at ri
 the most consequential path in the app. The composer today groups the requirement under one
 package heading, which is the shape a multi-package version grows into.
 
+### DEMO rounds at every stage (2026-09-05)
+
+Five bid rounds now live in the DEMO project, one per stage, so the workspace
+can be shown and taught without touching a real package. Seeded through an
+authenticated staff session; **not committed as SQL** — it is app data, not
+schema.
+
+| work package | stage | what it shows |
+|---|---|---|
+| DEMO-01 Site mobilization | `draft` | Sourced: three bidders named, nothing issued, no deadline running |
+| DEMO-08 Panel boards | `issued` | Solicited: five invited — two submitted, one viewed, one silent, one **declined with a reason**; deadline five days out |
+| DEMO-04 Rebar | `negotiation` | the full comparison: 5 priced lines, 4 TOR requirements, our budget rates, 15 bidder rates, 12 verdicts, a sample TOR attachment, and one negotiated figure |
+| DEMO-07 HVAC | `evaluation` | **eight bidders**, 6 lines, 5 requirements, 48 rates, 40 verdicts |
+| DEMO-10 Fire sprinkler | `awarded` | closed: winner, two Letters of Regret recorded, work package set Awarded |
+
+**⚠️ THE DATA IS DELIBERATELY AWKWARD, because a sample where the cheapest bid
+simply wins teaches the opposite of what this feature is for:**
+
+- **DEMO-07: the cheapest bidder fails TWO mandatory lines** (IPLV 0.61 against
+  a 0.55 ceiling, and no Metro Manila service centre). Another needs a BACnet
+  gateway, which is also mandatory. So the ranking and the award disagree — the
+  exact case the merged table exists to make visible.
+- **DEMO-04: Alrock is cheapest as quoted and has no third-party mill test
+  certificate**, a mandatory line.
+- **DEMO-10 was awarded to neither cheapest bidder**, and the Letter of Regret
+  note says why.
+- **No bidder is cheapest on every line** in either priced round — the per-line
+  heat and the `vs cheapest` view have something real to show.
+- **One bidder folds TAB into the controls lot** (`status: 'included'`), so the
+  non-numeric basis is exercised rather than read as zero.
+- **Mixed VAT bases**: DEMO-08 and DEMO-07 each carry a **non-VAT** bidder and
+  DEMO-07 a **VAT-exclusive** one, so netting visibly reorders the ranking.
+- **DEMO-10's work package records ₱22,250,000 net from a ₱24,920,000
+  VAT-inclusive quote** — the 12% correction, demonstrated on real data.
+
+**⚠️ THE WORK PACKAGE WAS UPDATED TO AGREE WITH THE AWARDED ROUND** (status,
+cost, contractor, the index-aligned awarded-vendor arrays, actual award date).
+An awarded round sitting over a "Not Started" package is precisely the mismatch
+`wpStatusLine()` exists to shout about, and a sample must not ship carrying it.
+
+**⚠️ NOT VISUALLY VERIFIED.** Every write returned its row count from the
+database, so the data is certainly there — but the browser tab driving the
+session was **backgrounded**, and Chrome's intensive throttling stalls network
+in a hidden tab, so the panels could not be read back. `document.visibilityState`
+returned `hidden` while synchronous JS answered instantly: the same signature
+recorded twice already in this file. **Check `visibilityState` before concluding
+the app is broken**, and foreground the tab before trying to verify a render.
+
 ### Storage — images are downscaled before upload (2026-09-05)
 
 Raised as a worry that vendor uploads would fill Supabase. It is justified, and
