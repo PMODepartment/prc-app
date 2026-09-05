@@ -990,12 +990,12 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
      requireLogin applies to every internal page. */
   window.__vendorSurface = true;
 </script>
-<script src="assets/js/auth.js?v=20260905j"></script>
-<script src="assets/js/db.js?v=20260905j"></script>
+<script src="assets/js/auth.js?v=20260905k"></script>
+<script src="assets/js/db.js?v=20260905k"></script>
 <!-- Self-contained: this page loads no ui.js, so the guide injects its own
      CSS and its own "?" button. Versioned independently of the shared assets. -->
-<script src="assets/js/coachmarks.js?v=20260905j"></script>
-<script src="assets/js/portal-guide.js?v=20260905j"></script>
+<script src="assets/js/coachmarks.js?v=20260905k"></script>
+<script src="assets/js/portal-guide.js?v=20260905k"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 
@@ -1413,14 +1413,20 @@ async function uploadDoc(docType, input) {
   // is trivially bypassed (drag-drop, "All files"), so the real gate is this.
   // Per-type: a one-page certificate has no business being 20 MB, while a
   // company-profile deck legitimately is. See window.checkAccredDoc in db.js.
+  /* ⚠️ SHRINK BEFORE THE CHECK, so the cap judges what will actually be
+     STORED. A phone photo of a BIR 2303 is 4–8 MB and the cap is 5 MB, so
+     checking first rejected a document that was about to become ~350 KB — the
+     vendor would have been told their own certificate was too big. */
+  let ready = files;
+  if (VendorDb.shrinkImage) ready = await Promise.all(files.map(f => VendorDb.shrinkImage(f)));
   if (window.checkAccredDoc) {
-    const bad = files.map(f => window.checkAccredDoc(docType, f)).filter(Boolean);
+    const bad = ready.map(f => window.checkAccredDoc(docType, f)).filter(Boolean);
     if (bad.length) { msg(bad[0], 'error'); input.value = ''; return; }
   }
   input.disabled = true;
   let done = 0;
   try {
-    for (const file of files) {
+    for (const file of ready) {
       const path = await VendorDb.uploadVendorDoc(vendor.id, docType, file);
       await VendorDb.documents.add(vendor.id, { doc_type: docType, file_path: path, file_name: file.name });
       done++;

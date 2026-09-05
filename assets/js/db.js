@@ -2328,7 +2328,66 @@ const VendorDb = (() => {
   }
 
   // ── Certification file uploads (Supabase Storage, private bucket) ───
+  /* ── images are downscaled before they are uploaded ──────────────────────
+     ⚠️⚠️ THIS IS THE SINGLE BIGGEST LEVER ON STORAGE AND ON EGRESS, and the
+        arithmetic is not close. The four required accreditation documents cap
+        at 5 + 20 + 10 + 5 = 40 MB per vendor; across ~2,400 vendors that is
+        ~96 GB — the whole Pro allowance before a single certificate, quotation,
+        logo, personnel photo or drawing. What actually fills it is PHONE PHOTOS
+        OF DOCUMENTS: a BIR 2303 shot at 4000x3000 is 4–8 MB, and the same page
+        at 2000px JPEG q0.82 is ~350 KB and just as legible. That is 10–20x on
+        exactly the files that dominate.
+
+     ⚠️ EGRESS MATTERS MORE THAN STORAGE. Storage past the included 100 GB is
+        about $0.021/GB/month — trivial. Egress is $0.09/GB past 250 GB, and
+        every signed-URL view is a full download of that 8 MB photo, repeatedly,
+        as staff review it. Shrinking the file fixes both at once.
+
+     ⚠️ PDFs, and anything that is not an image, PASS THROUGH UNTOUCHED. A PDF
+        cannot be safely recompressed in a browser, and these files are evidence
+        — a BIR 2303 or a signed quotation must arrive as the vendor sent it.
+     ⚠️ IT ALSO NEVER MAKES A FILE BIGGER. Re-encoding a small or already-
+        optimised image can grow it; if the result is not smaller, the original
+        is uploaded. Same if anything throws — a failed optimisation must never
+        cost somebody their upload. */
+  const SHRINK_MAX_EDGE = 2000;   // long edge, in px — a document page stays readable
+  const SHRINK_QUALITY = 0.82;
+  const SHRINK_MIN_BYTES = 400 * 1024;   // below this it is not worth touching
+  function _isShrinkable(file) {
+    return !!file && /^image\/(jpeg|png|webp)$/i.test(file.type || '')
+      && file.size > SHRINK_MIN_BYTES;
+  }
+  async function shrinkImage(file) {
+    if (!_isShrinkable(file)) return file;
+    try {
+      const bmp = await createImageBitmap(file);
+      const scale = Math.min(1, SHRINK_MAX_EDGE / Math.max(bmp.width, bmp.height));
+      // Already small enough AND already a JPEG: re-encoding could only lose.
+      if (scale === 1 && /jpeg/i.test(file.type)) { bmp.close && bmp.close(); return file; }
+      const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      const cx = cv.getContext('2d');
+      cx.drawImage(bmp, 0, 0, w, h);
+      bmp.close && bmp.close();
+      const blob = await new Promise(function (res) {
+        cv.toBlob(res, 'image/jpeg', SHRINK_QUALITY);
+      });
+      if (!blob || blob.size >= file.size) return file;   // never make it bigger
+      const name = String(file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg';
+      const out = new File([blob], name, { type: 'image/jpeg', lastModified: Date.now() });
+      console.info('[shrinkImage]', file.name, Math.round(file.size / 1024) + 'KB',
+        '->', Math.round(out.size / 1024) + 'KB');
+      return out;
+    } catch (e) {
+      // A browser without createImageBitmap, a CMYK JPEG, a corrupt file —
+      // upload what we were given rather than failing.
+      console.warn('[shrinkImage] left as-is:', e && e.message);
+      return file;
+    }
+  }
   async function uploadCertFile(vendorId, certId, file) {
+    file = await shrinkImage(file);
     const sb = await getSB();
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `${vendorId}/${certId}_${Date.now()}_${safeName}`;
@@ -2341,6 +2400,7 @@ const VendorDb = (() => {
   // personnel portraits. The <vendorId>/ prefix is LOAD-BEARING — the
   // vendor-certs Storage policies authorize on the first path segment.
   async function uploadVendorFile(vendorId, kind, file) {
+    file = await shrinkImage(file);
     const sb = await getSB();
     const safeName = String(file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `${vendorId}/${kind}_${Date.now()}_${safeName}`;
@@ -2551,6 +2611,11 @@ const VendorDb = (() => {
   // Storage policies key off the FIRST path segment being the vendor id, so
   // the '<vendorId>/' prefix here is load-bearing — do not reorder it.
   async function uploadVendorDoc(vendorId, docType, file) {
+    /* ⚠️ A SECOND, IDEMPOTENT SHRINK. The pages shrink BEFORE checkAccredDoc so
+       the cap judges what will actually be stored (see there); this covers any
+       caller that forgets. shrinkImage returns the file untouched when it is
+       already small enough, so running it twice costs nothing. */
+    file = await shrinkImage(file);
     const sb = await getSB();
     const safeName = String(file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `${vendorId}/doc_${docType}_${Date.now()}_${safeName}`;
@@ -4305,7 +4370,7 @@ const VendorDb = (() => {
     getClassCodes, classCodeIndex, normClassCode,
     bidReference, bidComparison,
     push,
-    uploadCertFile, getCertFileUrl, deleteCertFile,
+    uploadCertFile, getCertFileUrl, deleteCertFile, shrinkImage,
     documents: vendorDocuments, uploadVendorDoc, uploadVendorFile, requests: accreditationRequests, claims: vendorClaims, history: vendorHistory,
     getBidsForWP, getBidsForVendor, upsertBid, deleteBid, reconcileBidsOnAward,
     bidBoard, bidRounds, bidClarifications,
