@@ -3082,6 +3082,49 @@ back to one work package**. Half-doing that would put the award write-back at ri
 the most consequential path in the app. The composer today groups the requirement under one
 package heading, which is the shape a multi-package version grows into.
 
+### The bid tour lost a fifth of itself, silently (2026-09-06)
+
+Consolidating the Evaluated phase deleted `#bp-comparison` and `#bp-evaluation`.
+Their two tour steps stayed behind pointing at nothing.
+
+**⚠️ A STEP WHOSE SELECTOR MATCHES NOTHING IS SILENTLY SKIPPED — no error, the
+tour is just shorter.** So two steps taught nobody anything, and the panel that
+replaced them was not covered at all. Nothing failed.
+
+Replaced with **five** steps that cover what the phase now is:
+
+- **One comparison, not two** — cost and technical in one table because they are
+  one decision, three bands laid out like the real workbook.
+- **Everything is compared net of VAT** — the letter asks for VAT-inclusive
+  quotations while the budget and awarded cost are VAT-ex, so comparing quoted
+  figures would overstate every bid and mis-rank a non-VAT vendor.
+- **Filling in a column** — the pencil, the rate→amount fill, column paste, and
+  that the budget column is ours.
+- **Ten bidders do not fit** — narrowing, Compact, the view switch, Export to
+  Excel.
+- **Shortlist, negotiate and decide** — and that the technical standing comes
+  *from the comparison above*, so there is no second place to set it.
+
+**`check_tours.py` (repo root) is the guard.** It resolves every step's selector
+against the ids and classes each page can actually produce and checks each step
+has a title and a body:
+
+```
+python check_tours.py
+```
+
+- **⚠️ Selectors are resolved against `id="…"` / `class="…"` ANYWHERE in the
+  file, including inside JavaScript strings** — nearly every panel in
+  `bids.html` is built by `innerHTML` and never appears in the static markup.
+  It also reads the shared scripts, because `portal-guide.js` creates the
+  portal's own "?" button and `coachmarks.js` its card.
+- **⚠️ IT MUST NOT be "does this token appear anywhere in the file". That was
+  the first version and it FAILED THE TEST WRITTEN FOR IT** — a code comment
+  saying *"these replaced #bp-comparison"* made the dead id look alive. A token
+  counts only when something DEFINES it.
+- Proven: planting `#bp-comparison` and `#bp-evaluation` back gives
+  `2 problem(s)`; the real tree gives 0 across **53 steps on six pages**.
+
 ### ⚠️ The round page rendered its title and then nothing — `bidsInPlay` was deleted with a panel (2026-09-06)
 
 Found by loading the live round, and only by that.
