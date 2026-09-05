@@ -483,6 +483,24 @@
     .cc-table tbody tr.cc-band:hover td{background:#F3F3F3}
     html.dark-mode .cc-table tbody tr.cc-band:hover td,
     body.dark-mode .cc-table tbody tr.cc-band:hover td{background:#3a3a3a}
+    /* Quotations as a table — see responsesPanel's own note. */
+    .rq-table td{vertical-align:top}
+    .rq-sub{display:block;margin-top:2px;font-weight:400}
+    .rq-note{display:block;color:var(--text-hint);font-weight:400;font-size:0.7143rem;margin-top:2px}
+    .rq-terms{font-size:0.7857rem;white-space:normal;max-width:200px}
+    .rq-when{font-size:0.7857rem;color:var(--text-hint);white-space:nowrap}
+    /* Zoom, like the workbook's own. See ccApplyZoom for why it is CSS `zoom`
+       and not a transform. */
+    .cc-zoom{display:inline-flex;border:1.5px solid var(--border-md);border-radius:8px;overflow:hidden}
+    .cc-zoom .seg-btn{border:none;border-radius:0;padding:5px 9px;font-size:0.7857rem}
+    .cc-zoom .seg-btn + .seg-btn{border-left:1px solid var(--border)}
+    /* A band header is a control now, so it has to look like one. */
+    .cc-band td{cursor:pointer;user-select:none}
+    .cc-band td:hover{color:var(--mw-red-ink)}
+    .cc-band td .ti{margin-right:6px;font-size:0.7857rem;vertical-align:-1px}
+    .cc-band-n{margin-left:10px;font-weight:700;color:var(--text-hint);
+      text-transform:none;letter-spacing:0}
+    .cc-band-shut td{opacity:.82}
     .cc-views{display:inline-flex;border:1.5px solid var(--border-md);border-radius:8px;overflow:hidden}
     .cc-views .seg-btn{border:none;border-radius:0;padding:5px 10px;font-size:0.7857rem}
     .cc-views .seg-btn + .seg-btn{border-left:1px solid var(--border)}
@@ -2054,6 +2072,7 @@ function renderRound() {
         awardPanel());
 
   buildBidNav();
+  ccAfterRender();
 }
 
 async function setStage(s) {
@@ -2799,30 +2818,84 @@ async function markIssued() {
 }
 
 /* 2.2.3 — Receipt of Proposal. */
+/* ── quotations received, as a sortable table ────────────────────────────────
+   ⚠️ EIGHT STACKED CARDS IS NOT A LIST YOU CAN READ. Each bidder took ~85px with
+      its details buried in a run-on subtitle, so eight quotations filled a
+      screen and nothing could be compared or ordered. It is a table now, and
+      every column sorts.
+   ⚠️ IT DEFAULTS TO NET ASCENDING — cheapest first on the comparable basis.
+      Sorting on the quoted figure would put a non-VAT bidder behind a
+      VAT-inclusive one that costs exactly the same. */
+let _rqSort = { key: 'net', dir: 1 };
+function rqSortBy(key) {
+  if (_rqSort.key === key) _rqSort.dir = -_rqSort.dir;
+  else { _rqSort.key = key; _rqSort.dir = key === 'vendor_name' ? 1 : 1; }
+  renderRound();
+}
+function _rqTh(key, label, align) {
+  const on = _rqSort.key === key;
+  return '<th class="cmp-th' + (on ? ' on' : '') + '" style="text-align:' + (align || 'left') + '"'
+    + ' onclick="rqSortBy(&#39;' + key + '&#39;)" title="Sort by ' + esc(label) + '">'
+    + esc(label) + (on ? ' <span class="cmp-arrow">' + (_rqSort.dir === 1 ? '\u25b2' : '\u25bc') + '</span>' : '')
+    + '</th>';
+}
+function _rqVal(i, key) {
+  switch (key) {
+    case 'vendor_name': return (i.vendor_name || '').toLowerCase();
+    case 'submitted_at': return i.submitted_at ? new Date(i.submitted_at).getTime() : 0;
+    case 'offer': return Number(i.offer_amount) || 0;
+    case 'net': { const n = netOf(standing(i), i); return n == null ? Infinity : n; }
+    case 'lead_time_days': return i.lead_time_days == null ? Infinity : Number(i.lead_time_days);
+    case 'validity_days': return i.validity_days == null ? Infinity : Number(i.validity_days);
+    case 'payment_terms': return (i.payment_terms || '').toLowerCase();
+    default: return 0;
+  }
+}
 function responsesPanel() {
   const inPlay = INV.filter(i => i.status === 'submitted' || i.status === 'closed');
+  const d = _rqSort.dir;
+  const sorted = inPlay.slice().sort(function (a, b) {
+    const x = _rqVal(a, _rqSort.key), y = _rqVal(b, _rqSort.key);
+    if (typeof x === 'string') return d * x.localeCompare(y);
+    return d * (x - y);
+  });
+  // Marked on the AMOUNT, never on row position — once the table is sorted by
+  // lead time the first row is not the cheapest.
+  const low = Math.min.apply(null, inPlay.map(function (i) { return _rqVal(i, 'net'); }));
   return '<div class="panel" id="bp-responses"><div class="panel-title">Quotations received</div>'
-    + '<div class="sec-note">' + inPlay.length + ' of ' + INV.length + ' invited bidders have submitted.'
-    + '</div>'
+    + '<div class="sec-note">' + inPlay.length + ' of ' + INV.length
+    + ' invited bidders have submitted. Click a column to sort.</div>'
     + (inPlay.length
-        ? inPlay.map(i =>
-            '<div class="bidder"><div class="bidder-name">' + esc(i.vendor_name)
-            + '<small>Submitted ' + esc(dt(i.submitted_at) || '—')
-            + (i.lead_time_days != null ? ' · lead time ' + i.lead_time_days + 'd' : '')
-            + (i.validity_days != null ? ' · valid ' + i.validity_days + 'd' : '')
-            + (i.payment_terms ? ' · ' + esc(i.payment_terms) : '') + '</small></div>'
-            + '<b style="font-size:0.9286rem">' + esc(money(i.offer_amount, i.offer_currency)) + '</b>'
-            // ONE quotation. The fallback chain matters: the portal wrote
-            // attachment_path and the token link wrote commercial_path, so a
-            // bid could arrive with a file the buyer had no button for.
-            + _quoteBtn(i)
-            + '</div>'
-            + (i.vendor_notes ? '<div class="sec-note" style="margin:-4px 0 10px 2px">' + esc(i.vendor_notes) + '</div>' : ''))
-          .join('')
+        ? '<div style="overflow-x:auto"><table class="data-table rq-table"><thead><tr>'
+          + _rqTh('vendor_name', 'Bidder')
+          + _rqTh('offer', 'Quoted', 'right')
+          + _rqTh('net', 'Net of VAT', 'right')
+          + _rqTh('lead_time_days', 'Lead time', 'right')
+          + _rqTh('validity_days', 'Validity', 'right')
+          + _rqTh('payment_terms', 'Payment terms')
+          + _rqTh('submitted_at', 'Submitted')
+          + '<th></th></tr></thead><tbody>'
+          + sorted.map(function (i) {
+              const net = _rqVal(i, 'net');
+              return '<tr><td><b>' + esc(i.vendor_name) + '</b>'
+                + (isFinite(low) && Math.abs(net - low) < 0.5 ? ' <span class="bm-low">lowest net</span>' : '')
+                + (i.vendor_notes ? '<small class="rq-note">' + esc(i.vendor_notes) + '</small>' : '')
+                + '</td>'
+                + '<td style="text-align:right">' + esc(_amt(i.offer_amount))
+                + '<small class="rq-sub">' + vatChip(i) + '</small></td>'
+                + '<td style="text-align:right"><b>' + (isFinite(net) ? esc(_amt(net)) : '\u2014') + '</b></td>'
+                + '<td style="text-align:right">' + (i.lead_time_days != null ? i.lead_time_days + 'd' : '\u2014') + '</td>'
+                + '<td style="text-align:right">' + (i.validity_days != null ? i.validity_days + 'd' : '\u2014') + '</td>'
+                + '<td class="rq-terms">' + esc(i.payment_terms || '\u2014') + '</td>'
+                + '<td class="rq-when">' + esc(dOnly(i.submitted_at) || '\u2014') + '</td>'
+                + '<td style="text-align:right">' + _quoteBtn(i) + '</td></tr>';
+            }).join('')
+          + '</tbody></table></div>'
         : '<div class="empty-state"><i class="ti ti-inbox"></i><b>Nothing in yet</b>Quotations appear here as they arrive.</div>')
     + _emailQuoteForm()
     + '</div>';
 }
+
 /* ── a quotation that arrived outside the app, from ANYONE ──────────────────
    ⚠️⚠️ MOST QUOTATIONS DO NOT COME THROUGH THE LINK, and until now this only
       worked for a vendor already on the round. Megawide's own RFQ template
@@ -3821,6 +3894,50 @@ function _ccCellFigures(p, it, low, budRate) {
   return { main: _rate(rate), sub: amt == null ? '' : _amt(amt) };
 }
 
+/* ── zoom, and collapsible bands ─────────────────────────────────────────────
+   ⚠️ SCROLLING TO SEE A COMPARISON IS THE WRONG SHAPE. In the meeting the
+      workbook gets zoomed out until every bidder is on screen at once, and rows
+      nobody is discussing get collapsed. The table does both.
+
+   ⚠️ CSS `zoom`, NOT `transform: scale()`. A transform shrinks what you SEE but
+      leaves the original layout box behind, so the wrapper keeps the old scroll
+      width and you end up with a small table and a scrollbar for space that is
+      no longer used. `zoom` shrinks the layout box itself, so the scrollbar
+      goes away — which is the entire point. */
+const CC_ZOOMS = [['fit', 'Fit'], [1, '100%'], [0.85, '85%'], [0.7, '70%'], [0.55, '55%']];
+let _ccZoom = 1;
+function ccSetZoom(v) {
+  _ccZoom = v === 'fit' ? 'fit' : Number(v);
+  ccApplyZoom();
+  const bar = document.querySelector('.cc-zoom');
+  if (bar) [...bar.querySelectorAll('.seg-btn')].forEach(function (b) {
+    b.classList.toggle('active', b.getAttribute('data-z') === String(_ccZoom));
+  });
+}
+/* ⚠️ MEASURED, NOT GUESSED — and it must reset to 1 before measuring, or it
+   would be fitting the ALREADY-SCALED width and creep smaller on every call. */
+function ccApplyZoom() {
+  const wrap = document.getElementById('cc-wrap');
+  const t = wrap && wrap.querySelector('.cc-table');
+  if (!t) return;
+  if (_ccZoom === 'fit') {
+    t.style.zoom = '1';
+    const need = t.scrollWidth, have = wrap.clientWidth;
+    // Never magnify: a table that already fits stays at 100%.
+    const z = need > have ? Math.max(0.4, (have - 2) / need) : 1;
+    t.style.zoom = String(Math.floor(z * 100) / 100);
+  } else {
+    t.style.zoom = String(_ccZoom);
+  }
+}
+/* Bands collapse like the workbook's own grouped rows. Session-only, like the
+   WP grid's trade groups — a collapse is a reading aid, not a preference. */
+const _ccBandShut = {};
+function ccToggleBand(key) {
+  _ccBandShut[key] = !_ccBandShut[key];
+  renderRound();
+}
+
 function costComparePanel() {
   const allRows = bidsInPlay();
   if (!allRows.length) return '';
@@ -3865,34 +3982,28 @@ function costComparePanel() {
     + '<th class="cc-qty">Qty</th>'
     + (showBudget ? '<th class="cc-vh cc-budcol' + (editingBudget ? ' cc-editing' : '') + '">'
         + 'Budget' + colEdit('budget') + '<small>our rate &middot; VAT-ex</small></th>' : '')
+    /* ⚠️ THE HEADER CARRIES THE NAME AND THE BASIS, NOTHING ELSE. It used to
+       also show the priced total, the gap to the quoted figure and the technical
+       standing — all three of which are ALREADY ROWS IN THIS SAME TABLE
+       (GRAND TOTAL, and Technical standing). Saying them twice in a narrow
+       column is what made the table feel cramped and busy. The gap moved to the
+       GRAND TOTAL row, where the figure it disagrees with actually is. */
     + rows.map(function (i) {
-        const pt = pricedTotal(i.id);
-        const ts = REQS.length ? techScore(i.id) : null;
-        const gap = (pt.total != null && standing(i) != null) ? standing(i) - pt.total : null;
         return '<th class="cc-vh' + (editingInv === i.id ? ' cc-editing' : '') + '">'
           + esc(i.vendor_name) + colEdit(i.id)
-          + '<small>' + vatChip(i)
-          + (pt.total == null ? ' <span class="cc-none">no lines priced</span>'
-              : ' ' + esc(_amt(pt.total))
-                + (gap != null && Math.abs(gap) > 0.5
-                    ? ' <span class="cc-bad" title="The lines do not add up to the quoted figure">'
-                      + (gap > 0 ? '+' : '\u2212') + esc(_amt(Math.abs(gap))) + ' vs quote</span>' : ''))
-          /* ⚠️ "meets every line" MUST MEAN EVERY LINE. `blocked` counts only
-             MANDATORY failures, so reading it as full compliance told a reader
-             a bidder met everything while it carried a Partial on a preferred
-             line — seen live. A clean bid is met + n/a across the whole list. */
-          + (ts ? '<br>' + (ts.blocked
-              ? '<span class="cc-bad">' + ts.blocked + ' mandatory not met</span>'
-              : (ts.unanswered ? '<span class="cc-none">' + ts.unanswered + ' unanswered</span>'
-                 : (ts.met + ts.na === ts.total
-                    ? '<span class="cc-good">meets every line</span>'
-                    : '<span class="cc-warnish">all mandatory met</span>'))) : '')
-          + '</small></th>';
+          + '<small>' + vatChip(i) + '</small></th>';
       }).join('') + '</tr>';
 
-  function band(txt, sub) {
-    return '<tr class="cc-band"><td colspan="' + nCols + '">' + esc(txt)
-      + (sub ? '<span>' + esc(sub) + '</span>' : '') + '</td></tr>';
+  /* ⚠️ THE KEY IS PASSED IN, NEVER DERIVED FROM THE LABEL. A band label is
+     prose and would need escaping inside the inline handler — the trap that
+     bit the vendor grid's row groups. */
+  function band(key, txt, sub, n) {
+    const shut = !!_ccBandShut[key];
+    return '<tr class="cc-band' + (shut ? ' cc-band-shut' : '') + '">'
+      + '<td colspan="' + nCols + '" onclick="ccToggleBand(&#39;' + key + '&#39;)">'
+      + '<i class="ti ti-chevron-' + (shut ? 'right' : 'down') + '"></i>' + esc(txt)
+      + (sub ? '<span>' + esc(sub) + '</span>' : '')
+      + (shut && n ? '<b class="cc-band-n">' + n + ' hidden</b>' : '') + '</td></tr>';
   }
 
   /* ── the priced lines ──────────────────────────────────────────────────── */
@@ -4006,7 +4117,8 @@ function costComparePanel() {
     const n = netStanding(i); return n == null ? Infinity : n;
   }));
   const commercial =
-      band('Commercial terms', 'what was quoted, and on what terms')
+      band('comm', 'Commercial terms', 'what was quoted, and on what terms', 6)
+    + (_ccBandShut.comm ? '' :
     + commRow('Quoted in the letter', 'the figure the vendor sent', function (i) {
         const v = standing(i);
         return '<div class="cc-r">' + (v == null ? '\u2014' : esc(_amt(v))) + '</div>'
@@ -4028,7 +4140,7 @@ function costComparePanel() {
     + commRow('Quotation validity', '', function (i) {
         return i.validity_days != null ? i.validity_days + ' days' : '\u2014'; })
     + commRow('Payment terms', '', function (i) {
-        return '<span class="cc-terms">' + esc(i.payment_terms || '\u2014') + '</span>'; });
+        return '<span class="cc-terms">' + esc(i.payment_terms || '\u2014') + '</span>'; }));
 
   /* ── the technical requirements, in the SAME table ─────────────────────── */
   const reqRows = !REQS.length ? '' : REQS.map(function (q, n) {
@@ -4084,6 +4196,11 @@ function costComparePanel() {
     + (allRows.length > 3 ? '<label class="cc-dense"><input type="checkbox"'
         + (_ccCompact ? ' checked' : '') + ' onchange="ccSetCompact(this.checked)"> Compact</label>' : '')
     + '<span class="cc-bar-sp"></span>'
+    + '<span class="cc-zoom">' + CC_ZOOMS.map(function (z) {
+        return '<button class="seg-btn' + (String(_ccZoom) === String(z[0]) ? ' active' : '') + '"'
+          + ' data-z="' + z[0] + '" title="Zoom the table, as you would the workbook"'
+          + ' onclick="ccSetZoom(&#39;' + z[0] + '&#39;)">' + z[1] + '</button>';
+      }).join('') + '</span>'
     + '<span class="cc-views">' + CC_VIEWS.map(function (v) {
         return '<button class="seg-btn' + (_ccView === v[0] ? ' active' : '') + '"'
           + ' onclick="ccSetView(&#39;' + v[0] + '&#39;)">' + v[1] + '</button>';
@@ -4097,10 +4214,8 @@ function costComparePanel() {
         ? '<div class="sec-note cc-hint">Type the rate and the amount fills from the quantity in the ask '
           + '\u2014 overwrite it for a lump sum. You can <b>paste a whole column</b> straight from the '
           + 'vendor\u2019s spreadsheet. <b>Save</b> before switching to another bidder.</div>' : '')
-    + (rows.length < allRows.length
-        ? '<div class="sec-note cc-hidden-note">Showing <b>' + rows.length + ' of ' + allRows.length
-          + '</b> bidders — the shortlist, and always the lowest net. Use <b>Bidders shown</b> to change it.</div>'
-        : '')
+    // No "showing N of M" line: the Bidders shown button already says it.
+
     + '<div class="cc-wrap" id="cc-wrap"><table class="cc-table'
     + (_ccCompact ? ' cc-dense-on' : '') + '">'
     + '<thead>' + head + '</thead><tbody>'
@@ -4109,11 +4224,20 @@ function costComparePanel() {
        winner — the panel's own rule, now also its reading order: qualify, then
        compare among those who qualify, then the commercial summary. The totals
        stay directly under the lines they total. */
-    + (REQS.length ? band('Technical requirements', 'from the terms of reference') + reqRows + reqSummary : '')
-    + (REFITEMS.length ? band('Priced items', 'rate and amount per line') + itemRows + totals : '')
+    + (REQS.length ? band('reqs', 'Technical requirements', 'from the terms of reference', REQS.length)
+        + (_ccBandShut.reqs ? '' : reqRows + reqSummary) : '')
+    + (REFITEMS.length ? band('items', 'Priced items', 'rate and amount per line', REFITEMS.length)
+        + (_ccBandShut.items ? '' : itemRows) + totals : '')
     + commercial
     + '</tbody></table></div>'
     + '</div>';
+}
+/* ⚠️ Zoom has to be re-applied after EVERY render: renderRound() rebuilds the
+   table from scratch, so the inline zoom set on the old node goes with it. A
+   frame later, because Fit measures scrollWidth and that needs a layout. */
+function ccAfterRender() {
+  if (!document.getElementById('cc-wrap')) return;
+  requestAnimationFrame(ccApplyZoom);
 }
 
 
