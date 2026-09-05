@@ -474,10 +474,50 @@
     .cc-tot-net td{border-top:none}
     .cc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 4px}
     .cc-bar-sp{flex:1}
-    .cc-mode{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-    .cc-mode label{font-size:0.7143rem;font-weight:800;letter-spacing:.04em;
-      text-transform:uppercase;color:var(--text-hint)}
-    .cc-mode select{width:auto;min-width:170px;padding:5px 8px;font-size:0.8125rem}
+    /* Recording a quotation that came in by email — one row, in the panel where
+       the other quotations are, rather than a trip up to the Bidders panel and
+       back. */
+    .eq-box{border:1px dashed var(--border-md);border-radius:10px;padding:11px 12px;
+      background:var(--surface-2);display:flex;flex-direction:column;gap:9px}
+    .eq-row{display:flex;flex-wrap:wrap;gap:9px;align-items:flex-end}
+    .eq-f{display:flex;flex-direction:column;gap:3px;flex:0 0 150px;min-width:0}
+    .eq-f.eq-sm{flex:0 0 96px}
+    .eq-f.eq-grow{flex:1 1 200px}
+    .eq-vend{position:relative;display:flex;flex-direction:column;gap:3px;flex:1 1 260px;min-width:0}
+    .eq-results{position:absolute;z-index:40;top:100%;left:0;right:0;margin-top:3px;
+      background:var(--surface);border:1px solid var(--border-md);border-radius:9px;
+      box-shadow:0 10px 26px rgba(0,0,0,.16);max-height:260px;overflow-y:auto}
+    .eq-results:empty{display:none}
+    .eq-opt{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:none;
+      background:transparent;padding:8px 10px;font:inherit;font-size:0.8125rem;cursor:pointer;
+      color:var(--text-primary)}
+    .eq-opt:hover{background:var(--mw-red-light,#FDECEA)}
+    html.dark-mode .eq-opt:hover,body.dark-mode .eq-opt:hover{background:rgba(255,122,110,.14)}
+    .eq-opt .vat-chip{font-style:normal;margin-left:auto;flex:0 0 auto}
+    .eq-new{border-top:1px solid var(--border);color:var(--mw-red-ink);font-weight:700}
+    .eq-pick:empty{display:none}
+    .eq-chip{display:inline-flex;align-items:center;gap:6px;margin-bottom:2px;
+      background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);border-radius:6px;
+      padding:2px 6px;font-size:0.75rem;font-weight:700}
+    .eq-chip button{border:none;background:transparent;color:inherit;cursor:pointer;
+      font-size:0.9286rem;line-height:1;padding:0}
+    html.dark-mode .eq-chip,body.dark-mode .eq-chip{background:rgba(255,122,110,.16)}
+    #eq-fname{font-size:0.7857rem}
+    /* The derived technical standing, beside a bidder's negotiated figure. */
+    .ng-stand{flex:0 0 auto;font-size:0.7143rem;font-weight:800;white-space:nowrap;
+      padding:3px 8px;border-radius:6px;background:var(--surface-2)}
+    .ng-verdict{flex:0 0 130px}
+    /* The edit affordance lives in the column header, not in the toolbar. */
+    .cc-pencil{border:none;background:transparent;color:var(--text-hint);cursor:pointer;
+      padding:1px 4px;margin-left:5px;border-radius:5px;font-size:0.8571rem;vertical-align:-1px}
+    .cc-pencil:hover{background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink)}
+    html.dark-mode .cc-pencil:hover,body.dark-mode .cc-pencil:hover{background:rgba(255,122,110,.16)}
+    .cc-colact{display:inline-flex;gap:5px;margin-left:7px;vertical-align:middle}
+    .cc-colact .btn{padding:2px 7px;font-size:0.7143rem}
+    /* Payment terms are prose in a numeric table — let them wrap rather than
+       widening the column to fit "30% DP, 70% upon delivery" on one line. */
+    .cc-terms{display:block;white-space:normal;font-size:0.7143rem;line-height:1.35;
+      text-align:left;font-weight:600}
     .cc-hint{margin-top:2px}
     .cc-hidden-note{margin-top:2px}
     .cc-dense{display:inline-flex;align-items:center;gap:5px;font-size:0.7857rem;
@@ -1917,8 +1957,12 @@ function renderRound() {
     + phaseSection('Solicited', '',
         responsesPanel() + clarifyPanel())
     + phaseSection('Evaluated', '',
-        comparisonPanel() + costComparePanel()
-        + evaluationPanel() + negotiationPanel() + negotiationViz())
+        /* ⚠️ TWO PANELS, NOT FIVE. "Quotation comparison" duplicated the cost
+           comparison's own figures and vs-budget; "Evaluation" duplicated its
+           technical band; and the picture belongs with the negotiation it
+           describes. The commercial terms moved in as rows, which is where the
+           real workbook keeps them. */
+        costComparePanel() + negotiationPanel())
     + phaseSection('Awarded', '',
         awardPanel());
 
@@ -2689,62 +2733,161 @@ function responsesPanel() {
             + (i.vendor_notes ? '<div class="sec-note" style="margin:-4px 0 10px 2px">' + esc(i.vendor_notes) + '</div>' : ''))
           .join('')
         : '<div class="empty-state"><i class="ti ti-inbox"></i><b>Nothing in yet</b>Quotations appear here as they arrive.</div>')
-    + _pendingQuoteRows()
+    + _emailQuoteForm()
     + '</div>';
 }
-/* ── quotations that arrived by email ────────────────────────────────────────
-   ⚠️⚠️ MOST QUOTATIONS WILL NOT COME THROUGH THE LINK, AND THIS PANEL USED TO
-      HAVE NO WAY IN. Megawide's own RFQ template tells the vendor to email the
-      quotation to the officer, and the bid link is offered second — so the
-      common case was the one the app could not record. Everything downstream
-      reads offer_amount: with no way to enter it, the comparison, the
-      evaluation and the award were all unreachable on an email-only round.
-   ⚠️ NO FAKED PROVENANCE. Nothing here pretends the vendor submitted it: the
-      attached file is the evidence, and the audit columns already record which
-      officer entered it. */
-function _pendingQuoteRows() {
+/* ── a quotation that arrived outside the app, from ANYONE ──────────────────
+   ⚠️⚠️ MOST QUOTATIONS DO NOT COME THROUGH THE LINK, and until now this only
+      worked for a vendor already on the round. Megawide's own RFQ template
+      tells the vendor to email the officer, and vendors forward the enquiry on,
+      so a price regularly arrives from somebody who was never invited — and
+      there was no way to record it without first going up to the Bidders panel,
+      adding them, then coming back down here. One control now does both: pick
+      or create the vendor, type the figure, attach what they sent.
+
+   ⚠️ NO FAKED PROVENANCE. This does not pretend the vendor submitted through
+      the app. The invitation is created already `submitted`, the attached file
+      is the evidence, and the audit columns record which officer keyed it. */
+function _emailQuoteForm() {
   if (!canManage || R.stage === 'awarded' || R.stage === 'cancelled') return '';
-  const waiting = INV.filter(i => i.status !== 'submitted' && i.status !== 'closed'
-    && i.status !== 'withdrawn' && i.status !== 'declined');
-  if (!waiting.length) return '';
-  return '<div class="ref-sub" style="margin-top:16px">Received by email '
-    + '<span>enter a quotation a vendor sent you directly</span></div>'
-    + waiting.map(i =>
-        '<div class="bidder">'
-        + '<div class="bidder-name" style="flex:0 0 180px">' + esc(i.vendor_name) + '</div>'
-        + '<input ' + moneyAttrs('rq-a-' + i.id, '', 'Quoted amount') + ' '
-        + 'style="flex:0 0 160px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;'
-        + 'font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
-        + '<input id="rq-l-' + i.id + '" type="number" placeholder="Lead time (days)" '
-        + 'style="flex:0 0 140px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;'
-        + 'font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
-        /* The basis this vendor actually quoted on. Left as asked unless they
-           say otherwise — a non-VAT vendor is common and their figure is not on
-           the round's basis however clearly the letter asked. */
-        + '<span style="flex:0 0 190px">' + vatSelect('rq-t-' + i.id, '', false) + '</span>'
-        + '<label class="btn btn-sm" style="cursor:pointer" title="Attach the quotation you were sent">'
-        + '<i class="ti ti-paperclip"></i> Attach'
-        + '<input type="file" style="display:none" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx" '
-        + 'onchange="uploadQuote(' + Q + i.id + Q + ', this)"></label>'
-        + '<button class="btn btn-sm btn-primary" onclick="recordQuote(' + Q + i.id + Q + ')">Record</button>'
-        + '</div>').join('');
+  return '<div class="ref-sub" style="margin-top:18px">Received outside the app '
+    + '<span>a quotation emailed, handed over or phoned in</span></div>'
+    + '<div class="eq-box">'
+    + '<div class="eq-row">'
+    + '<div class="eq-vend"><label class="bm-cl" for="eqSearch">Vendor</label>'
+    + '<input id="eqSearch" class="bm-in" placeholder="Search the directory, or type a new name"'
+    + ' oninput="eqSearch()" autocomplete="off">'
+    + '<div id="eqPick" class="eq-pick"></div><div id="eqResults" class="eq-results"></div></div>'
+    + '<div class="eq-f"><label class="bm-cl" for="eq-amt">Quoted amount</label>'
+    + '<input ' + moneyAttrs('eq-amt', '', '0.00') + ' class="bm-in"></div>'
+    + '<div class="eq-f"><label class="bm-cl" for="eq-tax">Basis</label>'
+    + vatSelect('eq-tax', '', false) + '</div>'
+    + '<div class="eq-f eq-sm"><label class="bm-cl" for="eq-lead">Lead time</label>'
+    + '<input id="eq-lead" class="bm-in" type="number" min="0" placeholder="days"></div>'
+    + '<div class="eq-f eq-sm"><label class="bm-cl" for="eq-val">Validity</label>'
+    + '<input id="eq-val" class="bm-in" type="number" min="0" placeholder="days"></div>'
+    + '</div>'
+    + '<div class="eq-row">'
+    + '<div class="eq-f eq-grow"><label class="bm-cl" for="eq-terms">Payment terms</label>'
+    + '<input id="eq-terms" class="bm-in" placeholder="e.g. 20% DP, 80% on delivery"></div>'
+    + '<label class="btn" style="cursor:pointer" title="Attach what they sent you">'
+    + '<i class="ti ti-paperclip"></i> <span id="eq-fname">Attach the quotation</span>'
+    + '<input type="file" id="eq-file" style="display:none" onchange="eqFilePicked(this)"></label>'
+    + '<button class="btn btn-primary" onclick="eqRecord()"><i class="ti ti-plus"></i> Record</button>'
+    + '</div></div>';
 }
-async function recordQuote(id) {
-  const amt = num(val('rq-a-' + id));
-  if (amt == null || !(amt > 0)) { AppNotify.warn('Enter the quoted amount first.'); return; }
+let _eqPick = null, _eqTimer = null;
+function eqFilePicked(input) {
+  const el = document.getElementById('eq-fname');
+  const f = input.files && input.files[0];
+  if (el) el.textContent = f ? f.name : 'Attach the quotation';
+}
+function eqSearch() {
+  clearTimeout(_eqTimer);
+  _eqTimer = setTimeout(async function () {
+    const q = val('eqSearch'), host = document.getElementById('eqResults');
+    if (!host) return;
+    // Typing a different name clears a previous pick, or the officer could
+    // search for one vendor and silently record against another.
+    if (_eqPick && q !== _eqPick.name) { _eqPick = null; eqRenderPick(); }
+    if (q.length < 2) { host.innerHTML = ''; return; }
+    try {
+      const rows = await VendorDb.searchApprovedVendors(q);
+      host.innerHTML = (rows || []).slice(0, 8).map(function (v) {
+        const acc = window.accredMeta ? window.accredMeta(v.accreditation) : null;
+        return '<button class="eq-opt" onclick="eqChoose(&#39;' + esc(v.id) + '&#39;,&#39;'
+          + esc(String(v.name).replace(/'/g, '')) + '&#39;)">' + esc(v.name)
+          + (acc ? '<i class="vat-chip">' + esc(acc.label) + '</i>' : '') + '</button>';
+      }).join('')
+      + '<button class="eq-opt eq-new" onclick="eqCreate()">'
+      + '<i class="ti ti-plus"></i> Add &ldquo;' + esc(q) + '&rdquo; as a new vendor</button>';
+    } catch (e) { host.innerHTML = ''; }
+  }, 250);
+}
+function eqRenderPick() {
+  const el = document.getElementById('eqPick');
+  if (el) el.innerHTML = _eqPick
+    ? '<span class="eq-chip">' + esc(_eqPick.name)
+      + '<button onclick="eqClear()" title="Choose someone else">&times;</button></span>' : '';
+}
+function eqChoose(id, name) {
+  _eqPick = { id: id, name: name };
+  const s = document.getElementById('eqSearch'); if (s) s.value = name;
+  const r = document.getElementById('eqResults'); if (r) r.innerHTML = '';
+  eqRenderPick();
+}
+function eqClear() {
+  _eqPick = null;
+  const s = document.getElementById('eqSearch'); if (s) { s.value = ''; s.focus(); }
+  eqRenderPick();
+}
+async function eqCreate() {
+  const name = val('eqSearch');
+  if (name.length < 2) return;
   try {
-    await VendorDb.bidBoard.update(id, {
+    const v = await VendorDb.quickCreateVendor(name, profile);
+    eqChoose(v.id, v.name);
+    AppNotify.success('Added ' + v.name + ' to the directory.');
+  } catch (e) { AppNotify.fromError(e, 'Could not add that vendor'); }
+}
+
+async function eqRecord() {
+  if (_busy) return;
+  if (!_eqPick) { AppNotify.warn('Pick the vendor first, or add them as new.'); return; }
+  const amt = num(val('eq-amt'));
+  if (amt == null || !(amt > 0)) { AppNotify.warn('Enter the quoted amount.'); return; }
+  const fi = document.getElementById('eq-file');
+  const file = fi && fi.files && fi.files[0];
+  if (file && file.size > 15 * 1024 * 1024) { AppNotify.warn('That file is over 15 MB.'); return; }
+  _busy = true;
+  const prog = AppNotify.progress('Recording the quotation\u2026');
+  try {
+    /* ⚠️ A BIDDER ALREADY ON THE ROUND IS UPDATED, NOT DUPLICATED. The table is
+       unique on (round_id, vendor_id), so a second insert would fail — and the
+       common case IS a vendor who was invited and answered by email rather than
+       through the link. */
+    let inv = INV.find(function (i) { return i.vendor_id === _eqPick.id; });
+    if (!inv) {
+      await VendorDb.bidRounds.addVendors(R, [_eqPick.id], profile);
+      INV = await VendorDb.bidRounds.invitations(R.id);
+      inv = INV.find(function (i) { return i.vendor_id === _eqPick.id; });
+    }
+    if (!inv) throw new Error('Could not create the bidder record.');
+
+    const fields = {
       offer_amount: amt,
-      tax_basis: val('rq-t-' + id) || null,   // null = follow the round
-      lead_time_days: num(val('rq-l-' + id)),
+      offer_currency: 'PHP',
+      tax_basis: val('eq-tax') || null,      // null = follow the round
+      lead_time_days: intOf(val('eq-lead')),
+      validity_days: intOf(val('eq-val')),
+      payment_terms: val('eq-terms') || null,
       status: 'submitted',
       submitted_at: new Date().toISOString(),
-    }, profile);
+      // ⚠️ Says plainly how it got here. Nothing pretends the vendor submitted.
+      vendor_notes: 'Received outside the app, keyed in by '
+        + ((profile && (profile.name || profile.email)) || 'an officer') + '.',
+    };
+    /* The attachment is uploaded inline rather than through uploadQuote(),
+       which owns its own progress toast and re-render and would stack with
+       this one. */
+    if (file) {
+      prog.update('Uploading the quotation\u2026');
+      const path = await VendorDb.uploadVendorFile(inv.vendor_id, 'quote_' + inv.id, file);
+      fields.commercial_path = path;
+      fields.commercial_name = file.name;
+    }
+    await VendorDb.bidBoard.update(inv.id, fields, profile);
+    const who = inv.vendor_name;
     INV = await VendorDb.bidRounds.invitations(R.id);
+    _eqPick = null;
     renderRound();
-    AppNotify.success('Quotation recorded.');
-  } catch (e) { AppNotify.fromError(e, 'Could not record that quotation'); }
+    syncWpStatus();
+    prog.done('Recorded ' + who + '\u2019s quotation.');
+  } catch (e) {
+    prog.fail('Could not record that quotation: ' + (e.message || e));
+  } finally { _busy = false; }
 }
+
 /* The emailed file itself, stored exactly like a vendor's own upload. */
 async function uploadQuote(invId, input) {
   const file = input && input.files && input.files[0];
@@ -2861,191 +3004,20 @@ async function sendClarify(invId) {
    ⚠️ DEFAULT STAYS CHEAPEST-FIRST. _comparisonRows() already sorts by amount and
       the award turns on that order, so an unsorted table must not arrive in
       whatever order the rows came back from PostgREST. */
-let _cmpSort = { key: null, dir: 1 };
-function _cmpTh(key, label, align) {
-  const on = _cmpSort.key === key;
-  const arrow = on ? (_cmpSort.dir === 1 ? ' \u25b2' : ' \u25bc') : '';
-  return '<th class="cmp-th' + (on ? ' on' : '') + '" style="text-align:' + align + '" '
-    + 'onclick="cmpSort(' + Q + key + Q + ')" title="Sort by ' + esc(label) + '">'
-    + esc(label) + '<span class="cmp-arrow">' + arrow + '</span></th>';
-}
-window.cmpSort = function (key) {
-  if (_cmpSort.key === key) _cmpSort.dir = -_cmpSort.dir;
-  else { _cmpSort.key = key; _cmpSort.dir = 1; }
-  renderRound();
-};
-/* Applied on top of the cheapest-first base order, so an equal pair keeps the
-   price ordering rather than shuffling on every render. */
-function _cmpApplySort(rows) {
-  if (!_cmpSort.key) return rows;
-  const k = _cmpSort.key, d = _cmpSort.dir;
-  return rows.slice().sort(function (a, b) {
-    const x = a[k], y = b[k];
-    // A missing lead time or validity is not "0 days" — it is unknown, and
-    // unknown sorts last whichever direction you are reading.
-    const xn = x == null || x === '', yn = y == null || y === '';
-    if (xn && yn) return 0;
-    if (xn) return 1;
-    if (yn) return -1;
-    if (typeof x === 'number' && typeof y === 'number') return (x - y) * d;
-    return String(x).localeCompare(String(y)) * d;
-  });
-}
-
-/* 2.3.2 — Summarization (Cost Comparison). */
-function bidsInPlay() {
-  return INV.filter(i => i.status === 'submitted' || i.status === 'closed')
-            .filter(i => i.offer_amount != null);
-}
-function comparisonPanel() {
-  const rows = bidsInPlay().slice().sort((a, b) => (a.offer_amount || 0) - (b.offer_amount || 0));
-  if (!rows.length) return '';
-  const low = rows[0].offer_amount;
-  // Lowest on the comparable basis, which is not always the lowest as quoted.
-  const lowNet = Math.min.apply(null, rows.map(function (i) {
-    const n = netOf(i.offer_amount, i);
-    return n == null ? Infinity : n;
-  }));
-  const w = WPBYID[R.wp_id] || {};
-  // ⚠️ The BCB is OURS and is shown to staff only — it is deliberately absent
-  //    from every vendor-facing surface (see the migration's view).
-  const bcb = window.__hideBudget ? null : (w.approved_budget_bcb || null);
-  return '<div class="panel" id="bp-comparison"><div class="panel-title">Quotation comparison</div>'
-    + (bcb
-        ? '<div class="sec-note">Measured against the budget (BCB) of <b>' + esc(money(bcb)) + '</b>.</div>'
-        : (window.__hideBudget ? ''
-            : '<div class="sec-note bm-warn">No budget (BCB) on file for this package, so there is '
-              + 'nothing to measure these offers against.</div>'))
-    + '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
-    + _cmpTh('vendor_name', 'Bidder', 'left')
-    + _cmpTh('offer_amount', 'Offer', 'right')
-    /* ⚠️ THE ONLY HONEST BASIS FOR COMPARING TWO BIDDERS. One may be VAT-
-       inclusive, another non-VAT registered; ranking on the quoted figure ranks
-       them on numbers that were never the same thing. */
-    + '<th style="text-align:right">Net of VAT</th>'
-    + '<th style="text-align:right">vs lowest</th>'
-    + (bcb ? '<th style="text-align:right">vs BCB</th>' : '')
-    + _cmpTh('lead_time_days', 'Lead time', 'left')
-    + _cmpTh('validity_days', 'Quotation validity', 'left')
-    + _cmpTh('payment_terms', 'Payment terms', 'left')
-    + '</tr></thead><tbody>'
-    + _cmpApplySort(rows).map((i, n) => {
-        // Ranked and measured on net, for the reason in the header comment.
-        const net = netOf(i.offer_amount, i);
-        const diff = (net || 0) - lowNet;
-        const vsB = bcb ? (net || 0) - bcb : null;
-        return '<tr><td><b>' + esc(i.vendor_name) + '</b>'
-          // ⚠️ Keyed to the AMOUNT, not to the row position. Once the table
-          //    can be sorted by lead time the first row is not the cheapest, and
-          //    a "lowest" chip sitting on it would simply be a lie.
-          + (net != null && Math.abs(net - lowNet) < 0.5 ? ' <span class="bm-low">lowest net</span>' : '')
-          + '<div>' + vatChip(i) + '</div></td>'
-          + '<td style="text-align:right">' + esc(money(i.offer_amount, i.offer_currency)) + '</td>'
-          + '<td style="text-align:right"><b>' + esc(money(net, i.offer_currency)) + '</b></td>'
-          + '<td style="text-align:right">' + (diff > 0.5 ? '+' + esc(money(diff, i.offer_currency)) : '—') + '</td>'
-          + (bcb ? '<td style="text-align:right" class="' + (vsB > 0 ? 'bm-high' : 'bm-low') + '">'
-              + (vsB > 0 ? '+' : '') + esc(money(vsB)) + '</td>' : '')
-          + '<td>' + (i.lead_time_days != null ? i.lead_time_days + ' d' : '—') + '</td>'
-          + '<td>' + (i.validity_days != null ? i.validity_days + ' d' : '—') + '</td>'
-          + '<td>' + esc(i.payment_terms || '—') + '</td></tr>';
-      }).join('')
-    + '</tbody></table></div>'
-    + '<div class="sec-note" style="margin-top:12px">Lowest <b>compliant</b> bid wins &mdash; a cheaper '
-    + 'non-compliant one does not. Sort by any column.</div>'
-    /* BP 2.3.2 calls this a PRESENTED deliverable, so it has to leave the screen.
-       Both outputs carry the BCB and are internal — the print view says so on it. */
-    + '<div class="sec-note" style="margin-top:8px">Headline figures only. The full cost comparison is '
-    + 'built in your own template &mdash; export to start it.</div>'
-    + '<div class="bm-actions">'
-    + '<button class="btn" onclick="exportBidders()"><i class="ti ti-file-spreadsheet"></i> Export bidders &amp; offers (CSV)</button>'
-    + '</div></div>';
-}
-
-/* Evaluation — the two bases Megawide actually awards on.
-   ⚠️ NO GRADED "technical result" AND NO SCORE. This carried
-   pass/conditional/fail plus a free score, and neither is traceable to the
-   process mapping — they appear nowhere but this page's own code. Procurement
-   confirmed the real basis is (1) compliance with the technical requirements,
-   i.e. the TOR and the MPSS, and (2) the lowest bid in the
-   cost comparison. So compliance is a yes/no fact and the ranking comes from
-   the comparison workbook. The old columns are still in the table but are no
-   longer read or written. */
-function evaluationPanel() {
-  const rows = bidsInPlay();
-  if (!rows.length) return '';
-  const ro = canManage ? '' : ' disabled';
-  const comp = rows.filter(i => i.technical_compliant === true);
-  const lowComp = comp.length
-    ? Math.min.apply(null, comp.map(i => i.offer_amount == null ? Infinity : i.offer_amount)) : null;
-  return '<div class="panel" id="bp-evaluation"><div class="panel-title">Evaluation</div>'
-    + '<div class="sec-note">Mark each bidder compliant or not. Ranking comes from your cost comparison.</div>'
-    + rows.map(i =>
-        '<div class="bidder" style="align-items:flex-end">'
-        + '<div class="bm-cell" style="flex:0 0 190px"><span class="bm-cl">Bidder</span>'
-        + '<div class="bidder-name">' + esc(i.vendor_name)
-        + '<small>' + esc(money(i.offer_amount, i.offer_currency))
-        + (vsBcbHtml(i.offer_amount) ? ' &middot; ' + vsBcbHtml(i.offer_amount) : '')
-        + '</small></div></div>'
-        /* What the technical comparison actually found, beside the verdict, so
-           the officer is not asked to remember it from a panel above. */
-        + (REQS.length ? (function () {
-            const s = techScore(i.id);
-            return '<div class="bm-cell" style="flex:0 0 165px"><span class="bm-cl">From the comparison</span>'
-              + '<div style="font-size:0.8125rem;font-weight:700">'
-              + (s.blocked ? '<span class="cc-bad">' + s.blocked + ' mandatory not met</span>'
-                 : (s.unanswered ? '<span class="bm-high">' + s.unanswered + ' unanswered</span>'
-                    : (s.met + s.na === s.total
-                       ? '<span class="cc-good">meets every line</span>'
-                       : '<span class="cc-warnish">all mandatory met</span>')))
-              + '</div><small style="color:var(--text-hint)">' + s.met + ' of ' + s.total + ' met</small></div>';
-          })() : '')
-        + '<div class="bm-cell" style="flex:0 0 220px"><label class="bm-cl" for="ev-c-' + i.id + '">Meets the technical requirements</label>'
-        + '<select id="ev-c-' + i.id + '" class="bm-in"' + ro + '>'
-        + '<option value=""' + (i.technical_compliant == null ? ' selected' : '') + '>Not assessed</option>'
-        + '<option value="yes"' + (i.technical_compliant === true ? ' selected' : '') + '>Yes — compliant</option>'
-        + '<option value="no"' + (i.technical_compliant === false ? ' selected' : '') + '>No — not compliant</option>'
-        + '</select></div>'
-    /* no Rank field: the line above says ranking comes from the cost
-       comparison, and an editable Rank box contradicted it - inviting an
-       officer to type a standing the app has no basis for. The column still
-       exists in the table and is simply no longer written. */
-        + '<div class="bm-cell" style="flex:1;min-width:160px"><label class="bm-cl" for="ev-n-' + i.id + '">Notes</label>'
-        + '<input id="ev-n-' + i.id + '" class="bm-in" value="' + esc(i.evaluation_notes || '') + '"' + ro
-        + ' placeholder="What the comparison showed"></div>'
-        + '</div>').join('')
-    + (lowComp != null && isFinite(lowComp)
-        ? '<div class="sec-note" style="margin-top:12px">Lowest <b>compliant</b> bid: <b>'
-          + esc(money(lowComp, (comp[0] || {}).offer_currency)) + '</b> — '
-          + esc(comp.filter(i => i.offer_amount === lowComp).map(i => i.vendor_name).join(', ')) + '.</div>'
-        : '<div class="sec-note" style="margin-top:12px">No bid is marked compliant yet.</div>')
-    + (canManage ? '<div class="bm-actions"><button class="btn btn-primary" onclick="saveEvaluation()">Save evaluation</button></div>' : '')
-    + '</div>';
-}
-
-async function saveEvaluation() {
-  try {
-    for (const i of bidsInPlay()) {
-      const c = val('ev-c-' + i.id);
-      await VendorDb.bidBoard.update(i.id, {
-        // '' is "not assessed" and must stay NULL — false would assert the bid
-        // FAILS the technical requirements when nobody has looked yet.
-        technical_compliant: c === 'yes' ? true : c === 'no' ? false : null,
-        evaluation_notes: val('ev-n-' + i.id) || null,
-      }, profile);
-    }
-    INV = await VendorDb.bidRounds.invitations(R.id);
-    renderRound();
-    AppNotify.success('Evaluation saved.');
-  } catch (e) { AppNotify.fromError(e, 'Could not save the evaluation'); }
-}
-
 /* 2.4.1 — Negotiation with the top 1-3 bidders. */
 function negotiationPanel() {
   const rows = bidsInPlay();
   if (!rows.length) return '';
   const ro = canManage ? '' : ' disabled';
   const short = rows.filter(i => i.shortlisted).length;
-  return '<div class="panel" id="bp-negotiation"><div class="panel-title">Negotiation</div>'
+  /* ⚠️ THE COMPLIANCE VERDICT IS DERIVED WHEN THE COMPARISON HOLDS ONE.
+     A separate Evaluation panel asked the officer to set "meets the technical
+     requirements: yes / no" ALONGSIDE the requirement matrix that already
+     answers it — two places to say one thing, free to disagree. When the round
+     has TOR lines the standing comes from the matrix and is read-only here;
+     the manual control appears only on a round with no requirements, where
+     there is nothing to derive it from. */
+  return '<div class="panel" id="bp-negotiation"><div class="panel-title">Shortlist, negotiate and decide</div>'
     /* ⚠️ ONE SENTENCE, THEN THE CONTROLS. These notes had grown into three-line
        paragraphs that pushed the actual inputs below the fold and made every
        card read as dense. The reasoning behind each rule lives in CLAUDE.md and
@@ -3064,9 +3036,33 @@ function negotiationPanel() {
         + '<input id="ng-n-' + i.id + '" placeholder="Notes" value="' + esc(i.negotiation_notes || '') + '"' + ro
         + ' style="flex:1;min-width:140px;padding:7px 9px;border:1.5px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:0.8571rem;background:var(--surface);color:var(--text-primary)">'
         + _negoDoc(i)
+        + _negoStanding(i, ro)
         + '</div>').join('')
-    + (canManage ? '<div class="bm-actions"><button class="btn btn-primary" onclick="saveNegotiation()">Save negotiation</button></div>' : '')
+    + (canManage ? '<div class="bm-actions"><button class="btn btn-primary" onclick="saveNegotiation()">'
+        + '<i class="ti ti-device-floppy"></i> Save</button></div>' : '')
+    /* The picture belongs with the negotiation it describes, not in a sixth
+       panel of its own. */
+    + negotiationViz()
     + '</div>';
+}
+/* One bidder's technical standing, beside their negotiated figure. */
+function _negoStanding(i, ro) {
+  if (REQS.length) {
+    const t = techScore(i.id);
+    const txt = t.blocked ? t.blocked + ' mandatory not met'
+      : (t.unanswered ? t.unanswered + ' unanswered'
+         : (t.met + t.na === t.total ? 'meets every line' : 'all mandatory met'));
+    const cls = t.blocked ? 'cc-bad' : (t.unanswered ? 'cc-none'
+      : (t.met + t.na === t.total ? 'cc-good' : 'cc-warnish'));
+    return '<span class="ng-stand ' + cls + '" title="From the cost comparison">'
+      + esc(txt) + '</span>';
+  }
+  // No requirements on this round, so nothing to derive it from — ask.
+  return '<select id="ev-c-' + i.id + '" class="bm-in ng-verdict"' + ro + '>'
+    + '<option value=""' + (i.technical_compliant == null ? ' selected' : '') + '>Compliant?</option>'
+    + '<option value="yes"' + (i.technical_compliant === true ? ' selected' : '') + '>Yes</option>'
+    + '<option value="no"' + (i.technical_compliant === false ? ' selected' : '') + '>No</option>'
+    + '</select>';
 }
 /* The quotation behind the negotiated figure.
    ⚠️ A NEGOTIATED PRICE WITH NO DOCUMENT IS SOMEBODY'S RECOLLECTION. This
@@ -3110,17 +3106,42 @@ async function uploadNegotiated(invId, input) {
 }
 
 async function saveNegotiation() {
+  /* ⚠️ The manual compliance verdict is only rendered on a round with NO
+     requirements (see _negoStanding) — but when it IS rendered it must still
+     save, or the officer's answer is silently dropped. On a round that has
+     requirements the standing is derived and there is nothing to write. */
   try {
     for (const i of bidsInPlay()) {
-      await VendorDb.bidBoard.update(i.id, {
+      const patch = {
         shortlisted: checked('ng-s-' + i.id),
         negotiated_amount: num(val('ng-a-' + i.id)),
         negotiation_notes: val('ng-n-' + i.id) || null,
-      }, profile);
+      };
+      /* Present only when the round has no requirements. '' is "not assessed"
+         and must stay NULL — false would assert the bid FAILS when nobody has
+         looked. */
+      if (document.getElementById('ev-c-' + i.id)) {
+        const c = val('ev-c-' + i.id);
+        patch.technical_compliant = c === 'yes' ? true : c === 'no' ? false : null;
+      }
+      await VendorDb.bidBoard.update(i.id, patch, profile);
+    }
+    /* ⚠️ THE DERIVED STANDING MUST REACH technical_compliant. doAward() and the
+       phase chips read that column, so leaving it at whatever a human once
+       picked would let a bid the matrix says fails two mandatory lines still
+       report itself compliant at the award. */
+    if (REQS.length) {
+      for (const i of bidsInPlay()) {
+        const t = techScore(i.id);
+        const derived = t.unanswered === t.total ? null : (t.blocked === 0);
+        if (i.technical_compliant !== derived) {
+          await VendorDb.bidBoard.update(i.id, { technical_compliant: derived }, profile);
+        }
+      }
     }
     INV = await VendorDb.bidRounds.invitations(R.id);
     renderRound();
-    AppNotify.success('Negotiation saved.');
+    AppNotify.success('Saved.');
   } catch (e) { AppNotify.fromError(e, 'Could not save'); }
 }
 
@@ -3703,8 +3724,12 @@ function costComparePanel() {
   const rows = _ccVisible(allRows);
   const locked = !canManage || R.stage === 'awarded' || R.stage === 'cancelled';
   if (locked) _ccEdit = null;
-  if (!REFITEMS.length && !REQS.length) {
-    return '<div class="panel" id="bp-costcompare"><div class="panel-title">Cost &amp; technical comparison</div>'
+  /* ⚠️ NOT skipped when there are no priced lines. The commercial terms alone
+     — quoted, net, against the budget, lead time, validity, payment terms —
+     are the comparison on a round that was never itemised, which is most of
+     them early on. */
+  if (false) {
+    return '<div class="panel" id="bp-costcompare"><div class="panel-title">Cost comparison</div>'
       + '<div class="empty-state"><i class="ti ti-table"></i>'
       + '<b>Nothing to compare against yet</b>'
       + 'Add the priced lines and the technical requirements under <b>Documents and priced items</b>.</div>'
@@ -3715,29 +3740,34 @@ function costComparePanel() {
   const editingInv = _ccEdit && _ccEdit !== 'budget' ? _ccEdit : null;
   const nCols = 2 + (showBudget ? 1 : 0) + rows.length;
 
-  const picker = locked ? '' :
-      '<div class="cc-mode"><label for="cc-edit">Enter answers for</label>'
-    + '<select id="cc-edit" class="bm-in" onchange="ccSetEdit(this.value)">'
-    + '<option value=""' + (_ccEdit ? '' : ' selected') + '>\u2014 reading \u2014</option>'
-    + (showBudget ? '<option value="budget"' + (editingBudget ? ' selected' : '') + '>Budget (our rates)</option>' : '')
-    + rows.map(function (i) {
-        return '<option value="' + esc(i.id) + '"' + (editingInv === i.id ? ' selected' : '') + '>'
-          + esc(i.vendor_name) + '</option>';
-      }).join('')
-    + '</select>'
-    + (_ccEdit ? '<button class="btn btn-primary btn-sm" onclick="saveComparison()">'
+  /* ⚠️ NO MODE DROPDOWN. This was a select labelled "Enter answers for",
+     which is jargon for "turn one column into inputs" — and it was asked what
+     it did. The affordance now sits ON the column it edits: a pencil in each
+     bidder's header, replaced by Save/Done while that column is being filled
+     in. Nothing to explain, and one less control in the toolbar. */
+  const colEdit = function (id) {
+    if (locked) return '';
+    if (_ccEdit === id) {
+      return '<span class="cc-colact">'
+        + '<button class="btn btn-primary btn-sm" onclick="saveComparison()" title="Save this column">'
         + '<i class="ti ti-device-floppy"></i> Save</button>'
-        + '<button class="btn btn-sm" onclick="ccSetEdit(&#39;&#39;)">Done</button>' : '')
-    + '</div>';
+        + '<button class="btn btn-sm" onclick="ccSetEdit(&#39;&#39;)">Done</button></span>';
+    }
+    return '<button class="cc-pencil" title="Type in this column"'
+      + ' onclick="ccSetEdit(&#39;' + esc(id) + '&#39;)"><i class="ti ti-pencil"></i></button>';
+  };
+  const picker = '';
 
   const head = '<tr><th class="cc-stick">Item / requirement</th>'
     + '<th class="cc-qty">Qty</th>'
-    + (showBudget ? '<th class="cc-vh cc-budcol">Budget<small>our rate &middot; VAT-ex</small></th>' : '')
+    + (showBudget ? '<th class="cc-vh cc-budcol' + (editingBudget ? ' cc-editing' : '') + '">'
+        + 'Budget' + colEdit('budget') + '<small>our rate &middot; VAT-ex</small></th>' : '')
     + rows.map(function (i) {
         const pt = pricedTotal(i.id);
         const ts = REQS.length ? techScore(i.id) : null;
         const gap = (pt.total != null && standing(i) != null) ? standing(i) - pt.total : null;
-        return '<th class="cc-vh' + (editingInv === i.id ? ' cc-editing' : '') + '">' + esc(i.vendor_name)
+        return '<th class="cc-vh' + (editingInv === i.id ? ' cc-editing' : '') + '">'
+          + esc(i.vendor_name) + colEdit(i.id)
           + '<small>' + vatChip(i)
           + (pt.total == null ? ' <span class="cc-none">no lines priced</span>'
               : ' ' + esc(_amt(pt.total))
@@ -3852,6 +3882,51 @@ function costComparePanel() {
           + (best ? '<small class="cc-good">lowest net</small>' : '') + '</td>';
       }).join('') + '</tr>';
 
+
+  /* ── the commercial terms, as rows in the same table ─────────────────────
+     ⚠️ THIS REPLACED A WHOLE SECOND PANEL. "Quotation comparison" sat above
+        this one showing the same bidders, the same money and the same vs-budget
+        figure in a table of its own — the reader compared the two rather than
+        reading either. The workbook does not do that: the Busducts Final sheet
+        carries Downpayment, Payment Terms, Warranty and Remarks as ROWS under
+        the grand total, one column per bidder, and so does this. */
+  function commRow(label, sub, valOf, cls) {
+    return '<tr' + (cls ? ' class="' + cls + '"' : '') + '>'
+      + '<td class="cc-stick">' + esc(label) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</td>'
+      + '<td class="cc-qty"></td>'
+      + (showBudget ? '<td class="cc-budcol">'
+          + (label === 'Against the budget' && bcbOf() ? esc(_amt(bcbOf())) : '') + '</td>' : '')
+      + rows.map(function (i) { return '<td class="cc-cell">' + valOf(i) + '</td>'; }).join('')
+      + '</tr>';
+  }
+  const quotedLow = Math.min.apply(null, rows.map(function (i) {
+    const n = netStanding(i); return n == null ? Infinity : n;
+  }));
+  const commercial =
+      band('Commercial terms', 'what was quoted, and on what terms')
+    + commRow('Quoted in the letter', 'the figure the vendor sent', function (i) {
+        const v = standing(i);
+        return '<div class="cc-r">' + (v == null ? '\u2014' : esc(_amt(v))) + '</div>'
+          + (i.negotiated_amount != null && Number(i.negotiated_amount) !== Number(i.offer_amount)
+              ? '<div class="cc-a">was ' + esc(_amt(i.offer_amount)) + '</div>' : '');
+      })
+    + commRow('Net of VAT', 'the only comparable basis', function (i) {
+        const n = netStanding(i);
+        const best = n != null && isFinite(quotedLow) && Math.abs(n - quotedLow) < 0.5;
+        return '<div class="cc-r' + (best ? ' cc-r-best' : '') + '">'
+          + (n == null ? '\u2014' : esc(_amt(n))) + '</div>'
+          + '<div class="cc-a">' + vatChip(i) + '</div>';
+      }, 'cc-tot-net')
+    + (bcbOf() ? commRow('Against the budget', 'net, versus the BCB', function (i) {
+        return vsBcbHtml(standing(i), i) || '\u2014';
+      }) : '')
+    + commRow('Lead time', '', function (i) {
+        return i.lead_time_days != null ? i.lead_time_days + ' days' : '\u2014'; })
+    + commRow('Quotation validity', '', function (i) {
+        return i.validity_days != null ? i.validity_days + ' days' : '\u2014'; })
+    + commRow('Payment terms', '', function (i) {
+        return '<span class="cc-terms">' + esc(i.payment_terms || '\u2014') + '</span>'; });
+
   /* ── the technical requirements, in the SAME table ─────────────────────── */
   const reqRows = !REQS.length ? '' : REQS.map(function (q, n) {
     return '<tr><td class="cc-stick"><b>' + esc(q.requirement) + '</b>'
@@ -3896,8 +3971,8 @@ function costComparePanel() {
           + '</td>';
       }).join('') + '</tr>';
 
-  return '<div class="panel" id="bp-costcompare"><div class="panel-title">Cost &amp; technical comparison</div>'
-    + '<div class="sec-note">Every bidder against the same lines and the same requirements. '
+  return '<div class="panel" id="bp-costcompare"><div class="panel-title">Cost comparison</div>'
+    + '<div class="sec-note">Every bidder against the same lines, terms and requirements. '
     + 'The <b>lowest rate</b> on a line is marked; the totals are compared <b>net of VAT</b>, '
     + 'because the budget is. A <b>mandatory</b> requirement not met disqualifies a bid whatever it costs.'
     + (showBudget ? ' The budget column is <b>ours</b> \u2014 no vendor sees it.' : '') + '</div>'
@@ -3927,6 +4002,7 @@ function costComparePanel() {
     + (_ccCompact ? ' cc-dense-on' : '') + '">'
     + '<thead>' + head + '</thead><tbody>'
     + (REFITEMS.length ? band('Priced items', 'rate and amount per line') + itemRows + totals : '')
+    + commercial
     + (REQS.length ? band('Technical requirements', 'from the terms of reference') + reqRows + reqSummary : '')
     + '</tbody></table></div>'
     + '</div>';
@@ -4198,6 +4274,19 @@ async function saveComparison() {
       }
     }
     await reloadComparison();
+    /* ⚠️ The matrix IS the verdict now, so writing it has to update the column
+       doAward() and the phase chips read — otherwise the standing shown here
+       and the standing enforced at the award drift apart. */
+    if (REQS.length) {
+      for (const i of bidsInPlay()) {
+        const t = techScore(i.id);
+        const derived = t.unanswered === t.total ? null : (t.blocked === 0);
+        if (i.technical_compliant !== derived) {
+          await VendorDb.bidBoard.update(i.id, { technical_compliant: derived }, profile);
+        }
+      }
+      INV = await VendorDb.bidRounds.invitations(R.id);
+    }
     renderRound();
     AppNotify.success('Comparison saved.');
   } catch (e) { AppNotify.fromError(e, 'Could not save the comparison'); }

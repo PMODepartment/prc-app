@@ -3082,6 +3082,82 @@ back to one work package**. Half-doing that would put the award write-back at ri
 the most consequential path in the app. The composer today groups the requirement under one
 package heading, which is the shape a multi-package version grows into.
 
+### The Evaluated phase: five panels become two (2026-09-06)
+
+Reported as "the whole evaluation section looks complicated". It was: **five
+panels**, and three of them said things the others already said.
+
+| was | now |
+|---|---|
+| Quotation comparison | **gone** — its figures were the cost comparison's own |
+| Cost & technical comparison | **Cost comparison** — absorbed the commercial terms |
+| Evaluation | **gone** — it duplicated the technical band |
+| Negotiation | **Shortlist, negotiate and decide** |
+| Each bid against the budget | folded into that panel, not one of its own |
+
+- **⚠️ THE COMMERCIAL TERMS ARE ROWS, WHICH IS WHERE THE REAL WORKBOOK KEEPS
+  THEM.** The Busducts Final sheet carries Downpayment, Payment Terms, Warranty
+  and Remarks under the grand total, one column per bidder. So a **Commercial
+  terms** band now holds *Quoted in the letter · Net of VAT · Against the budget
+  · Lead time · Quotation validity · Payment terms* — and the separate table
+  that showed the same bidders, the same money and the same vs-budget figure is
+  gone. `comparisonPanel`, `_cmpTh`, `_cmpApplySort` and `_cmpSort` were deleted
+  outright.
+- **It is called "Cost comparison"**, technical rows and all — the name the
+  workbook itself uses.
+- **⚠️ THE PANEL NO LONGER SKIPS ITSELF when there are no priced lines.** The
+  commercial terms alone ARE the comparison on a round nobody has itemised,
+  which is most of them early on.
+
+#### ⚠️ "Enter answers for" is gone — the affordance is on the column
+
+Asked directly what it did, which is the answer. It was a `<select>` labelled
+with jargon meaning "turn one column into inputs". There is now a **pencil in
+each bidder's header** (and the Budget header), replaced by **Save / Done**
+while that column is being filled in. Nothing to explain, and one less control
+in the toolbar. Verified: clicking one pencil takes the table from 0 inputs to
+17, marks exactly **one** column, and Done returns it to reading.
+
+#### ⚠️ The compliance verdict is DERIVED, and it must reach the column the award reads
+
+The old Evaluation panel asked for "meets the technical requirements: yes/no"
+**alongside the matrix that already answers it** — two places to say one thing,
+free to disagree. Now `_negoStanding()` shows the standing derived from
+`techScore()`, and the manual control appears **only on a round with no
+requirements**, where there is nothing to derive it from.
+
+**⚠️ BOTH SAVE PATHS WRITE `technical_compliant`.** `doAward()` and the phase
+chips read that column, so leaving it at whatever a human once picked would let
+a bid the matrix says fails two mandatory lines still report itself compliant at
+the award. `saveComparison()` and `saveNegotiation()` each re-derive it
+(`unanswered === total` → NULL, else `blocked === 0`) and write only on a change.
+
+### Recording a quotation that arrived outside the app (2026-09-06)
+
+Asked how an officer adds a quotation the vendor sent by email, without the
+vendor going through the app.
+
+**⚠️ IT ONLY WORKED FOR A VENDOR ALREADY ON THE ROUND.** Megawide's own RFQ
+template tells the vendor to email the officer, and vendors forward the enquiry
+on — so a price regularly arrives from somebody never invited, and there was no
+way to record it without going up to the Bidders panel, adding them, and coming
+back down.
+
+**One control now does both**, in the panel where the other quotations are:
+search the directory (or **add a vendor who is not in it**), then amount, VAT
+basis, lead time, validity, payment terms, and attach what they sent.
+
+- **⚠️ A BIDDER ALREADY ON THE ROUND IS UPDATED, NOT DUPLICATED** — the table is
+  unique on `(round_id, vendor_id)`, and the commonest case IS an invited vendor
+  who replied by email instead of through the link.
+- **⚠️ NO FAKED PROVENANCE.** Nothing pretends the vendor submitted through the
+  app: `vendor_notes` records that it was keyed in and by whom, the attached
+  file is the evidence, and the audit columns carry the officer.
+- **⚠️ Typing a different name clears a previous pick**, or an officer could
+  search for one vendor and silently record the quotation against another.
+- The upload is inline rather than through `uploadQuote()`, which owns its own
+  progress toast and re-render and would stack with this one.
+
 ### DEMO rounds at every stage (2026-09-05)
 
 Five bid rounds now live in the DEMO project, one per stage, so the workspace
