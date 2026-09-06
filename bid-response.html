@@ -106,6 +106,24 @@
     .refpack-doc a{font-size:0.7857rem;font-weight:700;color:var(--mw-red-ink)}
     .refpack-nofile{font-size:0.7143rem;color:var(--text-hint)}
     .refpack-tw{overflow-x:auto}
+    .lines-tw{overflow-x:auto;border:1px solid var(--border);border-radius:10px;margin-bottom:14px}
+    .lines-t{border-collapse:separate;border-spacing:0;width:100%;font-size:0.8571rem}
+    .lines-t th,.lines-t td{padding:7px 9px;border-bottom:1px solid var(--border);
+      vertical-align:middle;text-align:left}
+    .lines-t th+th,.lines-t td+td{border-left:1px solid var(--border)}
+    .lines-t thead th{background:var(--surface-2);font-weight:800;font-size:0.7857rem;
+      border-bottom:2px solid var(--border-md)}
+    .lines-t th.r,.lines-t td.r{text-align:right}
+    .lines-t tbody td:first-child{min-width:190px}
+    .lines-t tbody td:first-child small{display:block;color:var(--text-hint);font-weight:400;
+      font-size:0.7857rem;margin-top:2px}
+    .lines-t input,.lines-t select{width:100%;padding:5px 7px;border:1px solid var(--border-md);
+      border-radius:6px;font-family:inherit;font-size:0.8571rem;background:var(--surface);
+      color:var(--text-primary)}
+    .lines-t input.ln-m{text-align:right}
+    .lines-t td:nth-child(2) input{width:74px}
+    .lines-t td:nth-child(3) input{width:72px}
+    .lines-t tfoot td{background:var(--surface-2);font-weight:800;border-bottom:0}
     .refpack-t{width:100%;border-collapse:collapse;font-size:0.8125rem}
     .refpack-t th{text-align:left;font-size:0.6786rem;font-weight:800;letter-spacing:.03em;
       text-transform:uppercase;color:var(--text-hint);padding:5px 8px;border-bottom:1px solid var(--border-md)}
@@ -278,12 +296,25 @@ async function load() {
     const { data } = await sb.rpc('bid_reference_by_token', { p_token: TOKEN });
     if (data) REF = { documents: data.documents || [], items: data.items || [] };
   } catch (e) { REF = { documents: [], items: [] }; }
+  /* ⚠️ Separate call, and a failure here must not stop the page. The RPC arrives
+     with migrations/2026-09-06_bid_vendor_lines.sql, so before that has run this
+     404s and the bidder simply gets the headline form they had before. */
+  try {
+    const { data } = await sb.rpc('bid_lines_by_token', { p_token: TOKEN });
+    LINES = {};
+    (data || []).forEach(function (r) { LINES[r.item_id] = r; });
+  } catch (e) { LINES = {}; }
   render();
 }
 
 function render() {
   const b = BID, due = dueInfo(b.due_at);
   const closed = !b.open;
+  /* ⚠️ refPackHtml() renders whether or not the invitation is closed, but the
+     FORM does not — so canPriceLines() has to know, or a closed invitation would
+     lose the line-item table altogether instead of falling back to the read-only
+     one. */
+  CLOSED = closed;
   const chips = [];
   if (b.trade) chips.push(b.trade);
   if (b.works) chips.push(b.works);
@@ -370,7 +401,10 @@ function refPackHtml(ref) {
         + '</div>';
     }).join('') + '</div>';
   }
-  if (items.length) {
+  /* ⚠️ ONLY WHEN THE LINES ARE NOT PRICEABLE. Once the bidder can price them in
+     the form below, showing the same table twice invites them to read the
+     read-only one and think they have answered it. */
+  if (items.length && !canPriceLines()) {
     out += '<div class="refpack-sub">Line items to price</div>'
       + '<div class="refpack-tw"><table class="refpack-t"><thead><tr>'
       + '<th>Item</th><th>Description</th><th>Specification</th><th>Unit</th><th>Qty</th>'
@@ -397,15 +431,137 @@ function _refUrl(path) {
   } catch (e) { return ''; }
 }
 let REF = { documents: [], items: [] };
+/* The bidder's own priced lines, keyed by item id. Seeded from
+   bid_lines_by_token so a revision starts from what they last sent. */
+let LINES = {};
+let CLOSED = false;
+
+/* ── pricing the ask, line by line ───────────────────────────────────────────
+   Until now this page collected ONE headline figure, so every per-line rate in
+   Megawide's cost comparison was an officer transcribing from the attached PDF.
+   The lines are the same ones the RFQ listed, so answering them here is the
+   bidder stating their own breakdown rather than someone re-keying it.
+
+   ⚠️ THE BIDDER'S OWN QUANTITY AND UNIT ARE EDITABLE, and that is deliberate:
+   one bidder quotes 348 LM where another quotes 306, and the difference is a
+   finding rather than an error to normalise away. They are prefilled from the
+   ask so the common case is one number per line. */
+const LINE_BASIS = [['quoted', 'Quoted'], ['included', 'Included in another line'],
+                    ['excluded', 'Excluded'], ['no_bid', 'Not bidding this line']];
+function canPriceLines() { return !!(REF.items && REF.items.length) && !CLOSED; }
+
+function linesHtml() {
+  if (!canPriceLines()) return '';
+  return '<div class="legend">Your price, line by line</div>'
+    + '<div class="field-hint" style="margin:-4px 0 8px">Every line the enquiry listed. '
+    + 'Type a rate and the amount fills from your quantity &mdash; overwrite it for a lump sum. '
+    + 'If a line sits inside another one, say so rather than entering nothing.</div>'
+    + '<div class="lines-tw"><table class="lines-t"><thead><tr>'
+    + '<th>Item</th><th>Qty</th><th>Unit</th><th class="r">Rate</th><th class="r">Amount</th>'
+    + '<th>Basis</th></tr></thead><tbody>'
+    + REF.items.map(function (it) {
+        const L = LINES[it.id] || {};
+        const q = L.quantity != null ? L.quantity : it.quantity;
+        const u = L.unit != null && L.unit !== '' ? L.unit : (it.unit || '');
+        return '<tr data-item="' + esc(it.id) + '">'
+          + '<td><b>' + esc((it.item_no ? it.item_no + '. ' : '') + it.description) + '</b>'
+          + (it.spec ? '<small>' + esc(it.spec) + '</small>' : '') + '</td>'
+          + '<td><input class="ln-q" data-k="quantity" value="' + esc(q == null ? '' : q)
+          + '" inputmode="decimal" oninput="lineEdit(this)"></td>'
+          + '<td><input class="ln-u" data-k="unit" value="' + esc(u)
+          + '" oninput="lineEdit(this)"></td>'
+          + '<td class="r"><input class="ln-m" data-k="unit_rate" inputmode="decimal"'
+          + ' value="' + esc(grp(L.unit_rate)) + '" oninput="lineEdit(this)"></td>'
+          + '<td class="r"><input class="ln-m" data-k="amount" inputmode="decimal"'
+          + ' value="' + esc(grp(L.amount)) + '" oninput="lineEdit(this)"></td>'
+          + '<td><select data-k="status" onchange="lineEdit(this)">'
+          + LINE_BASIS.map(function (b) {
+              return '<option value="' + b[0] + '"'
+                + ((L.status || 'quoted') === b[0] ? ' selected' : '') + '>' + esc(b[1]) + '</option>';
+            }).join('')
+          + '</select></td></tr>';
+      }).join('')
+    + '</tbody><tfoot><tr><td colspan="4">Total of the lines</td>'
+    + '<td class="r"><b id="ln-total">\u2014</b></td><td></td></tr></tfoot></table></div>';
+}
+
+/* ⚠️ THE ROWS ON SCREEN ARE THE TRUTH, NOT THE `LINES` OBJECT. LINES only seeds
+   the initial render; every read goes back to the inputs. The first version kept
+   a parallel copy and it desynced immediately — a quantity prefilled from the ask
+   was never IN that copy until the bidder happened to touch the field, so the
+   rate never filled an amount, and a submitted line would have carried a null
+   quantity while the form plainly showed one. */
+function readLines() {
+  return [...document.querySelectorAll('.lines-t tbody tr')].map(function (tr) {
+    const get = k => { const e = tr.querySelector('[data-k="' + k + '"]'); return e ? e.value.trim() : ''; };
+    return { item_id: tr.getAttribute('data-item'),
+             quantity: num(get('quantity')), unit: get('unit') || null,
+             unit_rate: num(get('unit_rate')), amount: num(get('amount')),
+             status: get('status') || 'quoted', note: null };
+  });
+}
+
+/* One handler for every cell. Reads the row's item id off the <tr>, so nothing
+   depends on the order the rows happen to be in. */
+function lineEdit(el) {
+  const tr = el.closest('tr'); if (!tr) return;
+  const k = el.getAttribute('data-k');
+  if (el.classList.contains('ln-m')) onMoneyInput(el);
+  /* Typing a rate fills the amount from the quantity - but never overwrites an
+     amount already there, because a lump sum is a legitimate answer. */
+  if (k === 'unit_rate' || k === 'quantity') {
+    const amtEl = tr.querySelector('[data-k="amount"]');
+    const rate = num((tr.querySelector('[data-k="unit_rate"]') || {}).value);
+    const qty  = num((tr.querySelector('[data-k="quantity"]')  || {}).value);
+    if (amtEl && !amtEl.value.trim() && rate != null && qty != null) {
+      amtEl.value = grp(Math.round(rate * qty * 100) / 100);
+    }
+  }
+  syncLineTotal();
+}
+
+/* ⚠️ The total counts only lines actually QUOTED. "Included" means the cost sits
+   in another line and adding it would double-count; "excluded" and "not bidding"
+   are not money at all. */
+function lineTotal() {
+  let t = 0, any = false;
+  readLines().forEach(function (L) {
+    if ((L.status || 'quoted') !== 'quoted') return;
+    if (L.amount != null) { t += Number(L.amount); any = true; }
+  });
+  return any ? Math.round(t * 100) / 100 : null;
+}
+function syncLineTotal() {
+  const el = document.getElementById('ln-total');
+  const t = lineTotal();
+  if (el) el.textContent = t == null ? '—' : grp(t);
+  /* The headline follows the lines while nobody has set it by hand, so the common
+     case needs no second entry - but a bidder who deliberately quotes a different
+     figure (a discount on the total, say) keeps theirs. */
+  const a = document.getElementById('f-amount');
+  if (!a || t == null) return;
+  if (!a.value.trim() || a.dataset.fromLines === '1') {
+    a.value = grp(t);
+    a.dataset.fromLines = '1';
+  }
+}
+/* Typing in the offer amount is the bidder taking it over. */
+function offerAmountTouched(el) { el.dataset.fromLines = ''; onMoneyInput(el); }
 
 function formHtml() {
   const b = BID;
   // One document, called the quotation. The technical/commercial split was
   // retired 2026-09-04: the quotation already describes what is being priced.
   return '<div class="panel"><div class="panel-title">Your bid</div>'
+    + linesHtml()
     + '<div class="legend">Quotation</div>'
+    + (canPriceLines()
+        ? '<div class="field-hint" style="margin:-4px 0 8px">Your offer amount follows the '
+          + 'lines above. Change it if your quotation is for a different figure &mdash; a '
+          + 'discount on the total, say &mdash; and it will stay as you set it.</div>' : '')
     + '<div class="grid">'
     + fldMoney('Offer amount <span class="req">*</span>', 'f-amount', b.offer_amount, 'e.g. 250,000')
+        .replace('oninput="onMoneyInput(this)"', 'oninput="offerAmountTouched(this)"')
     + fld('Currency', 'f-currency', b.offer_currency || 'PHP', 'PHP')
     + fld('Lead time (days)', 'f-lead', b.lead_time_days, 'e.g. 14', 'number')
     + fld('Quotation validity (days)', 'f-validity', b.validity_days, 'e.g. 30', 'number')
@@ -622,6 +778,23 @@ async function submitBid() {
   _busy = true;
   if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
   try {
+    /* ⚠️ LINES FIRST, THEN THE HEADLINE. submit_bid_by_token is what marks the
+       bid submitted, so if the lines fail this way the bidder is told and
+       nothing claims a submission that did not happen. The other order would
+       record a submitted bid whose breakdown silently went missing.
+       ⚠️ A separate RPC on purpose: adding a parameter to submit_bid_by_token
+       would create a second PostgREST overload and break every vendor's submit. */
+    if (canPriceLines()) {
+      const payload = readLines().filter(function (l) {
+        return l.unit_rate != null || l.amount != null || (l.status && l.status !== 'quoted');
+      });
+      if (payload.length) {
+        const r = await sb.rpc('submit_bid_lines_by_token', { p_token: TOKEN, p_lines: payload });
+        // Missing RPC = the migration has not run. Not the bidder's problem:
+        // let the headline bid through rather than blocking on it.
+        if (r.error && r.error.code !== 'PGRST202') throw r.error;
+      }
+    }
     const comm = await upload(document.getElementById('f-commercial'));
     const { error } = await sb.rpc('submit_bid_by_token', {
       p_token: TOKEN,

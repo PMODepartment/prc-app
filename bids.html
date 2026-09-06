@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260906a"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260906a"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260906b"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260906b"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -493,6 +493,10 @@
     .cc-stick small{display:block;color:var(--text-hint);font-weight:600;margin-top:2px}
     .cc-qty{width:74px;white-space:nowrap;color:var(--text-secondary)}
     .cc-table.cc-noqty .cc-qty{display:none}
+    .cc-vend{display:block;margin-top:3px;font-weight:700;font-size:0.6429rem;
+      color:#0F7A46;text-transform:none;letter-spacing:0}
+    .cc-vend i{font-size:0.6429rem;margin-right:3px}
+    body.dark-mode .cc-vend,html.dark-mode .cc-vend{color:#6EE7B7}
     .cc-qty small{display:block;color:var(--text-hint)}
     .cc-cell{min-width:66px}
     .cc-vh{max-width:120px}
@@ -939,10 +943,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260906a"></script>
-<script src="assets/js/db.js?v=20260906a"></script>
-<script src="assets/js/ui.js?v=20260906a"></script>
-<script src="assets/js/coachmarks.js?v=20260906a"></script>
+<script src="assets/js/auth.js?v=20260906b"></script>
+<script src="assets/js/db.js?v=20260906b"></script>
+<script src="assets/js/ui.js?v=20260906b"></script>
+<script src="assets/js/coachmarks.js?v=20260906b"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -4504,10 +4508,35 @@ function costComparePanel() {
     + rows.map(function (i) {
         return '<th class="cc-vh' + (editingInv === i.id ? ' cc-editing' : '') + '">'
           + esc(i.vendor_name) + colEdit(i.id)
-          + '<small>' + vatChip(i) + '</small></th>';
+          + '<small>' + vatChip(i) + _vendorPricedChip(i) + '</small></th>';
       }).join('') + '</tr>';
 
-  /* ⚠️ THE KEY IS PASSED IN, NEVER DERIVED FROM THE LABEL. A band label is
+  /* ⚠️ WHOSE FIGURES ARE THESE? Rates a bidder submitted through their own link
+   are evidence; rates an officer transcribed from a PDF are a reading of it, and
+   the two should not look identical in a table somebody awards from. Shown on
+   the COLUMN, not on every cell — a bidder has usually either priced the lines
+   or not, and a marker on fifty cells is noise.
+   ⚠️ It says "N of M" when it is MIXED, because an officer correcting one line
+   clears the flag on that line only (setPrice writes entered_by_vendor:false),
+   and "from the bidder" over a column somebody has since edited would be a
+   claim the data no longer supports. */
+function _vendorPricedChip(i) {
+  if (!REFITEMS.length) return '';
+  let mine = 0, total = 0;
+  REFITEMS.forEach(function (it) {
+    const p = priceOf(i.id, it.id);
+    if (!p) return;
+    total++;
+    if (p.entered_by_vendor) mine++;
+  });
+  if (!mine) return '';
+  return '<span class="cc-vend" title="Priced by the bidder through their own bid link">'
+    + '<i class="ti ti-check"></i>'
+    + (mine === total ? 'from the bidder' : mine + ' of ' + total + ' from the bidder')
+    + '</span>';
+}
+
+/* ⚠️ THE KEY IS PASSED IN, NEVER DERIVED FROM THE LABEL. A band label is
      prose and would need escaping inside the inline handler — the trap that
      bit the vendor grid's row groups. */
   function band(key, txt, sub, n) {

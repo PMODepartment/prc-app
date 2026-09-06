@@ -4307,14 +4307,27 @@ const VendorDb = (() => {
         console.warn('[bidComparison.prices]', e && e.message); return [];
       }
     },
+    /* ⚠️ AN OFFICER EDIT CLEARS entered_by_vendor. The flag means "exactly as the
+       bidder sent it" — the moment somebody corrects a line by hand that is no
+       longer true, and a badge that outlives its own claim is worse than none.
+       Deploy-safe: the column arrives with
+       migrations/2026-09-06_bid_vendor_lines.sql. */
     async setPrice(invitationId, itemId, fields, profile) {
       const sb = await getSB();
-      const { error } = await sb.from('vendor_bid_item_prices')
-        .upsert({ invitation_id: invitationId, item_id: itemId, ...fields,
-                  updated_at: new Date().toISOString(),
-                  updated_by: profile?.id || null,
-                  updated_by_name: profile?.name || profile?.email || null },
-                { onConflict: 'invitation_id,item_id' });
+      const row = { invitation_id: invitationId, item_id: itemId, ...fields,
+                    entered_by_vendor: false,
+                    updated_at: new Date().toISOString(),
+                    updated_by: profile?.id || null,
+                    updated_by_name: profile?.name || profile?.email || null };
+      let { error } = await sb.from('vendor_bid_item_prices')
+        .upsert(row, { onConflict: 'invitation_id,item_id' });
+      if (error && _isMissingCol(error, /entered_by_vendor/)) {
+        const before = Object.assign({}, row);
+        delete row.entered_by_vendor;
+        _warnDropped('bidComparison.setPrice', before, row, error);
+        ({ error } = await sb.from('vendor_bid_item_prices')
+          .upsert(row, { onConflict: 'invitation_id,item_id' }));
+      }
       if (error) throw error;
     },
     async removePrice(invitationId, itemId) {
