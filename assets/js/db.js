@@ -3958,15 +3958,33 @@ const VendorDb = (() => {
         stage: 'draft',
         created_by: (profile && profile.id) || null,
       }, fields || {}, _auditStamp(profile));
-      const { data, error } = await sb.from('vendor_bid_rounds').insert(row).select().single();
+      let { data, error } = await sb.from('vendor_bid_rounds').insert(row).select().single();
+      if (error && _isMissingCol(error, /contact_number/) && 'contact_number' in row) {
+        const before = Object.assign({}, row);
+        delete row.contact_number;
+        _warnDropped('bidRounds.create', before, row, error);
+        ({ data, error } = await sb.from('vendor_bid_rounds').insert(row).select().single());
+      }
       if (error) throw error;
       return data;
     },
+    /* ⚠️ Deploy-safe for contact_number: the round can be saved before
+       migrations/2026-09-06_bid_officer_contact.sql has been run. Strips
+       precisely the column the error names and WARNS that it was dropped —
+       a guard that silently discards a field is how a save comes to report
+       success having stored nothing (Known Issues, _stripBuyback). */
     async update(id, fields, profile) {
       const sb = await getSB();
-      const { data, error } = await sb.from('vendor_bid_rounds')
-        .update(Object.assign({}, fields, _auditStamp(profile)))
-        .eq('id', id).select().single();
+      const patch = Object.assign({}, fields, _auditStamp(profile));
+      let { data, error } = await sb.from('vendor_bid_rounds')
+        .update(patch).eq('id', id).select().single();
+      if (error && _isMissingCol(error, /contact_number/) && 'contact_number' in patch) {
+        const before = Object.assign({}, patch);
+        delete patch.contact_number;
+        _warnDropped('bidRounds.update', before, patch, error);
+        ({ data, error } = await sb.from('vendor_bid_rounds')
+          .update(patch).eq('id', id).select().single());
+      }
       if (error) throw error;
       return data;
     },
