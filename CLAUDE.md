@@ -3325,7 +3325,43 @@ on the projector.
   one moment you could not. **⚠️ It syncs its OWN icon**: `AppTheme`'s `_syncIcon`
   only knows `#theme-toggle-btn`, so a second toggle anywhere has to keep itself in
   step. Same sun/moon convention (sun = switch to light).
-- **⚠️ `exitPresent()` MUST call `ccApplyZoom()`.** Present writes the projector's
+- **⚠️⚠️ IT COULD ONLY EVER SHRINK, NEVER ENLARGE — the first version's real bug.**
+  `.cc-table` is `width:max-content; min-width:100%`, so inside the wrapper its
+  `scrollWidth` is never LESS than the container: `availW / needW` was permanently
+  ≤ 1 and the fit was pinned at zoom 1. A two-bidder comparison sat at base size in
+  the **top fifth of the screen**, and a full one was projected at 10px type using
+  **barely half the width**. `body.cc-present .cc-table` drops the min-width.
+- **⚠️ THE FIT IS A SEARCH, NOT A RATIO, BECAUSE THE TWO AXES ARE COUPLED.** Give
+  the table more width and its cells wrap less, so the rows get **shorter** — the
+  height it needs depends on the width it is given, which depends on the zoom. A
+  plain `min(availW/needW, availH/needH)` left a 22-row comparison using 53% of the
+  width while squeezed vertically. It now **bisects** for the largest `z` whose
+  layout at `availW / z` still fits `availH / z` (7 passes, on a deliberate click),
+  then spends any unused height on row padding rather than leaving the table
+  stranded at the top.
+- **Measured at 1432×760.** Two bidders, commercial terms only: **zoom 1 → 2.2,
+  10px → 22px, filling 100% × 100%**. Three bidders with all three bands: **53% →
+  100% of the width**, 98% of the height. **The zoom itself barely moves there
+  (0.88 → 0.89) and that is honest** — 22 rows of two-line cells is a real
+  constraint, and the lever is collapsing a band (**0.89 → 1.32 → 1.6**). Putting
+  the cell's second figure inline was tried and bought only 4%, so it was dropped.
+- **⚠️ NO PRICED ITEMS, NO QTY COLUMN.** Qty is only ever filled on a priced line,
+  so on a requirements-and-terms round it is a dead column taking width the bidders
+  could use. Done **in CSS over the whole column** (`.cc-table.cc-noqty .cc-qty`),
+  NOT by rebuilding each row — the row builders keep emitting the same cells, so no
+  colspan and no coordinate can fall out of step. Verified every row still reports
+  the same visible cell count in both shapes.
+- **⚠️ THE PRIMARY FIGURE WINS BY WEIGHT, NOT BY FADING THE SUB-LINE.** An
+  `opacity:.72` on `.cc-a` measured **3.03:1** across the room; the second figure is
+  the rate behind the amount, not decoration. It is `--text-secondary` instead, and
+  there are **zero contrast failures in either theme** afterwards.
+  **⚠️ When measuring a semi-transparent chip like `.req-must`, COMPOSITE the alpha
+  over its parent** — reading `rgba(255,122,110,.16)` as opaque reported 1.12 for
+  something that is actually 4.77, i.e. a phantom failure on the one marker that
+  decides the outcome.
+- **⚠️ `exitPresent()` MUST call `ccApplyZoom()`**, which now also clears the inline
+  `width` and `--cc-pad-y` Present writes onto the table — without that the reading
+  view stays stretched to the projector. Present writes the projector's
   scale onto the table; without restoring it you leave the meeting and the ordinary
   reading view is stuck at whatever fitted the screen. Found by measuring, not by
   reading. It also removes its `resize` listener.
