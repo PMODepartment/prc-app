@@ -40,6 +40,24 @@
     .bm-step.now{background:var(--mw-red);border-color:var(--mw-red);color:#fff}
     body.dark-mode .bm-step.done{background:#0F2E20;color:#6EE7B7;border-color:#0F7A46}
     .bm-stepn{font-size:0.6429rem;opacity:.75;font-weight:800}
+    /* the rounds list: a project header row, styled like the WP List's own
+       project group - a light band with a small red code pill, never a solid
+       red bar (that reads louder than the data it introduces). */
+    .ls-proj td{background:var(--surface-2);border-top:2px solid var(--border-md);
+      padding:7px 10px!important;white-space:nowrap}
+    .ls-pid{display:inline-block;background:var(--mw-red);color:#fff;font-weight:800;
+      font-size:0.6429rem;letter-spacing:.04em;padding:2px 7px;border-radius:4px;margin-right:8px}
+    .ls-pname{font-weight:700;font-size:0.8571rem;color:var(--text-primary)}
+    .ls-pn{margin-left:10px;font-size:0.7143rem;color:var(--text-secondary);font-weight:600}
+    .ls-table td{vertical-align:top}
+    .ls-sub{display:block;color:var(--text-secondary);font-weight:400;font-size:0.7143rem;margin-top:2px}
+    .ls-none{color:var(--text-hint)}
+    /* overdue is negative and red; the sign is always printed, so a lone number
+       can never be read as the opposite thing. */
+    .ls-age-bad{color:var(--mw-red-ink);font-weight:800}
+    .ls-age-warn{color:#B45309;font-weight:700}
+    .ls-age-ok{color:var(--text-secondary)}
+    body.dark-mode .ls-age-warn,html.dark-mode .ls-age-warn{color:#FBBF24}
     .aw-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
     .aw-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;
       background:var(--surface-2);border:1px solid var(--border);flex-wrap:wrap}
@@ -1256,6 +1274,68 @@ function listStatus(r) {
   return VendorDb.bidRounds.procStatus(r, c.total || 0) || '—';
 }
 
+/* the rounds list -----------------------------------------------------------
+   Grouped by PROJECT, always. An officer runs solicitations FOR a project, and a
+   flat list interleaves them. No toggle: the WP List and the Backlog settled the
+   same way once their grouping was right (their Flat / By Trade / By Project
+   switch was removed), and a second answer to "how is this ordered" is what the
+   toolbar passes kept having to be rescued from.
+
+   AGING IS `planned award - today`, SO OVERDUE READS NEGATIVE. That is the
+   app-wide convention, flipped deliberately across both Backlog tables in
+   2026-08-05; a bid list reading the other way round would be the only place in
+   the app where a red number meant the opposite thing. */
+let _lsSort = { key: null, dir: 1 };   // null = as loaded, newest first
+function lsSortBy(k) {
+  if (_lsSort.key === k) _lsSort.dir = -_lsSort.dir;
+  else { _lsSort.key = k; _lsSort.dir = 1; }
+  renderList();
+}
+function _lsTh(k, label, align) {
+  const on = _lsSort.key === k;
+  return '<th class="cmp-th' + (on ? ' on' : '') + '" style="text-align:' + (align || 'left') + '"'
+    + ' onclick="lsSortBy(' + Q + k + Q + ')" title="Sort by ' + esc(label) + '">'
+    + esc(label) + (on ? ' <span class="cmp-arrow">' + (_lsSort.dir === 1 ? '\u25b2' : '\u25bc') + '</span>' : '')
+    + '</th>';
+}
+function _lsDays(r) {
+  const w = WPBYID[r.wp_id] || {};
+  if (!w.awarding_date) return null;
+  const d = new Date(w.awarding_date);
+  if (isNaN(d.getTime())) return null;
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return Math.round((d - t) / 86400000);
+}
+function _lsBcb(r) {
+  const w = WPBYID[r.wp_id] || {};
+  const n = Number(w.approved_budget_bcb);
+  return isFinite(n) && n > 0 ? n : null;
+}
+/* Unknown is returned as null and placed last by _cmpNullsLast, in BOTH
+   directions - see the note there. */
+function _lsVal(r, k) {
+  const w = WPBYID[r.wp_id] || {};
+  switch (k) {
+    case 'wp':      return (wpLabel(w) || '').toLowerCase();
+    case 'type':    return (r.doc_type || '').toLowerCase();
+    /* by workflow position, not alphabetically - Awarded does not come after
+       Sourced because of the letter A. */
+    case 'status':  return VendorDb.bidRounds.procRank(listStatus(r));
+    case 'bidders': return (COUNTS[r.id] || {}).submitted || 0;
+    case 'bcb':     return _lsBcb(r);
+    case 'planned': return w.awarding_date ? new Date(w.awarding_date).getTime() : null;
+    case 'aging':   return _lsDays(r);
+    case 'deadline':return r.bid_due_at ? new Date(r.bid_due_at).getTime() : null;
+    default:        return 0;
+  }
+}
+/* Overdue is negative and red; not yet due is positive and plain. The sign is
+   printed explicitly so a lone number is never ambiguous. */
+function _lsAging(d) {
+  if (d == null) return '<span class="ls-none">\u2014</span>';
+  const cls = d < -30 ? 'ls-age-bad' : d < 0 ? 'ls-age-warn' : 'ls-age-ok';
+  return '<span class="' + cls + '">' + (d > 0 ? '+' : '') + d + 'd</span>';
+}
 function renderList() {
   const stage = val('fStage'), q = val('fSearch').toLowerCase();
   const rows = ROUNDS.filter(r => {
@@ -1265,7 +1345,7 @@ function renderList() {
     return (wpLabel(w) + ' ' + projName(r.project_id)).toLowerCase().includes(q);
   });
   const host = document.getElementById('listHost');
-  // Surface the passed deadlines here too — the nudge inside a round is no use
+  // Surface the passed deadlines here too - the nudge inside a round is no use
   // if you have to open the round to discover it.
   const over = _overdueCount();
   const note = document.getElementById('listNote');
@@ -1283,27 +1363,66 @@ function renderList() {
          : 'Start one from a work package and the app will issue the RFQ for you.') + '</div>';
     return;
   }
-  host.innerHTML = '<div style="overflow-x:auto"><table class="data-table"><thead><tr>'
-    + '<th>Work package</th><th>Project</th><th>Type</th><th>Procurement status</th>'
-    + '<th>Bidders</th><th>Deadline</th></tr></thead><tbody>'
-    + rows.map(r => {
-        const w = WPBYID[r.wp_id] || {};
-        return '<tr style="cursor:pointer" onclick="openRound(' + Q + r.id + Q + ')">'
-          + '<td><b>' + esc(wpLabel(w)) + '</b>'
-          + (r.round_no > 1 ? ' <span class="bstat bstat-invited">Round ' + r.round_no + '</span>' : '') + '</td>'
-          + '<td>' + esc(projName(r.project_id)) + '</td>'
-          + '<td>' + esc(r.doc_type || 'RFQ') + '</td>'
-          + '<td>' + esc(roundLabel(listStatus(r)))
-          + (_deadlinePassed(r) ? ' <span class="bm-high" title="The bid deadline has passed">· deadline passed</span>' : '')
-          + '</td>'
-          + '<td>' + (function () {
-              const c = COUNTS[r.id];
-              if (!c || !c.total) return '<span style="color:var(--text-hint)">none yet</span>';
-              return c.submitted + ' of ' + c.total + ' in';
-            })() + '</td>'
-          + '<td>' + esc(dOnly(r.bid_due_at) || '—') + '</td></tr>';
-      }).join('')
-    + '</tbody></table></div>';
+  const money = !window.__hideBudget;
+
+  /* Sort by PROJECT first so a group stays contiguous; the chosen column then
+     orders WITHIN each group. Same shape as the Portfolio's _projRows(). */
+  const sorted = rows.slice().sort(function (a, b) {
+    const pa = projName(a.project_id).toLowerCase(), pb = projName(b.project_id).toLowerCase();
+    if (pa !== pb) return pa.localeCompare(pb);
+    if (!_lsSort.key) return 0;                  // stable: keeps the loaded order
+    return _cmpNullsLast(_lsVal(a, _lsSort.key), _lsVal(b, _lsSort.key), _lsSort.dir);
+  });
+
+  const nCols = 7 + (money ? 1 : 0);
+  let out = '<div style="overflow-x:auto"><table class="data-table ls-table"><thead><tr>'
+    + _lsTh('wp', 'Work package')
+    + _lsTh('type', 'Type')
+    + _lsTh('status', 'Procurement status')
+    + _lsTh('bidders', 'Bidders', 'right')
+    + (money ? _lsTh('bcb', 'BCB', 'right') : '')
+    + _lsTh('planned', 'Planned award', 'right')
+    + _lsTh('aging', 'Aging', 'right')
+    + _lsTh('deadline', 'Bid deadline', 'right')
+    + '</tr></thead><tbody>';
+
+  let lastProj = null;
+  sorted.forEach(function (r) {
+    if (r.project_id !== lastProj) {
+      lastProj = r.project_id;
+      const mine = sorted.filter(function (x) { return x.project_id === lastProj; });
+      const tot = mine.reduce(function (t, x) { return t + (_lsBcb(x) || 0); }, 0);
+      out += '<tr class="ls-proj"><td colspan="' + nCols + '">'
+        + '<span class="ls-pid">' + esc(r.project_id) + '</span>'
+        + '<span class="ls-pname">' + esc(projName(r.project_id)) + '</span>'
+        + '<span class="ls-pn">' + mine.length + ' round' + (mine.length === 1 ? '' : 's')
+        + (money && tot > 0 ? ' \u00b7 ' + esc(_amt(tot)) + ' BCB' : '') + '</span>'
+        + '</td></tr>';
+    }
+    const w = WPBYID[r.wp_id] || {};
+    const d = _lsDays(r);
+    const bcb = _lsBcb(r);
+    const c = COUNTS[r.id];
+    out += '<tr style="cursor:pointer" onclick="openRound(' + Q + r.id + Q + ')">'
+      + '<td><b>' + esc(wpLabel(w)) + '</b>'
+      + (r.round_no > 1 ? ' <span class="bstat bstat-invited">Round ' + r.round_no + '</span>' : '')
+      + (w.trade ? '<small class="ls-sub">' + esc(w.trade) + '</small>' : '') + '</td>'
+      + '<td>' + esc(r.doc_type || 'RFQ') + '</td>'
+      + '<td>' + esc(roundLabel(listStatus(r)))
+      + (_deadlinePassed(r) ? ' <span class="bm-high" title="The bid deadline has passed">\u00b7 deadline passed</span>' : '')
+      + '</td>'
+      + '<td style="text-align:right">'
+      + (!c || !c.total ? '<span class="ls-none">none yet</span>'
+                        : c.submitted + ' of ' + c.total + ' in') + '</td>'
+      + (money ? '<td style="text-align:right">'
+          + (bcb == null ? '<span class="ls-none">\u2014</span>' : esc(_amt(bcb)))
+          + '</td>' : '')
+      + '<td style="text-align:right">' + esc(dOnly(w.awarding_date) || '\u2014') + '</td>'
+      + '<td style="text-align:right">' + _lsAging(d) + '</td>'
+      + '<td style="text-align:right">' + esc(dOnly(r.bid_due_at) || '\u2014') + '</td>'
+      + '</tr>';
+  });
+  host.innerHTML = out + '</tbody></table></div>';
 }
 
 /* ── new round ───────────────────────────────────────────────────────────── */
@@ -2935,6 +3054,21 @@ async function markIssued() {
       Sorting on the quoted figure would put a non-VAT bidder behind a
       VAT-inclusive one that costs exactly the same. */
 let _rqSort = { key: 'net', dir: 1 };
+/* ⚠️ UNKNOWN SORTS LAST IN BOTH DIRECTIONS, and that needs the COMPARATOR — not
+   a sentinel value. Both tables used +Infinity, which lands last ascending and
+   then FIRST descending: one click and the rows we know least about were at the
+   top of a table somebody is prioritising from. A missing lead time is not
+   "longest", a missing BCB is not "biggest", and a missing planned date is not
+   "furthest away" — they are unknown, which is not a position on the scale. */
+function _cmpNullsLast(x, y, dir) {
+  const nx = x === null || x === undefined, ny = y === null || y === undefined;
+  if (nx && ny) return 0;
+  if (nx) return 1;
+  if (ny) return -1;
+  if (typeof x === 'string') return dir * x.localeCompare(y);
+  return dir * (x < y ? -1 : x > y ? 1 : 0);
+}
+
 function rqSortBy(key) {
   if (_rqSort.key === key) _rqSort.dir = -_rqSort.dir;
   else { _rqSort.key = key; _rqSort.dir = 1; }
@@ -2950,11 +3084,11 @@ function _rqTh(key, label, align) {
 function _rqVal(i, key) {
   switch (key) {
     case 'vendor_name': return (i.vendor_name || '').toLowerCase();
-    case 'submitted_at': return i.submitted_at ? new Date(i.submitted_at).getTime() : 0;
+    case 'submitted_at': return i.submitted_at ? new Date(i.submitted_at).getTime() : null;
     case 'offer': return Number(i.offer_amount) || 0;
-    case 'net': { const n = netOf(standing(i), i); return n == null ? Infinity : n; }
-    case 'lead_time_days': return i.lead_time_days == null ? Infinity : Number(i.lead_time_days);
-    case 'validity_days': return i.validity_days == null ? Infinity : Number(i.validity_days);
+    case 'net': { const n = netOf(standing(i), i); return n == null ? null : n; }
+    case 'lead_time_days': return i.lead_time_days == null ? null : Number(i.lead_time_days);
+    case 'validity_days': return i.validity_days == null ? null : Number(i.validity_days);
     case 'payment_terms': return (i.payment_terms || '').toLowerCase();
     default: return 0;
   }
@@ -2963,13 +3097,13 @@ function responsesPanel() {
   const inPlay = INV.filter(i => i.status === 'submitted' || i.status === 'closed');
   const d = _rqSort.dir;
   const sorted = inPlay.slice().sort(function (a, b) {
-    const x = _rqVal(a, _rqSort.key), y = _rqVal(b, _rqSort.key);
-    if (typeof x === 'string') return d * x.localeCompare(y);
-    return d * (x - y);
+    return _cmpNullsLast(_rqVal(a, _rqSort.key), _rqVal(b, _rqSort.key), d);
   });
   // Marked on the AMOUNT, never on row position — once the table is sorted by
   // lead time the first row is not the cheapest.
-  const low = Math.min.apply(null, inPlay.map(function (i) { return _rqVal(i, 'net'); }));
+  const low = Math.min.apply(null, inPlay.map(function (i) {
+    const n = _rqVal(i, 'net'); return n == null ? Infinity : n;
+  }));
   return '<div class="panel" id="bp-responses"><div class="panel-title">Quotations received</div>'
     + '<div class="sec-note">' + inPlay.length + ' of ' + INV.length
     + ' invited bidders have submitted. Click a column to sort.</div>'
