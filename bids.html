@@ -45,7 +45,11 @@
       background:var(--surface-2);border:1px solid var(--border);flex-wrap:wrap}
     .aw-row.aw-no{opacity:.75}
     .aw-who{flex:1 1 190px;min-width:0;font-size:0.8571rem}
-    .aw-who small{display:block;color:var(--text-hint);font-weight:400;font-size:0.7143rem}
+    /* ⚠️ --text-secondary, NOT --text-hint. The hint token is tuned to 5.22:1 on
+       --surface, but this sits on --surface-2 where it drops to 4.41 — under AA
+       for 10px text. It is an email address you might have to read out, not a
+       hint. */
+    .aw-who small{display:block;color:var(--text-secondary);font-weight:400;font-size:0.7143rem}
     .aw-when{font-size:0.7143rem;color:var(--text-hint)}
     .aw-why{flex:1 1 100%;font-size:0.7143rem;color:var(--text-secondary);font-style:italic}
     .aw-acts{display:flex;gap:6px;margin-left:auto}
@@ -54,6 +58,12 @@
     html.dark-mode .bid-nav a.on,body.dark-mode .bid-nav a.on{background:#33211F;color:#FF8B80}
     /* A step is a <button> now, so undo the UA chrome and keep the pill shape. */
     button.bm-step{font:inherit;font-size:inherit;cursor:pointer;appearance:none}
+    /* ⚠️ MAKING IT A <button> PULLED IT INTO dashboard.css's
+       `body.dark-mode button:not([style*="color"])`, which scores (0,2,2) and so
+       BEATS `.bm-step.now` (0,2,0) — the live step went from white on brand red
+       to grey on brand red, 2.98:1, in dark mode only. `.done` was already safe
+       at (0,3,1). Restated here with the class on the element selector. */
+    body.dark-mode button.bm-step.now{color:#fff}
     button.bm-step:hover{border-color:var(--mw-red);color:var(--mw-red-ink)}
     button.bm-step.now:hover{color:#fff}
     /* ⚠️ `open` (what you are READING) must not look like `now` (where the round
