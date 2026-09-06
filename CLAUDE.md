@@ -3167,7 +3167,11 @@ is a one-directional min-selection where an unpriced bidder genuinely belongs la
 
 **Verified in the harness** (now generated with BOTH the list and the round page):
 groups stay contiguous under every sort, and the unknown row is last within its
-group in bcb asc/desc, aging asc/desc and planned desc.
+group in bcb asc/desc, aging asc/desc and planned desc. **And live**: the DEMO
+group header reads `5 rounds · 163,000,000 BCB`, aging is negative on the three
+overdue rounds (−203d, −387d, −128d) and positive on the two ahead, and sorting by
+status gives Sourcing → Soliciting → Evaluating → Evaluating → Awarded, i.e.
+workflow order rather than alphabetical.
 
 ### A round reads in the PRESENT tense; the work package keeps the PAST (2026-09-06)
 
@@ -3351,6 +3355,16 @@ on the projector.
   NOT by rebuilding each row — the row builders keep emitting the same cells, so no
   colspan and no coordinate can fall out of step. Verified every row still reports
   the same visible cell count in both shapes.
+- **⚠️ COLUMN RULES, NOT JUST ROW RULES.** The table had a `border-bottom` on every
+  cell and **nothing vertical at all**, so with wide columns and right-aligned
+  figures a number sat a long way from the heading it belongs to and the bidders
+  bled into each other — the one thing a comparison must not do. A hairline between
+  every column, a firmer 2px where **ours ends and theirs begins** (the first bidder
+  column, whichever of Budget or Qty precedes it — hence the `cc-nobudget` marker,
+  so it still lands for a cost-hidden role), and a firmer underline under the
+  header. **`td + td` is DOM adjacency**, so a hidden Qty column still leaves its
+  neighbour a rule. In Present they step up to `--border-md`: projected, a hairline
+  disappears.
 - **⚠️ THE PRIMARY FIGURE WINS BY WEIGHT, NOT BY FADING THE SUB-LINE.** An
   `opacity:.72` on `.cc-a` measured **3.03:1** across the room; the second figure is
   the rate behind the amount, not decoration. It is `--text-secondary` instead, and
