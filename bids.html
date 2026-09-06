@@ -464,6 +464,7 @@
     .cc-table thead .cc-stick{background:var(--surface-2);z-index:3}
     .cc-stick small{display:block;color:var(--text-hint);font-weight:600;margin-top:2px}
     .cc-qty{width:74px;white-space:nowrap;color:var(--text-secondary)}
+    .cc-table.cc-noqty .cc-qty{display:none}
     .cc-qty small{display:block;color:var(--text-hint)}
     .cc-cell{min-width:66px}
     .cc-vh{max-width:120px}
@@ -687,6 +688,17 @@
        screen again and clientHeight would be the wrong number to fit against. */
     body.cc-present .cc-wrap{max-height:none;overflow:hidden;border:0;margin:0;
       flex:1 1 auto;min-height:0;display:flex;align-items:flex-start;justify-content:center}
+    /* ⚠️ min-width:0 is the whole fix — with min-width:100% the table's scrollWidth
+       is the container's width, so the fit could never scale UP. */
+    body.cc-present .cc-table{min-width:0;width:max-content;margin:0 auto}
+    body.cc-present .cc-table th,body.cc-present .cc-table td{
+      padding-top:var(--cc-pad-y,4px);padding-bottom:var(--cc-pad-y,4px)}
+    /* Projected, the primary figure has to win against its own sub-line — by
+       WEIGHT, not by fading the sub-line. An `opacity:.72` here measured 3.03:1
+       across the room, and the second figure is the rate behind the amount, not
+       decoration. Raised instead, to --text-secondary. */
+    body.cc-present .cc-r,body.cc-present .cc-tot-net,body.cc-present .cc-vh{font-weight:800}
+    body.cc-present .cc-a{color:var(--text-secondary)}
     #cc-present-exit{position:fixed;right:16px;bottom:16px;z-index:400}
     #cc-present-theme{position:fixed;right:150px;bottom:16px;z-index:400;
       width:36px;padding:0;display:inline-flex;align-items:center;justify-content:center}
@@ -4244,6 +4256,10 @@ function ccApplyZoom() {
   // Present owns its own sizing: it fits both dimensions, not just the width.
   if (document.body.classList.contains('cc-present')) { ccFitPresent(); return; }
   const wrap = document.getElementById('cc-wrap');
+  // ⚠️ Present sets an explicit width and row padding on the table; the reading
+  //    view must get its own CSS back or it stays stretched to the projector.
+  const tt = wrap && wrap.querySelector('.cc-table');
+  if (tt) { tt.style.width = ''; tt.style.removeProperty('--cc-pad-y'); }
   const t = wrap && wrap.querySelector('.cc-table');
   if (!t) return;
   if (_ccZoom === 'fit') {
@@ -4261,16 +4277,65 @@ function ccApplyZoom() {
    Capped at 1.6 so a two-row comparison fills a projector instead of sitting
    tiny in the middle, and floored at 0.3 because past that nobody in the room
    can read it and collapsing a band is the better answer. */
+const CC_PRESENT_MAX = 2.2;   // a projector wants big; past this it is a poster
+const CC_PAD_BASE = 4;        // .cc-table's own th/td padding, in px
+const CC_PAD_MAX = 22;
+
+/* ⚠️⚠️ IT IS A SEARCH, NOT A RATIO, BECAUSE THE TWO AXES ARE COUPLED. Give the
+   table more width and its cells wrap less, so the rows get SHORTER — the height
+   it needs depends on the width it is given, and the width it is given depends on
+   the zoom. A plain `min(availW/needW, availH/needH)` therefore left a 22-row
+   comparison at 0.88 using barely half the screen's width while being squeezed
+   vertically to 8.8px type. This finds the largest z whose layout at `availW / z`
+   still fits in `availH / z`, by bisection — seven passes on a deliberate click.
+
+   ⚠️ AND IT COULD NEVER SCALE UP AT ALL BEFORE. `.cc-table` is `width:max-content;
+   min-width:100%`, so its scrollWidth inside the wrapper is never LESS than the
+   container: `availW / needW` was permanently ≤ 1. A two-bidder comparison sat at
+   base size in the top fifth of the screen. `body.cc-present .cc-table` drops the
+   min-width, and the search sets an explicit width anyway. */
 function ccFitPresent() {
   const wrap = document.getElementById('cc-wrap');
   const t = wrap && wrap.querySelector('.cc-table');
   if (!t) return;
-  t.style.zoom = '1';
   const availW = wrap.clientWidth, availH = wrap.clientHeight;
-  const needW = t.scrollWidth, needH = t.scrollHeight;
-  if (!availW || !availH || !needW || !needH) return;
-  const z = Math.min(availW / needW, availH / needH);
-  t.style.zoom = String(Math.max(0.3, Math.min(1.6, Math.floor(z * 100) / 100)));
+  if (!availW || !availH) return;
+
+  t.style.zoom = '1';
+  t.style.setProperty('--cc-pad-y', CC_PAD_BASE + 'px');
+
+  /* Does the table fit if it is laid out `availW / z` wide and allowed
+     `availH / z` of height? Measured at zoom 1, so both are in table space. */
+  const fits = function (z) {
+    t.style.width = Math.floor(availW / z) + 'px';
+    return t.scrollHeight <= Math.floor(availH / z) + 1;
+  };
+
+  let z;
+  if (fits(CC_PRESENT_MAX)) {
+    z = CC_PRESENT_MAX;
+  } else {
+    let lo = 0.3, hi = CC_PRESENT_MAX;
+    for (let i = 0; i < 7; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) lo = mid; else hi = mid;
+    }
+    z = lo;
+  }
+  z = Math.max(0.3, Math.floor(z * 100) / 100);
+  t.style.width = Math.floor(availW / z) + 'px';
+
+  /* Whatever height is still unused goes into the rows rather than being left
+     empty under the table. Reverted if it overflows - the fit wins. */
+  const rows = t.querySelectorAll('tr').length || 1;
+  const extra = Math.max(0, Math.min(CC_PAD_MAX,
+    Math.floor((availH / z - t.scrollHeight) / rows / 2)));
+  if (extra) {
+    t.style.setProperty('--cc-pad-y', (CC_PAD_BASE + extra) + 'px');
+    if (t.scrollHeight > Math.floor(availH / z) + 1)
+      t.style.setProperty('--cc-pad-y', CC_PAD_BASE + 'px');
+  }
+  t.style.zoom = String(z);
 }
 
 /* Bands collapse like the workbook's own grouped rows. Session-only, like the
@@ -4562,8 +4627,14 @@ function costComparePanel() {
           + 'vendor\u2019s spreadsheet. <b>Save</b> before switching to another bidder.</div>' : '')
     // No "showing N of M" line: the Bidders shown button already says it.
 
+    /* ⚠️ NO PRICED ITEMS, NO QTY COLUMN. Qty is only ever filled on a priced line,
+       so on a round that is only requirements and commercial terms it is a dead
+       column taking width the bidders could use — which on a projector is the
+       difference between readable and not. Done in CSS, hiding every cell in the
+       column, rather than by rebuilding each row: the row builders keep emitting
+       the same cells, so no colspan and no coordinate can fall out of step. */
     + '<div class="cc-wrap" id="cc-wrap"><table class="cc-table'
-    + '">'
+    + (REFITEMS.length ? '' : ' cc-noqty') + '">'
     + '<thead>' + head + '</thead><tbody>'
     /* ⚠️ REQUIREMENTS FIRST, THEN PRICES. Reading the money before knowing who
        qualifies is how a cheaper non-compliant bid comes to look like the
