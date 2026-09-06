@@ -3125,6 +3125,86 @@ python check_tours.py
 - Proven: planting `#bp-comparison` and `#bp-evaluation` back gives
   `2 problem(s)`; the real tree gives 0 across **53 steps on six pages**.
 
+### A round reads in the PRESENT tense; the work package keeps the PAST (2026-09-06)
+
+`migrations/2026-09-06_bid_officer_contact.sql` (**RUN**). A round is an activity
+under way, so its steps read **Sourcing · Soliciting · Evaluating**; the work
+package's Procurement Status stays **Sourced · Solicited · Evaluated**, the approved
+roster the rest of the app writes and reads. The tense says which of the two you are
+looking at.
+
+- **⚠️ `PHASE_LABEL` IS DISPLAY ONLY, AND THE KEYS STAY THE APPROVED WORDS.**
+  `procStatus`, `procRank`, `syncWpStatus`, `phaseStats`, `_phaseTab` and the list
+  filter's option **values** all still use the key — only visible text goes through
+  the map, or the round would start writing invented words into
+  `work_packages.procurement_status`. Verified live: the derived key is `Solicited`
+  while the pill reads `Soliciting`, and the button still says **Set to Solicited**
+  because that is literally the value it writes.
+- **⚠️ `Awarded` is deliberately NOT `Awarding`** — a round that has reached it is
+  finished, and a progressive label on a closed round would be a lie.
+- This reverses part of the 2026-09-04 "speak the approved words" change **on
+  purpose**. That fix removed seven arbitrary invented words; this adds a
+  systematic 1:1 tense distinction, which is a different thing. Keep it 1:1.
+- **⚠️ KNOWN COLLISION, flagged not fixed:** a handful of work packages still store
+  the pre-2026-07 labels, so a WP can read `Sourcing` (its own legacy stored value)
+  directly under a round pill reading `Sourcing` (the present tense of `Sourced`).
+  Live tally across ~1,000 WPs: **1 `Sourcing`, 1 `Solicitation`, 1
+  `Evaluation & Negotiation`, 1 off-roster `Not Awarded`** — four rows. `procRank`
+  already knows the legacy labels so nothing computes wrongly; `wpStatusLine`'s
+  explicit "Work package procurement status:" prefix is what disambiguates. Cleaning
+  those four rows would remove the collision entirely.
+
+#### The live audit that followed, and the four bugs it found
+
+Driven against production as super_admin across all five DEMO rounds and every phase:
+**zero console errors**, every round opens on its own live phase, an unreached phase
+already explains itself ("Comparison, compliance and negotiation open once a
+quotation arrives"), and `contact_number` round-trips through the app's own save into
+the database and on into the RFQ letter's contact sentence.
+
+- **⚠️ MAKING THE STEPPER A `<button>` GREYED THE LIVE STEP IN DARK MODE.**
+  `dashboard.css` carries `body.dark-mode button:not([style*="color"])` to give a
+  light default to buttons that would otherwise rely on the UA's black `ButtonText`.
+  Turning each step from a `<div>` into a `<button>` pulled the stepper into it, and
+  at **(0,2,2)** it beats `.bm-step.now` at **(0,2,0)** — white on brand red became
+  grey on brand red, **2.98:1**, dark mode only. `.done` was already safe at (0,3,1).
+  **Changing an element's TAG can change which shared rules match it** — re-measure
+  contrast after any div→button conversion.
+- **⚠️ `font:inherit` on that button blew the step size up 27%.** `.bm-step` already
+  sets its own family/size/weight, so `font:inherit` replaced `0.7857rem` with the
+  14px inherited from `.bm-steps`, and the four tab steps rendered visibly larger
+  than the plain "Not started" `div` beside them. **Reset `appearance` only.** The
+  user spotted this from a screenshot before any measurement did.
+- **The awaiting list's email line was `--text-hint`** — a token tuned to 5.22:1 on
+  `--surface`, but **4.41 on `--surface-2`**, under AA for 10px text. Now
+  `--text-secondary`.
+- **The stepper pills missed the touch minimum** (28px measured on a 375px touch
+  viewport). They were `<div>`s that were only ever read; as the phase switcher they
+  are tap targets, and `dashboard.css` applies its 32px rule to
+  `.action-btn/.nav-item/.tab/.view-tab`, not to these.
+
+**Verified clean:** read-only roles get **4 buttons (the stepper) and zero inputs**
+across all four phases — no Remind, no copy-link, no email-quote form, no icon-only
+buttons. At 375px the page has **no horizontal overflow**, the comparison scrolls
+inside its own wrapper only, and the rail becomes a horizontal strip. Fit hits its
+0.4 floor on a phone with 6 bidders, which is correct — it refuses to shrink past
+readability and leaves the scrollbar as the fallback.
+
+**Accepted, not fixed:** white on `--mw-red` is **4.30:1**, marginally under AA. That
+is the app-wide brand treatment (`.btn-primary` and every `.now` pill), so changing
+it is a brand decision rather than a bid-page one.
+
+**⚠️ TWO MEASUREMENT ARTIFACTS THAT LOOKED LIKE BUGS**, both already recorded in
+spirit and both re-encountered here: a reading taken **mid-resize** reported the
+sticky rail at 192px with a 160px comparison wrap (settled: 351px and full width),
+and the harness had **no `<meta name="viewport">`**, so mobile emulation fell back to
+the 980px layout viewport. **Let the resize settle, and give a harness the viewport
+meta**, before believing a responsive measurement.
+
+**`check_tours.py` now skips `_preview_*.html`** — a throwaway harness carries a
+subset of a page's markup, so a step whose target lives in the half it omits reports
+a phantom miss, and a guard that cries wolf on scratch files stops being read.
+
 ### The round shows ONE PHASE at a time, and Present fits the screen (2026-09-06)
 
 `migrations/2026-09-06_bid_officer_contact.sql` (**RUN ME**). Asked as *"instead of
