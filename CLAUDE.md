@@ -3125,6 +3125,103 @@ python check_tours.py
 - Proven: planting `#bp-comparison` and `#bp-evaluation` back gives
   `2 problem(s)`; the real tree gives 0 across **53 steps on six pages**.
 
+### The round shows ONE PHASE at a time, and Present fits the screen (2026-09-06)
+
+`migrations/2026-09-06_bid_officer_contact.sql` (**RUN ME**). Asked as *"instead of
+making the whole bid management a scrolling page we make it a select tab depending on
+which stage it is? so its more compact?"* — yes.
+
+- **⚠️ THE STEPPER IS ALSO THE TAB BAR, and the two meanings are drawn differently
+  ON PURPOSE.** `now` (filled red) is where the ROUND IS — still derived, never set
+  by hand. `open` (a ring) is which phase you are READING. **Clicking shows you a
+  phase; it never sets one.** That distinction is the entire reason the stepper
+  stopped being a control the first time: a status somebody remembers to click is a
+  status nobody trusts. Do not merge the two treatments.
+- **⚠️ `Not Started` folds into Sourced for navigation but takes NO ring** — it is
+  not a tab (rendered as a `<div>`, not a `<button>`), and ringing two steps reads
+  as two things being open. A round with no bidders still belongs in Sourced, which
+  is where you add them.
+- **⚠️ ONLY THE SELECTED PHASE IS IN THE DOM.** Consequences that bit during the
+  build: the sticky rail could no longer scroll-spy four sections (it now *switches*
+  the phase and marks the live one), and **every round step in the coach tour needed
+  `before: _tourPhase('X')`** — a step whose selector does not resolve is **silently
+  skipped**, so without it the tour would teach only whichever phase happened to be
+  open. `check_tours.py` cannot catch that: the selectors all still exist.
+- `_phaseTab` resets to `null` in `openRound`, so a round always opens on its own
+  live phase; after that it stays where the officer put it.
+
+#### Present fits BOTH dimensions — the complaint was vertical
+
+*"I still need to scroll just to see the cost comparison even in present mode."*
+Present was **enlarging** the type and dropping `.cc-wrap`'s height cap, so it made
+the table taller and left you scrolling the page to read the thing you had just put
+on the projector.
+
+- Now a **fixed full-viewport surface with `body.cc-present{overflow:hidden}`**, and
+  **`ccFitPresent()`** scales the table to `min(availW/needW, availH/needH)`.
+  **⚠️ `min-height:0` on the wrap** or its automatic minimum is its content height,
+  it refuses to shrink, and `clientHeight` becomes the wrong number to fit against.
+- **⚠️ Reset zoom to 1 before measuring**, same as Fit, or it measures an
+  already-scaled table and creeps smaller every call.
+- **Collapse a band and it refits BIGGER** — measured at 1100×620: **0.67 → 0.96 →
+  1.0** as the priced items and then the requirements collapse. That is the workbook
+  behaviour: zoom out to see everything, hide the rows nobody is discussing.
+- **⚠️ `exitPresent()` MUST call `ccApplyZoom()`.** Present writes the projector's
+  scale onto the table; without restoring it you leave the meeting and the ordinary
+  reading view is stuck at whatever fitted the screen. Found by measuring, not by
+  reading. It also removes its `resize` listener.
+
+#### Compact is GONE, not made permanent-with-a-switch
+
+*"The compact version is okay why is this toggleable?"* — the tight sizing is now
+always on and the toggle is deleted. The reason it existed ("for when you do want
+all ten") went away when Fit zoom arrived: two controls were answering one question.
+
+- **⚠️ BUT IT WAS HIDING CONTENT, and one piece of it decided the outcome.** Compact
+  dropped the item's spec, the unit, the per-cell second figure, the verdict note —
+  and **`.req-must`, the "Mandatory" marker**, on the panel whose whole rule is that
+  a mandatory requirement not met disqualifies a bid whatever it costs. **Tighten
+  the sizing, never the meaning.** All of that now renders unconditionally.
+
+#### Solicited answers the question it exists for
+
+*"The solicited portion needs to be worked in this time as well."* The one thing that
+phase could not tell you was **who is still out** — the bidder list lives under
+Sourced, so chasing meant leaving the phase you were working in.
+
+- **`awaitingPanel()`** lists them in place: state, when they opened the link, the
+  decline reason, a **copyable private link** and a **Remind** button that drafts an
+  addressed follow-up carrying their own link (same shape as the RFQ — the app writes
+  it, the officer's own mail client sends it).
+- **⚠️ A WITHDRAWN BIDDER IS NOT OUTSTANDING** — they never stood, so they are
+  neither chased nor counted, the same rule `bidRounds.award()` applies when it skips
+  them for a Letter of Regret.
+- **⚠️ TWO COUNTS, because a decline IS an answer** — `N still to answer · M declined
+  of K invited`. Folding the declined bidder into "have not quoted" would say we are
+  waiting on somebody who has already said no.
+
+#### The round's contact is the PROCUREMENT OFFICER, and has a number
+
+*"Instead of just contact email let's also add the contact number... refer it as
+procurement officer so its unambiguous."* On a page that also holds every BIDDER's
+contact person, "Contact" pointed both ways.
+
+- Labels are **Procurement officer / Officer email / Officer contact number**, and
+  `vendor_bid_rounds.contact_number` is new (defaults from the creating officer's
+  `users.mobile_number`; **not back-filled** — inventing one would publish a number
+  to vendors that nobody chose to publish).
+- **⚠️ THE ROUND'S NUMBER OVERRIDES THE OFFICER'S PROFILE ONE IN THE LETTER**
+  (`sigFields().mobile`), so a round handled by somebody else, or reached on a shared
+  desk line, needs no profile edit.
+- `bidRounds.create`/`update` strip-and-retry on the missing column and **warn**
+  through `_warnDropped` — deploy-safe before the migration runs, never silent.
+
+**⚠️ THE BASH HEREDOC ATE THE BACKSLASHES AGAIN** while authoring `chaseBidder` —
+`'
+'` became a real newline inside a JS string literal. Documented, and still the
+easiest way to break this file. **Build escapes with `chr(92)`**, and re-run the
+per-block `new Function()` parse after every scripted edit.
+
 ### Zoom, collapsible bands, and a sortable quotations table (2026-09-06)
 
 Following the workbook, at the user's direction: *"During excel cost comparison
