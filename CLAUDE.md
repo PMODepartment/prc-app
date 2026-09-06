@@ -3176,6 +3176,72 @@ lines-then-headline. **⚠️ NOT exercised by a real bidder** — `users where 
 still 0, so like the rest of the self-service path this is verified by construction and
 harness only.
 
+### Filling in the cost comparison: the cell is the affordance (2026-09-06)
+
+Reported as *"the details of the cost comparison cannot be edited intuitively"*, alongside a
+question about where the lines come from. The question answers itself once the flow is stated,
+and the flow is right — it was the **discoverability** that was wrong.
+
+**Where the two halves live** (this is the intended shape, unchanged):
+
+| phase | panel | what is authored there |
+|---|---|---|
+| **Sourced** | Documents and priced items | the documents every vendor gets, the **requirements** (each Mandatory or Preferred), and the **priced items** (BOQ lines with quantity and unit) |
+| **Evaluated** | Cost comparison | per bidder, per line: **met / partial / not met / n/a** against each requirement, and rate / amount / basis against each item |
+
+So yes — **specified once in Sourcing, checked per bidder in Evaluating.** One list, authored
+once, and every bidder is scored against the same lines. That is also why the RFQ letter can
+itemise the requirement: it is the same `REQS` the comparison is built from.
+
+**⚠️ THE EDIT AFFORDANCE WAS A `--text-hint` PENCIL, BORDERLESS AND UNLABELLED, IN THE HEADER
+OF A WIDE HORIZONTALLY-SCROLLING TABLE** — and nothing on the panel said the table was editable
+at all. Worse, the how-to (*"type the rate and the amount fills from the quantity"*) was only
+rendered **once already in edit mode**, i.e. invisible to exactly the person who needed it.
+Help that appears only after you no longer need it is not help.
+
+Three changes, none of which alter the data model:
+
+- **⚠️ CLICKING ANY CELL OPENS THAT COLUMN.** It is what a person actually reaches for, and it
+  is how every spreadsheet behaves — which is the mental model this table is already built on
+  (paste a column, Excel export, Present). `cellCls()`/`cellAtt()` in `costComparePanel` add
+  the handler to the priced-item cells (both the figure and the basis-word branch), the
+  requirement verdict cells, and the budget column. **Non-destructive**: nothing is written
+  until Save.
+- **The pencil now has a border and `--text-secondary`**, so it reads as a control rather than
+  decoration. Measured **10.15:1 dark, 7.07:1 light**.
+- **The always-visible panel note says it**, and says it only when the round is unlocked.
+
+**⚠️ AND THAT MADE AN EXISTING HAZARD ONE MISCLICK AWAY, SO IT HAD TO BE GUARDED.**
+`ccSetEdit` only ever set a variable and re-rendered — **there was no dirty tracking anywhere** —
+so leaving a half-filled column silently discarded the typing. Behind a small pencil that was
+survivable; behind any cell click it is not. `ccSyncSnap()` (called from `ccAfterRender`, so
+every render including a save re-takes it) snapshots the rendered inputs, and `ccSetEdit`
+confirms before leaving a dirty column — **Done included, since that leaves the column too**.
+- **⚠️ It compares the RENDERED INPUTS, not a per-field model**, so it needs no knowledge of the
+  id scheme (`cr-`/`ca-`/`cs-`/`cn-`/`tc-`/`tn-`/`cb-`) and cannot fall out of step when a field
+  is added. Values are joined with `String.fromCharCode(1)` — a separator that cannot occur in
+  a value, written as a call rather than a pasted control byte.
+- **A clean column still leaves with no prompt**, or the guard would become noise people learn
+  to dismiss.
+
+**⚠️ A locked round (awarded/cancelled, or a read-only role) offers NO clickable cell, NO pencil,
+and does not print the instruction** — verified, since an instruction you cannot follow is worse
+than none.
+
+**Deliberately NOT made clickable**: the totals rows and the commercial-terms rows. Those are
+derived or are edited in **Quotations received**, and making them look editable here would
+promise something this panel does not do.
+
+**Verified by driving the shipped code in the harness**: clicking a cell opens that column (32
+inputs), the open column stops offering the handler while the other 26 cells stay clickable,
+typing sets dirty, declining the prompt **keeps both the column and the typing**, accepting
+leaves, a clean column prompts not at all, and an awarded round yields 0 cells / 0 pencils /
+no instruction.
+
+**⚠️ THE BASH HEREDOC ATE A BACKSLASH AGAIN** — a pattern containing `'—'` was silently
+matched against a real em-dash and failed at 0 occurrences. Build any backslash with `chr(92)`.
+Documented already; this is the second session it has cost time in.
+
 ### The bid tour lost a fifth of itself, silently (2026-09-06)
 
 Consolidating the Evaluated phase deleted `#bp-comparison` and `#bp-evaluation`.

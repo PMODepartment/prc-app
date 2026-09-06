@@ -617,6 +617,12 @@
     .cc-lowmark{color:#1E7A54;font-size:0.7857rem;margin-left:3px;vertical-align:-1px}
     html.dark-mode .cc-lowmark,body.dark-mode .cc-lowmark{color:#5FD3A3}
     .cc-verdict{font-weight:700}
+    /* Only a hint — a permanent tint on every cell would fight the heat scale,
+       which is the thing this table exists to show. */
+    .cc-open{cursor:pointer}
+    .cc-open:hover{box-shadow:inset 0 0 0 2px var(--mw-red-mid,#FBD9D5)}
+    html.dark-mode .cc-open:hover,body.dark-mode .cc-open:hover{
+      box-shadow:inset 0 0 0 2px rgba(255,122,110,.35)}
     .cc-in2{margin-top:3px}
     /* The one column being edited is tinted, so it is obvious which bidder the
        inputs belong to on a table this wide. */
@@ -670,9 +676,14 @@
       padding:3px 8px;border-radius:6px;background:var(--surface-2)}
     .ng-verdict{flex:0 0 130px}
     /* The edit affordance lives in the column header, not in the toolbar. */
-    .cc-pencil{border:none;background:transparent;color:var(--text-hint);cursor:pointer;
-      padding:1px 4px;margin-left:5px;border-radius:5px;font-size:0.8571rem;vertical-align:-1px}
-    .cc-pencil:hover{background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink)}
+    /* ⚠️ IT HAS A BORDER ON PURPOSE. Borderless and --text-hint, it read as
+       decoration in a header already carrying a name, a VAT basis and a chip —
+       so nobody found the one control that makes the table editable. */
+    .cc-pencil{border:1px solid var(--border-md);background:var(--surface);
+      color:var(--text-secondary);cursor:pointer;
+      padding:1px 5px;margin-left:5px;border-radius:5px;font-size:0.8571rem;vertical-align:-1px}
+    .cc-pencil:hover{background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);
+      border-color:var(--mw-red)}
     html.dark-mode .cc-pencil:hover,body.dark-mode .cc-pencil:hover{background:rgba(255,122,110,.16)}
     .cc-colact{display:inline-flex;gap:5px;margin-left:7px;vertical-align:middle}
     .cc-colact .btn{padding:2px 7px;font-size:0.7143rem}
@@ -4185,7 +4196,36 @@ function ccBidderMenu() {
       is done, transcribing from one quotation at a time. */
 let _ccEdit = null;   // null = reading · 'budget' = our rates · else an invitation id
 
-function ccSetEdit(v) { _ccEdit = v || null; renderRound(); }
+/* ⚠️ SWITCHING COLUMNS THROWS AWAY UNSAVED TYPING. Nothing is written until
+   Save, and the panel now opens on any cell click rather than only on a small
+   pencil — so leaving a half-filled column is one misclick away instead of a
+   deliberate act. Snapshot what the inputs held at the last render and ask
+   before discarding. Covers Done as well as a switch: both leave the column.
+   ⚠️ Compares the RENDERED inputs, not a per-field model, so it needs no
+   knowledge of the id scheme and cannot fall out of step when a field is
+   added. */
+let _ccSnap = null;   // input values as of the last render, while a column is open
+
+function _ccSnapshot() {
+  const p = document.getElementById('bp-costcompare');
+  if (!p) return null;
+  return [].map.call(p.querySelectorAll('input, select, textarea'),
+    function (e) { return e.value; }).join(String.fromCharCode(1));
+}
+function ccSyncSnap() { _ccSnap = _ccEdit ? _ccSnapshot() : null; }
+function _ccIsDirty() {
+  if (_ccSnap == null) return false;
+  const now = _ccSnapshot();
+  return now != null && now !== _ccSnap;
+}
+
+function ccSetEdit(v) {
+  v = v || null;
+  if (_ccEdit && v !== _ccEdit && _ccIsDirty()
+      && !confirm('This column has changes you have not saved. Leave without saving?')) return;
+  _ccEdit = v;
+  renderRound();
+}
 
 function _lowRate(itemId, rows) {
   let low = null;
@@ -4581,6 +4621,19 @@ function costComparePanel() {
     return '<button class="cc-pencil" title="Type in this column"'
       + ' onclick="ccSetEdit(&#39;' + esc(id) + '&#39;)"><i class="ti ti-pencil"></i></button>';
   };
+  /* ⚠️ THE CELL IS THE AFFORDANCE, NOT ONLY THE PENCIL. A muted icon in the
+     header of a wide, horizontally-scrolling table is findable once you know it
+     is there — and invisible until then, which is what made this read as
+     uneditable. The thing a person reaches for is the cell they want to type
+     in, which is how every spreadsheet behaves, so clicking one opens that
+     whole column. Non-destructive: nothing is written until Save, Done backs
+     out, and a locked round offers it on no cell at all. */
+  const cellCls = function (id) { return (locked || _ccEdit === id) ? '' : ' cc-open'; };
+  const cellAtt = function (id) {
+    if (locked || _ccEdit === id) return '';
+    return ' onclick="ccSetEdit(&#39;' + esc(id) + '&#39;)"'
+         + ' title="Click to fill in this column"';
+  };
   const picker = '';
 
   const head = '<tr><th class="cc-stick">Item / requirement</th>'
@@ -4625,7 +4678,8 @@ function costComparePanel() {
       + '<td class="cc-qty">' + (it.quantity == null ? '\u2014' : Number(it.quantity).toLocaleString())
       + (it.unit ? '<small>' + esc(it.unit) + '</small>' : '') + '</td>'
       + (showBudget
-          ? '<td class="cc-budcol">' + (editingBudget
+          ? '<td class="cc-budcol' + (editingBudget ? '' : cellCls('budget')) + '"'
+              + (editingBudget ? '' : cellAtt('budget')) + '>' + (editingBudget
               ? '<input ' + moneyAttrs('cb-' + it.id, b.budget_rate, 'rate')
                 + ' class="bm-in cc-in" data-ccrow="' + rowIdx + '" data-ccpaste="budget">'
               : '<div class="cc-r">' + esc(_rate(b.budget_rate)) + '</div>'
@@ -4653,11 +4707,13 @@ function costComparePanel() {
               + '<input id="cn-' + i.id + '-' + it.id + '" class="bm-in cc-note-in"'
               + ' placeholder="note" value="' + esc(p.note || '') + '"></td>';
           }
-          if (word) return '<td class="cc-cell"><div class="cc-word">' + word + '</div>'
+          if (word) return '<td class="cc-cell' + cellCls(i.id) + '"' + cellAtt(i.id) + '>'
+            + '<div class="cc-word">' + word + '</div>'
             + _lineNote(p) + '</td>';
           const f = _ccCellFigures(p, it, low, (ITEMBUDGET[it.id] || {}).budget_rate);
           const heat = _ccHeatClass(_ccHeat(p.unit_rate, range.lo, range.hi));
-          return '<td class="cc-cell' + heat + (isLow ? ' cc-best' : '') + '">'
+          return '<td class="cc-cell' + heat + (isLow ? ' cc-best' : '') + cellCls(i.id) + '"'
+            + cellAtt(i.id) + '>'
             + '<div class="cc-r' + (f.over ? ' cc-r-over' : (f.best ? ' cc-r-best' : '')) + '">'
             + esc(f.main)
             + (isLow && _ccView === 'rate'
@@ -4780,7 +4836,8 @@ function costComparePanel() {
               + '<input id="tn-' + i.id + '-' + q.id + '" class="bm-in cc-note" value="' + esc(r.note || '') + '"'
               + ' placeholder="What they offered"></td>';
           }
-          return '<td class="cc-cell cc-' + (v || 'none') + '">'
+          return '<td class="cc-cell cc-' + (v || 'none') + cellCls(i.id) + '"'
+            + cellAtt(i.id) + '>'
             + '<div class="cc-verdict">' + esc(REQ_SHORT[v] || '\u2014') + '</div>'
             + (r.note ? '<div class="cc-a">' + esc(r.note) + '</div>' : '')
             + '</td>';
@@ -4808,6 +4865,10 @@ function costComparePanel() {
     + '<div class="sec-note">Every bidder against the same lines, terms and requirements. '
     + 'The <b>lowest rate</b> on a line is marked; the totals are compared <b>net of VAT</b>, '
     + 'because the budget is. A <b>mandatory</b> requirement not met disqualifies a bid whatever it costs.'
+    /* ⚠️ THE HOW-TO WAS ONLY SHOWN ONCE ALREADY IN EDIT MODE — i.e. invisible to
+       exactly the person who needed it. It belongs in the always-visible note. */
+    + (locked ? '' : ' <b>Click any cell</b>, or the pencil in a bidder&rsquo;s heading, '
+        + 'to fill that column in.')
     + (showBudget ? ' The budget column is <b>ours</b> \u2014 no vendor sees it.' : '') + '</div>'
     + '<div class="cc-bar">' + picker
     + ccBidderMenu()
@@ -4864,6 +4925,8 @@ function costComparePanel() {
    table from scratch, so the inline zoom set on the old node goes with it. A
    frame later, because Fit measures scrollWidth and that needs a layout. */
 function ccAfterRender() {
+  // Re-taken on every render, so a save (which re-renders) clears the flag too.
+  ccSyncSnap();
   if (!document.getElementById('cc-wrap')) return;
   requestAnimationFrame(ccApplyZoom);
 }
