@@ -678,8 +678,13 @@
     body.cc-present .cc-hint,body.cc-present #bp-costcompare .sec-note{display:none!important}
     body.cc-present .main{margin-left:0!important}
     body.cc-present .content{padding:0!important;overflow:hidden}
+    /* ⚠️ The bottom padding is the CONTROL BAR's room. Exit, the theme toggle and
+       the size buttons are fixed over this panel, and without it the last row of
+       the comparison sits underneath them — on the one screen where every row is
+       supposed to be readable. Reserved here rather than on .cc-wrap so the fit's
+       clientHeight is already correct and needs no arithmetic. */
     body.cc-present #bp-costcompare{position:fixed;inset:0;z-index:300;margin:0;
-      border-radius:0;padding:10px 14px 14px;background:var(--surface);
+      border-radius:0;padding:10px 14px 62px;background:var(--surface);
       display:flex;flex-direction:column;min-height:0;overflow:hidden}
     body.cc-present #bp-costcompare .panel-title{flex:0 0 auto;margin-bottom:6px}
     body.cc-present .cc-a{font-size:0.8571rem}
@@ -702,8 +707,21 @@
     #cc-present-exit{position:fixed;right:16px;bottom:16px;z-index:400}
     #cc-present-theme{position:fixed;right:150px;bottom:16px;z-index:400;
       width:36px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+    #cc-present-zoom{position:fixed;right:196px;bottom:16px;z-index:400;
+      display:flex;align-items:center;gap:4px}
+    #cc-present-zoom .btn{width:34px;padding:0;display:inline-flex;
+      align-items:center;justify-content:center}
+    #cc-present-zoom .cc-fitbtn{width:auto;padding:0 10px;font-weight:700}
+    /* The readout doubles as the state: muted while it is following the screen,
+       solid once a size has been chosen by hand. */
+    #cc-present-pct{min-width:46px;text-align:center;font-size:0.7857rem;
+      font-weight:800;color:var(--text-primary);font-variant-numeric:tabular-nums}
+    #cc-present-pct.is-auto{color:var(--text-hint);font-weight:600}
+    /* Auto-fit never scrolls. A size chosen by hand may, and must be allowed to. */
+    body.cc-present .cc-wrap.cc-present-zoomed{overflow:auto;align-items:flex-start}
     body:not(.cc-present) #cc-present-exit,
-    body:not(.cc-present) #cc-present-theme{display:none}
+    body:not(.cc-present) #cc-present-theme,
+    body:not(.cc-present) #cc-present-zoom{display:none}
     .req-must{display:inline-block;font-size:0.6429rem;font-weight:800;letter-spacing:.04em;
       text-transform:uppercase;background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);
       border-radius:5px;padding:1px 6px;margin-top:3px}
@@ -4277,7 +4295,17 @@ function ccApplyZoom() {
    Capped at 1.6 so a two-row comparison fills a projector instead of sitting
    tiny in the middle, and floored at 0.3 because past that nobody in the room
    can read it and collapsing a band is the better answer. */
-const CC_PRESENT_MAX = 2.2;   // a projector wants big; past this it is a poster
+const CC_PRESENT_MAX = 2.2;   // the auto-fit's ceiling
+/* The manual size, once the user has touched it. null = follow the auto-fit.
+   Reset on every entry to Present, so each session opens on the best fit and a
+   size chosen for one round is never silently carried into the next. */
+let _ccPresentZoom = null;
+const CC_PRESENT_STEP = 0.1;
+const CC_PRESENT_FLOOR = 0.3;
+/* ⚠️ THE MANUAL CEILING IS HIGHER THAN THE AUTO ONE. The auto-fit stops at 2.2
+   because past that it is a poster, but a user asking for bigger has a reason —
+   a far seat, a small projector — and the table is allowed to scroll for it. */
+const CC_PRESENT_MANUAL_MAX = 5;
 const CC_PAD_BASE = 4;        // .cc-table's own th/td padding, in px
 const CC_PAD_MAX = 22;
 
@@ -4303,6 +4331,19 @@ function ccFitPresent() {
 
   t.style.zoom = '1';
   t.style.setProperty('--cc-pad-y', CC_PAD_BASE + 'px');
+
+  /* ⚠️ A MANUAL SIZE SKIPS THE SEARCH ENTIRELY. Asking for bigger than fits is a
+     legitimate request — the wrapper is allowed to scroll for it, which is why
+     `.cc-present-zoomed` restores overflow. Auto-fit never scrolls. */
+  if (_ccPresentZoom != null) {
+    t.style.width = Math.floor(availW / _ccPresentZoom) + 'px';
+    t.style.zoom = String(_ccPresentZoom);
+    wrap.classList.toggle('cc-present-zoomed',
+      t.scrollHeight * _ccPresentZoom > availH + 1);
+    ccSyncPresentZoom();
+    return;
+  }
+  wrap.classList.remove('cc-present-zoomed');
 
   /* Does the table fit if it is laid out `availW / z` wide and allowed
      `availH / z` of height? Measured at zoom 1, so both are in table space. */
@@ -4336,6 +4377,31 @@ function ccFitPresent() {
       t.style.setProperty('--cc-pad-y', CC_PAD_BASE + 'px');
   }
   t.style.zoom = String(z);
+  ccSyncPresentZoom();
+}
+
+/* ── the size control, because Present hides the reading view's zoom bar ────
+   ⚠️ IT STEPS FROM WHATEVER IS ON SCREEN, not from a stored number. The first
+   press has to continue from the auto-fit the user is looking at, or the table
+   would jump to some unrelated size the moment they touch it. */
+function ccPresentZoomStep(d) {
+  const t = document.querySelector('.cc-table');
+  if (!t) return;
+  const cur = _ccPresentZoom != null ? _ccPresentZoom : (parseFloat(t.style.zoom) || 1);
+  _ccPresentZoom = Math.max(CC_PRESENT_FLOOR,
+    Math.min(CC_PRESENT_MANUAL_MAX, Math.round((cur + d) * 100) / 100));
+  ccFitPresent();
+}
+function ccPresentZoomAuto() { _ccPresentZoom = null; ccFitPresent(); }
+function ccSyncPresentZoom() {
+  const lbl = document.getElementById('cc-present-pct');
+  if (!lbl) return;
+  const t = document.querySelector('.cc-table');
+  const z = parseFloat(t && t.style.zoom) || 1;
+  lbl.textContent = Math.round(z * 100) + '%';
+  lbl.classList.toggle('is-auto', _ccPresentZoom == null);
+  lbl.title = _ccPresentZoom == null ? 'Sized to fit \u2014 press Fit to return here'
+                                     : 'Set by hand \u2014 press Fit to size to the screen again';
 }
 
 /* Bands collapse like the workbook's own grouped rows. Session-only, like the
@@ -4794,6 +4860,7 @@ async function exportComparisonXlsx() {
    drift from the one the decision is actually made on. */
 function presentComparison() {
   document.body.classList.add('cc-present');
+  _ccPresentZoom = null;          // every session opens on the best fit
   ccFitPresent();
   // A projector gets plugged in, a window gets resized, a laptop gets rotated.
   window.addEventListener('resize', ccFitPresent);
@@ -4801,6 +4868,22 @@ function presentComparison() {
      lives — so the one moment you most want to switch (a projector in a bright
      room, or a dark one) was the one moment you could not. Its own button,
      with its own icon sync: AppTheme._syncIcon only knows #theme-toggle-btn. */
+  if (!document.getElementById('cc-present-zoom')) {
+    const box = document.createElement('div');
+    box.id = 'cc-present-zoom';
+    box.innerHTML =
+        '<button class="btn" title="Smaller (\u2212)" aria-label="Smaller">'
+      + '<i class="ti ti-minus"></i></button>'
+      + '<span id="cc-present-pct" aria-live="polite">100%</span>'
+      + '<button class="btn" title="Bigger (+)" aria-label="Bigger">'
+      + '<i class="ti ti-plus"></i></button>'
+      + '<button class="btn cc-fitbtn" title="Size to the screen (0)">Fit</button>';
+    const b = box.querySelectorAll('button');
+    b[0].onclick = function () { ccPresentZoomStep(-CC_PRESENT_STEP); };
+    b[1].onclick = function () { ccPresentZoomStep(CC_PRESENT_STEP); };
+    b[2].onclick = ccPresentZoomAuto;
+    document.body.appendChild(box);
+  }
   if (!document.getElementById('cc-present-theme')) {
     const th = document.createElement('button');
     th.id = 'cc-present-theme';
@@ -4809,6 +4892,10 @@ function presentComparison() {
     document.body.appendChild(th);
   }
   ccSyncPresentTheme();
+  // ⚠️ After the controls exist. ccFitPresent() runs first (the table has to be
+  //    sized before anything is drawn over it), and its own sync finds no
+  //    readout yet — so on open it kept the markup's placeholder 100%.
+  ccSyncPresentZoom();
   if (!document.getElementById('cc-present-exit')) {
     const b = document.createElement('button');
     b.id = 'cc-present-exit';
@@ -4828,7 +4915,15 @@ function exitPresent() {
      the ordinary view is stuck at whatever fitted the screen. */
   ccApplyZoom();
 }
-function _ccPresentKey(e) { if (e.key === 'Escape') exitPresent(); }
+function _ccPresentKey(e) {
+  if (e.key === 'Escape') { exitPresent(); return; }
+  // Not while someone is typing in a cell editor.
+  const t = e.target;
+  if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+  if (e.key === '+' || e.key === '=') { e.preventDefault(); ccPresentZoomStep(CC_PRESENT_STEP); }
+  else if (e.key === '-' || e.key === '_') { e.preventDefault(); ccPresentZoomStep(-CC_PRESENT_STEP); }
+  else if (e.key === '0') { e.preventDefault(); ccPresentZoomAuto(); }
+}
 function ccPresentTheme() {
   if (typeof AppTheme === 'undefined' || !AppTheme.toggle) return;
   AppTheme.toggle(profile && profile.id);
