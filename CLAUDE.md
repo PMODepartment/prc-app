@@ -3166,6 +3166,12 @@ on the projector.
 - **Collapse a band and it refits BIGGER** — measured at 1100×620: **0.67 → 0.96 →
   1.0** as the priced items and then the requirements collapse. That is the workbook
   behaviour: zoom out to see everything, hide the rows nobody is discussing.
+- **A theme toggle lives inside Present** (`#cc-present-theme`, beside Exit).
+  Present hides the topbar, and the topbar is where the toggle is — so the one
+  moment you most want to switch, a projector in a bright or a dark room, was the
+  one moment you could not. **⚠️ It syncs its OWN icon**: `AppTheme`'s `_syncIcon`
+  only knows `#theme-toggle-btn`, so a second toggle anywhere has to keep itself in
+  step. Same sun/moon convention (sun = switch to light).
 - **⚠️ `exitPresent()` MUST call `ccApplyZoom()`.** Present writes the projector's
   scale onto the table; without restoring it you leave the meeting and the ordinary
   reading view is stuck at whatever fitted the screen. Found by measuring, not by
