@@ -4341,15 +4341,27 @@ function ccFitPresent() {
   const wrap = document.getElementById('cc-wrap');
   const t = wrap && wrap.querySelector('.cc-table');
   if (!t) return;
+  /* ⚠️⚠️ MEASURE FROM A KNOWN STATE, OR THE FIT DEPENDS ON WHAT CAME BEFORE IT.
+     A manual size may have left the wrapper scrolling, and a scrollbar takes ~15px
+     off clientWidth (measured: 1402 without, 1387 with) — so pressing Fit straight
+     after enlarging produced a different answer from pressing it on open, for the
+     same table on the same screen. The leftover inline width does the same thing by
+     deciding whether that scrollbar is there at all. Both are reset here, BEFORE
+     availW/availH are read, so a fit is a pure function of the table and the
+     screen. */
+  wrap.classList.remove('cc-present-zoomed');
+  t.style.zoom = '1';
+  t.style.width = '';
+  t.style.setProperty('--cc-pad-y', CC_PAD_BASE + 'px');
+
   const availW = wrap.clientWidth, availH = wrap.clientHeight;
   if (!availW || !availH) return;
 
-  t.style.zoom = '1';
-  t.style.setProperty('--cc-pad-y', CC_PAD_BASE + 'px');
-
   /* ⚠️ A MANUAL SIZE SKIPS THE SEARCH ENTIRELY. Asking for bigger than fits is a
      legitimate request — the wrapper is allowed to scroll for it, which is why
-     `.cc-present-zoomed` restores overflow. Auto-fit never scrolls. */
+     `.cc-present-zoomed` restores overflow. Auto-fit never scrolls.
+     ⚠️ Its width comes from the SCROLLBAR-FREE availW above, so enlarging twice
+     lands on the same layout as enlarging once then re-entering. */
   if (_ccPresentZoom != null) {
     t.style.width = Math.floor(availW / _ccPresentZoom) + 'px';
     t.style.zoom = String(_ccPresentZoom);
@@ -4358,7 +4370,6 @@ function ccFitPresent() {
     ccSyncPresentZoom();
     return;
   }
-  wrap.classList.remove('cc-present-zoomed');
 
   /* Does the table fit if it is laid out `availW / z` wide and allowed
      `availH / z` of height? Measured at zoom 1, so both are in table space. */
