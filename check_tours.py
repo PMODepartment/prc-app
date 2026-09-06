@@ -90,7 +90,11 @@ def unresolved(sel, ids, classes):
 
 
 problems = 0
-for path in sorted(glob.glob('*.html')) + sorted(glob.glob('assets/js/*.js')):
+# _preview_*.html are throwaway harnesses (git-ignored). They carry a subset of a
+# real page's markup, so a step whose target lives in the half they omit reports a
+# phantom miss — a guard that cries wolf on scratch files stops being read.
+PAGES = [p for p in sorted(glob.glob('*.html')) if not p.startswith('_preview_')]
+for path in PAGES + sorted(glob.glob('assets/js/*.js')):
     src = io.open(path, encoding='utf-8').read()
     if 'CoachTour.configure' not in src:
         continue

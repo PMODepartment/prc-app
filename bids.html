@@ -56,8 +56,12 @@
     .bid-nav a.on{background:var(--mw-red-light);color:var(--mw-red-ink);font-weight:800}
     .bid-nav a i{font-size:0.6429rem;margin-left:6px;opacity:.8}
     html.dark-mode .bid-nav a.on,body.dark-mode .bid-nav a.on{background:#33211F;color:#FF8B80}
-    /* A step is a <button> now, so undo the UA chrome and keep the pill shape. */
-    button.bm-step{font:inherit;font-size:inherit;cursor:pointer;appearance:none}
+    /* A step is a <button> now, so undo the UA chrome and keep the pill shape.
+       ⚠️ RESET `appearance` ONLY — do NOT add `font:inherit`. `.bm-step` already
+       sets font-family/size/weight, so `font:inherit` overrode its 0.7857rem
+       with the 14px inherited from .bm-steps: the four tab steps rendered 27%
+       larger than the plain "Not Started" div beside them. */
+    button.bm-step{cursor:pointer;appearance:none;-webkit-appearance:none}
     /* ⚠️ MAKING IT A <button> PULLED IT INTO dashboard.css's
        `body.dark-mode button:not([style*="color"])`, which scores (0,2,2) and so
        BEATS `.bm-step.now` (0,2,0) — the live step went from white on brand red
@@ -912,7 +916,7 @@ AppAuth.requireLogin(async (user, p) => {
   const sel = document.getElementById('fStage');
   VendorDb.bidRounds.procSteps.concat(['Cancelled']).forEach(st => {
     const o = document.createElement('option');
-    o.value = st; o.textContent = st;
+    o.value = st; o.textContent = roundLabel(st);
     sel.appendChild(o);
   });
   await loadAll();
@@ -963,10 +967,13 @@ function configureBidTour() {
             + 'two can never tell different stories.' },
       { sel: '.bm-steps', title: 'Where the round is, and what you are reading',
         body: 'The <b>filled</b> step is where the round actually is, and it is <b>derived</b> &mdash; '
-            + 'bidders named &rarr; Sourced, RFQ issued &rarr; Solicited, closed for pricing &rarr; '
-            + 'Evaluated, awarded &rarr; Awarded. Nothing to remember to set. <b>Clicking</b> a step '
-            + 'opens that phase (the ringed one) &mdash; it shows you a phase, it never sets one. '
-            + 'Underneath is the work package’s own status, which you can put right in one click.' },
+            + 'bidders named &rarr; Sourcing, RFQ issued &rarr; Soliciting, closed for pricing &rarr; '
+            + 'Evaluating, awarded &rarr; Awarded. Nothing to remember to set. A <b>round</b> reads in '
+            + 'the present tense because it is an activity under way; the <b>work package</b> below it '
+            + 'keeps the past tense &mdash; Sourced, Solicited, Evaluated &mdash; because that is a '
+            + 'state it has reached, and it is the approved wording the rest of the app uses. '
+            + '<b>Clicking</b> a step opens that phase (the ringed one) &mdash; it shows you a phase, '
+            + 'it never sets one.' },
       { sel: '#bp-ask', title: 'Scope and terms', before: _tourPhase('Sourced'),
         body: 'Scope, deadline, payment terms and conditions. Everything here goes to the bidders '
             + 'exactly as written, and it is what fills in the RFQ letter further down.' },
@@ -1279,7 +1286,7 @@ function renderList() {
           + (r.round_no > 1 ? ' <span class="bstat bstat-invited">Round ' + r.round_no + '</span>' : '') + '</td>'
           + '<td>' + esc(projName(r.project_id)) + '</td>'
           + '<td>' + esc(r.doc_type || 'RFQ') + '</td>'
-          + '<td>' + esc(listStatus(r))
+          + '<td>' + esc(roundLabel(listStatus(r)))
           + (_deadlinePassed(r) ? ' <span class="bm-high" title="The bid deadline has passed">· deadline passed</span>' : '')
           + '</td>'
           + '<td>' + (function () {
@@ -1489,6 +1496,22 @@ function roundProcStatus() { return VendorDb.bidRounds.procStatus(R, roundBidder
    past rather than context. `Not Started` has no panels of its own — a round
    with no bidders yet still belongs in Sourced, which is where you add them. */
 const PHASE_TABS = ['Sourced', 'Solicited', 'Evaluated', 'Awarded'];
+/* ⚠️ DISPLAY ONLY. A ROUND is an activity in progress, so it reads in the
+   present tense; the WORK PACKAGE's Procurement Status is a state it has
+   reached, so it keeps the approved past-tense roster. Same fact, two tenses,
+   and the tense says which of the two you are looking at.
+   ⚠️ THE KEYS STAY THE APPROVED WORDS. Everything that derives, compares,
+   filters or WRITES a status — procStatus, procRank, syncWpStatus, phaseStats,
+   _phaseTab, the list filter's option VALUES — uses the key. Only the visible
+   text goes through this map, or the round would start writing invented words
+   into work_packages.procurement_status.
+   ⚠️ `Awarded` is deliberately NOT `Awarding`: a round that has reached it is
+   finished, and a progressive label on a closed round would be a lie. */
+const PHASE_LABEL = {
+  'Not Started': 'Not started', 'Sourced': 'Sourcing', 'Solicited': 'Soliciting',
+  'Evaluated': 'Evaluating', 'Awarded': 'Awarded', 'Cancelled': 'Cancelled'
+};
+function roundLabel(key) { return PHASE_LABEL[key] || key; }
 let _phaseTab = null;
 function _phaseOf(step) { return step === 'Not Started' ? 'Sourced' : step; }
 function _livePhase() { return _phaseOf(roundProcStatus()); }
@@ -1523,7 +1546,7 @@ function stepperHtml() {
           + (on ? ' open' : '') + '"'
           + (has ? ' type="button" role="tab" aria-selected="' + (on ? 'true' : 'false') + '"'
                  + ' onclick="setPhaseTab(&#39;' + s + '&#39;)"' : '') + '>'
-          + '<span class="bm-stepn">' + (i + 1) + '</span>' + esc(s)
+          + '<span class="bm-stepn">' + (i + 1) + '</span>' + esc(roundLabel(s))
           + (i === at && !cancelled
               ? '<em class="bm-stepsub">' + esc(VendorDb.bidRounds.stageLabel(R.stage)) + '</em>' : '')
           + '</' + (has ? 'button' : 'div') + '>';
@@ -1681,7 +1704,7 @@ function buildBidNav() {
   nav.innerHTML = PHASE_TABS.map(function (p) {
     return '<a href="#" data-phase="' + esc(p) + '"'
       + (p === _phaseTab ? ' class="on"' : '')
-      + (p === live ? ' data-live="1"' : '') + '>' + esc(p)
+      + (p === live ? ' data-live="1"' : '') + '>' + esc(roundLabel(p))
       + (p === live ? '<i class="ti ti-player-play-filled"></i>' : '') + '</a>';
   }).join('');
   if (_bidSpy) { _bidSpy.disconnect(); _bidSpy = null; }
@@ -2083,7 +2106,7 @@ function phaseSection(label, hint, bodyHtml) {
   return '<section class="bm-phase' + state + '" id="ph-' + label.toLowerCase() + '">'
     + '<div class="bm-phase-head">'
     + '<span class="bm-phase-n">' + (at >= 0 ? at + 1 : '') + '</span>'
-    + '<h3>' + esc(label) + '</h3>'
+    + '<h3>' + esc(roundLabel(label)) + '</h3>'
     /* ⚠️ NO SENTENCE UNDER THE HEADING. Each phase used to carry a line of prose
        explaining itself; the figures below say the same thing faster, and the
        complaint was that there is too much to read before the app makes sense. */
