@@ -449,8 +449,23 @@
       font-size:0.7143rem}
     .cc-table th,.cc-table td{padding:4px 6px;border-bottom:1px solid var(--border);
       vertical-align:top;text-align:left}
+    /* ⚠️ COLUMN RULES, NOT JUST ROW RULES. The table had a border-bottom on every
+       cell and nothing vertical at all, so with wide columns and right-aligned
+       figures a number sat a long way from the heading it belongs to and the
+       bidders bled into each other — the one thing a comparison must not do.
+       `td + td` is DOM adjacency, so a hidden Qty column still leaves its
+       neighbour a rule. */
+    .cc-table th + th,.cc-table td + td{border-left:1px solid var(--border)}
+    /* Ours ends and theirs begins: a firmer rule on the first bidder column,
+       whichever of Budget or Qty happens to precede it. */
+    .cc-table .cc-budcol + th,.cc-table .cc-budcol + td,
+    .cc-table.cc-nobudget .cc-qty + th,.cc-table.cc-nobudget .cc-qty + td{
+      border-left:2px solid var(--border-md)}
     .cc-table thead th{background:var(--surface-2);font-weight:800;font-size:0.7143rem;
-      position:sticky;top:0;z-index:2}
+      position:sticky;top:0;z-index:2;border-bottom:2px solid var(--border-md)}
+    /* Projected, a hairline disappears — the rules carry more weight there. */
+    body.cc-present .cc-table th + th,body.cc-present .cc-table td + td{
+      border-left-color:var(--border-md)}
     .cc-vh small{display:block;font-weight:600;color:var(--text-hint);margin-top:2px;
       text-transform:none;letter-spacing:0}
     /* ⚠️ The frozen first column needs an OPAQUE background of its own, or the
@@ -4700,7 +4715,8 @@ function costComparePanel() {
        column, rather than by rebuilding each row: the row builders keep emitting
        the same cells, so no colspan and no coordinate can fall out of step. */
     + '<div class="cc-wrap" id="cc-wrap"><table class="cc-table'
-    + (REFITEMS.length ? '' : ' cc-noqty') + '">'
+    + (REFITEMS.length ? '' : ' cc-noqty')
+    + (showBudget ? '' : ' cc-nobudget') + '">'
     + '<thead>' + head + '</thead><tbody>'
     /* ⚠️ REQUIREMENTS FIRST, THEN PRICES. Reading the money before knowing who
        qualifies is how a cheaper non-compliant bid comes to look like the
