@@ -3359,6 +3359,30 @@ on the projector.
   over its parent** — reading `rgba(255,122,110,.16)` as opaque reported 1.12 for
   something that is actually 4.77, i.e. a phantom failure on the one marker that
   decides the outcome.
+- **A SIZE CONTROL, because the auto-fit knows the screen but not the seat.**
+  `−` / percentage / `+` / **Fit** beside Exit, and `+`, `-`, `0` on the keyboard —
+  **ignored while a cell editor has focus**, so typing a rate never resizes the room.
+  - **⚠️ IT STEPS FROM WHAT IS ON SCREEN, not from a stored number.** The first press
+    has to continue from the auto-fit the user is looking at, or the table jumps to
+    an unrelated size the moment they touch it.
+  - **⚠️ THE MANUAL CEILING (5.0) IS HIGHER THAN THE AUTO ONE (2.2), and a manual
+    size MAY SCROLL.** Asking for bigger than fits is a legitimate request — a far
+    seat, a small projector. **Auto-fit still never scrolls**
+    (`.cc-present-zoomed` is what restores overflow, and only for a manual size).
+  - `_ccPresentZoom` resets on every entry, so a size chosen for one round is never
+    carried silently into the next; a manual size DOES survive a band collapse.
+  - The readout doubles as the state — muted (`is-auto`) while it follows the
+    screen, solid once set by hand.
+  - **⚠️ `ccSyncPresentZoom()` must also be called AFTER the controls are built.**
+    `ccFitPresent()` runs first (the table has to be sized before anything is drawn
+    over it) and its own sync finds no readout yet, so on open it kept the markup's
+    placeholder `100%`.
+- **⚠️ THE PANEL RESERVES THE CONTROL BAR'S HEIGHT** (`padding-bottom:62px`). Exit,
+  the theme toggle and the size buttons are `position:fixed` over it, and without
+  that reservation the last row of the comparison sits underneath them — on the one
+  screen where every row is meant to be readable. Reserved on `#bp-costcompare`
+  rather than on `.cc-wrap` so the fit's `clientHeight` is already correct and needs
+  no arithmetic. It costs 0.89 → 0.83 on a full table, which is what `+` is for.
 - **⚠️ `exitPresent()` MUST call `ccApplyZoom()`**, which now also clears the inline
   `width` and `--cc-pad-y` Present writes onto the table — without that the reading
   view stays stretched to the projector. Present writes the projector's
