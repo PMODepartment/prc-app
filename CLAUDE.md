@@ -3190,7 +3190,25 @@ looking at.
   purpose**. That fix removed seven arbitrary invented words; this adds a
   systematic 1:1 tense distinction, which is a different thing. Keep it 1:1.
 - **The collision this exposed is cleaned up by
-  `migrations/2026-09-06_wp_status_retire_legacy_labels.sql`.** A WP could read
+  `migrations/2026-09-06_wp_status_retire_legacy_labels.sql` — ✅ RUN 2026-09-06,
+  verification returned `retired_labels 0 · still_off_roster 1 · total 1870`.**
+  The three DEMO rows now read Evaluated / Solicited / Sourced, `total` is unchanged
+  so nothing was created or deleted, and the live roster is **Awarded 1332 ·
+  Not Started 286 · Evaluated 180 · Sourced 61 · Solicited 10**. Verified on screen:
+  DEMO-08 now reads **Sourced** under a pill reading **Sourcing**, which is exactly
+  the job the two tenses were introduced to do.
+  - **⚠️ STM101 WP 55 IS THE `still_off_roster 1`, AND IT IS A REAL DATA QUESTION,
+    NOT A LEFTOVER.** `procurement_status = 'Not Awarded'` came straight from its
+    own `remarks` ("Not Awarded") via the importer, which takes the award flag from
+    Remarks. But the row carries **issued PO/JO numbers** (`JO# 347000306
+    PO# 347000307 347000310-311 …`), **₱38.77M against a 184-char multi-vendor
+    contractor string**, and a ₱57.68M BCB — while `award_status` says
+    `Not Yet Awarded` with **no actual award date**, and `po_jo_count` is 0 against
+    ~8 numbers (the documented PO/JO mismatch). POs raised against named contractors
+    is what an award looks like in practice. **Do not set it from here:** if it is
+    awarded, that moves ₱38.77M into the awarded totals and changes portfolio KPIs,
+    so it needs somebody on STM101 to confirm — then the WP form sets both the
+    procurement and award status together. A WP could read
   `Sourcing` (its own retired stored value) directly under a round pill reading
   `Sourcing` (the present tense of `Sourced`) — the same word, two meanings, one
   screen. Live tally across ~1,000 WPs: **1 `Sourcing`, 1 `Solicitation`, 1
