@@ -3145,14 +3145,25 @@ looking at.
 - This reverses part of the 2026-09-04 "speak the approved words" change **on
   purpose**. That fix removed seven arbitrary invented words; this adds a
   systematic 1:1 tense distinction, which is a different thing. Keep it 1:1.
-- **⚠️ KNOWN COLLISION, flagged not fixed:** a handful of work packages still store
-  the pre-2026-07 labels, so a WP can read `Sourcing` (its own legacy stored value)
-  directly under a round pill reading `Sourcing` (the present tense of `Sourced`).
-  Live tally across ~1,000 WPs: **1 `Sourcing`, 1 `Solicitation`, 1
-  `Evaluation & Negotiation`, 1 off-roster `Not Awarded`** — four rows. `procRank`
-  already knows the legacy labels so nothing computes wrongly; `wpStatusLine`'s
-  explicit "Work package procurement status:" prefix is what disambiguates. Cleaning
-  those four rows would remove the collision entirely.
+- **The collision this exposed is cleaned up by
+  `migrations/2026-09-06_wp_status_retire_legacy_labels.sql`.** A WP could read
+  `Sourcing` (its own retired stored value) directly under a round pill reading
+  `Sourcing` (the present tense of `Sourced`) — the same word, two meanings, one
+  screen. Live tally across ~1,000 WPs: **1 `Sourcing`, 1 `Solicitation`, 1
+  `Evaluation & Negotiation`, 1 off-roster `Not Awarded`**.
+  - **⚠️ THE THREE MAPPINGS ARE NOT A GUESS** — they are the ones already encoded
+    in `procRank` (Sourcing → 1, Solicitation → 2, Evaluation & Negotiation → 3)
+    against the roster's own positions.
+  - **⚠️ `Not Awarded` IS AN AWARD STATUS, so it cannot be mapped across** — it
+    says nothing about how far procurement got. It is DERIVED from the row: awarded
+    → `Awarded`, else `Not Started`, the same proc ⇄ award invariant the importer
+    and the WP form keep (Known Issues #18).
+  - **Touches `procurement_status` only**, leads with a report of exactly what will
+    change, and is idempotent (the WHERE matches only off-roster values, so a second
+    pass is `UPDATE 0`). **No audit stamp** — those columns are client-stamped by
+    `_auditStamp`, and this is data hygiene, not an officer's edit.
+  - `procRank` KEEPS its legacy-label knowledge afterwards: it costs nothing and it
+    is the guard against a future import reintroducing one.
 
 #### The live audit that followed, and the four bugs it found
 
