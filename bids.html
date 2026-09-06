@@ -649,7 +649,10 @@
     body.cc-present .cc-wrap{max-height:none;overflow:hidden;border:0;margin:0;
       flex:1 1 auto;min-height:0;display:flex;align-items:flex-start;justify-content:center}
     #cc-present-exit{position:fixed;right:16px;bottom:16px;z-index:400}
-    body:not(.cc-present) #cc-present-exit{display:none}
+    #cc-present-theme{position:fixed;right:150px;bottom:16px;z-index:400;
+      width:36px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+    body:not(.cc-present) #cc-present-exit,
+    body:not(.cc-present) #cc-present-theme{display:none}
     .req-must{display:inline-block;font-size:0.6429rem;font-weight:800;letter-spacing:.04em;
       text-transform:uppercase;background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);
       border-radius:5px;padding:1px 6px;margin-top:3px}
@@ -4549,6 +4552,18 @@ function presentComparison() {
   ccFitPresent();
   // A projector gets plugged in, a window gets resized, a laptop gets rotated.
   window.addEventListener('resize', ccFitPresent);
+  /* ⚠️ Present hides the topbar, and the topbar is where the theme toggle
+     lives — so the one moment you most want to switch (a projector in a bright
+     room, or a dark one) was the one moment you could not. Its own button,
+     with its own icon sync: AppTheme._syncIcon only knows #theme-toggle-btn. */
+  if (!document.getElementById('cc-present-theme')) {
+    const th = document.createElement('button');
+    th.id = 'cc-present-theme';
+    th.className = 'btn';
+    th.onclick = ccPresentTheme;
+    document.body.appendChild(th);
+  }
+  ccSyncPresentTheme();
   if (!document.getElementById('cc-present-exit')) {
     const b = document.createElement('button');
     b.id = 'cc-present-exit';
@@ -4569,6 +4584,19 @@ function exitPresent() {
   ccApplyZoom();
 }
 function _ccPresentKey(e) { if (e.key === 'Escape') exitPresent(); }
+function ccPresentTheme() {
+  if (typeof AppTheme === 'undefined' || !AppTheme.toggle) return;
+  AppTheme.toggle(profile && profile.id);
+  ccSyncPresentTheme();
+}
+function ccSyncPresentTheme() {
+  const b = document.getElementById('cc-present-theme');
+  if (!b) return;
+  const dark = document.body.classList.contains('dark-mode');
+  // sun = switch to light, moon = switch to dark — same convention as the topbar
+  b.innerHTML = '<i class="ti ' + (dark ? 'ti-sun' : 'ti-moon-stars') + '"></i>';
+  b.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
+}
 
 /* ── paste a whole column straight from the vendor's spreadsheet ─────────────
    ⚠️ THIS IS THE ONE THING THE All-Work-Packages GRID GIVES THAT IS WORTH
