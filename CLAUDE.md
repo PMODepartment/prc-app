@@ -3165,6 +3165,17 @@ test the descending direction with a null present.**
 **The one remaining `Infinity` is correct**: `_ccAuto`'s "pick the six lowest by net"
 is a one-directional min-selection where an unpriced bidder genuinely belongs last.
 
+**All five stage shapes render, zero errors** — draft / issued / evaluation /
+negotiation / awarded, each opening on its own live phase, each phase showing its
+own panels, and a draft correctly rendering nothing under Evaluated and Awarded
+because there is nothing there yet. The harness takes `?stage=` for exactly this;
+**it is what found the Present boundary bug above**, which the one round I happened
+to have open did not show.
+**⚠️ To read state out of a harness iframe, use `frame.eval(...)`** — `PHASE_TABS`
+and friends are top-level `const`s, i.e. global LEXICAL bindings, so
+`frame.contentWindow.PHASE_TABS` is `undefined` (the same trap as `Charts` having no
+`window.Charts`). Function declarations do land on `window`; `const` and `let` do not.
+
 **Verified in the harness** (now generated with BOTH the list and the round page):
 groups stay contiguous under every sort, and the unknown row is last within its
 group in bcb asc/desc, aging asc/desc and planned desc. **And live**: the DEMO
@@ -3365,6 +3376,15 @@ on the projector.
   header. **`td + td` is DOM adjacency**, so a hidden Qty column still leaves its
   neighbour a rule. In Present they step up to `--border-md`: projected, a hairline
   disappears.
+  - **⚠️⚠️ BORDER WIDTH DOES NOT SURVIVE `zoom`.** Under Present the table is scaled
+    and the used border width rounds to whole device pixels, so at zoom 0.84 a 2px
+    rule and a 1px rule **both land on 1** — the ours/theirs boundary flattened into
+    an ordinary gridline on the one screen where it matters most. Measured: every
+    column reported `1.19048px` (= 1 ÷ 0.84) in Present while the reading view still
+    had a genuine 2px. Present therefore restates it with **more width AND a
+    distinctly lighter colour**, because **colour does not round away**.
+    **When a distinction has to read inside a zoomed subtree, do not carry it on
+    width alone.**
 - **⚠️ THE PRIMARY FIGURE WINS BY WEIGHT, NOT BY FADING THE SUB-LINE.** An
   `opacity:.72` on `.cc-a` measured **3.03:1** across the room; the second figure is
   the rate behind the amount, not decoration. It is `--text-secondary` instead, and
