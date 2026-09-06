@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260906b"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260906b"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260906c"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260906c"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -155,7 +155,7 @@
     .cl-sum{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;
       flex-wrap:wrap;padding:9px 10px;border-radius:9px}
     .cl-sum::-webkit-details-marker{display:none}
-    .cl-sum::before{content:'b8';color:var(--text-hint);font-size:0.7857rem;
+    .cl-sum::before{content:'▸';color:var(--text-hint);font-size:0.7857rem;
       transition:transform .15s}
     details[open] > .cl-sum::before{transform:rotate(90deg)}
     .cl-sum:hover{background:var(--surface-2)}
@@ -493,6 +493,17 @@
     .cc-stick small{display:block;color:var(--text-hint);font-weight:600;margin-top:2px}
     .cc-qty{width:74px;white-space:nowrap;color:var(--text-secondary)}
     .cc-table.cc-noqty .cc-qty{display:none}
+    .cc-note{margin-top:3px;font-size:0.6429rem;font-style:italic;
+      color:var(--text-secondary);white-space:normal;line-height:1.3;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .cc-note-in{margin-top:3px;font-size:0.6786rem}
+    /* The bidder's own arithmetic is a question for them; ours is a slip to fix,
+       so they do not get the same colour. */
+    .cc-gap{margin-top:3px;font-size:0.6429rem;font-weight:800;color:#B45309}
+    .cc-gap small{display:block;font-weight:600;font-style:italic;opacity:.85}
+    .cc-gap.cc-gap-ours{color:var(--mw-red-ink)}
+    body.dark-mode .cc-gap,html.dark-mode .cc-gap{color:#FBBF24}
+    body.dark-mode .cc-gap.cc-gap-ours,html.dark-mode .cc-gap.cc-gap-ours{color:#FCA5A5}
     .cc-vend{display:block;margin-top:3px;font-weight:700;font-size:0.6429rem;
       color:#0F7A46;text-transform:none;letter-spacing:0}
     .cc-vend i{font-size:0.6429rem;margin-right:3px}
@@ -943,10 +954,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260906b"></script>
-<script src="assets/js/db.js?v=20260906b"></script>
-<script src="assets/js/ui.js?v=20260906b"></script>
-<script src="assets/js/coachmarks.js?v=20260906b"></script>
+<script src="assets/js/auth.js?v=20260906c"></script>
+<script src="assets/js/db.js?v=20260906c"></script>
+<script src="assets/js/ui.js?v=20260906c"></script>
+<script src="assets/js/coachmarks.js?v=20260906c"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -4455,6 +4466,83 @@ function ccToggleBand(key) {
   renderRound();
 }
 
+/* ⚠️ THESE LIVE AT TOP LEVEL, and that is not cosmetic. They were written
+   just above costComparePanel's nested band() helper, which put them INSIDE
+   costComparePanel's braces at indentation 0 — so they worked everywhere they
+   were called from except saveComparison, a different function, which calls
+   _sameFigure and would have thrown on every officer Save. `node --check`
+   cannot see it (the file parses), and it renders perfectly until you press
+   the one button that uses it. Caught by `typeof` in the live page.
+   ⚠️ Indentation is not scope: check the enclosing braces. */
+/* null, '' and 0 are three different answers; == would fold the first two into
+   the third and call an emptied cell unchanged. */
+function _sameFigure(a, b) {
+  const x = a == null || a === '' ? null : Number(a);
+  const y = b == null || b === '' ? null : Number(b);
+  if (x == null || y == null) return x === y;
+  return Math.abs(x - y) < 0.0001;
+}
+function _lineNote(p) {
+  return p && p.note ? '<div class="cc-note" title="' + esc(p.note) + '">'
+    + esc(p.note) + '</div>' : '';
+}
+
+/* ⚠️ A GAP BETWEEN THE LINES AND THE HEADLINE MEANS DIFFERENT THINGS DEPENDING
+   ON WHO TYPED THE LINES, and that is the whole point of recording who did.
+   If the BIDDER priced them, their own breakdown disagrees with their own
+   covering figure — a discount on the total, a line they forgot, something to
+   ask them about, but their arithmetic and not ours. If an OFFICER transcribed
+   them from a PDF, the likeliest explanation is a slip in the transcription,
+   which is ours to fix. Saying "off by X" without saying whose X it is leaves
+   the reader to guess, and the two lead to opposite actions.
+   ⚠️ Compared against offer_amount, the ORIGINAL quote — not standing(), which
+   prefers a negotiated figure. Lines submitted before a negotiation are not
+   expected to match the number that came out of it, so a negotiated bid is
+   skipped rather than flagged every time. */
+function _totalGapNote(i, pt) {
+  if (pt.total == null) return '';
+  if (i.negotiated_amount != null && i.negotiated_amount !== '') return '';
+  const quoted = i.offer_amount == null || i.offer_amount === '' ? null : Number(i.offer_amount);
+  if (quoted == null) return '';
+  const d = pt.total - quoted;
+  if (Math.abs(d) < 1) return '';
+  const theirs = _vendorPricedCount(i).mine > 0;
+  return '<div class="cc-gap' + (theirs ? '' : ' cc-gap-ours') + '">'
+    + (d > 0 ? '+' : '\u2212') + esc(_amt(Math.abs(d)))
+    + ' vs their quote'
+    + '<small>' + (theirs ? 'their own lines disagree with their covering figure'
+                          : 'lines were keyed in here \u2014 check the transcription') + '</small></div>';
+}
+
+/* ⚠️ WHOSE FIGURES ARE THESE? Rates a bidder submitted through their own link
+   are evidence; rates an officer transcribed from a PDF are a reading of it, and
+   the two should not look identical in a table somebody awards from. Shown on
+   the COLUMN, not on every cell — a bidder has usually either priced the lines
+   or not, and a marker on fifty cells is noise.
+   ⚠️ It says "N of M" when it is MIXED, because an officer correcting one line
+   clears the flag on that line only (setPrice writes entered_by_vendor:false),
+   and "from the bidder" over a column somebody has since edited would be a
+   claim the data no longer supports. */
+function _vendorPricedCount(i) {
+  let mine = 0, total = 0;
+  REFITEMS.forEach(function (it) {
+    const p = priceOf(i.id, it.id);
+    if (!p) return;
+    total++;
+    if (p.entered_by_vendor) mine++;
+  });
+  return { mine: mine, total: total };
+}
+function _vendorPricedChip(i) {
+  if (!REFITEMS.length) return '';
+  const c = _vendorPricedCount(i), mine = c.mine, total = c.total;
+  if (!mine) return '';
+  return '<span class="cc-vend" title="Priced by the bidder through their own bid link">'
+    + '<i class="ti ti-check"></i>'
+    + (mine === total ? 'from the bidder' : mine + ' of ' + total + ' from the bidder')
+    + '</span>';
+}
+
 function costComparePanel() {
   const allRows = bidsInPlay();
   if (!allRows.length) return '';
@@ -4511,31 +4599,9 @@ function costComparePanel() {
           + '<small>' + vatChip(i) + _vendorPricedChip(i) + '</small></th>';
       }).join('') + '</tr>';
 
-  /* ⚠️ WHOSE FIGURES ARE THESE? Rates a bidder submitted through their own link
-   are evidence; rates an officer transcribed from a PDF are a reading of it, and
-   the two should not look identical in a table somebody awards from. Shown on
-   the COLUMN, not on every cell — a bidder has usually either priced the lines
-   or not, and a marker on fifty cells is noise.
-   ⚠️ It says "N of M" when it is MIXED, because an officer correcting one line
-   clears the flag on that line only (setPrice writes entered_by_vendor:false),
-   and "from the bidder" over a column somebody has since edited would be a
-   claim the data no longer supports. */
-function _vendorPricedChip(i) {
-  if (!REFITEMS.length) return '';
-  let mine = 0, total = 0;
-  REFITEMS.forEach(function (it) {
-    const p = priceOf(i.id, it.id);
-    if (!p) return;
-    total++;
-    if (p.entered_by_vendor) mine++;
-  });
-  if (!mine) return '';
-  return '<span class="cc-vend" title="Priced by the bidder through their own bid link">'
-    + '<i class="ti ti-check"></i>'
-    + (mine === total ? 'from the bidder' : mine + ' of ' + total + ' from the bidder')
-    + '</span>';
-}
-
+  /* A bidder's own words about one line — "includes crating", "ex-works Cebu".
+   Rendered wherever that line's figure is, because a caveat away from the number
+   it qualifies is a caveat nobody reads. */
 /* ⚠️ THE KEY IS PASSED IN, NEVER DERIVED FROM THE LABEL. A band label is
      prose and would need escaping inside the inline handler — the trap that
      bit the vendor grid's row groups. */
@@ -4583,9 +4649,12 @@ function _vendorPricedChip(i) {
                   return '<option value="' + o[0] + '"'
                     + ((p.status || 'quoted') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
                 }).join('')
-              + '</select></td>';
+              + '</select>'
+              + '<input id="cn-' + i.id + '-' + it.id + '" class="bm-in cc-note-in"'
+              + ' placeholder="note" value="' + esc(p.note || '') + '"></td>';
           }
-          if (word) return '<td class="cc-cell"><div class="cc-word">' + word + '</div></td>';
+          if (word) return '<td class="cc-cell"><div class="cc-word">' + word + '</div>'
+            + _lineNote(p) + '</td>';
           const f = _ccCellFigures(p, it, low, (ITEMBUDGET[it.id] || {}).budget_rate);
           const heat = _ccHeatClass(_ccHeat(p.unit_rate, range.lo, range.hi));
           return '<td class="cc-cell' + heat + (isLow ? ' cc-best' : '') + '">'
@@ -4595,6 +4664,7 @@ function _vendorPricedChip(i) {
                 ? '<i class="ti ti-caret-down-filled cc-lowmark" title="cheapest on this line"></i>' : '')
             + '</div>'
             + (f.sub ? '<div class="cc-a">' + esc(f.sub) + '</div>' : '')
+            + _lineNote(p)
             + '</td>';
         }).join('')
       + '</tr>';
@@ -4624,6 +4694,7 @@ function _vendorPricedChip(i) {
         const pt = pricedTotal(i.id);
         return '<td class="cc-cell"><b>' + (pt.total == null ? '\u2014' : esc(_amt(pt.total))) + '</b>'
           + (pt.total != null ? '<small>' + pt.lines + ' of ' + REFITEMS.length + ' lines</small>' : '')
+          + _totalGapNote(i, pt)
           + '</td>';
       }).join('') + '</tr>'
     + '<tr class="cc-tot cc-tot-net"><td class="cc-stick">GRAND TOTAL'
@@ -5102,10 +5173,20 @@ async function saveComparison() {
         const st = val('cs-' + i.id + '-' + it.id) || 'quoted';
         const cur = priceOf(i.id, it.id);
         // A cell nobody filled in, holding nothing, is not an answer.
-        if (rate == null && amt == null && st === 'quoted' && !cur) continue;
+        if (rate == null && amt == null && st === 'quoted'
+            && !val('cn-' + i.id + '-' + it.id) && !cur) continue;
+        /* ⚠️ ONLY A CHANGED FIGURE CLEARS "from the bidder". Adding a note to a
+           line the bidder priced leaves their rate, amount and basis exactly as
+           they sent them — flipping the column to "5 of 6 from the bidder" for
+           an annotation would read as though we had altered a price. */
+        const same = cur && _sameFigure(cur.unit_rate, rate)
+                         && _sameFigure(cur.amount, amt)
+                         && (cur.status || 'quoted') === st;
         await VendorDb.bidComparison.setPrice(i.id, it.id, {
           quantity: it.quantity, unit: it.unit || null,
           unit_rate: rate, amount: amt, status: st,
+          note: val('cn-' + i.id + '-' + it.id) || null,
+          ...(same && cur.entered_by_vendor ? { entered_by_vendor: true } : {}),
         }, profile);
       }
     }

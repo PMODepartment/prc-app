@@ -124,6 +124,9 @@
     .lines-t td:nth-child(2) input{width:74px}
     .lines-t td:nth-child(3) input{width:72px}
     .lines-t tfoot td{background:var(--surface-2);font-weight:800;border-bottom:0}
+    .lines-t input.ln-note{margin-top:5px;font-size:0.7857rem;font-weight:400;
+      background:var(--surface-2)}
+    .lines-t input.ln-note::placeholder{font-style:italic}
     .refpack-t{width:100%;border-collapse:collapse;font-size:0.8125rem}
     .refpack-t th{text-align:left;font-size:0.6786rem;font-weight:800;letter-spacing:.03em;
       text-transform:uppercase;color:var(--text-hint);padding:5px 8px;border-bottom:1px solid var(--border-md)}
@@ -465,7 +468,13 @@ function linesHtml() {
         const u = L.unit != null && L.unit !== '' ? L.unit : (it.unit || '');
         return '<tr data-item="' + esc(it.id) + '">'
           + '<td><b>' + esc((it.item_no ? it.item_no + '. ' : '') + it.description) + '</b>'
-          + (it.spec ? '<small>' + esc(it.spec) + '</small>' : '') + '</td>'
+          + (it.spec ? '<small>' + esc(it.spec) + '</small>' : '')
+          /* ⚠️ In the item cell, not a seventh column. A note is occasional and a
+             column for it would widen every row on a phone for something usually
+             empty — and this is the cell the note is about. */
+          + '<input class="ln-note" data-k="note" placeholder="Note on this line (optional)"'
+          + ' value="' + esc(L.note || '') + '" oninput="lineEdit(this)">'
+          + '</td>'
           + '<td><input class="ln-q" data-k="quantity" value="' + esc(q == null ? '' : q)
           + '" inputmode="decimal" oninput="lineEdit(this)"></td>'
           + '<td><input class="ln-u" data-k="unit" value="' + esc(u)
@@ -497,7 +506,7 @@ function readLines() {
     return { item_id: tr.getAttribute('data-item'),
              quantity: num(get('quantity')), unit: get('unit') || null,
              unit_rate: num(get('unit_rate')), amount: num(get('amount')),
-             status: get('status') || 'quoted', note: null };
+             status: get('status') || 'quoted', note: get('note') || null };
   });
 }
 
@@ -786,7 +795,8 @@ async function submitBid() {
        would create a second PostgREST overload and break every vendor's submit. */
     if (canPriceLines()) {
       const payload = readLines().filter(function (l) {
-        return l.unit_rate != null || l.amount != null || (l.status && l.status !== 'quoted');
+        return l.unit_rate != null || l.amount != null || l.note
+               || (l.status && l.status !== 'quoted');
       });
       if (payload.length) {
         const r = await sb.rpc('submit_bid_lines_by_token', { p_token: TOKEN, p_lines: payload });

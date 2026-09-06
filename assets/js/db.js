@@ -4314,8 +4314,11 @@ const VendorDb = (() => {
        migrations/2026-09-06_bid_vendor_lines.sql. */
     async setPrice(invitationId, itemId, fields, profile) {
       const sb = await getSB();
-      const row = { invitation_id: invitationId, item_id: itemId, ...fields,
-                    entered_by_vendor: false,
+      // ⚠️ `fields` may carry entered_by_vendor:true to PRESERVE it — a note-only
+      //    edit leaves the bidder's figures untouched, so it must not read as
+      //    though an officer changed a price. Default is to clear.
+      const row = { invitation_id: invitationId, item_id: itemId,
+                    entered_by_vendor: false, ...fields,
                     updated_at: new Date().toISOString(),
                     updated_by: profile?.id || null,
                     updated_by_name: profile?.name || profile?.email || null };
