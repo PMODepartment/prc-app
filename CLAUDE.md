@@ -3387,6 +3387,21 @@ on the projector.
     carried silently into the next; a manual size DOES survive a band collapse.
   - The readout doubles as the state — muted (`is-auto`) while it follows the
     screen, solid once set by hand.
+  - **⚠️⚠️ MEASURE FROM A KNOWN STATE, OR THE FIT DEPENDS ON WHAT CAME BEFORE IT.**
+    `availW`/`availH` were read at the top of `ccFitPresent`, while a previous
+    manual size could still have the wrapper scrolling — and **a scrollbar takes
+    ~15px off `clientWidth`** (measured: 1402 without, 1387 with). The leftover
+    inline `width` does the same thing by deciding whether that scrollbar is there
+    at all. So pressing **Fit** straight after enlarging gave a different answer
+    from pressing it on open (67% vs 71%, same table, same screen). The class and
+    the inline width are now cleared **before** anything is measured, and the
+    manual path takes its width from that scrollbar-free number so one big step
+    lands where several small ones do.
+    **Verified from eight prior states** — open, refit ×3, after enlarging, after
+    shrinking, after a large enlargement, through a band-collapse cycle, and after
+    leaving Present and returning: **all identical**, while a genuinely collapsed
+    band still moves it (0.86 → 1.26), which is a different table rather than
+    instability.
   - **⚠️ `ccSyncPresentZoom()` must also be called AFTER the controls are built.**
     `ccFitPresent()` runs first (the table has to be sized before anything is drawn
     over it) and its own sync finds no readout yet, so on open it kept the markup's
