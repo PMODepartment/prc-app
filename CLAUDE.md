@@ -3125,6 +3125,65 @@ python check_tours.py
 - Proven: planting `#bp-comparison` and `#bp-evaluation` back gives
   `2 problem(s)`; the real tree gives 0 across **53 steps on six pages**.
 
+### The bidder prices the lines themselves (2026-09-06)
+
+`migrations/2026-09-06_bid_vendor_lines.sql` (**RUN ME**, after
+`2026-09-05_bid_cost_comparison.sql`). The bid link collected **one headline
+figure**, so every per-line rate in the cost comparison was an officer transcribing
+from an attached PDF. The ask already travels to the bidder (they receive the priced
+items through `bid_reference_by_token`), so the only missing piece was a way to
+answer it line by line.
+
+- **⚠️⚠️ IT CANNOT BE A TABLE POLICY.** `vendor_bid_item_prices` holds **every**
+  bidder's prices, and a bidder answering from their link **has no login at all** —
+  `auth.uid()` is null, so RLS has nothing to identify them by. The table stays
+  staff-only with **no vendor policy**; the bidder reaches it only through two
+  `SECURITY DEFINER` RPCs. The migration's verification asserts the table still has
+  exactly one policy.
+- **`submit_bid_lines_by_token(token, lines)`** derives the invitation **from the
+  token**, checks **every item id belongs to that invitation's own round** (without
+  it, a crafted payload could write against another round's line), validates the
+  status against the allowed set, and is **deadline-gated** — this is pricing, which
+  is what a deadline exists to stop. An unknown item id is **skipped, not raised**:
+  one bad id must not throw away the rest of a bidder's work.
+- **`bid_lines_by_token(token)`** returns **only their own** rows, so a revision
+  starts from what they last sent. **⚠️ Its `where p.invitation_id = inv.id` is the
+  whole of the access control and must never widen to `round_id`** — this is the one
+  function a bidder can call that touches a table holding their competitors' prices.
+- **⚠️ A SEPARATE RPC, NOT A PARAMETER ON `submit_bid_by_token`.** PostgREST resolves
+  overloads by ARGUMENT NAMES, so adding one creates a second overload and every
+  vendor's submit starts failing — a live hazard that function has already had to
+  keep its parameter names for.
+- **⚠️ THE SUBMIT SENDS THE LINES FIRST.** `submit_bid_by_token` is what marks a bid
+  submitted, so a failure in this order tells the bidder and nothing claims a
+  submission that did not happen. The other order records a submitted bid whose
+  breakdown silently went missing. A `PGRST202` (migration not run) is tolerated so
+  the headline bid still goes through.
+- **`entered_by_vendor` is EXPLICIT, not inferred from a null `updated_by`.** The
+  officer needs to know which figures are the bidder's own evidence and which are
+  their own reading of a PDF. **`setPrice` clears it**, so the flag always means
+  "exactly as the bidder sent it", and the column header reads **"N of M from the
+  bidder"** when an officer has since corrected some — a badge that outlives its own
+  claim is worse than none.
+- The bidder's **own quantity and unit are editable** (prefilled from the ask). One
+  bidder quoting 348 LM where another quotes 306 is a finding, not an error to
+  normalise away — the table was already built for it.
+
+#### ⚠️ THE ROWS ON SCREEN ARE THE TRUTH, NOT A PARALLEL OBJECT
+
+The first version kept a `LINES` object beside the form and **it desynced
+immediately**: a quantity prefilled from the ask was never IN that copy until the
+bidder happened to touch the field, so **a rate never filled an amount**, and worse,
+**a submitted line would have carried a null quantity while the form plainly showed
+one**. `readLines()` now walks the rows, and the total, the headline auto-fill and
+the submit payload all read through it. `LINES` only seeds the initial render.
+
+**Caught by driving the form, not by reading it.** Verified against the shipped page
+with only its Supabase client stubbed: rate × qty fills the amount; a lump sum typed
+first survives a later rate; **"included" drops out of the total** rather than being
+double-counted; the headline follows the lines until the bidder sets it by hand and
+then stays put; and the payload matches the screen row for row, quantities included.
+
 ### The rounds list: grouped by project, with BCB, planned award and aging (2026-09-06)
 
 It was one flat list across every project with six columns. An officer runs
