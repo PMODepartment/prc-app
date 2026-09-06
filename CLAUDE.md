@@ -3125,6 +3125,50 @@ python check_tours.py
 - Proven: planting `#bp-comparison` and `#bp-evaluation` back gives
   `2 problem(s)`; the real tree gives 0 across **53 steps on six pages**.
 
+### The rounds list: grouped by project, with BCB, planned award and aging (2026-09-06)
+
+It was one flat list across every project with six columns. An officer runs
+solicitations **for a project**, so it is **grouped by project, always** — no toggle.
+The WP List and the Backlog both settled that way once their grouping was right
+(their Flat / By Trade / By Project switch was removed), and a second answer to "how
+is this ordered" is what the toolbar passes kept having to be rescued from. Each
+group header carries its round count and its **total BCB**.
+
+- **Three columns added — BCB, Planned award, Aging — and every column sorts.**
+  Sorting is **by project first** so a group stays contiguous; the chosen column then
+  orders *within* it, the same shape as the Portfolio's `_projRows()`.
+- **Procurement status sorts by `procRank`, not alphabetically** — Awarded does not
+  come after Sourced because of the letter A.
+- **⚠️ AGING IS `planned award − today`, SO OVERDUE READS NEGATIVE** — the app-wide
+  convention, flipped deliberately across both Backlog tables in 2026-08-05. A bid
+  list reading the other way would be the only place in the app where a red number
+  meant the opposite thing. The sign is always printed, so a lone number is never
+  ambiguous.
+- BCB is gated on `window.__hideBudget` like every other money column, even though
+  read-only roles are already barred from this page.
+- **No `db.js` change** — `getWPsByIds` already does `select('*')`.
+
+#### ⚠️ UNKNOWN MUST SORT LAST IN BOTH DIRECTIONS, AND THAT LIVES IN THE COMPARATOR
+
+Both this table and **Quotations received** used **`+Infinity` as a sentinel**, which
+lands last ascending and then **FIRST descending** — one click and the rows we know
+least about sat at the top of a table somebody is prioritising from. **A missing lead
+time is not "longest", a missing BCB is not "biggest", a missing planned date is not
+"furthest away": unknown is not a position on the scale.** `_lsVal`/`_rqVal` now
+return `null` and **`_cmpNullsLast(x, y, dir)`** places it last regardless of `dir`.
+
+**The comment already claimed this behaviour; the code did not do it** — and it
+passed review because only the ASCENDING case had ever been exercised (every bidder
+in the test data happened to have a lead time). **When a sort claims a null rule,
+test the descending direction with a null present.**
+
+**The one remaining `Infinity` is correct**: `_ccAuto`'s "pick the six lowest by net"
+is a one-directional min-selection where an unpriced bidder genuinely belongs last.
+
+**Verified in the harness** (now generated with BOTH the list and the round page):
+groups stay contiguous under every sort, and the unknown row is last within its
+group in bcb asc/desc, aging asc/desc and planned desc.
+
 ### A round reads in the PRESENT tense; the work package keeps the PAST (2026-09-06)
 
 `migrations/2026-09-06_bid_officer_contact.sql` (**RUN**). A round is an activity
