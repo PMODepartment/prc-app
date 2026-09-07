@@ -7748,6 +7748,56 @@ Unlinked vendor names **1,345 → 941**, Import from WPs **840 → 477** (363 du
 will now not be created), and Backfill Trade/Bid Data **99 → 113**, which is the right direction:
 more vendors resolve, so there is more bid history it can write.
 
+### `Bu-Cels` / `Bu-Formworks` are Megawide's own PCS business units (2026-09-07)
+
+The user spotted that `Bu-Cels` and `Bu-Formworks` in the contractor text are **MCC PCS business
+units**, and asked for every similar instance to be fixed. Each unit has its OWN directory row, so
+20 aliases now cover the `BU`-prefixed family and two typos:
+
+| unit | row | forms aliased |
+|---|---|---|
+| CELS | V-00813 MCC - PCS CELS `[Equipments and Fuel]` | `BU Cels`, `MCC BU CELS` (+ `Cels`, `Bu-Cels` earlier) |
+| Formworks | V-00814 MCC - PCS Formworks `[Formworks]` | `Bu-Formworks`, `BU FORMWORKS`, `BU - FORMWORKS`, `MCC BU FORMWORKS` |
+| Precast | V-00815 MCC PCS Precast | `BU Precast`, `BU-PRECAST`, `BU - PRECAST`, `MCC BU PRECAST`, `Megawide Construction Corporation - Bu Precast` |
+| Batching Plant | V-00812 MCC PCS Batching Plant | `BU Batching`, `BU Batching Plant`, `BU - BATCHING PLANT`, `MEGAWIDE CONSTRUCTION CORPORATION - BU BATCHING` |
+| Central Warehouse | V-00852 MCC-EPC Central Warehouse | `Cental Warehouse` and `MCC - EPC Cental Warehouse` (**typo of Central**), `BU Central Warehouse` |
+| Facilities Management | V-00941 MCC - PCS Facilities Management | `BU Facilities Management`, `PCS Facilities Management` |
+
+**⚠ MAP TO THE SPECIFIC BUSINESS UNIT, NEVER TO THE PARENT.** `MEGAWIDE CONSTRUCTION CORPORATION
+- BU BATCHING` goes to V-00812, not to V-01175 MEGAWIDE CONSTRUCTION CORPORATION — the BU is what
+supplied the scope, and rolling it to the parent would move the attribution to a different row.
+An earlier pass had *refused* that string for exactly this reason; the fix was to point it at the
+BU, not to accept the parent.
+
+**⚠ Case and punctuation variants share one alias.** The alias index keys on a punctuation-
+squashed form, so `Bu-Formworks`, `BU FORMWORKS` and `BU - FORMWORKS` all reduce to `buformworks`
+— one row covers all three. Writing them separately just produces a duplicate-key error, which
+is how the constraint proved it.
+
+**Where the value landed: PROPOSED vendors, not awarded spend.** These forms sit overwhelmingly in
+`proposed_vendors` (541 mentions), so unattributed awarded spend only moved ₱1.024B →
+**₱1.009B (8.5%)** — but **proposed-vendor resolution across the whole dataset is now 3,824 of
+5,210 mentions (73.4%)**, which is what the WP-List vendor filter and every vendor profile's
+work-package list read. **A link is worth writing even when no money moves.**
+
+#### ⚠⚠ A BARE `Precast` ALIAS WAS ASKED FOR, AND THE ₱561.2M BEHIND IT WAS MY OWN ARTIFACT
+
+A scan reported `Precast` as an unresolved form worth **₱561.2M**, and the instruction was to award
+it to MCC PCS Precast. **That figure was a measurement artifact and had to be corrected before
+acting on it:** the regex matched the WORD "Precast" *inside* longer names — `Global Precast
+Building Solutions, Inc.`, `MCC - PCS Precast` — and then summed the whole work package, nearly
+all of which already resolved.
+
+Verified against the data: **there are ZERO standalone `Precast` segments**, and all ten real MCC
+variants already resolve to V-00815. So a bare alias would have attributed **nothing**, while
+creating a live shadowing risk: **V-00549 `Global Precast Building Solutions, Inc.` is a real
+third-party company**, and a bare-word alias could credit its work to Megawide's own BU.
+
+The one genuine gap the check DID find was `Megawide Construction Corporation - Bu Precast`, which
+resolved to nothing. That is now aliased, which achieves the intent exactly. **`Precast` alone
+still resolves to NOTHING, deliberately — do not alias a bare industry word that another
+registered vendor also carries.**
+
 ### The single-blocker bucket: one missing name was holding a whole string (2026-09-07)
 
 Worked the "one unresolved company" bucket, which had grown to **28 names blocking ₱887.6M across
