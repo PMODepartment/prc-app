@@ -7748,6 +7748,62 @@ Unlinked vendor names **1,345 → 941**, Import from WPs **840 → 477** (363 du
 will now not be created), and Backfill Trade/Bid Data **99 → 113**, which is the right direction:
 more vendors resolve, so there is more bid history it can write.
 
+### The acronyms are in, and a 5-character floor was hiding ₱270M (2026-09-07)
+
+The user confirmed the initials-based candidates, so all 12 acronyms are now aliased: 7 by NAME
+match (the registered name contains the acronym) and **5 by INITIALS match, user-confirmed** —
+`CCSP` → China Communications Services Philippines, `GCCI` → Grand Creare Construction,
+`LRPA` → L. R. Punsalan & Associates, `ISTS` → Industrial Solutions & Technical Services,
+`JSEC` → Jardine Schindler Elevator. Each alias note records that it was user-confirmed and why,
+so the basis is auditable rather than folklore.
+
+**₱1.319B → ₱1.192B unattributed (11.1% → 10.0%)**, names 66 → 60, aliases 483 → 488,
+work packages carrying vendor id links 225 → 375 over the wider effort.
+
+#### ⚠⚠ A <5-CHARACTER FLOOR IN THE TILER MEANT AN ALIAS COULD NEVER TILE A 4-CHAR ACRONYM
+
+`WCB358 WP68` (₱270.5M) resolves on ALL THREE of its segments — Fujihaya Electric, Tomelekt,
+CCSP — and the tiler still reported it unwritable. Cause: the tiler skips any span whose squashed
+form is under 5 characters, to stop tiny fragments matching. `ccsp` is 4. So were `gcci`, `jsec`,
+`ists`. **The floor was silently cancelling the aliases that had just been created for exactly
+these names.**
+
+The fix is not to lower the floor — that would let bare fragments match again — but to let a
+sub-floor span through **only when `resolveVendorNameTier` reports `'alias set by a person'`**.
+An alias is an explicit human decision, so it is entitled to bypass a heuristic guard; a derived
+tier is not. **If you add another length or shape guard to a matcher, exempt the alias tier.**
+
+#### ⚠ THE INVERSE OF THE MAGCALAS NEAR-MISS, AND IT CAME OUT RIGHT
+
+`STM101 WP17` reads `"JASL Constuction Supply Magcalas-Romero Construction Supplies Trading"`.
+Longest-first captured the FULL name including `Trading`, so it tiled to **V-01465, the ACCREDITED
+company** — not the blacklisted `...Supplies`. That is the same pair that produced the earlier
+near-miss when a typo (`Traiding`) was dropped. **Correct spelling tiles correctly; it was only
+the filler-drop that picked the wrong twin.** A pre-write sweep confirms no target vendor in a
+batch is problematic, on top of the tiler's own refusal.
+
+#### ⚠⚠ `RAMP` AND `AMG` DO NOT EXIST IN ANY SOURCE — CHECKED EXHAUSTIVELY, DO NOT GUESS
+
+Asked whether they might be vendor names rather than acronyms (a fair instinct) and whether they
+sit on the unaccredited list. Searched as a **substring, any spacing or punctuation**, across:
+
+- the workbook's **2,403 accredited**, **31 unaccredited** and **3 problematic** rows — nothing;
+- the **live directory's 2,404 rows** — nothing.
+
+The only loose hits are coincidences (`Wolf`**ram G**`roup`, `S`**am G**`lobal Security`). The
+nearest plausible candidate for `RAMP` is V-01648 `Ramon D. Aguilos Engineering Consultants`,
+which IS a consultancy on the right kind of WP — **and it was deliberately NOT written**, because
+"Ramp" from "Ramon D. Aguilos" is a guess, not a derivation. These two need the officer or the PO.
+
+#### ⚠ WHY SO MUCH IS STILL STUCK IN ONE STRING: THE ANALYTICS DOES NOT SPLIT ON COMMAS
+
+`"GCCI, J.Pastor"` (₱96.8M) and `"Arkitekton, Beebee Construction, Gonzales Lumber, MGH Trading,
+Ursua Sand Gravel"` (₱48.7M) each reach the analytics as ONE unresolvable name, even though most
+of their members now resolve. That is **correct and must stay** — comma is barred as a delimiter
+app-wide because `"Company, Inc."` would shred (see `_splitVendors`). **The route for a
+comma-joined string is therefore writing `awarded_vendor_ids`, never widening the splitter** —
+and that still requires EVERY member to resolve, which is why `J.Pastor` alone holds ₱96.8M.
+
 ### "Various Supplier" is not a placeholder for ONE vendor, and the acronyms split two ways (2026-09-07)
 
 Asked to look for a pattern behind `Various Supplier`, and to check whether any masterlist company
