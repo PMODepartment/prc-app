@@ -11,13 +11,13 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907l"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260907l"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907l"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260907l"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907m"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260907m"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907m"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260907m"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907l"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907m"/>
   <style>
     .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
     .form-group{display:flex;flex-direction:column;gap:5px}
@@ -820,10 +820,10 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260907l"></script>
-<script src="assets/js/ui.js?v=20260907l"></script>
-<script src="assets/js/db.js?v=20260907l"></script>
-<script src="assets/js/coachmarks.js?v=20260907l"></script>
+<script src="assets/js/auth.js?v=20260907m"></script>
+<script src="assets/js/ui.js?v=20260907m"></script>
+<script src="assets/js/db.js?v=20260907m"></script>
+<script src="assets/js/coachmarks.js?v=20260907m"></script>
 <script>
   const TRADE_WORKS = {
     'General Requirements': [
@@ -2450,6 +2450,23 @@ AppAuth.requireLogin(async (user, profile) => {
       if (!freeOfCharge && !getNum('f-contract'))
                                      return showErr('This WP is marked Awarded — enter the Awarded Cost (Net), set Award Status back to "Not Yet Awarded", or check "No-Cost Award" / "Not to be Awarded".', 'f-contract');
       if (!getVal('f-contractor'))   return showErr('This WP is marked Awarded — add at least one Awarded Vendor, set Award Status back to "Not Yet Awarded", or check "Not to be Awarded".', 'av-input');
+      /* ⚠️ A PLACEHOLDER IS NOT A VENDOR, AND THIS IS HOW "n/a" GOT INTO THE
+         DIRECTORY. Reported 2026-09-07: an officer typed `n/a` because the
+         Awarded Vendor field is REQUIRED once a WP is Awarded and they had not
+         found the "Not to be Awarded" checkbox. Four UTM work packages ended up
+         awarded to a company called "n/a", and a vendor record was created for
+         it. The message above already offers the alternative — what was missing
+         is that the field ACCEPTED the placeholder, so the officer never had to
+         read it. Refusing it here is what closes the loop.
+         ⚠️ Uses the shared predicate, so this can never disagree with the guard
+         on vendor CREATION or with the import's own filter. */
+      if (window.VendorDb && VendorDb.isPlaceholderVendorName
+          && VendorDb.isPlaceholderVendorName(getVal('f-contractor'))) {
+        return showErr('“' + getVal('f-contractor') + '” is a placeholder, not a company. '
+          + 'If this WP will never be awarded, check “Not to be Awarded”. If it was awarded '
+          + 'at ₱0, check “No-Cost Award” and still name the vendor providing it free. '
+          + 'Otherwise enter the real company.', 'av-input');
+      }
       // Co-award: every awarded vendor needs its own negotiated amount (they sum to the Awarded Cost).
       if (_avIsMulti() && !freeOfCharge) {
         const missing = _avChips.filter(c => c.id && (c.amount == null || isNaN(c.amount) || c.amount <= 0));
