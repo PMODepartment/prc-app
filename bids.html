@@ -83,9 +83,6 @@
     .aw-when{font-size:0.7143rem;color:var(--text-hint)}
     .aw-why{flex:1 1 100%;font-size:0.7143rem;color:var(--text-secondary);font-style:italic}
     .aw-acts{display:flex;gap:6px;margin-left:auto}
-    .bid-nav a.on{background:var(--mw-red-light);color:var(--mw-red-ink);font-weight:800}
-    .bid-nav a i{font-size:0.6429rem;margin-left:6px;opacity:.8}
-    html.dark-mode .bid-nav a.on,body.dark-mode .bid-nav a.on{background:#33211F;color:#FF8B80}
     /* A step is a <button> now, so undo the UA chrome and keep the pill shape.
        ⚠️ RESET `appearance` ONLY — do NOT add `font:inherit`. `.bm-step` already
        sets font-family/size/weight, so `font:inherit` overrode its 0.7857rem
@@ -415,27 +412,30 @@
       .nv-figs{justify-content:flex-start}}
     /* Section jump. Sticky rail on desktop, a scrolling strip on narrow
        screens — the shape wp-form.html and the dashboards already use. */
-    .bid-layout{display:flex;gap:18px;align-items:flex-start}
-    .bid-layout > #roundHost{flex:1;min-width:0}
-    /* Matches wp-form.html's #form-nav exactly - same width, offset, radius, shadow
-       and type - so the two rails in this app are the same component. */
-    .bid-nav{position:sticky;top:72px;flex:0 0 210px;max-height:calc(100vh - 88px);overflow-y:auto;
-      display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:12px;
-      background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-sm)}
-    .bid-nav a{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;
-      text-decoration:none;font-size:0.8571rem;font-weight:600;color:var(--text-secondary);
-      border-left:2.5px solid transparent;line-height:1.35;white-space:nowrap;
-      transition:background .15s,color .15s}
-    .bid-nav a:hover{background:var(--surface-2);color:var(--text-primary)}
-    .bid-nav a.on{background:var(--mw-red-light,#FDECEA);color:var(--mw-red-ink);
-      border-left-color:var(--mw-red)}
-    #roundHost .panel{scroll-margin-top:84px}
-    @media (max-width:900px){
-      .bid-layout{display:block}
-      .bid-nav{position:sticky;top:52px;z-index:9;flex-direction:row;max-height:none;
-        overflow-x:auto;overflow-y:hidden;margin-bottom:12px;padding:6px}
-      .bid-nav a{white-space:nowrap;border-left:0;border-bottom:3px solid transparent}
-      .bid-nav a.on{border-left:0;border-bottom-color:var(--mw-red)}
+    /* ⚠️ THE 210px PHASE RAIL IS GONE, and the stepper is sticky instead.
+       Once each phase became a page of its own the rail stopped scroll-spying
+       anything and became a second copy of the stepper — same four labels, the
+       same `_phaseTab`, the same live marker — while costing 228px of width on
+       the page that carries the widest table in the app. One control, always
+       reachable, and the comparison gets the space back.
+       ⚠️ IT MUST BE A CHILD OF #roundHost, NOT of the first panel: sticky is
+       bounded by its containing block, so inside that panel it would unstick
+       the moment the panel scrolled past. */
+    .bm-stepbar{position:sticky;top:60px;z-index:20;background:var(--bg);
+      padding:10px 0 2px;margin-bottom:6px}
+    /* ⚠️ `.panel` CARRIES NO MARGIN OF ITS OWN — the rest of the app spaces
+       panels with per-instance inline styles, so the three stacked panels in a
+       phase (Scope and terms · Documents and priced items · Proposed vendors)
+       butted straight into one another with no gap at all. */
+    #roundHost .panel{margin-bottom:16px;scroll-margin-top:84px}
+    #roundHost .panel:last-child{margin-bottom:0}
+    /* The sub-blocks inside a panel need air between them too: an empty state,
+       its add-row, then the next sub-heading ran together. */
+    #roundHost .ref-sub{margin-top:22px}
+    #roundHost .ref-sub:first-child{margin-top:0}
+    @media (max-width:767px){
+      /* The topbar is 52px here, not 60. */
+      .bm-stepbar{top:52px}
       #roundHost .panel{scroll-margin-top:108px}
     }
     /* A sub-heading carries its own six-word explanation, so the panel needs no
@@ -736,7 +736,7 @@
        table to whatever fits. Collapse a band and it refits BIGGER, which is
        exactly what zooming out of a workbook and hiding rows does. */
     body.cc-present{overflow:hidden}
-    body.cc-present .sidebar,body.cc-present .topbar,body.cc-present .bid-nav,
+    body.cc-present .sidebar,body.cc-present .topbar,
     body.cc-present .panel:not(#bp-costcompare),body.cc-present .cc-bar,
     body.cc-present .cc-hint,body.cc-present #bp-costcompare .sec-note{display:none!important}
     body.cc-present .main{margin-left:0!important}
@@ -911,10 +911,7 @@
       <div id="bidRoundPage" style="display:none">
         <button class="btn" onclick="showList()" style="margin-bottom:14px">
           <i class="ti ti-arrow-left"></i> All bid rounds</button>
-        <div class="bid-layout">
-          <nav class="bid-nav" id="bid-nav" style="display:none"></nav>
-          <div id="roundHost"></div>
-        </div>
+        <div id="roundHost"></div>
       </div>
     </div>
   </div>
@@ -1070,11 +1067,14 @@ function configureBidTour() {
   CoachTour.configure({
     key: 'coach_bids',
     steps: [
-      /* ⚠️ THE LIST STEPS NEED when() FOR THE SAME REASON #bid-nav DOES.
+      /* ⚠️ THESE LIST STEPS NEED when(), AND THEY ARE THE ONLY ONES THAT DO.
          #bidListPage and everything in it is authored into the page and merely
          hidden while a round is open, so computeLive() — which counts on
-         EXISTENCE, deliberately — counted both and then skipped them: opening
-         the tour inside a round read "Step 3 of 14" and delivered twelve. */
+         EXISTENCE, deliberately, since visibility moves as the tour walks —
+         counted both and then skipped them: opening the tour inside a round
+         read "Step 3 of 14" and delivered twelve. Every workspace step below is
+         generated by renderRound's innerHTML, so it is genuinely absent until
+         it exists and needs no predicate. */
       { sel: '#btnNewRound', title: 'One round, one solicitation', when: _onBidList,
         body: 'A round is one work package going out to bid. Re-tendering never reopens a round '
             + '&mdash; it starts a new one, so the attempt that failed stays readable exactly as it was. '
@@ -1150,16 +1150,14 @@ function configureBidTour() {
             + 'promotes every offer into that vendor’s bid history, and marks the others not awarded. '
             + 'The NOA and the Letter of Regret stay a separate process &mdash; the app records that a '
             + 'notice went out and its reference.' },
-      /* ⚠️ `when()` IS REQUIRED HERE, and only here. computeLive() counts a step
-         if its element EXISTS, deliberately — visibility moves as the tour walks.
-         But #bid-nav is authored into the page with style="display:none" and only
-         revealed once a round is open, so on the rounds list it was counted and
-         then skipped: the card read "Step 1 of 3" and delivered two. Every other
-         workspace panel is generated by innerHTML, so it is genuinely absent
-         until it exists and needs no predicate. */
-      { sel: '#bid-nav', title: 'Jumping about', when: function () { return _shown('bid-nav'); },
-        body: 'The rail follows the sections that are actually on screen, so it grows as the round '
-            + 'progresses. That is the whole tour &mdash; reopen it any time from the <b>?</b> button.' },
+      /* Repointed from the removed #bid-nav rail. Generated by renderRound's
+         innerHTML like every other workspace panel, so it is genuinely absent
+         until a round is open and needs no when() predicate. */
+      { sel: '.bm-stepbar', pad: 6, title: 'Moving between the phases',
+        body: 'The stepper is also the tab bar, and it sticks to the top as you scroll. The '
+            + 'filled step is where the round <b>is</b>; the ringed one is what you are '
+            + '<b>reading</b>. Clicking only changes the view &mdash; nothing here sets a status. '
+            + 'That is the whole tour &mdash; reopen it any time from the <b>?</b> button.' },
     ],
   });
 }
@@ -1786,8 +1784,7 @@ function stepperHtml() {
        it did not reach anywhere, and a part-filled bar would say it did. */
     + '<div class="bm-track"><i style="width:'
     + (cancelled || atTrue < 0 ? 0
-        : Math.round(((atTrue + 1) / steps.length) * 100)) + '%"></i></div>'
-    + wpStatusLine();
+        : Math.round(((atTrue + 1) / steps.length) * 100)) + '%"></i></div>';
 }
 
 /* The work package's own Procurement Status, shown so it is visibly the same
@@ -1926,35 +1923,6 @@ async function finishAwardOnWp() {
       render nothing until the round reaches them (there is no comparison
       before a bid arrives), and a link to a section that is not there is worse
       than no link. */
-function buildBidNav() {
-  const nav = document.getElementById('bid-nav');
-  if (!nav) return;
-  const host = document.getElementById('roundHost');
-  /* the rail lists PHASES now, not panels. It used to list all nine, which is
-     the same long sequence the regrouping exists to remove - and it auto-assigned
-     POSITIONAL bsec-N ids to panels that had none, so a link meant a different
-     section before and after a bid arrived. Four phase links; the sections carry
-     their own ph-* ids. */
-  /* ⚠️ IT SWITCHES THE PHASE, IT NO LONGER SCROLL-SPIES ONE. Only the selected
-     phase is in the DOM now, so an observer watching four sections would be
-     watching three that do not exist. Same four links, same place; they set the
-     tab, and the live phase is marked so the rail says where the round IS as
-     well as what you are reading. */
-  const live = _livePhase();
-  nav.style.display = '';
-  nav.innerHTML = PHASE_TABS.map(function (p) {
-    return '<a href="#" data-phase="' + esc(p) + '"'
-      + (p === _phaseTab ? ' class="on"' : '')
-      + (p === live ? ' data-live="1"' : '') + '>' + esc(roundLabel(p))
-      + (p === live ? '<i class="ti ti-player-play-filled"></i>' : '') + '</a>';
-  }).join('');
-  if (_bidSpy) { _bidSpy.disconnect(); _bidSpy = null; }
-  nav.querySelectorAll('a').forEach(function (a) {
-    a.onclick = function (e) { e.preventDefault(); setPhaseTab(a.dataset.phase); };
-  });
-}
-let _bidSpy = null;
-
 /* ── Reference pack ────────────────────────────────────────────────────────
    What the bidder prices AGAINST. A scope paragraph is enough for a materials
    enquiry; for anything with a specification it is not — the pumps case
@@ -2408,7 +2376,7 @@ function renderRound() {
     + '<h2>' + esc(wpLabel(w)) + '<small>' + esc(projName(R.project_id))
     + (w.trade ? ' · ' + esc(w.trade) : '') + '</small></h2>'
     + bcbStrip() + '</div>'
-    + stepperHtml()
+    + wpStatusLine()
     + (canManage && R.stage !== 'awarded' && R.stage !== 'cancelled'
         ? '<div class="bm-actions" style="margin-top:-4px">'
           + nextStepHtml()
@@ -2433,6 +2401,10 @@ function renderRound() {
          + 'This round was cancelled' + (R.cancelled_reason ? ': ' + esc(R.cancelled_reason) : '.') + '</div>'
        : '')
     + '</div>'
+    /* ⚠️ OUTSIDE the panel above, on purpose — see .bm-stepbar in the CSS.
+       Sticky is bounded by its containing block, so in there it unstuck the
+       moment that panel scrolled past. */
+    + '<div class="bm-stepbar">' + stepperHtml() + '</div>'
     + deadlineNudge()
     + (_phaseTab !== 'Sourced' ? '' : phaseSection('Sourced', '',
         askPanel() + referencePanel() + biddersPanel()))
@@ -2448,7 +2420,6 @@ function renderRound() {
     + (_phaseTab !== 'Awarded' ? '' : phaseSection('Awarded', '',
         awardPanel()));
 
-  buildBidNav();
   ccAfterRender();
 }
 
