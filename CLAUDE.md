@@ -8936,6 +8936,98 @@ Removing 49 false resolutions put those multi-company names back on the worklist
 and the new guard stops them being resolved away again. **A badge falling is not by itself
 progress.**
 
+### The accreditation spread reconciles exactly to the masterlist (2026-09-07)
+
+| standing | vendors | |
+|---|---|---|
+| accredited | **2,400** | the masterlist's 2,403 accredited codes, less the 3 that are a second code for a company already counted |
+| problematic | **3** | all three blacklisted companies are present and flagged |
+| Not Accredited (NULL) | **31** | **exactly the masterlist's 31 non-accredited prospects** |
+| | **2,434** | |
+
+Checked name by name: **31 of the 32 code-less rows ARE the workbook's non-accredited sheet**, held
+with no standing — which is the correct representation, since "Not Accredited" is the ABSENCE of a
+value, not a word (`ACCREDITATIONS` is `['accredited','problematic']`). The 32nd, `Sy2 + Associates,
+Inc`, is a work-package-derived row absent from the masterlist. **Nothing to stamp.**
+
+**⚠ THE ODD ONE OUT WAS A SPLIT RECORD MY DUPLICATE SCAN COULD NOT SEE.** `Bagayas Construction
+Services` sat in the code-less/no-standing group, yet the masterlist lists that exact name as
+**accredited under V-00474**. The app held the company as TWO rows under DIFFERENT names —
+`"Bagayas"` (V-00474, carrying the BP code, TIN and accreditation, no data) and `"Bagayas
+Construction Services"` (no code, no standing, carrying **2 bids and 2 work-package links**). An
+exact-name duplicate scan and a same-code scan both miss this shape. Merged onto V-00474 (the row
+with the standing, per the canonical rule), **renamed to the masterlist's full form**, and the short
+form kept as an alias per the merge lesson above. Both bids and both WP links carried across.
+
+**Generalised afterwards by grouping the DIRECTORY on TIN root + branch: 24 groups hold two or more
+rows for one taxpayer branch** — and **none of them is a duplicate to merge.** They are the same
+one-taxpayer-several-names groups already audited from the workbook side: renames (UCPB ->
+Cocogen, PNB-Mizuho -> PNB-IBJL, MAA -> Maagap, Philippine AXA -> AXA Philippines),
+sole-proprietor trade names (SGQ Construction / Silverio Genorga Quinones III, IES Electrical /
+Efren Descarga, R.R. Trading / Rachell Ann - Rica Mae), brand names (Philflex Wires / Philips Wire &
+Cable), and separate dealership OUTLETS under one group TIN (Toyota Pasig / Makati / Shaw, Honda
+Makati / Shaw, Ford Manila / Global City Auto). **The app correctly holds them apart, because each
+is its own BP code in Megawide's own SAP master, and both names then resolve with no alias needed.**
+
+**⚠ Two of the 24 are workbook TIN ERRORS, not shared identity:** `V-01342 Rapid Forming` +
+`V-01343 RCBC Bankard` (a formwork manufacturer and a credit-card company), and `V-01566 CSRM
+Electrical Services` + `V-01712 Plantitas Landscaping Services`. Flagged upstream, changed nowhere.
+
+### ⚠ INVISIBLE UNICODE: a class the control-character scan CANNOT see (2026-09-07)
+
+The earlier hygiene scan tested `[\x00-\x1F\x7F]` and reported zero control characters —
+correctly, but that range cannot match a **zero-width space (U+200B)**, which is above U+007F. Two
+fields carried one, both faithfully imported from the masterlist: `V-01201`'s NAME
+(`\u200B24-1 Harmony Laundry & Water Station`) and `V-00851`'s address. A leading ZWSP is invisible
+in every review and **silently breaks exact-name resolution**, so the row can never match its own
+name. Both stripped, NBSP normalised to a real space, whitespace collapsed.
+
+**⚠ WRITE THESE AS `\uXXXX` ESCAPES, NEVER PASTE THE CHARACTER.** A pasted invisible character is
+unreviewable — and it did not even survive transmission: the first attempt at this scan came back
+`SyntaxError: Invalid regular expression`. Same rule already recorded for control bytes in
+`vendors.html` and `review.html`, and it applies to a REGEX just as much as to source text.
+**Scan for `[\u200B-\u200F\u2060\u180E\uFEFF\u00AD]` and `[\u00A0\u2007\u202F]`, not just
+`[\x00-\x1F]`.**
+
+### ⚠ `V-02293` IS LITERALLY NAMED `", Inc."` — AND THAT IS THE SOURCE, NOT THE IMPORT (2026-09-07)
+
+Spotted only by READING THE RENDERED PAGE: the vendor list's first card showed a name that is
+nothing but a comma and a legal suffix. It carries a real BP code and a real TIN
+(`008-899-849-00000`), so it is an accredited company whose name was lost — **and the accredited
+masterlist itself carries the row as `", Inc."`**, so the app is a faithful copy of a bad source
+row with nothing to correct it against. It is unique on that TIN root in the workbook, so no sibling
+row identifies it either.
+
+**⚠ A NAME INFERRED FROM AN EMAIL DOMAIN IS A GUESS AND WAS DELIBERATELY NOT WRITTEN.** Its
+contact email is `sales.esquareshowroom@gemkonstruk.ph`, which strongly suggests a company name —
+but writing one would assert an identity nobody confirmed, on an accredited vendor. The evidence
+(TIN, contact person, number, email) is recorded in the row's `notes` for whoever can identify it;
+**ask Procurement for the registered name.**
+
+**A pure-filler name is worth scanning for as its own class:** a name whose every token is a legal
+form, or that begins with punctuation, or that has —2 alphanumeric characters. Two rows matched
+across 2,434, and neither was reachable by the artifact, whitespace, mojibake or trailing-punctuation
+tests that had already been run.
+
+### Final state (2026-09-07)
+
+Real projects only, DEMO excluded. **Integrity: 0 dangling ids, 0 misaligned amount arrays, 0 rows
+where `vendor_id` is not a member of `awarded_vendor_ids`, across all 1,879 work packages.**
+
+| | |
+|---|---|
+| directory | **2,434** — 2,400 accredited ₱ 3 problematic ₱ 31 not accredited |
+| masterlist BP codes missing from the app | **0** |
+| aliases | **517** |
+| awarded WPs naming a vendor / linked | 440 / **363** |
+| unattributed awarded spend | **₱1.506B (12.7%)** of ₱11.885B, 77 WPs |
+| awarded WPs naming NOBODY | **915** (₱13.95B) — needs the PO, not matching |
+| WPs with proposed text / linked | 1,630 / **894** (2,231 ids, was 0) |
+| bids / rates / products | **1,222 / 517 / 499** |
+| vendors carrying a trade category | **570** |
+| Needs Splitting ₱ exact duplicates ₱ non-canonical trades | **0 ₱ 0 ₱ 0** |
+| Backfill badge | **24** (structural floor: ₱0 awards and co-awards) |
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
