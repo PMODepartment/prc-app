@@ -276,6 +276,19 @@
        it for dark mode would preview something the recipient never sees. */
     .rfq-preview{max-height:340px;overflow:auto;background:#fff;color:#000;
       border:1px solid var(--border-md);border-radius:8px;padding:16px 18px}
+    /* ⚠️ THIS WAS THE ACTUAL READABILITY BUG (found by rendering the real CSS in a
+       harness, not by eye): dashboard.css's `.modal p { color:var(--text-secondary);
+       font-size:0.8571rem }` is a generic "muted confirmation-dialog copy" rule —
+       and every paragraph the letter is built from is a bare `<p style="margin:...">`
+       with no colour/size of its OWN, so it's a direct match for `.modal p`, which
+       beats the INHERITED black/11pt from this div's ancestor regardless of
+       specificity (a directly-matching rule always outranks inheritance). Verified:
+       computed colour on a letter <p> was rgb(220,219,219) — dark mode's
+       --text-secondary — instead of the intended black. Same specificity as
+       `.modal p` (one class + one tag), so source order alone settles the tie in
+       our favour since this block loads after dashboard.css — no !important needed,
+       confirmed by re-measuring in the harness. */
+    .rfq-preview p, .rfq-preview div { color:inherit; font-size:inherit; }
     /* Editable, so it has to look editable AND show focus — a contenteditable
        div inherits none of an input's affordances. */
     .rfq-preview[contenteditable]{cursor:text}

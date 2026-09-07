@@ -2791,6 +2791,25 @@
     // what "Select all → Ctrl+C → (navigate) → Ctrl+V" means. Narrower blocks stay a
     // positional cell paste (Excel-block interop).
     if (VC.length && rows.length && rows[0].length === VC.length){ _xlPasteWholeWPs(rows); return; }
+    _xlApplyCellPaste(rows);
+  });
+  // Pasting a column of vendor names (Awarded Vendor / Proposed Vendors) over many rows at
+  // once — the whole point of this being a spreadsheet — needs the name→id cache warmed
+  // FIRST: `_xlSet`→`_xlRelinkVendorIds` only links a name it already has cached (typed,
+  // searched, or already on a loaded row), and a bulk paste of names nobody has searched
+  // for this session would otherwise save as plain text with nothing linked to the
+  // directory. `_xlPaste` used to call `_xlSet` synchronously cell-by-cell for exactly this
+  // reason — 100+ Awarded Vendor picks used to mean opening the picker on every single row.
+  async function _xlApplyCellPaste(rows){
+    const vendorNames = [];
+    rows.forEach(function(cells){ cells.forEach(function(v, dc){
+      const col = VC[_xlSel.c + dc];
+      if (col && col.type === 'vendors' && v && v.trim()) vendorNames.push(v);
+    }); });
+    if (vendorNames.length){
+      xlToast('Linking ' + vendorNames.length + ' vendor cell' + (vendorNames.length===1?'':'s') + ' to the directory…');
+      try { await _xlWarmVendorName(vendorNames.join('\n')); } catch(_){ /* linking is best-effort */ }
+    }
     const b=[]; let blocked=0;
     rows.forEach(function(cells,dr){ cells.forEach(function(v,dc){
       const r=_xlSel.r+dr, c=_xlSel.c+dc;
@@ -2799,7 +2818,11 @@
     }); });
     if (b.length) _xlUndo.push(b);
     if (blocked) xlToast(blocked+' cell'+(blocked===1?'':'s')+" skipped (read-only, or a project you can't edit).");
-  });
+    if (vendorNames.length){
+      const linked = vendorNames.filter(function(n){ return _xlVendorByName[_xlVendorNorm(n)]; }).length;
+      if (linked < vendorNames.length) xlToast((vendorNames.length-linked)+' vendor name'+(vendorNames.length-linked===1?'':'s')+" didn't match the directory exactly — saved as text, not linked.");
+    }
+  }
 
   window.gridUndo = function(){
     const batch = _xlUndo.pop();

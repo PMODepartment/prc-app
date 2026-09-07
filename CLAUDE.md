@@ -1071,6 +1071,25 @@ plural by nature).
   which is what later lets a pasted name resolve back to its id. `_xlWarmVendorName` looks a name up
   once before a header-▾ set-all, or a bulk apply would leave every row unlinked purely because nobody
   had searched for that vendor yet this session.
+- **⚠️ BULK CTRL+V PASTE OF A VENDOR COLUMN HAD THE SAME GAP AND WAS THE ACTUAL PAIN POINT
+  (2026-09-07) — "the officer has to select each awarded vendor for 100+ work packages" was
+  reported because pasting a whole Excel column of vendor names over 100+ rows landed as
+  unlinked plain text on any name nobody had searched for yet.** The `paste` listener called
+  `_xlSet` synchronously cell-by-cell with no chance to warm the cache first, unlike the
+  header-▾ set-all path above (which already awaits `_xlWarmVendorName`). Fixed by extracting
+  the cell-paste body into **`async function _xlApplyCellPaste(rows)`**: before writing any
+  cell, it collects every value pasted into a `type:'vendors'` column and
+  `await _xlWarmVendorName(joined)`s them ALL first (one `searchApprovedVendors` call per
+  distinct name, via the existing per-name cache-skip in `_xlWarmVendorName`), THEN runs the
+  normal per-cell `_xlSet` loop — so `_xlRelinkVendorIds` finds the name already cached and
+  links it, exactly as if it had been searched by hand. A toast reports how many cells were
+  being linked, and a second toast afterward names how many names didn't match the directory
+  exactly (saved as text, not linked) — the same "exact match only, never fuzzy" rule as
+  always, so a genuinely unmatched or ambiguous name still saves as plain text rather than
+  guessing. **The full-grid-width "paste whole WPs as new rows" branch (`_xlPasteWholeWPs`)
+  still resolves synchronously off whatever's already cached** — not fixed here, since that
+  path is for adding brand-new rows (typically far fewer at once) rather than the 100+-existing-row
+  bulk-update case that was reported; flag if that path needs the same treatment.
 - **`xlFmt` renders a vendors cell on ONE line (`' ; '`-joined) and `xlCoerce` splits it back to
   newline-joined** — a newline inside a cell would break the tab/newline TSV that Ctrl+C / Ctrl+V and
   Excel interop are built on. **Splitting is newline/semicolon/pipe only, NEVER comma or space**, so
@@ -3309,6 +3328,43 @@ string literals (three literals ended up with real newlines and the file stopped
 in a regex `\\n` in the harness builder (the pattern silently matched nothing and the assert
 fired). Fifth session running. **Write long patches to a file with the Write tool rather than a
 heredoc, and build every escape with `chr(92)`.**
+
+### The RFQ letter preview was unreadable — `.modal p` was clobbering it (2026-09-07)
+
+Reported as "the email preview is not readable, let's fix." **Found by rendering the real
+`dashboard.css` + the real `.rfq-preview` markup in a throwaway harness and reading the
+COMPUTED style, not by eye** — the same technique used earlier this session for the
+`.locked-note` flex clash and the vendor-portal dark-mode gaps.
+
+**⚠️ `dashboard.css`'s `.modal p { color:var(--text-secondary); font-size:0.8571rem }`
+(a generic "muted confirmation-dialog copy" rule, line ~1150) was winning over the letter's
+OWN inherited black/11pt.** Every paragraph the letter is built from (`_hp()`) is a bare
+`<p style="margin:0 0 11pt 0">` with no colour or font-size of its own — only the wrapping
+`<div style="color:#000000;font-size:11pt">` sets those, meant to be inherited down. But a
+directly-matching rule on the element ITSELF always beats an inherited value, with no
+specificity contest needed — so `.modal p`, matching every `<p>` inside the RFQ modal,
+silently overrode both. Measured: a letter paragraph computed to `rgb(220,219,219)` (dark
+mode's `--text-secondary`) and 0.8571rem instead of black 11pt. **This is why the preview
+box in the screenshot read as low-contrast grey text on white — the box itself WAS
+correctly white/black (`.rfq-preview{background:#fff;color:#000}`), it was every `<p>`
+inside it individually re-overriding that back to muted grey.**
+- **Fixed with `.rfq-preview p, .rfq-preview div { color:inherit; font-size:inherit; }`**,
+  added right after `.rfq-preview`'s own rule in `bids.html`'s `<style>` block. Same
+  specificity as `.modal p` (one class + one tag) — ties resolve by SOURCE ORDER, and this
+  block loads after `dashboard.css`'s `<link>`, so no `!important` was needed (confirmed by
+  re-measuring in the harness: `color:rgb(0,0,0)`, `font-size:14.6667px` = 11pt).
+- **⚠️ Scoped to `.rfq-preview` only — `.modal p` is otherwise correct and untouched.** It's
+  the right default for an ordinary confirmation dialog's prose; the RFQ letter is the one
+  place inside a modal that must render as a DOCUMENT (Outlook's own black-on-white), not as
+  app chrome, and that's the whole reason `.rfq-preview` already carries its
+  "deliberately white/black in both themes" comment.
+- **Doesn't touch what actually gets sent.** Outlook has no `.modal p` rule, so the generated
+  HTML (`rfqHtmlDoc`/`rfqLetterHtml`) was never wrong — only this app's own on-screen preview
+  of it was. `_h`/`_hp`/`_hlink` and the `.eml`/clipboard paths are unchanged.
+- **General lesson for this codebase's `.modal p` rule**: any future preview-a-real-document
+  panel placed inside a `.modal` needs the same `color:inherit;font-size:inherit` escape
+  hatch on its own paragraphs, or it will silently read as muted app copy instead of the
+  document being previewed.
 
 ### The phase rail goes, the stepper sticks, and the cards get air (2026-09-07)
 
