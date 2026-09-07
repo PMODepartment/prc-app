@@ -4504,6 +4504,22 @@ function _vdShow(which) {
   if (region) region.scrollTop = 0;
 }
 
+/* One section failing must not blank the rest of the profile, and must not be
+   silent — a staff member needs to know WHICH part did not load. */
+async function _dsec(label, fn, hostId) {
+  try {
+    await fn();
+  } catch (e) {
+    console.error('[vendors] ' + label + ' failed', e);
+    const host = document.getElementById(hostId);
+    if (host) {
+      host.innerHTML = '<div class="empty-state"><i class="ti ti-alert-triangle"></i>'
+        + '<b>Could not load ' + esc(label) + '</b>'
+        + esc((e && e.message) || String(e)) + '</div>';
+    }
+  }
+}
+
 async function openVendorPage(id, opts) {
   const v = allVendors.find(x => x.id === id);
   if (!v) return;
@@ -4518,10 +4534,27 @@ async function openVendorPage(id, opts) {
   if (!(opts && opts.noPush)) {
     try { history.pushState({ vendor: id }, '', 'vendors.html?vendor=' + encodeURIComponent(id)); } catch (_) {}
   }
-  await Promise.all([renderDetailAccred(), renderDetailWps(), renderDetailSched(), renderDetailProducts(),
-                     renderDetailCerts(), renderDetailPersonnel(), renderDetailRates(), renderDetailBids(),
-                     renderDetailHistory()]);
+  /* ⚠️ OVERVIEW RENDERS FIRST, AND THAT IS THE FIX FOR A REPORTED BLANK SECTION.
+     It used to run AFTER `await Promise.all([...nine section renderers])` — and
+     Promise.all rejects on the FIRST failure, so a throw in any one of them
+     meant this line was never reached and the whole Overview stayed empty with
+     nothing on screen to say why. It needs no fetch (every field is already on
+     `activeVendor`), so there was never a reason for it to wait.
+     ⚠️ AND EACH SECTION IS NOW FAULT-ISOLATED, so one failure cannot blank the
+     others and reports itself INSIDE its own section rather than silently. Same
+     bug and same fix as vendor-portal.html's `_step` — see its comment. */
   renderDetailOverview();
+  await Promise.all([
+    _dsec('accreditation', renderDetailAccred, 'dtab-accred'),
+    _dsec('work packages', renderDetailWps, 'dtab-wps'),
+    _dsec('schedule performance', renderDetailSched, 'dtab-sched'),
+    _dsec('products and services', renderDetailProducts, 'dtab-products'),
+    _dsec('certifications', renderDetailCerts, 'dtab-certs'),
+    _dsec('personnel', renderDetailPersonnel, 'dtab-personnel'),
+    _dsec('reference rates', renderDetailRates, 'dtab-rates'),
+    _dsec('bid history', renderDetailBids, 'dtab-bids'),
+    _dsec('change history', renderDetailHistory, 'dtab-history'),
+  ]);
   _wireDetailScrollSpy();
 }
 // Kept: the vendor cards and the analytics ranked tables both call this name.

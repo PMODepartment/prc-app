@@ -30,12 +30,21 @@
     .bm-step{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;
       border:1px solid var(--border-md);background:var(--surface);cursor:default;
       font-size:0.7857rem;font-weight:600;color:var(--text-hint);font-family:inherit;white-space:nowrap}
-    .bm-stepsub{font-style:normal;font-size:0.6429rem;font-weight:700;opacity:.85;
-      padding-left:7px;margin-left:1px;border-left:1px solid rgba(255,255,255,.45)}
+    /* ⚠️ A MIDDOT, NOT A border-left. Against short text on the filled pill the
+       vertical rule read as a strikethrough through the caption. */
+    .bm-stepsub{font-style:normal;font-size:0.6429rem;font-weight:700;opacity:.85;margin-left:2px}
+    .bm-stepsub::before{content:'·';margin-right:4px;opacity:.7}
     .bm-wpstat{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:-8px 0 18px;
       font-size:0.7857rem;color:var(--text-secondary)}
     .bm-wpstat .ti{color:var(--text-hint)}
     .bm-behind{font-size:0.7143rem;font-weight:700;color:var(--mw-red-ink)}
+    /* The next step leads, so it sits first and Cancel is pushed away from it. */
+    .bm-next{margin-right:auto}
+    .bm-next-wait{margin-right:auto;font-size:0.7857rem;color:var(--text-secondary);
+      align-self:center}
+    /* Ahead is not a problem, so it is not red. */
+    .bm-ahead{font-size:0.7143rem;font-weight:700;color:var(--text-hint);cursor:help;
+      border-bottom:1px dotted var(--border-md)}
     .bm-step.done{color:#0F7A46;border-color:#BEEBD3;background:#E7F7EF}
     .bm-step.now{background:var(--mw-red);border-color:var(--mw-red);color:#fff}
     body.dark-mode .bm-step.done{background:#0F2E20;color:#6EE7B7;border-color:#0F7A46}
@@ -1733,11 +1742,26 @@ function setPhaseTab(p) {
   if (h) h.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
+/* ⚠️ THE CAPTION IS SHOWN ONLY WHEN IT ADDS SOMETHING. `stageLabel` restates
+   the phase for three of the stages — "Evaluating · Evaluation" told nobody
+   anything and read as a struck-through duplicate of the word beside it. These
+   four genuinely narrow the phase down: Preparing (nothing sent yet), and the
+   three steps within Evaluating. */
+const STAGE_CAPTION = { draft: 1, clarification: 1, comparison: 1, negotiation: 1 };
+
 function stepperHtml() {
-  const steps = VendorDb.bidRounds.procSteps;
+  /* ⚠️ FOUR PHASES, NOT FIVE. 'Not Started' is the ABSENCE of progress, not
+     something anyone does, so it is not a step — and having it as step 1 pushed
+     every real step's number up by one, so the third thing you do was labelled
+     4 in both the stepper and the phase heading. A round with no bidders yet is
+     at Sourcing: preparing the ask IS the sourcing work, which is what
+     phaseSection already assumed with its own clamp. `procSteps` is untouched —
+     it is the approved status roster and procRank depends on its order. */
+  const steps = PHASE_TABS;
   const cancelled = R.stage === 'cancelled';
   const now = roundProcStatus();
-  const at = steps.indexOf(now);
+  const atTrue = steps.indexOf(now);
+  const at = Math.max(0, atTrue);
   /* ⚠️ THE STEPPER IS ALSO THE TAB BAR, and the two meanings are drawn
      differently ON PURPOSE. `now` (filled red) is where the ROUND IS — derived,
      never clicked. `open` (ring) is which phase you are READING. Clicking
@@ -1746,26 +1770,23 @@ function stepperHtml() {
      first time: a status somebody sets by hand is a status nobody trusts. */
   return '<div class="bm-steps" role="tablist">'
     + steps.map((s, i) => {
-        const has = PHASE_TABS.indexOf(s) >= 0;
-        // ⚠️ Only a real tab takes the ring. `Not Started` folds INTO Sourced for
-        //    navigation, but it is not clickable, and ringing two steps at once
-        //    reads as two things being open.
-        const on = has && s === _phaseTab;
-        return '<' + (has ? 'button' : 'div') + ' class="bm-step'
+        const on = s === _phaseTab;
+        return '<button class="bm-step'
           + (cancelled ? '' : (i === at ? ' now' : (at > i ? ' done' : '')))
           + (on ? ' open' : '') + '"'
-          + (has ? ' type="button" role="tab" aria-selected="' + (on ? 'true' : 'false') + '"'
-                 + ' onclick="setPhaseTab(&#39;' + s + '&#39;)"' : '') + '>'
+          + ' type="button" role="tab" aria-selected="' + (on ? 'true' : 'false') + '"'
+          + ' onclick="setPhaseTab(&#39;' + s + '&#39;)">'
           + '<span class="bm-stepn">' + (i + 1) + '</span>' + esc(roundLabel(s))
-          + (i === at && !cancelled
+          + (i === at && !cancelled && STAGE_CAPTION[R.stage]
               ? '<em class="bm-stepsub">' + esc(VendorDb.bidRounds.stageLabel(R.stage)) + '</em>' : '')
-          + '</' + (has ? 'button' : 'div') + '>';
+          + '</button>';
       }).join('')
     + '</div>'
     /* The same progress as a shape. A cancelled round shows an empty track —
        it did not reach anywhere, and a part-filled bar would say it did. */
     + '<div class="bm-track"><i style="width:'
-    + (cancelled || at < 0 ? 0 : Math.round((at / (steps.length - 1)) * 100)) + '%"></i></div>'
+    + (cancelled || atTrue < 0 ? 0
+        : Math.round(((atTrue + 1) / steps.length) * 100)) + '%"></i></div>'
     + wpStatusLine();
 }
 
@@ -1786,6 +1807,12 @@ function wpStatusLine() {
   //    "procurement status: Not Started" and says nothing about it. That is the
   //    ONE mismatch worth shouting about: the award has not reached the record
   //    anything downstream reads.
+  /* ⚠️ AHEAD IS LEGITIMATE, AND SILENCE MADE IT LOOK LIKE A CONTRADICTION.
+     A package awarded through an earlier round, or awarded elsewhere, outranks
+     a round still evaluating — reported as "why does it say Awarded when it is
+     awaiting decision?". Nothing here pulls it back; it just says so now. */
+  const ahead = want && w.procurement_status
+    && VendorDb.bidRounds.procRank(w.procurement_status) > VendorDb.bidRounds.procRank(want);
   const winner = INV.find(function (i) { return i.outcome === 'awarded'; });
   const awardStranded = R.stage === 'awarded' && w.procurement_status !== 'Awarded';
   return '<div class="bm-wpstat' + (awardStranded ? ' bm-wpstat-bad' : '') + '">'
@@ -1796,6 +1823,10 @@ function wpStatusLine() {
               ? ' <button class="btn btn-sm" onclick="finishAwardOnWp()">'
                 + '<i class="ti ti-refresh"></i> Finish the award</button>'
               : '')
+        : ahead
+        ? ' <span class="bm-ahead" title="The package already reached this status'
+          + ' before this round got there — an earlier round, or an award made'
+          + ' outside the app. A round never pulls it back.">ahead of this round</span>'
         : behind
         ? ' <span class="bm-behind">behind this round</span>'
           + (canManage ? ' <button class="btn btn-sm" onclick="syncWpStatus(true)">'
@@ -2304,14 +2335,13 @@ function phaseSection(label, hint, bodyHtml) {
      line saying what unlocks it, and the rail always lists all four. */
   const empty = !bodyHtml || !bodyHtml.trim();
   if (empty) bodyHtml = '<div class="bm-wait">' + esc(PHASE_WAIT[label] || '') + '</div>';
-  const steps = VendorDb.bidRounds.procSteps;
+  /* ⚠️ PHASE_TABS, NOT procSteps — the same off-by-one as the stepper. Numbering
+     against the 5-entry status roster made Evaluating the 4th heading when it is
+     the 3rd thing you do. 'Not Started' owns no phase, so it clamps to Sourced:
+     the ask and the bidders ARE the sourcing work. */
+  const steps = PHASE_TABS;
   const at = steps.indexOf(label);
-  /* ⚠️ 'Not Started' OWNS NO PHASE, so a draft round used to render with no phase
-     marked live at all — every heading grey, nothing saying where you are.
-     Clamping to 1 makes Sourced the live phase while the round is still being
-     prepared, which is true: the ask and the bidders ARE the Sourced work. Any
-     later status indexes normally. */
-  const cur = Math.max(1, steps.indexOf(roundProcStatus()));
+  const cur = Math.max(0, steps.indexOf(roundProcStatus()));
   const state = R.stage === 'cancelled' ? '' : (at === cur ? ' now' : (cur > at ? ' done' : ''));
   return '<section class="bm-phase' + state + '" id="ph-' + label.toLowerCase() + '">'
     + '<div class="bm-phase-head">'
@@ -2323,6 +2353,33 @@ function phaseSection(label, hint, bodyHtml) {
     + (hint ? '<small>' + hint + '</small>' : '') + '</div>'
     + (function (s) { return s ? '<div class="metrics-grid bm-stats">' + s + '</div>' : ''; })(phaseStats(label))
     + bodyHtml + '</section>';
+}
+
+/* ── what to do next ────────────────────────────────────────────────────────
+   ⚠️ NAMED AFTER THE ACTION, NEVER THE STATUS. The status is DERIVED from the
+      work — that is the whole reason the stepper stopped being a control — so a
+      button reading "Evaluating" would imply setting a label and would put us
+      straight back to a status somebody maintains by hand. "Close for pricing"
+      says what will happen; the status then follows on its own.
+   ⚠️ It does not duplicate any logic: each branch calls the SAME function the
+      panel's own button calls, so there is one code path per transition. */
+function nextStepHtml() {
+  if (!canManage || R.stage === 'awarded' || R.stage === 'cancelled') return '';
+  const b = function (label, icon, call) {
+    return '<button class="btn btn-primary bm-next" onclick="' + call + '">'
+      + '<i class="ti ' + icon + '"></i> Next: ' + label + '</button>';
+  };
+  if (R.stage === 'draft') {
+    return INV.length
+      ? b('issue the RFQ', 'ti-send', 'openRfq()')
+      : '<span class="bm-next-wait">Next: name the vendors you want to invite, below.</span>';
+  }
+  if (R.stage === 'issued') {
+    // The same transition the passed-deadline nudge offers, reachable before it.
+    return b('close for pricing', 'ti-lock', 'setStage(&#39;clarification&#39;)');
+  }
+  // clarification · comparison · evaluation · negotiation → the decision itself
+  return b('award this round', 'ti-award', 'setPhaseTab(&#39;Awarded&#39;)');
 }
 
 function renderRound() {
@@ -2342,6 +2399,7 @@ function renderRound() {
     + stepperHtml()
     + (canManage && R.stage !== 'awarded' && R.stage !== 'cancelled'
         ? '<div class="bm-actions" style="margin-top:-4px">'
+          + nextStepHtml()
           + '<button class="btn" onclick="cancelRound()"><i class="ti ti-ban"></i> Cancel this round</button>'
           + '</div>'
         : '')
@@ -2463,10 +2521,11 @@ function askPanel() {
           + t[1] + ' — ' + t[2] + '</option>';
       }).join('')
     + '</select></div>'
-    + '<div class="field"><label>VAT rate</label>'
+    /* The unit belongs in the label, not in a sentence under the box. Left as
+       (%) rather than (12%) because a zero-rated round would then read wrongly. */
+    + '<div class="field"><label>VAT rate (%)</label>'
     + '<input id="a-vat" type="number" step="0.1" min="0" max="100" value="'
-    + esc(Math.round(roundVatRate() * 1000) / 10) + '" placeholder="12"' + ro + '>'
-    + '<span class="field-hint">Per cent. 12 in the Philippines; zero-rated and exempt work differs.</span></div>'
+    + esc(Math.round(roundVatRate() * 1000) / 10) + '" placeholder="12"' + ro + '></div>'
     /* ⚠️ "Contact" was ambiguous on a page that also holds every BIDDER's contact
        person — a vendor reading the RFQ had to work out whose details these are.
        They are Megawide's, and the labels now say so. */
@@ -4114,7 +4173,14 @@ function vatChip(i) {
    means in the database. */
 function vatSelect(id, cur, ro) {
   return '<select id="' + id + '" class="bm-in"' + (ro ? ' disabled' : '') + '>'
-    + '<option value=""' + (cur ? '' : ' selected') + '>As asked (' + esc(vatLabel(roundBasis())) + ')</option>'
+    /* ⚠️ NOT A SYNONYM FOR THE ROUND'S OWN BASIS, which is why it reads as one
+       and had to be relabelled. Blank means NOBODY HAS CHECKED what this bidder
+       actually quoted, so it falls back to what the letter asked for; picking a
+       basis explicitly records that someone read their quotation and confirmed
+       it. The net figure that drives the ranking and the award is computed from
+       this, so "assumed" and "confirmed" must not look alike. */
+    + '<option value=""' + (cur ? '' : ' selected') + '>Not confirmed — assume as asked ('
+    + esc(vatLabel(roundBasis())) + ')</option>'
     + VAT_BASES.map(function (o) {
         return '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
       }).join('')
