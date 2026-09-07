@@ -7748,6 +7748,87 @@ Unlinked vendor names **1,345 → 941**, Import from WPs **840 → 477** (363 du
 will now not be created), and Backfill Trade/Bid Data **99 → 113**, which is the right direction:
 more vendors resolve, so there is more bid history it can write.
 
+### Were any vendors merged that shouldn't have been? (2026-09-07)
+
+Asked after the Sofaire/Wenjem finding. **Answer: no vendor was destructively merged, but the
+masterlist import silently collapsed 5 pairs of DIFFERENT TAXPAYERS into one row each. All 5 are
+now fixed; total exposure across all of them was ₱3.5M on one work package.**
+
+#### ⚠️ THE TEST IS THE TIN ROOT, NOT THE NAME
+
+Two companies can share a name; the same company can appear under two names. What settles it is
+the Philippine TIN, whose **9-digit root identifies the taxpayer** (the trailing branch code
+does not). So: **a group of workbook rows spanning 2+ TIN roots is 2+ taxpayers and the app must
+hold 2+ rows.** Fewer rows than roots means something was collapsed.
+
+#### ⚠️⚠️ MY FIRST PASS WAS TOO NARROW IN TWO WAYS, AND BOTH MATTER
+
+1. **It used a legal-suffix-only stop list** (inc/corp/ltd/philippines). But the masterlist seed's
+   own `_vcore` ALSO strips **construction / trading / services / supply / builders / ventures /
+   marketing** — so it can collapse `X Trading` with `X Supplies`, which is the documented
+   Magcalas-Romero class where one company is accredited and one BLACKLISTED. Re-running with the
+   seed's real stop list took the at-risk groups from **6 to 11**, adding Abenson, Glory Lumber,
+   Leodemac, Rockbuilt and Syblingss.
+2. **It skipped byte-identical names** as "not this problem". Wrong — two distinct taxpayers
+   sharing an identical name is exactly what **Remove Exact Duplicates** would fold together, and
+   that tool merged 471 groups. **Measured: 0 such groups**, so those 471 merges are clean. That
+   is the reassuring half of the answer and it had to be checked, not assumed.
+
+#### What the 11 groups actually held
+
+| | groups |
+|---|---|
+| identical name spanning 2+ taxpayers | **0** — Remove Exact Duplicates is exonerated |
+| both rows present with their own correct TIN | 6 |
+| **HYBRID** — one row carrying its sibling's TIN | **2** (Sofaire ₱0, Wenjem ₱3.5M) |
+| **sibling had no row at all** | **3** (Genus Rigging, Rockbuilt, Syblingss — all ₱0) |
+
+**⚠️ THE MECHANISM, AND IT EXPLAINS 3 OF THE 13 "IMPORT MISSES".** The seed matched by
+code → exact name → **core name**. On the core-name tier the sole prop and the corporation have
+the SAME core, so the second workbook row matched the first row's record; the seed then fills
+"only where the directory row is still blank", so it contributed whatever was missing and
+created nothing. The result is either a row that is a **field-by-field merge of two legal
+entities** (`Wenjem Enterprises Corp.` carried V-00755's name, code and email but V-00754's TIN
+*and city*) or a taxpayer with **no row of its own** — which then reads as NOT FOUND in the
+reconciliation. `Genus Rigging Supplies Inc.` (V-00167), `Rockbuilt Manufacturing Co., Inc.`
+(V-01423) and `Syblingss Construction Corporation` (V-02183) were all three of those, and all
+three were in the 13.
+
+**⚠️ The seed guarded the OTHER direction only.** Its documented rule — "a source name matching
+more than one directory vendor is SKIPPED" — protects against one workbook name hitting two app
+rows. Nothing protected against two workbook ROWS hitting one app row, which is this bug.
+
+#### Fixed
+
+The 5 missing taxpayers were created from the workbook (own code, TIN, contacts, address,
+accredited), each carrying a note saying it is a separate taxpayer from its same-named sibling
+and why it had no row. The 2 hybrids were corrected to their own code's TIN, city, telephone and
+address, with a note recording the merge. **Verified: all 22 codes across the 11 groups now
+resolve to a row whose TIN matches what the workbook says for that code.** Directory 2,399 →
+2,404.
+
+**⚠️ Correcting a hybrid was only safe because the money was checked first.** Sofaire had **0**
+work packages. Wenjem had **1**, and its contractor text reads *"Wenjem Enterprises Corp."* —
+V-00755, the row that keeps it. Had the text named the sole prop, the ₱3.5M would have had to
+move, and that is not something to infer from a name.
+
+#### ⚠️ A ₱65.1M FIGURE I QUOTED WAS WRONG — CHECK WHAT A QUERY IS MATCHING ON
+
+I first reported "₱65.1M across 4 work packages hangs on which entity was paid". That query
+matched `/sofaire|wenjem/i` against the **contractor TEXT** as well as the FK, so it swept in
+three long multi-company strings that merely contain those names somewhere (UTM101 WP 2 at
+₱50.6M, STM101 WP 34 at ₱10.9M, UTM101 WP 40 at ₱0) — those belong to the Split backlog, not to
+this issue. **The linked exposure was ₱3.5M on one work package.** When a figure is meant to
+measure "what is attributed to THIS vendor", match on the link, not on the text.
+
+#### How to re-run this check
+
+`suffix_pairs.py` / `merge_risk.py` in the scratchpad (both data-bearing, both un-committed):
+group the accredited sheet by identical name, by narrow core and by the seed's broad core; keep
+any group spanning 2+ TIN roots; then ask the live directory how many of that group's codes
+exist and whether each row's TIN matches its own code. **Re-run it after any future masterlist
+import or bulk merge** — it is the only check that catches two entities becoming one row.
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
