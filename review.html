@@ -175,6 +175,23 @@
        (Awarded Vendor, Proposed Vendors). Multi-select: searches the vendor
        directory, holds any number of vendors as chips. */
     #xl-vendor-pop{position:fixed;z-index:60;width:360px;max-width:94vw;background:var(--surface);border:1.5px solid var(--border-md);border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.26);padding:10px;font-size:0.8571rem;box-sizing:border-box}
+    /* The cell editor's own suggestion list. Replaces a native <datalist>,
+       which is OS chrome and cannot be styled at all — see _xlOpenEdList. Lives
+       in #xl-wrap's scroll space exactly like .xl-ed, so it tracks its cell. */
+    #xl-ed-list{position:absolute;z-index:1002;min-width:180px;max-height:236px;overflow-y:auto;
+      background:var(--surface);border:1.5px solid #EE3124;border-radius:8px;
+      box-shadow:0 10px 28px rgba(0,0,0,.18);padding:4px;display:none}
+    #xl-ed-list.open{display:block}
+    #xl-ed-list .xl-eo{display:block;width:100%;box-sizing:border-box;text-align:left;
+      padding:6px 9px;border:1px solid transparent;border-radius:6px;background:transparent;
+      color:var(--text-primary);font-family:inherit;font-size:0.8571rem;line-height:1.35;
+      cursor:pointer;white-space:normal}
+    #xl-ed-list .xl-eo:hover{background:var(--mw-red-light,#FDECEA);border-color:#F5B8B3}
+    #xl-ed-list .xl-eo.on{background:var(--mw-red-light,#FDECEA);border-color:#EE3124;font-weight:700}
+    #xl-ed-list .xl-eo-blank{color:var(--text-hint);font-style:italic}
+    #xl-ed-list .xl-eo-legacy .xl-eo-tag{float:right;font-size:0.6786rem;text-transform:uppercase;
+      letter-spacing:.04em;color:var(--text-hint);font-weight:700;padding-left:8px}
+    #xl-ed-list .xl-eo-none{padding:8px 9px;font-size:0.7857rem;color:var(--text-hint)}
     #xl-vendor-pop .xl-vp-h{font-size:0.7857rem;font-weight:700;color:var(--text-secondary);margin-bottom:7px;line-height:1.35}
     #xl-vendor-pop .xl-vp-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px;max-height:96px;overflow-y:auto}
     #xl-vendor-pop .xl-vp-chip{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:3px 5px 3px 8px;border-radius:20px;background:var(--mw-red-light,#FDECEA);border:1px solid #F5B8B3;color:var(--text-primary);font-size:0.7857rem;line-height:1.3}
@@ -2438,6 +2455,129 @@
     }
   }
   /* ── Cell editor ────────────────────────────────────────────────────────── */
+  /* ── the cell editor's suggestion list ───────────────────────────────────
+     ⚠️ A NATIVE <datalist> POPUP IS OS CHROME AND CANNOT BE STYLED — not its
+        font, row height, colours, dark mode, or how many rows it shows. That is
+        why it read as a Microsoft template pasted onto the grid. This is the
+        replacement: a real element, in the page, in the grid's own type size
+        and theme tokens.
+
+     It only ever writes into ed.value; the editor's existing finish()/commit/
+     undo/nav path is untouched, so Tab, Enter, Escape and blur behave as
+     before. Returns a small controller the editor's keydown drives. */
+  let _xlEdList = null;
+  // Off-list/legacy values currently offered (so the list can label them), and
+  // the option set the open editor is backed by (null = a plain text cell).
+  let _xlEdOffList = [];
+  let _xlEdOpts = null;
+
+  function _xlOpenEdList(ed, opts, curVal){
+    const host = document.getElementById('xl-wrap');
+    if (!host) return null;
+    let box = document.getElementById('xl-ed-list');
+    if (!box){ box = document.createElement('div'); box.id = 'xl-ed-list'; }
+    // ⚠️ Re-parent on every open: renderGrid() replaces the wrap's contents,
+    //    which would otherwise leave this node orphaned and invisible.
+    if (box.parentNode !== host) host.appendChild(box);
+    let items = [], active = -1;
+
+    function place(){
+      // Anchored under the editor in the wrap's scroll coordinates — the same
+      // frame .xl-ed is positioned in. Flips above when there is no room below.
+      const edTop  = parseFloat(ed.style.top) || 0;
+      const edH    = parseFloat(ed.style.height) || 22;
+      const edLeft = parseFloat(ed.style.left) || 0;
+      box.style.left = edLeft + 'px';
+      box.style.minWidth = Math.max(parseFloat(ed.style.width) || 0, 180) + 'px';
+      box.style.top = (edTop + edH + 2) + 'px';
+      const bx = box.getBoundingClientRect(), hx = host.getBoundingClientRect();
+      if (bx.bottom > hx.bottom && (edTop - bx.height - 2) > 0){
+        box.style.top = (edTop - bx.height - 2) + 'px';
+      }
+    }
+
+    /* ⚠️ THE FIRST RENDER SHOWS EVERYTHING, AND ONLY TYPING FILTERS. Opening a
+       cell that already reads "Metal Doors" must not narrow the list to just
+       "Metal Doors" — the other 16 works would be unreachable without clearing
+       the text first, which is precisely the trap the native datalist had and
+       the reason the user-directory columns were moved off it. So the initial
+       call passes useFilter=false; the `input` listener's refresh() filters. */
+    function render(useFilter){
+      const q = useFilter === false ? '' : String(ed.value || '').trim().toLowerCase();
+      // Substring, not prefix: "doors" has to find "Metal Doors" and "Wood
+      // Doors" as well, or most of a trade's works list is unreachable.
+      items = opts.filter(function(o){
+        if (o === '') return !q;                 // the blank option only when not filtering
+        return !q || String(o).toLowerCase().indexOf(q) >= 0;
+      });
+      if (!items.length){
+        box.innerHTML = '<div class="xl-eo-none">Nothing matches. What you type is kept as-is.</div>';
+        active = -1; box.classList.add('open'); place(); return;
+      }
+      // Preselect what the cell already holds, so Enter on an untouched cell
+      // re-commits its own value instead of jumping to the first option.
+      active = items.indexOf(curVal == null ? '' : String(curVal));
+      if (active < 0) active = q ? 0 : -1;
+      box.innerHTML = items.map(function(o, i){
+        const legacy = o !== '' && _xlEdOffList.indexOf(o) >= 0;
+        return '<button type="button" class="xl-eo' + (i === active ? ' on' : '')
+          + (o === '' ? ' xl-eo-blank' : '') + (legacy ? ' xl-eo-legacy' : '')
+          + '" data-i="' + i + '">' + esc(o === '' ? 'none' : o)
+          + (legacy ? '<span class="xl-eo-tag">off-list</span>' : '') + '</button>';
+      }).join('');
+      box.classList.add('open');
+      place();
+      /* ⚠️ SCROLL THE PRESELECTED ROW INTO VIEW. render() writes the `on` class
+         straight into the HTML rather than going through mark(), so without
+         this a cell holding a later option (say "Specialties", 17th of 17)
+         opens showing the top of the list with no visible highlight — and
+         Enter would then commit a value the user cannot see. */
+      const sel = box.querySelector('.xl-eo.on');
+      if (sel) sel.scrollIntoView({ block: 'nearest' });
+    }
+
+    function mark(){
+      Array.prototype.forEach.call(box.querySelectorAll('.xl-eo'), function(b, i){
+        b.classList.toggle('on', i === active);
+      });
+      const on = box.querySelector('.xl-eo.on');
+      if (on) on.scrollIntoView({ block: 'nearest' });
+    }
+
+    const ctl = {
+      close: function(){ box.classList.remove('open'); box.innerHTML = ''; _xlEdList = null; },
+      isOpen: function(){ return box.classList.contains('open'); },
+      refresh: function(){ render(true); },
+      move: function(dir){
+        if (!items.length) return;
+        active = active < 0 ? (dir > 0 ? 0 : items.length - 1)
+                            : Math.min(items.length - 1, Math.max(0, active + dir));
+        mark();
+      },
+      /* The highlighted option, or null when the user has typed something of
+         their own — then their text stands, and xlCoerce() still snaps a
+         near-miss onto the real option on commit. */
+      picked: function(){ return (active >= 0 && active < items.length) ? items[active] : null; },
+    };
+
+    // mousedown, not click: click fires after the editor has already blurred,
+    // and blur commits — so the pick would land after the commit.
+    box.onmousedown = function(e){
+      const b = e.target.closest && e.target.closest('.xl-eo');
+      if (!b) return;
+      e.preventDefault();                        // keep focus on the editor
+      ed.value = items[+b.dataset.i] || '';
+      ctl.close();
+      ed.focus();
+      // Commit down the editor's own Enter path, so undo batching and the
+      // draft-row jump behave identically to a keyboard pick.
+      ed.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    };
+
+    render(false);          // everything on open, preselecting the current value
+    return ctl;
+  }
+
   function _xlBeginEdit(seed){
     if (_xlEditing) return;
     const r = _xlSel.r, c = _xlSel.c, w = _gridRows[r], col = VC[c];
@@ -2447,6 +2587,12 @@
     // so they open a searchable popover instead of an inline input.
     if (col.type === 'vendors'){ _xlOpenVendorPop(r, c, td, seed); return; }
     _xlEditing = true;
+    /* ⚠️ RESET BEFORE ANYTHING CAN SET IT. _xlEdOpts is module-level and only
+       the select branch below assigns it, so a plain text/date/money cell would
+       otherwise inherit whatever the last select cell left behind and open a
+       suggestion list of the wrong column's options. finish() also clears it,
+       but that only covers the paths that reach finish() — this covers all. */
+    _xlEdOpts = null; _xlEdOffList = [];
     _xlSyncFill();                       // hide the fill handle while the editor is open
     const cur = xlVal(w, col.k);
     let ed;
@@ -2466,7 +2612,11 @@
       // bool columns are fully covered by ['','Yes','No'] already — a raw true/false current
       // value is NOT an off-list legacy value, it's just the un-labeled form of Yes/No, so
       // String(cur) ("true"/"false") must never be unshifted as a spurious 4th option.
-      if (col.type!=='bool' && cur!=null && cur!=='' && opts.indexOf(String(cur))<0) opts.unshift(String(cur));   // keep legacy/off-list values
+      _xlEdOffList = [];
+      if (col.type!=='bool' && cur!=null && cur!=='' && opts.indexOf(String(cur))<0){
+        opts.unshift(String(cur));            // keep legacy/off-list values
+        _xlEdOffList = [String(cur)];         // ...and say so in the list
+      }
       if (asUserSelect || col.type==='bool'){
         // Native <select> — full option list visible on click. Deliberately NOT a datalist
         // here: a datalist filters its suggestion popup to the current text, which hides
@@ -2476,17 +2626,18 @@
         ed.innerHTML = opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o||'— none —')+'</option>'; }).join('');
         ed.value = col.type==='bool' ? (cur===true?'Yes':cur===false?'No':'') : (cur==null ? '' : String(cur));
       } else {
-        // Fixed-list or dynOpts (Works/Type) select column — a filterable text input backed by
-        // a <datalist> so a long option list (some trades' Works run to a dozen+ entries) can
-        // be narrowed by typing instead of scrolling a native dropdown. xlCoerce() snaps
-        // whatever's typed back onto the real option (case/whitespace-insensitive) on commit.
+        /* Fixed-list or dynOpts (Works/Type) select column — a filterable text
+           input with a STYLED list under it (_xlOpenEdList), so a long option
+           list (Architectural Works runs to 17 entries) is narrowed by typing
+           rather than scrolled. xlCoerce() snaps whatever is typed back onto
+           the real option (case/whitespace-insensitive) on commit.
+           ⚠️ This was a native <datalist>. Its popup is OS chrome and cannot be
+              styled at all, so it rendered as an unthemed Microsoft-looking box
+              over a dark grid. Do not go back to one. */
         ed = document.createElement('input');
         ed.type = 'text'; ed.autocomplete = 'off';
-        let dl = document.getElementById('xl-ed-datalist');
-        if (!dl){ dl = document.createElement('datalist'); dl.id = 'xl-ed-datalist'; document.body.appendChild(dl); }
-        dl.innerHTML = opts.filter(function(o){ return o!==''; }).map(function(o){ return '<option value="'+esc(o)+'">'; }).join('');
-        ed.setAttribute('list', 'xl-ed-datalist');
         ed.value = cur==null ? '' : String(cur);
+        _xlEdOpts = opts;
       }
     } else {
       ed = document.createElement('input');
@@ -2496,6 +2647,9 @@
                : (col.type==='date'||col.type==='pct' ? (xlFmt(cur,col)||'') : (cur==null?'':String(cur)));
     }
     ed.className = 'xl-ed';
+    // A native <select> (bool / user directory) and every plain text cell get
+    // no list — _xlEdOpts is only set by the branch above.
+    if (ed.tagName !== 'INPUT') _xlEdOpts = null;
     const wrap = document.getElementById('xl-wrap');
     const tr = td.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
     ed.style.left   = (tr.left - wr.left + wrap.scrollLeft) + 'px';
@@ -2505,10 +2659,18 @@
     wrap.appendChild(ed);
     ed.focus();
     if (ed.tagName==='INPUT' && seed==null) ed.select();
+    // Opened AFTER the editor is positioned: the list anchors to ed's own
+    // left/top/height, which are only set just above.
+    if (_xlEdOpts){
+      _xlEdList = _xlOpenEdList(ed, _xlEdOpts, cur);
+      ed.addEventListener('input', function(){ if (_xlEdList) _xlEdList.refresh(); });
+    }
 
     const finish = function(commit, move){
       if (!_xlEditing) return;
       _xlEditing = false;
+      if (_xlEdList) _xlEdList.close();
+      _xlEdOpts = null; _xlEdOffList = [];
       const v = ed.value;
       if (ed.parentNode) ed.parentNode.removeChild(ed);
       if (commit){ const b=[]; _xlSet(r,c,v,b); if(b.length) _xlUndo.push(b); }
@@ -2529,9 +2691,32 @@
       const wr2 = document.getElementById('xl-wrap'); if(wr2) wr2.focus();
     };
     ed.addEventListener('keydown', function(e){
-      if (e.key==='Enter'){ e.preventDefault(); finish(true,'down'); }
-      else if (e.key==='Tab'){ e.preventDefault(); finish(true, e.shiftKey?'left':'right'); }
-      else if (e.key==='Escape'){ e.preventDefault(); finish(false); }
+      const L = _xlEdList;
+      // Up/Down walk the suggestions. Safe to take: the editor is open, so
+      // there is no cell navigation to conflict with.
+      if (L && L.isOpen() && (e.key==='ArrowDown' || e.key==='ArrowUp')){
+        e.preventDefault(); e.stopPropagation();
+        L.move(e.key==='ArrowDown' ? 1 : -1);
+        return;
+      }
+      if (e.key==='Enter'){
+        e.preventDefault();
+        if (L && L.isOpen()){ const p = L.picked(); if (p != null) ed.value = p; }
+        finish(true,'down');
+      }
+      else if (e.key==='Tab'){
+        e.preventDefault();
+        if (L && L.isOpen()){ const p = L.picked(); if (p != null) ed.value = p; }
+        finish(true, e.shiftKey?'left':'right');
+      }
+      else if (e.key==='Escape'){
+        e.preventDefault();
+        // ⚠️ First Escape dismisses the list, the second cancels the edit — so
+        //    a stray keystroke that opened the list cannot also discard the
+        //    cell's own value.
+        if (L && L.isOpen()){ L.close(); return; }
+        finish(false);
+      }
       e.stopPropagation();
     });
     ed.addEventListener('blur', function(){ finish(true); });
