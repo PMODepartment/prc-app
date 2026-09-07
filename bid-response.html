@@ -138,6 +138,12 @@
       color:var(--mw-red-ink);margin:18px 0 10px;padding-top:14px;border-top:1px dashed var(--border-md)}
     .legend:first-child{margin-top:0;padding-top:0;border-top:none}
     .req{color:var(--mw-red)}
+    /* The VAT basis sits ABOVE the amount field, not under it as a hint — it
+       changes what number the bidder types, so they have to read it first. */
+    .vat-note{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.6;
+      background:var(--surface-2);border-left:3px solid var(--mw-red);border-radius:6px;
+      padding:10px 12px;margin:0 0 14px;color:var(--text-primary)}
+    .vat-note i{color:var(--mw-red-ink);font-size:15px;flex-shrink:0;margin-top:1px}
     .acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:20px}
     .btn{padding:11px 20px;border-radius:8px;font-size:13px;font-weight:700;
       font-family:inherit;cursor:pointer;border:1px solid var(--border-md);
@@ -251,6 +257,47 @@ function fmtDate(v) {
   return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric',
                                        hour: 'numeric', minute: '2-digit' });
 }
+/* ⚠️ A PLANNED DATE THAT HAS ALREADY PASSED IS WORSE THAN NO DATE AT ALL HERE.
+   `target_delivery` / `target_installation` are the buyer's own planning dates,
+   set on the work package long before this round was raised and mirrored from
+   the Planning app's schedule — so if the package is bid out LATE they are
+   already behind us, and showing one to a supplier who is about to quote a lead
+   time reads as a commitment we are asking them to meet. Reported live: "Target
+   Delivery will be misleading if the work package is bid out late." So a date
+   still ahead of us is shown (it is real information a bidder needs); one that
+   has passed is simply omitted, the same way every blank field here is.
+   ⚠️ Parsed from its LOCAL parts, not `new Date('2026-11-30')` — that is UTC
+   midnight, which reads as the previous day in UTC+8 (the app-wide sCurve trap)
+   and would hide a date on its own due day. */
+function stillAhead(v) {
+  if (!v) return false;
+  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return false;
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  if (isNaN(d.getTime())) return false;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return d.getTime() >= today.getTime();
+}
+/* What basis to quote on, in the bidder's own words. Comes from the ROUND (what
+   the RFQ asked for) — never from staff's own confirmation of what this bidder
+   actually quoted, which is an internal assessment and is deliberately not
+   returned by bid_by_token. Renders nothing when the field is absent, so the
+   page is safe before migrations/2026-09-07_bid_token_vat_basis.sql is run:
+   silence is right where an assumed basis would be a 12% error. */
+function vatNote() {
+  const basis = BID && BID.asked_tax_basis;
+  if (!basis) return '';
+  const pct = BID.asked_vat_rate != null
+    ? (Math.round(Number(BID.asked_vat_rate) * 10000) / 100) + '%' : 'VAT';
+  const say = {
+    vat_inclusive: 'Quote your price <b>inclusive of ' + pct + ' VAT</b>, as stated in our '
+      + esc(BID.doc_type || 'RFQ') + '. Costs not shown in your quotation will not be paid.',
+    vat_exclusive: 'Quote your price <b>exclusive of VAT</b> — ' + pct
+      + ' VAT will be added on top when we compare and award.',
+    non_vat: 'Quote your price with <b>no VAT</b>, as a non-VAT supplier.',
+  }[basis];
+  return say ? '<div class="vat-note"><i class="ti ti-receipt-tax"></i><span>' + say + '</span></div>' : '';
+}
 function dueInfo(v) {
   if (!v) return { text: 'No deadline set', cls: '' };
   const d = new Date(v);
@@ -361,8 +408,8 @@ function render() {
     + (b.detailed_description ? '<div class="scope">' + esc(b.detailed_description) + '</div>' : '')
     + '<dl class="kv">'
     + (b.boq_note ? '<dt>Bill of quantities</dt><dd>' + esc(b.boq_note) + '</dd>' : '')
-    + (b.target_delivery ? '<dt>Target delivery</dt><dd>' + esc(b.target_delivery) + '</dd>' : '')
-    + (b.target_installation ? '<dt>Target installation</dt><dd>' + esc(b.target_installation) + '</dd>' : '')
+    + (stillAhead(b.target_delivery) ? '<dt>Target delivery</dt><dd>' + esc(b.target_delivery) + '</dd>' : '')
+    + (stillAhead(b.target_installation) ? '<dt>Target installation</dt><dd>' + esc(b.target_installation) + '</dd>' : '')
     + (b.payment_terms_required ? '<dt>Payment terms</dt><dd>' + esc(b.payment_terms_required) + '</dd>' : '')
     + (b.prebid_at ? '<dt>Pre-bid</dt><dd>' + esc(fmtDate(b.prebid_at)) + '</dd>' : '')
     + (b.conditions ? '<dt>Conditions</dt><dd>' + esc(b.conditions) + '</dd>' : '')
@@ -564,6 +611,7 @@ function formHtml() {
   return '<div class="panel"><div class="panel-title">Your bid</div>'
     + linesHtml()
     + '<div class="legend">Quotation</div>'
+    + vatNote()
     + (canPriceLines()
         ? '<div class="field-hint" style="margin:-4px 0 8px">Your offer amount follows the '
           + 'lines above. Change it if your quotation is for a different figure &mdash; a '

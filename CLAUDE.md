@@ -3351,6 +3351,77 @@ in a regex `\\n` in the harness builder (the pattern silently matched nothing an
 fired). Fifth session running. **Write long patches to a file with the Write tool rather than a
 heredoc, and build every escape with `chr(92)`.**
 
+### The bid page states the VAT basis, and stops showing dates that have passed (2026-09-07)
+
+`migrations/2026-09-07_bid_token_vat_basis.sql` (**RUN ME**, after `2026-09-05_bid_vat_basis.sql`).
+Four things raised off a live bid page and its RFQ email.
+
+**⚠️ THE BIDDER WAS NEVER TOLD WHICH VAT BASIS TO QUOTE ON.** Staff have carried
+`tax_basis` / `vat_rate` per round AND per bidder since `2026-09-05_bid_vat_basis.sql` — it is
+the whole reason the cost comparison can rank on a NET figure, and the reason a "not confirmed —
+assume as asked" chip exists. But `bid_by_token` never returned it, so the vendor filling in
+*Offer amount* had nothing on screen saying whether we want VAT in or out. **Two bidders reading
+that differently is a 12% error in the comparison**, and it is silent.
+- The migration injects **`asked_tax_basis` / `asked_vat_rate`** into `bid_by_token` and the page
+  renders a `.vat-note` **above the amount field, not as a hint under it** — it changes what
+  number they type, so it has to be read first.
+- **⚠️ ONLY THE ROUND'S ASKED-FOR BASIS IS EXPOSED. Never add `i.tax_basis` / `i.vat_rate`.**
+  The invitation-level pair is *staff's own confirmation of what that bidder actually quoted* —
+  an internal assessment of their submission, not theirs to read. **The field list of
+  `bid_by_token` IS the access control**, the same rule that keeps the budget, the awarded cost
+  and every other bidder's name out of it; the migration's verification asserts it.
+- **⚠️ It rewrites `bid_by_token` BY SOURCE**, the same way `2026-09-04_bid_negotiated_quotation.sql`
+  does, so the negotiated keys that migration injected survive — asserted both ways, and it is a
+  no-op when already applied. Its anchor (`'payment_terms_required', r.payment_terms,`) is in
+  the ask block, which no prior rewrite has touched.
+- **⚠️ An unknown or absent basis renders NOTHING rather than assuming one** — silence is right
+  where a guess would be a 12% error, and it means the page is safe before the migration runs.
+- **Deliberately NOT built: letting the vendor SET the basis.** `submit_bid_by_token` cannot take
+  another parameter — PostgREST resolves overloads by argument NAMES, so adding one creates a
+  second overload and **every vendor's submit starts failing** (a hazard that function has
+  already had to be protected from twice). It would need its own RPC, like
+  `submit_bid_lines_by_token`. Today the vendor is *told* the basis and staff confirm what
+  actually arrived, which is the existing design.
+
+**⚠️ A PLANNED DATE THAT HAS ALREADY PASSED IS WORSE THAN NO DATE AT ALL ON A VENDOR PAGE.**
+Reported: *"Target Delivery will be misleading if the work package is bid out late… this is also
+dependent with the planning app."* Exactly right — `target_delivery` / `target_installation` are
+the buyer's planning dates, set on the work package long before the round was raised and tied to
+the Planning app's schedule, so on a late-issued RFQ they are already behind us. Showing one to a
+supplier about to quote a lead time reads as a commitment we are asking them to meet.
+**`stillAhead(v)` now gates both**: a date still ahead of us is shown (real information a bidder
+needs), one that has passed is simply omitted, the same way every blank field on that page is.
+**⚠️ Parsed from LOCAL parts, never `new Date('2026-11-30')`** — that is UTC midnight, which reads
+as the previous day in UTC+8 (the app-wide sCurve trap) and would hide a date on its own due day.
+Verified: today's date still shows; **that assertion failed first against a harness that built its
+fixture with `toISOString()`, i.e. the test had the very bug the code guards against — rule out
+the harness before the code.**
+
+**The bid link IS apparent in the sent email — confirmed from the live Outlook draft**, no change
+needed. It renders as a bold, underlined hyperlink reading **"Open your bid page"** with the real
+URL in the Ctrl+Click tooltip, which is the documented design: the token is 95 characters of
+unguessable capability and printing it raw was what made the letter unreadable. The plain-text
+flavour still carries the bare URL, because plain text has nowhere to hide it.
+
+**Storage was checked with real numbers, and it is not the problem it looks like.** The 15 MB cap
+on a bid attachment, against 50 projects × 100 WPs × 8 quotations:
+
+| scenario | files | size | cost |
+|---|---|---|---|
+| the worst case as described (every WP bid out, 8 bidders, **every file maxed at 15 MB**) | 40,000 | **586 GB** | ~**$10/month** over the included 100 GB |
+| realistic (today's 1,870 WPs, a quarter bid out, 5 bidders, ~2 MB per real quotation PDF) | 2,335 | **4.6 GB** | included |
+| same, plus one kept revision per bidder | 4,670 | **9.1 GB** | included |
+
+- **Supabase Pro includes 100 GB and overage is ~$0.021/GB/month**, so even the absurd upper bound
+  is ~$10/month — **the cost is not the risk here, and the 15 MB cap was left alone**: lowering it
+  would only make life harder for a vendor with a large scanned quotation, for no real saving.
+- **⚠️ WHAT IS ACTUALLY UNBOUNDED IS RETENTION, NOT SIZE.** Every negotiated revision is kept
+  deliberately (that is the audit trail), archived child rows keep their files so a restore is not
+  broken, and **nothing anywhere reports storage usage** — a gap already recorded under "Storage —
+  images are downscaled before upload". **Build the measurement before tuning any cap.** Note also
+  that `shrinkImage` does NOT apply here: quotations are PDF/Word/Excel, and evidence documents are
+  deliberately passed through untouched.
+
 ### The RFQ letter preview was unreadable — `.modal p` was clobbering it (2026-09-07)
 
 Reported as "the email preview is not readable, let's fix." **Found by rendering the real
