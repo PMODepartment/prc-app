@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907f"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260907f"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907f"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907g"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260907g"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907g"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907f">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907g">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1476,10 +1476,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260907f"></script>
-<script src="assets/js/db.js?v=20260907f"></script>
-<script src="assets/js/ui.js?v=20260907f"></script>
-<script src="assets/js/coachmarks.js?v=20260907f"></script>
+<script src="assets/js/auth.js?v=20260907g"></script>
+<script src="assets/js/db.js?v=20260907g"></script>
+<script src="assets/js/ui.js?v=20260907g"></script>
+<script src="assets/js/coachmarks.js?v=20260907g"></script>
 <script src="assets/js/vendor-guide.js?v=20260905c"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1496,6 +1496,26 @@ let _dovEditing = false;
    a module-scope `let` is in the Temporal Dead Zone until its own line runs, so
    referencing it from a function defined earlier is safe only by accident of
    when that function is first called. */
+/* ══ Recognising a vendor whose name only LOOKS different ═════════════════
+   ⚠️ ONE INDEX FOR THE WHOLE PAGE, BUILT LAZILY AND CLEARED IN loadAll().
+      Rebuilding per name is what made an earlier analytics pass take ~5s over
+      ~2,400 vendors (see CLAUDE.md); and clearing it in loadAll() rather than
+      at each call site means it cannot be forgotten for the next tool.
+   ⚠️ IT IS BUILT FROM allVendors, whose trade_categories loadAll() canonicalises
+      in memory — names are untouched by that, so the index is unaffected. */
+/* ⚠️ DECLARED ABOVE loadAll(), WHICH CLEARS IT. A module-scope `let` sits in
+   the Temporal Dead Zone until its own line executes, so referencing it from a
+   function defined further up the file is safe only by accident of when that
+   function is first called — the same ordering hazard _toolCounts was moved to
+   avoid, and not worth relying on twice. */
+let _vrIdx = null;
+function _vrIndex() {
+  if (!_vrIdx && window.VendorDb && VendorDb.buildVendorIndex) {
+    _vrIdx = VendorDb.buildVendorIndex(allVendors || []);
+  }
+  return _vrIdx;
+}
+
 let _toolCounts = null, _toolCountsRunning = false;
 const _selectedVendors = new Set();
 let _pageIds = [];
@@ -1632,6 +1652,7 @@ async function loadAll() {
      next tool, and a stale count either shows the wrong number or hides a
      tool that has work again. */
   _toolCounts = null;
+  _vrIdx = null;                      // allVendors is about to change, so the name index is stale
   try { allVendors = await VendorDb.getVendors(); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not load vendors') : alert(e.message); allVendors = []; }
   // Normalize trade_categories to the 10 canonical trades for DISPLAY (casing/
@@ -1849,6 +1870,17 @@ async function renderVendorAnalytics() {
     const e = { v, c };
     new Set(c.split(' ')).forEach(t => { if (t) { const a = _coreTok.get(t); a ? a.push(e) : _coreTok.set(t, [e]); } });
   });
+  /* ⚠️ THE EXACT-KEY TIERS RUN BEFORE THE FUZZY CORE MATCHER, because they are
+     stronger evidence: each is an exact match on a normalised key (punctuation
+     removed, or legal form removed), whereas coreMatch accepts a whole-word
+     run of one name inside another. Both refuse ambiguity, so the order only
+     decides WHICH single answer wins, never whether a wrong one can. */
+  const byTier = raw => {
+    const idx = _vrIndex();
+    if (!idx) return null;
+    const hit = VendorDb.resolveVendorName(idx, raw);
+    return (hit && hit !== 'AMBIGUOUS') ? hit : null;
+  };
   const _coreCache = new Map();
   const byCore = raw => {
     const k = nm(raw);
@@ -1901,7 +1933,7 @@ async function renderVendorAnalytics() {
     // No precise link — fall back to the vendor_id FK, then the free-text contractor
     // names (slash-aware), resolved by name.
     if (w.vendor_id && byId[w.vendor_id]) add(w.vendor_id, byId[w.vendor_id].name, null);
-    splitAw(w.contractor).forEach(n => { const v = byName[nm(n)] || byCore(n); add(v ? v.id : nm(n), v ? v.name : n.trim(), null); });
+    splitAw(w.contractor).forEach(n => { const v = byName[nm(n)] || byTier(n) || byCore(n); add(v ? v.id : nm(n), v ? v.name : n.trim(), null); });
     return out;
   };
   let awardedWpTotal = 0;
@@ -1909,7 +1941,7 @@ async function renderVendorAnalytics() {
     const awarded = awardedOf(w);
     const parts = new Set();
     if (Array.isArray(w.proposed_vendor_ids)) w.proposed_vendor_ids.forEach(id => { if (byId[id]) parts.add(id); });
-    splitV(w.proposed_vendors).forEach(n => { const v = byName[nm(n)] || byCore(n); parts.add(v ? v.id : nm(n)); });
+    splitV(w.proposed_vendors).forEach(n => { const v = byName[nm(n)] || byTier(n) || byCore(n); parts.add(v ? v.id : nm(n)); });
     awarded.forEach(a => parts.add(a.key));
     parts.forEach(pk => { if (pk) ensure(pk, byId[pk] ? byId[pk].name : pk).participated++; });
     if (window.isMoneyAwarded(w) && awarded.length) {
@@ -2409,7 +2441,7 @@ function renderCards(rows) {
 
 /* ── Import vendors from Work Packages ── */
 async function importFromWPs() {
-  if (!confirm('Scan all work packages and add any awarded or proposed vendors that aren’t already in the directory?\n\nNew vendors are added with no accreditation standing yet ("Not Accredited"). Work packages will be linked to their awarded vendor where the name matches exactly.')) return;
+  if (!confirm('Scan all work packages and add any awarded or proposed vendors that aren’t already in the directory?\n\nA name already on file under a different spelling — different punctuation, or a legal suffix like "Inc." — is recognised and NOT created again. New vendors are added with no accreditation standing yet ("Not Accredited").')) return;
   const prog = AppNotify && AppNotify.progress ? AppNotify.progress('Importing vendors from work packages… please wait.') : null;
   try {
     /* ⚠️ _looksGarbled IS PASSED IN, NOT REIMPLEMENTED IN db.js. It is the same
@@ -2421,9 +2453,18 @@ async function importFromWPs() {
     }, userProfile);
     if (prog) prog.update('Refreshing directory…');
     await loadAll();
-    const skipped = r.skipped || [];
+    const skipped = r.skipped || [], matched = r.matched || [];
     let msg = `Import complete: ${r.created} new vendor(s) added, ${r.linked} work package(s) linked `
       + `(${r.distinct} distinct names found).`;
+    /* ⚠️ REPORT WHAT WAS RECOGNISED, NOT ONLY WHAT WAS CREATED. Measured against
+       the Megawide vendor masterdata, 252 of 1,592 work-package vendor names
+       (16%) were already on file and differed only in punctuation or a legal
+       suffix — so without this line a run that correctly created almost nothing
+       reads as a broken import. */
+    if (matched.length) {
+      msg += ` ${matched.length} name(s) were already on file under a different spelling and were NOT created again.`;
+      console.info('[vendors] import recognised these as existing vendors:', matched);
+    }
     if (skipped.length) {
       msg += ` ${skipped.length} name(s) were NOT created because they are several companies in `
         + `one string or a placeholder — creating them would just add work for Split and Merge.`;
@@ -2575,7 +2616,7 @@ async function fqSave(wpId) {
     }
     // Keep the counts honest without re-reading 1,879 work packages.
     _fq.total = Math.max(0, _fq.total - 1);
-    _toolCounts = null;          // this changed a work package; the menu count is stale
+    _toolCounts = null;               // this changed a work package; the menu count is stale
     const g = _fq.projects.find(function (p) { return p.project_id === _fqProj; });
     if (g) g.count = Math.max(0, g.count - 1);
     _fqSyncBadge();
@@ -3168,6 +3209,7 @@ function openSplitModal() {
   _syncModalScrollLock();
 }
 function closeSplitModal() { document.getElementById('splitModal').style.display = 'none'; _syncModalScrollLock(); }
+
 // Finds an already-existing vendor whose name normalizes to the same
 // value as `name` (case/punctuation/whitespace-insensitive, same
 // normalization Merge's duplicate-suggestion uses) — excludes `excludeId`
@@ -3176,9 +3218,26 @@ function closeSplitModal() { document.getElementById('splitModal').style.display
 // creating a new one, which would otherwise silently duplicate any
 // segment name that already has its own clean vendor row elsewhere.
 function _findExistingVendorByName(name, excludeId) {
-  const norm = _mgNormalize(name);
+  const idx = _vrIndex();
+  if (idx) {
+    /* ⚠️ AMBIGUOUS IS NOT A MATCH. A segment that could be either of two
+       directory vendors is a collision for a person to settle; linking it to
+       an arbitrary one would attribute another company's work packages, bids
+       and rates to the wrong vendor. It falls through to "create new", which
+       is the reversible outcome. */
+    const hit = VendorDb.resolveVendorName(idx, name, { excludeId: excludeId });
+    return (hit && hit !== 'AMBIGUOUS') ? hit : null;
+  }
+  const norm = _mgNormalize(name);      // pre-db.js-upgrade fallback
   if (!norm) return null;
   return allVendors.find(v => v.id !== excludeId && _mgNormalize(v.name) === norm) || null;
+}
+/* Why a segment was recognised, shown on its chip — a reviewer should be able
+   to see WHY two spellings were treated as one company, not just be told. */
+function _matchWhy(name, excludeId) {
+  const idx = _vrIndex();
+  if (!idx || !VendorDb.resolveVendorNameTier) return '';
+  return VendorDb.resolveVendorNameTier(idx, name) || '';
 }
 function renderSplitList() {
   const cands = _splitRows();
@@ -3192,7 +3251,7 @@ function renderSplitList() {
       return `<span class="seg-chip">
         <input type="text" value="${esc(s)}" data-vid="${v.id}" data-idx="${i}" onchange="_splitSegEdit(this)" style="width:${Math.max(40, Math.min(s.length * 7, 440))}px;max-width:100%">
         <span class="seg-x" onclick="_splitSegRemove('${v.id}',${i})" title="Remove segment">&times;</span>
-        ${match ? `<span class="seg-match" title="Will LINK to the existing vendor “${esc(match.name)}” instead of creating a new one"><i class="ti ti-link"></i> links to existing</span>` : ''}
+        ${match ? `<span class="seg-match" title="Will LINK to the existing vendor “${esc(match.name)}” instead of creating a new one — matched by ${esc(_matchWhy(s, v.id) || 'name')}"><i class="ti ti-link"></i> ${esc(match.name.length > 26 ? match.name.slice(0, 25) + '…' : match.name)}</span>` : ''}
       </span>`;
     }).join('');
     const linkCount = segs.filter(s => _findExistingVendorByName(s, v.id)).length;

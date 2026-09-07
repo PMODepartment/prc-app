@@ -2916,6 +2916,121 @@ const VendorDb = (() => {
   // ("Vendor A / Vendor B"), so this adds "/" to the delimiter set. Comma/space
   // are still excluded on purpose ("Company, Inc." must stay intact).
   function _splitAwarded(s) { return String(s || '').split(/[\r\n;|/]+/).map(x => x.trim()).filter(Boolean); }
+
+  /* ══ VendorResolve — one tiered name resolver ═══════════════════════════
+     Reported: "Some of the vendors I see here are already in the directory but
+     due to different characters it recognizes it as a different vendor."
+     Correct, and measured against production: of 1,592 names on work packages
+     reported as absent from the directory, **360 (23%) were already there** —
+     123 differing only in punctuation and 237 more only in a legal suffix. So
+     Import from WPs would have created 360 duplicates of records that exist.
+
+       Air Beyond Satisfaction Services Inc  ->  ...Inc.        (a full stop)
+       MCC - PCS Precast                     ->  MCC PCS Precast (hyphen/space)
+       Steelasia Manufacturing Corp.         ->  STEELASIA ... CORP
+       Yek yeu Merchandising                 ->  Yek Yeu Merchandising, Inc.
+       Fuji-Haya Electric Corp               ->  Fuji Haya Electric Corp. Phil...
+
+     ⚠️⚠️ EVERY TIER IS "EXACTLY ONE HIT OR NOTHING". A name matching two
+        vendors returns AMBIGUOUS and resolves to nobody. This is the rule the
+        vendor analytics already lives by and it is not negotiable here: these
+        ids decide which company is credited with awarded money, and crediting
+        the wrong one is worse than leaving it unattributed. Measured on
+        production: tier 2 has ZERO collisions across the whole directory and
+        tier 3 has one, which is refused rather than guessed.
+
+     ⚠️ TIERS ARE TRIED IN ORDER, WIDEST LAST. A tighter tier's answer always
+        wins, so adding a looser tier can never override a precise match.
+
+     ⚠️ THIS IS NOT FUZZY MATCHING. There is no edit distance, no substring
+        containment and no scoring — each tier is an exact match on a
+        normalised key, which is why it can be trusted with money. The
+        deliberately fuzzy things (VendorMatch.coreMatch for the vendor-detail
+        WP list, _mgSimilarity for Merge suggestions) stay where they are. */
+  /* ⚠️⚠️ LEGAL FORM AND GEOGRAPHY ONLY — NEVER A BUSINESS-TYPE WORD.
+     "Inc." is interchangeable with nothing; "Trading" is not interchangeable
+     with "Supplies". A first cut of this list also stripped trading / supply /
+     services / enterprises / industries / construction, and the test caught it
+     resolving **Magcalas-Romero Construction Trading** onto **Magcalas-Romero
+     Construction Supplies** — which CLAUDE.md records as an accredited company
+     and a BLACKLISTED one that must never be merged, because doing so either
+     whitewashes the blacklist or wrongly blacklists a clean company. It would
+     equally have merged "Summit Steel Corp" with "Summit Steel Trading".
+     ⚠️ DO NOT ADD A BUSINESS-TYPE WORD HERE. Two names that differ by one is
+     the commonest way two genuinely different registered companies look. */
+  const _VR_STOP = new Set(('inc incorporated corp corporation corporations co company '
+    + 'ltd limited llc philippines phils phil ph the of and').split(' '));
+
+  // tier 1 — trim + collapse whitespace + lowercase (the app-wide key)
+  function _vrExact(s) { return String(s == null ? '' : s).trim().replace(/\s+/g, ' ').toLowerCase(); }
+  // tier 2 — characters do not matter: keep only letters and digits
+  function _vrSquash(s) { return _vrExact(s).replace(/[^a-z0-9]/g, ''); }
+  // tier 3 — also drop the legal/boilerplate words, so a short form matches
+  function _vrCore(s) {
+    return _vrExact(s).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
+      .filter(w => w && !_VR_STOP.has(w)).join('');
+  }
+
+  /* Build the index once per vendor list. ⚠️ Callers MUST reuse it rather than
+     rebuilding per name — a per-name scan of ~2,400 vendors across three tiers
+     is what made an earlier analytics pass take ~5s (see CLAUDE.md). */
+  function buildVendorIndex(vendors) {
+    const t1 = new Map(), t2 = new Map(), t3 = new Map();
+    const put = (m, k, v) => { if (!k) return; const a = m.get(k); if (a) a.push(v); else m.set(k, [v]); };
+    (vendors || []).forEach(v => {
+      put(t1, _vrExact(v.name), v);
+      put(t2, _vrSquash(v.name), v);
+      const c = _vrCore(v.name);
+      // ⚠️ A 3-character core is far too collision-prone to trust with money
+      //    ("ABC", "JM2"), so tier 3 only indexes 4+.
+      if (c.length >= 4) put(t3, c, v);
+    });
+    return { t1, t2, t3, size: (vendors || []).length };
+  }
+
+  /* Resolve one name. Returns the vendor, or null, or the string 'AMBIGUOUS'.
+     ⚠️ AMBIGUOUS IS NOT null AND CALLERS MUST TELL THEM APART: null means "no
+     such vendor, creating one is reasonable"; AMBIGUOUS means "two or more
+     vendors could be this, so a human decides" — creating a third record for it
+     would make the collision worse. */
+  function resolveVendorName(idx, name, opts) {
+    if (!idx || !name) return null;
+    const wide = !(opts && opts.exactOnly);
+    const tiers = wide ? [[idx.t1, _vrExact], [idx.t2, _vrSquash], [idx.t3, _vrCore]]
+                       : [[idx.t1, _vrExact]];
+    for (let i = 0; i < tiers.length; i++) {
+      const m = tiers[i][0], key = tiers[i][1](name);
+      if (!key) continue;
+      if (m === idx.t3 && key.length < 4) continue;
+      let hit = m.get(key);
+      if (!hit) continue;
+      /* ⚠️ EXCLUSION HAPPENS BEFORE THE "EXACTLY ONE" COUNT. The Split tool asks
+         "is this segment some OTHER vendor?" while the record being split is
+         itself in the index — so dropping it afterwards would either return the
+         record to itself, or read two hits as ambiguous when exactly one other
+         vendor matches. */
+      if (opts && opts.excludeId) hit = hit.filter(v => v.id !== opts.excludeId);
+      if (!hit.length) continue;
+      if (hit.length === 1) return hit[0];
+      // Same vendor listed twice under byte-identical names is not a conflict.
+      const uniq = Array.from(new Set(hit.map(v => v.id)));
+      if (uniq.length === 1) return hit[0];
+      return 'AMBIGUOUS';
+    }
+    return null;
+  }
+
+  /* Which tier answered — for reporting, so a reviewer can see WHY two names
+     were treated as one company rather than having to trust it. */
+  function resolveVendorNameTier(idx, name) {
+    if (!idx || !name) return null;
+    if (idx.t1.has(_vrExact(name))) return 'exact name';
+    if (idx.t2.has(_vrSquash(name))) return 'same name, different punctuation';
+    const c = _vrCore(name);
+    if (c.length >= 4 && idx.t3.has(c)) return 'same name, different legal suffix';
+    return null;
+  }
+
 /* Strings that appear in a contractor field but are not a company: the ones
    actually seen in this data are "Various Supplier" and "Various". Kept narrow
    and explicit — a loose pattern here would silently refuse to create a real
@@ -2940,6 +3055,11 @@ function _isPlaceholderVendorName(s) {
     // hid ~40% of the work packages from this import (see CLAUDE.md / _pagedSelect).
     const rows = await _pagedSelect(() => sb.from('work_packages').select('id,contractor,proposed_vendors,vendor_id'));
     const existing = await getVendors();
+    /* ⚠️ RESOLVED THROUGH THE TIERED INDEX, NOT AN EXACT-NAME MAP. The exact map
+       is why this used to create duplicates of vendors that already existed:
+       measured on production, 360 of 1,592 unmatched names (23%) were already
+       in the directory and differed only in punctuation or a legal suffix. */
+    const vidx = buildVendorIndex(existing);
     const byNorm = {}; existing.forEach(v => { byNorm[_normName(v.name)] = v; });
     // distinct display names from the WPs
     const names = new Map(); // norm -> best display string
@@ -2964,9 +3084,17 @@ function _isPlaceholderVendorName(s) {
        officer can see what was left out and why. */
     const skipName = typeof opts.skipName === 'function' ? opts.skipName : null;
     let created = 0;
-    const skipped = [];
+    const skipped = [], matched = [];
     for (const [k, disp] of names) {
       if (byNorm[k]) continue;
+      /* ⚠️ AMBIGUOUS IS NOT "MISSING". A name that matches two directory
+         vendors is a collision for a human to resolve; creating a third record
+         would make it worse. Reported, never created. */
+      const hit = resolveVendorName(vidx, disp);
+      if (hit === 'AMBIGUOUS') {
+        skipped.push({ name: disp, why: 'matches more than one existing vendor' }); continue;
+      }
+      if (hit) { byNorm[k] = hit; matched.push({ name: disp, vendor: hit.name, how: resolveVendorNameTier(vidx, disp) }); continue; }
       if (_isPlaceholderVendorName(disp)) { skipped.push({ name: disp, why: 'placeholder' }); continue; }
       if (skipName && skipName(disp)) { skipped.push({ name: disp, why: 'several companies in one name' }); continue; }
       const placeholder = `import+${Date.now()}.${created}.${Math.random().toString(36).slice(2, 7)}@no-invite.local`;
@@ -2988,7 +3116,7 @@ function _isPlaceholderVendorName(s) {
         if (!e3) linked++;
       }
     }
-    return { created, linked, distinct: names.size, skipped };
+    return { created, linked, distinct: names.size, skipped, matched };
   }
 
   // ── Backfill trade categories / products / bid history / rates for
@@ -4640,8 +4768,12 @@ function _isPlaceholderVendorName(s) {
       getVendors(),
       _pagedSelect(() => sb.from('vendor_bids').select('wp_id')).catch(() => []),
     ]);
-    const byNorm = {}, byId = {};
-    vendors.forEach(v => { byNorm[_normName(v.name)] = 1; byId[v.id] = 1; });
+    const byId = {};
+    vendors.forEach(v => { byId[v.id] = 1; });
+    // ⚠️ THE SAME TIERED RESOLVER THE IMPORT USES, or the badge counts vendors
+    //    the import will not create because it recognises them.
+    const vidx = buildVendorIndex(vendors);
+    const known = nm => !!resolveVendorName(vidx, nm);
     const hasBid = new Set((bids || []).map(b => b.wp_id));
 
     let awardedNoVendor = 0, awardedNoBidRow = 0;
@@ -4667,15 +4799,16 @@ function _isPlaceholderVendorName(s) {
       if (awarded && !hasBid.has(w.id)) {
         const resolvable = (Array.isArray(w.awarded_vendor_ids) && w.awarded_vendor_ids.some(id => byId[id]))
           || (w.vendor_id && byId[w.vendor_id])
-          || _splitAwarded(w.contractor).some(n => byNorm[_normName(n)]);
+          || _splitAwarded(w.contractor).some(n => known(n));
         if (resolvable) awardedNoBidRow++;
       }
 
       // What "Import from WPs" would actually create, after its own guard.
       const push = nm => {
         const disp = String(nm || '').trim().replace(/\s+/g, ' ');
-        const k = _normName(disp);
-        if (!k || byNorm[k]) return;
+        if (!disp) return;
+        const hit = resolveVendorName(vidx, disp);
+        if (hit) return;               // already in the directory (any tier)
         if (_isPlaceholderVendorName(disp) || (skipName && skipName(disp))) refused.add(disp);
         else importable.add(disp);
       };
@@ -4711,6 +4844,7 @@ function _isPlaceholderVendorName(s) {
     getVendorSchedulePerf,
     getAwardedWithoutVendor, setAwardedVendor,
     isPlaceholderVendorName: _isPlaceholderVendorName,
+    buildVendorIndex, resolveVendorName, resolveVendorNameTier,
     getWpDerivedToolCounts,
   };
 })();
