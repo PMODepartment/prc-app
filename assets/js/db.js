@@ -1982,6 +1982,27 @@ const VendorDb = (() => {
     return data;
   }
   async function createVendor(fields, profile) {
+    /* ⚠️ REFUSE A PLACEHOLDER NAME. This guard existed only on the IMPORT path,
+       so nothing stopped an officer typing "n/a" into Add Vendor — and the
+       masterdata reconciliation (2026-09-07) found exactly that: a live vendor
+       record literally named **n/a**, with no code and no standing.
+       ⚠️ PUT HERE, NOT IN THE MODAL, because createVendor is the ONE choke point
+       for all four creation paths (Add Vendor, quickCreateVendor, the Split
+       tool's segments, the vendor grid's draft rows) — so a path added later
+       cannot forget it.
+       ⚠️ The pattern is deliberately narrow and anchored: `Various Industries
+       Inc.` and `NA Steel Works` are real companies and are NOT matched. */
+    /* A blank name is as invalid as a placeholder one, and `name text not null`
+       does NOT reject '' — every current path happens to require one, but the
+       choke point exists so a future one cannot forget. */
+    if (!String((fields && fields.name) || '').trim()) {
+      throw new Error('A vendor needs a company name.');
+    }
+    if (_isPlaceholderVendorName(fields && fields.name)) {
+      throw new Error('“' + String((fields && fields.name) || '').trim()
+        + '” is a placeholder, not a company name. Enter the real company, or '
+        + 'fix the work package that carries this text.');
+    }
     const sb = await getSB();
     const payload = { ...fields, status: 'approved', created_by: profile?.id || null, ...(_stamp()) };
     let { data, error } = await sb.from('vendors').insert(payload).select().single();
