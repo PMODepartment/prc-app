@@ -1086,10 +1086,20 @@ plural by nature).
   being linked, and a second toast afterward names how many names didn't match the directory
   exactly (saved as text, not linked) — the same "exact match only, never fuzzy" rule as
   always, so a genuinely unmatched or ambiguous name still saves as plain text rather than
-  guessing. **The full-grid-width "paste whole WPs as new rows" branch (`_xlPasteWholeWPs`)
-  still resolves synchronously off whatever's already cached** — not fixed here, since that
-  path is for adding brand-new rows (typically far fewer at once) rather than the 100+-existing-row
-  bulk-update case that was reported; flag if that path needs the same treatment.
+  guessing.
+  **⚠️ CO-AWARDED CELLS (several vendor names in ONE cell, newline/`;`/`|`-joined) are
+  decomposed via `_xlVendorSplit` BEFORE warming and BEFORE the match-report — checking the
+  raw multi-vendor cell text as a single glob string can never match anything in the cache
+  (the cache only ever holds single vendor names), which was falsely reporting a correctly-
+  linked co-award as "didn't match".** The toast now counts distinct vendor NAMES across
+  however many cells they came from ("Linking 3 vendors across 2 cells…"), and the
+  didn't-match count is per-name too — verified against the shipped source: `"Vendor A;
+  Vendor B"` + `"Vendor C"` correctly decomposes to 3 names / 2 cells with exactly the 1
+  unmatched name flagged, not the whole 2-vendor cell. **The full-grid-width "paste whole
+  WPs as new rows" branch (`_xlPasteWholeWPs`) still resolves synchronously off whatever's
+  already cached** — not fixed here, since that path is for adding brand-new rows (typically
+  far fewer at once) rather than the 100+-existing-row bulk-update case that was reported;
+  flag if that path needs the same treatment.
 - **`xlFmt` renders a vendors cell on ONE line (`' ; '`-joined) and `xlCoerce` splits it back to
   newline-joined** — a newline inside a cell would break the tab/newline TSV that Ctrl+C / Ctrl+V and
   Excel interop are built on. **Splitting is newline/semicolon/pipe only, NEVER comma or space**, so
@@ -3261,11 +3271,21 @@ no instruction.
 matched against a real em-dash and failed at 0 occurrences. Build any backslash with `chr(92)`.
 Documented already; this is the second session it has cost time in.
 
-### Outlook opens a real draft — no pasting — and the letter is editable (2026-09-07)
+### Outlook opens a real draft — no pasting — and the letter is editable (2026-09-07, PARTIALLY REVERTED same week — see below)
 
 Three asks on the Send-the-RFQ modal, and the third has a proper answer.
 
-**⚠️ THE OFFICER NO LONGER PASTES: `mailTo` downloads an `.eml` carrying `X-Unsent: 1`.** Asked
+**⚠️⚠️ THE `.eml` APPROACH DESCRIBED BELOW WAS TRIED, SHIPPED, AND THEN REVERTED — read the
+correction under "Outlook opens a real draft" REVERTED before reaching for it again.** It read
+correctly on paper (verified structurally: headers, `X-Unsent`, base64 round-trip) but broke in
+real use two ways at once: Chrome's Safe Browsing flagged the downloaded `.eml` as a file that
+"could harm your device" (screenshot confirmed, live), and "Open in Outlook" did not reliably
+open as an editable draft even past that warning. `mailTo()` is back to copying the formatted
+letter to the clipboard and opening an addressed, subject-filled, empty `mailto:` draft to paste
+into (Ctrl+V) — the same shape this section originally replaced. The rest of this entry (the
+editable preview, the modal footer reorganisation) is unaffected and still current.
+
+~~**⚠️ THE OFFICER NO LONGER PASTES: `mailTo` downloads an `.eml` carrying `X-Unsent: 1`.** Asked
 directly — *"does the procurement officer have to paste it? Is there no way it's auto filled in
 the outlook draft mail?"* Outlook opens such a file as an **editable, already-addressed, fully
 formatted draft with a Send button**, so the clipboard step is gone. Nothing is sent by the app:
@@ -3287,14 +3307,16 @@ gave.
   verified structurally (headers, `X-Unsent`, RFC-2047 subject decoding back to its em-dashes,
   base64 decoding back to the exact HTML, max line 93 chars). `X-Unsent` is a classic-Outlook
   feature; **new Outlook may open it read-only instead of as a draft.** If it does, the fallback
-  is Copy letter, and this is where to look first.
+  is Copy letter, and this is where to look first.~~ **(THIS WAS THE PART THAT FAILED — see the
+  correction above. `_b64`/`_emlSubject`/`_emlFor` were deleted along with it; do not recreate a
+  client-side `.eml` download for this without a real Outlook to test against.)**
 
 **⚠️ THE PREVIEW IS EDITABLE, AND THE EDIT IS WHAT GETS SENT.** A template cannot anticipate
 every package. `_rfqEdits` holds the edited HTML per invitation for the life of the modal, and
-**`rfqLetterHtml()` is the ONE accessor every send path reads** — Copy and the `.eml` — so an
-edit cannot be silently dropped by one route. Verified: an edit is stored, is what
-`rfqLetterHtml` returns, reaches the base64 body, survives switching vendors and back, does
-**not** leak to another vendor, and is marked in the picker.
+**`rfqLetterHtml()` is the ONE accessor every send path reads** — Copy letter and Open in
+Outlook both call `copyRich()`, which reads it — so an edit cannot be silently dropped by one
+route. Verified: an edit is stored, is what `rfqLetterHtml` returns, survives switching vendors
+and back, does **not** leak to another vendor, and is marked in the picker.
 - **⚠️ EDITS ARE PER VENDOR, and the modal says so.** Each bidder gets their own letter with
   their own link, so once the text is free-form HTML there is no single template left to
   re-substitute into. A vendor picker chooses which letter you are working on, with a "Back to

@@ -3200,7 +3200,7 @@ function renderRfq() {
           + '<i class="ti ti-clipboard-text"></i> Copy letter</button>'
           + (cur.vendor_contact_email
               ? '<button class="btn btn-primary" onclick="mailTo(' + Q + cur.id + Q + ')"'
-                + ' title="Downloads a draft that opens in Outlook already addressed and formatted">'
+                + ' title="Copies the letter, then opens a new email addressed to this bidder — press Ctrl+V">'
                 + '<i class="ti ti-mail"></i> Open in Outlook</button>'
               : '')
         : '')
@@ -3304,75 +3304,35 @@ function _copyHtmlFallback(html) {
   sel.removeAllRanges();
   document.body.removeChild(d);
 }
-/* Copy the formatted letter, then open an ADDRESSED, EMPTY draft to paste into.
-   The body is deliberately left out of the mailto — see rfqHtml's note. */
-/* ── opening a real Outlook draft, with no pasting ──────────────────────────
-   ⚠️ mailto: CANNOT CARRY THIS LETTER, which is why pasting was the original
-      answer: a mailto body is plain text BY DEFINITION, so the bold, the
-      underline, the indented requirement and every hyperlink die on the way
-      through — and the Windows shell caps the whole command line at ~8KB
-      besides, which this letter exceeds every time.
-   ⚠️ AN .eml FILE CARRYING `X-Unsent: 1` IS THE ANSWER. Outlook opens such a
-      file as an EDITABLE, ALREADY-ADDRESSED, fully formatted draft with a Send
-      button — no clipboard step at all. Nothing is sent by the app: the officer
-      still reads it and presses Send, which is the same guarantee the clipboard
-      route gave.
-   ⚠️ THE BODY IS BASE64, NOT RAW. Two reasons, both real here: the letter
-      contains em-dashes and pesos (so it must be declared UTF-8 and survive
-      byte-for-byte), and mail lines are limited to 998 characters while this
-      HTML has single lines far longer than that. Base64 in 76-char lines
-      satisfies both.
-   ⚠️ THE SUBJECT NEEDS RFC-2047 ENCODING for the same reason — it carries em
-      dashes, and a raw 8-bit header is not valid. */
-function _b64(str) {
-  const bytes = new TextEncoder().encode(str);
-  let bin = '';
-  bytes.forEach(function (b) { bin += String.fromCharCode(b); });
-  return btoa(bin);
-}
-function _emlSubject(sub) {
-  // Pure ASCII needs no encoding, and reads better in a raw file if left alone.
-  return /^[ -~]*$/.test(sub) ? sub : '=?UTF-8?B?' + _b64(sub) + '?=';
-}
-function _emlFor(i, html) {
-  const nl = String.fromCharCode(13) + String.fromCharCode(10);   // CRLF, per RFC
-  const b64 = _b64(html).replace(/(.{76})/g, '$1' + nl);
-  return [
-    'To: ' + (i.vendor_contact_email || ''),
-    'Subject: ' + _emlSubject(rfqSubject()),
-    'X-Unsent: 1',                 // ⚠️ this is what makes Outlook open it as a DRAFT
-    'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=UTF-8',
-    'Content-Transfer-Encoding: base64',
-    '', b64, '',
-  ].join(nl);
-}
-
+/* ── opening a real Outlook draft ────────────────────────────────────────────
+   ⚠️ mailto: CANNOT CARRY THIS LETTER — a mailto body is plain text BY
+      DEFINITION, so the bold, the underline, the indented requirement and
+      every hyperlink die on the way through, and the Windows shell caps the
+      whole command line at ~8KB besides, which this letter exceeds every
+      time. So the body is deliberately left OUT of the mailto: it copies the
+      formatted letter to the clipboard, then opens an ADDRESSED, SUBJECT-
+      FILLED, EMPTY draft to paste into. One click, then Ctrl+V.
+   ⚠️⚠️ A CLIENT-SIDE .eml FILE WAS TRIED HERE AND REVERTED (2026-09-07) — it
+      does NOT belong back. The theory was sound (Outlook opens an `.eml`
+      carrying `X-Unsent: 1` as an editable draft, no paste needed) but real
+      use broke it two ways at once: Chrome's Safe Browsing flags a
+      JS-generated `.eml` download as a file that "could harm your device"
+      (blob: downloads carry no origin reputation, and .eml is on the
+      commonly-abused list) — so the officer hit a scary warning before ever
+      reaching Outlook — and even past that warning it did not reliably open
+      as an editable draft. **Never reach for a downloaded .eml as "no
+      pasting" again without a real Outlook to verify against; the mailto +
+      clipboard combo below is the one that has actually been used.** */
 function mailTo(id) {
   const i = invById(id); if (!i) return;
   if (!i.vendor_contact_email) { AppNotify.warn('No contact email on file for this vendor.'); return; }
-  try {
-    const blob = new Blob([_emlFor(i, rfqLetterHtml(i))], { type: 'message/rfc822' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    // The filename is what the officer sees in the download bar.
-    a.download = (rfqSubject().replace(/[^A-Za-z0-9 ._-]+/g, ' ').trim().slice(0, 80) || 'RFQ') + '.eml';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
-    AppNotify.success('Draft downloaded. Open it and Outlook shows the letter addressed to '
-      + i.vendor_contact_email + ', formatted and ready to send — no pasting.');
-  } catch (e) {
-    // ⚠️ FALL BACK TO THE CLIPBOARD, never leave the officer with nothing. The
-    //    .eml route depends on Outlook being the handler for the file type.
-    console.error('[bids] .eml draft failed', e);
-    copyRich(id, true).then(function (ok) {
-      if (ok) AppNotify.warn('Could not build the draft file, so the letter was copied instead — '
-        + 'open a new mail to ' + i.vendor_contact_email + ' and paste it.');
-    });
-  }
+  copyRich(id, true).then(function (copied) {
+    window.location.href = 'mailto:' + encodeURIComponent(i.vendor_contact_email)
+      + '?subject=' + encodeURIComponent(rfqSubject());
+    AppNotify.success((copied ? 'Letter copied with its formatting. ' : '')
+      + 'An addressed draft to ' + i.vendor_contact_email + ' is opening in your mail app'
+      + (copied ? ' — press Ctrl+V to paste it in.' : '.'));
+  });
 }
 function csvCell(v) {
   const s = String(v == null ? '' : v);

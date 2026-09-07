@@ -2801,13 +2801,25 @@
   // directory. `_xlPaste` used to call `_xlSet` synchronously cell-by-cell for exactly this
   // reason — 100+ Awarded Vendor picks used to mean opening the picker on every single row.
   async function _xlApplyCellPaste(rows){
+    // ⚠️ A CO-AWARDED CELL HOLDS SEVERAL VENDOR NAMES (newline/semicolon/pipe-joined —
+    // the app-wide delimiter, never comma), and every one of them has to be warmed and
+    // reported on its OWN — checking the raw cell text as a single glob string can
+    // never match anything in the cache (the cache only ever holds single vendor
+    // names), which would wrongly claim a correctly-linked co-award "didn't match".
+    // `_xlVendorSplit` is the same splitter `_xlRelinkVendorIds` itself uses, so the
+    // count here always agrees with what actually gets linked.
+    let vendorCells = 0;
     const vendorNames = [];
     rows.forEach(function(cells){ cells.forEach(function(v, dc){
       const col = VC[_xlSel.c + dc];
-      if (col && col.type === 'vendors' && v && v.trim()) vendorNames.push(v);
+      if (col && col.type === 'vendors' && v && v.trim()){
+        vendorCells++;
+        _xlVendorSplit(v).forEach(function(n){ vendorNames.push(n); });
+      }
     }); });
     if (vendorNames.length){
-      xlToast('Linking ' + vendorNames.length + ' vendor cell' + (vendorNames.length===1?'':'s') + ' to the directory…');
+      xlToast('Linking ' + vendorNames.length + ' vendor' + (vendorNames.length===1?'':'s')
+        + ' across ' + vendorCells + ' cell' + (vendorCells===1?'':'s') + ' to the directory…');
       try { await _xlWarmVendorName(vendorNames.join('\n')); } catch(_){ /* linking is best-effort */ }
     }
     const b=[]; let blocked=0;
@@ -2819,8 +2831,11 @@
     if (b.length) _xlUndo.push(b);
     if (blocked) xlToast(blocked+' cell'+(blocked===1?'':'s')+" skipped (read-only, or a project you can't edit).");
     if (vendorNames.length){
+      // A name that resolves to multiple vendors (ambiguous) is cached as `false`,
+      // which is correctly counted here as "not linked" — same refuse-to-guess rule
+      // as `_xlRelinkVendorIds` itself.
       const linked = vendorNames.filter(function(n){ return _xlVendorByName[_xlVendorNorm(n)]; }).length;
-      if (linked < vendorNames.length) xlToast((vendorNames.length-linked)+' vendor name'+(vendorNames.length-linked===1?'':'s')+" didn't match the directory exactly — saved as text, not linked.");
+      if (linked < vendorNames.length) xlToast((vendorNames.length-linked)+' vendor name'+(vendorNames.length-linked===1?'':'s')+" didn't match the directory exactly (or matched more than one vendor) — saved as text, not linked.");
     }
   }
 
