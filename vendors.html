@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907i"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260907i"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907i"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907j"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260907j"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907j"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907i">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907j">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -604,6 +604,18 @@
        guessed; the identical swap was already needed for the bid page's
        awaiting-list email line. */
     .al-where{font-size:0.7143rem;color:var(--text-secondary)}
+    .al-sug{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px}
+    .al-sug-h{font-size:0.6786rem;text-transform:uppercase;letter-spacing:.04em;
+      /* ⚠️ --text-secondary, NOT --text-hint — same trap as .al-where above:
+         this sits on .fq-row (--surface-2), where --text-hint measures 4.41 in
+         dark mode. Measured. Made this exact mistake twice in one pass. */
+      font-weight:800;color:var(--text-secondary)}
+    .al-sug-b{border:1.5px dashed var(--mw-red);border-radius:7px;background:var(--surface);
+      color:var(--text-primary);font-family:inherit;font-size:0.7857rem;padding:4px 9px;cursor:pointer}
+    .al-sug-b:hover{background:var(--mw-red-light);border-style:solid}
+    html.dark-mode .al-sug-b:hover,body.dark-mode .al-sug-b:hover{background:#33211F}
+    .al-sug-b b{font-weight:800;color:var(--text-secondary);font-size:0.7143rem}
+    .al-sug-n{font-size:0.6786rem;color:var(--text-secondary)}
     .fq-projs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
     .fq-proj{border:1.5px solid var(--border-md);border-radius:7px;background:var(--surface);
       color:var(--text-primary);font-family:inherit;font-size:0.7857rem;padding:5px 10px;cursor:pointer}
@@ -1501,10 +1513,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260907i"></script>
-<script src="assets/js/db.js?v=20260907i"></script>
-<script src="assets/js/ui.js?v=20260907i"></script>
-<script src="assets/js/coachmarks.js?v=20260907i"></script>
+<script src="assets/js/auth.js?v=20260907j"></script>
+<script src="assets/js/db.js?v=20260907j"></script>
+<script src="assets/js/ui.js?v=20260907j"></script>
+<script src="assets/js/coachmarks.js?v=20260907j"></script>
 <script src="assets/js/vendor-guide.js?v=20260907a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1683,6 +1695,7 @@ async function loadAll() {
      tool that has work again. */
   _toolCounts = null;
   _vrIdx = null;                      // allVendors is about to change, so the name index is stale
+  _alSugIdx = null;                   // …and so is the suggestion index built from it
   try { allVendors = await VendorDb.getVendors(); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not load vendors') : alert(e.message); allVendors = []; }
   /* Human-stated name aliases — tier 0 of the resolver. Returns [] (not an
@@ -1895,8 +1908,177 @@ function _alRow(r) {
     + '<button class="btn-cancel" style="padding:6px 10px;font-size:0.7857rem"'
     + ' onclick="alSave(' + Q + id + Q + ')" id="alb-' + id + '" disabled>Link</button>'
     + '<div class="fq-pop" id="alp-' + id + '"></div>'
-    + '</div></div>';
+    + '</div>'
+    + _alSugHtml(id, r, kind)
+    + '</div>';
 }
+
+function _alSugHtml(id, r, kind) {
+  /* ⚠️ NO SUGGESTIONS FOR A GARBLED NAME. It is several companies in one
+     string, so proposing ONE of them invites exactly the wrong action — every
+     peso on those work packages would be credited to a single constituent.
+     Those belong in Needs Splitting, and the group note says so. */
+  if (kind === 'garbled' || kind === 'placeholder') return '';
+  const sug = _alSuggest(r.name);
+  if (!sug.length) return '';
+  return '<div class="al-sug"><span class="al-sug-h">Likely:</span>'
+    + sug.map(function (x) {
+        return '<button type="button" class="al-sug-b" title="' + esc(x.why)
+          + '" onclick="alTake(' + Q + id + Q + ',' + Q + x.v.id + Q + ')">'
+          + esc(x.v.name)
+          + (x.v.vendor_code ? ' <b>' + esc(x.v.vendor_code) + '</b>' : '')
+          + '</button>';
+      }).join('')
+    + '<span class="al-sug-n">' + esc(sug[0].why) + ' · click to link</span></div>';
+}
+
+/* ── suggesting the match ────────────────────────────────────────────────────
+   1,345 unlinked names hand-searched one at a time is many hours of typing, and
+   the officer already knows most of the answers on sight. So the tool proposes
+   candidates and they confirm.
+
+   ⚠️ FUZZY IS CORRECT HERE AND ONLY HERE, because a PERSON confirms it. The
+      resolver's tiers stay exact precisely because they decide money
+      attribution unattended; `VendorMatch.coreMatch` is the deliberately fuzzy
+      rule already used for the vendor-detail WP list. Nothing here is ever
+      applied automatically — a suggestion is a button, and the reason it
+      matched is printed beside it so the officer can judge rather than trust.
+
+   ⚠️ A TOKEN INDEX CULLS CANDIDATES FIRST, and doing so is provably safe: every
+      branch of coreMatch implies the two cores share at least one token (equal
+      shares all of them; a whole-word run makes one core's tokens a subset of
+      the other's), so a vendor sharing no token can never match. Without it a
+      full scan is ~2,400 vendors per name with a regex compiled inside
+      wordContains — the same shape that made an earlier analytics pass take
+      ~5 seconds. Only the ~60 rows actually on screen are ever suggested for. */
+let _alSugIdx = null;
+function _alSugIndex() {
+  if (_alSugIdx) return _alSugIdx;
+  const byTok = new Map();
+  const cores = [];
+  (allVendors || []).forEach(function (v) {
+    if (!window.VendorMatch) return;
+    const c = VendorMatch.core(v.name);
+    if (!c) return;
+    cores.push({ v: v, core: c });
+    const rec = cores[cores.length - 1];
+    c.split(' ').forEach(function (t) {
+      if (t.length < 3) return;          // a 1-2 char token culls almost nothing
+      const a = byTok.get(t);
+      if (a) a.push(rec); else byTok.set(t, [rec]);
+    });
+  });
+  _alSugIdx = { byTok: byTok };
+  return _alSugIdx;
+}
+
+/* ⚠️⚠️ THE GUARD THAT MATTERS: NEVER SUGGEST TWO NAMES THAT DIFFER BY A
+   BUSINESS-TYPE WORD. `VendorMatch`'s own `_CORE_STOP` strips
+   trading / supplies / services / construction — so `coreMatch` happily
+   reports **Summit Steel Trading** and **Summit Steel Supplies** as the same
+   company, and worse, **Magcalas-Romero Construction Trading** and
+   **…Construction Supplies**, which CLAUDE.md records as an ACCREDITED company
+   and a BLACKLISTED one that must never be merged — doing so either whitewashes
+   the blacklist or wrongly blacklists a clean company.
+   The resolver's own `_VR_STOP` deliberately does NOT strip those words for
+   exactly this reason; `coreMatch` does, because it was built for a looser job
+   (the vendor-detail WP list, where nothing is written). Caught by the test,
+   not by review.
+   ⚠️ "Trading" is interchangeable with NOTHING. A conflict is only declared
+   when BOTH names actually say what type of business they are and those
+   disagree — `Genus Rigging` vs `Genus Rigging Supplies` is one name simply
+   being more specific, and refusing that would kill most good suggestions. */
+const _AL_BIZ_RE = /\b(trading|traders|trade|supply|supplies|services|service|construction|constructions|enterprises|enterprise|industries|industrial|marketing|merchandising|manufacturing|builders|development|hardware)\b/g;
+function _alBizWords(str) {
+  return new Set(String(str || '').toLowerCase().match(_AL_BIZ_RE) || []);
+}
+function _alBizConflict(a, b) {
+  const A = _alBizWords(a), B = _alBizWords(b);
+  if (!A.size || !B.size) return false;        // one of them says nothing
+  if (A.size !== B.size) return true;
+  for (const x of A) if (!B.has(x)) return true;
+  return false;
+}
+
+/* A single-letter typo is the OTHER commonest real duplicate here —
+   `Haffele` / `Hafele`, `HARWARE` / `HARDWARE` — and `coreMatch` cannot see it
+   (it has no edit distance). So reuse the Merge tool's own `_mgTokenMatch`,
+   which already carries the hard-won rule that edit-distance-1 applies ONLY to
+   a DIFFERENT-length pair: a same-length substitution matched TRADE against
+   TRANE, the HVAC brand, and grouped it with five unrelated trading companies.
+   ⚠️ Reused, not reimplemented — a second copy of that rule would drift from
+   the one that has already been corrected once.
+   ⚠️ A ≥6-character floor on the shorter token set, or a generic single token
+   ("Steel") would match half the directory. */
+function _alTypoMatch(a, b) {
+  if (typeof _mgTokens !== 'function' || typeof _mgTokenMatch !== 'function') return false;
+  const A = [..._mgTokens(a)], B = [..._mgTokens(b)];
+  if (!A.length || !B.length) return false;
+  const lo = A.length <= B.length ? A : B, hi = A.length <= B.length ? B : A;
+  if (lo.join('').length < 6) return false;
+  return lo.every(t => hi.some(u => _mgTokenMatch(t, u)));
+}
+
+const _AL_SUG_MAX = 3;
+function _alSuggest(name) {
+  if (!window.VendorMatch) return [];
+  const nc = VendorMatch.core(name);
+  if (!nc) return [];
+  const idx = _alSugIndex();
+  const seen = new Set(), out = [];
+  /* ⚠️ A TYPO CANDIDATE SHARES NO EXACT TOKEN, so exact-token culling alone
+     would drop `Hafele` before `Haffele` was ever tested. The token-index proof
+     ("every coreMatch branch implies a shared token") holds for coreMatch only.
+     So each of this name's tokens also pulls in the index keys within one edit
+     of it — still a tiny candidate set, and it keeps the typo tier reachable. */
+  const keys = new Set();
+  nc.split(' ').forEach(function (t) {
+    if (t.length < 3) return;
+    keys.add(t);
+    if (t.length >= 5) {
+      idx.byTok.forEach(function (_v, k) {
+        if (k.length >= 5 && k.length !== t.length && Math.abs(k.length - t.length) <= 1
+            && typeof _mgLev === 'function' && _mgLev(k, t) <= 1) keys.add(k);
+      });
+    }
+  });
+  keys.forEach(function (t) {
+    (idx.byTok.get(t) || []).forEach(function (rec) {
+      if (seen.has(rec.v.id)) return;
+      seen.add(rec.v.id);
+      const byCore = VendorMatch.coreMatch(rec.core, name);
+      const byTypo = !byCore && _alTypoMatch(rec.v.name, name);
+      if (!byCore && !byTypo) return;
+      // ⚠️ the business-type divergence guard — see _alBizConflict
+      if (_alBizConflict(rec.v.name, name)) return;
+      /* Say WHY, so the officer is judging evidence rather than trusting a
+         ranking they cannot see into. */
+      const why = byTypo ? 'looks like a one-letter difference'
+        : rec.core === nc ? 'same core name'
+        : VendorMatch.wordContains(nc, rec.core) ? 'the directory name sits inside this one'
+        : 'this name sits inside the directory name';
+      out.push({ v: rec.v, why: why, exact: rec.core === nc });
+    });
+  });
+  // an exact core match is the strongest, then the shortest name (least extra)
+  out.sort(function (a, b) {
+    return (b.exact - a.exact) || (a.v.name.length - b.v.name.length);
+  });
+  return out.slice(0, _AL_SUG_MAX);
+}
+
+window.alTake = function (id, vendorId) {
+  const r = _alByRowId[id];
+  if (!r) return;
+  const v = (allVendors || []).find(function (x) { return x.id === vendorId; });
+  if (!v) return;
+  _alPicked[id] = v;
+  const box = document.getElementById('ali-' + id);
+  if (box) box.value = v.name;
+  const btn = document.getElementById('alb-' + id);
+  if (btn) btn.disabled = false;
+  alSave(id);
+};
 
 /* ⚠️ ROWS ARE ADDRESSED BY A GENERATED ID, NEVER BY THE VENDOR NAME. A name is
    free text and no escaping makes it safe inside an inline handler — the HTML
