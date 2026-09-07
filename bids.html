@@ -297,6 +297,10 @@
       box-shadow:0 0 0 3px var(--mw-red-light,#FDECEA)}
     .rfq-editable{font-weight:600;text-transform:none;letter-spacing:0;
       color:var(--text-hint);font-size:0.7143rem;margin-left:6px}
+    /* A field that is genuinely optional should say so on its own label rather
+       than leaving the officer to guess from the absence of an asterisk. */
+    .fld-opt{font-weight:600;text-transform:none;letter-spacing:0;
+      color:var(--text-hint);font-size:0.7143rem;margin-left:5px}
     #rfqFoot{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .sig-box{margin-top:14px;border:1px solid var(--border-md);border-radius:8px;
       padding:10px 14px;background:var(--surface-2)}
@@ -2541,8 +2545,15 @@ function askPanel() {
     + '</select></div>'
     + '<div class="field"><label>Bid deadline</label>'
     + '<input id="a-due" type="datetime-local" value="' + esc(toLocalInput(R.bid_due_at)) + '"' + ro + '></div>'
-    + '<div class="field"><label>Pre-bid</label>'
-    + '<input id="a-prebid" type="datetime-local" value="' + esc(toLocalInput(R.prebid_at)) + '"' + ro + '></div>'
+    /* ⚠️ OPTIONAL, AND IT NOW SAYS SO. It always was — `fromLocalInput('')`
+       returns null, the column is nullable, `saveAsk` validates nothing, and
+       BOTH letter flavours emit the pre-bid line only `if (R.prebid_at)` — but
+       an unlabelled date box beside a deadline reads as required. Most rounds
+       have no pre-bid conference at all. */
+    + '<div class="field"><label>Pre-bid <span class="fld-opt">optional</span></label>'
+    + '<input id="a-prebid" type="datetime-local" value="' + esc(toLocalInput(R.prebid_at)) + '"' + ro + '>'
+    + '<span class="field-hint">Leave blank if there is no pre-bid conference — the letter '
+    + 'then omits it entirely.</span></div>'
     // The Technical / Commercial split was retired 2026-09-04: the quotation a
     // vendor sends already describes what it is pricing, so asking them to cut
     // it in two served nobody. One upload, called the quotation.
@@ -3411,12 +3422,24 @@ function _copyHtmlFallback(html) {
 function officerAddress() {
   return (R && R.contact_email) || (profile && profile.email) || '';
 }
+/* ⚠️ AN EMPTY To: WOULD OPEN A DRAFT ADDRESSED TO NOBODY. officerAddress()
+   falls back through the round's officer email to the signed-in profile and
+   then to '', which is reachable on a round created before that field existed
+   by a profile with no email — so it is checked here rather than shipped as a
+   draft the officer has to notice is unaddressed. Returns false so the caller
+   can skip its success toast. */
 function openMail(opts) {
   const to = officerAddress();
+  if (!to) {
+    AppNotify.warn('No address to send from \u2014 set the Procurement officer\u2019s email on '
+      + 'this round (Scope and terms), or an email on your own profile.');
+    return false;
+  }
   const q = ['subject=' + encodeURIComponent(opts.subject || '')];
   if (opts.bcc) q.push('bcc=' + encodeURIComponent(opts.bcc));
   if (opts.body) q.push('body=' + encodeURIComponent(opts.body));
   window.location.href = 'mailto:' + encodeURIComponent(to) + '?' + q.join('&');
+  return true;
 }
 
 /* The blast letter on its own, for an officer who would rather paste it into a
@@ -3445,11 +3468,25 @@ async function mailBlast() {
     AppNotify.warn('None of the bidders on this round has a contact email on file.');
     return;
   }
+  /* ⚠️ AND THE OFFICER IS NOT Bcc'd ALONGSIDE BEING IN To:. A vendor record's
+     contact_email MIRRORS whichever Personnel row is flagged primary, so a
+     vendor set up by an officer carries the officer's own address — which put
+     them in both fields and read as a routing fault. They still receive it,
+     via To. */
+  const mine = String(officerAddress() || '').trim().toLowerCase();
   const seen = Object.create(null), bcc = [];
+  let selfSkipped = 0;
   withMail.forEach(function (i) {
     const k = String(i.vendor_contact_email).trim().toLowerCase();
+    if (k === mine) { selfSkipped++; return; }
     if (!seen[k]) { seen[k] = true; bcc.push(i.vendor_contact_email); }
   });
+  if (!bcc.length) {
+    AppNotify.warn(selfSkipped
+      ? 'The only contact email on this round is your own \u2014 nothing to Bcc.'
+      : 'None of the bidders on this round has a contact email on file.');
+    return;
+  }
   if (!confirm('Open ONE draft to all ' + bcc.length + ' bidder'
       + (bcc.length === 1 ? '' : 's') + ' with everyone in Bcc?\n\n'
       + 'The letter will NOT contain a bid link \u2014 one email cannot carry a different '
@@ -3458,7 +3495,7 @@ async function mailBlast() {
           + without.map(function (i) { return i.vendor_name; }).join(', ') : ''))) return;
   let copied = false;
   try { copied = await copyHtml(rfqBlastHtml(), rfqSubject() + '\n\n' + rfqBody(null)); } catch (e) { copied = false; }
-  openMail({ subject: rfqSubject(), bcc: bcc.join(',') });
+  if (!openMail({ subject: rfqSubject(), bcc: bcc.join(',') })) return;
   AppNotify.success((copied ? 'Blast letter copied with its formatting. ' : '')
     + 'One draft is opening with ' + bcc.length + ' bidder'
     + (bcc.length === 1 ? '' : 's') + ' in Bcc, you in To.'

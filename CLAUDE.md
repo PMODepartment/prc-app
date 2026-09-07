@@ -3271,6 +3271,63 @@ no instruction.
 matched against a real em-dash and failed at 0 occurrences. Build any backslash with `chr(92)`.
 Documented already; this is the second session it has cost time in.
 
+### The To: is guarded, the officer stops being Bcc'd twice, and Award Outcome gets short labels (2026-09-07)
+
+**⚠️ AN EMPTY `To:` WOULD HAVE OPENED A DRAFT ADDRESSED TO NOBODY.** Asked to double-check it.
+`officerAddress()` falls back round-officer-email → profile email → `''`, and that last case is
+reachable (a round created before that field existed, by a profile with no email). `openMail`
+now refuses, names both places to fix it, and **returns false so the caller skips its success
+toast** — `mailBlast` was otherwise free to announce a draft that never opened.
+
+**⚠️ THE OFFICER APPEARED IN BOTH `To:` AND `Bcc:`, and it was not a routing fault — but it is
+fixed anyway.** A vendor record's `contact_email` MIRRORS whichever Personnel row is flagged
+primary, so a vendor set up by an officer carries that officer's own address; the test vendor
+does exactly this. `mailBlast` now drops any Bcc address equal to the officer's — they still
+receive it, via `To:` — and refuses outright when that leaves nobody, saying which case it is
+("the only contact email on this round is your own"). This is the SECOND time this shape of
+report has arrived; the first was diagnosed and left alone, and the duplicate kept reading as a
+bug, so removing it is cheaper than explaining it again.
+
+**Award Outcome labels shortened, with the explanation moved to the column header.** The first
+cut spelled each option out in the dropdown — *"Awarded — at no cost (vendor provides it
+free)"* — which wrapped over two lines inside a grid cell and made a four-item list read like a
+paragraph. Now `Awarded` · `Awarded at no cost` · `Not to be awarded` · `Not yet awarded`
+(≤20 chars, column 250px → 170px), and the distinction lives in a new **`col.hint`** rendered as
+the `<th>`'s own `title`.
+- **⚠️ `col.hint` IS NEW AND ANY COLUMN CAN USE IT** — for an explanation too long to sit in a
+  label. Rendered in the `xl-colh` branch of the thead builder.
+- **⚠️ THE CALLBACK VARIABLE THERE IS `c`, NOT `col`.** The first cut wrote `col.hint` and would
+  have thrown at render time for every column — `node --check` cannot see an unbound identifier.
+  Caught by reading the surrounding scope before shipping, the same habit that caught `_vName`.
+- **⚠️ These strings are the KEYS of `XL_OUTCOMES` and the values `_xlOutcomeOf` returns, so the
+  two must change together.** Safe to rename at will: the column is derived and never stored, so
+  no data carries these words.
+
+**What it used to be, since it was asked:** two separate Yes/No columns in the grid — **"Not to
+be Awarded"** and **"No-Cost Award"** (`not_to_be_awarded` and `free_of_charge`). They were
+replaced in the same session, in response to the WP-16 report: a correct ₱0 award still demanded
+an Awarded Vendor so the officer typed `n/a`, and *"some procurement officers don't actually use
+the not to be awarded column"*. Both columns still exist in the database and on the WP form; only
+the grid asks the question once instead of twice.
+
+**Pre-bid is labelled optional — it always WAS optional.** `fromLocalInput('')` returns null,
+`prebid_at` is nullable, `saveAsk` validates nothing, and **both** letter flavours emit the
+pre-bid line only `if (R.prebid_at)`. Nothing needed fixing behind the field; an unlabelled date
+box beside a deadline simply reads as required. New **`.fld-opt`** chip on the label plus a hint
+saying the letter omits it entirely when blank. **A genuinely optional field should say so rather
+than leaving the officer to infer it from a missing asterisk.**
+
+**Verified: 36 + 19 assertions against the verbatim shipped source**, plus the routing driven in
+the harness with `openMail` stubbed to capture its arguments rather than navigate — the officer's
+address deduped out of Bcc, the all-self case refused with the right message, and a missing
+officer address refused before touching `location`.
+
+**⚠️ AND THE APPENDED ASSERTIONS DID NOT RUN AT FIRST.** They landed AFTER the file's
+`process.exit()`, so the suite reported its old count of 32 and looked green. Three separate
+times in this project a green run has meant "the assertion never executed" (a backwards slice, a
+harness missing the markup, now dead code after an exit). **Check the assertion COUNT moved, not
+just that it passed.**
+
 ### One draft to all, the vendor-paste fix, and one Award Outcome question (2026-09-07)
 
 **⚠️ ONE OUTLOOK BUTTON, AND IT ALWAYS SENDS THE BLAST.** Stated directly: *"One draft to all is

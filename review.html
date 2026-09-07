@@ -919,9 +919,16 @@
   const XL_GROUPS_DEFAULT_COLLAPSED = ['approval','bonds','payment'];
 
   // ro:true = read-only (generated/derived). req/reqIfAwarded drive the red highlight.
-  const XL_OUT_PLAIN = 'Awarded \u2014 a cost was agreed';
-  const XL_OUT_FREE  = 'Awarded \u2014 at no cost (vendor provides it free)';
-  const XL_OUT_NTBA  = 'Not to be awarded (no award will ever happen)';
+/* ⚠️ SHORT LABELS, WITH THE EXPLANATION ON THE COLUMN HEADER (col.hint) rather
+   than inside every option. The first cut spelled each one out in the dropdown
+   — "Awarded — at no cost (vendor provides it free)" — which wrapped over two
+   lines in a grid cell and made a four-item list read like a paragraph.
+   ⚠️ These strings are the KEYS of XL_OUTCOMES and the values _xlOutcomeOf
+   returns, so the two must be changed together. Safe to rename at will: the
+   column is derived and never stored, so no data carries these words. */
+  const XL_OUT_PLAIN = 'Awarded';
+  const XL_OUT_FREE  = 'Awarded at no cost';
+  const XL_OUT_NTBA  = 'Not to be awarded';
   const XL_OUT_NONE  = 'Not yet awarded';
   const XL_OUTCOMES = {};
   XL_OUTCOMES[XL_OUT_PLAIN] = { proc:'Awarded', free:false, ntba:false };
@@ -1008,8 +1015,13 @@
        ⚠️ THE TWO BOOLEAN COLUMNS WERE REMOVED FROM THIS GRID ON PURPOSE. Two ways
        to set the same fact, one of them in plain words and one not, is exactly the
        confusion that was reported. Do not add them back alongside this. */
-    { g:'budget',   k:'_award_outcome',      label:'Award Outcome',        w:250, type:'select',
-      opts:[XL_OUT_PLAIN, XL_OUT_FREE, XL_OUT_NTBA, XL_OUT_NONE] },
+    { g:'budget',   k:'_award_outcome',      label:'Award Outcome',        w:170, type:'select',
+      opts:[XL_OUT_PLAIN, XL_OUT_FREE, XL_OUT_NTBA, XL_OUT_NONE],
+      hint:'How this package\u2019s award ended up. '
+         + '\u201cAwarded at no cost\u201d is a real award at \u20b10 \u2014 the vendor provides the scope '
+         + 'free, so the cost is not required but the vendor still is. '
+         + '\u201cNot to be awarded\u201d means no award will ever happen (handled outside PRC, or '
+         + 'the scope was dropped) \u2014 neither a cost nor a vendor is required.' },
     // BUYBACK: the vendor takes the item back, so part of the awarded cost is recovered.
     // Depreciation % (the CONSUMED share) is required once the flag is on — see reqIfBuyback
     // in _xlRequired. Buyback Value is derived (awarded x (1 - dep%)) and counts as savings;
@@ -1945,7 +1957,10 @@
           + 'onclick="xlSetFreeze(\'' + c.k + '\')"><i class="ti ti-'+(isBoundary?'pinned-filled':'pin')+'"></i></button>';
         const star = (c.req || c.reqIfAwarded || c.reqIfBuyback) ? '<span class="xl-req-star" title="Required">*</span>' : '';
         const lblHtml = '<span class="xl-hlbl">'+esc(c.label)+star+'</span>';
-        return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+lblHtml+pin+setBtn+rz+'</th>';
+        // A column may carry an explanation too long for its label — see
+        // `_award_outcome`. Shown as the header's own tooltip.
+        const ht = c.hint ? ' title="'+esc(c.hint)+'"' : '';
+        return '<th class="xl-colh'+(fz?' xl-freeze':'')+rq+'"'+ht+(fz?' style="left:'+_xlLeft(i)+'px"':'')+'>'+lblHtml+pin+setBtn+rz+'</th>';
       }).join('') + '</tr>';
     const thead = '<thead>' + grpRow + colRow + '</thead>';
     // A group's subtotal row is emitted immediately before its first VISIBLE member row
