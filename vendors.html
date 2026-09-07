@@ -2130,6 +2130,7 @@ function _alMultiCompany(name) {
   const idx = _alBareIndex();
   const words = String(name || '').split(/\s+/).filter(Boolean);
   const hit = new Set();
+  let ambig = 0;
   let i = 0;
   while (i < words.length) {
     if (_AL_MC_FILLER.test(bare(words[i]))) { i++; continue; }
@@ -2141,8 +2142,15 @@ function _alMultiCompany(name) {
       if (!cand) continue;
       const v = VendorDb.resolveVendorName(idx, cand);
       if (v && v !== 'AMBIGUOUS') { hit.add(v.id); adv = len; break; }
+      /* ⚠️ AN AMBIGUOUS CONSTITUENT STILL PROVES ANOTHER COMPANY IS NAMED — it
+         means "some vendor matched here, we just cannot say which". Not counting
+         it let `Doron Builders and Concrete Solution` through (Concrete Solution
+         matches V-00097 and V-00500), and that was one of the 49 deleted aliases.
+         Longest-match-first is what keeps this from firing on a single company
+         whose own leading word is ambiguous, because the full name matches first. */
+      if (v === 'AMBIGUOUS') { ambig++; adv = len; break; }
     }
-    if (hit.size >= 2) return true;
+    if (hit.size + (ambig ? 1 : 0) >= 2) return true;
     i += adv;
   }
   return false;
