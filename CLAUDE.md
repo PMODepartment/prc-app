@@ -7351,6 +7351,48 @@ false-positived on "**Walter** Mart".
 codes and TINs, and GitHub Pages serves this repo publicly. Regenerate with the (also
 un-committed) `extract_master.py` + `gen_reconcile_sql.py`.
 
+**RECONCILIATION RESULT — run against production 2026-09-07. The masterlist import is
+98.4% complete and the two checks that matter most are CLEAN.**
+
+| | |
+|---|---|
+| workbook companies | 2,437 |
+| directory vendors | 2,402 |
+| matched — by BP code | 2,354 |
+| matched — exact name / punctuation | 38 / 5 |
+| **⚠ NOT FOUND in the directory** | **40** |
+| ⚠ AMBIGUOUS | **0** |
+| ⚠⚠ workbook PROBLEMATIC but directory does not agree | **0** |
+| workbook accredited, directory does not agree | 2 |
+| TIN differs | 7 · missing `vendor_code` 4 · missing TIN 3 |
+| in the app but not in the workbook | 3 coded + 41 with no code |
+
+- **`AMBIGUOUS = 0` is the load-bearing one.** No workbook company resolves to two directory
+  rows, so the dedup work (Remove Exact Duplicates, Merge, the 18 identity-checked merges)
+  genuinely held — and it means the alias tool's tier 0 is never fighting a duplicate.
+- **`PROBLEMATIC = 0` mismatch**: every blacklisted vendor that IS in the directory carries the
+  flag. **⚠️ BUT ONLY 2 OF THE 3 ARE IN THE DIRECTORY AT ALL** — `Eiros Builders` (V-00125)
+  and `Pacific Timber Export Corp.` are stamped; **`Magcalas-Romero Construction Supplies`
+  has no BP code and no directory record, so it falls in the 40 NOT FOUND.** That check
+  counts matched rows only, so a 0 there does NOT mean every blacklisted company is covered.
+  A company with no record can still be typed as free text on a work package with nothing to
+  flag it — and CLAUDE.md already records that Magcalas-Romero *Supplies* vs *Trading* was a
+  deliberate NON-merge, so this one needs evidence, not a blind create.
+- **⚠️ THE 40 NOT FOUND ARE A FUNCTIONAL GAP, NOT BOOKKEEPING.** The directory is what the WP
+  form's Awarded/Proposed Vendor pickers search, so 40 accredited companies **cannot be
+  selected when awarding** — an officer either types free text or creates a duplicate, which
+  is exactly the mess the alias/Split/Merge tools exist to clean up afterwards.
+- **The 1,050 "no contact email" is mostly NOT a gap**: 1,080 of the 2,437 workbook companies
+  carry no email either, which broadly accounts for it. Don't chase that number.
+- **⚠️ A DIFFERING TIN IS USUALLY A BRANCH.** PH TINs are `<9-digit root>-<branch>`, so
+  `000-313-856-006` and `000-313-856-00000` are the same taxpayer at two branches — already
+  the basis of two of the 18 identity-checked merges. `CHECK_vendor_masterdata_detail.sql`
+  therefore splits "same root, different branch" from "different root", and only the latter
+  is worth acting on.
+
+**`CHECK_vendor_masterdata_detail.sql`** (also read-only, also un-committed) lists the actual
+rows behind each of those counts, with the problematic NOT-FOUND rows ordered first.
+
 **⚠️ A WORKBOOK COUNT IN THESE NOTES WAS WRONG.** CLAUDE.md recorded 2,387 accredited / 2,410
 distinct for this same file; extracting it gives **2,403 accredited, 31 unaccredited, 3
 problematic — 2,437 distinct** after collapsing 13 duplicate names. Every accredited row bar
