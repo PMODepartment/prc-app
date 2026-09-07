@@ -2603,6 +2603,16 @@ function biddersPanel() {
         + '<input id="vSearch" type="text" placeholder="Search the vendor directory…" oninput="searchVendors()" autocomplete="off">'
         + '<div id="vResults"></div></div>'
         + '<div class="bm-actions">'
+        /* ⚠️ THE PACKAGE'S OWN NOMINATIONS COME FIRST, ahead of a catalogue
+           suggestion. An officer already named these in the WP form's Proposed
+           Vendors field; re-picking them by hand here was duplicated work, and
+           it let a round's bidder list silently diverge from the package it
+           belongs to. Listed by name so it is never a blind bulk add. */
+        + (_wpProposedIds().length
+            ? '<button class="btn btn-primary" onclick="addProposedVendors()"'
+              + ' title="The vendors named in this work package’s Proposed Vendors field.'
+              + ' They appear in the list above once added."><i class="ti ti-user-check"></i>'
+              + ' Add the ' + _wpProposedIds().length + ' proposed on this package</button>' : '')
         + (WPBYID[R.wp_id] && WPBYID[R.wp_id].trade
             ? '<button class="btn" onclick="suggestVendors()"><i class="ti ti-wand"></i> Suggest from the catalogue</button>' : '')
         + '<button class="btn btn-primary" id="btnIssueRfq" onclick="openRfq()"' + (INV.length ? '' : ' disabled') + '>'
@@ -2669,6 +2679,30 @@ function vendorOption(v, note) {
     + (note ? '<small>' + esc(note) + ' in their catalogue</small>' : '') + '</div>'
     + (acc ? '<span class="bstat bstat-invited">' + esc(acc.label) + '</span>' : '')
     + '<button class="btn btn-sm"><i class="ti ti-plus"></i></button></div>';
+}
+
+/* The work package's Proposed Vendors, minus anyone already on this round.
+   Falls to an empty list when the column is absent or holds only free text, so
+   the button simply does not appear rather than misreporting a count. */
+function _wpProposedIds() {
+  const w = WPBYID[R.wp_id] || {};
+  const ids = Array.isArray(w.proposed_vendor_ids) ? w.proposed_vendor_ids : [];
+  const have = new Set(INV.map(function (i) { return i.vendor_id; }));
+  return ids.filter(function (id) { return id && !have.has(id); });
+}
+async function addProposedVendors() {
+  const ids = _wpProposedIds();
+  if (!ids.length || _busy) return;
+  _busy = true;
+  try {
+    await VendorDb.bidRounds.addVendors(R, ids, profile);
+    INV = await VendorDb.bidRounds.invitations(R.id);
+    renderRound();
+    syncWpStatus();
+    AppNotify.success('Added ' + ids.length + ' vendor' + (ids.length === 1 ? '' : 's')
+      + ' proposed on the work package.');
+  } catch (e) { AppNotify.fromError(e, 'Could not add the proposed vendors'); }
+  finally { _busy = false; }
 }
 
 async function addBidder(vendorId) {

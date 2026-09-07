@@ -3242,6 +3242,121 @@ no instruction.
 matched against a real em-dash and failed at 0 occurrences. Build any backslash with `chr(92)`.
 Documented already; this is the second session it has cost time in.
 
+### Live review batch: the blank Overview, the stepper, and invite-first (2026-09-07)
+
+Ten items from one live pass. The three real bugs first.
+
+**⚠️⚠️ THE VENDOR OVERVIEW SECTION RENDERED BLANK, AND IT WAS HOSTAGE TO NINE OTHERS.**
+`renderDetailOverview()` ran AFTER `await Promise.all([...nine section renderers])` — and
+**Promise.all rejects on the FIRST failure**, so a throw in any one of them meant that line was
+never reached and the whole Overview stayed empty with nothing on screen to say why. It needs no
+fetch (every field is already on `activeVendor`), so there was never a reason for it to wait.
+
+- It renders **first** now, and each section goes through **`_dsec(label, fn, hostId)`**, which
+  catches, logs, and writes the failure **into that section's own host** — so one failure can no
+  longer blank the others, and the culprit names itself on the next load.
+- **Same bug and same fix as `vendor-portal.html`'s `_step`** (2026-09-03). ⚠️ When a page renders
+  N independent sections, one throw must not take the rest with it — and the section that fails
+  must say so rather than looking empty.
+- **Which renderer was throwing is still unidentified** — all nine functions and every `VendorDb`
+  method they call resolve, so it is data-dependent. The isolation is what will name it.
+- **Probing the live schema while chasing it corrected four stale "NOT RUN" notes**:
+  `vendor_history`, `vendor_documents.locked_at`, `vendor_products.archived_at` and
+  `.created_by` are all present, so the soft-delete, audit-trail, doc-lock and history-restore
+  migrations HAVE run. **Probe; do not trust a note** — the rule this file already states.
+
+**⚠️ "NOT STARTED" WAS STEP 1, WHICH PUSHED EVERY REAL STEP'S NUMBER UP BY ONE.** Reported as
+*"step 1 isn't Not Started — it's only a status, it's not a step"*, and correct: it is the absence
+of progress, not something anyone does. Numbering the stepper and the phase headings against the
+5-entry status roster made **Evaluating the 4th heading when it is the 3rd thing you do**.
+
+- Both now index **`PHASE_TABS`** (Sourced · Solicited · Evaluated · Awarded). A round with no
+  bidders sits at **Sourcing** — preparing the ask IS the sourcing work — which is exactly what
+  `phaseSection` already assumed with its own clamp.
+- **⚠️ `procSteps` is UNTOUCHED**: it is the approved status roster and `procRank` depends on its
+  order. Only the *display* list changed.
+- The progress track reads from the TRUE status, so a draft still shows an empty track while
+  Sourcing is highlighted.
+
+**⚠️ THE STAGE CAPTION RESTATED THE PHASE — "Evaluating · Evaluation".** Reported as a
+"strikethrough evaluation": the caption's `border-left` divider, against short text on the filled
+red pill, read as a line through the word. Two fixes: **`STAGE_CAPTION`** shows it only for the
+four stages that genuinely narrow the phase down (`draft` → Preparing, `clarification`,
+`comparison`, `negotiation`), and the divider is a **middot**, which cannot be misread that way.
+
+**⚠️ A WORK PACKAGE CAN LEGITIMATELY BE AHEAD OF ITS ROUND, AND SILENCE MADE THAT LOOK LIKE A
+CONTRADICTION.** Reported as *"why does the work package procurement status say Awarded when it's
+awaiting decision?"* — the package was awarded through an earlier round, or outside the app, and a
+round never pulls it back. It now says **"ahead of this round"** (neutral, not red — ahead is not
+a problem) with the reason in its title. `awardStranded` still outranks it, since that one IS a
+problem. Verified all four states: ahead · behind (+ the fix button) · in step · stranded.
+
+**A next-step button — ⚠️ NAMED AFTER THE WORK, NEVER THE STATUS.** Asked for directly, along with
+*"is it better if the next button is named as the status itself?"* — **no**, and that is the whole
+point: the status is DERIVED from the action, which is why the stepper stopped being a control, so
+a button reading "Evaluating" would put us straight back to a label somebody maintains by hand.
+`nextStepHtml()` reads *Next: issue the RFQ* / *close for pricing* / *award this round*, and each
+branch **calls the same function the panel's own button calls** — one code path per transition. A
+draft with no bidders gets a sentence, not a button that would open an RFQ addressed to nobody.
+
+**⚠️ A BLANK PER-BIDDER VAT BASIS IS NOT A SYNONYM FOR THE ROUND'S.** Asked *"why is there an
+as-asked basis? What does it differ from VAT-inclusive?"* — fair, because "As asked
+(VAT-inclusive)" read as one. Blank means **nobody has checked what that bidder actually quoted**,
+so it falls back to what the letter asked for; picking a basis records that someone read their
+quotation and confirmed it. **The net figure that drives the ranking and the award is computed
+from this**, so assumed and confirmed must not look alike. Relabelled *"Not confirmed — assume as
+asked (…)"*.
+
+**The VAT rate hint was a sentence for one number.** Now the unit is in the label. ⚠️ Left as
+**`VAT rate (%)`** rather than `(12%)` as asked, because a zero-rated or exempt round would then
+carry a label stating a rate it does not use.
+
+**⚠️ THE WORK PACKAGE'S PROPOSED VENDORS NEVER REACHED THE BID ROUND.** Asked how the
+WP-monitoring Proposed Vendors field integrates — and `bids.html` referenced neither
+`proposed_vendor_ids` nor `proposed_vendors` anywhere, so an officer re-picked by hand vendors they
+had already nominated, and a round's bidder list could silently diverge from its package. The
+bidders panel now leads with **"Add the N proposed on this package"** (ahead of the catalogue
+suggestion, which is a weaker signal), deduped against who is already invited, and the button
+disappears when there is nothing left to add. Empty/absent column ⇒ no button and no false count.
+
+**Invite-first: ⚠️ MANUAL VENDOR ENTRY IS NOW THE FALLBACK, NOT THE DEFAULT.** Asked for
+explicitly — *"discourage procurement officers to add vendors manually; vendors themselves should
+register"*. The toolbar button is **Invite a Vendor** and opens on the choice: the registration
+link with **Copy** and **Show QR**, then *"add a record manually instead"* as a quiet dashed
+fallback that reveals the old form behind a note saying what you give up. The Add Vendor button
+stays hidden until that form is open. The reason is real: a typed record is unverified, it cannot
+carry the four accreditation documents (only the vendor has those), and it is how duplicates get
+in — which Merge / Split / Remove Exact Duplicates exist to clean up afterwards.
+
+- **Removed the Invite Email field and the per-vendor link it produced.** Both are vestiges of the
+  retired email gate: registration has been identity-matched on TIN and company name since
+  `2026-09-01_vendor_self_registration.sql`, so that address gates nothing, and the field's own
+  label promising self-management through it was simply **false**. `createInvite` always
+  synthesizes the NOT-NULL placeholder now.
+
+**Already true, confirmed rather than changed:** the company name is staff-only — `new.name :=
+old.name` in `internal.vendor_edit_guard` (section 3 of the consolidated migration) pins it
+server-side, and the portal renders it read-only via `STAFF_FIELDS`. RLS cannot restrict which
+COLUMNS an update writes, so the trigger is the enforcement and the disabled input is presentation.
+
+**⚠️ NOT BUILT — one bid round covering SEVERAL work packages.** Asked whether it is possible: yes,
+and it is a real piece of work rather than a flag. `vendor_bid_rounds.wp_id` is a single FK, so it
+needs a join table, and it ripples through `renderRound`, `syncWpStatus`, the cost comparison, the
+board view, the vendor bid page and — the part that decides it — **`doAward()`, which writes the
+award back to ONE work package**. That is the most consequential path in the app, and half-doing
+it would put the award write-back at risk. The RFQ composer already groups the requirement under
+one package heading, which is the shape a multi-package version grows into.
+
+**⚠️ `_vName` WAS INVENTED AND WOULD HAVE THROWN AT RENDER TIME.** I wrote a tooltip against a
+vendor-name cache this page does not have. `node --check` passes on an unbound identifier — it is
+a RUNTIME error — and this is the same class of bug that took `bidsInPlay` down. Caught by
+grepping my own new symbols for definitions before shipping. **Do that after every edit that adds
+a helper.**
+
+**⚠️ AND ONE OF MY TEST FAILURES WAS THE TEST.** The dedup check seeded `proposed_vendor_ids` with
+INVITATION ids where the code correctly reads `vendor_id`, so it looked like the dedup was broken
+when the fixture was. Third time in this project — **rule out the harness before the code.**
+
 ### The bid tour lost a fifth of itself, silently (2026-09-06)
 
 Consolidating the Evaluated phase deleted `#bp-comparison` and `#bp-evaluation`.
