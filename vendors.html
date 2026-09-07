@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907m"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260907m"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907m"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907n"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260907n"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907n"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907m">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907n">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1513,10 +1513,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260907m"></script>
-<script src="assets/js/db.js?v=20260907m"></script>
-<script src="assets/js/ui.js?v=20260907m"></script>
-<script src="assets/js/coachmarks.js?v=20260907m"></script>
+<script src="assets/js/auth.js?v=20260907n"></script>
+<script src="assets/js/db.js?v=20260907n"></script>
+<script src="assets/js/ui.js?v=20260907n"></script>
+<script src="assets/js/coachmarks.js?v=20260907n"></script>
 <script src="assets/js/vendor-guide.js?v=20260907a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -2395,7 +2395,16 @@ async function renderVendorAnalytics() {
   const el = document.getElementById('vendorAnalytics');
   el.innerHTML = '<div style="color:#888;padding:20px">Loading analytics…</div>';
   if (!_vaWPs) {
-    try { _vaWPs = await WPDb.getAllApprovedWPs(); }
+    try {
+      /* ⚠️ DEMO IS EXCLUDED, exactly as index.html excludes it from the portfolio.
+         It is the read-only sample project: 7 awarded WPs whose synthetic vendors
+         (Solid Rock Concrete, CoolAir Systems, FlowTech Plumbing, Terra Movers)
+         are deliberately NOT in the directory, so it sits ~91% unattributed BY
+         DESIGN and inflated "not attributed to a directory vendor" by ~₱227M -
+         a distortion no amount of cleanup could ever remove. It also inflated
+         Awarded Spend and the Awarded WPs count. */
+      _vaWPs = (await WPDb.getAllApprovedWPs()).filter(w => w.project_id !== 'DEMO');
+    }
     catch (e) { el.innerHTML = '<div style="color:#EE3124;padding:20px">Could not load work packages for analytics.</div>'; return; }
   }
   const wps = _vaWPs;

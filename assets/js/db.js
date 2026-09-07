@@ -4810,6 +4810,9 @@ function _isPlaceholderVendorName(s) {
         + 'actual_awarding_date,awarding_date,contractor,vendor_id,'
         + 'awarded_vendor_ids,award_status,not_to_be_awarded'));
     const out = rows.filter(w => {
+      // DEMO is the read-only sample project: offering its sample rows in a
+      // fill-in queue asks an officer to do work that must never be saved.
+      if (w.project_id === 'DEMO') return false;
       if (w.award_status !== 'Awarded') return false;
       if (w.not_to_be_awarded) return false;          // never went to a vendor
       if (w.vendor_id) return false;
@@ -4897,7 +4900,13 @@ function _isPlaceholderVendorName(s) {
     if (_toolWpCache && (Date.now() - _toolWpCache.at) < _TOOL_WP_TTL) return _toolWpCache.rows;
     const sb = await getSB();
     const rows = await _pagedSelect(() => sb.from('work_packages').select(_TOOL_WP_COLS));
-    _toolWpCache = { at: Date.now(), rows: rows || [] };
+    /* ⚠️ DEMO IS EXCLUDED HERE, which covers every consumer of this shared read.
+       It is the read-only sample project, and its synthetic vendors (Solid Rock
+       Concrete, CoolAir Systems, FlowTech Plumbing, Terra Movers) are deliberately
+       NOT in the directory — so left in, it puts FAKE vendors at the top of the
+       cleanup worklist and inflates every Data Tools badge with work nobody can
+       ever do. index.html excludes it from the portfolio for the same reason. */
+    _toolWpCache = { at: Date.now(), rows: (rows || []).filter(w => w.project_id !== 'DEMO') };
     return _toolWpCache.rows;
   }
   function bustToolWps() { _toolWpCache = null; }
