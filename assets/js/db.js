@@ -2916,6 +2916,15 @@ const VendorDb = (() => {
   // ("Vendor A / Vendor B"), so this adds "/" to the delimiter set. Comma/space
   // are still excluded on purpose ("Company, Inc." must stay intact).
   function _splitAwarded(s) { return String(s || '').split(/[\r\n;|/]+/).map(x => x.trim()).filter(Boolean); }
+/* Strings that appear in a contractor field but are not a company: the ones
+   actually seen in this data are "Various Supplier" and "Various". Kept narrow
+   and explicit — a loose pattern here would silently refuse to create a real
+   vendor whose name happens to contain one of these words. */
+const _PLACEHOLDER_VENDOR_RE = /^(various(\s+(supplier|suppliers|vendors?|contractors?))?|tbd|to\s*be\s*(advised|determined)|n\/?a|none|unknown|assorted)$/i;
+function _isPlaceholderVendorName(s) {
+  return _PLACEHOLDER_VENDOR_RE.test(String(s || '').trim());
+}
+
   async function importVendorsFromWPs(opts, profile) {
     opts = opts || {};
     const includeProposed = opts.includeProposed !== false;
@@ -2934,9 +2943,26 @@ const VendorDb = (() => {
       _splitAwarded(w.contractor).forEach(push);
       if (includeProposed) _splitVendors(w.proposed_vendors).forEach(push);
     });
+    /* ⚠️ A NAME THAT IS SEVERAL COMPANIES, OR A PLACEHOLDER, IS NOT A VENDOR.
+       Measured on production before this guard existed: of 158 unmatched awarded
+       names, 85 were garbled multi-company strings or placeholders, so a run
+       created more junk than vendors and undid the Split/Merge cleanup.
+
+       ⚠️ `opts.skipName` IS SUPPLIED BY THE CALLER ON PURPOSE. vendors.html owns
+       the one "looks garbled" definition (_looksGarbled, shared with
+       _splitCandidates so the tool and its badge cannot disagree); a second copy
+       here would drift from it. With no predicate passed, only the placeholder
+       names below are skipped — never silently everything.
+
+       ⚠️ Skipped names are RETURNED, not swallowed. The point is that the
+       officer can see what was left out and why. */
+    const skipName = typeof opts.skipName === 'function' ? opts.skipName : null;
     let created = 0;
+    const skipped = [];
     for (const [k, disp] of names) {
       if (byNorm[k]) continue;
+      if (_isPlaceholderVendorName(disp)) { skipped.push({ name: disp, why: 'placeholder' }); continue; }
+      if (skipName && skipName(disp)) { skipped.push({ name: disp, why: 'several companies in one name' }); continue; }
       const placeholder = `import+${Date.now()}.${created}.${Math.random().toString(36).slice(2, 7)}@no-invite.local`;
       const v = await createVendor({ name: disp, invite_email: placeholder, trade_categories: [] }, profile);
       byNorm[k] = v; created++;
@@ -2956,7 +2982,7 @@ const VendorDb = (() => {
         if (!e3) linked++;
       }
     }
-    return { created, linked, distinct: names.size };
+    return { created, linked, distinct: names.size, skipped };
   }
 
   // ── Backfill trade categories / products / bid history / rates for
