@@ -4533,6 +4533,76 @@ function _isPlaceholderVendorName(s) {
     },
   };
 
+
+  /* ══ Awarded work packages with no vendor recorded ══════════════════════
+     Measured on production: of 1,360 awarded work packages, 223 are ID-linked
+     to a directory vendor, 175 carry a vendor name as free text only, and
+     **962 (71%) record no vendor at all**. That 71% is the ceiling on
+     everything vendor-side — Reference Rates, Bid History, win rates, spend
+     attribution — because a backfill cannot invent a vendor nobody recorded.
+
+     ⚠️ THIS IS THE GAP ITSELF, NOT A DERIVED METRIC. It reads work_packages
+        directly rather than anything the vendor tables hold, because the whole
+        point is the packages that never reached those tables.
+
+     ⚠️ PAGINATED. A plain .select() stops at PostgREST's 1000-row default and
+        1,360 awarded packages already exceed it — the third time that cap has
+        silently hidden data here (see _pagedSelect). */
+  async function getAwardedWithoutVendor() {
+    const sb = await getSB();
+    const rows = await _pagedSelect(() => sb.from('work_packages')
+      .select('id,wp_no,project_id,description,trade,works,awarded_cost,'
+        + 'actual_awarding_date,awarding_date,contractor,vendor_id,'
+        + 'awarded_vendor_ids,award_status,not_to_be_awarded'));
+    const out = rows.filter(w => {
+      if (w.award_status !== 'Awarded') return false;
+      if (w.not_to_be_awarded) return false;          // never went to a vendor
+      if (w.vendor_id) return false;
+      if (w.awarded_vendor_ids && w.awarded_vendor_ids.length) return false;
+      // Free text alone still counts as "recorded" for this queue's purpose —
+      // it is a linkage problem, not a missing-fact problem, and conflating the
+      // two would bury the 962 that have nothing at all.
+      return !String(w.contractor || '').trim();
+    });
+    // Most-affected project first: that is the order somebody works through it.
+    const byProj = {};
+    out.forEach(w => { (byProj[w.project_id || '(none)'] = byProj[w.project_id || '(none)'] || []).push(w); });
+    Object.values(byProj).forEach(list => list.sort((a, b) =>
+      String(a.wp_no || '').localeCompare(String(b.wp_no || ''), undefined, { numeric: true })));
+    const projects = Object.keys(byProj)
+      .map(p => ({ project_id: p, rows: byProj[p], count: byProj[p].length }))
+      .sort((a, b) => b.count - a.count || a.project_id.localeCompare(b.project_id));
+    return { total: out.length, projects };
+  }
+
+  /* Record the awarded vendor on one work package.
+
+     ⚠️ WRITES ALL FOUR FIELDS TOGETHER, because every reader picks a different
+        one: `contractor` is what the dashboards and the legacy filters show,
+        `vendor_id` is the single FK, and awarded_vendor_ids/_amounts are the
+        INDEX-ALIGNED co-award arrays the analytics credit money from. Writing
+        only some of them is how a package ends up reading differently in two
+        places (Known Issues #28).
+     ⚠️ ONE VENDOR, ONE AMOUNT. This queue is for packages with nothing
+        recorded, so a co-award is authored in the WP form where per-vendor
+        amounts can be entered — here the whole awarded cost goes to the single
+        vendor, which is what a one-name award means.
+     ⚠️ updateWPDirect, NOT updateWP: the latter resets review_status to
+        pending_review, which would pull a live awarded package off every
+        dashboard just for naming its vendor.
+     ⚠️ RLS scopes work_packages writes to the caller's assigned projects, so a
+        refusal here is expected and must surface as itself rather than as a
+        generic failure. */
+  async function setAwardedVendor(wpId, vendor, amount, profile) {
+    if (!wpId || !vendor || !vendor.id) throw new Error('Pick a vendor first.');
+    const amt = (amount == null || amount === '') ? null : Number(amount);
+    return WPDb.updateWPDirect(wpId, {
+      contractor: vendor.name,
+      vendor_id: vendor.id,
+      awarded_vendor_ids: [vendor.id],
+      awarded_vendor_amounts: [amt],
+    });
+  }
   return {
     getVendors, getVendor, createVendor, updateVendor, approveVendor, rejectVendor, setVendorStatus, deleteVendor,
     products, certifications, personnel,
@@ -4551,6 +4621,7 @@ function _isPlaceholderVendorName(s) {
     bulkSetVendorStatus, bulkSetAccreditation, findExactDuplicateGroups, mergeExactDuplicates, bulkDeleteVendors, getDeletionImpact,
     backfillVendorDataFromWPs, getWorkPackagesForVendor,
     getVendorSchedulePerf,
+    getAwardedWithoutVendor, setAwardedVendor,
   };
 })();
 window.VendorDb = VendorDb;

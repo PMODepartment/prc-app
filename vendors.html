@@ -571,6 +571,31 @@
     .vd-view select:disabled{text-overflow:ellipsis}
     .vd-view .field-hint{display:none}          /* guidance for typing, not for reading */
     .vd-view input[type=checkbox]:disabled{opacity:.85 !important}
+    .fq-projs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+    .fq-proj{border:1.5px solid var(--border-md);border-radius:7px;background:var(--surface);
+      color:var(--text-primary);font-family:inherit;font-size:0.7857rem;padding:5px 10px;cursor:pointer}
+    .fq-proj:hover{border-color:var(--mw-red);background:var(--mw-red-light)}
+    .fq-proj.on{background:var(--mw-red);border-color:var(--mw-red);color:#fff;font-weight:700}
+    .fq-proj b{font-weight:800}
+    .fq-rows{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto}
+    .fq-row{border:1px solid var(--border);border-radius:8px;background:var(--surface-2);padding:9px 11px}
+    .fq-row.done{opacity:.55}
+    .fq-head{display:flex;gap:8px;align-items:baseline;justify-content:space-between}
+    .fq-wp{font-size:0.7857rem;font-weight:800;color:var(--text-hint);white-space:nowrap}
+    .fq-desc{flex:1;min-width:0;font-size:0.8571rem;color:var(--text-primary);line-height:1.4}
+    .fq-cost{font-size:0.7857rem;font-weight:700;color:var(--text-secondary);white-space:nowrap}
+    .fq-pick{display:flex;gap:7px;align-items:center;margin-top:8px;position:relative}
+    .fq-pick input{flex:1;min-width:0;padding:6px 9px;border:1.5px solid var(--border-md);
+      border-radius:7px;background:var(--surface);color:var(--text-primary);font-family:inherit;font-size:0.7857rem}
+    .fq-pop{position:absolute;z-index:20;left:0;right:96px;top:100%;margin-top:3px;background:var(--surface);
+      border:1.5px solid var(--mw-red);border-radius:8px;max-height:190px;overflow-y:auto;padding:4px;display:none}
+    .fq-pop.open{display:block}
+    .fq-opt{display:block;width:100%;box-sizing:border-box;text-align:left;padding:6px 8px;border:1px solid transparent;
+      border-radius:6px;background:transparent;color:var(--text-primary);font-family:inherit;font-size:0.7857rem;cursor:pointer}
+    .fq-opt:hover{background:var(--mw-red-light);border-color:var(--mw-red)}
+    .fq-none{padding:8px;font-size:0.7143rem;color:var(--text-hint)}
+    .fq-ok{font-size:0.7857rem;color:#1E7A55;font-weight:700}
+    html.dark-mode .fq-ok,body.dark-mode .fq-ok{color:#6EE7B7}
     .skip-list{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto}
     .skip-row{display:flex;gap:10px;align-items:baseline;justify-content:space-between;
       padding:7px 9px;border:1px solid var(--border);border-radius:7px;background:var(--surface-2)}
@@ -1098,6 +1123,7 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
             <div class="tools-menu-wrap" id="toolsMenuWrap" style="position:relative;flex-shrink:0">
               <button class="btn-cancel" id="btn-tools-menu" onclick="toggleToolsMenu()"><i class="ti ti-tool" style="margin-right:4px"></i>Data Tools <i class="ti ti-chevron-down" style="margin-left:2px;font-size:0.75em"></i></button>
               <div class="tools-menu" id="toolsMenu" style="display:none">
+                <button onclick="closeToolsMenu();openFillQueue()"><i class="ti ti-user-question"></i><span>Awarded, no vendor recorded</span><small>Name the vendor on awarded work packages that never recorded one — counted when you open it</small></button>
                 <button onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs</span><small>Scan work packages for vendors not yet in the directory</small></button>
                 <button onclick="closeToolsMenu();backfillFromWPs()"><i class="ti ti-refresh-dot"></i><span>Backfill Trade/Bid Data</span><small>Fill in trades, products, bid history and rates from WPs</small></button>
                 <button onclick="closeToolsMenu();normalizeVendorTrades()"><i class="ti ti-tags"></i><span>Normalize Trades</span><small>Collapse trade variants (e.g. "GENERAL REQUIREMENT" → "General Requirements") to the 10 standard trades</small></button>
@@ -2347,6 +2373,168 @@ async function importFromWPs() {
     if (prog) prog.fail((e && e.message) || 'Import failed', { title: 'Import from WPs — failed' });
     else if (AppNotify) AppNotify.fromError(e, 'Import failed'); else alert(e.message);
   }
+}
+
+/* ══ Awarded work packages with no vendor recorded ═══════════════════════
+   Of 1,360 awarded packages, 962 (71%) named no vendor at all — the ceiling on
+   Reference Rates, Bid History, win rates and spend attribution, because no
+   backfill can invent a vendor nobody recorded. This is where that is closed.
+
+   ⚠️ ONE PROJECT AT A TIME. ~1,000 rows each with a live search box is both
+      unusable and slow; grouped most-affected-first is the order somebody
+      actually works through it. */
+let _fq = null, _fqProj = null, _fqPickTimer = null;
+
+async function openFillQueue() {
+  const host = document.getElementById('fillQueueBody');
+  document.getElementById('fillQueueModal').style.display = 'flex';
+  _syncModalScrollLock();
+  host.innerHTML = '<div class="empty">Reading work packages…</div>';
+  try { _fq = await VendorDb.getAwardedWithoutVendor(); }
+  catch (e) {
+    host.innerHTML = '<div class="empty">Could not read the work packages. ' + esc((e && e.message) || e) + '</div>';
+    return;
+  }
+  _fqProj = _fq.projects.length ? _fq.projects[0].project_id : null;
+  renderFillQueue();
+}
+function closeFillQueue() {
+  document.getElementById('fillQueueModal').style.display = 'none';
+  _syncModalScrollLock();
+}
+function fqPickProject(p) { _fqProj = p; renderFillQueue(); }
+
+function renderFillQueue() {
+  const host = document.getElementById('fillQueueBody');
+  if (!_fq) return;
+  if (!_fq.total) {
+    host.innerHTML = '<div class="pf-empty" style="padding:22px"><i class="ti ti-circle-check"></i>'
+      + '<b>Every awarded work package names its vendor</b>'
+      + 'Nothing to fill in. Reference Rates and Bid History can see all of it.</div>';
+    return;
+  }
+  const grp = _fq.projects.find(function (p) { return p.project_id === _fqProj; }) || _fq.projects[0];
+  const note = '<p class="sec-note"><b><span id="fq-remaining">' + _fq.total + '</span> awarded work package'
+    + (_fq.total === 1 ? '' : 's') + ' record no vendor at all.</b> Until one is named, that award '
+    + 'is invisible to Reference Rates, Bid History, win rates and spend attribution — a backfill '
+    + 'cannot invent a vendor nobody recorded. Naming one here writes it straight to the work '
+    + 'package. Pick the project, then the vendor per row.</p>';
+  const tabs = '<div class="fq-projs">' + _fq.projects.map(function (p) {
+    return '<button class="fq-proj' + (p.project_id === grp.project_id ? ' on' : '') + '"'
+      + ' onclick="fqPickProject(' + Q + esc(p.project_id) + Q + ')">'
+      + esc(p.project_id) + ' <b>' + p.count + '</b></button>';
+  }).join('') + '</div>';
+  const rows = grp.rows.map(_fqRow).join('');
+  host.innerHTML = note + tabs + '<div class="fq-rows">' + rows + '</div>';
+}
+
+function _fqRow(w) {
+  const cost = w.awarded_cost != null
+    ? (window.Fmt ? Fmt.moneyShort(w.awarded_cost) : String(w.awarded_cost)) : '';
+  return '<div class="fq-row" id="fq-' + w.id + '">'
+    + '<div class="fq-head">'
+    + '<span class="fq-wp">WP ' + esc(w.wp_no || '—') + '</span>'
+    + '<span class="fq-desc">' + esc(w.description || '(no description)')
+    + (w.trade ? ' <span style="color:var(--text-hint)">· ' + esc(w.trade) + '</span>' : '') + '</span>'
+    + (cost ? '<span class="fq-cost">' + esc(cost) + '</span>' : '')
+    + '</div>'
+    + '<div class="fq-pick">'
+    + '<input id="fqi-' + w.id + '" type="text" autocomplete="off" placeholder="Search the vendor directory…"'
+    + ' oninput="fqSearch(' + Q + w.id + Q + ')">'
+    + '<button class="btn-cancel" style="padding:6px 10px;font-size:0.7857rem"'
+    + ' onclick="fqSave(' + Q + w.id + Q + ')" id="fqb-' + w.id + '" disabled>Save</button>'
+    + '<div class="fq-pop" id="fqp-' + w.id + '"></div>'
+    + '</div></div>';
+}
+
+/* ⚠️ THE PICKED VENDOR IS HELD BY ID, NOT BY THE TEXT IN THE BOX. Typing a name
+   that merely looks right must never be saved as a link — the whole point of
+   this queue is to produce real vendor_id references, and a name-only guess is
+   what the free-text era already left behind. */
+const _fqPicked = {};
+function fqSearch(wpId) {
+  const box = document.getElementById('fqi-' + wpId);
+  const pop = document.getElementById('fqp-' + wpId);
+  const btn = document.getElementById('fqb-' + wpId);
+  if (!box || !pop) return;
+  // Typing invalidates a previous pick, or Save would write the old vendor.
+  delete _fqPicked[wpId];
+  if (btn) btn.disabled = true;
+  const q = box.value.trim();
+  clearTimeout(_fqPickTimer);
+  if (q.length < 2) { pop.classList.remove('open'); pop.innerHTML = ''; return; }
+  _fqPickTimer = setTimeout(async function () {
+    let list = [];
+    try { list = await VendorDb.searchApprovedVendors(q); } catch (e) { list = []; }
+    if (!list.length) {
+      pop.innerHTML = '<div class="fq-none">Nothing matches. Add the company under '
+        + '<b>Invite a Vendor</b> first, then come back.</div>';
+    } else {
+      pop.innerHTML = list.slice(0, 25).map(function (v) {
+        const badge = window.accredMeta ? accredMeta(v.accreditation) : null;
+        return '<button type="button" class="fq-opt" onclick="fqChoose(' + Q + wpId + Q + ',' + Q + v.id + Q + ')">'
+          + esc(v.name) + (badge ? ' <span style="color:var(--text-hint)">· ' + esc(badge.label) + '</span>' : '')
+          + '</button>';
+      }).join('');
+      _fqResults[wpId] = list;
+    }
+    pop.classList.add('open');
+  }, 220);
+}
+const _fqResults = {};
+function fqChoose(wpId, vendorId) {
+  const v = (_fqResults[wpId] || []).find(function (x) { return x.id === vendorId; });
+  if (!v) return;
+  _fqPicked[wpId] = v;
+  const box = document.getElementById('fqi-' + wpId);
+  const pop = document.getElementById('fqp-' + wpId);
+  const btn = document.getElementById('fqb-' + wpId);
+  if (box) box.value = v.name;
+  if (pop) { pop.classList.remove('open'); pop.innerHTML = ''; }
+  if (btn) btn.disabled = false;
+}
+
+async function fqSave(wpId) {
+  const v = _fqPicked[wpId];
+  if (!v) return;
+  const row = (_fq.projects.find(function (p) { return p.project_id === _fqProj; }) || {rows:[]})
+    .rows.find(function (r) { return r.id === wpId; });
+  const btn = document.getElementById('fqb-' + wpId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    await VendorDb.setAwardedVendor(wpId, v, row ? row.awarded_cost : null, userProfile);
+    const el = document.getElementById('fq-' + wpId);
+    if (el) {
+      el.classList.add('done');
+      const pick = el.querySelector('.fq-pick');
+      if (pick) pick.innerHTML = '<span class="fq-ok"><i class="ti ti-check"></i> '
+        + esc(v.name) + ' recorded</span>';
+    }
+    // Keep the counts honest without re-reading 1,879 work packages.
+    _fq.total = Math.max(0, _fq.total - 1);
+    const g = _fq.projects.find(function (p) { return p.project_id === _fqProj; });
+    if (g) g.count = Math.max(0, g.count - 1);
+    _fqSyncBadge();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+    /* ⚠️ RLS scopes work_packages writes to the caller's assigned projects, so a
+       refusal here is expected for a project they are not on and has to read as
+       itself rather than as a generic failure. */
+    const m = (e && e.message) || String(e);
+    AppNotify.fromError(e, /permission|policy|row-level/i.test(m)
+      ? 'You are not assigned to ' + (row ? row.project_id : 'this project')
+      : 'Could not record the vendor');
+  }
+}
+/* ⚠️ DELIBERATELY NOT A MENU BADGE. Counting this needs all 1,879 work packages
+   paged on every load of a page that already takes tens of seconds for 2,400
+   vendors — and a 962-strong standing backlog would light the Data Tools alert
+   dot permanently, which is how a badge stops being read. The count lives in the
+   panel, where it is re-read on open and decremented as rows are filled. */
+function _fqSyncBadge() {
+  if (!_fq) return;
+  const n = document.getElementById('fq-remaining');
+  if (n) n.textContent = _fq.total;
 }
 
 /* The names the import refused to create, so "N skipped" is never a number with
@@ -6136,6 +6324,21 @@ function restoreDetailPersonnel(id) { return _restoreChild(VendorDb.personnel, i
 <!-- The names "Import from WPs" refused to create. Hidden inline, like every
      other modal here — a stylesheet rule claiming display would win over the
      JS that shows it (Known Issues #30). -->
+<!-- Awarded work packages with no vendor recorded. Hidden inline like every
+     other modal here (Known Issues #30). -->
+<div class="modal-overlay" id="fillQueueModal" style="display:none">
+  <div class="modal" style="max-width:920px">
+    <div class="modal-header">
+      <div class="modal-title">Awarded, no vendor recorded</div>
+      <button class="modal-close" onclick="closeFillQueue()">&times;</button>
+    </div>
+    <div class="modal-body" id="fillQueueBody"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeFillQueue()">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="skippedImportModal" style="display:none">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
