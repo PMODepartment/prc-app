@@ -3664,6 +3664,79 @@ a helper.**
 INVITATION ids where the code correctly reads `vendor_id`, so it looked like the dedup was broken
 when the fixture was. Third time in this project — **rule out the harness before the code.**
 
+### ⚠️ A placeholder was ranked as Megawide's #6 vendor (2026-09-07, Vendor Analytics)
+
+Found by reading the live Analytics tab while answering "what do these tools do?".
+**`various supplier (not in directory)` was ranked the #6 vendor by awarded spend (₱340.56M),
+#7 by savings delivered (+₱59.14M), and #2 by Bid Win Rate at 11 of 11 = 100%.** It is not a
+company — it is what somebody typed into a contractor field before deciding. A placeholder
+presented as a top supplier with a perfect record was the most misleading thing on the page.
+
+- **⚠️ THE SPEND IS KEPT; ONLY THE ATTRIBUTION GOES.** The totals now come from **`awardedAll`**
+  and the rankings from the filtered `awarded`. Filtering before the totals would silently shrink
+  Awarded Spend by ₱342M and leave the page reconciling to nothing — the money is real, it just has
+  no company behind it. **Verified live: Awarded Spend stayed ₱11.76B and the vendor count went
+  325 → 323.**
+- **⚠️ `winList` IS FILTERED TOO — that is where the 100% sat.** A placeholder wins every package
+  it appears on by construction, so it tops a win-rate table forever.
+- **`_isPlaceholderVendorName` is EXPORTED from `db.js`** (`VendorDb.isPlaceholderVendorName`)
+  rather than duplicating the pattern here, so the analytics, the import guard and the Data Tools
+  count cannot disagree about what a placeholder is.
+
+**The banner now splits the gap by WHAT CLOSES IT.** It used to give one number and point everyone
+at Import from WPs — but only ~57% of the unresolved names are importable at all, so it sent
+officers to the wrong tool for nearly half the money. Live: **₱3.79B / 32% not attributed**, as
+79 several-companies-in-one-name (₱1.84B → **Needs Splitting**), 75 single companies with no record
+(₱1.60B → **Import from WPs**), 2 placeholders (₱342M across 12 WPs → fix the work package).
+
+### ⚠️ The Backfill badge over-promised by more than 10× (2026-09-07)
+
+`awardedNoBidRow` counted every awarded work package with no bid row — **1,004** — but Backfill can
+only write a bid where it can **resolve a vendor**, and measured on production that was **90**. An
+officer would run it, see ~90 written, and have no idea why 914 remained.
+
+It now counts only what the tool can actually write. **The 914 are blocked on ₱13.8B of awarded
+spend with NO vendor recorded at all** — that is the fill-in queue's job, not Backfill's. **Two
+honest numbers beat one misleading one**, and the two are now complementary: fill in the 962, and
+Backfill's number rises to match.
+
+**What Backfill actually writes** (measured against live data before answering): trade categories
+unioned onto **98** vendors, plus **123 bids**, **134 rates** and **125 product rows** — only from
+work packages whose awarded vendor resolves. It never invents a vendor.
+
+### Data Tools, verified live (2026-09-07)
+
+The restructured menu, read off production:
+
+| tool | badge | note |
+|---|---|---|
+| Backfill Trade/Bid Data | **90** | Ongoing — never retires |
+| Awarded, no vendor recorded | **962** | the blocker on everything vendor-side |
+| Import from WPs | **1222** | see the correction below |
+| Needs Splitting | **17** | |
+| Merge Duplicates | — | uncounted by design, so never hidden |
+| Remove Exact Duplicates | **RETIRED** | 0 groups |
+| Normalize Trades | **RETIRED** | 0 values |
+| Manage Product Categories | — | Configuration |
+
+**⚠️ AN EARLIER FIGURE IN THESE NOTES WAS SCOPED TOO NARROWLY AND IS CORRECTED HERE.** "Import from
+WPs would create ~42 vendors" counted only *awarded contractor* names. The tool also scans
+**`proposed_vendors`**, so the real figure is **~1,222**: 162 from contractor text and ~1,060 from
+proposed-vendor text, against 507 refused as garbled or placeholder. That is a **51% increase** on a
+2,402-vendor directory, so **whether to run it is a business decision, not a cleanup** — those are
+companies Megawide genuinely solicited (Hilti, Isuzu Philippines, Laticrete and Xypex all appear),
+and they would all arrive with no accreditation standing.
+
+**⚠️ `MCC Central Warehouse` is in the importable list and was deliberately NOT filtered.** It is
+Megawide's own warehouse, not a third-party vendor — but excluding names by an `MCC` prefix risks
+refusing a genuine supplier, and wrongly dropping a real company is worse than one internal entity
+in a list somebody reviews. Flagged rather than guessed at.
+
+**A live-diagnosis note:** `window.allVendors` reads **0** on this page — `allVendors` is a
+top-level `let`, i.e. a **lexical binding that is not a property of `window`** (the same trap as
+`Charts` having no `window.Charts`). A bare `allVendors` in the page context reads 2,402 correctly.
+An earlier session mis-read that 0 as "still loading".
+
 ### Data Tools: grouped, counted, and it retires itself (2026-09-07, `vendors.html`)
 
 The menu was **eight flat buttons with no indication whether any still had work**, so Remove
