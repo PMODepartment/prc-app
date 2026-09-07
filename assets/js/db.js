@@ -2920,9 +2920,15 @@ const VendorDb = (() => {
    actually seen in this data are "Various Supplier" and "Various". Kept narrow
    and explicit — a loose pattern here would silently refuse to create a real
    vendor whose name happens to contain one of these words. */
-const _PLACEHOLDER_VENDOR_RE = /^(various(\s+(supplier|suppliers|vendors?|contractors?))?|tbd|to\s*be\s*(advised|determined)|n\/?a|none|unknown|assorted)$/i;
+const _PLACEHOLDER_VENDOR_RE = /^(various(\s+(supplier|suppliers|vendors?|contractors?))?|tbd|to\s*be\s*(advised|determined|sourced|confirmed|identified|nominated)|for\s*sourcing|not\s*yet\s*sourced|n\/?a|none|unknown|assorted|open|pending)$/i;
+/* ⚠️ STRIPS SURROUNDING BRACKETS FIRST. Found live: `(To be sourced)` sailed
+   through the anchored pattern because of its parentheses, so it was about to
+   be created as a vendor. A placeholder is often written that way precisely to
+   mark it as not-a-name. Only OUTER brackets are stripped — a real company
+   like "Acme (Phils.) Inc." keeps its inner ones and is unaffected. */
 function _isPlaceholderVendorName(s) {
-  return _PLACEHOLDER_VENDOR_RE.test(String(s || '').trim());
+  const t = String(s || '').trim().replace(/^[([{<]+/, '').replace(/[)\]}>]+$/, '').trim();
+  return _PLACEHOLDER_VENDOR_RE.test(t);
 }
 
   async function importVendorsFromWPs(opts, profile) {
