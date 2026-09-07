@@ -8452,6 +8452,249 @@ sibling that is present.
 spreadsheet, which has not changed; only the live half can move. Read the two together — the
 workbook says which groups COULD have been collapsed, the directory says whether any WAS.
 
+### ⚠⚠ 49 ALIASES WERE COLLAPSING A MULTI-COMPANY STRING ONTO ONE VENDOR — AND MY OWN PROGRESS FIGURES WERE A FICTION (2026-09-07)
+
+**Found by testing my own writes rather than by adding more.** The bulk alias passes earlier that
+day had written aliases whose text names SEVERAL companies but which point at exactly ONE:
+
+```
+"MCC-PCS Batching Plant, Beebee Construction, MCI Construction, Solidtech"  ->  V-00812 MCC PCS Batching Plant
+"Fuji Haya, Apsi, Lj Industrial, Tom Elek\"T, Abb"                          ->  V-00893 Fuji Haya Electric
+"Microphase Corporation Nexus Technologies, Inc."                          ->  V-00287 Nexus  (the SECOND one)
+"Rowen Enterprise Super Shine Chemical Products Corp"                      ->  V-00397 Super Shine (also the second)
+```
+
+**⚠⚠ THIS IS STRICTLY WORSE THAN NO ALIAS, in three ways at once.** (a) `awarded_vendor_ids`
+and the alias tier are AUTHORITATIVE, so the analytics credited ONE co-awardee with the whole work
+package — CDP101 WP40 was crediting MCC-PCS Batching Plant with all ₱120M of a four-company
+award. (b) The name then RESOLVES, so it drops off `getUnlinkedVendorNames` and nobody ever fixes
+it: **the error hides itself.** (c) The pick was not even consistent — four of them point at the
+*second* company in the string, so which vendor got the money was arbitrary.
+
+**⚠⚠ CONSEQUENCE FOR THE RECORD: the figures I had been reporting were inflated by this.** The
+"₱1.009B / 8.5% unattributed" milestone was a fiction produced by the collapsing aliases; with
+them gone the honest number was **₱1.605B / 13.5%**. **A cleanup metric computed from the same
+index the cleanup is writing into will flatter itself — re-derive it from an index built WITHOUT
+the aliases under test.**
+
+- **The test is decomposition, not a heuristic.** Build an index with **no aliases** (exact /
+  punctuation / legal-suffix tiers only) and tile the alias's OWN TEXT. If it decomposes into
+  **≥ 2 different vendors**, the text is provably multi-company. No name similarity, no scoring.
+- **⚠ ITERATE TO A FIXPOINT.** A collapsing alias HIDES others: while it matches the whole
+  string, the string never decomposes. Round 1 found 38, **round 2 found 9 more**, round 3 found
+  none. A single pass would have left a quarter of them in place.
+- **⚠ THE TEST HAS A BLIND SPOT: it can only see a second company that is IN the directory.**
+  `"Mcc-pcs Cels, Comansa Machinery, Zoomlion"` read as single-company because Comansa and
+  Zoomlion (crane makers) have no rows. A second, **directory-independent** test catches those:
+  split on comma/slash/semicolon and count segments that carry a non-filler word — two or more
+  is multi-company whether or not those companies exist anywhere. Use BOTH.
+- **⚠ TWO FALSE POSITIVES, AND THEY ARE A SHAPE TO REMEMBER: `Parent Corp - Business Unit`.**
+  `"MEGAWIDE CONSTRUCTION CORPORATION - BU BATCHING"` decomposes into two vendors — the real
+  parent row **V-01175 MEGAWIDE CONSTRUCTION CORPORATION** plus the unit — but it is ONE thing.
+  Both were restored with a note. The 24 short BU forms (`Bu-Cels`, `BU Precast`, `MCC BU FORMWORKS`)
+  were never affected. **When a decomposition test flags a name, check whether the "second company"
+  is that company's own parent.**
+- **The right fix for these strings is `awarded_vendor_ids` naming EVERY constituent**, which is
+  what was then written — strictly better than an alias, because it credits all of them and the
+  analytics splits evenly across them.
+- **47 removed + 2 more from the second test = 49; 2 restored.** Every one is reversible: an alias
+  is one row, and re-adding it is one call.
+
+### ⚠ `vendor_aliases` HAS NO `alias` COLUMN — IT IS `alias_text` (2026-09-07)
+
+A hand-rolled `sb.from('vendor_aliases').select('vendor_id,alias')` **errors**, PostgREST returns
+`data: null`, and an `aliases || []` fallback then builds an index with **ZERO aliases** — silently.
+The visible symptom is that three names which demonstrably resolve in the app came back
+unresolvable, which nearly led to writing duplicate aliases and to reporting a resolvable name as
+a dead end.
+
+**⚠ ALWAYS `await VendorDb.getVendorAliases()`.** It knows the schema (`alias_text`, plus the
+precomputed `alias_norm` / `alias_squash` the unique index is built on) and it is cached. The same
+applies to any hand-rolled read of a table whose columns you have not just looked at: **a failed
+select in this stack degrades to an empty result, not to an error.**
+
+### STM101 WP23 — the "₱187M precast shell" corroborated, 13 vendors (2026-09-07)
+
+Asked to corroborate the work package itself to determine whose it is. Its `contractor` cell holds
+**16 company names with no delimiter anywhere**, which is why no tool could see it: `_looksGarbled`
+reported **false**, so it was neither a Split candidate nor on any worklist, while carrying the
+largest non-placeholder unattributed sum in the portfolio.
+
+**It tiles CLEAN: 16 tiles, 13 distinct vendors, zero residue** — Splice Sleeve Japan (the
+sleeves), three Megawide PCS business units (CELS, Formworks, Precast), two precast fabricators,
+Doron, JASL, Glory Lumber, Sika, Fil-American Hardware, Gilas Manila Hardware, Capitol Steel and
+the EPC Central Warehouse. A materials-and-fabrication package, consistent with "Precast shell".
+
+Three residue names needed one alias each, and each is a mechanical variant rather than a judgement:
+`Doron Builders and Construction Supply Ltd Co` (singular, periods dropped),
+`MCC - EPC Cental Warehouse` (**"Cental"**), and
+`Global Building Precast Solutions Inc` — **a word-order transposition of
+`Global Precast Building Solutions, Inc.` that appears TWICE IN THE SAME CELL**, which is one
+supplier typed two ways rather than two companies with identically-transposed names.
+
+### ⚠ TWO TILER RULES THAT ONLY SHOW UP ON REAL DATA (2026-09-07)
+
+1. **⚠ NEVER BEGIN A TILE ON A BARE LEGAL-SUFFIX WORD.** Greedy longest-match starting at `Inc`
+   or `Ltd Co` swallows the suffix belonging to the company BEFORE it — which both mis-widens the
+   current tile and leaves the previous company unresolvable. Seen exactly: tiles read
+   `"Inc MCC - PCS CELS"` and `"Ltd Co JASL Construction Supply"` while
+   `Global Building Precast Solutions` and `Doron Builders and Construction Supply` sat in the
+   residue with their own suffixes missing.
+2. **⚠ TRIM TRAILING PUNCTUATION OFF THE CANDIDATE, because a company name can contain a comma.**
+   `"Rp-Ra, Builders"` IS one company (RP-RA Builders Corporation) and resolves; `"Rp-Ra, Builders,"`
+   does not. Splitting on the comma first gives `Rp-Ra` + `Builders`, neither of which resolves.
+
+### 118 work packages linked by tiling, ₱2.72B (2026-09-07)
+
+With the index corrected, every awarded work package carrying vendor text but no stored links was
+tiled: **89 resolved to a single vendor, 24 to several, 5 more after the mechanical fixes above**.
+Linked awarded WPs went **245 -> 363**.
+
+- **⚠ `vendor_id` (the back-compat primary) is written ONLY when there is exactly one awardee.**
+  On a co-award it stays NULL rather than naming a primary nobody chose.
+- **⚠ `contractor` text is left byte-identical** — it IS the procurement record, and leaving it
+  makes the whole write reversible by clearing the ids.
+- **⚠ `awarded_vendor_amounts` is left alone** — the per-vendor split is unknown and inventing
+  one asserts a breakdown nobody agreed. An empty array reads the same as NULL: even split.
+- **⚠ A tile pointing at a `problematic` vendor is refused outright.** Moving award money onto or
+  off a blacklisted company is always a deliberate human act.
+- **⚠⚠ THE INDEX-ALIGNMENT INVARIANT WAS VERIFIED PORTFOLIO-WIDE AFTERWARDS: 0 misaligned rows
+  across all 1,879 work packages.** `awarded_vendor_ids` and `awarded_vendor_amounts` are
+  index-aligned, so a length mismatch anywhere silently reattributes every later vendor's money.
+  **Re-run that scan after any bulk write to either column.**
+
+### The masterlist closes the count, and 35 vendors were restored (2026-09-07)
+
+The countermeasure asked for — reconcile the workbook count against the app, since the masterlist
+is authoritative. **Workbook 2,403 distinct BP codes; app was missing 40.** All 40 were created or
+explained:
+
+| | |
+|---|---|
+| **restored as new rows** | **35** — 6 branch rows lost to an earlier name-based merge, plus ~29 added to the masterlist after the original import (the contiguous `V-02392`—`V-02419` block) |
+| second BP code for a taxpayer ALREADY present | 5 |
+
+**⚠ `createVendor` DOES NOT SYNTHESIZE `invite_email`, and that column is NOT NULL.** All 35
+inserts failed with `null value in column "invite_email"` — the UI layer supplies it
+(`_addVendorPlaceholderEmail()`), not `db.js`. Use the documented deterministic placeholder;
+keyed on the BP code it is unique by construction, and the unique index on `lower(invite_email)`
+makes a collision a hard failure rather than a silent one. **Nothing was written on the failed
+attempt (delta 0), so the retry was clean.**
+
+**⚠ The 5 that remain "missing" are all a SECOND BP code the workbook itself carries for one
+taxpayer** — V-00318 Pilipinas Shell (= V-01388 Shell Pilipinas, a real corporate rename, same
+TIN), V-00559 Haffele (= V-01832 Hafele, same TIN, typo'd name), V-00858 Rambic Construction
+Equipment (= V-00655 Rambic, same TIN), V-01743 Office Warehouse Gilmore (= V-00295, **same branch
+083**, one branch two codes), V-02304 Luljettas's Place (= V-01272, same TIN). Plus V-01873 for the
+John Paul I. Javier employee exception. **Do not "fix" these by creating rows — the reconciliation
+is CLOSED and these six gaps are correct.**
+
+### ⚠ THE BRANCH AUDIT: 38 TIN ROOTS SPAN 82 BP CODES, AND ONLY 13 ARE ACTUALLY BRANCHES (2026-09-07)
+
+Asked to check vendors that have a branch, since accredited branch records may have been destroyed
+by merging and branches carry different TINs. Grouping the workbook by **TIN root** (the 9-digit
+taxpayer; the trailing branch code is a separate branch record):
+
+| | roots |
+|---|---|
+| all codes share ONE branch — one taxpayer trading under several names | **25** |
+| codes span SEVERAL branches — a row is expected per branch | **13** |
+
+**⚠ "SAME TIN" DOES NOT MEAN "SAME TRADING ENTITY", and this is where an alias would do damage.**
+The 25 include real renames (UCPB General Insurance -> Cocogen, Philippine AXA -> AXA Philippines,
+PNB-Mizuho -> PNB-IBJL, MAA General -> Maagap), sole-proprietor trade names (SGQ Construction /
+Silverio Genorga Quinones III, IES Electrical / Efren Descarga), brand names (Philflex Wires /
+Philips Wire & Cable) — **and at least one outright workbook TIN error: V-01342 Rapid Forming
+Corporation and V-01343 RCBC Bankard share a TIN and are plainly different companies.** They also
+include **separate dealership OUTLETS** under one group TIN (Toyota Pasig / Makati / Shaw, Honda
+Manila Bay / Makati / Shaw, Ford Global City / Manila, Nissan Quezon Ave / Ortigas). **Aliasing an
+outlet onto a sibling outlet would misattribute a real award**, so a shared TIN is evidence of one
+TAXPAYER, never on its own a licence to merge or alias.
+
+### Ten masterlist aliases, each corroborated against the work package's own trade (2026-09-07)
+
+The blocker list was ranked by the awarded spend each unresolved name holds up, then each name was
+looked up in the masterlist and **checked against the WP's trade and the vendor's own SAP
+`vendor_group`** — a contradiction there is the cheapest disproof available.
+
+| written | evidence |
+|---|---|
+| `MGH Trading` -> V-01972 MGH Construction **Aggregates** Trading | group "Aggregates"; WPs are Gravel Bedding, Masonry Materials |
+| `LJ Industrial` -> V-00234 LJ Industrial Fabrication | **₱195M / 5 WPs, the largest.** Only other "LJ" row shares nothing past the initials; WPs are Transformer / Generators / Escalators / Utilities alongside Fuji-Haya and ABB |
+| `Firelyn` -> V-00161 Fyrelyn Industries | both WPs are Fire Protection Works |
+| `Architekton` -> V-00732 ArkhiTekton Asia | the variant `Arkitekton` already resolved to it; both WPs are masonry/AAC |
+| `Bonny Furnitures` -> V-00071 Bonny Furniture | singular/plural; WP is Temporary Facilities |
+| `Sentine Dev't Corp` -> V-00375 Sentine Development | "Sentine" is distinctive, NOT Sentinel Plastic |
+| `Geolink` -> V-00168 Geolink Positioning Instrument | WP is Light Tools and Equipment |
+| `Trane` -> V-01102 Trane | global HVAC brand, PH entity in the masterlist |
+| `China Com.` -> V-01674 China Communications Services PH | group "Electrical Works"; package also names Fuji-Haya |
+| `Rexim Philippines Uneversal Sales Corp.` -> V-01719 | typo "Uneversal"; group "MEPF Works, Sound Attenuator" |
+
+**⚠ REFUSED, and each refusal is a finding rather than a gap:**
+
+- **`Affordaink`** — **AMBIGUOUS**: V-00822 Affordaink **OPC** and V-00462 Affordaink **Store**.
+  ₱26M on an Office Equipment package where both are plausible.
+- **`Prime Power`** — three same-industry candidates (Multico Prime Power, Prime Power Energie
+  Systems, E-Prime Power Generators). The identity-leads tiebreak picks one, but **a tiebreak
+  invented for a suggester is not evidence enough to move ₱58M between power suppliers.**
+- **`Enci`** — the only masterlist match is **V-01152 ENCI Canteen**, against ₱104M of
+  electrical/wire packages. A canteen cannot be that awardee. (The suggester's short-generic-token
+  guard already refuses this; the masterlist confirms why.)
+- **`RT Valenzuela`** (₱122M, 6 WPs) — the only match is **Gary A. Valenzuela**, a different person.
+- **`Hitachi`** — two elevator candidates (Hitachi Elevator PH, Hitachi Building Systems).
+- **`Ursua Sand & Gravel`** (₱59M) — the only Ursua is **R.G. Ursua Sea and Land Cargo
+  Transport**. Sand and gravel is not cargo transport; `R.G. Ursua` resolves on its own elsewhere.
+- **`Hyundai Iloilo`** — only Hyundai Engineering and Hyundai Elevator; neither is a car dealer.
+- **Absent from the masterlist entirely**: `Apsi`, `ABB`, `Otis`, `Zoomlion`, `Comansa Machinery`,
+  `Alag Gravel`, `HDC`, `Ramp`, `E.C DAUGHSON`, `ISTS`, `Abs`, `Conception`, `Nexus` (6 candidates).
+  These need creating or a person who knows the project — **no rule reaches an acronym.**
+
+### Four duplicate rows merged, two of which I had just created (2026-09-07)
+
+A duplicate scan by **BP code** and by **exact normalised name** over all 2,439 rows found only four
+groups — and the 35-vendor restore had introduced two of them, because those companies already
+existed under a different code:
+
+- `John Paul I. Javier` — already present as the documented **E-00345 employee exception** carrying
+  a real bid. **Kept the row with the data**, folded mine, and noted V-01873 on the survivor rather
+  than overwriting a recorded exception.
+- `MCC - Modan Lofts Ortigas Hills` — already present. Kept the older row; `mergeVendors`
+  **carried V-01902 onto it automatically** via its blank-field preservation, which is why the
+  reconciliation stayed closed with no extra write.
+- `V-00133 Ericson Builders` / `Ericson` and `V-00535 Felport International Marketing` / `Felport`
+  — pre-existing pairs, **two rows sharing one BP code**, no data on either side.
+
+**⚠ CHECK FOR AN EXISTING ROW UNDER A DIFFERENT CODE BEFORE CREATING FROM THE MASTERLIST.** The
+reconciliation was done by CODE, so a company already present under another code reads as missing.
+Directory 2,439 -> **2,435**.
+
+### Where it stands, honestly (2026-09-07)
+
+Real projects only, DEMO excluded, awarded work packages that NAME a vendor (₱11.885B basis):
+
+| | start of session | now |
+|---|---|---|
+| unattributed awarded spend | ₱1.605B (13.5%)* | **₱1.506B (12.7%)** |
+| awarded WPs carrying stored vendor links | 245 | **363** |
+| aliases | 535 | **498** |
+| directory vendors | 2,404 | **2,435** |
+| masterlist codes missing from the app | 40 | **0** (6 duplicate-code gaps, all explained) |
+
+*the true figure once the 49 collapsing aliases were removed; it had been REPORTED as
+₱1.009B / 8.5%.
+
+**⚠ `Unlinked vendor names` rose 888 -> 932 and `Import from WPs` 881 -> 925, and that is the
+CORRECT direction.** Deleting the collapsing aliases put those multi-company names back on the
+worklist where they belong. **A badge falling is not by itself progress — it can also mean a
+fiction was installed.**
+
+**Still needing a person, in value order:** `Various Supplier` (₱341M, 11 WPs) and four other
+placeholders — not companies, so no alias or record is honest; `E.C DAUGHSON` (₱178M, and it
+blocks a string whose other four members all resolve); `HDC` (₱108M); `Ramp` (₱100M); `Apsi` /
+`ABB` (₱91M each); `Zoomlion` + `Comansa` (₱153M, crane makers with no rows); the ambiguous and
+refused names above. **911 awarded work packages name NOBODY at all (₱13.95B)** — that is the
+`Awarded, no vendor recorded` queue and it needs the PO or the contract, not matching.
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
