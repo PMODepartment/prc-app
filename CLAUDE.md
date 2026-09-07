@@ -7507,6 +7507,49 @@ sight — so the tool suggests candidates and they confirm.
   contrast AA in both themes after `.al-sug-h` was moved off `--text-hint` — **the identical
   `--text-hint`-on-`--surface-2` 4.41 mistake made twice in one pass.**
 
+#### The 40 NOT FOUND, settled by diffing the TWO workbooks (2026-09-07)
+
+There are two copies in `~/Downloads`: **`EPC. PROC. Vendor Masterdata. 2023 07 27.xlsx`** (the
+file as of today, 2,437 companies) and **`Copy of EPC. PROC. …xlsx`** (2,410 — the one the
+original import actually ran against). Diffing them turns the 40 from a mystery into arithmetic,
+and the diff is remarkably small: **28 companies added, 1 removed, and exactly 2 field changes
+in the whole workbook.**
+
+| the 40 NOT FOUND | |
+|---|---|
+| **new since the import** (the contiguous `V-02392`–`V-02419` block) | **26** |
+| **genuine import misses** | **13** + Pacific Timber (no BP code) |
+
+**So the import was 99.4% accurate on the file it was given — 14 misses out of 2,410.** The
+"contiguous block suggests newer additions" guess was right, and is now measured rather than
+inferred. Two of the 28 added (`V-02405 RJB Deuna Construction Services`,
+`V-02406 NLG Construction`) already exist in the app as **bare name-only rows created from
+work-package text**, which is why they show as a standing disagreement rather than as missing.
+
+**And half the 14 misses are not really absent:**
+- `Pacific Timber Export Corp.` **is** there, as `Pacific Timber Export Corp. (PATECO)` — alias it.
+- `V-00559 Haffele Philippines,Inc.` is almost certainly there as `Hafele` (one f) — alias it.
+- `V-00384 Sofaire System Enterprises` and `V-00754 Wenjem Enterprises` are the **TIN-conflation
+  pair**: the app holds ONE row carrying their TIN under their *sibling's* name.
+- `V-00294 office Warehouse` and `V-01743 Office Warehouse, Inc. (Gilmore Branch)` are branches
+  of `V-00295`, which IS present.
+
+Leaving roughly **6–8 genuinely absent companies** (Genus Rigging, Pilipinas Shell, Weld
+Powertools, Rambic, Rockbuilt, Foshan Becter, Syblingss, Luljettas's Place).
+
+**⚠️ A RENAME EXPLAINS THE "in the app, not in the workbook" MCC ROW.** One of the two field
+changes is `V-01536` renamed from **`Zilhomes Corporation`** to
+**`MCC - West Side City Phase 1 Site B`** — and `V-01598`, which used to carry that name, is the
+single company *removed* from the file. The app still holds the name under the **old** code
+`V-01598`. So that row is not a stray: the masterlist moved a name between codes.
+**⚠️ MATCH BY BP CODE, NOT NAME, WHEN COMPARING WORKBOOK VERSIONS** — a name can migrate
+between codes, so a name-only diff would have reported one addition and one deletion and hidden
+the rename entirely. (The other change is a city correction on `V-00181`.)
+
+**⚠️ RE-RUN THE RECONCILIATION AGAINST THE FILE THAT WAS IMPORTED, NOT ONLY THE CURRENT ONE,
+whenever these numbers are questioned again.** `diff_master.py` (scratchpad, un-committed) does
+it; regenerate `extract_master.py` output from whichever workbook you mean to hold the app to.
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
