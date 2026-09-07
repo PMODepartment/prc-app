@@ -7748,6 +7748,63 @@ Unlinked vendor names **1,345 → 941**, Import from WPs **840 → 477** (363 du
 will now not be created), and Backfill Trade/Bid Data **99 → 113**, which is the right direction:
 more vendors resolve, so there is more bid history it can write.
 
+### "Various Supplier" is not a placeholder for ONE vendor, and the acronyms split two ways (2026-09-07)
+
+Asked to look for a pattern behind `Various Supplier`, and to check whether any masterlist company
+carries the acronyms exactly. Both questions had answers.
+
+#### ⚠⚠ `Various Supplier` IS AGGREGATE SPEND BY DESIGN — STOP LOOKING FOR THE ONE VENDOR
+
+`work_packages.type_of_service` explains all 12 of its work packages, and it is never one company:
+
+| type_of_service | WPs | what it is |
+|---|---|---|
+| `Subcon Weekly - JO` | STM101 WP45/46/47/48/49 | labour priced **per block** ("Labor Cost for Block 1, 7, 8, 15, 16, 20") across many small subcontractors on weekly job orders |
+| `Main Materials - P` | STM101 WP44/50/51/52 | routine material purchases from many suppliers |
+| `Subcon Monthly - JO` | WCB358 WP14 (₱286.3M "Site Management Organization (HR)"), STM101 WP53 | monthly subcon / staffing across agencies |
+| `Consumable Mat'ls` | WCB358 WP26 (PPE & First Aid) | consumables |
+
+So the honest reading is that these WPs **aggregate high-frequency, many-vendor spend on purpose**.
+An alias would be a lie and creating a vendor called "Various Supplier" would be worse.
+**⚠ THE RESOLUTION PATH IS THE PO/JO EXPORT, NOT THE DIRECTORY.** `Conso PO List` carries
+`U_WPNo` on 85% of its 135,567 lines (see the vendor_code backfill notes), so it can name the
+actual vendors behind each of these WPs. Nothing inside this app can.
+
+#### ⚠⚠ A NAME THAT CONTAINS THE ACRONYM IS A NAME MATCH; INITIALS ARE AN INFERENCE
+
+CLAUDE.md already says never to expand an acronym by initials against the directory. That still
+holds — but it is worth separating two cases the check surfaced:
+
+**WRITTEN (7): the vendor's registered name literally CONTAINS the acronym**, each unique in the
+masterlist: `NBF` → NBF Consulting, `OSP` → OSP Advantage System, `CSE` → CSE Tech Resources,
+`MGH` → MGH Construction Aggregates Trading, `CEC` → CEC Construction, `SDA` → SDA
+Construction Services, `PGI` → PGI Construction Services. That is a name match, not a guess.
+**CSE had the strongest corroboration of all: the FULL name appears on WCB358 WP60, the same
+project whose WP5 abbreviates it.**
+
+**NOT WRITTEN: initials-only matches, however well corroborated.** Held for the user even where
+`vendor_group` agrees, because an initials expansion is an inference about IDENTITY rather than a
+spelling normalisation, and these carry real money:
+
+| acronym | unique masterlist candidate | corroboration | at stake |
+|---|---|---|---|
+| `CCSP` | V-01674 China Communications Services Philippines | `vendor_group` = **Electrical Works**; WP is "EL-02 — Electrical Works" with Fujihaya + Tomelekt | ₱270.5M |
+| `HDC` | V-00187 Hesreal Development Corp. | group only `Supplier`; a *Development Corp* on "EL-04 UPS Equipment" reads **weak** | ₱108.2M |
+| `LRPA` | V-01371 L. R. Punsalan & Associates | Design Coordination + BIM WPs beside Maarka Engineering Consultancy and R.D. Purisima **+ Associates** — same naming pattern | ₱100.3M |
+| `GCCI` | V-01649 Grand Creare Construction Inc. | group = **Civil Works**; Road Works / Site Works — and **"Grand Creare" already appears IN FULL on LCR102 WP29**, the same project | ₱101.5M |
+| `ISTS` | V-01225 Industrial Solutions & Technical Services | "Equipment Positioning" beside Fuji-Haya, Prime Power, Trane, Cummins | ₱58.5M |
+| `JSEC` | V-00206 Jardine Schindler Elevator Corp | group = **Elevator**; the WP lists Hitachi, Mitsubishi, Otis, The Lift, Schindler, Hyundai | ₱8.6M |
+
+**⚠ `RAMP` and `AMG` are in NEITHER the directory nor the workbook** — no candidate exists at
+all, by initials or by token. They need creating or naming.
+
+**⚠ A note on JSEC: the same WP already lists "Schnieder", which is very likely a misspelling of
+Schindler** — so JSEC and that entry may be the same company twice. Resolve the duplicate before
+attributing both.
+
+Result: aliases 476 → **483**, unattributed awarded spend ₱1.339B → **₱1.319B (11.1%)**,
+names 68 → 66.
+
 ### The tiler grows two refusal rules, and one of them stopped a blacklist mis-link (2026-09-07)
 
 Pushing the covering approach further. **₱1.641B → ₱1.339B unattributed (13.8% → 11.3%)**,
