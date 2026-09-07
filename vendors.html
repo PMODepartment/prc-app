@@ -1084,7 +1084,7 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
                 <button onclick="closeToolsMenu();openTaxonomyModal()"><i class="ti ti-category"></i><span>Manage Product Categories</span><small>The Trade → Works → … tree vendors classify their offerings against</small></button>
               </div>
             </div>
-            <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Add Vendor</button>
+            <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-user-plus" style="margin-right:4px"></i>Invite a Vendor</button>
             </div>
           </div>
           <div class="vendor-meta">
@@ -1244,11 +1244,37 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <div class="modal-overlay" id="inviteModal" style="display:none">
   <div class="modal">
     <div class="modal-header">
-      <div><div class="modal-title">Add a Vendor</div><div class="modal-subtitle">Add a vendor to the directory — fill in what you know now, invite them to self-manage their profile later if needed.</div></div>
+      <div><div class="modal-title">Invite a Vendor</div><div class="modal-subtitle">Send them the registration link. They fill in their own details and apply for accreditation.</div></div>
       <button class="modal-close" onclick="closeInviteModal()">&times;</button>
     </div>
     <div class="modal-body">
       <div class="msg" id="inviteMsg" style="display:none;font-size:0.8571rem;padding:8px 12px;border-radius:8px;margin-bottom:12px"></div>
+      <!-- ⚠️ THE PREFERRED PATH LEADS, and the manual form is behind a link.
+           A record typed in here is a directory entry nobody has verified, it
+           cannot carry the four accreditation documents (only the vendor has
+           those), and it is how duplicates get in — which is what Merge, Split
+           and Remove Exact Duplicates exist to clean up afterwards. -->
+      <div id="avChoice">
+        <div class="av-lead">
+          <div class="av-lead-h"><i class="ti ti-qrcode"></i> Let the vendor register themselves</div>
+          <p>One link, the same for every vendor. They identify themselves by TIN and company
+             name, upload their own BIR 2303, company profile, business permits and sample
+             invoice, and the claim lands in <b>Vendor Registrations</b> for you to approve.</p>
+          <div class="invite-link-box" id="avRegLink"></div>
+          <div class="av-lead-btns">
+            <button class="btn-primary" onclick="avCopyRegLink()"><i class="ti ti-copy"></i> Copy link</button>
+            <button class="btn-cancel" onclick="closeInviteModal();openQrModal()"><i class="ti ti-qrcode"></i> Show QR code</button>
+          </div>
+        </div>
+        <div class="av-or"><span>or</span></div>
+        <button class="av-manual-toggle" onclick="avShowManual()">
+          Add a record manually instead <i class="ti ti-chevron-down"></i></button>
+      </div>
+      <div id="avManual" style="display:none">
+        <div class="av-manual-note"><i class="ti ti-info-circle"></i>
+          <span>Use this only when the vendor cannot register — you are creating an
+          unverified record, and accreditation will still need documents only they can
+          upload. Check the directory first so you do not add a duplicate.</span></div>
       <div class="field"><label>Company Name *</label><input id="inv-name" placeholder="e.g. ABC Construction Supply Inc."></div>
       <div class="field"><label>Trade Categories</label><div class="trade-checklist" id="inviteTradeChips"></div></div>
       <div class="field"><label>Contact Person</label><input id="inv-contact-person" type="text" placeholder="Full name"></div>
@@ -1256,16 +1282,11 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
       <div class="field"><label>Contact Email</label><input id="inv-contact-email" type="email" placeholder="contact@vendor.com"></div>
       <div class="field"><label>Address</label><input id="inv-address" type="text" placeholder="Company address"></div>
       <div class="field"><label>Notes</label><textarea id="inv-notes" placeholder="Anything else worth recording about this vendor"></textarea></div>
-      <div class="field"><label>Invite Email <span style="font-weight:400;text-transform:none;color:#999">(optional — only needed if this vendor should self-manage their profile)</span></label><input id="inv-email" type="email" placeholder="contact@vendor.com"></div>
-      <div id="inviteLinkWrap" style="display:none">
-        <label style="display:block;font-size:0.7857rem;font-weight:600;text-transform:uppercase;color:#888;margin-bottom:6px">An invite link was also generated — send it if you'd like this vendor to self-manage their own profile</label>
-        <div class="invite-link-box" id="inviteLinkText"></div>
-        <button class="btn-cancel" style="margin-top:8px" onclick="copyInviteLink()">Copy Link</button>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeInviteModal()">Close</button>
-      <button class="btn-primary" id="btnCreateInvite" onclick="createInvite()">Add Vendor</button>
+      <button class="btn-primary" id="btnCreateInvite" onclick="createInvite()" style="display:none">Add Vendor</button>
     </div>
   </div>
 </div>
@@ -4399,19 +4420,40 @@ function toggleInviteTrade(el) {
   const t = el.dataset.t;
   if (el.checked) inviteTrades.add(t); else inviteTrades.delete(t);
 }
+/* Opens on the choice, never on the form — so the manual path is a decision
+   rather than the default. */
+function avShowManual() {
+  document.getElementById('avChoice').style.display = 'none';
+  document.getElementById('avManual').style.display = 'block';
+  document.getElementById('btnCreateInvite').style.display = '';
+  document.getElementById('inv-name').focus();
+}
+function avCopyRegLink() {
+  const t = document.getElementById('avRegLink').textContent;
+  navigator.clipboard.writeText(t).then(function () {
+    AppNotify && AppNotify.success('Registration link copied.');
+  }).catch(function () {
+    AppNotify && AppNotify.warn('Could not copy — select the link and copy it by hand.');
+  });
+}
+
 function openInviteModal() {
   document.getElementById('inv-name').value = '';
-  document.getElementById('inv-email').value = '';
   document.getElementById('inv-contact-person').value = '';
   document.getElementById('inv-contact-number').value = '';
   document.getElementById('inv-contact-email').value = '';
   document.getElementById('inv-address').value = '';
   document.getElementById('inv-notes').value = '';
-  document.getElementById('inviteLinkWrap').style.display = 'none';
   document.getElementById('inviteMsg').style.display = 'none';
   inviteTrades = new Set();
   buildInviteChips();
-  document.getElementById('btnCreateInvite').style.display = '';
+  // ⚠️ The generic registration link — no per-vendor parameter. Registration is
+  //    matched server-side on the TIN and company name the vendor types, so
+  //    there is nothing per-vendor to encode and the link is safe on a PO.
+  document.getElementById('avRegLink').textContent = _regLinkFor('');
+  document.getElementById('avChoice').style.display = '';
+  document.getElementById('avManual').style.display = 'none';
+  document.getElementById('btnCreateInvite').style.display = 'none';
   document.getElementById('btnCreateInvite').textContent = 'Add Vendor';
   document.getElementById('inviteModal').style.display = 'flex';
   _syncModalScrollLock();
@@ -4428,7 +4470,6 @@ function _addVendorPlaceholderEmail() {
 }
 async function createInvite() {
   const name = document.getElementById('inv-name').value.trim();
-  const invite_email = document.getElementById('inv-email').value.trim();
   const msgBox = document.getElementById('inviteMsg');
   if (!name) {
     msgBox.textContent = 'Company name is required.';
@@ -4440,7 +4481,9 @@ async function createInvite() {
   try {
     const fields = {
       name,
-      invite_email: invite_email || _addVendorPlaceholderEmail(),
+      // Always a placeholder: the column is NOT NULL, and this address has not
+      // gated anything since registration became identity-matched.
+      invite_email: _addVendorPlaceholderEmail(),
       trade_categories: [...inviteTrades],
       contact_person: document.getElementById('inv-contact-person').value.trim(),
       contact_number: document.getElementById('inv-contact-number').value.trim(),
@@ -4448,20 +4491,8 @@ async function createInvite() {
       address: document.getElementById('inv-address').value.trim(),
       notes: document.getElementById('inv-notes').value.trim(),
     };
-    const v = await VendorDb.createVendor(fields, userProfile);
-    if (invite_email) {
-      // `v` isn't in allVendors yet (loadAll() hasn't run), so build the link
-      // from this fresh object directly rather than through _vendorInviteLink,
-      // which looks up by id. A brand-new vendor has no Vendor Code yet (this
-      // form doesn't collect one), so this correctly falls back to the plain
-      // generic link — a code can be added later from the vendor's profile.
-      const link = _regLinkFor(v.vendor_code);
-      document.getElementById('inviteLinkText').textContent = link;
-      document.getElementById('inviteLinkWrap').style.display = 'block';
-      btn.style.display = 'none';
-    } else {
-      closeInviteModal();
-    }
+    await VendorDb.createVendor(fields, userProfile);
+    closeInviteModal();
     msgBox.style.display = 'none';
     await loadAll();
     AppNotify && AppNotify.success(`Vendor "${name}" added.`);
@@ -4471,11 +4502,6 @@ async function createInvite() {
   }
   btn.disabled = false; btn.textContent = 'Add Vendor';
 }
-function copyInviteLink() {
-  const text = document.getElementById('inviteLinkText').textContent;
-  navigator.clipboard.writeText(text).then(() => AppNotify && AppNotify.success('Link copied.'));
-}
-
 /* ── Detail modal ── */
 /* ══ Vendor detail page — routing, header, logo ════════════════════════════
    Was a 760px modal over the directory. A profile is nine sections deep, so
@@ -5917,6 +5943,30 @@ function restoreDetailCert(id)      { return _restoreChild(VendorDb.certificatio
 function restoreDetailPersonnel(id) { return _restoreChild(VendorDb.personnel, id, renderDetailPersonnel); }
 </script>
 <!-- ── Vendor self-registration queue ─────────────────────────────────────── -->
+
+<style>
+    /* ── Invite a Vendor: the preferred path leads ─────────────────────────── */
+    .av-lead{border:1px solid var(--mw-red-mid,#FBD9D5);background:var(--mw-red-light,#FDECEA);
+      border-radius:10px;padding:14px 16px}
+    .av-lead-h{font-weight:800;font-size:0.9286rem;color:var(--mw-red-ink);
+      display:flex;align-items:center;gap:7px;margin-bottom:6px}
+    .av-lead p{margin:0 0 10px;font-size:0.8214rem;line-height:1.5;color:var(--text-secondary)}
+    .av-lead-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .av-or{display:flex;align-items:center;gap:10px;margin:14px 0;
+      font-size:0.7143rem;font-weight:700;text-transform:uppercase;color:var(--text-hint)}
+    .av-or::before,.av-or::after{content:'';flex:1;height:1px;background:var(--border-md)}
+    /* Quiet on purpose: this is the fallback, not a second primary action. */
+    .av-manual-toggle{width:100%;border:1px dashed var(--border-md);background:transparent;
+      color:var(--text-secondary);border-radius:9px;padding:9px 12px;cursor:pointer;
+      font-family:inherit;font-size:0.8214rem;font-weight:600}
+    .av-manual-toggle:hover{border-color:var(--mw-red);color:var(--mw-red-ink)}
+    .av-manual-note{display:flex;gap:9px;align-items:flex-start;margin-bottom:14px;
+      padding:10px 12px;border-radius:9px;background:var(--surface-2);
+      border-left:3px solid var(--mw-red);font-size:0.7857rem;line-height:1.5;
+      color:var(--text-secondary)}
+    .av-manual-note .ti{color:var(--mw-red-ink);flex-shrink:0;margin-top:1px}
+    body.dark-mode .av-lead{background:rgba(255,122,110,.10);border-color:rgba(255,122,110,.30)}
+  </style>
 
 <!-- ── Registration QR ────────────────────────────────────────────────────── -->
 <div class="modal-overlay" id="qrModal" style="display:none">
