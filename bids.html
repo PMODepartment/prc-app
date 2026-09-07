@@ -12,8 +12,8 @@
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
-  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260906c"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260906c"/>
+  <link rel="preload" as="style" href="assets/css/dashboard.css?v=20260907a"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907a"/>
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -40,6 +40,9 @@
     .bm-behind{font-size:0.7143rem;font-weight:700;color:var(--mw-red-ink)}
     /* The next step leads, so it sits first and Cancel is pushed away from it. */
     .bm-next{margin-right:auto}
+    /* Destructive, so it reads that way — but quietly, not as a primary action. */
+    .bm-del{color:var(--mw-red-ink);border-color:var(--mw-red-mid,#FBD9D5)}
+    .bm-del:hover{background:var(--mw-red-light,#FDECEA);border-color:var(--mw-red)}
     .bm-next-wait{margin-right:auto;font-size:0.7857rem;color:var(--text-secondary);
       align-self:center}
     /* Ahead is not a problem, so it is not red. */
@@ -441,9 +444,6 @@
       color:var(--text-hint);font-size:0.75rem;margin-left:8px}
     .ref-sub{font-size:0.7143rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
       color:var(--text-hint);margin:14px 0 8px}
-    .ref-kind{flex:0 0 auto;font-size:0.6429rem;font-weight:800;letter-spacing:.04em;
-      text-transform:uppercase;background:var(--surface-2);color:var(--text-secondary);
-      border-radius:6px;padding:2px 7px}
     .ref-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;
       padding-top:11px;border-top:1px dashed var(--border-md)}
     .ref-fname{font-size:0.7143rem;color:var(--text-hint);max-width:180px;overflow:hidden;
@@ -974,10 +974,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260906c"></script>
-<script src="assets/js/db.js?v=20260906c"></script>
-<script src="assets/js/ui.js?v=20260906c"></script>
-<script src="assets/js/coachmarks.js?v=20260906c"></script>
+<script src="assets/js/auth.js?v=20260907a"></script>
+<script src="assets/js/db.js?v=20260907a"></script>
+<script src="assets/js/ui.js?v=20260907a"></script>
+<script src="assets/js/coachmarks.js?v=20260907a"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Bid Management — the officer's side of BP 2.2 Solicitation through
@@ -1965,19 +1965,10 @@ let _bidSpy = null;
    ⚠️ THIS IS THE ASK, NOT THE ANALYSIS. The cost comparison itself is still
       prepared outside the app, in the per-package template. */
 let REFDOCS = [], REFITEMS = [];
-const REF_KINDS = [
-  ['tor', 'Terms of reference'], ['mpss', 'MPSS — minimum performance standards & specs'],
-  ['drawing', 'Drawing'], ['boq', 'Bill of quantities'], ['other', 'Other'],
-];
-function refKindLabel(k) {
-  const f = REF_KINDS.find(function (x) { return x[0] === k; });
-  return f ? f[1] : 'Reference';
-}
 function refDocsHtml(ro) {
   return REFDOCS.map(function (d) {
     const url = VendorDb.bidReference.publicUrl(d.file_path);
     return '<div class="rfq-row">'
-      + '<span class="ref-kind">' + esc(refKindLabel(d.kind)) + '</span>'
       + '<div style="flex:1;min-width:140px"><b>' + esc(d.title) + '</b>'
       + (d.note ? '<small style="display:block;color:var(--text-hint)">' + esc(d.note) + '</small>' : '')
       + '</div>'
@@ -2023,10 +2014,11 @@ function referencePanel() {
     + (refDocsHtml(ro) || '<div class="empty-state"><i class="ti ti-paperclip"></i>'
         + '<b>No documents yet</b>Attach the drawings and specifications vendors price against.</div>')
     + (ro ? '' :
+        /* ⚠️ NO TYPE PICKER. It classified nothing — `kind` drove one badge and
+           no behaviour at all — while forcing a choice before the officer could
+           attach anything, and in practice almost everything lands under
+           "Other". The title is what identifies a document. */
         '<div class="ref-add">'
-        + '<select id="rf-kind" class="bm-in" style="flex:0 0 160px">'
-        + REF_KINDS.map(function (k) { return '<option value="' + k[0] + '">' + esc(k[1]) + '</option>'; }).join('')
-        + '</select>'
         + '<input id="rf-title" class="bm-in" style="flex:1;min-width:150px" placeholder="Title, e.g. Pump schedule Rev C">'
         + '<label class="btn" style="cursor:pointer"><i class="ti ti-upload"></i> Choose file'
         + '<input type="file" id="rf-file" style="display:none" onchange="onRefFilePicked(this)"></label>'
@@ -2075,7 +2067,9 @@ async function addRefDoc() {
     let path = null, name = null;
     if (file) { path = await VendorDb.bidReference.upload(R.id, file); name = file.name; }
     await VendorDb.bidReference.addDocument(R.id, {
-      kind: val('rf-kind') || 'reference',
+      // The column's own default, and CHECK-valid. Kept so nothing downstream
+      // that reads `kind` has to cope with a null.
+      kind: 'reference',
       title: title || name,
       file_path: path, file_name: name,
       sort_order: REFDOCS.length,
@@ -2096,6 +2090,24 @@ async function removeRefDoc(id) {
 async function addRefItem() {
   const desc = val('ri-desc');
   if (!desc) { AppNotify.warn('A line item needs a description.'); return; }
+  /* ⚠️ TWO LINES UNDER ONE NUMBER IS ALMOST ALWAYS A DUPLICATE, and there is no
+     unique constraint to catch it — which is how the DEMO-04 round ended up
+     with nine items numbered 1-5, one set priced and one not. Every bidder
+     then prices the set they were given and the other reads as blank, so the
+     comparison quietly measures a different scope than the ask.
+     ⚠️ A CONFIRM, NOT A BLOCK: a genuine sub-line under one BOQ number is a
+     real thing, so the officer decides — they just see what they are about to
+     duplicate first. */
+  const no = val('ri-no');
+  if (no) {
+    const clash = REFITEMS.find(function (it) {
+      return String(it.item_no == null ? '' : it.item_no).trim() === no.trim();
+    });
+    if (clash && !confirm('Line ' + no + ' already exists on this round:'
+        + String.fromCharCode(10) + String.fromCharCode(10)
+        + '    ' + (clash.description || '') + String.fromCharCode(10) + String.fromCharCode(10)
+        + 'Add a second line under the same number anyway?')) return;
+  }
   try {
     await VendorDb.bidReference.addItem(R.id, {
       item_no: val('ri-no') || null, description: desc,
@@ -2400,7 +2412,15 @@ function renderRound() {
     + (canManage && R.stage !== 'awarded' && R.stage !== 'cancelled'
         ? '<div class="bm-actions" style="margin-top:-4px">'
           + nextStepHtml()
-          + '<button class="btn" onclick="cancelRound()"><i class="ti ti-ban"></i> Cancel this round</button>'
+          + '<button class="btn" onclick="cancelRound()" title="Keeps the round on record'
+          + ' as a solicitation that happened and failed. The package can then be re-tendered.">'
+          + '<i class="ti ti-ban"></i> Cancel this round</button>'
+          /* ⚠️ Offered to admins only, because `vbr_delete` allows only them —
+             showing it to anyone else could produce nothing but a refusal. */
+          + (AppAuth.isAdmin(profile)
+              ? '<button class="btn bm-del" onclick="deleteRound()" title="Removes the round'
+                + ' and everything under it. For a round that should never have existed.">'
+                + '<i class="ti ti-trash"></i> Delete this round</button>' : '')
           + '</div>'
         : '')
     + (R.stage === 'cancelled' && canManage
@@ -2449,6 +2469,41 @@ async function setStage(s) {
    closable — otherwise it sits in the list as "Out for bid" indefinitely and the
    package looks like it is still in the market. Cancelling keeps the round as
    history; the package can then be re-tendered as round 2. */
+/* ⚠️ THIS IS NOT CANCEL. Cancel keeps the round as history — a solicitation
+   that happened and drew nothing. Delete removes it and everything under it:
+   the bidders, their quotations and line prices, the clarification threads, the
+   priced items and the requirements all cascade. It is for a round created by
+   mistake, and it is admin-only because `vbr_delete` allows only admins. */
+async function deleteRound() {
+  if (!AppAuth.isAdmin(profile) || _busy) return;
+  // ⚠️ AN AWARDED ROUND IS THE RECORD OF AN AWARD. Never destroy that.
+  if (R.stage === 'awarded') {
+    AppNotify.warn('This round has been awarded, so it is a record of the award and cannot be '
+      + 'deleted. Cancel it instead if the package has to go back to the market.');
+    return;
+  }
+  const c = COUNTS[R.id] || { total: 0, submitted: 0 };
+  const loses = [];
+  if (c.total) loses.push(c.total + ' invited bidder' + (c.total === 1 ? '' : 's'));
+  if (c.submitted) loses.push(c.submitted + ' submitted quotation' + (c.submitted === 1 ? '' : 's'));
+  if (REFITEMS.length) loses.push(REFITEMS.length + ' priced item' + (REFITEMS.length === 1 ? '' : 's'));
+  if (REQS.length) loses.push(REQS.length + ' requirement' + (REQS.length === 1 ? '' : 's'));
+  if (REFDOCS.length) loses.push(REFDOCS.length + ' document' + (REFDOCS.length === 1 ? '' : 's'));
+  if (!confirm('Delete this round permanently?\n\n'
+      + (loses.length ? 'This also deletes ' + loses.join(', ') + ', and any clarifications.\n\n'
+                      : 'Nothing has been recorded on it yet.\n\n')
+      + 'There is no undo. To keep it on record instead, use Cancel.')) return;
+  _busy = true;
+  try {
+    await VendorDb.bidRounds.remove(R.id);
+    const i = ROUNDS.findIndex(function (x) { return x.id === R.id; });
+    if (i >= 0) ROUNDS.splice(i, 1);
+    AppNotify.success('Round deleted.');
+    showList();
+  } catch (e) { AppNotify.fromError(e, 'Could not delete the round'); }
+  finally { _busy = false; }
+}
+
 async function cancelRound() {
   const reason = window.prompt(
     'Cancel this round?\n\nIt stays on record as history, and the package can be '
@@ -2516,9 +2571,12 @@ function askPanel() {
        bidder who quotes on another basis is set individually where their offer
        is recorded. Everything is compared net, because the BCB is net. */
     + '<div class="field"><label>Quotations are</label><select id="a-tax"' + ro + '>'
+    /* The three names say it; the sentence after each one was noise in a
+       dropdown this narrow. t[2] is still used where it earns its place — the
+       per-bidder picker, where "assumed" vs "confirmed" is the whole point. */
     + VAT_BASES.map(function (t) {
         return '<option value="' + t[0] + '"' + (roundBasis() === t[0] ? ' selected' : '') + '>'
-          + t[1] + ' — ' + t[2] + '</option>';
+          + t[1] + '</option>';
       }).join('')
     + '</select></div>'
     /* The unit belongs in the label, not in a sentence under the box. Left as

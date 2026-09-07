@@ -3935,6 +3935,21 @@ const VendorDb = (() => {
     /* A round that produced nothing still has to be closable, or it sits in the
        list as "Out for bid" forever. Cancelling keeps it as history and leaves
        the package free to be re-tendered as a new round. */
+    /* ⚠️ REMOVES THE ROUND AND EVERYTHING UNDER IT. The invitations, priced
+       items and requirements all cascade, and the invitations take their own
+       prices and clarification threads with them — so this destroys
+       procurement history, not just a row. `cancel()` is the right tool for a
+       solicitation that genuinely happened and failed; this one is for a round
+       that should never have existed.
+       ⚠️ ADMIN ONLY, and that is enforced by the `vbr_delete` RLS policy, not
+       here — the client check is only so the button is not offered to someone
+       the database will refuse. */
+    async remove(id) {
+      const sb = await getSB();
+      const { error } = await sb.from('vendor_bid_rounds').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    },
     async cancel(id, reason, profile) {
       return this.update(id, {
         stage: 'cancelled',
