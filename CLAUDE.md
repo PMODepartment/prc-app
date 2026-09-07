@@ -7748,6 +7748,70 @@ Unlinked vendor names **1,345 → 941**, Import from WPs **840 → 477** (363 du
 will now not be created), and Backfill Trade/Bid Data **99 → 113**, which is the right direction:
 more vendors resolve, so there is more bid history it can write.
 
+### The tiler grows two refusal rules, and one of them stopped a blacklist mis-link (2026-09-07)
+
+Pushing the covering approach further. **₱1.641B → ₱1.339B unattributed (13.8% → 11.3%)**,
+names 79 → 68, aliases 470 → 476, work packages carrying vendor id links 210 → 371.
+
+#### ⚠⚠ THE TILER MUST NEVER AUTO-LINK A **PROBLEMATIC** VENDOR — THIS WAS A LIVE NEAR-MISS
+
+`"Magcalas Romero Construction Supplies Traiding"` tiled to the **BLACKLISTED**
+`Magcalas-Romero Construction Supplies`, dropping `Traiding` as a legal-suffix typo — but the
+text says **Trading**, and CLAUDE.md records `...Supplies` (problematic) vs `...Trading`
+(accredited) as a deliberate NEVER-MERGE. ₱0 was at stake, but it would have stamped a
+blacklist flag onto a work package that names the clean company. **Attributing spend to a
+blacklisted vendor is always a deliberate human act.**
+
+#### ⚠ AND NEVER DROP A FILLER WORD THAT CHANGES WHICH COMPANY THE TILE MEANS
+
+Same case, generalised: before discarding a leftover word, test whether **tile + that word**
+resolves to a DIFFERENT vendor. If it does, the drop is what picked the wrong company, so refuse
+the tile instead. Cheap, and it is the only thing separating a legal-suffix typo from a
+company-changing suffix.
+
+#### ⚠ SEPARATE "NOTHING LEFT OVER" FROM "ONLY FILLER LEFT OVER" AND EYEBALL THE SECOND
+
+4 work packages tiled with **literally nothing** left (₱241.1M) and 10 more only by dropping one
+word (₱122.5M). Reading those 10 individually is what found the Magcalas case; every other one
+was a genuine legal-suffix typo (`Corpration`, `Coporation`) or a duplicated descriptor.
+**A blanket filler rule would have shipped the bad one silently.**
+
+#### ⚠ A FILLER-ASSISTED MATCH WORTH KEEPING BECOMES AN ALIAS, NOT A SILENT DROP
+
+`"Power Resource Development"` (₱75.2M across CDP101 WP86/90/91/92/93) tiled only because
+`Development` was discarded. **The workbook has NO company of that name**, and the only
+`Power Resource*` in the accredited masterlist is **V-00645 `Power Resources & System Dev't Inc.`**
+— where `Dev't` IS Development, and whose `vendor_group` is **Electrical Works** against five
+Electrical WPs. Recorded as an explicit alias so the decision is visible and reversible rather
+than resting on a noise list.
+
+#### ⚠ TWO ALARMS I RAISED WERE WRONG, AND CHECKING WAS STILL RIGHT
+
+`UTM101 WP2` tiling to **44 vendors** and `STM101 WP19` showing **Capitol Steel four times** both
+looked like runaway matching. Neither was: WP2's text genuinely lists 44 companies alphabetically,
+and WP19's text literally repeats `Capitol Steel Corporation` 4→ (the `ids` dedupe to 3).
+**Verify before you "fix" — but do verify**, because the same pass found the real defect above.
+
+#### Tokenisation: padding separators recovered NOTHING, and that is the finding
+
+`"Alpha,Plasticell"` with no space after the comma is one token, so padding `, ; / |` looked like
+an easy win. It unlocked **zero** further work packages — every one of the remaining 74 contains
+a company that is genuinely **not in the directory**. The blocker is missing records, not parsing.
+
+#### What actually remains, and it needs people rather than rules
+
+| blocker | spend |
+|---|---|
+| a run-on holding a company not in the directory | ₱903M |
+| one unresolved single company | ₱829M |
+| several unresolved names in one string | ₱743M |
+| bare acronyms | ₱306M |
+
+**⚠ THE ACRONYMS ARE A DEAD END FOR ANY RULE, AND THE USER DOES NOT KNOW THEM EITHER** —
+`CCSP` (₱270.5M), `GCCI`, `HDC`, `LRPA`, `NBF`, `RAMP`. They need the PO or the officer who
+raised the package, exactly like `Various Supplier` (₱340.6M). **Do not try to expand an
+acronym by initials against the directory** — that is precisely the guess that mis-credits money.
+
 ### Run-on vendor strings are a COVERING problem, not a guessing one (2026-09-07)
 
 The follow-on pass. 53 awarded work packages (₱1.81B) resolved only partially, so nothing could
