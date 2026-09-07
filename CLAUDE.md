@@ -7838,6 +7838,25 @@ by pasting the emitted file verbatim.
 **Re-run both halves after any future masterlist import or bulk merge** — this is the only check
 that catches two legal entities becoming one row.
 
+#### Re-run confirmed, both halves, 2026-09-07
+
+| half | result |
+|---|---|
+| workbook (`merge_risk.py`, 2,415 accredited rows) | identical name **0** · narrow core **6** · SEED core **11** · **11 distinct at-risk groups** |
+| live directory (the emitted `merge_risk_check.js`) | **PASS** · 11 groups, 23 codes, 22 rows, **0 problems** |
+
+**⚠⚠ 23 CODES BUT 22 ROWS IS THE CORRECT ANSWER, NOT A MISSING ROW.** The absent code is
+**V-01041 `Abenson Ventures, Inc.`**, whose TIN root `004149434` is the SAME as **V-00458**,
+which does have a row → one taxpayer, two workbook BP codes, one directory row. The workbook is
+known to carry duplicate codes (see the reconciliation notes), so **the verifier counts TIN
+ROOTS, never codes** — counting codes would raise a permanent false alarm here. Confirmed
+against production rather than assumed: the absent code was looked up and its root matched a
+sibling that is present.
+
+**⚠ The Python half printing the same 11 groups again is not a regression.** It reads the
+spreadsheet, which has not changed; only the live half can move. Read the two together — the
+workbook says which groups COULD have been collapsed, the directory says whether any WAS.
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
