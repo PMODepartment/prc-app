@@ -3271,6 +3271,103 @@ no instruction.
 matched against a real em-dash and failed at 0 occurrences. Build any backslash with `chr(92)`.
 Documented already; this is the second session it has cost time in.
 
+### One draft to all, the vendor-paste fix, and one Award Outcome question (2026-09-07)
+
+**⚠️ ONE OUTLOOK BUTTON, AND IT ALWAYS SENDS THE BLAST.** Stated directly: *"One draft to all is
+the main idea. It is impractical to email vendors separately… there will be no separate function
+for open in outlook."* So the per-vendor `mailTo` and its button are **deleted** — there is no
+second send path left to keep in step — and the modal opens on the blast letter, because
+previewing something the primary button does not send is how the old layout misled.
+- **The picker leads with `All bidders — one draft, everyone in Bcc`**; a single vendor's letter
+  is still reachable below it, because it is **the only thing that carries their personal bid
+  link**, and it is what `Copy letter` then copies.
+- **⚠️ THE BLAST CANNOT CARRY A BID LINK, and the modal now says why** rather than leaving it as
+  a footnote: one email cannot hold a different personal link per bidder — whoever opened it
+  would be submitting as that one vendor — so the blast asks them to reply by email, which is
+  what Megawide's template asks for first anyway. Personal links go out via the **mail-merge
+  list** or by picking one bidder.
+- **⚠️ THE BLAST LETTER WAS UNEDITABLE, AND THAT WAS A SILENT GAP.** `rfqBlastHtml()` read
+  `_rfqEdits.__blast` and **nothing ever wrote it** — the editable preview only ever showed a
+  vendor letter. `_rfqEditKey()` now returns `_rfqVendor || '__blast'`, so the default letter is
+  the one you can actually edit.
+- **⚠️ Do NOT reach for the `.eml` route again** — see the REVERTED note above. This path is
+  clipboard + an addressed empty draft, deliberately.
+
+**⚠️⚠️ PASTING AWARDED VENDORS LINKED NOTHING WHEN THE NAME WAS ALREADY THERE — a real reported
+bug.** `_xlSet` takes a no-op early return when the new text equals the old, and
+`_xlRelinkVendorIds` runs at the **bottom** of that function, so it never ran. That is precisely
+the commonest case: **175 work packages carry the awarded vendor as free TEXT with no
+`awarded_vendor_ids` at all**, so pasting the correct names *in order to link them* is exactly
+when the text does not change. Nothing happened and nothing said why.
+- Same text is now a no-op **only when the ids it resolves to already match what is stored**;
+  otherwise it falls through and relinks. A stale id under unchanged text relinks too.
+- **`_xlResolveVendorIds` is the ONE definition** of "what ids does this text resolve to",
+  shared by the relink and by the no-op test, so the two cannot disagree about whether a paste
+  would change anything. **⚠️ `false` in the cache means AMBIGUOUS and is skipped** — the same
+  refuse-to-guess rule as the vendor analytics, because a wrong link mis-credits award money.
+- **Verified: 19 assertions against the verbatim shipped helpers** — the reported case, an
+  already-correct row staying a true no-op, a stale id, a real rename, co-award reordering
+  keeping each amount with its own vendor, ambiguous and unknown names resolving to nothing,
+  clearing the cell clearing the ids, a plain column keeping its no-op, and comma never
+  splitting a vendor name.
+
+**⚠️⚠️ TWO OPAQUE YES/NO COLUMNS BECAME ONE PLAIN QUESTION — `Award Outcome`.** Reported: WP 16
+has a correct **₱0** awarded cost, yet the grid still demanded an Awarded Vendor, so the officer
+typed `n/a`; and *"some procurement officers don't actually use the not to be awarded column"*,
+because nothing on screen says what it means or when to reach for it. `not_to_be_awarded` and
+`free_of_charge` between them encode ONE fact — how did this package's award end up — so it is
+asked once, in words:
+
+| answer | writes |
+|---|---|
+| `Awarded — a cost was agreed` | both flags false, Procurement Status → Awarded |
+| `Awarded — at no cost (vendor provides it free)` | `free_of_charge`, cost recorded as **0**, Procurement Status → Awarded |
+| `Not to be awarded (no award will ever happen)` | `not_to_be_awarded`; Procurement Status **untouched** |
+| `Not yet awarded` | both flags cleared; Procurement Status **untouched** |
+
+- **⚠️ `_award_outcome` IS DERIVED** — the `_` prefix marks it as having no column of its own. It
+  reads the two booleans and writes them back, never itself; `_xlSet` returns before the generic
+  staging path, and `gridSave` deletes it from the patch as belt-and-braces.
+- **⚠️ THE TWO BOOLEAN COLUMNS WERE REMOVED FROM THE GRID ON PURPOSE.** Two ways to set the same
+  fact, one in plain words and one not, is exactly the confusion that was reported. **Do not add
+  them back alongside this.** The WP form keeps its own checkboxes — that surface has room to
+  explain itself.
+- **⚠️ 'Not yet awarded' does NOT push Procurement Status backwards.** Un-awarding is a real data
+  change and Procurement Status is the control for it, two columns away; guessing a stage to drop
+  back to would silently rewrite where the package had got to. It clears the flags and **says so
+  in a toast** rather than appearing to do nothing.
+- **⚠️ 'Not to be awarded' still stands alone**, independent of Award Status — the rule from
+  Known Issues #28. And a **no-cost award still requires the Awarded Vendor** (#28c): somebody is
+  providing the scope free and we record who. Only the COST is waived.
+- **⚠️ THE CONSTANTS MUST BE DECLARED ABOVE `XL_COLS`.** `XL_COLS` is a top-level `const`
+  evaluated at load and its `opts` reference them, so declaring them further down threw in the
+  **Temporal Dead Zone** and killed the entire grid at startup. Caught by load-testing the whole
+  inline script under `node:vm` — it now gets past every declaration and stops only at
+  `initMobileMenu` (from `ui.js`, unstubbed), which is well after them. `node --check` cannot see
+  this: a TDZ error is a runtime error.
+- **Verified: 32 assertions against the shipped source** — every derivation, WP 16 before and
+  after each answer, the vendor requirement appearing and disappearing correctly, Procurement
+  Status moved only where being awarded is implied, the no-award-silently-undone guard and its
+  toast, re-picking being a no-op, junk text ignored, both booleans gone from the column list,
+  the declaration order, and the patch strip.
+
+**⚠️ AND ONE OF THOSE ASSERTIONS WAS LYING UNTIL I FIXED THE TEST.** The "these columns are gone"
+checks sliced `XL_COLS` up to `XL_GROUPS` — which is declared **before** it, so the slice was
+EMPTY and both assertions passed vacuously. Only the third check ("outcome column present")
+failed and exposed it. **A slice-based source assertion needs a length floor**; it now throws if
+the slice is under 4000 characters. Fourth time in this project that a failure was the test
+rather than the code — **rule out the harness first, and be suspicious of assertions that pass
+for the wrong reason.**
+
+**⚠️ THE BASH HEREDOC ATE `\n` ESCAPES TWICE MORE** (once into shipped JS string literals, once
+into the test), taking the sixth and seventh instance. **Use the Write/Edit tools for anything
+containing a backslash; build escapes with `chr(92)` when a script is unavoidable.**
+
+**Not done, flagged deliberately:** a vendor cell holding placeholder text (`n/a`, `none`) still
+satisfies the Awarded-Vendor requirement. Treating it as empty is arguably right — those rows do
+need a real answer — but it would light up red cells across projects with no warning, so it
+belongs in its own pass with the count measured first.
+
 ### Outlook opens a real draft — no pasting — and the letter is editable (2026-09-07, PARTIALLY REVERTED same week — see below)
 
 Three asks on the Send-the-RFQ modal, and the third has a proper answer.

@@ -919,6 +919,16 @@
   const XL_GROUPS_DEFAULT_COLLAPSED = ['approval','bonds','payment'];
 
   // ro:true = read-only (generated/derived). req/reqIfAwarded drive the red highlight.
+  const XL_OUT_PLAIN = 'Awarded \u2014 a cost was agreed';
+  const XL_OUT_FREE  = 'Awarded \u2014 at no cost (vendor provides it free)';
+  const XL_OUT_NTBA  = 'Not to be awarded (no award will ever happen)';
+  const XL_OUT_NONE  = 'Not yet awarded';
+  const XL_OUTCOMES = {};
+  XL_OUTCOMES[XL_OUT_PLAIN] = { proc:'Awarded', free:false, ntba:false };
+  XL_OUTCOMES[XL_OUT_FREE]  = { proc:'Awarded', free:true,  ntba:false };
+  XL_OUTCOMES[XL_OUT_NTBA]  = { proc:null,      free:false, ntba:true  };
+  XL_OUTCOMES[XL_OUT_NONE]  = { proc:null,      free:false, ntba:false };
+
   const XL_COLS = [
     /* ── Identity & Classification ─────────────────────────────────────── */
     { g:'identity', k:'project_id',          label:'Project',              w:80,  type:'text',  ro:true, keep:true },
@@ -984,16 +994,22 @@
     // form — the grid only preserves the ones already on file (Known Issues: the two
     // arrays must never drift apart).
     { g:'budget',   k:'contractor',          label:'Awarded Vendor',       w:190, type:'vendors', idsKey:'awarded_vendor_ids', amtsKey:'awarded_vendor_amounts', primaryKey:'vendor_id', reqIfAwarded:true },
-    // Ops decided this WP will NEVER go through a formal award (handled outside PRC —
-    // petty cash, direct arrangement, scope removed). Waives the Awarded Cost/Vendor
-    // requirement below and tells the dashboard's money math to count this WP's full
-    // budget as realized savings at an effective ₱0 cost instead of excluding it. See
-    // isMoneyAwarded/effectiveAwardedCost in db.js and CLAUDE.md.
-    { g:'budget',   k:'not_to_be_awarded',   label:'Not to be Awarded',    w:130, type:'bool'  },
-    // NO-COST AWARD (free_of_charge): awarded at PHP 0, the vendor provides the scope free. A real
-    // award (unlike Not to be Awarded) whose full budget is realized savings. Waives the
-    // Awarded COST requirement but NOT the Awarded Vendor one — see _xlRequired.
-    { g:'budget',   k:'free_of_charge',      label:'No-Cost Award',        w:130, type:'bool'  },
+    /* ⚠️⚠️ ONE QUESTION, NOT TWO OPAQUE YES/NO COLUMNS. Reported directly: a WP
+       awarded at ₱0 still demanded an Awarded Vendor, so officers typed "n/a" — and
+       "some procurement officers don't actually use the not to be awarded column",
+       because nothing on screen says what it means or when to reach for it. It was
+       two booleans (`not_to_be_awarded`, `free_of_charge`) that between them encode
+       ONE fact: how did this package's award end up? Asking that once, in words,
+       removes the guessing.
+       ⚠️ `_award_outcome` IS DERIVED — the `_` prefix marks it as having no column of
+       its own. It reads the two booleans and writes them back; see _xlOutcomeOf and
+       the `_award_outcome` branch of _xlSet. The booleans remain the stored truth,
+       and the WP form keeps its own checkboxes.
+       ⚠️ THE TWO BOOLEAN COLUMNS WERE REMOVED FROM THIS GRID ON PURPOSE. Two ways
+       to set the same fact, one of them in plain words and one not, is exactly the
+       confusion that was reported. Do not add them back alongside this. */
+    { g:'budget',   k:'_award_outcome',      label:'Award Outcome',        w:250, type:'select',
+      opts:[XL_OUT_PLAIN, XL_OUT_FREE, XL_OUT_NTBA, XL_OUT_NONE] },
     // BUYBACK: the vendor takes the item back, so part of the awarded cost is recovered.
     // Depreciation % (the CONSUMED share) is required once the flag is on — see reqIfBuyback
     // in _xlRequired. Buyback Value is derived (awarded x (1 - dep%)) and counts as savings;
@@ -1302,6 +1318,7 @@
       if (d==null) return null;
       return a * (1 - Math.max(0, Math.min(1, d)));
     }
+    if (k === '_award_outcome') return _xlOutcomeOf(w);
     if (k === '_variance') {
       const b = xlNum(xlVal(w,'approved_budget_bcb')), a = xlNum(xlVal(w,'awarded_cost'));
       return (b==null||a==null) ? null : b - a;
@@ -1659,6 +1676,25 @@
      WP No., Description, Trade, Planned Award, Target Delivery, Target Completion,
      Budget (BCB), Charging; plus Awarded Cost + Awarded Vendor once a WP is Awarded
      (`reqIfAwarded`). Project is implicit (a row always has one). */
+  /* The four answers to "how did this package's award end up?", and what each one
+     means in the two stored booleans. `proc` is set only where being awarded is
+     implied — Award Status is DERIVED from Procurement Status (Known Issues #18),
+     so making a WP awarded means moving that, not the label.
+     ⚠️ 'Not yet awarded' deliberately does NOT push Procurement Status backwards.
+     Un-awarding is a real data change with consequences and Procurement Status is
+     the control for it, two columns away; guessing a stage to drop back to would
+     silently rewrite where the package had got to. It clears the two flags and says
+     so. */
+
+  function _xlOutcomeOf(w){
+    // Not to be awarded outranks everything: it says no award ever happened.
+    if (xlVal(w,'not_to_be_awarded')) return XL_OUT_NTBA;
+    if (xlVal(w,'award_status') === 'Awarded'){
+      return xlVal(w,'free_of_charge') ? XL_OUT_FREE : XL_OUT_PLAIN;
+    }
+    return XL_OUT_NONE;
+  }
+
   function _xlRequired(w, col){
     if (col.req) return true;
     // Not to be Awarded WPs will never get a real Awarded Cost/Vendor — see the column note above.
@@ -2158,6 +2194,28 @@
      authoritative. Re-derive them from the name cache instead: an exact normalized-name
      match links, anything else (unknown, or a name two vendors share) is left unlinked.
      Never a fuzzy match — mis-linking would mis-attribute award money to another company. */
+  /* The ids a vendors cell's TEXT resolves to, in order. Shared by the relink
+     below AND by _xlSet's no-op test, so the two can never disagree about
+     whether a paste would change anything.
+     ⚠️ `false` in the cache means AMBIGUOUS (two vendors share that normalized
+     name) and is deliberately skipped — the same refuse-to-guess rule as the
+     vendor analytics, because a wrong link mis-credits award money. */
+  function _xlResolveVendorIds(textVal){
+    const ids = [];
+    _xlVendorSplit(textVal).forEach(function(nm){
+      const hit = _xlVendorByName[_xlVendorNorm(nm)];
+      if (hit) ids.push(hit);
+    });
+    return ids;
+  }
+  function _xlVendorIdsMatch(w, col, textVal){
+    const want = _xlResolveVendorIds(textVal);
+    const have = xlVal(w, col.idsKey);
+    const haveArr = Array.isArray(have) ? have.filter(Boolean) : [];
+    return want.length === haveArr.length
+        && want.every(function(id, i){ return id === haveArr[i]; });
+  }
+
   function _xlRelinkVendorIds(w, col, textVal, undoBatch){
     if (!col.idsKey) return;
     const prevIds = xlVal(w, col.idsKey);
@@ -2166,10 +2224,8 @@
     if (Array.isArray(prevIds)) prevIds.forEach(function(id, i){
       if (id) keep[id] = Array.isArray(prevAmt) ? prevAmt[i] : null;
     });
-    const linked = [];
-    _xlVendorSplit(textVal).forEach(function(n){
-      const hit = _xlVendorByName[_xlVendorNorm(n)];        // false = ambiguous → don't guess
-      if (hit) linked.push({ id:hit, amount: (hit in keep) ? keep[hit] : null });
+    const linked = _xlResolveVendorIds(textVal).map(function(id){
+      return { id: id, amount: (id in keep) ? keep[id] : null };
     });
     _xlStage(w, col.idsKey, linked.map(function(x){ return x.id; }), undoBatch);
     if (col.amtsKey){
@@ -2183,9 +2239,44 @@
   function _xlSet(r, c, raw, undoBatch){
     const w = _gridRows[r], col = VC[c];
     if (!w || !col || !_xlEditable(w, col)) return false;
+    /* ⚠️ THE DERIVED OUTCOME COLUMN NEVER STAGES ITSELF — it has no column in the
+       database, so it stages the two booleans (and Procurement Status where being
+       awarded is implied) and returns before the generic path below. */
+    if (col.k === '_award_outcome'){
+      const want = String(raw == null ? '' : raw).trim();
+      const o = XL_OUTCOMES[want];
+      if (!o) return true;                          // unrecognised text pasted in
+      if (_xlOutcomeOf(w) === want) return true;    // no-op
+      _xlStage(w, 'not_to_be_awarded', o.ntba, undoBatch);
+      _xlStage(w, 'free_of_charge', o.free, undoBatch);
+      // ₱0 IS the real figure for a no-cost award, so record it rather than
+      // leaving a blank that reads as "cost not entered yet".
+      if (o.free) _xlStage(w, 'awarded_cost', 0, undoBatch);
+      if (o.proc){
+        _xlStage(w, 'procurement_status', o.proc, undoBatch);
+        _xlStage(w, 'award_status', 'Awarded', undoBatch);
+      } else if (want === XL_OUT_NONE && xlVal(w,'award_status') === 'Awarded'){
+        xlToast('Flags cleared. This package is still Awarded — change Procurement '
+          + 'Status to un-award it.');
+      }
+      _xlRefreshRow(r);
+      return true;
+    }
     const val  = xlCoerce(raw, col, w);
     const prev = xlVal(w, col.k);
-    if ((prev==null?'':String(prev)) === (val==null?'':String(val))) return true;   // no-op
+    if ((prev==null?'':String(prev)) === (val==null?'':String(val))){
+      /* ⚠️⚠️ A VENDORS COLUMN MUST NOT TAKE THIS EARLY RETURN ON THE NAME ALONE,
+         and that was a real reported bug ("the copy paste for awarded vendors
+         didn't work properly"). Most work packages carry the awarded vendor as
+         free TEXT with no `awarded_vendor_ids` at all, so pasting the correct
+         names in ORDER TO LINK THEM is exactly the case where the text does not
+         change — and _xlRelinkVendorIds, which runs at the BOTTOM of this
+         function, never ran. Nothing happened and nothing said why.
+         So: same text is only a no-op when the ids it resolves to already
+         match what is stored. Otherwise fall through and relink. */
+      if (col.type !== 'vendors' || !col.idsKey) return true;
+      if (_xlVendorIdsMatch(w, col, val)) return true;
+    }
     const had = !!(_gridEdits[w.id] && Object.prototype.hasOwnProperty.call(_gridEdits[w.id], col.k));
     if (undoBatch) undoBatch.push({ id:w.id, k:col.k, had:had, prev:had?_gridEdits[w.id][col.k]:undefined });
     if (!_gridEdits[w.id]) _gridEdits[w.id] = {};
@@ -3114,6 +3205,7 @@
     for (const id of ids){
       const patch = Object.assign({}, _gridEdits[id]);
       delete patch.total_awarded; delete patch._variance; delete patch._buyback_value;   // generated/derived — never write
+      delete patch._award_outcome;   // derived front for not_to_be_awarded / free_of_charge
       try {
         if (direct) await WPDb.updateWPDirect(id, patch);
         else        await WPDb.updateWP(id, patch);

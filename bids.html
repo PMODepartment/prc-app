@@ -3127,22 +3127,30 @@ function rfqLetterHtml(i) {
 function rfqBlastHtml() {
   return _rfqEdits.__blast || rfqHtmlDoc(null);
 }
+/* ⚠️ `_rfqVendor === null` MEANS THE BLAST, which is the default and the one
+   the primary action sends. Its edits key under '__blast' — the same map, so
+   rfqBlastHtml() picks them up. Before this the blast letter was READ from
+   that key and never written to it, so it could not be edited at all. */
+function _rfqEditKey() { return _rfqVendor || '__blast'; }
 function _rfqOnEdit(el) {
-  if (_rfqVendor) _rfqEdits[_rfqVendor] = el.innerHTML;
+  _rfqEdits[_rfqEditKey()] = el.innerHTML;
   const w = document.getElementById('rfq-edited');
   if (w) w.style.display = '';
 }
-function rfqPickVendor(id) { _rfqVendor = id; renderRfq(); }
+// '' from the picker means the blast; anything else is that invitation.
+function rfqPickVendor(id) { _rfqVendor = id || null; renderRfq(); }
 function rfqResetLetter() {
-  if (!_rfqVendor) return;
   if (!confirm('Discard your edits to this letter and go back to the template?')) return;
-  delete _rfqEdits[_rfqVendor];
+  delete _rfqEdits[_rfqEditKey()];
   renderRfq();
 }
 
 function openRfq() {
   _rfqEdits = {};
-  _rfqVendor = INV.length ? INV[0].id : null;
+  // ⚠️ Opens on the BLAST, because that is what Open in Outlook sends. Opening
+  //    on a vendor's letter would preview something the primary button does
+  //    not send.
+  _rfqVendor = null;
   document.getElementById('rfqDocType').textContent = R.doc_type || 'RFQ';
   renderRfq();
   document.getElementById('rfqModal').style.display = 'flex';
@@ -3155,44 +3163,59 @@ function renderRfq() {
 
   document.getElementById('rfqBody').innerHTML =
       '<div class="sec-note">Megawide\u2019s own ' + esc(docLong()) + ' template, filled in from '
-    + 'this round. One email per vendor \u2014 read it, edit it if you need to, then send.</div>'
+    + 'this round. <b>One draft to every bidder</b>, with all of them in Bcc \u2014 read it, edit '
+    + 'it if you need to, then send.</div>'
     + '<div class="field"><label>Subject</label><input id="rfqSubj" value="'
     + esc(rfqSubject()) + '" readonly></div>'
     + _sigEditorHtml()
-    /* ⚠️ A PICKER, NOT A ROW PER VENDOR. The old modal printed a block per
-       bidder — each with a raw 95-character link and its own send button —
-       ABOVE the preview and the signature, so an officer could copy a letter
-       before ever reading it or filling their signature in, and with eight
-       bidders that was two dozen lines of URL noise. One letter at a time. */
-    + (INV.length > 1
-        ? '<div class="field" style="margin-top:14px"><label>Letter for</label>'
+    /* ⚠️ THE BLAST IS THE FIRST OPTION AND THE DEFAULT. Emailing bidders one at
+       a time was called impractical, so one draft to all is the main path and
+       Open in Outlook always sends it. A single vendor's letter is still
+       reachable here — it is the only thing that carries their personal bid
+       link — but it is a fallback, not the default. */
+    + (INV.length
+        ? '<div class="field" style="margin-top:14px"><label>Letter</label>'
           + '<select id="rfq-pick" onchange="rfqPickVendor(this.value)">'
+          + '<option value=""' + (cur ? '' : ' selected') + '>'
+          + 'All bidders \u2014 one draft, everyone in Bcc'
+          + (_rfqEdits.__blast ? ' \u2014 edited' : '') + '</option>'
           + INV.map(function (i) {
               return '<option value="' + esc(i.id) + '"' + (i.id === _rfqVendor ? ' selected' : '') + '>'
-                + esc(i.vendor_name)
+                + 'Just ' + esc(i.vendor_name)
                 + (i.vendor_contact_email ? '' : ' \u2014 no email on file')
                 + (_rfqEdits[i.id] ? ' \u2014 edited' : '') + '</option>';
             }).join('')
           + '</select></div>'
         : '')
-    + (cur
+    + (INV.length
         ? '<div class="field" style="margin-top:14px">'
-          + '<label>The letter to ' + esc(cur.vendor_name)
+          + '<label>' + (cur ? 'The letter to ' + esc(cur.vendor_name)
+                             : 'The letter to all bidders')
           + ' <span class="rfq-editable">click to edit</span></label>'
           + '<div class="rfq-preview" contenteditable="true" spellcheck="true"'
-          + ' oninput="_rfqOnEdit(this)">' + rfqLetterHtml(cur) + '</div>'
+          + ' oninput="_rfqOnEdit(this)">'
+          + (cur ? rfqLetterHtml(cur) : rfqBlastHtml()) + '</div>'
           + '<div class="sec-note" style="margin:6px 0 0">'
           + '<span id="rfq-edited" style="display:' + (edited ? '' : 'none') + '">'
-          + '<b>Edited.</b> This version is what Copy and the Outlook draft use \u2014 for '
-          + '<b>' + esc(cur.vendor_name) + '</b> only. '
+          + '<b>Edited.</b> This version is what gets sent'
+          + (cur ? ' \u2014 for <b>' + esc(cur.vendor_name) + '</b> only' : '') + '. '
           + '<a href="#" onclick="event.preventDefault();rfqResetLetter()">Back to the template</a>. '
           + '</span>'
-          + 'Every other bidder gets the template with their own link.</div></div>'
+          /* ⚠️ SAYING WHY THE BLAST CARRIES NO LINK IS THE POINT. One email
+             cannot hold a different personal link per bidder — whoever opened
+             it would be submitting as that one vendor — so the blast asks them
+             to reply by email, which is what the template asks for anyway. */
+          + (cur
+              ? 'This one carries ' + esc(cur.vendor_name) + '\u2019s own bid link.'
+              : 'No bid link: one email cannot carry a different personal link per bidder, so '
+                + 'they are asked to reply by email. To send someone their own link, pick them '
+                + 'above, or use the mail-merge list.')
+          + '</div></div>'
         : '<div class="sec-note" style="margin-top:14px">No bidders on this round yet.</div>')
     + (without.length
         ? '<div class="sec-note" style="margin-top:12px"><b>' + without.length + '</b> bidder(s) have '
-          + 'no contact email on file \u2014 copy their letter and address it yourself, or add the '
-          + 'email to their vendor profile.</div>'
+          + 'no contact email on file \u2014 they are left out of the draft. Add the email to their '
+          + 'vendor profile, or copy their letter and address it yourself.</div>'
         : '');
 
   /* ⚠️ THE ACTIONS LIVE IN THE FOOTER, which is flex-shrink:0 and therefore
@@ -3202,28 +3225,27 @@ function renderRfq() {
   document.getElementById('rfqFoot').innerHTML =
       '<button class="btn" onclick="closeRfq()">Close</button>'
     + '<span style="flex:1"></span>'
-    + '<button class="btn" onclick="copyMergeCsv()" title="For an Outlook mail merge over the whole round">'
+    + '<button class="btn" onclick="copyMergeCsv()" title="Every bidder, their address and their'
+    + ' own bid link \u2014 for an Outlook mail merge if they each need their personal link">'
     + '<i class="ti ti-table-export"></i> Mail-merge list</button>'
-    /* One draft to everyone, Bcc, no links — the alternative to sending one
-       letter per bidder. Only worth offering when there is more than one. */
-    + (INV.filter(function (i) { return i.vendor_contact_email; }).length > 1
-        ? '<button class="btn" onclick="mailBlast()"'
-          + ' title="One draft to all bidders, everyone in Bcc \u2014 no personal bid links">'
-          + '<i class="ti ti-users"></i> One draft to all</button>'
-        : '')
+    /* ⚠️ ONE OUTLOOK BUTTON, AND IT ALWAYS SENDS THE BLAST. The per-vendor
+       "Open in Outlook" is gone: emailing bidders one at a time was called
+       impractical, so there is no second send path to keep in step. A single
+       vendor's letter is still reachable through Copy letter, which is the
+       only route that carries their personal link. */
     + (cur
         ? '<button class="btn" onclick="copyLink(' + Q + cur.id + Q + ')"'
           + ' title="Copy just this bidder\u2019s link" aria-label="Copy the link">'
           + '<i class="ti ti-link"></i></button>'
-          + '<button class="btn" onclick="copyRich(' + Q + cur.id + Q + ')"'
-          + ' title="Copy the letter with its formatting, to paste in yourself">'
-          + '<i class="ti ti-clipboard-text"></i> Copy letter</button>'
-          + (cur.vendor_contact_email
-              ? '<button class="btn btn-primary" onclick="mailTo(' + Q + cur.id + Q + ')"'
-                + ' title="Copies the letter, then opens a draft with this bidder in Bcc'
-                + ' and you in To — press Ctrl+V to paste it in">'
-                + '<i class="ti ti-mail"></i> Open in Outlook</button>'
-              : '')
+        : '')
+    + '<button class="btn" onclick="' + (cur ? 'copyRich(' + Q + cur.id + Q + ')' : 'copyBlast()') + '"'
+    + ' title="Copy this letter with its formatting, to paste in yourself">'
+    + '<i class="ti ti-clipboard-text"></i> Copy letter</button>'
+    + (INV.some(function (i) { return i.vendor_contact_email; })
+        ? '<button class="btn btn-primary" onclick="mailBlast()"'
+          + ' title="Copies the letter and opens ONE draft with every bidder in Bcc and you in To'
+          + ' \u2014 press Ctrl+V to paste it in">'
+          + '<i class="ti ti-mail"></i> Open in Outlook</button>'
         : '')
     + (canManage && R.stage === 'draft'
         ? '<button class="btn btn-primary" onclick="markIssued()"><i class="ti ti-send"></i>'
@@ -3383,8 +3405,9 @@ function _copyHtmlFallback(html) {
       forwards the thread, replies-all or adds a recipient. To: is the officer's
       own address, which also gives them the sent copy in their own mailbox.
    ⚠️ `bcc` is a standard mailto header field and Outlook honours it. Keep the
-      body OUT for the RFQ itself (see mailTo) — a mailto body is plain text by
-      definition and the Windows shell caps the command line at ~8KB. */
+      body OUT for the RFQ itself (see mailBlast) — a mailto body is plain text
+      by definition and the Windows shell caps the command line at ~8KB, so the
+      letter goes via the clipboard and the officer pastes it in. */
 function officerAddress() {
   return (R && R.contact_email) || (profile && profile.email) || '';
 }
@@ -3396,20 +3419,16 @@ function openMail(opts) {
   window.location.href = 'mailto:' + encodeURIComponent(to) + '?' + q.join('&');
 }
 
-function mailTo(id) {
-  const i = invById(id); if (!i) return;
-  if (!i.vendor_contact_email) { AppNotify.warn('No contact email on file for this vendor.'); return; }
-  copyRich(id, true).then(function (copied) {
-    openMail({ subject: rfqSubject(), bcc: i.vendor_contact_email });
-    /* Naming the address is the point: the bidder is in BCC, so it is no longer
-       visible in the draft's header, and a wrong address on that vendor's
-       record has to be caught HERE rather than after the send. */
-    AppNotify.success((copied ? 'Letter copied with its formatting. ' : '')
-      + 'A draft is opening — ' + i.vendor_name + ' is in Bcc as '
-      + i.vendor_contact_email + ', you are in To.'
-      + (copied ? ' Press Ctrl+V to paste the letter in.' : ''));
-  });
+/* The blast letter on its own, for an officer who would rather paste it into a
+   draft they addressed themselves. `mailTo` (one draft per bidder) was removed
+   with its button — there is no second send path to keep in step any more. */
+function copyBlast() {
+  copyHtml(rfqBlastHtml(), rfqSubject() + String.fromCharCode(10) + String.fromCharCode(10)
+    + rfqBody(null)).then(function (ok) {
+      if (ok) AppNotify.success('Blast letter copied with its formatting.');
+    }).catch(function () { AppNotify.warn('Could not copy the letter.'); });
 }
+
 /* One draft, every bidder in Bcc, no links. Copies the blast letter with its
    formatting first (a mailto body is plain text by definition and this letter is
    formatted), then opens the addressed draft to paste into.
