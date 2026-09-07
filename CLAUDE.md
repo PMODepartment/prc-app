@@ -3271,6 +3271,51 @@ no instruction.
 matched against a real em-dash and failed at 0 occurrences. Build any backslash with `chr(92)`.
 Documented already; this is the second session it has cost time in.
 
+### The blast letter offers the PORTAL, and Open in Outlook stopped asking (2026-09-07)
+
+Two regressions from the blast-first change, both reported.
+
+**⚠️ THE ONLINE ROUTE WAS DROPPED FROM THE LETTER ENTIRELY, and it did not have to be.** Making
+the blast the only Outlook path took the per-vendor bid link out — correctly, since one email
+Bcc'd to ten bidders can carry only one capability token and whoever opened it would submit as
+that vendor — but it also silently removed any mention of submitting online at all, so vendors
+now only ever heard "email us". That wastes both the bid page and the portal.
+- **⚠️ THE PORTAL AND THE REGISTRATION LINK ARE GENERIC, so they ARE safe in a blast.** Neither
+  identifies a vendor: the portal is a login, and registration is matched server-side on the TIN
+  and company name the vendor types. **Only `bid-response.html` carries a per-vendor token**, and
+  that is the one thing a Bcc'd email must never contain. `portalLink()` / `registerLink()` sit
+  beside `bidLink()` on a shared `_appLink(page)`.
+- The blast now says the enquiry is waiting on their **Bid Board** if they have an account, and
+  offers registration if not. **That claim is accurate**: `vendor_bid_board_view` scopes to the
+  caller's own `vendor_id`, and invitations carry it. In practice no vendor has ever logged in
+  (`users where role='vendor'` = 0), so the registration half is the live path today.
+- **The per-vendor letter is UNCHANGED** — its own token link, "personal to your company", and no
+  portal pitch. Verified both ways round.
+
+**⚠️ AND THE PLAIN-TEXT BLAST SAID SOMETHING UNTRUE.** In `rfqBody` the prose was unconditional
+while only the LINK was guarded by `if (inv)`, so the blast's plain-text flavour read *"You may
+also submit it through the link below … The link is personal to your company"* **with no link
+anywhere in it.** The HTML flavour guarded the whole block and was fine, which is why it was not
+noticed. **When a paragraph and the thing it refers to are guarded separately, one of them will
+eventually be wrong.** Both flavours now branch as a unit.
+
+**⚠️ CLICKING "OPEN IN OUTLOOK" RAISED A POPUP WHERE IT NEVER USED TO.** The `confirm()` was
+written when the blast was a SECONDARY button, where "are you sure you want to mail everyone?"
+earned its place. Promoting it to the one Outlook path meant every ordinary send asked first —
+and the per-vendor send it replaced never had. It was also repeating what the modal now shows on
+screen: the letter is previewed directly above the button, the no-bid-link note sits under the
+preview, and bidders with no email are listed there too. Nothing is sent by it either — it opens
+a draft the officer still reads and presses Send on.
+- **⚠️ ONE CASE STILL ASKS: bidders being LEFT OUT** because they have no contact email. That is
+  genuinely surprising, cannot be undone after the send, and is the one thing the officer would
+  want to stop for — so it names them and asks whether to send to the rest.
+- Verified: every bidder reachable → **0 popups**, draft opens with all of them in Bcc; one
+  missing → exactly **1** popup naming that vendor; declining it sends nothing.
+
+**Not a regression, and worth knowing so it is not chased:** the browser's own "Open Outlook?"
+external-protocol dialog appears for any `mailto:` and did so on the per-vendor path too. If a
+popup remains after this, that is which one it is.
+
 ### The rounds list at 100-400 rounds (2026-09-07)
 
 Asked what happens at that size. **Measured with 400 synthetic rounds across 21 projects rather

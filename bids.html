@@ -2928,10 +2928,20 @@ function rfqSubject() {
   const w = WPBYID[R.wp_id] || {};
   return (R.doc_type || 'RFQ') + ' — ' + wpLabel(w) + ' — ' + projName(R.project_id);
 }
-function bidLink(inv) {
-  const base = location.origin + location.pathname.replace(/[^/]*$/, '');
-  return base + 'bid-response.html?t=' + encodeURIComponent(inv.access_token);
+function _appLink(page) {
+  return location.origin + location.pathname.replace(/[^/]*$/, '') + page;
 }
+function bidLink(inv) {
+  return _appLink('bid-response.html?t=' + encodeURIComponent(inv.access_token));
+}
+/* ⚠️ THESE TWO ARE GENERIC AND THEREFORE SAFE IN A BLAST, which is the whole
+   reason the online route can come back to the one-draft letter. Neither
+   identifies a vendor: the portal is a login, and registration is matched
+   server-side on the TIN and company name the vendor types. Only
+   bid-response.html carries a per-vendor capability token, and that is the one
+   thing a Bcc'd email must never contain. */
+function portalLink() { return _appLink('vendor-portal.html'); }
+function registerLink() { return _appLink('vendor-register.html'); }
 /* ⚠️⚠️ THE WORDING BELOW IS MEGAWIDE'S OWN RFQ / RFP TEMPLATE, NOT PROSE THIS
       APP INVENTED. It follows the letter Procurement actually sends, clause for
       clause: the company preamble, the "most competitive price proposal"
@@ -3074,12 +3084,25 @@ function rfqBody(inv) {
     + (R.bid_due_at ? ' not later than ' + dt(R.bid_due_at) : '')
     + (mail ? ', via email, to ' + who + ' at ' + mail : '') + '.');
   L.push('');
-  L.push('You may also submit it through the link below. You do not need an account: open it, enter '
-    + 'your price and attach your quotation.');
-  L.push('');
-  if (inv) L.push(bidLink(inv));
-  L.push('');
-  L.push('The link is personal to your company. Please do not forward it.');
+  /* ⚠️ THIS BRANCHED WRONG AND SAID SOMETHING UNTRUE. The prose was
+     unconditional while only the LINK was guarded by `if (inv)`, so the blast's
+     plain-text flavour read "submit it through the link below … the link is
+     personal to your company" with no link anywhere in it. */
+  if (inv) {
+    L.push('You may also submit it through the link below. You do not need an account: open it, '
+      + 'enter your price and attach your quotation.');
+    L.push('');
+    L.push(bidLink(inv));
+    L.push('');
+    L.push('The link is personal to your company. Please do not forward it.');
+  } else {
+    L.push('You may also submit online through the Megawide Vendor Portal. If your company already '
+      + 'has a portal account, this enquiry is waiting on your Bid Board. If not, you can register '
+      + '— accreditation and future enquiries are handled there too.');
+    L.push('');
+    L.push('Vendor Portal:  ' + portalLink());
+    L.push('Register:       ' + registerLink());
+  }
   if (R.prebid_at) { L.push(''); L.push('Pre-bid conference: ' + dt(R.prebid_at)); }
   L.push('');
   L.push('This ' + docLong() + ' does not constitute an offer to contract and does not obligate '
@@ -3210,6 +3233,18 @@ function rfqHtml(inv) {
     H.push(_hp('<b>' + _hlink(bidLink(inv), 'Open your bid page') + '</b>'
       + '<br><span style="font-size:10pt;color:#444">This page is personal to your company. '
       + 'Please do not forward it.</span>'));
+  } else {
+    /* ⚠️ THE BLAST STILL OFFERS AN ONLINE ROUTE — through the PORTAL, which is a
+       login and identifies nobody, rather than a per-vendor bid link. Dropping
+       the online route entirely (the first cut) meant vendors only ever heard
+       "email us", which wastes the bid page and the portal both. An invited
+       vendor with a portal account genuinely sees this enquiry on their Bid
+       Board: vendor_bid_board_view scopes to their own vendor_id. */
+    H.push(_hp('You may also submit online through the Megawide Vendor Portal. If your company '
+      + 'already has a portal account, this enquiry is waiting on your Bid Board. If not, you can '
+      + 'register — accreditation and future enquiries are handled there too.'));
+    H.push(_hp('<b>' + _hlink(portalLink(), 'Open the Vendor Portal') + '</b>'
+      + '&nbsp;&nbsp;&middot;&nbsp;&nbsp;' + _hlink(registerLink(), 'Register your company')));
   }
   if (R.prebid_at) H.push(_hp('<b>Pre-bid conference:</b> ' + _h(dt(R.prebid_at))));
 
@@ -3622,12 +3657,21 @@ async function mailBlast() {
       : 'None of the bidders on this round has a contact email on file.');
     return;
   }
-  if (!confirm('Open ONE draft to all ' + bcc.length + ' bidder'
-      + (bcc.length === 1 ? '' : 's') + ' with everyone in Bcc?\n\n'
-      + 'The letter will NOT contain a bid link \u2014 one email cannot carry a different '
-      + 'personal link per bidder, so they are asked to reply by email instead.'
-      + (without.length ? '\n\nNo email on file for: '
-          + without.map(function (i) { return i.vendor_name; }).join(', ') : ''))) return;
+  /* ⚠️ NO CONFIRM ON THE ORDINARY SEND. This used to ask every time — fine
+     while the blast was a secondary button, but it became the ONE Outlook path,
+     so clicking "Open in Outlook" started raising a popup where the per-vendor
+     send never had. It was also telling the officer what the modal now says
+     plainly on screen: the letter is previewed above it, the no-bid-link note
+     sits under the preview, and bidders with no email are listed there too.
+     Nothing is sent by this — it opens a draft the officer still reads and
+     presses Send on.
+     ⚠️ THE ONE CASE THAT STILL ASKS is bidders being LEFT OUT. That is
+     genuinely surprising and cannot be undone after the send, so it is named. */
+  if (without.length && !confirm(without.length + ' bidder'
+      + (without.length === 1 ? '' : 's') + ' will be LEFT OUT of this draft \u2014 no contact '
+      + 'email on file:\n\n    '
+      + without.map(function (i) { return i.vendor_name; }).join('\n    ')
+      + '\n\nSend to the other ' + bcc.length + ' anyway?')) return;
   let copied = false;
   try { copied = await copyHtml(rfqBlastHtml(), rfqSubject() + '\n\n' + rfqBody(null)); } catch (e) { copied = false; }
   if (!openMail({ subject: rfqSubject(), bcc: bcc.join(',') })) return;
