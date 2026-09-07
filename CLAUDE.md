@@ -7823,11 +7823,20 @@ measure "what is attributed to THIS vendor", match on the link, not on the text.
 
 #### How to re-run this check
 
-`suffix_pairs.py` / `merge_risk.py` in the scratchpad (both data-bearing, both un-committed):
-group the accredited sheet by identical name, by narrow core and by the seed's broad core; keep
-any group spanning 2+ TIN roots; then ask the live directory how many of that group's codes
-exist and whether each row's TIN matches its own code. **Re-run it after any future masterlist
-import or bulk merge** — it is the only check that catches two entities becoming one row.
+`merge_risk.py` in the scratchpad (data-bearing, un-committed). It groups the accredited sheet
+by identical name, by narrow core and by the seed's broad core, keeps any group spanning 2+ TIN
+roots, and **emits `merge_risk_check.js`** — paste that into the console of a signed-in Vendor
+Management tab and it prints either the offending groups or `PASS`.
+
+**⚠️ THE WORKBOOK HALF ALONE PROVES NOTHING, which is why the script now emits the second
+half.** Grouping the spreadsheet says only which companies COULD have been collapsed; whether
+any WAS is a question about the directory. Re-running the Python after the fixes still printed
+the same 11 groups — correctly, since the workbook has not changed — and that is not a failure
+report. Only the live check moved, from 5 problems to **PASS (11 groups, 23 codes)**, verified
+by pasting the emitted file verbatim.
+
+**Re-run both halves after any future masterlist import or bulk merge** — this is the only check
+that catches two legal entities becoming one row.
 
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
