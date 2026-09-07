@@ -52,7 +52,16 @@
     .tools-menu button:hover{background:var(--mw-red-light,#FDECEA)}
     .tools-menu button i{font-size:1rem;color:#EE3124;margin-bottom:2px}
     .tools-menu button span{font-size:0.8571rem;font-weight:600;color:#231F20;display:flex;align-items:center;gap:6px}
-    .tools-menu button small{font-size:0.7143rem;color:#888;font-weight:400}
+    /* ⚠️ WAS #888 = 3.54:1, under AA. That is tolerated elsewhere on 10-11px
+       BOLD labels, but these descriptions say WHY a tool exists — non-bold prose
+       somebody reads — so they get the real hint token (5.22 light / 4.95 dark). */
+    .tools-menu button small{font-size:0.7143rem;color:var(--text-hint,#6E6C6C);font-weight:400}
+    .tools-group + .tools-group{border-top:1px solid var(--border,#eee);margin-top:5px;padding-top:5px}
+    .tools-group-h{font-size:0.6786rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+      color:var(--text-hint,#888);padding:5px 10px 3px}
+    .tools-group-note{display:block;text-transform:none;letter-spacing:0;font-weight:400;font-size:0.6786rem}
+    .tools-status{font-size:0.7143rem;color:var(--text-hint,#888);padding:5px 10px 7px}
+    .tools-status.done{display:none}
     .tools-menu-badge{background:#EE3124;color:#fff;border-radius:9px;padding:1px 7px;font-size:0.7143rem;font-weight:700}
     /* Vendor cards — compact, content-sized (handles hundreds of rows) */
     .vendor-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:11px}
@@ -1123,14 +1132,29 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
             <div class="tools-menu-wrap" id="toolsMenuWrap" style="position:relative;flex-shrink:0">
               <button class="btn-cancel" id="btn-tools-menu" onclick="toggleToolsMenu()"><i class="ti ti-tool" style="margin-right:4px"></i>Data Tools <i class="ti ti-chevron-down" style="margin-left:2px;font-size:0.75em"></i></button>
               <div class="tools-menu" id="toolsMenu" style="display:none">
-                <button onclick="closeToolsMenu();openFillQueue()"><i class="ti ti-user-question"></i><span>Awarded, no vendor recorded</span><small>Name the vendor on awarded work packages that never recorded one — counted when you open it</small></button>
-                <button onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs</span><small>Scan work packages for vendors not yet in the directory</small></button>
-                <button onclick="closeToolsMenu();backfillFromWPs()"><i class="ti ti-refresh-dot"></i><span>Backfill Trade/Bid Data</span><small>Fill in trades, products, bid history and rates from WPs</small></button>
-                <button onclick="closeToolsMenu();normalizeVendorTrades()"><i class="ti ti-tags"></i><span>Normalize Trades</span><small>Collapse trade variants (e.g. "GENERAL REQUIREMENT" → "General Requirements") to the 10 standard trades</small></button>
-                <button onclick="closeToolsMenu();openMergeModal()"><i class="ti ti-arrows-join"></i><span>Merge Duplicates</span><small>Combine records that are the same company under different names</small></button>
-                <button id="tools-menu-dupes" onclick="closeToolsMenu();openDupModal()"><i class="ti ti-copy-off"></i><span>Remove Exact Duplicates <span class="tools-menu-badge" id="dup-count-badge" style="display:none"><span id="dup-count">0</span></span></span><small>Fold byte-identical vendor names into one record (keeps children, links and trades)</small></button>
-                <button id="tools-menu-split" onclick="closeToolsMenu();openSplitModal()"><i class="ti ti-cut"></i><span>Needs Splitting <span class="tools-menu-badge" id="split-count-badge" style="display:none"><span id="split-count">0</span></span></span><small>Records that look like several companies joined together</small></button>
-                <button onclick="closeToolsMenu();openTaxonomyModal()"><i class="ti ti-category"></i><span>Manage Product Categories</span><small>The Trade → Works → … tree vendors classify their offerings against</small></button>
+                <div class="tools-status" id="toolsStatus">Counting what is left…</div>
+
+                <div class="tools-group" id="tg-ongoing">
+                  <div class="tools-group-h">Ongoing</div>
+                <button id="tm-backfill" onclick="closeToolsMenu();backfillFromWPs()"><i class="ti ti-refresh-dot"></i><span>Backfill Trade/Bid Data <span class="tools-menu-badge" id="tc-backfill" style="display:none">0</span></span><small>Pull trades, products, bid history and rates out of awarded work packages</small></button>
+                </div>
+
+                <div class="tools-group" id="tg-migration">
+                  <div class="tools-group-h">Finish the import
+                    <span class="tools-group-note">one-time — each disappears when it is done</span>
+                  </div>
+                <button id="tm-fill" onclick="closeToolsMenu();openFillQueue()"><i class="ti ti-user-question"></i><span>Awarded, no vendor recorded <span class="tools-menu-badge" id="tc-fill" style="display:none">0</span></span><small>Name the vendor on awarded work packages that never recorded one</small></button>
+                <button id="tm-import" onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs <span class="tools-menu-badge" id="tc-import" style="display:none">0</span></span><small>Add vendors that appear on a work package but not in the directory</small></button>
+                <button id="tm-split" onclick="closeToolsMenu();openSplitModal()"><i class="ti ti-cut"></i><span>Needs Splitting <span class="tools-menu-badge" id="tc-split" style="display:none">0</span></span><small>Records that are several companies joined into one name</small></button>
+                <button id="tm-dupes" onclick="closeToolsMenu();openDupModal()"><i class="ti ti-copy-off"></i><span>Remove Exact Duplicates <span class="tools-menu-badge" id="tc-dupes" style="display:none">0</span></span><small>Fold byte-identical vendor names into one record (keeps children, links and trades)</small></button>
+                <button id="tm-trades" onclick="closeToolsMenu();normalizeVendorTrades()"><i class="ti ti-tags"></i><span>Normalize Trades <span class="tools-menu-badge" id="tc-trades" style="display:none">0</span></span><small>Collapse trade variants (e.g. "GENERAL REQUIREMENT") to the 10 standard trades</small></button>
+                <button id="tm-merge" onclick="closeToolsMenu();openMergeModal()"><i class="ti ti-arrows-join"></i><span>Merge Duplicates <span class="tools-menu-badge" id="tc-merge" style="display:none">0</span></span><small>Same company under different names — reviewed per group, so it is not counted here</small></button>
+                </div>
+
+                <div class="tools-group" id="tg-config">
+                  <div class="tools-group-h">Configuration</div>
+                <button id="tm-taxonomy" onclick="closeToolsMenu();openTaxonomyModal()"><i class="ti ti-category"></i><span>Manage Product Categories <span class="tools-menu-badge" id="tc-taxonomy" style="display:none">0</span></span><small>The Trade → Works → … tree vendors classify their offerings against</small></button>
+                </div>
               </div>
             </div>
             <button class="btn-primary" onclick="openInviteModal()"><i class="ti ti-user-plus" style="margin-right:4px"></i>Invite a Vendor</button>
@@ -1468,6 +1492,11 @@ let _canManage = false, _canBulkDelete = false;
    a stray keystroke into a real vendor's record. Reset on every open so leaving
    one vendor mid-edit cannot leave the next one unlocked. */
 let _dovEditing = false;
+/* Cached Data Tools counts. ⚠️ Declared HERE, above loadAll(), which clears it:
+   a module-scope `let` is in the Temporal Dead Zone until its own line runs, so
+   referencing it from a function defined earlier is safe only by accident of
+   when that function is first called. */
+let _toolCounts = null, _toolCountsRunning = false;
 const _selectedVendors = new Set();
 let _pageIds = [];
 
@@ -1597,6 +1626,12 @@ let _vendorProductText = {};  // vendorId -> lowercased "category description �
    view therefore shows nothing) until migrations/2026-08-20_product_taxonomy.sql runs. */
 let _vendorUnclassified = new Set();
 async function loadAll() {
+  /* ⚠️ Drop the cached Data Tools counts. Every tool that changes vendor or
+     work-package data refreshes through here, so this one line covers all of
+     them — hooking each call site individually would be forgotten by the
+     next tool, and a stale count either shows the wrong number or hides a
+     tool that has work again. */
+  _toolCounts = null;
   try { allVendors = await VendorDb.getVendors(); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not load vendors') : alert(e.message); allVendors = []; }
   // Normalize trade_categories to the 10 canonical trades for DISPLAY (casing/
@@ -2512,6 +2547,7 @@ async function fqSave(wpId) {
     }
     // Keep the counts honest without re-reading 1,879 work packages.
     _fq.total = Math.max(0, _fq.total - 1);
+    _toolCounts = null;          // this changed a work package; the menu count is stale
     const g = _fq.projects.find(function (p) { return p.project_id === _fqProj; });
     if (g) g.count = Math.max(0, g.count - 1);
     _fqSyncBadge();
@@ -2833,7 +2869,10 @@ function _splitRows() {
 // so that dot had never appeared at all. Each updater now just writes its own
 // count into the DOM and calls this.
 function _syncToolsAlert() {
-  const total = ['split-count', 'dup-count'].reduce(function (a, id) {
+  /* ⚠️ Sums only the SMALL, ACTIONABLE counts. The fill-in queue's 962 and the
+     import's backlog are standing work, and a dot that is always on stops
+     being read. */
+  const total = ['tc-split', 'tc-dupes'].reduce(function (a, id) {
     const e = document.getElementById(id);
     return a + (e ? (parseInt(e.textContent, 10) || 0) : 0);
   }, 0);
@@ -2842,16 +2881,135 @@ function _syncToolsAlert() {
 }
 function updateSplitBadge() {
   const n = _splitCandidates().length;
-  document.getElementById('split-count').textContent = n;
-  const badge = document.getElementById('split-count-badge');
-  if (badge) badge.style.display = n ? '' : 'none';
+  // ⚠️ Goes through _tcSet, which also HIDES the tool at zero. Setting the
+  //    badge directly here is what left a finished tool looking live.
+  _tcSet('split', n);
   _syncToolsAlert();
 }
+/* ══ How much work each Data Tool has left ═══════════════════════════════
+   ⚠️ COUNTED WHEN THE MENU OPENS, NOT ON PAGE LOAD. This page already takes
+      tens of seconds for ~2,400 vendors; adding an unconditional 1,879-row work
+      package scan would slow every visit to answer a question nobody has asked
+      yet. Opening the menu IS the question. Cached for the session after that.
+
+   ⚠️ ZERO HIDES THE TOOL; NO COUNT NEVER DOES. Not knowing whether a tool has
+      work is not the same as knowing it has none, and hiding on ignorance would
+      quietly remove a working tool. Only Merge Duplicates has no count (its
+      suggestion pass is an O(n²) judgement call, not a number), and its own
+      description says so. */
+
+/* ⚠️ ONLY A ONE-TIME TOOL MAY RETIRE ITSELF. Backfill is counted like the
+   others but must NEVER hide: it is ongoing, so a zero means "nothing to do
+   right now", not "finished" — and because the counts are cached for the
+   session, hiding it would make it vanish from the menu the moment somebody
+   awarded a package, which is exactly when they need it. Caught by a test that
+   asserted the Ongoing group disappeared, which it should not.
+   Merge and Manage Product Categories are uncounted and so never hide anyway. */
+const _TC_RETIRES = ['fill', 'import', 'split', 'dupes', 'trades'];
+
+function _tcSet(key, n) {
+  const badge = document.getElementById('tc-' + key);
+  const item = document.getElementById('tm-' + key);
+  if (badge) {
+    if (n == null) { badge.style.display = 'none'; }
+    else { badge.textContent = n; badge.style.display = n ? '' : 'none'; }
+  }
+  // n === 0 is provably finished; n == null is unknown, and hiding on ignorance
+  // would quietly remove a working tool.
+  if (item) {
+    item.style.display = (n === 0 && _TC_RETIRES.indexOf(key) >= 0) ? 'none' : '';
+  }
+}
+
+/* Vendor-derived counts are cheap — allVendors is already in memory. */
+function _tcVendorCounts() {
+  let split = 0, dupes = 0, trades = 0;
+  try { split = _splitCandidates().length; } catch (_) { split = 0; }
+  try {
+    // Only computed for the roles that may act on it — the caller hides the
+    // tool outright for anybody else.
+    dupes = _canBulkDelete
+      ? VendorDb.findExactDuplicateGroups(allVendors, _dupActiveIds()).reduce((a, g) => a + g.remove.length, 0)
+      : 0;
+  } catch (_) { dupes = 0; }
+  try {
+    trades = (allVendors || []).reduce(function (a, v) {
+      const cur = v.trade_categories || [];
+      const canon = window.CanonTrades ? CanonTrades(cur) : cur;
+      return a + (JSON.stringify(cur) !== JSON.stringify(canon) ? 1 : 0);
+    }, 0);
+  } catch (_) { trades = 0; }
+  return { split: split, dupes: dupes, trades: trades };
+}
+
+async function refreshToolCounts(force) {
+  const status = document.getElementById('toolsStatus');
+  // Cheap ones first, so the menu is useful before the WP scan lands.
+  const v = _tcVendorCounts();
+  _tcSet('split', v.split);
+  if (_canBulkDelete) _tcSet('dupes', v.dupes);
+  else { const it = document.getElementById('tm-dupes'); if (it) it.style.display = 'none'; }
+  _tcSet('trades', v.trades);
+  _tcSet('merge', null);            // deliberately uncounted — never hidden
+  _tcSet('taxonomy', null);         // configuration, not a backlog
+
+  if (_toolCounts && !force) { _tcApplyWp(_toolCounts); return; }
+  if (_toolCountsRunning) return;
+  _toolCountsRunning = true;
+  if (status) { status.textContent = 'Counting what is left…'; status.classList.remove('done'); }
+  try {
+    _toolCounts = await VendorDb.getWpDerivedToolCounts({
+      // ⚠️ Same predicate the import itself uses, or the count would promise
+      //    vendors the import then refuses to create.
+      skipName: function (nm) { return _looksGarbled({ name: nm }); },
+    });
+    _tcApplyWp(_toolCounts);
+  } catch (e) {
+    console.warn('[vendors] could not count the work-package tools', e);
+    if (status) { status.textContent = 'Could not count the work-package tools \u2014 they are all still shown.'; }
+    // ⚠️ On failure show everything. Hiding a tool because we could not count
+    //    it is the one outcome worse than showing a finished one.
+    ['fill', 'import', 'backfill'].forEach(function (k) { _tcSet(k, null); });
+  } finally { _toolCountsRunning = false; }
+}
+
+function _tcApplyWp(c) {
+  _tcSet('fill', c.awardedNoVendor);
+  _tcSet('import', c.importable);
+  _tcSet('backfill', c.awardedNoBidRow);
+  const status = document.getElementById('toolsStatus');
+  if (!status) return;
+  const bits = [];
+  if (c.awardedTotal) {
+    bits.push(c.awardedTotal + ' awarded work package' + (c.awardedTotal === 1 ? '' : 's'));
+  }
+  if (c.refused) {
+    bits.push(c.refused + ' vendor name' + (c.refused === 1 ? '' : 's')
+      + ' too garbled to import \u2014 use Needs Splitting');
+  }
+  status.textContent = bits.join(' \u00b7 ');
+  /* ⚠️ toggle, NOT add. It only ever ADDED `done`, so once the line had nothing
+     to report it stayed hidden for the rest of the session even when the next
+     count had something to say. Caught by measuring the rendered line, not by
+     reading the branch. */
+  status.classList.toggle('done', !bits.length);
+  // If every tool in a group is hidden, the group heading goes too.
+  ['tg-ongoing', 'tg-migration', 'tg-config'].forEach(function (id) {
+    const g = document.getElementById(id);
+    if (!g) return;
+    const anyVisible = Array.prototype.some.call(g.querySelectorAll('button'),
+      function (b) { return b.style.display !== 'none'; });
+    g.style.display = anyVisible ? '' : 'none';
+  });
+}
+
 function toggleToolsMenu() {
   const menu = document.getElementById('toolsMenu');
   const opening = menu.style.display === 'none';
   menu.style.display = opening ? 'block' : 'none';
-  if (opening) setTimeout(() => document.addEventListener('click', _toolsMenuOutsideClick), 0);
+  // ⚠️ Counted HERE, not at page load — opening the menu is the question being
+  //    asked, and this page already takes tens of seconds for ~2,400 vendors.
+  if (opening) { refreshToolCounts(); setTimeout(() => document.addEventListener('click', _toolsMenuOutsideClick), 0); }
 }
 function closeToolsMenu() {
   document.getElementById('toolsMenu').style.display = 'none';
@@ -6194,15 +6352,15 @@ async function runDupCleanup() {
 }
 // Badge on the Data Tools menu — same treatment as the Split tool's count.
 function updateDupBadge() {
-  const item = document.getElementById('tools-menu-dupes');
+  const item = document.getElementById('tm-dupes');
   if (!item) return;
-  if (!_canBulkDelete) { item.style.display = 'none'; return; }   // merge_vendors is admin-only
+  // merge_vendors is admin-only, so for anyone else this is not a finished tool
+  // — it is not theirs at all, which is a different reason to hide it.
+  if (!_canBulkDelete) { item.style.display = 'none'; return; }
   let n = 0;
   try { n = VendorDb.findExactDuplicateGroups(allVendors, _dupActiveIds()).reduce((a, g) => a + g.remove.length, 0); }
   catch (_) { n = 0; }
-  const badge = document.getElementById('dup-count-badge');
-  const cnt = document.getElementById('dup-count');
-  if (badge && cnt) { cnt.textContent = n; badge.style.display = n ? '' : 'none'; }
+  _tcSet('dupes', n);
   _syncToolsAlert();
 }
 

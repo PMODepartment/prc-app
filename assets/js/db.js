@@ -4603,6 +4603,76 @@ function _isPlaceholderVendorName(s) {
       awarded_vendor_amounts: [amt],
     });
   }
+
+  /* ══ How much work is left in each work-package-derived Data Tool ═══════
+     The Data Tools menu was a flat list of eight buttons with no indication of
+     whether any of them still had anything to do — so tools that finished
+     months ago (Remove Exact Duplicates, Normalize Trades: both measured at 0)
+     sat there looking as live as the ones with a real backlog, and the question
+     "can we retire these yet?" had no answer on screen.
+
+     ⚠️ ONE WORK-PACKAGE READ FOR ALL THREE WP-DERIVED COUNTS. Three separate
+        scans of 1,879 rows to fill in one menu would be indefensible; the
+        caller also caches the result for the session.
+
+     ⚠️ CALLED WHEN THE MENU IS OPENED, NEVER ON PAGE LOAD. vendors.html already
+        takes tens of seconds for ~2,400 vendors, and adding an unconditional
+        1,879-row scan to that would make every visit slower to answer a
+        question nobody asked yet. Opening the menu IS the question.
+
+     ⚠️ `skipName` mirrors importVendorsFromWPs so the count and the run agree.
+        Without it this would promise vendors the import then refuses to create,
+        which is worse than no count at all. */
+  async function getWpDerivedToolCounts(opts) {
+    opts = opts || {};
+    const skipName = typeof opts.skipName === 'function' ? opts.skipName : null;
+    const sb = await getSB();
+    const [wps, vendors, bids] = await Promise.all([
+      _pagedSelect(() => sb.from('work_packages').select(
+        'id,project_id,contractor,proposed_vendors,vendor_id,awarded_vendor_ids,'
+        + 'award_status,not_to_be_awarded')),
+      getVendors(),
+      _pagedSelect(() => sb.from('vendor_bids').select('wp_id')).catch(() => []),
+    ]);
+    const byNorm = {}; vendors.forEach(v => { byNorm[_normName(v.name)] = 1; });
+    const hasBid = new Set((bids || []).map(b => b.wp_id));
+
+    let awardedNoVendor = 0, awardedNoBidRow = 0;
+    const importable = new Set(), refused = new Set();
+
+    wps.forEach(w => {
+      const awarded = w.award_status === 'Awarded' && !w.not_to_be_awarded;
+      const linked = w.vendor_id || (w.awarded_vendor_ids && w.awarded_vendor_ids.length);
+      const text = String(w.contractor || '').trim();
+
+      // The fill-in queue's own definition, kept identical to
+      // getAwardedWithoutVendor so the menu count and the panel agree.
+      if (awarded && !linked && !text) awardedNoVendor++;
+
+      // Awarded work whose money has never reached the bid ledger. Capped by
+      // the linkage above, which is exactly why both are worth showing together.
+      if (awarded && !hasBid.has(w.id)) awardedNoBidRow++;
+
+      // What "Import from WPs" would actually create, after its own guard.
+      const push = nm => {
+        const disp = String(nm || '').trim().replace(/\s+/g, ' ');
+        const k = _normName(disp);
+        if (!k || byNorm[k]) return;
+        if (_isPlaceholderVendorName(disp) || (skipName && skipName(disp))) refused.add(disp);
+        else importable.add(disp);
+      };
+      _splitAwarded(w.contractor).forEach(push);
+      _splitVendors(w.proposed_vendors).forEach(push);
+    });
+
+    return {
+      awardedNoVendor,
+      awardedNoBidRow,
+      importable: importable.size,
+      refused: refused.size,
+      awardedTotal: wps.filter(w => w.award_status === 'Awarded' && !w.not_to_be_awarded).length,
+    };
+  }
   return {
     getVendors, getVendor, createVendor, updateVendor, approveVendor, rejectVendor, setVendorStatus, deleteVendor,
     products, certifications, personnel,
@@ -4622,6 +4692,7 @@ function _isPlaceholderVendorName(s) {
     backfillVendorDataFromWPs, getWorkPackagesForVendor,
     getVendorSchedulePerf,
     getAwardedWithoutVendor, setAwardedVendor,
+    getWpDerivedToolCounts,
   };
 })();
 window.VendorDb = VendorDb;
