@@ -3200,7 +3200,8 @@ function renderRfq() {
           + '<i class="ti ti-clipboard-text"></i> Copy letter</button>'
           + (cur.vendor_contact_email
               ? '<button class="btn btn-primary" onclick="mailTo(' + Q + cur.id + Q + ')"'
-                + ' title="Copies the letter, then opens a new email addressed to this bidder — press Ctrl+V">'
+                + ' title="Copies the letter, then opens a draft with this bidder in Bcc'
+                + ' and you in To — press Ctrl+V to paste it in">'
                 + '<i class="ti ti-mail"></i> Open in Outlook</button>'
               : '')
         : '')
@@ -3323,27 +3324,65 @@ function _copyHtmlFallback(html) {
       as an editable draft. **Never reach for a downloaded .eml as "no
       pasting" again without a real Outlook to verify against; the mailto +
       clipboard combo below is the one that has actually been used.** */
+/* ⚠️ THE BIDDER GOES IN BCC, THE OFFICER IN To: — every mailto this page opens
+      goes through here so the rule cannot drift between the RFQ and the chase.
+      A quotation request discloses that this company was invited, and BCC keeps
+      the bidder list out of the visible header even if the officer later
+      forwards the thread, replies-all or adds a recipient. To: is the officer's
+      own address, which also gives them the sent copy in their own mailbox.
+   ⚠️ `bcc` is a standard mailto header field and Outlook honours it. Keep the
+      body OUT for the RFQ itself (see mailTo) — a mailto body is plain text by
+      definition and the Windows shell caps the command line at ~8KB. */
+function officerAddress() {
+  return (R && R.contact_email) || (profile && profile.email) || '';
+}
+function openMail(opts) {
+  const to = officerAddress();
+  const q = ['subject=' + encodeURIComponent(opts.subject || '')];
+  if (opts.bcc) q.push('bcc=' + encodeURIComponent(opts.bcc));
+  if (opts.body) q.push('body=' + encodeURIComponent(opts.body));
+  window.location.href = 'mailto:' + encodeURIComponent(to) + '?' + q.join('&');
+}
+
 function mailTo(id) {
   const i = invById(id); if (!i) return;
   if (!i.vendor_contact_email) { AppNotify.warn('No contact email on file for this vendor.'); return; }
   copyRich(id, true).then(function (copied) {
-    window.location.href = 'mailto:' + encodeURIComponent(i.vendor_contact_email)
-      + '?subject=' + encodeURIComponent(rfqSubject());
+    openMail({ subject: rfqSubject(), bcc: i.vendor_contact_email });
+    /* Naming the address is the point: the bidder is in BCC, so it is no longer
+       visible in the draft's header, and a wrong address on that vendor's
+       record has to be caught HERE rather than after the send. */
     AppNotify.success((copied ? 'Letter copied with its formatting. ' : '')
-      + 'An addressed draft to ' + i.vendor_contact_email + ' is opening in your mail app'
-      + (copied ? ' — press Ctrl+V to paste it in.' : '.'));
+      + 'A draft is opening — ' + i.vendor_name + ' is in Bcc as '
+      + i.vendor_contact_email + ', you are in To.'
+      + (copied ? ' Press Ctrl+V to paste the letter in.' : ''));
   });
 }
 function csvCell(v) {
   const s = String(v == null ? '' : v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
+/* ⚠️ THE HEADERS NAME WHOSE ADDRESS EACH COLUMN IS. Reported as "the email in
+      the mail list is the email of the procurement officer" — the column held
+      vendors.contact_email, which is correct, but that column MIRRORS whichever
+      Personnel row a vendor flagged primary, so a vendor whose record was set
+      up by an officer carries the officer's address. A header reading plain
+      "Email" gave nobody anything to check that against.
+   ⚠️ `Bcc` and `To` are separate columns because the merge must route the same
+      way the buttons do: the bidder in Bcc, the officer in To. Anyone building
+      a mail merge off a single "Email" column would put the bidder straight in
+      To: and disclose the bidder list. */
 function copyMergeCsv() {
-  const rows = [['Company', 'Contact', 'Email', 'Subject', 'Link']];
+  const officer = officerAddress();
+  const rows = [['Company', 'Their contact person', 'Bcc (the bidder)',
+                 'To (you)', 'Subject', 'Their own bid link']];
   INV.forEach(i => rows.push([i.vendor_name, i.vendor_contact_person || '',
-    i.vendor_contact_email || '', rfqSubject(), bidLink(i)]));
+    i.vendor_contact_email || '', officer, rfqSubject(), bidLink(i)]));
+  const missing = INV.filter(i => !i.vendor_contact_email).length;
   navigator.clipboard.writeText(rows.map(r => r.map(csvCell).join(',')).join('\n'))
-    .then(() => AppNotify.success('Merge list copied — paste into Excel for an Outlook mail merge.'));
+    .then(() => AppNotify.success('Merge list copied — ' + INV.length + ' bidder'
+      + (INV.length === 1 ? '' : 's') + ', each with their own link. Bidders go in Bcc.'
+      + (missing ? ' ' + missing + ' have no email on file.' : '')));
 }
 async function markIssued() {
   try {
@@ -3522,9 +3561,14 @@ function chaseBidder(id) {
     + '\n\n' + bidLink(i) + '\n\n'
     + (contactSentence() || '') + '\n\n'
     + sigPlain().join('\n');
-  window.location.href = 'mailto:' + encodeURIComponent(i.vendor_contact_email)
-    + '?subject=' + encodeURIComponent('Follow-up: ' + (R.doc_type || 'RFQ') + ' \u2014 ' + wpLabel(w))
-    + '&body=' + encodeURIComponent(body);
+  // Same routing as the RFQ — the bidder in Bcc, the officer in To.
+  openMail({
+    subject: 'Follow-up: ' + (R.doc_type || 'RFQ') + ' \u2014 ' + wpLabel(w),
+    bcc: i.vendor_contact_email,
+    body: body,
+  });
+  AppNotify.success('A follow-up draft is opening — ' + i.vendor_name
+    + ' is in Bcc as ' + i.vendor_contact_email + ', you are in To.');
 }
 
 async function copyBidLink(id) {

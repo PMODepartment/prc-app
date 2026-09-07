@@ -257,27 +257,6 @@ function fmtDate(v) {
   return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric',
                                        hour: 'numeric', minute: '2-digit' });
 }
-/* ⚠️ A PLANNED DATE THAT HAS ALREADY PASSED IS WORSE THAN NO DATE AT ALL HERE.
-   `target_delivery` / `target_installation` are the buyer's own planning dates,
-   set on the work package long before this round was raised and mirrored from
-   the Planning app's schedule — so if the package is bid out LATE they are
-   already behind us, and showing one to a supplier who is about to quote a lead
-   time reads as a commitment we are asking them to meet. Reported live: "Target
-   Delivery will be misleading if the work package is bid out late." So a date
-   still ahead of us is shown (it is real information a bidder needs); one that
-   has passed is simply omitted, the same way every blank field here is.
-   ⚠️ Parsed from its LOCAL parts, not `new Date('2026-11-30')` — that is UTC
-   midnight, which reads as the previous day in UTC+8 (the app-wide sCurve trap)
-   and would hide a date on its own due day. */
-function stillAhead(v) {
-  if (!v) return false;
-  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return false;
-  const d = new Date(+m[1], +m[2] - 1, +m[3]);
-  if (isNaN(d.getTime())) return false;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  return d.getTime() >= today.getTime();
-}
 /* What basis to quote on, in the bidder's own words. Comes from the ROUND (what
    the RFQ asked for) — never from staff's own confirmation of what this bidder
    actually quoted, which is an internal assessment and is deliberately not
@@ -408,8 +387,17 @@ function render() {
     + (b.detailed_description ? '<div class="scope">' + esc(b.detailed_description) + '</div>' : '')
     + '<dl class="kv">'
     + (b.boq_note ? '<dt>Bill of quantities</dt><dd>' + esc(b.boq_note) + '</dd>' : '')
-    + (stillAhead(b.target_delivery) ? '<dt>Target delivery</dt><dd>' + esc(b.target_delivery) + '</dd>' : '')
-    + (stillAhead(b.target_installation) ? '<dt>Target installation</dt><dd>' + esc(b.target_installation) + '</dd>' : '')
+    /* ⚠️ TARGET DELIVERY / TARGET INSTALLATION ARE DELIBERATELY NOT SHOWN AT ALL
+       (2026-09-07). An earlier pass showed them only while still ahead of us,
+       on the reasoning that a date already behind us misleads a bidder. That
+       did not go far enough: these are the BUYER'S OWN PLANNING dates, set on
+       the work package long before the round was raised and mirrored from the
+       Planning app's schedule, so even a future one is an internal plan rather
+       than a commitment we are asking the bidder to meet — and a bidder reads
+       any date we print as the date we want. What we actually need from them is
+       their own LEAD TIME, which the form asks for directly. Leaving these out
+       removes the contradiction entirely. The `stillAhead()` helper that used to
+       gate them went with them — nothing else called it. */
     + (b.payment_terms_required ? '<dt>Payment terms</dt><dd>' + esc(b.payment_terms_required) + '</dd>' : '')
     + (b.prebid_at ? '<dt>Pre-bid</dt><dd>' + esc(fmtDate(b.prebid_at)) + '</dd>' : '')
     + (b.conditions ? '<dt>Conditions</dt><dd>' + esc(b.conditions) + '</dd>' : '')
