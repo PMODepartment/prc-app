@@ -7748,6 +7748,86 @@ Unlinked vendor names **1,345 → 941**, Import from WPs **840 → 477** (363 du
 will now not be created), and Backfill Trade/Bid Data **99 → 113**, which is the right direction:
 more vendors resolve, so there is more bid history it can write.
 
+### Tracing the legacy vendor names to the accredited masterlist (2026-09-07)
+
+Asked to trace the unresolved names to the accredited masterlist, and to split the multi-company
+strings by allocating each to its proper accredited vendor. Placeholders were left alone — the
+user is tracing those back to the procurement officers.
+
+| | before | after |
+|---|---|---|
+| aliases | 357 | **468** |
+| unattributed awarded spend (of the ₱12.12B that names somebody) | ₱2.702B (22.3%) | **₱2.372B (19.6%)** |
+| distinct unresolved names | 113 | **104** |
+| work packages carrying vendor id links | 144 | **153** |
+
+**₱330M recovered.** 111 aliases (LG plus a 110-row bulk pass) and 9 multi-company work packages
+decomposed into `awarded_vendor_ids`.
+
+#### ⚠⚠ FOUR REFUSAL RULES, EACH DERIVED FROM A FALSE POSITIVE THE LIVE DATA PRODUCED
+
+The suggester proposed 262 matches. **145 survived its own guards and 35 of those were still
+wrong** — so the rules below are what separated them. Every one was caught by reading the
+proposals against the directory, not by the suggester.
+
+1. **⚠ AN ALIAS MAPS THE WHOLE STRING TO ONE VENDOR, so aliasing a multi-company string
+   credits it with another company's money.** The existing blob guard needs — 2 leftover words,
+   which misses a string whose second company is ONE word: `Starbright. Xceltek`,
+   `PGI. MCC-PCS Cels`, `LG Daikin Airconditioning`, `Wall Vision Jangho`,
+   `JCAP Construction Asiawide`. **The leftover must be nothing but legal-form or descriptor
+   noise.**
+2. **⚠ A LEFTOVER THAT IS A PLURAL OR TYPO OF A WORD THE VENDOR ALREADY HAS IS THE SAME WORD.**
+   The first cut of rule 1 was too strict and refused `Fil-American Hardare` →
+   `Fil-American Hardware` (₱3.7M), `Zenshing` → `Zenshin`, `Crystallite` → `Crystalite`,
+   `Orion Wires` → `Orion Wire`. Dismiss such a leftover via the existing `_alTokWhy`.
+3. **⚠⚠ A COMPANY'S IDENTITY LEADS ITS NAME.** When the typed name is a strict subset of the
+   directory name, its first distinctive word must be the directory name's first distinctive word.
+   This is the ONLY thing separating `Maynilad` → `Maynilad Water Services` (right) from
+   `Petron` → `Tuy Petron Station`, `Talent` → `Philippine Society for Talent Development`,
+   `Brother` → `Chusenfu Brothers`, `Schindler` → `Jardine Schindler` (all wrong). **Ignore
+   single-letter initials** or it refuses `Ursua Sea and Land Cargo` → `R.G. Ursua —`
+   (₱6.4M).
+4. **Under 4 distinctive characters, hold it.** `ABC` → `ABC Philippines`, `TAC`, `CEC`, `SDA`,
+   `KSB`, `JAD`, `PGI` all had exactly one candidate and are all too collision-prone to write
+   unattended.
+
+**⚠ `CCSP` (₱90.2M), `HDC` (₱54.1M), `GCCI` (₱53.1M) and `J.Pastor` (₱48.4M) are the
+largest single-company names left and NO rule can expand an acronym.** They need somebody who
+knows the project.
+
+#### ⚠ THE MONEY WAS CONFIRMED AGAINST THE WORK PACKAGES, NOT INFERRED FROM THE NAME
+
+Every match over ₱5M was checked against its WP's trade and description and the vendor's own
+`vendor_group`, which corroborated all of them: `Pag-asa` and `Universal Steel` sit on **Supply of
+Rebar** and are both group *Rebar, Steel Fabrication*; `Transmodal`, `Ursua` and `DMC` sit on
+**Mobilization** and are *Logistics* / *Shipping Services*; `Maynilad` on **Utilities**;
+`Triplewell` + `Fyrelyn` on **Fire Protection**; `ESCA` + `Ecosolutions` on **Bonds, Insurances &
+Permits**. **A `vendor_group` that contradicts the WP's trade is the cheapest disproof available
+— use it.**
+
+#### ⚠ A PARTIAL DECOMPOSITION IS STILL NEVER WRITTEN
+
+53 awarded WPs (₱1.81B) resolve only PARTIALLY. Writing those would OVER-CREDIT the segments
+that did resolve, because the analytics splits evenly across whatever ids it finds. Only the **9**
+where EVERY segment resolves were written (₱291.8M) — `contractor` text left byte-identical
+(it is the procurement record, and this keeps the write reversible by clearing the ids) and
+`awarded_vendor_amounts` left NULL (the per-vendor split is unknown; inventing one asserts a
+breakdown nobody agreed).
+
+#### ⚠ THE TAB WAS RUNNING A STALE `vendors.html` AND TWO FIXED FALSE POSITIVES CAME BACK
+
+`FinishPro Builders` → `IBuilders Inc.` and `ENCI` → `ENCI Canteen` — both fixed earlier
+that day, both reappearing. **`vendors.html` carries no `?v=` of its own**, so the page HTML sits
+behind Fastly's ~10-minute TTL while the shared assets refresh. **Before trusting a suggester
+result, probe a known-refused case** (`_alSuggest('FinishPro Builders')` must be empty); a stale
+page silently reintroduces every guard you have removed.
+
+#### ⚠ A HARNESS TRAP THAT READ AS TOTAL DATA LOSS
+
+The first measurement selected `awarded_cost` but **`window.effectiveAwardedCost` reads
+`total_awarded`** — the GENERATED column. Every peso came back `0`. **Select `total_awarded`
+when calling the money helpers.**
+
 ### Where the vendor cleanup actually stands, measured (2026-09-07)
 
 Asked what the next steps are. Measured against production first, because the numbers had moved
