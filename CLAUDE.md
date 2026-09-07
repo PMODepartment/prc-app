@@ -7748,6 +7748,77 @@ Unlinked vendor names **1,345 → 941**, Import from WPs **840 → 477** (363 du
 will now not be created), and Backfill Trade/Bid Data **99 → 113**, which is the right direction:
 more vendors resolve, so there is more bid history it can write.
 
+### Where the vendor cleanup actually stands, measured (2026-09-07)
+
+Asked what the next steps are. Measured against production first, because the numbers had moved
+since the mid-cleanup figures: **the DIRECTORY is essentially finished and the remaining work is
+almost entirely on the WORK PACKAGE side.**
+
+| directory | |
+|---|---|
+| vendors | **2,404** |
+| accredited · problematic · not assessed | 2,369 · 3 · 32 |
+| carrying a BP code · a TIN | 2,368 · 2,262 |
+| aliases | **358** |
+| claimed vendor logins | 1 |
+
+So the masterlist import is complete and every taxpayer has its own row (the merge-risk check
+reads PASS). What is left is that a work package names a company in free text and nothing links
+it to that row.
+
+| work packages | |
+|---|---|
+| awarded | **1,363** |
+| → of those, NAME a vendor | 447 (₱12.12B) |
+| → of those, name **NOBODY** | **916** (₱13.95B) |
+| unattributed awarded spend, on the WPs that DO name someone | **₱2.57B (21.2%)** |
+| distinct unresolved names | **112** |
+
+#### ⚠ THE LG ALIAS WAS ASKED FOR ONCE AND NEVER LANDED — CHECK, DO NOT ASSUME
+
+`LG Philippines` was still resolving to NOTHING at **₱133.8M across 5 WPs**, despite being the
+example that prompted the whole alias feature. Created now against **V-00594 `Lg Electronics`**;
+unattributed spend fell ₱2.702B → **₱2.568B** on that one row.
+
+**The evidence was checked before writing it, not inferred from the name**: all five are HVAC
+equipment on WCB358 (AHU / FCU / DOAS / FAHU / VRF), and V-00594 is accredited with vendor_group
+`Supplier`. Two of the five are `LG Philippines / Air Beyond Satisfaction Services Inc`
+co-awards, which is why LG's share is ₱133.8M against a ₱177.4M raw total — the analytics
+splits on `/`, so a co-award is already partly attributed.
+
+**⚠ Note the directory row is now named `Lg Electronics`, not `LG Electronics Philippines.Inc.`**
+— the masterlist re-import renamed it. An alias written against the old name would have looked
+correct and matched nothing.
+
+#### The 112 remaining names, grouped by WHAT CLOSES EACH ONE
+
+Pointing an officer at the wrong tool is worse than saying nothing, so the worklist is grouped by
+the fix rather than by size:
+
+| what it needs | names | awarded spend | biggest |
+|---|---|---|---|
+| **Split** — several companies in one string | 441 | ₱1.68B | `Splice Sleeve Japan Ltd. MCC - PCS CELS —` ₱187.1M |
+| **alias or create** — a single company | **68** | **₱930.2M** | `CCSP` ₱90.2M · `Solid Rock Concrete` ₱82.5M |
+| **placeholder** — not a company at all | 5 | ₱342.2M | `Various Supplier` ₱340.6M on 11 WPs |
+| proposed-only, no awarded spend | 384 | ₱0 | `BCS` · `JM2` · `TMC` |
+
+**⚠ `Various Supplier` at ₱340.6M is the single largest item and NO tool can fix it.** It is
+not a company, so an alias would be a lie and creating a vendor would be worse. Somebody has to
+open those 11 work packages (WCB358 WP14, STM101 WP46/47/52 and others) and name who was actually
+paid. Same for `Various`, `Various Vendors`, `(To be sourced)` and `FOR SOURCING`.
+
+**⚠ The 916 awarded WPs that name NOBODY (₱13.95B) are the biggest gap in the app and are
+NOT a matching problem.** No tool can invent a vendor nobody recorded — it needs the PO or the
+contract. Data Tools → **Awarded, no vendor recorded** is the queue, and it is deliberately
+un-badged because a permanent 900-strong count would kill the alert dot.
+
+#### ⚠ A HARNESS TRAP THAT MADE EVERY MONEY FIGURE READ ZERO
+
+My first measurement selected `awarded_cost` but **`window.effectiveAwardedCost` reads
+`total_awarded`** — the GENERATED column (₱awarded_cost + additionals). Every peso came back
+`0` and it looked like a catastrophic data loss. **Select `total_awarded` when calling the money
+helpers**, and rule out the harness before believing a figure that extreme.
+
 ### Were any vendors merged that shouldn't have been? (2026-09-07)
 
 Asked after the Sofaire/Wenjem finding. **Answer: no vendor was destructively merged, but the
