@@ -8695,6 +8695,126 @@ blocks a string whose other four members all resolve); `HDC` (₱108M); `Ramp` (
 refused names above. **911 awarded work packages name NOBODY at all (₱13.95B)** — that is the
 `Awarded, no vendor recorded` queue and it needs the PO or the contract, not matching.
 
+### Backfill run: the badge went 141 -> 24, and 24 is its STRUCTURAL FLOOR (2026-09-07)
+
+With 118 more work packages carrying vendor links, `backfillVendorDataFromWPs` had far more to
+work with. Run to completion (about three minutes; it loops individual writes, so the
+`javascript_tool` 45s ceiling is hit long before it finishes — **poll the row counts to tell
+whether it is still writing, do not re-invoke it**):
+
+| | before | after |
+|---|---|---|
+| `vendor_bids` | ~700 | **1,222** |
+| `vendor_rates` | 166 | **517** |
+| `vendor_products` | ~350 | **499** |
+| vendors carrying a trade category | — | **571** |
+| `Backfill Trade/Bid Data` badge | **141** | **24** |
+
+**⚠ THE RESIDUAL 24 ARE NOT A FAILURE — they are structurally unwritable by the tool as
+designed, and the badge over-counts them.** Checked individually: **7 are ₱0 awards** (Backfill
+gates on `awarded_cost > 0`, which is now out of step with Known Issue #43, where an Awarded WP
+counts whatever its cost) and **17 are multi-vendor co-awards** (Backfill writes a bid for the ONE
+vendor a WP was awarded to, and cannot split the amount across a co-award). `awardedNoBidRow`
+counts "resolvable and bidless" and knows neither exclusion. **Do not chase this badge below 24
+without first deciding what a bid row should mean for a ₱0 award and for a co-award.**
+
+### `proposed_vendor_ids` had NEVER been populated — 872 work packages, 2,172 links (2026-09-07)
+
+The column exists (`migrations/2026-08-10_wp_proposed_vendor_ids.sql` is applied) and **every one of
+the 1,630 work packages carrying proposed-vendor text had an empty array**: only a WP created or
+edited through the form since that migration would get one, and none had been. Tiling the text and
+writing the complete decomposition filled **872 of them with 2,172 links, 0 failures**, matching
+the dry-run figure exactly.
+
+- **⚠ NO MONEY IS ATTRIBUTED BY THIS COLUMN**, which is why it was safe to write in bulk. It
+  powers the WP-List **vendor filter** on both dashboards (`_wpVendors` / `_projVendors` resolve
+  through the FK when present, so spelling variants collapse into ONE filter entry instead of
+  several), the vendor profile's Work Packages list, and `findVendorsForWP`.
+- **⚠ Written only when EVERY delimited part tiles clean**, so the ids are a complete
+  decomposition and never a subset — a partial write would understate participation, which feeds
+  the Bid Win Rate denominator.
+- Split on **newline / semicolon / pipe only, never comma** — the app-wide rule, because a
+  company name contains commas.
+- The 758 still unlinked are the ones holding a name that does not resolve; they keep working off
+  the free text exactly as before.
+
+### ⚠⚠ MERGING A DUPLICATE WHOSE NAME WAS THE **SHORT FORM** BREAKS RESOLUTION OF THAT SHORT FORM (2026-09-07)
+
+`mergeVendors` preserves child rows, WP links, trade categories, the accreditation standing and
+blank profile fields — **but NOT the folded row's NAME as a resolution key.** Folding
+`"Felport"` into `"Felport International Marketing"` and `"Ericson"` into `"Ericson Builders"`
+removed the exact-match key that work-package text was relying on, and **both short forms went
+from resolving to resolving to NOTHING.**
+
+Caught because a re-derivation of `proposed_vendor_ids` on two work packages came back with **3
+ids where it had written 4**. Fixed with an alias per folded name, carrying a note saying why.
+
+**⚠ AFTER MERGING A DUPLICATE, ALIAS THE FOLDED ROW'S NAME TO THE SURVIVOR** — unless the two
+names are identical (the other two merges that day were, and were unaffected). This applies to
+`Remove Exact Duplicates` and the fuzzy Merge tool as much as to a hand merge, and it is a real
+gap: the tools that exist to CLEAN duplicate names can silently make a name unresolvable.
+
+### ⚠ REBUILD THE VENDOR INDEX AFTER ANY VENDOR DELETE OR MERGE (2026-09-07)
+
+`buildVendorIndex` is built from a snapshot. The proposed-vendor pass ran against a snapshot taken
+**before** four merges, so the tiler resolved a name to a since-folded id and wrote **2 dangling
+`proposed_vendor_ids`**. Harmless here and repaired in the same pass, but the shape generalises:
+**a stale snapshot writes references to rows that no longer exist**, and nothing complains — the
+arrays have no foreign key (deliberately, so a merge cannot cascade real buyer data away). A
+dangling-id scan is therefore the check that catches it; run one after any bulk write.
+
+**Final integrity sweep, all 1,879 work packages: 0 dangling ids (awarded, proposed and the
+`vendor_id` FK), 0 misaligned amount arrays, 0 rows where `vendor_id` is not a member of
+`awarded_vendor_ids`.**
+
+### Vendor-name hygiene: what a full-field scan found (2026-09-07)
+
+Scanned all 2,435 rows for Excel artifacts, control characters, edge/double whitespace, mojibake,
+trailing punctuation, non-numeric TINs and malformed emails.
+
+**Fixed (4):** three names carrying Excel's literal **`_x000D_`** escape — a carriage return that
+survived the export AS TEXT (`Xiamen Kingbest Tools Co., Ltd._x000D_`, V-01692 / V-01715 / V-01730)
+— and one `contact_email` holding **a URL** (`https://www.becterdecor.com/`), moved to `website`.
+
+**Clean:** 0 control characters, 0 edge or doubled whitespace, 0 mojibake anywhere in the directory.
+
+**⚠⚠ FLAGGED, NOT CHANGED — 213 rows whose `tin` is NOT A NUMBER: `NO TIN` (117),
+`IMPORT` (91), `NA` (2), `FOREIGN`, `N/A`, `-`.** These are **faithfully imported from the
+masterlist, which stores exactly those placeholders** (117 / 95 / 2 / 1 in the workbook), so the
+import was correct. But the app treats that field as "a TIN is on file", with two consequences:
+
+1. **`accredReadiness` counts them as SATISFIED** — verified against the shipped function:
+   `tin: 'NO TIN'` and `tin: 'IMPORT'` both return `ok: true`, only `null` returns false. So 213
+   accreditation checklists report a TIN on file when none exists.
+2. **⚠ `internal.vendor_edit_guard` makes `tin` FILL-ONCE, so those 213 vendors can NEVER supply
+   a real TIN through the portal** — the guard sees a non-blank value and pins it. That is a
+   genuine lockout for a foreign supplier who later obtains a PH TIN.
+
+**Not bulk-changed on purpose.** Nulling them flips 213 checklists from "TIN ok" to "TIN missing"
+(—8.7% of the directory) and would discard the `IMPORT` vs `NO TIN` distinction, which is real
+information. **The clean fix is to move the placeholder into `notes` and null the column** — it
+keeps the distinction, un-freezes the field and makes the checklist honest — but it is a
+business-visible change and belongs to the user.
+
+**Also flagged: 277 `contact_email` values hold SEVERAL addresses in one field** (`a@x.com;
+b@y.com`, sometimes space-separated), again as the masterlist stores them. Every `mailto:` built
+from those is malformed, and the invite CSV exports them verbatim.
+
+### Where it stands after the second batch (2026-09-07)
+
+Real projects only, DEMO excluded:
+
+| | |
+|---|---|
+| awarded WPs naming a vendor / of which LINKED | 440 / **363** |
+| unattributed awarded spend | **₱1.506B (12.7%)** of an ₱11.885B basis, 77 WPs |
+| WPs with proposed text / of which LINKED | 1,630 / **872** (2,172 ids, was 0) |
+| directory vendors | **2,435** |
+| aliases | **500** |
+| masterlist codes missing from the app | **0** |
+| integrity: dangling ids / misaligned amounts | **0 / 0** |
+| Backfill badge | **24** (from 141; structural floor) |
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
