@@ -3271,6 +3271,60 @@ no instruction.
 matched against a real em-dash and failed at 0 occurrences. Build any backslash with `chr(92)`.
 Documented already; this is the second session it has cost time in.
 
+### The rounds list at 100-400 rounds (2026-09-07)
+
+Asked what happens at that size. **Measured with 400 synthetic rounds across 21 projects rather
+than reasoned about**, and the answer was: it does not fall over, it becomes unnavigable.
+
+| | before | after |
+|---|---|---|
+| render | **140 ms** | **12 ms** |
+| page height | **19,947 px** (22 screens) | **1,666 px** |
+| rows in the DOM | 421 | 21 group headers, opened on demand |
+| narrowing by project | none | a filter with per-project counts |
+| search cost | 140 ms **per keystroke** | debounced 180 ms |
+
+**⚠️ THE FIX IS NARROWING, NOT VIRTUALISING.** 400 rows is nothing for a plain table — the
+vendor grid renders 2,400 — so a windowing library would have solved a problem this list does not
+have. What fails at that size is *finding* a round.
+
+- **Collapsible project groups**, and **`LS_COLLAPSE_OVER = 60`**: below that the list behaves
+  exactly as it did (verified — 5 rounds, nothing closed), and above it the wall becomes a
+  directory you open one project at a time. Decided **once per session**, so a project the
+  officer opened stays open across filter changes.
+- **⚠️ A COLLAPSED GROUP'S HEADER STILL REPORTS ITS FULL COUNT AND BCB** — a header that counted
+  only what is visible would read `0 rounds` when closed. Same rule as the vendor grid's row
+  groups.
+- **⚠️ THE TOGGLE TAKES AN INDEX, NEVER THE PROJECT ID.** A key interpolated into an inline
+  handler cannot be made safe by escaping — the HTML parser decodes the attribute *before* the JS
+  is parsed. Same rule as Known Issues #23 and the vendor grid.
+- **A project filter**, built from the rounds actually loaded so a project with none is never
+  offered as a filter that can only ever return nothing. **⚠️ It rebuilds only when its own
+  signature changes** (`sel.dataset.sig`), or every render would wipe the officer's selection and
+  drop focus mid-interaction — verified the filter survives a re-render.
+- **`Past the deadline only`**, because the overdue count was already printed above the list and
+  there was no way to filter to it. At 400 that was 50 rounds across 3 projects.
+- **A count line that says what is on screen** — `400 rounds across 21 projects · 19 shown, 20
+  projects closed — open all`. With groups closed the table shows a handful of rows out of
+  hundreds, and without this the list silently looks short.
+- **⚠️ THE GROUP HEADER WAS O(projects × rounds).** It re-`filter()`ed the whole sorted array for
+  its own count and total, so 21 groups over 400 rounds meant 8,400 needless comparisons per
+  render. Grouped in one pass now — that plus the collapse is where the 140 ms went.
+
+**⚠️ AND THE SEARCH BOX CALLED `renderList()` STRAIGHT FROM `oninput`**, so the full render landed
+on every keystroke. Debounced at 180 ms, the same reason `index.html`/`project.html` wrap their
+heavy search handlers in `dbnc`.
+
+**Not done, and it is the next thing if the list keeps growing:** every round is still fetched up
+front (`bidRounds.list()` is paged, so it is correct, just unbounded), and there is no date or
+"my rounds" filter. Server-side paging would be the real answer past a few thousand — but the
+work packages themselves number 1,879 today, so rounds are bounded by that in practice.
+
+**⚠️ TWO OF MY OWN TEST FAILURES WERE THE TEST.** The project-filter check set `SYN03` when the
+generated ids are `SYN3` (only the *name* is zero-padded), so the filter looked broken; and a
+count regex captured `0020` out of `Synthetic Project 0020 rounds`. Fifth and sixth time in this
+project — **rule out the harness first.**
+
 ### The To: is guarded, the officer stops being Bcc'd twice, and Award Outcome gets short labels (2026-09-07)
 
 **⚠️ AN EMPTY `To:` WOULD HAVE OPENED A DRAFT ADDRESSED TO NOBODY.** Asked to double-check it.

@@ -40,6 +40,16 @@
     .bm-behind{font-size:0.7143rem;font-weight:700;color:var(--mw-red-ink)}
     /* The next step leads, so it sits first and Cancel is pushed away from it. */
     .bm-next{margin-right:auto}
+    /* The rounds list at scale — a project group is a control now, so it reads
+       as one and gives feedback on hover. */
+    .ls-proj{cursor:pointer}
+    .ls-proj:hover td{background:var(--mw-red-light,#FDECEA)}
+    html.dark-mode .ls-proj:hover td,body.dark-mode .ls-proj:hover td{background:#33211F}
+    .ls-caret{margin-right:7px;color:var(--text-hint);font-size:0.7857rem;vertical-align:-1px}
+    .ls-tools{display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .ls-check{display:inline-flex;align-items:center;gap:6px;font-size:0.7857rem;
+      font-weight:600;color:var(--text-secondary);white-space:nowrap;cursor:pointer}
+    .ls-check input{cursor:pointer}
     /* Destructive, so it reads that way — but quietly, not as a primary action. */
     .bm-del{color:var(--mw-red-ink);border-color:var(--mw-red-mid,#FBD9D5)}
     .bm-del:hover{background:var(--mw-red-light,#FDECEA);border-color:var(--mw-red)}
@@ -915,16 +925,31 @@
           </div>
           <div class="filter-bar" style="margin-bottom:14px">
             <div class="filter-group">
+              <label>Project</label>
+              <select id="fProject" onchange="renderList()">
+                <option value="">All projects</option>
+              </select>
+            </div>
+            <div class="filter-group">
               <label>Stage</label>
               <select id="fStage" onchange="renderList()">
                 <option value="">All statuses</option>
               </select>
             </div>
             <div style="flex:1 1 200px;min-width:160px">
-              <input id="fSearch" type="text" placeholder="Search work package or project…" oninput="renderList()"
+              <input id="fSearch" type="text" placeholder="Search work package or project…" oninput="_lsSearchInput()"
                 style="width:100%;padding:8px 11px;border:1.5px solid var(--border-md);border-radius:8px;font-family:inherit;font-size:0.9286rem;background:var(--surface);color:var(--text-primary)">
             </div>
+            <div class="ls-tools">
+              <label class="ls-check"><input type="checkbox" id="fOverdue" onchange="renderList()">
+                Past the deadline only</label>
+              <button class="btn btn-sm" onclick="lsSetAllGroups(false)"
+                title="Open every project"><i class="ti ti-chevrons-down"></i></button>
+              <button class="btn btn-sm" onclick="lsSetAllGroups(true)"
+                title="Close every project"><i class="ti ti-chevrons-up"></i></button>
+            </div>
           </div>
+          <div id="listCount" class="sec-note" style="margin:-4px 0 10px"></div>
           <div id="listNote" class="sec-note" style="display:none;margin:-4px 0 12px;color:var(--mw-red-ink);font-weight:600"></div>
           <div id="listHost"></div>
         </div>
@@ -1448,10 +1473,76 @@ function _lsAging(d) {
   const cls = d < -30 ? 'ls-age-bad' : d < 0 ? 'ls-age-warn' : 'ls-age-ok';
   return '<span class="' + cls + '">' + (d > 0 ? '+' : '') + d + 'd</span>';
 }
+/* ── the list at 100-400 rounds ──────────────────────────────────────────────
+   Measured with 400 synthetic rounds across 21 projects: it rendered in ~140ms
+   into a 19,947px page — twenty-two screens of scrolling with no way to narrow
+   by project, and, because the search box called renderList() straight from
+   `oninput`, that 140ms landed on EVERY KEYSTROKE.
+   ⚠️ THE FIX IS NARROWING, NOT VIRTUALISING. 400 rows is nothing for a plain
+   table (the vendor grid renders 2,400); what fails at that size is FINDING a
+   round. So: a project filter, collapsible project groups, an overdue-only
+   toggle, a debounced search, and a count that says what you are looking at. */
+const LS_COLLAPSE_OVER = 60;      // rounds, above which groups start closed
+let _lsCollapsed = null;          // Set of closed project ids; null = not decided yet
+let _lsGroupIds = [];             // index -> project id, for the inline toggle
+let _lsSearchTimer = null;
+
+/* ⚠️ DEBOUNCED. Without this every keystroke paid the full render — 140ms at
+   400 rounds, which makes typing feel broken. Same reason index.html/project.html
+   wrap their heavy search handlers in `dbnc`. */
+function _lsSearchInput() {
+  clearTimeout(_lsSearchTimer);
+  _lsSearchTimer = setTimeout(renderList, 180);
+}
+
+/* ⚠️ THE TOGGLE TAKES AN INDEX, NEVER THE PROJECT ID. A key interpolated into
+   an inline handler cannot be made safe by escaping — the HTML parser decodes
+   the attribute BEFORE the JS is parsed, so a key containing `&quot;` becomes a
+   bare quote and throws. Same rule as the vendor grid's row groups and Known
+   Issues #23. */
+window.lsToggleGroup = function (idx) {
+  const pid = _lsGroupIds[idx];
+  if (pid == null || !_lsCollapsed) return;
+  if (_lsCollapsed.has(pid)) _lsCollapsed.delete(pid); else _lsCollapsed.add(pid);
+  renderList();
+};
+window.lsSetAllGroups = function (closed) {
+  _lsCollapsed = new Set();
+  if (closed) _lsGroupIds.forEach(function (pid) { _lsCollapsed.add(pid); });
+  renderList();
+};
+
+/* Rebuilt from the rounds actually loaded, so a project with none is never
+   offered as a filter that can only ever yield nothing. */
+function _lsSyncProjectFilter() {
+  const sel = document.getElementById('fProject');
+  if (!sel) return;
+  const counts = Object.create(null);
+  ROUNDS.forEach(function (r) { counts[r.project_id] = (counts[r.project_id] || 0) + 1; });
+  const ids = Object.keys(counts).sort(function (a, b) {
+    return projName(a).toLowerCase().localeCompare(projName(b).toLowerCase());
+  });
+  const sig = ids.map(function (i) { return i + ':' + counts[i]; }).join('|');
+  if (sel.dataset.sig === sig) return;      // nothing to rebuild; keeps focus
+  sel.dataset.sig = sig;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All projects (' + ROUNDS.length + ')</option>'
+    + ids.map(function (id) {
+        return '<option value="' + esc(id) + '">' + esc(id) + ' — ' + esc(projName(id))
+          + ' (' + counts[id] + ')</option>';
+      }).join('');
+  if (cur && counts[cur]) sel.value = cur;
+}
+
 function renderList() {
+  _lsSyncProjectFilter();
   const stage = val('fStage'), q = val('fSearch').toLowerCase();
+  const proj = val('fProject');
+  const overdueOnly = !!(document.getElementById('fOverdue') || {}).checked;
   const rows = ROUNDS.filter(r => {
+    if (proj && r.project_id !== proj) return false;
     if (stage && listStatus(r) !== stage) return false;
+    if (overdueOnly && !_deadlinePassed(r)) return false;
     if (!q) return true;
     const w = WPBYID[r.wp_id] || {};
     return (wpLabel(w) + ' ' + projName(r.project_id)).toLowerCase().includes(q);
@@ -1477,6 +1568,12 @@ function renderList() {
   }
   const money = !window.__hideBudget;
 
+  /* ⚠️ GROUPED IN ONE PASS. The group header used to re-`filter()` the whole
+     sorted array for its own count and BCB total — O(projects × rounds), so 21
+     groups over 400 rounds meant 8,400 needless comparisons per render. */
+  const byProj = Object.create(null);
+  rows.forEach(function (r) { (byProj[r.project_id] || (byProj[r.project_id] = [])).push(r); });
+
   /* Sort by PROJECT first so a group stays contiguous; the chosen column then
      orders WITHIN each group. Same shape as the Portfolio's _projRows(). */
   const sorted = rows.slice().sort(function (a, b) {
@@ -1498,19 +1595,38 @@ function renderList() {
     + _lsTh('deadline', 'Bid deadline', 'right')
     + '</tr></thead><tbody>';
 
+  /* ⚠️ COLLAPSED BY DEFAULT ONLY ONCE THE LIST IS BIG. A small portfolio
+     behaves exactly as before; past LS_COLLAPSE_OVER the wall becomes a
+     directory you open one project at a time. Decided once per session, so a
+     project the user opened stays open across filter changes. */
+  _lsGroupIds = Object.keys(byProj);
+  if (_lsCollapsed === null) {
+    _lsCollapsed = new Set();
+    if (rows.length > LS_COLLAPSE_OVER) _lsGroupIds.forEach(function (pid) { _lsCollapsed.add(pid); });
+  }
+
   let lastProj = null;
+  let shown = 0;
   sorted.forEach(function (r) {
     if (r.project_id !== lastProj) {
       lastProj = r.project_id;
-      const mine = sorted.filter(function (x) { return x.project_id === lastProj; });
+      const mine = byProj[lastProj] || [];
       const tot = mine.reduce(function (t, x) { return t + (_lsBcb(x) || 0); }, 0);
-      out += '<tr class="ls-proj"><td colspan="' + nCols + '">'
+      const shut = _lsCollapsed.has(lastProj);
+      const idx = _lsGroupIds.indexOf(lastProj);
+      out += '<tr class="ls-proj" onclick="lsToggleGroup(' + idx + ')" title="'
+        + (shut ? 'Open' : 'Close') + ' this project"><td colspan="' + nCols + '">'
+        + '<i class="ti ti-chevron-' + (shut ? 'right' : 'down') + ' ls-caret"></i>'
         + '<span class="ls-pid">' + esc(r.project_id) + '</span>'
         + '<span class="ls-pname">' + esc(projName(r.project_id)) + '</span>'
+        /* The count is of the WHOLE group, collapsed or not — a header that
+           reported only what is visible would read as 0 when closed. */
         + '<span class="ls-pn">' + mine.length + ' round' + (mine.length === 1 ? '' : 's')
         + (money && tot > 0 ? ' \u00b7 ' + esc(_amt(tot)) + ' BCB' : '') + '</span>'
         + '</td></tr>';
     }
+    if (_lsCollapsed.has(r.project_id)) return;      // header stays, rows do not
+    shown++;
     const w = WPBYID[r.wp_id] || {};
     const d = _lsDays(r);
     const bcb = _lsBcb(r);
@@ -1535,6 +1651,25 @@ function renderList() {
       + '</tr>';
   });
   host.innerHTML = out + '</tbody></table></div>';
+
+  /* ⚠️ SAY WHAT IS ON SCREEN. With groups closed the table can show a handful
+     of rows out of hundreds, and without this the list silently looks short —
+     the same reason the vendor directory prints "N vendors · showing 1-60". */
+  const cnt = document.getElementById('listCount');
+  if (cnt) {
+    const nGroups = _lsGroupIds.length;
+    const closed = _lsGroupIds.filter(function (pid) { return _lsCollapsed.has(pid); }).length;
+    const bits = [];
+    bits.push('<b>' + rows.length + '</b> round' + (rows.length === 1 ? '' : 's')
+      + (rows.length === ROUNDS.length ? '' : ' of ' + ROUNDS.length)
+      + ' across <b>' + nGroups + '</b> project' + (nGroups === 1 ? '' : 's'));
+    if (closed) {
+      bits.push('<b>' + shown + '</b> shown, ' + closed + ' project'
+        + (closed === 1 ? '' : 's') + ' closed — '
+        + '<a href="#" onclick="event.preventDefault();lsSetAllGroups(false)">open all</a>');
+    }
+    cnt.innerHTML = bits.join(' · ');
+  }
 }
 
 /* ── new round ───────────────────────────────────────────────────────────── */
