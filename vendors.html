@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907k"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260907k"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907k"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907l"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260907l"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907l"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907k">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907l">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1513,10 +1513,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260907k"></script>
-<script src="assets/js/db.js?v=20260907k"></script>
-<script src="assets/js/ui.js?v=20260907k"></script>
-<script src="assets/js/coachmarks.js?v=20260907k"></script>
+<script src="assets/js/auth.js?v=20260907l"></script>
+<script src="assets/js/db.js?v=20260907l"></script>
+<script src="assets/js/ui.js?v=20260907l"></script>
+<script src="assets/js/coachmarks.js?v=20260907l"></script>
 <script src="assets/js/vendor-guide.js?v=20260907a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -2021,13 +2021,38 @@ function _alBizConflict(a, b) {
    the one that has already been corrected once.
    ⚠️ A ≥6-character floor on the shorter token set, or a generic single token
    ("Steel") would match half the directory. */
+/* ⚠️ A ONE-LETTER DIFFERENCE AT INDEX 0 IS A DIFFERENT WORD, NOT A TYPO.
+   Found live on 2026-09-07 while cleaning: `FinishPro Builders` was being
+   proposed as **IBuilders Inc.** on ₱20.8M of awarded spend, because
+   "builders" → "ibuilders" is edit-distance 1. The leading letter IS the brand.
+   Every documented real typo pair differs in the MIDDLE or at the END
+   (HARWARE/HARDWARE, HAFELE/HAFFELE, Mechandising/Merchandising, Dodges/Dodge),
+   so requiring the first character to agree costs nothing and removes a whole
+   class of wrong company.
+   ⚠️ It also reports WHICH rule fired. `_mgTokenMatch` succeeding does NOT mean
+   a typo was involved — `MEACE Security` matched `Meace-7 Security Agency` by
+   plain token EQUALITY, and calling that "a one-letter difference" told the
+   officer something untrue about the evidence they are being asked to trust. */
+function _alTokWhy(a, b) {
+  if (a === b) return 'equal';
+  const lo = a.length <= b.length ? a : b, hi = a.length <= b.length ? b : a;
+  if (lo.length >= 4 && hi.startsWith(lo) && hi.length - lo.length <= 2) return 'plural';
+  if (lo.length >= 5 && a.length !== b.length && _mgLev(a, b) <= 1) {
+    return a[0] === b[0] ? 'typo' : null;
+  }
+  return null;
+}
 function _alTypoMatch(a, b) {
-  if (typeof _mgTokens !== 'function' || typeof _mgTokenMatch !== 'function') return false;
+  if (typeof _mgTokens !== 'function' || typeof _mgLev !== 'function') return null;
   const A = [..._mgTokens(a)], B = [..._mgTokens(b)];
-  if (!A.length || !B.length) return false;
+  if (!A.length || !B.length) return null;
   const lo = A.length <= B.length ? A : B, hi = A.length <= B.length ? B : A;
-  if (lo.join('').length < 6) return false;
-  return lo.every(t => hi.some(u => _mgTokenMatch(t, u)));
+  if (lo.join('').length < 6) return null;
+  const whys = lo.map(t => { for (const u of hi) { const w = _alTokWhy(t, u); if (w) return w; } return null; });
+  if (whys.some(w => !w)) return null;
+  return whys.every(w => w === 'equal') ? 'every distinctive word matches'
+       : whys.includes('typo') ? 'one-letter difference mid-word'
+       : 'plural or truncation';
 }
 
 const _AL_SUG_MAX = 3;
@@ -2058,16 +2083,57 @@ function _alSuggest(name) {
       if (seen.has(rec.v.id)) return;
       seen.add(rec.v.id);
       const byCore = VendorMatch.coreMatch(rec.core, name);
-      const byTypo = !byCore && _alTypoMatch(rec.v.name, name);
+      const byTypo = byCore ? null : _alTypoMatch(rec.v.name, name);
       if (!byCore && !byTypo) return;
       // ⚠️ the business-type divergence guard — see _alBizConflict
       if (_alBizConflict(rec.v.name, name)) return;
-      /* Say WHY, so the officer is judging evidence rather than trusting a
-         ranking they cannot see into. */
-      const why = byTypo ? 'looks like a one-letter difference'
+      /* ⚠️⚠️ NEVER PROPOSE A BLACKLISTED VENDOR. An automated suggestion must
+         not be able to move awarded spend onto (or off) a problematic company —
+         that is always a person's decision, made deliberately. Found live: the
+         garbled `Magcalas Romero Construction Supplies Traiding` was being
+         proposed as the BLACKLISTED `Magcalas-Romero Construction Supplies`,
+         which CLAUDE.md records as the pair that must never be merged. */
+      if (window.accredKey && accredKey(rec.v.accreditation) === 'problematic') return;
+      const why = byTypo ? byTypo
         : rec.core === nc ? 'same core name'
         : VendorMatch.wordContains(nc, rec.core) ? 'the directory name sits inside this one'
         : 'this name sits inside the directory name';
+      /* ⚠️ THE WP TEXT BEING MUCH LONGER THAN THE REGISTERED NAME USUALLY MEANS
+         IT CARRIES A SECOND COMPANY. A registered name does not gain words; free
+         text on a work package does. Found live: `Shinerise Manpower Services
+         Hongkong MidasInternational Co., Ltd.` → Shinerise (two companies), and
+         `AKJ Technical Services Corporation EDD Builders Enelsaj-Nnitram…`
+         proposing the THIRD company in the string. Those belong in Split.
+         Kept for a near-equal length, which is the genuine typo case
+         (`Ebara Pumps Philiipines` → `Ebara Pumps Philippines`). */
+      if (why === 'the directory name sits inside this one') {
+        const a = rec.core.replace(/\s/g, '').length, b = nc.replace(/\s/g, '').length;
+        /* ⚠️ LENGTH ALONE CANNOT TELL THE TWO CASES APART, and a plain ratio
+           guard broke the documented JANGHO case: `*JANGHO (LOCAL)` is correctly
+           found from `JANGHO CURTAIN WALL`, whose extra words describe the
+           SCOPE, not a second company. What Shinerise/AKJ/Maitre-D all carry in
+           their extra text is a LEGAL SUFFIX — the tail of another company's
+           registered name. So the length ratio only disqualifies when a
+           corporate suffix is present to corroborate it. */
+        /* Test the EXTRA text, not the whole string. `Ebara Pumps Philiipines
+           Inc.` is longer than `Ebara Pumps Philippines Inc.` only because the
+           misspelled "Philiipines" escapes the geography stopword - its residual
+           carries no suffix, so it is a typo and not a second company. */
+        const words = t => String(t || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+        const known = new Set(words(rec.v.name));
+        const residual = words(name).filter(w => !known.has(w)).join(' ');
+        const suffixy = (typeof _countSuffixTokens === 'function')
+          ? _countSuffixTokens(residual) >= 1 : false;
+        if (suffixy && (!b || a / b < 0.7)) return;
+      }
+      /* ⚠️ A SINGLE SHORT GENERIC TOKEN IS THIN EVIDENCE for a short-form match.
+         Live examples that were about to be applied: `Enci` → ENCI **Canteen** on
+         ₱16.9M of construction spend, plus Orion / Nema / Mayer / Jaman. A
+         longer single token (Amsteel, Maarka, Purisima) is distinctive enough. */
+      if (why === 'this name sits inside the directory name') {
+        const toks = nc.split(' ').filter(Boolean);
+        if (toks.length === 1 && toks[0].length < 6) return;
+      }
       out.push({ v: rec.v, why: why, exact: rec.core === nc });
     });
   });
