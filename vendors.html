@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907e"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260907e"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907e"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907f"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260907f"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907f"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907e">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907f">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1476,10 +1476,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260907e"></script>
-<script src="assets/js/db.js?v=20260907e"></script>
-<script src="assets/js/ui.js?v=20260907e"></script>
-<script src="assets/js/coachmarks.js?v=20260907e"></script>
+<script src="assets/js/auth.js?v=20260907f"></script>
+<script src="assets/js/db.js?v=20260907f"></script>
+<script src="assets/js/ui.js?v=20260907f"></script>
+<script src="assets/js/coachmarks.js?v=20260907f"></script>
 <script src="assets/js/vendor-guide.js?v=20260905c"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1929,9 +1929,23 @@ async function renderVendorAnalytics() {
     }
   });
   const rows = Object.values(agg);
-  const awarded = rows.filter(r => r.wpCount > 0).map(r => ({ ...r, savings: r.bcb - r.spend, savPct: r.bcb ? (r.bcb - r.spend) / r.bcb * 100 : 0 }));
-  const totalSpend = awarded.reduce((s, r) => s + r.spend, 0);
-  const totalBcb = awarded.reduce((s, r) => s + r.bcb, 0);
+  const awardedAll = rows.filter(r => r.wpCount > 0).map(r => ({ ...r, savings: r.bcb - r.spend, savPct: r.bcb ? (r.bcb - r.spend) / r.bcb * 100 : 0 }));
+  /* ⚠️ A PLACEHOLDER IS NOT A VENDOR AND MUST NOT BE RANKED AS ONE. Measured on
+     production: `various supplier` was the #6 vendor by awarded spend
+     (₱340.56M), #7 by savings delivered and #2 by win rate at 11 of 11 = 100%.
+     It is what somebody typed into a contractor field before deciding.
+     ⚠️ THE TOTALS BELOW COME FROM awardedAll, THE RANKINGS FROM `awarded`.
+     Filtering before the totals would silently shrink Awarded Spend by that
+     money and leave the whole page reconciling to nothing — the spend is real,
+     it just has no company behind it. Reported as not attributable instead. */
+  const _isPh = r => !byId[r.key] && window.VendorDb && VendorDb.isPlaceholderVendorName
+    && VendorDb.isPlaceholderVendorName(r.name);
+  const placeholders = awardedAll.filter(_isPh);
+  const phSpend = placeholders.reduce((n, r) => n + r.spend, 0);
+  const phWps = placeholders.reduce((n, r) => n + (r.wins || 0), 0);
+  const awarded = awardedAll.filter(r => !_isPh(r));
+  const totalSpend = awardedAll.reduce((s, r) => s + r.spend, 0);
+  const totalBcb = awardedAll.reduce((s, r) => s + r.bcb, 0);
   const totalSav = totalBcb - totalSpend;
   const totalSavPct = totalBcb ? totalSav / totalBcb * 100 : 0;
   const accreditedCount = allVendors.filter(v => _accredOf(v) === 'accredited').length;
@@ -1956,9 +1970,23 @@ async function renderVendorAnalytics() {
      reader needs the size of it to judge the rest of the page. */
   const orphans = awarded.filter(r => !byId[r.key]);
   const orphanSpend = orphans.reduce((n, r) => n + r.spend, 0);
-  const orphanNote = orphans.length ? `<div style="font-size:0.8125rem;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:11px 14px;margin-bottom:16px;line-height:1.6">
-      <b><i class="ti ti-alert-triangle" style="margin-right:5px"></i>${orphans.length.toLocaleString()} of these ${awarded.length.toLocaleString()} vendors have no directory record</b> — ${money(orphanSpend)} of awarded spend, ${totalSpend ? Math.round(orphanSpend / totalSpend * 100) : 0}% of the total.
-      <div style="margin-top:4px">This view is built from work packages, not the directory: a WP's awarded vendor is resolved by id, then by name, then by unambiguous core name — anything left over is counted under the contractor text on the WP so no spend goes missing. These companies are usually absent from the accreditation masterlist. <b>Data Tools → Import from WPs</b> creates records for them, with no accreditation standing.</div>
+  /* ⚠️ SPLIT THE GAP BY WHAT ACTUALLY CLOSES IT. The old note gave one number
+     and pointed everyone at Import from WPs — but measured on production, only
+     57% of the unresolved names are importable at all: the rest are garbled
+     multi-company strings that Import deliberately refuses, and sending an
+     officer to the wrong tool is worse than saying nothing. */
+  const garbled = orphans.filter(r => typeof _looksGarbled === 'function' && _looksGarbled({ name: r.name }));
+  const gSpend = garbled.reduce((n, r) => n + r.spend, 0);
+  const single = orphans.filter(r => garbled.indexOf(r) < 0);
+  const sSpend = single.reduce((n, r) => n + r.spend, 0);
+  const pct = v => totalSpend ? Math.round(v / totalSpend * 100) : 0;
+  const line = (icon, txt) => `<div style="margin-top:6px"><i class="ti ti-${icon}" style="margin-right:5px"></i>${txt}</div>`;
+  const orphanNote = (orphans.length || placeholders.length) ? `<div style="font-size:0.8125rem;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:11px 14px;margin-bottom:16px;line-height:1.6">
+      <b><i class="ti ti-alert-triangle" style="margin-right:5px"></i>${money(orphanSpend + phSpend)} of awarded spend is not attributed to a directory vendor</b> — ${pct(orphanSpend + phSpend)}% of the total. It is still counted in the figures above; it just has no company behind it yet.
+      ${garbled.length ? line('cut', `<b>${garbled.length}</b> are several companies in one name \u2014 ${money(gSpend)}, ${pct(gSpend)}%. Each hides real suppliers whose spend is credited to a string that does not exist. <b>Data Tools \u2192 Needs Splitting</b>.`) : ''}
+      ${single.length ? line('file-import', `<b>${single.length}</b> are single companies with no record \u2014 ${money(sSpend)}, ${pct(sSpend)}%. <b>Data Tools \u2192 Import from WPs</b> creates them, with no accreditation standing.`) : ''}
+      ${placeholders.length ? line('help-circle', `<b>${placeholders.length}</b> are placeholders, not companies (${placeholders.map(r => esc(r.name)).join(', ')}) \u2014 ${money(phSpend)} across ${phWps} awarded work packages. <b>Excluded from the rankings below</b>; fix the contractor field on those work packages.`) : ''}
+      <div style="margin-top:6px;opacity:.85">Resolved by id, then exact name, then unambiguous core name \u2014 a name matching two vendors is left unattributed rather than credited to the wrong one.</div>
     </div>` : '';
 
   const TH = 'padding:8px 10px;border-bottom:2px solid var(--border-md,#ddd);font-size:0.68rem;text-transform:uppercase;color:#888;white-space:nowrap;text-align:left';
@@ -1978,7 +2006,7 @@ async function renderVendorAnalytics() {
   const savTbl = rank('Top Vendors by Savings Delivered', 'BCB − awarded cost, awarded WPs', [...awarded].sort((a, b) => b.savings - a.savings).slice(0, 10),
     [{ t: 'Vendor', f: nameCell }, { t: 'WPs', a: 'right', f: r => r.wpCount }, { t: 'BCB', a: 'right', f: r => money(r.bcb) }, { t: 'Awarded', a: 'right', f: r => money(r.spend) },
      { t: 'Savings', a: 'right', f: r => `<span style="color:${savColor(r.savings)};font-weight:700">${r.savings >= 0 ? '+' : '-'}${money(Math.abs(r.savings))}</span>` }]);
-  const winList = rows.filter(r => r.participated >= 3).map(r => ({ ...r, rate: r.participated ? r.wins / r.participated * 100 : 0 })).sort((a, b) => b.rate - a.rate || b.participated - a.participated).slice(0, 10);
+  const winList = rows.filter(r => r.participated >= 3 && !_isPh(r)).map(r => ({ ...r, rate: r.participated ? r.wins / r.participated * 100 : 0 })).sort((a, b) => b.rate - a.rate || b.participated - a.participated).slice(0, 10);
   const winTbl = rank('Bid Win Rate', 'vendors on ≥3 WPs (proposed or awarded)', winList,
     [{ t: 'Vendor', f: nameCell }, { t: 'Participated', a: 'right', f: r => r.participated }, { t: 'Won', a: 'right', f: r => r.wins },
      { t: 'Win Rate', a: 'right', f: r => `<strong>${r.rate.toFixed(0)}%</strong>` }]);

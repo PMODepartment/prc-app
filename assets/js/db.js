@@ -4640,7 +4640,8 @@ function _isPlaceholderVendorName(s) {
       getVendors(),
       _pagedSelect(() => sb.from('vendor_bids').select('wp_id')).catch(() => []),
     ]);
-    const byNorm = {}; vendors.forEach(v => { byNorm[_normName(v.name)] = 1; });
+    const byNorm = {}, byId = {};
+    vendors.forEach(v => { byNorm[_normName(v.name)] = 1; byId[v.id] = 1; });
     const hasBid = new Set((bids || []).map(b => b.wp_id));
 
     let awardedNoVendor = 0, awardedNoBidRow = 0;
@@ -4655,9 +4656,20 @@ function _isPlaceholderVendorName(s) {
       // getAwardedWithoutVendor so the menu count and the panel agree.
       if (awarded && !linked && !text) awardedNoVendor++;
 
-      // Awarded work whose money has never reached the bid ledger. Capped by
-      // the linkage above, which is exactly why both are worth showing together.
-      if (awarded && !hasBid.has(w.id)) awardedNoBidRow++;
+      /* ⚠️ COUNTS ONLY WHAT BACKFILL CAN ACTUALLY WRITE, which means the vendor
+         has to be resolvable. Measured on production: 1,004 awarded work
+         packages had no bid row, but Backfill could resolve a vendor for just
+         90 of them — the badge over-promised by more than 10x, so an officer
+         would run it, see ~90 written, and have no idea why 914 remained. The
+         914 are blocked on ₱13.8B of awarded spend with NO vendor recorded at
+         all, which is the fill-in queue's job, not this one. Two honest numbers
+         beat one misleading one. */
+      if (awarded && !hasBid.has(w.id)) {
+        const resolvable = (Array.isArray(w.awarded_vendor_ids) && w.awarded_vendor_ids.some(id => byId[id]))
+          || (w.vendor_id && byId[w.vendor_id])
+          || _splitAwarded(w.contractor).some(n => byNorm[_normName(n)]);
+        if (resolvable) awardedNoBidRow++;
+      }
 
       // What "Import from WPs" would actually create, after its own guard.
       const push = nm => {
@@ -4698,6 +4710,7 @@ function _isPlaceholderVendorName(s) {
     backfillVendorDataFromWPs, getWorkPackagesForVendor,
     getVendorSchedulePerf,
     getAwardedWithoutVendor, setAwardedVendor,
+    isPlaceholderVendorName: _isPlaceholderVendorName,
     getWpDerivedToolCounts,
   };
 })();
