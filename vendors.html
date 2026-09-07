@@ -1721,6 +1721,11 @@ async function loadAll() {
   _toolCounts = null;
   _vrIdx = null;                      // allVendors is about to change, so the name index is stale
   _alSugIdx = null;                   // …and so is the suggestion index built from it
+  /* ⚠️ And the bare (alias-free) index behind _alMultiCompany. A STALE vendor
+     snapshot resolves names to rows that no longer exist — that is how two
+     dangling proposed_vendor_ids were written on 2026-09-07, and the id arrays
+     deliberately carry no foreign key, so nothing would have complained. */
+  _alBareIdx = null;
   try { allVendors = await VendorDb.getVendors(); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not load vendors') : alert(e.message); allVendors = []; }
   /* Human-stated name aliases — tier 0 of the resolver. Returns [] (not an
@@ -2080,11 +2085,84 @@ function _alTypoMatch(a, b) {
        : 'plural or truncation';
 }
 
+/* ⚠️⚠️ A MULTI-COMPANY STRING MUST NEVER BE SUGGESTED FOR AN ALIAS, because an
+   alias maps the WHOLE string to ONE vendor — so accepting one credits that
+   vendor with every other company's award money, and because the name then
+   RESOLVES it drops off the unlinked worklist and the error hides itself.
+   ⚠️ 49 SUCH ALIASES HAD TO BE DELETED (2026-09-07); this guard is why they
+   cannot come back. The two guards below it were BOTH bypassed by real data:
+     · `MCC-PCS Batching Plant, Beebee Construction, MCI Construction, Solidtech`
+       reached V-00812 because the length guard needs a LEGAL SUFFIX in the
+       residual to corroborate, and these strings separate companies with
+       "Construction" — suffix count 0, so it never fired.
+     · `Adventus It Services … MCC - EPC Central Warehouse` reached CENTRAL
+       LUMBER because `why` was labelled the OTHER containment direction, and
+       the length guard only applies to one of them.
+   Decomposition catches both, and unlike `_looksGarbled` it does not need the
+   string to carry a delimiter. */
+let _alBareIdx = null;
+function _alBareIndex() {
+  /* Derived tiers ONLY (no aliases): an alias is what we are deciding about, so
+     letting one in would let an existing collapsing alias vouch for the next. */
+  if (!_alBareIdx) _alBareIdx = VendorDb.buildVendorIndex(allVendors || [], []);
+  return _alBareIdx;
+}
+const _AL_MC_FILLER = /^(inc|incorporated|corp|corporation|ltd|limited|co|company|llc|opc|and|the|of|phils|philippines)$/i;
+function _alMultiCompany(name) {
+  const bare = w => String(w || '').replace(/[.,;]+$/, '');
+  /* (a) Directory-INDEPENDENT: two or more delimited segments that each carry a
+     real word. Catches a string whose other companies have no directory row at
+     all (`Mcc-pcs Cels, Comansa Machinery, Zoomlion` — crane makers), which the
+     decomposition test below cannot see. A trailing `, Inc.` is pure filler and
+     correctly does not count as a second segment. */
+  /* ⚠️ The COLON is a real delimiter in this data and was missing from the first
+     cut: `J VAZCO COMPANY: TRADETEK: CONCRETE SOLUTION` and `BRAZEN INDUSTRIES:
+     PHILGEN` both slipped through. Keep this set in step with `_splitSegments`,
+     which already splits on `[,/;:|\r\n]`. */
+  const segs = String(name || '').split(/[,;:\/|\r\n]+/).map(s => s.trim()).filter(Boolean);
+  const real = segs.filter(s => s.split(/\s+/).some(w => w && !_AL_MC_FILLER.test(bare(w))));
+  if (real.length >= 2) return true;
+  /* (b) Decomposition: greedy longest-match tiling. Two DIFFERENT vendors found
+     inside the text proves it names two companies. Never begin a tile on a bare
+     legal-suffix word — that suffix belongs to the company BEFORE it, and
+     swallowing it both mis-widens this tile and hides the previous company. */
+  if (!window.VendorDb || !VendorDb.buildVendorIndex) return false;
+  const idx = _alBareIndex();
+  const words = String(name || '').split(/\s+/).filter(Boolean);
+  const hit = new Set();
+  let i = 0;
+  while (i < words.length) {
+    if (_AL_MC_FILLER.test(bare(words[i]))) { i++; continue; }
+    let adv = 1;
+    for (let len = Math.min(12, words.length - i); len >= 1; len--) {
+      // trim trailing punctuation: a company name can contain a comma
+      // ("Rp-Ra, Builders" is ONE company), but a trailing one blocks the match
+      const cand = words.slice(i, i + len).join(' ').replace(/[\s,;.]+$/, '');
+      if (!cand) continue;
+      const v = VendorDb.resolveVendorName(idx, cand);
+      if (v && v !== 'AMBIGUOUS') { hit.add(v.id); adv = len; break; }
+    }
+    if (hit.size >= 2) return true;
+    i += adv;
+  }
+  return false;
+}
+
 const _AL_SUG_MAX = 3;
 function _alSuggest(name) {
   if (!window.VendorMatch) return [];
   const nc = VendorMatch.core(name);
   if (!nc) return [];
+  /* ⚠️ Bias toward a FALSE NEGATIVE here: a withheld suggestion costs one manual
+     search, a wrong one applied mis-attributes award money.
+     ⚠️ The `Parent Corp - Business Unit` shape (`MEGAWIDE CONSTRUCTION
+     CORPORATION - BU BATCHING`) is NOT withheld, and that falls out of the bare
+     index excluding aliases: the unit half only resolves THROUGH an alias, so
+     only the parent is found and the string reads as one company — which is
+     what it is. The same exclusion is the arm's known limit: a second company
+     reachable only by alias is invisible to test (b), which is why the
+     delimiter test (a) runs first and needs no directory at all. */
+  if (_alMultiCompany(name)) return [];
   const idx = _alSugIndex();
   const seen = new Set(), out = [];
   /* ⚠️ A TYPO CANDIDATE SHARES NO EXACT TOKEN, so exact-token culling alone
