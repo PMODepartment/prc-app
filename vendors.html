@@ -604,6 +604,31 @@
        guessed; the identical swap was already needed for the bid page's
        awaiting-list email line. */
     .al-where{font-size:0.7143rem;color:var(--text-secondary)}
+    /* Analytics "not attributed" notice. Neutral surface + an amber ACCENT, so it
+       reads in both themes; every colour comes from a token except the accent
+       itself, which is restated for dark mode because #B45309 on a dark surface
+       is far too low-contrast. NEVER give this inline styles - that is what made
+       the original unfixable (an inline style beats a class rule). */
+    .va-notice{background:var(--surface-2);border:1px solid var(--border-md);
+      border-left:3px solid #B45309;border-radius:8px;padding:12px 15px;
+      margin-bottom:16px;font-size:0.8125rem;line-height:1.6;color:var(--text-primary)}
+    .va-notice-h{display:flex;gap:8px;align-items:flex-start;font-size:0.875rem;font-weight:700}
+    .va-notice-h > i{color:#B45309;flex-shrink:0;line-height:1.5}
+    .va-notice-fig{font-weight:800}
+    .va-notice-pct{font-weight:600;color:var(--text-secondary);white-space:nowrap}
+    /* ⚠️ literal middot, NOT "\00b7 " - a CSS escape swallows the space that
+       follows it as its terminator, so the escaped form renders " ·8%". */
+    .va-notice-pct::before{content:" · "}
+    .va-notice-sub{color:var(--text-secondary);margin:2px 0 0 25px}
+    .va-notice-row{display:flex;gap:8px;align-items:flex-start;margin-top:8px;padding-left:25px}
+    .va-notice-row > i{color:var(--text-secondary);flex-shrink:0;line-height:1.5}
+    .va-notice-foot{margin-top:10px;padding-top:9px;border-top:1px solid var(--border);
+      color:var(--text-secondary);font-size:0.7857rem;line-height:1.55}
+    body.dark-mode .va-notice{border-left-color:#F0A94C}
+    body.dark-mode .va-notice-h > i{color:#F0A94C}
+    @media (max-width:640px){
+      .va-notice-sub,.va-notice-row{padding-left:0;margin-left:0}
+    }
     .al-sug{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px}
     .al-sug-h{font-size:0.6786rem;text-transform:uppercase;letter-spacing:.04em;
       /* ⚠️ --text-secondary, NOT --text-hint — same trap as .al-where above:
@@ -2585,13 +2610,21 @@ async function renderVendorAnalytics() {
   const single = orphans.filter(r => garbled.indexOf(r) < 0);
   const sSpend = single.reduce((n, r) => n + r.spend, 0);
   const pct = v => totalSpend ? Math.round(v / totalSpend * 100) : 0;
-  const line = (icon, txt) => `<div style="margin-top:6px"><i class="ti ti-${icon}" style="margin-right:5px"></i>${txt}</div>`;
-  const orphanNote = (orphans.length || placeholders.length) ? `<div style="font-size:0.8125rem;background:#FFF7ED;border:1px solid #FED7AA;color:#9A3412;border-radius:8px;padding:11px 14px;margin-bottom:16px;line-height:1.6">
-      <b><i class="ti ti-alert-triangle" style="margin-right:5px"></i>${money(orphanSpend + phSpend)} of awarded spend is not attributed to a directory vendor</b> — ${pct(orphanSpend + phSpend)}% of the total. It is still counted in the figures above; it just has no company behind it yet.
+  /* ⚠️ CLASSES, NOT INLINE STYLES. This notice used to be a hardcoded amber
+     panel (background:#FFF7ED / color:#9A3412): a glaring cream block on a dark
+     page, and a wall of muddy orange text in light mode. It could not have been
+     fixed with a body.dark-mode rule either, because an inline style beats a
+     class rule (Known Issues #30). Amber is now an ACCENT - the left bar and the
+     one warning icon - over the app's own neutral surface tokens, the same
+     restraint already used for the vendor-edit banner. */
+  const line = (icon, txt) => `<div class="va-notice-row"><i class="ti ti-${icon}"></i><div>${txt}</div></div>`;
+  const orphanNote = (orphans.length || placeholders.length) ? `<div class="va-notice">
+      <div class="va-notice-h"><i class="ti ti-alert-triangle"></i><div><span class="va-notice-fig">${money(orphanSpend + phSpend)}</span> of awarded spend is not attributed to a directory vendor<span class="va-notice-pct">${pct(orphanSpend + phSpend)}% of the total</span></div></div>
+      <div class="va-notice-sub">Still counted in the figures above &mdash; it just has no company behind it yet.</div>
       ${garbled.length ? line('cut', `<b>${garbled.length}</b> are several companies in one name \u2014 ${money(gSpend)}, ${pct(gSpend)}%. Each hides real suppliers whose spend is credited to a string that does not exist. <b>Data Tools \u2192 Needs Splitting</b>.`) : ''}
       ${single.length ? line('file-import', `<b>${single.length}</b> are single companies with no record \u2014 ${money(sSpend)}, ${pct(sSpend)}%. <b>Data Tools \u2192 Import from WPs</b> creates them, with no accreditation standing.`) : ''}
       ${placeholders.length ? line('help-circle', `<b>${placeholders.length}</b> are placeholders, not companies (${placeholders.map(r => esc(r.name)).join(', ')}) \u2014 ${money(phSpend)} across ${phWps} awarded work packages. <b>Excluded from the rankings below</b>; fix the contractor field on those work packages.`) : ''}
-      <div style="margin-top:6px;opacity:.85">Resolved by id, then exact name, then unambiguous core name \u2014 a name matching two vendors is left unattributed rather than credited to the wrong one.</div>
+      <div class="va-notice-foot">Resolved by id, then exact name, then unambiguous core name \u2014 a name matching two vendors is left unattributed rather than credited to the wrong one.</div>
     </div>` : '';
 
   const TH = 'padding:8px 10px;border-bottom:2px solid var(--border-md,#ddd);font-size:0.68rem;text-transform:uppercase;color:#888;white-space:nowrap;text-align:left';
