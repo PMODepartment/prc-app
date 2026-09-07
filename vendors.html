@@ -3555,10 +3555,35 @@ function _splitOnSuffixRuns(name) {
 // content has that suffix as the tail of the PREVIOUS company, and the rest
 // as its own real name. Used by both the auto detector and the manual
 // suggester so the two can never drift.
+/* ⚠️⚠️ A SEGMENT THAT NAMES NO COMPANY OF ITS OWN IS A CONTINUATION OF THE ONE
+   BEFORE IT, not a second company. `CORP_SUFFIX_RE` alone only catches a segment
+   that is EXACTLY a bare legal suffix, which left every one of these reading as a
+   separate company and offered for splitting (all 15 live candidates, 2026-09-07):
+     · `E.B. Testing Center, Inc. (Iloilo Branch)`  -> "Inc. (Iloilo Branch)"
+     · `Airytrade Construction & Development, Opc`  -> "Opc"     (OPC was missing)
+     · `Esteban U. Dychauco, Jr.`                   -> "Jr."     (a NAME suffix)
+     · `Fujian Electric Power Engineering Company (Philippines) Inc.`
+     · `C.S Enriquez (CSEMSCORP Contractors, Fabricators) Inc.` -> "Fabricators) Inc."
+   ⚠️ THE BRANCH CASE IS THE DANGEROUS ONE: the tool offered "Split (1 new + 1
+   linked to existing)", which would DESTROY a legitimate branch record by folding
+   half of it into the parent. A branch is its own BP code and its own TIN branch. */
+const _SEG_FILLER_RE = /^(inc|incorporated|corp|corporation|ltd|limited|llc|co|company|opc|plc|pte|pty|sdn|bhd|gmbh|ag|sa|nv|bv|kk|srl|spa|as|jr|sr|ii|iii|iv|of|the|and)$/i;
+function _isContinuationSegment(seg) {
+  const s = String(seg || '');
+  /* A broken parenthetical: the delimiter split cut through "( … )", so this
+     fragment cannot be a company on its own. */
+  if ((s.match(/\(/g) || []).length !== (s.match(/\)/g) || []).length) return true;
+  /* A whole parenthetical is a qualifier — "(Iloilo Branch)", "(Philippines)" —
+     never a second company, so it carries no weight either. */
+  const rest = s.replace(/\([^)]*\)/g, ' ')
+                .split(/[^A-Za-z0-9&]+/).filter(Boolean)
+                .filter(t => !_SEG_FILLER_RE.test(t));
+  return rest.length === 0;
+}
 function _coalesceSegments(raw) {
   const merged = [];
   for (let seg of raw) {
-    if (CORP_SUFFIX_RE.test(seg) && merged.length) { merged[merged.length - 1] += ', ' + seg; continue; }
+    if (_isContinuationSegment(seg) && merged.length) { merged[merged.length - 1] += ', ' + seg; continue; }
     const lead = seg.match(LEADING_SUFFIX_RE);
     if (lead && merged.length && /^[A-Z0-9]/.test(lead[2])) {
       merged[merged.length - 1] += ', ' + lead[1];
@@ -3605,7 +3630,23 @@ function _suggestSplitPoints(name) {
 function _standing(v) { return window.accredStanding ? window.accredStanding(v) : { key: '', state: 'n/a', days: null }; }
 function _looksGarbled(v) { return _splitSegments(v.name).length >= 2; }
 function _splitCandidates() {
-  return allVendors.filter(v => _looksGarbled(v) && !_splitSkipped.has(v.id));
+  /* ⚠️⚠️ A VENDOR CARRYING A BP CODE IS ONE LEGAL ENTITY, whatever its punctuation
+     looks like. That code comes from Megawide's own SAP accredited masterlist,
+     where it identifies a single company (or a single BRANCH of one, which is
+     equally not a thing to split). The garbled records this tool exists for are
+     the work-package-derived rows created by importVendorsFromWPs /
+     quickCreateVendor, and NEITHER sets a vendor_code.
+     Measured 2026-09-07: 15 of 15 auto-flagged candidates carried a BP code and
+     every one was a false positive — branches ("E.B. Testing Center, Inc. (Iloilo
+     Branch)"), joint ventures ("BPI/MS Insurance Corporation"), a firm whose own
+     name contains a comma ("Gotuaco, Del Rosario Insurance Brokers, Inc."), people
+     ("Sare, Antoniette Magallanes"), a municipality ("Muncp of Nabas, Aklan (IRA)")
+     and foreign legal forms ("Oracle Corporation Singapore Pte. Ltd."). Zero
+     code-less rows were flagged, so this filter costs nothing real.
+     ⚠️ It gates the AUTO-FLAGGED list only — staff can still pull any vendor in by
+     name through the search box, which is the deliberate manual escape hatch. */
+  return allVendors.filter(v => !(v.vendor_code || '').trim()
+    && _looksGarbled(v) && !_splitSkipped.has(v.id));
 }
 // Vendors staff manually pulled into the Split tool via search (records with
 // no delimiter / no repeated suffix that _splitCandidates can't auto-detect).
