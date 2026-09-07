@@ -4849,6 +4849,7 @@ function _isPlaceholderVendorName(s) {
         refusal here is expected and must surface as itself rather than as a
         generic failure. */
   async function setAwardedVendor(wpId, vendor, amount, profile) {
+    bustToolWps();          // this writes a work package; the shared read is stale
     if (!wpId || !vendor || !vendor.id) throw new Error('Pick a vendor first.');
     const amt = (amount == null || amount === '') ? null : Number(amount);
     return WPDb.updateWPDirect(wpId, {
@@ -4878,6 +4879,29 @@ function _isPlaceholderVendorName(s) {
      ⚠️ `skipName` mirrors importVendorsFromWPs so the count and the run agree.
         Without it this would promise vendors the import then refuses to create,
         which is worse than no count at all. */
+  /* ⚠️ ONE WORK-PACKAGE READ, SHARED. getWpDerivedToolCounts runs when the
+     Data Tools menu opens and getUnlinkedVendorNames runs when the panel opens,
+     seconds later — so without this the same ~1,900 rows are paged out of
+     PostgREST twice in a row. The column list is the UNION of what both need;
+     four extra columns on 1,900 rows costs nothing next to a second round trip.
+     ⚠️ 90s TTL, which is strictly FRESHER than the _toolCounts cache it feeds
+     (that one lives for the whole session until loadAll clears it), and it is
+     busted by setAwardedVendor — the one thing on this page that writes a work
+     package. */
+  const _TOOL_WP_COLS = 'id,project_id,wp_no,contractor,proposed_vendors,vendor_id,'
+    + 'awarded_vendor_ids,award_status,not_to_be_awarded,free_of_charge,total_awarded,'
+    + 'buyback,buyback_depreciation_percent,buyback_amount';
+  const _TOOL_WP_TTL = 90000;
+  let _toolWpCache = null;
+  async function _toolWps() {
+    if (_toolWpCache && (Date.now() - _toolWpCache.at) < _TOOL_WP_TTL) return _toolWpCache.rows;
+    const sb = await getSB();
+    const rows = await _pagedSelect(() => sb.from('work_packages').select(_TOOL_WP_COLS));
+    _toolWpCache = { at: Date.now(), rows: rows || [] };
+    return _toolWpCache.rows;
+  }
+  function bustToolWps() { _toolWpCache = null; }
+
   /* Every free-text vendor name on a work package that resolves to NO directory
      vendor, with the awarded spend sitting behind it. This is the cleanup
      worklist for the alias tool: an officer works it down by spend, and each
@@ -4894,18 +4918,17 @@ function _isPlaceholderVendorName(s) {
   async function getUnlinkedVendorNames(opts) {
     opts = opts || {};
     const skipName = typeof opts.skipName === 'function' ? opts.skipName : null;
-    const sb = await getSB();
-    const [wps, vendors, aliases] = await Promise.all([
-      /* The columns effectiveAwardedCost needs, and no more — this is ~1,900
-         rows and the money must go through that helper, never a re-inlined
-         `total_awarded` (Known Issue #28). */
-      _pagedSelect(() => sb.from('work_packages').select(
-        'id,project_id,wp_no,contractor,proposed_vendors,award_status,'
-        + 'not_to_be_awarded,free_of_charge,total_awarded,buyback,'
-        + 'buyback_depreciation_percent,buyback_amount')),
-      getVendors(),
-      getVendorAliases(),
-    ]);
+    const say = typeof opts.onProgress === 'function' ? opts.onProgress : function () {};
+    /* ⚠️ TAKE THE DIRECTORY FROM THE CALLER. getVendors() is `select('*')` over
+       ~2,400 rows across three paged requests — the single slowest read on this
+       page — and vendors.html already holds exactly that in `allVendors`.
+       Refetching it made opening this panel feel frozen for many seconds.
+       Falls back to fetching only when a caller has nothing to give. */
+    say('Reading the work packages\u2026');
+    const wps = await _toolWps();
+    say('Matching against the directory\u2026');
+    const vendors = (opts.vendors && opts.vendors.length) ? opts.vendors : await getVendors();
+    const aliases = opts.aliases || await getVendorAliases();
     const vidx = buildVendorIndex(vendors, aliases);
     const map = new Map();            // normalised name -> row
 
@@ -4959,10 +4982,8 @@ function _isPlaceholderVendorName(s) {
     const skipName = typeof opts.skipName === 'function' ? opts.skipName : null;
     const sb = await getSB();
     const [wps, vendors, bids] = await Promise.all([
-      _pagedSelect(() => sb.from('work_packages').select(
-        'id,project_id,contractor,proposed_vendors,vendor_id,awarded_vendor_ids,'
-        + 'award_status,not_to_be_awarded')),
-      getVendors(),
+      _toolWps(),                                   // shared, cached (see _toolWps)
+      (opts.vendors && opts.vendors.length) ? opts.vendors : getVendors(),
       _pagedSelect(() => sb.from('vendor_bids').select('wp_id')).catch(() => []),
     ]);
     const byId = {};
@@ -5054,7 +5075,7 @@ function _isPlaceholderVendorName(s) {
     isPlaceholderVendorName: _isPlaceholderVendorName,
     buildVendorIndex, resolveVendorName, resolveVendorNameTier,
     getVendorAliases, addVendorAlias, deleteVendorAlias, bustVendorAliases,
-    getUnlinkedVendorNames,
+    getUnlinkedVendorNames, bustToolWps,
     getWpDerivedToolCounts,
   };
 })();

@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907j"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260907j"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907j"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907k"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260907k"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907k"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907j">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907k">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1513,10 +1513,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260907j"></script>
-<script src="assets/js/db.js?v=20260907j"></script>
-<script src="assets/js/ui.js?v=20260907j"></script>
-<script src="assets/js/coachmarks.js?v=20260907j"></script>
+<script src="assets/js/auth.js?v=20260907k"></script>
+<script src="assets/js/db.js?v=20260907k"></script>
+<script src="assets/js/ui.js?v=20260907k"></script>
+<script src="assets/js/coachmarks.js?v=20260907k"></script>
 <script src="assets/js/vendor-guide.js?v=20260907a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1763,10 +1763,21 @@ async function openAliasQueue() {
   if (!m || !body) return;
   m.style.display = 'flex';
   _syncModalScrollLock();
-  body.innerHTML = '<div class="fq-note"><i class="ti ti-loader-2 spin"></i> '
-    + 'Reading the vendor names on every work package\u2026</div>';
+  /* ⚠️ STAGED PROGRESS. One unchanging line for a multi-second read reads as
+     a hang — which is exactly how this was reported. */
+  const say = function (msg) {
+    body.innerHTML = '<div class="fq-note"><i class="ti ti-loader-2 spin"></i> ' + esc(msg) + '</div>';
+  };
+  say('Reading the work packages\u2026');
   try {
     _al = await VendorDb.getUnlinkedVendorNames({
+      /* ⚠️ PASS THE DIRECTORY WE ALREADY HAVE. Without this it re-reads all
+         ~2,400 vendors via getVendors() — select('*') across three paged
+         requests, the slowest read on this page — purely to rebuild something
+         sitting in memory. */
+      vendors: allVendors,
+      aliases: _aliases,
+      onProgress: say,
       skipName: typeof _looksGarbled === 'function'
         ? function (nm) { return _looksGarbled({ name: nm }); } : null,
     });
@@ -3515,6 +3526,7 @@ async function refreshToolCounts(force) {
   if (status) { status.textContent = 'Counting what is left…'; status.classList.remove('done'); }
   try {
     _toolCounts = await VendorDb.getWpDerivedToolCounts({
+      vendors: allVendors,        // already in memory; see _toolWps in db.js
       // ⚠️ Same predicate the import itself uses, or the count would promise
       //    vendors the import then refuses to create.
       skipName: function (nm) { return _looksGarbled({ name: nm }); },
