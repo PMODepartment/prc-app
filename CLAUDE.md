@@ -3242,6 +3242,74 @@ no instruction.
 matched against a real em-dash and failed at 0 occurrences. Build any backslash with `chr(92)`.
 Documented already; this is the second session it has cost time in.
 
+### Outlook opens a real draft — no pasting — and the letter is editable (2026-09-07)
+
+Three asks on the Send-the-RFQ modal, and the third has a proper answer.
+
+**⚠️ THE OFFICER NO LONGER PASTES: `mailTo` downloads an `.eml` carrying `X-Unsent: 1`.** Asked
+directly — *"does the procurement officer have to paste it? Is there no way it's auto filled in
+the outlook draft mail?"* Outlook opens such a file as an **editable, already-addressed, fully
+formatted draft with a Send button**, so the clipboard step is gone. Nothing is sent by the app:
+the officer still reads it and presses Send, which is the same guarantee the clipboard route
+gave.
+- **⚠️ `mailto:` CANNOT DO THIS, and that is why pasting was the original answer** — a mailto
+  body is plain text BY DEFINITION, so the bold, the underline, the indented requirement and
+  every hyperlink die on the way through, and the Windows shell caps the command line at ~8KB
+  besides, which this letter exceeds every time. Do not "simplify" this back to a mailto body.
+- **⚠️ THE BODY IS BASE64, NOT RAW, for two real reasons here**: the letter carries em-dashes and
+  pesos (so it must be declared UTF-8 and survive byte-for-byte), and mail lines are limited to
+  998 characters while this HTML has single lines far longer. Wrapped at 76. **The subject needs
+  RFC-2047** (`=?UTF-8?B?…?=`) for the same reason — it contains em-dashes, and a raw 8-bit
+  header is invalid.
+- **⚠️ IT FALLS BACK TO THE CLIPBOARD ON ANY FAILURE**, never leaving the officer with nothing:
+  the `.eml` route depends on Outlook being the registered handler for the file type. **Copy
+  letter is deliberately kept** as the manual path.
+- **⚠️ UNVERIFIED AGAINST A REAL OUTLOOK — there is none in this environment.** The `.eml` is
+  verified structurally (headers, `X-Unsent`, RFC-2047 subject decoding back to its em-dashes,
+  base64 decoding back to the exact HTML, max line 93 chars). `X-Unsent` is a classic-Outlook
+  feature; **new Outlook may open it read-only instead of as a draft.** If it does, the fallback
+  is Copy letter, and this is where to look first.
+
+**⚠️ THE PREVIEW IS EDITABLE, AND THE EDIT IS WHAT GETS SENT.** A template cannot anticipate
+every package. `_rfqEdits` holds the edited HTML per invitation for the life of the modal, and
+**`rfqLetterHtml()` is the ONE accessor every send path reads** — Copy and the `.eml` — so an
+edit cannot be silently dropped by one route. Verified: an edit is stored, is what
+`rfqLetterHtml` returns, reaches the base64 body, survives switching vendors and back, does
+**not** leak to another vendor, and is marked in the picker.
+- **⚠️ EDITS ARE PER VENDOR, and the modal says so.** Each bidder gets their own letter with
+  their own link, so once the text is free-form HTML there is no single template left to
+  re-substitute into. A vendor picker chooses which letter you are working on, with a "Back to
+  the template" escape.
+- A `contenteditable` div inherits none of an input's affordances, so it gets an explicit
+  hover border and a focus ring.
+
+**⚠️ THE ACTIONS MOVED INTO THE MODAL FOOTER, WHICH IS WHAT FIXED THE REAL DEFECT.** Asked to
+move Copy-&-open-Outlook down before Mark as issued — and doing it exposed why the modal read as
+broken:
+- The old layout printed **a block per bidder ABOVE the preview and the signature**, each with a
+  raw 95-character link and its own send button. So an officer could copy a letter **before ever
+  reading it or filling in their signature** — and the copied letter then had no signature. The
+  buttons sat upstream of the thing they acted on.
+- **`Mail-merge list` and `Mark as issued` were inside the scrolling body**, so the two actions
+  that matter scrolled away while the only always-visible button was `Close`.
+- Now: Close · Mail-merge list · copy-link · Copy letter · **Open in Outlook** · **Mark as
+  issued**, all in `.modal-footer` (`flex-shrink:0`, always on screen), in that order. Verified
+  no send button and no raw link remains in the body.
+- With eight bidders the old modal was ~two dozen lines of URL noise; the picker replaces it.
+- `.rfq-link` and `.rfq-noemail` went dead with the rows and were removed.
+
+**⚠️ THE HARNESS CONTAINED NO MODALS AT ALL**, so `openRfq()` threw on a null `#rfqDocType` and
+nothing in any modal had ever been testable there. `mk_bid_harness.py` extracted only
+`#bidListPage` and `#bidRoundPage`; it now also pulls every `^<div class="modal-overlay"…^</div>`
+(2 found: newRoundModal, rfqModal). **A passing harness proves nothing about markup it never
+included** — check what a harness actually contains before trusting a green run.
+
+**⚠️ THE BASH HEREDOC ATE BACKSLASHES TWICE MORE IN THIS PASS** — once in a `\n` inside JS
+string literals (three literals ended up with real newlines and the file stopped parsing), once
+in a regex `\\n` in the harness builder (the pattern silently matched nothing and the assert
+fired). Fifth session running. **Write long patches to a file with the Write tool rather than a
+heredoc, and build every escape with `chr(92)`.**
+
 ### The phase rail goes, the stepper sticks, and the cards get air (2026-09-07)
 
 **⚠️ THE 210px PHASE RAIL WAS A SECOND COPY OF THE STEPPER.** Asked directly — *"since we have

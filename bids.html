@@ -200,9 +200,6 @@
     .rfq-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 0;
       border-bottom:1px solid var(--border)}
     .rfq-row:last-child{border-bottom:none}
-    .rfq-link{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.7143rem;
-      color:var(--text-hint);word-break:break-all;flex:1;min-width:180px}
-    .rfq-noemail{font-size:0.7143rem;color:var(--mw-red-ink);font-weight:600}
     /* The budget, pinned in the round header so it is readable from every step
        rather than only inside the comparison. Staff-only by construction —
        bcbStrip() returns nothing at all for a cost-hidden role. */
@@ -279,6 +276,15 @@
        it for dark mode would preview something the recipient never sees. */
     .rfq-preview{max-height:340px;overflow:auto;background:#fff;color:#000;
       border:1px solid var(--border-md);border-radius:8px;padding:16px 18px}
+    /* Editable, so it has to look editable AND show focus — a contenteditable
+       div inherits none of an input's affordances. */
+    .rfq-preview[contenteditable]{cursor:text}
+    .rfq-preview[contenteditable]:hover{border-color:var(--mw-red-mid,#FBD9D5)}
+    .rfq-preview[contenteditable]:focus{outline:none;border-color:var(--mw-red);
+      box-shadow:0 0 0 3px var(--mw-red-light,#FDECEA)}
+    .rfq-editable{font-weight:600;text-transform:none;letter-spacing:0;
+      color:var(--text-hint);font-size:0.7143rem;margin-left:6px}
+    #rfqFoot{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .sig-box{margin-top:14px;border:1px solid var(--border-md);border-radius:8px;
       padding:10px 14px;background:var(--surface-2)}
     .sig-box>summary{cursor:pointer;font-weight:700;font-size:0.7857rem}
@@ -964,9 +970,7 @@
       <button class="modal-close" onclick="closeRfq()">&times;</button>
     </div>
     <div class="modal-body" id="rfqBody"></div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeRfq()">Close</button>
-    </div>
+    <div class="modal-footer" id="rfqFoot"></div>
   </div>
 </div>
 
@@ -3081,44 +3085,115 @@ function rfqHtmlDoc(inv) {
   return '<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#000000;'
     + 'line-height:1.35">' + rfqHtml(inv) + '</div>';
 }
+/* ⚠️ THE LETTER IS EDITABLE, AND THE EDIT IS WHAT GETS SENT. Asked for
+   directly: a template cannot anticipate every package, so the officer needs to
+   fix wording before it goes out. `_rfqEdits` holds the edited HTML per
+   invitation for the life of this modal, and `rfqLetterHtml()` is the ONE
+   accessor every send path reads — Copy and the Outlook draft — so an edit can
+   never be silently dropped by one route.
+   ⚠️ EDITS ARE PER VENDOR, and the modal says so. Each bidder gets their own
+   letter with their own link, so once the text is free-form HTML there is no
+   single template left to re-substitute into; the picker chooses which letter
+   you are working on. */
+let _rfqEdits = {};
+let _rfqVendor = null;
+
+function rfqLetterHtml(i) {
+  return (i && _rfqEdits[i.id]) || rfqHtmlDoc(i);
+}
+function _rfqOnEdit(el) {
+  if (_rfqVendor) _rfqEdits[_rfqVendor] = el.innerHTML;
+  const w = document.getElementById('rfq-edited');
+  if (w) w.style.display = '';
+}
+function rfqPickVendor(id) { _rfqVendor = id; renderRfq(); }
+function rfqResetLetter() {
+  if (!_rfqVendor) return;
+  if (!confirm('Discard your edits to this letter and go back to the template?')) return;
+  delete _rfqEdits[_rfqVendor];
+  renderRfq();
+}
+
 function openRfq() {
+  _rfqEdits = {};
+  _rfqVendor = INV.length ? INV[0].id : null;
   document.getElementById('rfqDocType').textContent = R.doc_type || 'RFQ';
-  const withEmail = INV.filter(i => i.vendor_contact_email);
-  const without = INV.filter(i => !i.vendor_contact_email);
-  document.getElementById('rfqBody').innerHTML =
-      '<div class="sec-note">Megawide\'s own ' + esc(docLong()) + ' template, filled in from this round. '
-    + 'One email per vendor — read it before you send.</div>'
-    + '<div class="field"><label>Subject</label><input id="rfqSubj" value="' + esc(rfqSubject()) + '" readonly></div>'
-    + INV.map(i =>
-        '<div class="rfq-row">'
-        + '<div class="bidder-name" style="flex:0 0 190px">' + esc(i.vendor_name)
-        + '<small>' + (i.vendor_contact_email ? esc(i.vendor_contact_email)
-            : '<span class="rfq-noemail">no email on file</span>') + '</small></div>'
-        + '<div class="rfq-link">' + esc(bidLink(i)) + '</div>'
-        + '<button class="btn btn-sm" onclick="copyLink(' + Q + i.id + Q + ')" title="Copy just the link"><i class="ti ti-link"></i></button>'
-        + '<button class="btn btn-sm" onclick="copyRich(' + Q + i.id + Q + ')" title="Copy the formatted letter"><i class="ti ti-clipboard-text"></i> Copy</button>'
-        + (i.vendor_contact_email
-            ? '<button class="btn btn-sm btn-primary" onclick="mailTo(' + Q + i.id + Q + ')"><i class="ti ti-mail"></i> Copy &amp; open Outlook</button>'
-            : '')
-        + '</div>').join('')
-    + (without.length
-        ? '<div class="sec-note" style="margin-top:12px"><b>' + without.length + '</b> bidder(s) have no contact '
-          + 'email on file — copy their letter and address it yourself, or add the email to their vendor profile.</div>'
-        : '')
-    + _sigEditorHtml()
-    + (INV.length
-        ? '<div class="field" style="margin-top:14px"><label>Preview &mdash; '
-          + esc(INV[0].vendor_name) + '</label>'
-          + '<div class="rfq-preview">' + rfqHtmlDoc(INV[0]) + '</div>'
-          + '<div class="sec-note" style="margin:6px 0 0">This is exactly what Copy puts on the '
-          + 'clipboard. Every bidder gets the same letter with their own link.</div></div>'
-        : '')
-    + '<div class="bm-actions">'
-    + '<button class="btn" onclick="copyMergeCsv()"><i class="ti ti-table-export"></i> Copy mail-merge list (CSV)</button>'
-    + (canManage && R.stage === 'draft'
-        ? '<button class="btn btn-primary" onclick="markIssued()"><i class="ti ti-send"></i> Mark as issued</button>' : '')
-    + '</div>';
+  renderRfq();
   document.getElementById('rfqModal').style.display = 'flex';
+}
+
+function renderRfq() {
+  const without = INV.filter(function (i) { return !i.vendor_contact_email; });
+  const cur = _rfqVendor ? invById(_rfqVendor) : null;
+  const edited = cur && _rfqEdits[cur.id];
+
+  document.getElementById('rfqBody').innerHTML =
+      '<div class="sec-note">Megawide\u2019s own ' + esc(docLong()) + ' template, filled in from '
+    + 'this round. One email per vendor \u2014 read it, edit it if you need to, then send.</div>'
+    + '<div class="field"><label>Subject</label><input id="rfqSubj" value="'
+    + esc(rfqSubject()) + '" readonly></div>'
+    + _sigEditorHtml()
+    /* ⚠️ A PICKER, NOT A ROW PER VENDOR. The old modal printed a block per
+       bidder — each with a raw 95-character link and its own send button —
+       ABOVE the preview and the signature, so an officer could copy a letter
+       before ever reading it or filling their signature in, and with eight
+       bidders that was two dozen lines of URL noise. One letter at a time. */
+    + (INV.length > 1
+        ? '<div class="field" style="margin-top:14px"><label>Letter for</label>'
+          + '<select id="rfq-pick" onchange="rfqPickVendor(this.value)">'
+          + INV.map(function (i) {
+              return '<option value="' + esc(i.id) + '"' + (i.id === _rfqVendor ? ' selected' : '') + '>'
+                + esc(i.vendor_name)
+                + (i.vendor_contact_email ? '' : ' \u2014 no email on file')
+                + (_rfqEdits[i.id] ? ' \u2014 edited' : '') + '</option>';
+            }).join('')
+          + '</select></div>'
+        : '')
+    + (cur
+        ? '<div class="field" style="margin-top:14px">'
+          + '<label>The letter to ' + esc(cur.vendor_name)
+          + ' <span class="rfq-editable">click to edit</span></label>'
+          + '<div class="rfq-preview" contenteditable="true" spellcheck="true"'
+          + ' oninput="_rfqOnEdit(this)">' + rfqLetterHtml(cur) + '</div>'
+          + '<div class="sec-note" style="margin:6px 0 0">'
+          + '<span id="rfq-edited" style="display:' + (edited ? '' : 'none') + '">'
+          + '<b>Edited.</b> This version is what Copy and the Outlook draft use \u2014 for '
+          + '<b>' + esc(cur.vendor_name) + '</b> only. '
+          + '<a href="#" onclick="event.preventDefault();rfqResetLetter()">Back to the template</a>. '
+          + '</span>'
+          + 'Every other bidder gets the template with their own link.</div></div>'
+        : '<div class="sec-note" style="margin-top:14px">No bidders on this round yet.</div>')
+    + (without.length
+        ? '<div class="sec-note" style="margin-top:12px"><b>' + without.length + '</b> bidder(s) have '
+          + 'no contact email on file \u2014 copy their letter and address it yourself, or add the '
+          + 'email to their vendor profile.</div>'
+        : '');
+
+  /* ⚠️ THE ACTIONS LIVE IN THE FOOTER, which is flex-shrink:0 and therefore
+     always on screen. They used to sit inside the scrolling body, so the two
+     that matter — the send and Mark as issued — scrolled away while the only
+     always-visible button was Close. */
+  document.getElementById('rfqFoot').innerHTML =
+      '<button class="btn" onclick="closeRfq()">Close</button>'
+    + '<span style="flex:1"></span>'
+    + '<button class="btn" onclick="copyMergeCsv()" title="For an Outlook mail merge over the whole round">'
+    + '<i class="ti ti-table-export"></i> Mail-merge list</button>'
+    + (cur
+        ? '<button class="btn" onclick="copyLink(' + Q + cur.id + Q + ')"'
+          + ' title="Copy just this bidder\u2019s link" aria-label="Copy the link">'
+          + '<i class="ti ti-link"></i></button>'
+          + '<button class="btn" onclick="copyRich(' + Q + cur.id + Q + ')"'
+          + ' title="Copy the letter with its formatting, to paste in yourself">'
+          + '<i class="ti ti-clipboard-text"></i> Copy letter</button>'
+          + (cur.vendor_contact_email
+              ? '<button class="btn btn-primary" onclick="mailTo(' + Q + cur.id + Q + ')"'
+                + ' title="Downloads a draft that opens in Outlook already addressed and formatted">'
+                + '<i class="ti ti-mail"></i> Open in Outlook</button>'
+              : '')
+        : '')
+    + (canManage && R.stage === 'draft'
+        ? '<button class="btn btn-primary" onclick="markIssued()"><i class="ti ti-send"></i>'
+          + ' Mark as issued</button>' : '');
 }
 function closeRfq() { document.getElementById('rfqModal').style.display = 'none'; }
 
@@ -3178,7 +3253,7 @@ function copyLink(id) {
    would paste raw tags into a plain-text target. */
 async function copyRich(id, quiet) {
   const i = invById(id); if (!i) return false;
-  const html = rfqHtmlDoc(i);
+  const html = rfqLetterHtml(i);
   const text = rfqSubject() + '\n\n' + rfqBody(i);
   try {
     if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
@@ -3218,13 +3293,73 @@ function _copyHtmlFallback(html) {
 }
 /* Copy the formatted letter, then open an ADDRESSED, EMPTY draft to paste into.
    The body is deliberately left out of the mailto — see rfqHtml's note. */
-async function mailTo(id) {
+/* ── opening a real Outlook draft, with no pasting ──────────────────────────
+   ⚠️ mailto: CANNOT CARRY THIS LETTER, which is why pasting was the original
+      answer: a mailto body is plain text BY DEFINITION, so the bold, the
+      underline, the indented requirement and every hyperlink die on the way
+      through — and the Windows shell caps the whole command line at ~8KB
+      besides, which this letter exceeds every time.
+   ⚠️ AN .eml FILE CARRYING `X-Unsent: 1` IS THE ANSWER. Outlook opens such a
+      file as an EDITABLE, ALREADY-ADDRESSED, fully formatted draft with a Send
+      button — no clipboard step at all. Nothing is sent by the app: the officer
+      still reads it and presses Send, which is the same guarantee the clipboard
+      route gave.
+   ⚠️ THE BODY IS BASE64, NOT RAW. Two reasons, both real here: the letter
+      contains em-dashes and pesos (so it must be declared UTF-8 and survive
+      byte-for-byte), and mail lines are limited to 998 characters while this
+      HTML has single lines far longer than that. Base64 in 76-char lines
+      satisfies both.
+   ⚠️ THE SUBJECT NEEDS RFC-2047 ENCODING for the same reason — it carries em
+      dashes, and a raw 8-bit header is not valid. */
+function _b64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  bytes.forEach(function (b) { bin += String.fromCharCode(b); });
+  return btoa(bin);
+}
+function _emlSubject(sub) {
+  // Pure ASCII needs no encoding, and reads better in a raw file if left alone.
+  return /^[ -~]*$/.test(sub) ? sub : '=?UTF-8?B?' + _b64(sub) + '?=';
+}
+function _emlFor(i, html) {
+  const nl = String.fromCharCode(13) + String.fromCharCode(10);   // CRLF, per RFC
+  const b64 = _b64(html).replace(/(.{76})/g, '$1' + nl);
+  return [
+    'To: ' + (i.vendor_contact_email || ''),
+    'Subject: ' + _emlSubject(rfqSubject()),
+    'X-Unsent: 1',                 // ⚠️ this is what makes Outlook open it as a DRAFT
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+    '', b64, '',
+  ].join(nl);
+}
+
+function mailTo(id) {
   const i = invById(id); if (!i) return;
-  const ok = await copyRich(id, true);
-  window.location.href = 'mailto:' + encodeURIComponent(i.vendor_contact_email)
-    + '?subject=' + encodeURIComponent(rfqSubject());
-  if (ok) AppNotify.success('Letter copied. Outlook is opening addressed to '
-    + i.vendor_contact_email + ' — press Ctrl+V to paste it in.');
+  if (!i.vendor_contact_email) { AppNotify.warn('No contact email on file for this vendor.'); return; }
+  try {
+    const blob = new Blob([_emlFor(i, rfqLetterHtml(i))], { type: 'message/rfc822' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    // The filename is what the officer sees in the download bar.
+    a.download = (rfqSubject().replace(/[^A-Za-z0-9 ._-]+/g, ' ').trim().slice(0, 80) || 'RFQ') + '.eml';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+    AppNotify.success('Draft downloaded. Open it and Outlook shows the letter addressed to '
+      + i.vendor_contact_email + ', formatted and ready to send — no pasting.');
+  } catch (e) {
+    // ⚠️ FALL BACK TO THE CLIPBOARD, never leave the officer with nothing. The
+    //    .eml route depends on Outlook being the handler for the file type.
+    console.error('[bids] .eml draft failed', e);
+    copyRich(id, true).then(function (ok) {
+      if (ok) AppNotify.warn('Could not build the draft file, so the letter was copied instead — '
+        + 'open a new mail to ' + i.vendor_contact_email + ' and paste it.');
+    });
+  }
 }
 function csvCell(v) {
   const s = String(v == null ? '' : v);
