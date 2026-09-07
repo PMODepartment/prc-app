@@ -7748,6 +7748,97 @@ Unlinked vendor names **1,345 → 941**, Import from WPs **840 → 477** (363 du
 will now not be created), and Backfill Trade/Bid Data **99 → 113**, which is the right direction:
 more vendors resolve, so there is more bid history it can write.
 
+### Run-on vendor strings are a COVERING problem, not a guessing one (2026-09-07)
+
+The follow-on pass. 53 awarded work packages (₱1.81B) resolved only partially, so nothing could
+be written for them under the never-write-a-partial rule. Cracked by changing the question.
+
+| real projects only | before | after |
+|---|---|---|
+| unattributed awarded spend | ₱2.142B (18.0%) | **₱1.641B (13.8%)** |
+| distinct unresolved names | 96 | **79** |
+| work packages carrying vendor id links | 153 | **210** |
+| aliases | 468 | **470** |
+
+**₱501M attributed** from 2 aliases and 57 work-package link writes.
+
+#### ⚠⚠ CORRECTION: EVERY FIGURE I HAD QUOTED INCLUDED THE **DEMO** SANDBOX
+
+`DEMO` is the read-only sample project, and `index.html` deliberately excludes it from the
+portfolio — but a plain `work_packages` query does not. Its **7 awarded WPs are 91%
+unattributed by design** (₱227M), because its synthetic vendors (`Solid Rock Concrete`,
+`CoolAir Systems`, `FlowTech Plumbing`, `Terra Movers Corp.`) were never added to the directory
+and must not be. So the honest baseline was ₱2.142B / 18.0%, not ₱2.372B / 19.6%.
+**Filter `project_id !== 'DEMO'` out of any vendor-attribution measurement**, the same way the
+portfolio does. It was spotted only because two synthetic vendors appeared near the top of a
+worklist.
+
+#### ⚠⚠ THE TECHNIQUE: TILE THE STRING AGAINST DIRECTORY NAMES, DEMAND ZERO RESIDUE
+
+A string like *"CNB Machinery and Steel Corp. Comanchesteel Corporation Concrete Solution Builders
+& Supply — Wyler Enterprises, Inc."* holds **28 companies with no delimiter anywhere**. Every
+segmentation heuristic fails on it, because it is asking the wrong question: the companies are all
+present, in sequence, so the job is to COVER the text.
+
+`__tileFn` walks the words and greedily takes the **LONGEST** directory name (or alias) matching
+at that position, keyed on a punctuation-squashed form with `&` normalised to `and`. Whatever no
+tile claims becomes **residue**, and a write happens **only when the residue is empty** — so a
+company that is not in the directory blocks its own string rather than letting the others absorb
+its money. **17 work packages tiled completely (₱475.3M)**, including the 28-company string and
+a 13-company one.
+
+- **⚠ LONGEST-FIRST IS LOAD-BEARING, and the Glory Lumbers prove why.** There are two distinct
+  Glory Lumber taxpayers (V-00741 `Glory Lumber Construction Supplies Inc.` and V-00830
+  `Glory Lumber`, different TIN roots — see the merge-risk section). Shortest-first would tile
+  the 2-word `Glory Lumber` and credit the wrong taxpayer. Verified both resolve to their own row
+  across these writes.
+- **⚠ `coverageExact:false` is NOT a failure and must not be treated as one.** Legal-suffix
+  words that no tile claims are dropped as noise, and an alias tile legitimately covers text the
+  vendor's registered name does not contain (`Top One Construction` → V-00413 `TOP ONE`). The
+  guarantee is the empty RESIDUE, not string equality.
+- The greedy tiler is **not** a replacement for `_splitSegments` — it needs the directory,
+  answers only "is this text entirely made of known vendors", and stays silent otherwise.
+
+#### ⚠ MY OWN AGGRESSIVE SPLIT CUT A COMPANY IN HALF — AND FAILED CLOSED
+
+Running `_suggestSplitPoints` (documented manual-only, precisely because it false-positives) over
+the failing segments broke **`Citiaire Industrial Serices Corp`** into `Citiaire Industrial` +
+`Serices Corp`, and `Heartdhane Construction Services —` mid-name. It splits after a hint word
+followed by a capital, and *Serices* is capitalised. **Nothing wrong was written — those WPs
+simply stayed unresolved**, which is what the every-segment-must-resolve rule is for. The real
+fix was one alias for the typo, worth **₱130M** on WCB358 WP76.
+
+#### ⚠ AN "AMBIGUOUS" CAN BE A FALSE AMBIGUITY — LET THE TRADE DECIDE
+
+`Prisma` resolved to nothing because two candidates matched: V-00324 `Prisma Electrical Controls
+Corp.` and V-01168 **`Prima And Ricky's Canteen`** — a CANTEEN, spelled *Prima*, matched only by
+the edit-distance tier. All three WPs carrying `Prisma` are **Electrical and Auxiliary** (grounding
+and lightning protection, conduit and fittings). Aliased to the electrical company; the canteen
+still resolves to itself. **The WP's trade and the vendor's `vendor_group` are the cheapest
+disproof available** — a genuine ambiguity survives them, a spurious one does not.
+
+#### 57 work packages linked, and what a link is worth even when no money moves
+
+Most of the 40 in the first batch already resolved from their TEXT, so their spend was already
+attributed — writing `awarded_vendor_ids` converts a display-time guess into a **stored** link,
+which is what feeds Backfill, the vendor profile's work-package list and the WP-List vendor
+filter. `vendor_id` (the back-compat primary) is written **only where there is exactly one
+vendor**; on a co-award it stays NULL rather than implying a primary nobody chose.
+
+#### What is left, and why no rule reaches it
+
+| blocker | WPs | spend |
+|---|---|---|
+| a run-on string holding a company that is NOT in the directory | 20 | ₱903M |
+| one unresolved single company (alias or create it) | 51 | ₱829M |
+| several unresolved names in one string | 37 | ₱743M |
+| a bare acronym | 4 | ₱306M |
+
+**⚠ The largest single items are acronyms and no rule can expand one:** `CCSP` (₱270.5M on
+WCB358 WP68, alongside Fujihaya and Tomelekt which both resolve), `GCCI` + `J.Pastor` (₱96.8M),
+`Lrpa` / `Nbf` / `Ramp` (₱81.9M, design consultancies), `Enci` + `LJ Industrial` (₱81.9M).
+And `Various Supplier` (₱286.3M on WCB358 WP14 alone) is a placeholder the officers are tracing.
+
 ### Tracing the legacy vendor names to the accredited masterlist (2026-09-07)
 
 Asked to trace the unresolved names to the accredited masterlist, and to split the multi-company
