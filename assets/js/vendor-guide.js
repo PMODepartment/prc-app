@@ -30,7 +30,7 @@
     { icon: 'ti-category', title: 'Product categories', body:
       'Offerings file under <b>Trade \u2192 Works</b>, the same tree the WP form uses.<br><br>That is what makes <b>Suggest vendors</b> work on a work package.' },
     { icon: 'ti-tool', title: 'Data Tools', body:
-      'Build the directory from work packages, <b>Merge</b> duplicates, <b>Split</b> garbled names, and curate the category tree.' },
+      'Build the directory from work packages, <b>Merge</b> duplicates, <b>Split</b> garbled names, and curate the category tree.<br><br><b>Unlinked vendor names</b> is where a spelling on a work package (“LG Philippines”) gets linked to the company it really is (“LG Electronics Philippines.Inc.”). It changes nothing on the work package — just what that text resolves to.' },
     { icon: 'ti-list-check', title: 'Bulk actions', body:
       'Tick vendors \u2014 the selection survives paging and filtering.<br><br>Set accreditation, export an invite list, or delete. Delete is admin-only and backs up to CSV first.' },
     { icon: 'ti-id-badge-2', title: 'Inside a profile', body:

@@ -2853,7 +2853,11 @@ const VendorDb = (() => {
   // Awarded Vendor combobox) ───────────────────────────────────────────
   async function searchApprovedVendors(query) {
     const sb = await getSB();
-    let q = sb.from('vendors').select('id,name,status,accreditation').order('name').limit(20);
+    // vendor_code is included because it is the ONE unambiguous identifier a
+     // person can check a picked company against — two vendors can share a
+     // near-identical name, and a picker that shows only the name asks the
+     // officer to guess between them.
+    let q = sb.from('vendors').select('id,name,status,accreditation,vendor_code').order('name').limit(20);
     if (query && query.trim()) q = q.ilike('name', `%${query.trim()}%`);
     const { data, error } = await q;
     if (error) throw error;
@@ -2974,8 +2978,9 @@ const VendorDb = (() => {
   /* Build the index once per vendor list. ⚠️ Callers MUST reuse it rather than
      rebuilding per name — a per-name scan of ~2,400 vendors across three tiers
      is what made an earlier analytics pass take ~5s (see CLAUDE.md). */
-  function buildVendorIndex(vendors) {
+  function buildVendorIndex(vendors, aliases) {
     const t1 = new Map(), t2 = new Map(), t3 = new Map();
+    const a1 = new Map(), a2 = new Map();
     const put = (m, k, v) => { if (!k) return; const a = m.get(k); if (a) a.push(v); else m.set(k, [v]); };
     (vendors || []).forEach(v => {
       put(t1, _vrExact(v.name), v);
@@ -2985,7 +2990,34 @@ const VendorDb = (() => {
       //    ("ABC", "JM2"), so tier 3 only indexes 4+.
       if (c.length >= 4) put(t3, c, v);
     });
-    return { t1, t2, t3, size: (vendors || []).length };
+    /* ⚠️ TIER 0 — HUMAN-STATED ALIASES, AND THE ONLY TIER NOT DERIVED FROM THE
+       DATA. A short form or a trade name is unreachable by any safe rule: the
+       live case is "LG Philippines" for "LG Electronics Philippines.Inc.",
+       whose core is the 2-character "lg" (below the floor) and whose bare "LG"
+       would collide with LGC Automotive, LGM Global and LGG Glass. So a person
+       records the mapping and it outranks every derived tier — someone who
+       KNOWS is better evidence than any string comparison.
+       ⚠️ Keyed on the CLIENT's own normalisers, not on the stored alias_norm /
+       alias_squash columns. Those exist for the DB's unique index; recomputing
+       here means a client/server drift can never leave an alias indexed under a
+       key this code will not look up.
+       ⚠️ An alias naming a vendor absent from `vendors` is DROPPED, not
+       resolved to nothing-in-particular — the caller may have been handed a
+       filtered list, and a dangling tier-0 hit would beat a perfectly good
+       tier-1 match on the same name. */
+    if (aliases && aliases.length) {
+      const byId = new Map();
+      (vendors || []).forEach(v => byId.set(v.id, v));
+      aliases.forEach(a => {
+        const v = byId.get(a && a.vendor_id);
+        if (!v) return;
+        const txt = a.alias_text || a.alias_norm || '';
+        put(a1, _vrExact(txt), v);
+        put(a2, _vrSquash(txt), v);
+      });
+    }
+    return { a1, a2, t1, t2, t3, size: (vendors || []).length,
+             aliases: a1.size };
   }
 
   /* Resolve one name. Returns the vendor, or null, or the string 'AMBIGUOUS'.
@@ -2996,8 +3028,13 @@ const VendorDb = (() => {
   function resolveVendorName(idx, name, opts) {
     if (!idx || !name) return null;
     const wide = !(opts && opts.exactOnly);
-    const tiers = wide ? [[idx.t1, _vrExact], [idx.t2, _vrSquash], [idx.t3, _vrCore]]
-                       : [[idx.t1, _vrExact]];
+    /* ⚠️ ALIASES LEAD, AND THEY LEAD IN `exactOnly` MODE TOO. A person saying
+       "this spelling is that company" is a statement of exact identity, not a
+       loosening of the match, so excluding it from the strict mode would make
+       the strict mode less correct rather than safer. */
+    const al = idx.a1 ? [[idx.a1, _vrExact], [idx.a2, _vrSquash]] : [];
+    const tiers = wide ? al.concat([[idx.t1, _vrExact], [idx.t2, _vrSquash], [idx.t3, _vrCore]])
+                       : al.concat([[idx.t1, _vrExact]]);
     for (let i = 0; i < tiers.length; i++) {
       const m = tiers[i][0], key = tiers[i][1](name);
       if (!key) continue;
@@ -3024,6 +3061,8 @@ const VendorDb = (() => {
      were treated as one company rather than having to trust it. */
   function resolveVendorNameTier(idx, name) {
     if (!idx || !name) return null;
+    if (idx.a1 && idx.a1.has(_vrExact(name))) return 'alias set by a person';
+    if (idx.a2 && idx.a2.has(_vrSquash(name))) return 'alias set by a person';
     if (idx.t1.has(_vrExact(name))) return 'exact name';
     if (idx.t2.has(_vrSquash(name))) return 'same name, different punctuation';
     const c = _vrCore(name);
@@ -3046,6 +3085,64 @@ function _isPlaceholderVendorName(s) {
   return _PLACEHOLDER_VENDOR_RE.test(t);
 }
 
+  /* ── vendor name aliases ────────────────────────────────────────────────
+     Cached like getTaxonomy: every consumer of buildVendorIndex needs these,
+     and re-reading them per page render would put a query on the dashboards'
+     critical path for a table holding a few dozen rows. */
+  let _aliasCache = null;
+  /* ⚠️ NAMED FOR ITS TABLE. A second `_isMissingTable` in this closure once
+     silently replaced the two-argument one and broke 14 guards — see
+     _isMissingTaxonomyTable's comment. Do not add a bare one. */
+  function _isMissingAliasTable(e) {
+    const m = ((e && (e.message || '')) + (e && e.details || '')).toLowerCase();
+    return /vendor_aliases/.test(m) &&
+           (/does not exist|schema cache|could not find|relation/.test(m)
+            || e?.code === '42P01' || e?.code === 'PGRST205');
+  }
+  async function getVendorAliases(force) {
+    if (_aliasCache && !force) return _aliasCache;
+    try {
+      const sb = await getSB();
+      /* _pagedSelect, not a plain select — the 1000-row cap has silently
+         truncated a "load everything" read three times in this file. */
+      const rows = await _pagedSelect(() =>
+        sb.from('vendor_aliases').select('*').order('alias_norm'));
+      _aliasCache = rows || [];
+    } catch (e) {
+      /* ⚠️ DEGRADES TO NO ALIASES, so this ships safely before
+         migrations/2026-09-07_vendor_aliases.sql is run: resolution behaves
+         exactly as it does today rather than breaking every page that resolves
+         a vendor name. */
+      if (!_isMissingAliasTable(e)) console.warn('[VendorAliases] load failed:', e && e.message);
+      _aliasCache = [];
+    }
+    return _aliasCache;
+  }
+  async function addVendorAlias(aliasText, vendorId, note) {
+    const sb = await getSB();
+    const txt = String(aliasText == null ? '' : aliasText).trim();
+    if (!txt) throw new Error('Enter the spelling to link.');
+    if (!vendorId) throw new Error('Pick the vendor it belongs to.');
+    /* alias_norm / alias_squash are NOT sent — internal.vendor_alias_guard
+       computes them, so a client cannot index an alias under a key nobody
+       typed. They are still NOT NULL, hence the placeholders. */
+    const { data, error } = await sb.from('vendor_aliases')
+      .insert({ alias_text: txt, alias_norm: txt, alias_squash: txt,
+                vendor_id: vendorId, note: note || null })
+      .select('*').single();
+    if (error) throw error;
+    _aliasCache = null;
+    return data;
+  }
+  async function deleteVendorAlias(id) {
+    const sb = await getSB();
+    const { error } = await sb.from('vendor_aliases').delete().eq('id', id);
+    if (error) throw error;
+    _aliasCache = null;
+    return true;
+  }
+  function bustVendorAliases() { _aliasCache = null; }
+
   async function importVendorsFromWPs(opts, profile) {
     opts = opts || {};
     const includeProposed = opts.includeProposed !== false;
@@ -3059,7 +3156,10 @@ function _isPlaceholderVendorName(s) {
        is why this used to create duplicates of vendors that already existed:
        measured on production, 360 of 1,592 unmatched names (23%) were already
        in the directory and differed only in punctuation or a legal suffix. */
-    const vidx = buildVendorIndex(existing);
+    /* ⚠️ ALIASES MATTER MOST HERE. Without them this creates a SECOND
+       "LG Philippines" beside the registered LG Electronics — exactly the
+       duplication Merge and Split then exist to clean up. */
+    const vidx = buildVendorIndex(existing, await getVendorAliases());
     const byNorm = {}; existing.forEach(v => { byNorm[_normName(v.name)] = v; });
     // distinct display names from the WPs
     const names = new Map(); // norm -> best display string
@@ -4757,6 +4857,82 @@ function _isPlaceholderVendorName(s) {
      ⚠️ `skipName` mirrors importVendorsFromWPs so the count and the run agree.
         Without it this would promise vendors the import then refuses to create,
         which is worse than no count at all. */
+  /* Every free-text vendor name on a work package that resolves to NO directory
+     vendor, with the awarded spend sitting behind it. This is the cleanup
+     worklist for the alias tool: an officer works it down by spend, and each
+     row is either an alias to record, a garbled string for Split, a placeholder
+     to fix on the work package, or a company that genuinely needs creating.
+
+     ⚠️ READ-ONLY. It touches nothing — the fix is a person choosing what each
+        name means, and this only tells them which names are worth their time.
+
+     ⚠️ AMBIGUOUS COUNTS AS UNRESOLVED, deliberately. resolveVendorName returns
+        the string 'AMBIGUOUS' when a name matches two vendors, and `!hit` is
+        false for it — so it must be tested explicitly or the very names most in
+        need of a human decision would be the ones hidden from the worklist. */
+  async function getUnlinkedVendorNames(opts) {
+    opts = opts || {};
+    const skipName = typeof opts.skipName === 'function' ? opts.skipName : null;
+    const sb = await getSB();
+    const [wps, vendors, aliases] = await Promise.all([
+      /* The columns effectiveAwardedCost needs, and no more — this is ~1,900
+         rows and the money must go through that helper, never a re-inlined
+         `total_awarded` (Known Issue #28). */
+      _pagedSelect(() => sb.from('work_packages').select(
+        'id,project_id,wp_no,contractor,proposed_vendors,award_status,'
+        + 'not_to_be_awarded,free_of_charge,total_awarded,buyback,'
+        + 'buyback_depreciation_percent,buyback_amount')),
+      getVendors(),
+      getVendorAliases(),
+    ]);
+    const vidx = buildVendorIndex(vendors, aliases);
+    const map = new Map();            // normalised name -> row
+
+    const note = (nm, awarded, spend, wpNo, pid) => {
+      const disp = String(nm || '').trim().replace(/\s+/g, ' ');
+      if (!disp) return;
+      const hit = resolveVendorName(vidx, disp);
+      // A real vendor object means it is already linked; 'AMBIGUOUS' does not.
+      if (hit && hit !== 'AMBIGUOUS') return;
+      const key = disp.toLowerCase();
+      let r = map.get(key);
+      if (!r) {
+        r = { name: disp, key: key, spend: 0, wps: 0, awardedWps: 0,
+              proposedWps: 0, ambiguous: hit === 'AMBIGUOUS',
+              placeholder: _isPlaceholderVendorName(disp),
+              garbled: !!(skipName && skipName(disp)),
+              examples: [] };
+        map.set(key, r);
+      }
+      r.wps++;
+      if (awarded) { r.awardedWps++; r.spend += spend; } else { r.proposedWps++; }
+      if (r.examples.length < 4) r.examples.push({ pid: pid, wp_no: wpNo });
+    };
+
+    wps.forEach(w => {
+      /* ⚠️ SPEND IS ATTRIBUTED TO THE AWARDED NAME ONLY. A proposed vendor was
+         never paid, so giving it spend would double-count the portfolio. Where
+         a work package names several awarded companies the cost is split evenly
+         — the same fallback the vendor analytics uses when no per-vendor
+         amounts are on file. */
+      const paid = window.isMoneyAwarded(w) ? (window.effectiveAwardedCost(w) || 0) : 0;
+      const aw = _splitAwarded(w.contractor);
+      const per = aw.length ? paid / aw.length : 0;
+      aw.forEach(nm => note(nm, true, per, w.wp_no, w.project_id));
+      _splitVendors(w.proposed_vendors).forEach(nm => note(nm, false, 0, w.wp_no, w.project_id));
+    });
+
+    const rows = Array.from(map.values())
+      .sort((a, b) => b.spend - a.spend || b.wps - a.wps
+                      || a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    return {
+      rows: rows,
+      total: rows.length,
+      spend: rows.reduce((t, r) => t + r.spend, 0),
+      wpTotal: wps.length,
+    };
+  }
+
   async function getWpDerivedToolCounts(opts) {
     opts = opts || {};
     const skipName = typeof opts.skipName === 'function' ? opts.skipName : null;
@@ -4770,14 +4946,15 @@ function _isPlaceholderVendorName(s) {
     ]);
     const byId = {};
     vendors.forEach(v => { byId[v.id] = 1; });
-    // ⚠️ THE SAME TIERED RESOLVER THE IMPORT USES, or the badge counts vendors
-    //    the import will not create because it recognises them.
-    const vidx = buildVendorIndex(vendors);
+    /* ⚠️ THE SAME TIERED RESOLVER THE IMPORT USES — aliases included — or the
+       badge counts vendors the import will not create because it recognises
+       them. */
+    const vidx = buildVendorIndex(vendors, await getVendorAliases());
     const known = nm => !!resolveVendorName(vidx, nm);
     const hasBid = new Set((bids || []).map(b => b.wp_id));
 
     let awardedNoVendor = 0, awardedNoBidRow = 0;
-    const importable = new Set(), refused = new Set();
+    const importable = new Set(), refused = new Set(), ambiguous = new Set();
 
     wps.forEach(w => {
       const awarded = w.award_status === 'Awarded' && !w.not_to_be_awarded;
@@ -4808,6 +4985,12 @@ function _isPlaceholderVendorName(s) {
         const disp = String(nm || '').trim().replace(/\s+/g, ' ');
         if (!disp) return;
         const hit = resolveVendorName(vidx, disp);
+        /* ⚠️ 'AMBIGUOUS' IS TRUTHY, so it lands here as "already known" — and
+           for IMPORT that is right: creating a third record for a name that
+           already matches two would make the collision worse. But it is NOT
+           linked, so the unlinked worklist has to count it, hence the separate
+           set rather than folding it into `refused`. */
+        if (hit === 'AMBIGUOUS') { ambiguous.add(disp); return; }
         if (hit) return;               // already in the directory (any tier)
         if (_isPlaceholderVendorName(disp) || (skipName && skipName(disp))) refused.add(disp);
         else importable.add(disp);
@@ -4821,6 +5004,10 @@ function _isPlaceholderVendorName(s) {
       awardedNoBidRow,
       importable: importable.size,
       refused: refused.size,
+      /* Every free-text name that resolves to no ONE vendor — the worklist
+         getUnlinkedVendorNames renders in full. Counted here because this
+         function already resolves every name, so the badge is free. */
+      unlinked: importable.size + refused.size + ambiguous.size,
       awardedTotal: wps.filter(w => w.award_status === 'Awarded' && !w.not_to_be_awarded).length,
     };
   }
@@ -4845,6 +5032,8 @@ function _isPlaceholderVendorName(s) {
     getAwardedWithoutVendor, setAwardedVendor,
     isPlaceholderVendorName: _isPlaceholderVendorName,
     buildVendorIndex, resolveVendorName, resolveVendorNameTier,
+    getVendorAliases, addVendorAlias, deleteVendorAlias, bustVendorAliases,
+    getUnlinkedVendorNames,
     getWpDerivedToolCounts,
   };
 })();

@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260907g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907h"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260907h"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907h"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907g">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907h">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -580,6 +580,30 @@
     .vd-view select:disabled{text-overflow:ellipsis}
     .vd-view .field-hint{display:none}          /* guidance for typing, not for reading */
     .vd-view input[type=checkbox]:disabled{opacity:.85 !important}
+    /* An explanatory strip above a queue. Used by the unlinked-names tool; the
+       fill-in queue's own note is inline-styled, which is why this did not
+       exist yet. */
+    .fq-note{font-size:0.8125rem;line-height:1.55;color:var(--text-secondary);
+      background:var(--mw-red-light,#FDECEA);border:1px solid var(--border);
+      border-radius:8px;padding:9px 12px;margin:0 0 12px}
+    .fq-note i{margin-right:5px}
+    html.dark-mode .fq-note,body.dark-mode .fq-note{background:#33211F}
+    .al-sort{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px;
+      font-size:0.7143rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-hint)}
+    .al-sbtn{border:1px solid var(--border-md);border-radius:6px;background:var(--surface);
+      color:var(--text-secondary);font-family:inherit;font-size:0.7143rem;font-weight:700;
+      padding:3px 8px;cursor:pointer;text-transform:none;letter-spacing:0}
+    .al-sbtn:hover{border-color:var(--mw-red);background:var(--mw-red-light)}
+    html.dark-mode .al-sbtn:hover,body.dark-mode .al-sbtn:hover{background:#33211F}
+    .al-sbtn.on{background:var(--mw-red);border-color:var(--mw-red);color:#fff}
+    .al-shown{margin-left:auto;font-weight:700;color:var(--text-secondary);
+      text-transform:none;letter-spacing:0}
+    /* ⚠️ --text-secondary, NOT --text-hint. This line sits on .fq-row, which is
+       --surface-2, and --text-hint is tuned to 5.22:1 against --surface — on
+       --surface-2 it measures 4.41 in dark mode, under AA. Measured, not
+       guessed; the identical swap was already needed for the bid page's
+       awaiting-list email line. */
+    .al-where{font-size:0.7143rem;color:var(--text-secondary)}
     .fq-projs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
     .fq-proj{border:1.5px solid var(--border-md);border-radius:7px;background:var(--surface);
       color:var(--text-primary);font-family:inherit;font-size:0.7857rem;padding:5px 10px;cursor:pointer}
@@ -1144,6 +1168,7 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
                     <span class="tools-group-note">one-time — each disappears when it is done</span>
                   </div>
                 <button id="tm-fill" onclick="closeToolsMenu();openFillQueue()"><i class="ti ti-user-question"></i><span>Awarded, no vendor recorded <span class="tools-menu-badge" id="tc-fill" style="display:none">0</span></span><small>Name the vendor on awarded work packages that never recorded one</small></button>
+                <button id="tm-alias" onclick="closeToolsMenu();openAliasQueue()"><i class="ti ti-link"></i><span>Unlinked vendor names <span class="tools-menu-badge" id="tc-alias" style="display:none">0</span></span><small>A spelling on a work package that is really a vendor already in the directory — link the two</small></button>
                 <button id="tm-import" onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs <span class="tools-menu-badge" id="tc-import" style="display:none">0</span></span><small>Add vendors that appear on a work package but not in the directory</small></button>
                 <button id="tm-split" onclick="closeToolsMenu();openSplitModal()"><i class="ti ti-cut"></i><span>Needs Splitting <span class="tools-menu-badge" id="tc-split" style="display:none">0</span></span><small>Records that are several companies joined into one name</small></button>
                 <button id="tm-dupes" onclick="closeToolsMenu();openDupModal()"><i class="ti ti-copy-off"></i><span>Remove Exact Duplicates <span class="tools-menu-badge" id="tc-dupes" style="display:none">0</span></span><small>Fold byte-identical vendor names into one record (keeps children, links and trades)</small></button>
@@ -1476,11 +1501,11 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260907g"></script>
-<script src="assets/js/db.js?v=20260907g"></script>
-<script src="assets/js/ui.js?v=20260907g"></script>
-<script src="assets/js/coachmarks.js?v=20260907g"></script>
-<script src="assets/js/vendor-guide.js?v=20260905c"></script>
+<script src="assets/js/auth.js?v=20260907h"></script>
+<script src="assets/js/db.js?v=20260907h"></script>
+<script src="assets/js/ui.js?v=20260907h"></script>
+<script src="assets/js/coachmarks.js?v=20260907h"></script>
+<script src="assets/js/vendor-guide.js?v=20260907a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
 let allVendors = [], userProfile = null, inviteTrades = new Set(), activeVendor = null, detailTrades = new Set();
@@ -1509,9 +1534,14 @@ let _dovEditing = false;
    function is first called — the same ordering hazard _toolCounts was moved to
    avoid, and not worth relying on twice. */
 let _vrIdx = null;
+/* ⚠️ DECLARED IMMEDIATELY ABOVE _vrIdx, and for the same reason: _vrIndex()
+   reads it, and a module-scope `let` is in the Temporal Dead Zone until its own
+   line runs. Keeping the two together means they can only ever be initialised
+   as a pair. */
+let _aliases = [];
 function _vrIndex() {
   if (!_vrIdx && window.VendorDb && VendorDb.buildVendorIndex) {
-    _vrIdx = VendorDb.buildVendorIndex(allVendors || []);
+    _vrIdx = VendorDb.buildVendorIndex(allVendors || [], _aliases);
   }
   return _vrIdx;
 }
@@ -1655,6 +1685,11 @@ async function loadAll() {
   _vrIdx = null;                      // allVendors is about to change, so the name index is stale
   try { allVendors = await VendorDb.getVendors(); }
   catch (e) { AppNotify ? AppNotify.fromError(e, 'Could not load vendors') : alert(e.message); allVendors = []; }
+  /* Human-stated name aliases — tier 0 of the resolver. Returns [] (not an
+     error) until migrations/2026-09-07_vendor_aliases.sql has run, so the page
+     behaves exactly as it did before that migration. */
+  try { _aliases = await VendorDb.getVendorAliases(true); }
+  catch (e) { console.error('[vendors] could not load name aliases', e); _aliases = []; }
   // Normalize trade_categories to the 10 canonical trades for DISPLAY (casing/
   // label variants from the WP-derived import — "GENERAL REQUIREMENT" vs
   // "General Requirements" — collapse). Non-destructive: the DB isn't touched
@@ -1684,6 +1719,276 @@ async function loadAll() {
   buildInviteChips();
   updateSplitBadge(); updateClaimsBadge();
   updateDupBadge();
+}
+
+/* ── Unlinked vendor names ───────────────────────────────────────────────────
+   The cleanup worklist for legacy work packages whose vendor was typed as free
+   text. The app's tiered resolver already recognises a name that only LOOKS
+   different (punctuation, a legal suffix), so what lands here is what no safe
+   rule can reach — a short form or a trade name. The live example that started
+   this: "LG Philippines" is "LG Electronics Philippines.Inc." (V-00594), whose
+   core is the 2-character "lg" and whose bare "LG" would collide with LGC
+   Automotive, LGM Global and LGG Glass. Only a person can say it is the same
+   company; recording that is what this does.
+
+   ⚠️ IT WRITES NO WORK-PACKAGE DATA. The contractor text stays exactly as
+      entered — it is the procurement record. Linking creates one alias row, so
+      a mistake is undone by deleting it and nothing downstream is damaged in
+      the meantime. That reversibility is why this was built instead of stamping
+      vendor_id across ~1,000 legacy work packages.
+
+   ⚠️ ONE ALIAS FIXES EVERY SURFACE AT ONCE, because they all resolve through
+      buildVendorIndex: the vendor analytics stops reporting the spend as
+      unattributed, Import from WPs stops offering to create a duplicate, the
+      Split tool links instead of creating, and the dashboards' WP vendor filter
+      collapses the two spellings into one entry. */
+let _al = null, _alSort = 'spend', _alKind = 'all';
+
+async function openAliasQueue() {
+  const m = document.getElementById('aliasQueueModal');
+  const body = document.getElementById('aliasQueueBody');
+  if (!m || !body) return;
+  m.style.display = 'flex';
+  _syncModalScrollLock();
+  body.innerHTML = '<div class="fq-note"><i class="ti ti-loader-2 spin"></i> '
+    + 'Reading the vendor names on every work package\u2026</div>';
+  try {
+    _al = await VendorDb.getUnlinkedVendorNames({
+      skipName: typeof _looksGarbled === 'function'
+        ? function (nm) { return _looksGarbled({ name: nm }); } : null,
+    });
+  } catch (e) {
+    _al = null;
+    body.innerHTML = '<div class="fq-note" style="color:var(--mw-red-ink)">'
+      + '<i class="ti ti-alert-triangle"></i> Could not read the work packages: '
+      + esc((e && e.message) || String(e)) + '</div>';
+    return;
+  }
+  renderAliasQueue();
+}
+
+function closeAliasQueue() {
+  const m = document.getElementById('aliasQueueModal');
+  if (m) m.style.display = 'none';
+  _syncModalScrollLock();
+  /* The directory's own name index is stale the moment an alias is added, and
+     an alias changes what the analytics attributes — so re-render from the top
+     rather than leave the page showing the pre-alias picture. */
+  if (_alDirty) { _alDirty = false; loadAll(); }
+}
+
+let _alDirty = false;
+window.alSetKind = function (k) { _alKind = k; renderAliasQueue(); };
+window.alSetSort = function (k) { _alSort = k; renderAliasQueue(); };
+
+/* Split the list by WHAT ACTUALLY CLOSES EACH ROW, the same reasoning as the
+   analytics banner: an alias, the Split tool, a fix on the work package, or
+   creating the company. Pointing an officer at the wrong tool is worse than
+   saying nothing. */
+function _alKindOf(r) {
+  if (r.placeholder) return 'placeholder';
+  if (r.garbled) return 'garbled';
+  if (r.ambiguous) return 'ambiguous';
+  return 'single';
+}
+const _AL_KINDS = {
+  single: { label: 'Needs a link or a record', icon: 'link',
+            note: 'One company. If it is already in the directory under its registered name, link the two — that is what this tool is for. If it genuinely has no record, <b>Import from WPs</b> creates it.' },
+  garbled: { label: 'Several companies in one name', icon: 'cut',
+             note: 'Each of these hides real suppliers whose spend is credited to a string that does not exist. <b>Data Tools → Needs Splitting</b>, not an alias.' },
+  ambiguous: { label: 'Two vendors could be this', icon: 'help-circle',
+               note: 'The name matches more than one directory record, so the resolver refuses to guess. Clean the duplicates first (<b>Merge</b> / <b>Remove Exact Duplicates</b>), or link it explicitly here if you know which company it is.' },
+  placeholder: { label: 'Not a company', icon: 'ban',
+                 note: 'A placeholder, not a vendor. Fix the contractor field on the work package — an alias would give it a company it never had.' },
+};
+
+function renderAliasQueue() {
+  const body = document.getElementById('aliasQueueBody');
+  if (!body || !_al) return;
+  const money = v => (typeof Fmt !== 'undefined' ? Fmt.moneyShort(v) : String(Math.round(v)));  // ⚠️ typeof, NOT window.Fmt — Fmt is a top-level const in db.js and is not on window
+  const all = _al.rows;
+  const byKind = { single: [], garbled: [], ambiguous: [], placeholder: [] };
+  all.forEach(function (r) { byKind[_alKindOf(r)].push(r); });
+
+  const rows = (_alKind === 'all' ? all : byKind[_alKind] || []).slice();
+  if (_alSort === 'wps') rows.sort(function (a, b) { return b.wps - a.wps || b.spend - a.spend; });
+  else if (_alSort === 'name') rows.sort(function (a, b) { return a.name.toLowerCase().localeCompare(b.name.toLowerCase()); });
+  // 'spend' is the order getUnlinkedVendorNames already returns.
+
+  const spend = rows.reduce(function (t, r) { return t + r.spend; }, 0);
+  const tab = function (k, label, list) {
+    /* .fq-proj / .fq-projs, not a new class — the fill-in queue's project pills
+       are the same control doing the same job, and an UNSTYLED class renders as
+       raw flow content (the trap that shipped the topbar help menu unstyled,
+       Known Issues #42). */
+    return '<button class="fq-proj' + (_alKind === k ? ' on' : '') + '" onclick="alSetKind('
+      + Q + k + Q + ')">' + esc(label) + ' <span>' + list.length + '</span></button>';
+  };
+  const note = '<div class="fq-note"><i class="ti ti-info-circle"></i> '
+    + '<b>' + all.length + '</b> vendor name' + (all.length === 1 ? '' : 's')
+    + ' on your work packages match no directory vendor, carrying <b>' + esc(money(_al.spend))
+    + '</b> of awarded spend. Linking one records that the spelling IS that company — '
+    + 'it changes nothing on the work package itself, and every surface that resolves a '
+    + 'vendor picks it up at once.</div>'
+    + (_alKind !== 'all' && _AL_KINDS[_alKind]
+        ? '<div class="fq-note" style="background:var(--surface-2)"><i class="ti ti-'
+          + _AL_KINDS[_alKind].icon + '"></i> ' + _AL_KINDS[_alKind].note + '</div>'
+        : '');
+
+  const tabs = '<div class="fq-projs">'
+    + tab('all', 'All', all)
+    + Object.keys(_AL_KINDS).map(function (k) { return tab(k, _AL_KINDS[k].label, byKind[k]); }).join('')
+    + '</div>'
+    + '<div class="al-sort">Sort: '
+    + ['spend', 'wps', 'name'].map(function (k) {
+        return '<button class="al-sbtn' + (_alSort === k ? ' on' : '') + '" onclick="alSetSort('
+          + Q + k + Q + ')">' + (k === 'spend' ? 'Awarded spend' : k === 'wps' ? 'Work packages' : 'Name')
+          + '</button>';
+      }).join('')
+    + '<span class="al-shown">' + rows.length + ' shown'
+    + (spend > 0 ? ' · ' + esc(money(spend)) : '') + '</span></div>';
+
+  /* ⚠️ CAPPED, and it says so. Measured on production this list runs to ~155
+     names; rendering every row with a live search box is both slow and useless,
+     and the tail is worth almost nothing (the list is spend-ordered). */
+  const CAP = 60;
+  const show = rows.slice(0, CAP);
+  const more = rows.length > CAP
+    ? '<div class="fq-note" style="margin-top:10px">Showing the top ' + CAP + ' of '
+      + rows.length + ' by ' + (_alSort === 'name' ? 'name' : _alSort === 'wps' ? 'work packages' : 'awarded spend')
+      + '. Work these down and re-open for the rest.</div>' : '';
+
+  body.innerHTML = note + tabs
+    + '<div class="fq-rows">' + (show.length ? show.map(_alRow).join('')
+        : '<div class="fq-note">Nothing here — every name in this group is accounted for.</div>')
+    + '</div>' + more;
+}
+
+function _alRow(r) {
+  const money = v => (typeof Fmt !== 'undefined' ? Fmt.moneyShort(v) : String(Math.round(v)));  // ⚠️ typeof, NOT window.Fmt — Fmt is a top-level const in db.js and is not on window
+  const id = 'al' + Math.abs(_alHash(r.key)).toString(36);
+  _alByRowId[id] = r;
+  const kind = _alKindOf(r);
+  const where = r.examples.map(function (e) {
+    return esc(e.pid) + ' WP ' + esc(e.wp_no || '?');
+  }).join(', ');
+  const roles = [];
+  if (r.awardedWps) roles.push(r.awardedWps + ' awarded');
+  if (r.proposedWps) roles.push(r.proposedWps + ' proposed');
+  return '<div class="fq-row" id="alr-' + id + '">'
+    + '<div class="fq-head">'
+    + '<span class="fq-desc"><b>' + esc(r.name) + '</b>'
+    + '<span style="color:var(--text-hint)"> · ' + esc(roles.join(', ')) + '</span>'
+    + (where ? '<br><span class="al-where">' + where + (r.wps > r.examples.length ? ' …' : '') + '</span>' : '')
+    + '</span>'
+    + (r.spend > 0 ? '<span class="fq-cost">' + esc(money(r.spend)) + '</span>' : '')
+    + '</div>'
+    /* Every row can be linked, including a garbled or placeholder one — the
+       grouping is advice, not a lock. An officer who knows better is right more
+       often than a heuristic, and refusing the action would just send them to
+       edit the database by hand. */
+    + '<div class="fq-pick">'
+    + '<input id="ali-' + id + '" type="text" autocomplete="off" placeholder="'
+    + (kind === 'placeholder' ? 'Not a company — fix it on the work package instead'
+        : 'Search the directory for the registered company…') + '"'
+    + ' oninput="alSearch(' + Q + id + Q + ')">'
+    + '<button class="btn-cancel" style="padding:6px 10px;font-size:0.7857rem"'
+    + ' onclick="alSave(' + Q + id + Q + ')" id="alb-' + id + '" disabled>Link</button>'
+    + '<div class="fq-pop" id="alp-' + id + '"></div>'
+    + '</div></div>';
+}
+
+/* ⚠️ ROWS ARE ADDRESSED BY A GENERATED ID, NEVER BY THE VENDOR NAME. A name is
+   free text and no escaping makes it safe inside an inline handler — the HTML
+   parser decodes the attribute BEFORE the JS is parsed, so a name containing
+   the literal text `&quot;` becomes a bare quote and throws a SyntaxError.
+   Verified live elsewhere in this file; same rule as Known Issues #23. */
+const _alByRowId = {};
+function _alHash(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
+  return h;
+}
+
+let _alPickTimer = null;
+const _alPicked = {}, _alResults = {};
+function alSearch(id) {
+  const box = document.getElementById('ali-' + id);
+  const pop = document.getElementById('alp-' + id);
+  const btn = document.getElementById('alb-' + id);
+  if (!box || !pop) return;
+  // Typing invalidates a previous pick, or Link would record the old vendor.
+  delete _alPicked[id];
+  if (btn) btn.disabled = true;
+  const q = box.value.trim();
+  clearTimeout(_alPickTimer);
+  if (q.length < 2) { pop.classList.remove('open'); pop.innerHTML = ''; return; }
+  _alPickTimer = setTimeout(async function () {
+    let list = [];
+    try { list = await VendorDb.searchApprovedVendors(q); } catch (e) { list = []; }
+    if (!list.length) {
+      pop.innerHTML = '<div class="fq-none">Nothing matches. If this company has no record '
+        + 'at all, <b>Import from WPs</b> creates it — an alias needs something to point at.</div>';
+    } else {
+      _alResults[id] = list;
+      pop.innerHTML = list.slice(0, 25).map(function (v) {
+        const badge = window.accredMeta ? accredMeta(v.accreditation) : null;
+        return '<button type="button" class="fq-opt" onclick="alChoose(' + Q + id + Q + ',' + Q + v.id + Q + ')">'
+          + esc(v.name)
+          + (v.vendor_code ? ' <span style="color:var(--text-hint)">· ' + esc(v.vendor_code) + '</span>' : '')
+          + (badge ? ' <span style="color:var(--text-hint)">· ' + esc(badge.label) + '</span>' : '')
+          + '</button>';
+      }).join('');
+    }
+    pop.classList.add('open');
+  }, 220);
+}
+function alChoose(id, vendorId) {
+  const v = (_alResults[id] || []).find(function (x) { return x.id === vendorId; });
+  if (!v) return;
+  _alPicked[id] = v;
+  const box = document.getElementById('ali-' + id);
+  const pop = document.getElementById('alp-' + id);
+  const btn = document.getElementById('alb-' + id);
+  if (box) box.value = v.name;
+  if (pop) { pop.classList.remove('open'); pop.innerHTML = ''; }
+  if (btn) btn.disabled = false;
+}
+
+async function alSave(id) {
+  const v = _alPicked[id];
+  const r = _alByRowId[id];
+  if (!v || !r) return;
+  const btn = document.getElementById('alb-' + id);
+  if (btn) { btn.disabled = true; btn.textContent = 'Linking…'; }
+  try {
+    await VendorDb.addVendorAlias(r.name, v.id,
+      'Linked from the unlinked-names queue — ' + r.wps + ' work package'
+      + (r.wps === 1 ? '' : 's'));
+    _alDirty = true;
+    _vrIdx = null;                 // the name index no longer reflects the aliases
+    _toolCounts = null;            // the Data Tools badge is stale
+    const el = document.getElementById('alr-' + id);
+    if (el) {
+      el.classList.add('done');
+      const pick = el.querySelector('.fq-pick');
+      if (pick) pick.innerHTML = '<span class="fq-ok"><i class="ti ti-check"></i> linked to '
+        + esc(v.name) + '</span>';
+    }
+    if (_al) { _al.total = Math.max(0, _al.total - 1); _al.spend = Math.max(0, _al.spend - r.spend); }
+    _tcSet('alias', _al ? _al.total : null);
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Link'; }
+    /* ⚠️ The shadowing guard is the one refusal worth spelling out: it fires
+       when the spelling IS another company's registered name, which means these
+       are two vendor records rather than one bad spelling. */
+    const msg = (e && e.message) || String(e);
+    AppNotify.fromError(e, /registered name of another vendor/i.test(msg)
+      ? 'These look like two separate vendor records — merge them instead'
+      : /vendor_aliases/i.test(msg)
+        ? 'Run migrations/2026-09-07_vendor_aliases.sql first — the alias table is not there yet'
+        : 'Could not link that name');
+  }
 }
 
 async function refreshVendors() {
@@ -2534,7 +2839,7 @@ function renderFillQueue() {
 
 function _fqRow(w) {
   const cost = w.awarded_cost != null
-    ? (window.Fmt ? Fmt.moneyShort(w.awarded_cost) : String(w.awarded_cost)) : '';
+    ? (typeof Fmt !== 'undefined' ? Fmt.moneyShort(w.awarded_cost) : String(w.awarded_cost)) : '';
   return '<div class="fq-row" id="fq-' + w.id + '">'
     + '<div class="fq-head">'
     + '<span class="fq-wp">WP ' + esc(w.wp_no || '—') + '</span>'
@@ -2974,7 +3279,7 @@ function updateSplitBadge() {
    awarded a package, which is exactly when they need it. Caught by a test that
    asserted the Ongoing group disappeared, which it should not.
    Merge and Manage Product Categories are uncounted and so never hide anyway. */
-const _TC_RETIRES = ['fill', 'import', 'split', 'dupes', 'trades'];
+const _TC_RETIRES = ['fill', 'alias', 'import', 'split', 'dupes', 'trades'];
 
 function _tcSet(key, n) {
   const badge = document.getElementById('tc-' + key);
@@ -3038,12 +3343,13 @@ async function refreshToolCounts(force) {
     if (status) { status.textContent = 'Could not count the work-package tools \u2014 they are all still shown.'; }
     // ⚠️ On failure show everything. Hiding a tool because we could not count
     //    it is the one outcome worse than showing a finished one.
-    ['fill', 'import', 'backfill'].forEach(function (k) { _tcSet(k, null); });
+    ['fill', 'alias', 'import', 'backfill'].forEach(function (k) { _tcSet(k, null); });
   } finally { _toolCountsRunning = false; }
 }
 
 function _tcApplyWp(c) {
   _tcSet('fill', c.awardedNoVendor);
+  _tcSet('alias', c.unlinked);
   _tcSet('import', c.importable);
   _tcSet('backfill', c.awardedNoBidRow);
   const status = document.getElementById('toolsStatus');
@@ -6580,6 +6886,21 @@ function restoreDetailPersonnel(id) { return _restoreChild(VendorDb.personnel, i
     <div class="modal-body" id="fillQueueBody"></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeFillQueue()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Free-text vendor names on work packages that resolve to no directory
+     vendor. Hidden inline like every other modal here (Known Issues #30). -->
+<div class="modal-overlay" id="aliasQueueModal" style="display:none">
+  <div class="modal" style="max-width:980px">
+    <div class="modal-header">
+      <div class="modal-title">Unlinked vendor names</div>
+      <button class="modal-close" onclick="closeAliasQueue()">&times;</button>
+    </div>
+    <div class="modal-body" id="aliasQueueBody"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeAliasQueue()">Close</button>
     </div>
   </div>
 </div>
