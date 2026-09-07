@@ -7748,6 +7748,67 @@ Unlinked vendor names **1,345 → 941**, Import from WPs **840 → 477** (363 du
 will now not be created), and Backfill Trade/Bid Data **99 → 113**, which is the right direction:
 more vendors resolve, so there is more bid history it can write.
 
+### The single-blocker bucket: one missing name was holding a whole string (2026-09-07)
+
+Worked the "one unresolved company" bucket, which had grown to **28 names blocking ₱887.6M across
+44 work packages** — because a string is only writable when EVERY member resolves, so one name
+holds the entire work package. 16 aliases unblocked 18 of them.
+
+**₱1.192B → ₱1.024B unattributed (10.0% → 8.6%)**, names 60 → 44, aliases 488 → 504,
+work packages carrying vendor id links 229 → 393.
+
+#### The workbook answered almost every one, and the trade decided the ambiguous ones
+
+| typed | resolved to | what settled it |
+|---|---|---|
+| `J.Pastor` **₱96.8M** | V-01910 JPastor Mechanical Engineering | unique; a dot away from the distinctive part |
+| `Cels` / `Bu-Cels` ₱27.5M | V-00813 MCC - PCS CELS | equipment/truck rental WPs; "Bu-" is Business Unit |
+| `Rexim Uneversal` ₱11.4M | V-01719 Rexim Philippines Universal Sales | "Uneversal" typo, unique |
+| `Lexton Commercial Marketing Corporation` ₱9.8M | V-00233 | the residue was the word "Commercial" from this vendor's OWN fuller name |
+| `Shell Pilipinas Petroleum Corp.` ₱8.7M | V-01388 | same shape: "Petroleum" was its own leftover word |
+| `Elite Blue` ₱8.0M | V-01975 Eliteblue Security Specialist | the WP is literally "Security Sevices" |
+| `Cebu Overseas` ₱5.3M | V-00489 Cebu Oversea Hardware | one letter; appears TWICE in the same string |
+| `Philgen` ₱2.6M | V-00797 Philgen **Enviromental** Services | **TWO Philgens exist**; the WP is "Garbage Disposal / Siphoning", which decides it |
+| `Stealasia` | V-00392 Steelasia Manufacturing | the WP is "Supply of Rebar" |
+| `Malabanan` | V-00892 Belen-A Malabanan Excavation & Plumbing | "Declogging and Siphoning" |
+
+**⚠ The `Malabanan` hold was lifted on evidence, not impatience.** The "identity leads the name"
+rule had held it (the directory name leads with *Belen*), but the workbook has **exactly one**
+Malabanan — so there is no competing candidate for that rule to protect against. **A refusal rule
+exists to stop a WRONG pick; when the candidate set is a single row, re-check whether it still
+applies.**
+
+#### ⚠ A LEFTOVER WORD FROM THE MATCHED VENDOR'S OWN NAME IS BEST FIXED BY ALIASING THE FULL SPAN
+
+`Lexton Commercial Marketing Corporation` and `Shell Pilipinas Petroleum Corp.` each tiled on a
+shorter alias and left one real word behind, which the run-grouper then counted as a missing
+company. Widening the filler list would have been the wrong fix — "Commercial" is a genuine
+identity word elsewhere (Rainbow Commercial, Sinophil Commercial). **Alias the full string instead:
+explicit, reversible, and it cannot leak into another vendor's match.**
+
+#### ⚠ THREE THAT LOOK RESOLVABLE AND ARE NOT — DO NOT REVISIT WITHOUT NEW EVIDENCE
+
+- **`Ursua Sand & Gravel` (₱48.7M)** — the only Ursua anywhere is V-01977 *R.G. Ursua Sea and
+  Land Cargo Transport Services*, `vendor_group` **Shipping Services**. Sand and gravel is not
+  shipping. **A shared surname is not a shared company.**
+- **`MCC Admin` (₱21.4M)** — no record in the directory or the workbook. It sits beside
+  *Worklife Multipurpose Cooperative* on "Admin Workers" and "Dewatering Works": an internal
+  Megawide cost centre, **not a vendor**. Other MCC business units (MCC - PCS CELS, MCC-EPC Central
+  Warehouse) ARE real vendor rows, so absence here is meaningful rather than an oversight.
+- **`Arkitekton` / `Architekton`** — nothing, either spelling.
+
+Also still ambiguous and correctly untouched: **`Nexus`** (6 candidates), **`Trigold`** (2),
+**`Leodemac`** (2 — and they are the two DIFFERENT TAXPAYERS from the merge-risk work, so a guess
+here would undo that).
+
+#### What is left at ₱1.024B
+
+`various supplier` ₱340.6M (aggregate by design) · two run-ons holding a company that is not in
+the directory (₱187.1M `Splice Sleeve Japan —`, ₱177.8M `Concrete Solution Builders & Supply
+— E.C DAUGHSON`, the latter with **zero** workbook matches) · `arkitekton, —` ₱48.7M {C}
+the elevator-brand list ₱31.0M (Hitachi, Otis, Kone, Hyundai are all absent) · `ramp` ₱20.1M
+{C} `enci`, `lj industrial`, `mayer, regan, osp`.
+
 ### The acronyms are in, and a 5-character floor was hiding ₱270M (2026-09-07)
 
 The user confirmed the initials-based candidates, so all 12 acronyms are now aliased: 7 by NAME
