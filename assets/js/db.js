@@ -4083,6 +4083,38 @@ const VendorDb = (() => {
       return this.invitations(round.id);
     },
 
+    /* Put an issued round back to draft. A mis-click on "Mark as issued" had
+       no way back short of editing the database by hand, which is what happened.
+
+       ⚠️ IT UNDOES EXACTLY WHAT issue() DID, AND NOTHING ELSE — stage,
+          issued_at and the two issued_by stamps. The invitations are left alone
+          on purpose: they were created while the round was a draft, and their
+          due_at/scope_note are what a bidder may already have been shown, so
+          clearing those would rewrite the ask rather than undo the issuing.
+       ⚠️ IT DELIBERATELY DOES NOT PULL THE WORK PACKAGE'S PROCUREMENT STATUS
+          BACK. syncWpStatus is monotonic by design (a round may only ever push
+          a package forward), because a package can legitimately be further along
+          than one of its rounds — dragging it back here would wipe progress made
+          elsewhere, including through another round. The caller is told to check
+          it instead.
+       ⚠️ REFUSES ONCE A BIDDER HAS SUBMITTED. At that point the solicitation
+          demonstrably happened and somebody has priced it; presenting the round
+          as a draft again would misrepresent the record. Cancel it instead. */
+    async unissue(round, profile) {
+      const inv = await this.invitations(round.id);
+      const answered = (inv || []).filter(function (i) {
+        return i.status === 'submitted' || i.offer_amount != null;
+      });
+      if (answered.length) {
+        throw new Error(answered.length + ' bidder(s) have already responded, so this round '
+          + 'cannot go back to being a draft. Cancel the round instead if it should not stand.');
+      }
+      await this.update(round.id, {
+        stage: 'draft', issued_at: null, issued_by: null, issued_by_name: null,
+      }, profile);
+      return this.invitations(round.id);
+    },
+
     /* 2.4.2 Award. ONE winner per round: the winner is marked awarded and
        every other invitation not_awarded, in one pass, so a round can never
        end up with two winners or with a bidder left un-notified.

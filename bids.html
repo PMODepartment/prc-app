@@ -2931,7 +2931,7 @@ function rfqBody(inv) {
   L.push('You may also submit it through the link below. You do not need an account: open it, enter '
     + 'your price and attach your quotation.');
   L.push('');
-  L.push(bidLink(inv));
+  if (inv) L.push(bidLink(inv));
   L.push('');
   L.push('The link is personal to your company. Please do not forward it.');
   if (R.prebid_at) { L.push(''); L.push('Pre-bid conference: ' + dt(R.prebid_at)); }
@@ -3052,11 +3052,19 @@ function rfqHtml(inv) {
      What was unpresentable was PRINTING it, so the formatted flavour hyperlinks
      a sentence instead. The plain-text flavour still carries the bare URL,
      because plain text has nowhere to hide it. */
-  H.push(_hp('You may also submit it online. You do not need an account: open your bid page, enter '
-    + 'your price and attach your quotation.'));
-  H.push(_hp('<b>' + _hlink(bidLink(inv), 'Open your bid page') + '</b>'
-    + '<br><span style="font-size:10pt;color:#444">This page is personal to your company. '
-    + 'Please do not forward it.</span>'));
+  /* ⚠️ OMITTED FOR THE ONE-DRAFT BLAST (inv == null). A blast is Bcc'd to every
+     bidder, and one email cannot carry a different capability link per
+     recipient — sending them all the SAME link would let whoever opened it
+     submit as that one vendor and read that company's offer. So the blast has
+     no online route and says so; email, which the template asks for first, is
+     the way to reply. The per-bidder letter is unchanged. */
+  if (inv) {
+    H.push(_hp('You may also submit it online. You do not need an account: open your bid page, enter '
+      + 'your price and attach your quotation.'));
+    H.push(_hp('<b>' + _hlink(bidLink(inv), 'Open your bid page') + '</b>'
+      + '<br><span style="font-size:10pt;color:#444">This page is personal to your company. '
+      + 'Please do not forward it.</span>'));
+  }
   if (R.prebid_at) H.push(_hp('<b>Pre-bid conference:</b> ' + _h(dt(R.prebid_at))));
 
   H.push(_hp('This ' + _h(docLong()) + ' does not constitute an offer to contract and does not '
@@ -3113,6 +3121,11 @@ let _rfqVendor = null;
 
 function rfqLetterHtml(i) {
   return (i && _rfqEdits[i.id]) || rfqHtmlDoc(i);
+}
+/* The blast letter. Keyed under '__blast' in the same _rfqEdits map, so it is
+   editable like any other and every send path reads it through one accessor. */
+function rfqBlastHtml() {
+  return _rfqEdits.__blast || rfqHtmlDoc(null);
 }
 function _rfqOnEdit(el) {
   if (_rfqVendor) _rfqEdits[_rfqVendor] = el.innerHTML;
@@ -3191,6 +3204,13 @@ function renderRfq() {
     + '<span style="flex:1"></span>'
     + '<button class="btn" onclick="copyMergeCsv()" title="For an Outlook mail merge over the whole round">'
     + '<i class="ti ti-table-export"></i> Mail-merge list</button>'
+    /* One draft to everyone, Bcc, no links — the alternative to sending one
+       letter per bidder. Only worth offering when there is more than one. */
+    + (INV.filter(function (i) { return i.vendor_contact_email; }).length > 1
+        ? '<button class="btn" onclick="mailBlast()"'
+          + ' title="One draft to all bidders, everyone in Bcc \u2014 no personal bid links">'
+          + '<i class="ti ti-users"></i> One draft to all</button>'
+        : '')
     + (cur
         ? '<button class="btn" onclick="copyLink(' + Q + cur.id + Q + ')"'
           + ' title="Copy just this bidder\u2019s link" aria-label="Copy the link">'
@@ -3207,7 +3227,18 @@ function renderRfq() {
         : '')
     + (canManage && R.stage === 'draft'
         ? '<button class="btn btn-primary" onclick="markIssued()"><i class="ti ti-send"></i>'
-          + ' Mark as issued</button>' : '');
+          + ' Mark as issued</button>'
+        : '')
+    /* A mis-click on "Mark as issued" previously had no way back short of
+       editing the database by hand. Offered only while nobody has answered —
+       bidRounds.unissue() refuses after that, and the button follows the same
+       rule so it is never shown as an action the server will reject. */
+    + (canManage && R.stage === 'issued' && !INV.some(function (i) {
+          return i.status === 'submitted' || i.offer_amount != null; })
+        ? '<button class="btn" onclick="unissueRound()"'
+          + ' title="Put this round back to draft \u2014 nobody has answered yet">'
+          + '<i class="ti ti-arrow-back-up"></i> Back to draft</button>'
+        : '');
 }
 function closeRfq() { document.getElementById('rfqModal').style.display = 'none'; }
 
@@ -3265,6 +3296,27 @@ function copyLink(id) {
    one and keeps the formatting; anything that cannot (Notepad, a plain-text
    reply, a chat box) falls back to text/plain by itself. Writing only HTML
    would paste raw tags into a plain-text target. */
+/* ⚠️ BOTH FLAVOURS GO ON THE CLIPBOARD (text/html + text/plain in ONE
+   ClipboardItem). Outlook takes the HTML; a plain-text target falls back by
+   itself. Writing only HTML pastes raw tags into Notepad.
+   Extracted from copyRich so the per-bidder letter and the one-draft blast
+   share ONE clipboard path instead of two copies that could drift. */
+async function copyHtml(html, text) {
+  try {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text || ''], { type: 'text/plain' }),
+      })]);
+    } else {
+      _copyHtmlFallback(html);
+    }
+    return true;
+  } catch (e) {
+    try { _copyHtmlFallback(html); return true; } catch (e2) { return false; }
+  }
+}
+
 async function copyRich(id, quiet) {
   const i = invById(id); if (!i) return false;
   const html = rfqLetterHtml(i);
@@ -3358,6 +3410,43 @@ function mailTo(id) {
       + (copied ? ' Press Ctrl+V to paste the letter in.' : ''));
   });
 }
+/* One draft, every bidder in Bcc, no links. Copies the blast letter with its
+   formatting first (a mailto body is plain text by definition and this letter is
+   formatted), then opens the addressed draft to paste into.
+
+   ⚠️ BIDDERS WITH NO EMAIL ON FILE ARE NAMED, NEVER SILENTLY DROPPED — the
+      whole point of a blast is that the officer believes everyone got it.
+   ⚠️ Addresses are DE-DUPLICATED. Two bidders can share a contact address (the
+      same trading group, or a shared info@), and Outlook shows a duplicated Bcc
+      as a mistake the officer then has to reason about. */
+async function mailBlast() {
+  const withMail = INV.filter(function (i) { return i.vendor_contact_email; });
+  const without = INV.filter(function (i) { return !i.vendor_contact_email; });
+  if (!withMail.length) {
+    AppNotify.warn('None of the bidders on this round has a contact email on file.');
+    return;
+  }
+  const seen = Object.create(null), bcc = [];
+  withMail.forEach(function (i) {
+    const k = String(i.vendor_contact_email).trim().toLowerCase();
+    if (!seen[k]) { seen[k] = true; bcc.push(i.vendor_contact_email); }
+  });
+  if (!confirm('Open ONE draft to all ' + bcc.length + ' bidder'
+      + (bcc.length === 1 ? '' : 's') + ' with everyone in Bcc?\n\n'
+      + 'The letter will NOT contain a bid link \u2014 one email cannot carry a different '
+      + 'personal link per bidder, so they are asked to reply by email instead.'
+      + (without.length ? '\n\nNo email on file for: '
+          + without.map(function (i) { return i.vendor_name; }).join(', ') : ''))) return;
+  let copied = false;
+  try { copied = await copyHtml(rfqBlastHtml(), rfqSubject() + '\n\n' + rfqBody(null)); } catch (e) { copied = false; }
+  openMail({ subject: rfqSubject(), bcc: bcc.join(',') });
+  AppNotify.success((copied ? 'Blast letter copied with its formatting. ' : '')
+    + 'One draft is opening with ' + bcc.length + ' bidder'
+    + (bcc.length === 1 ? '' : 's') + ' in Bcc, you in To.'
+    + (copied ? ' Press Ctrl+V to paste it in.' : '')
+    + (without.length ? ' ' + without.length + ' had no email on file.' : ''));
+}
+
 function csvCell(v) {
   const s = String(v == null ? '' : v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -3384,6 +3473,27 @@ function copyMergeCsv() {
       + (INV.length === 1 ? '' : 's') + ', each with their own link. Bidders go in Bcc.'
       + (missing ? ' ' + missing + ' have no email on file.' : '')));
 }
+/* ⚠️ THE CONFIRM NAMES WHAT DOES **NOT** GET UNDONE. The work package's
+   Procurement Status stays where it is: syncWpStatus is monotonic, so a round
+   may only push a package forward, and pulling it back here could wipe progress
+   made through another round. Saying so is the difference between an undo the
+   officer can trust and one that quietly leaves half the change behind. */
+async function unissueRound() {
+  if (!confirm('Put this round back to draft?\n\n'
+    + 'It will read as not yet issued and "Mark as issued" comes back. Your bidders, '
+    + 'the ask and every letter are kept exactly as they are.\n\n'
+    + 'The work package\u2019s Procurement Status is NOT changed \u2014 check it separately '
+    + 'if this round was the only reason it moved.')) return;
+  try {
+    INV = await VendorDb.bidRounds.unissue(R, profile);
+    R = await VendorDb.bidRounds.get(R.id);
+    await renderRound();
+    AppNotify.success('Back to draft. Nothing was sent, and nothing else changed.');
+  } catch (e) {
+    AppNotify.fromError(e, 'Could not put the round back to draft');
+  }
+}
+
 async function markIssued() {
   try {
     INV = await VendorDb.bidRounds.issue(R, profile);

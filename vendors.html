@@ -4569,7 +4569,13 @@ async function openVendorPage(id, opts) {
      ⚠️ AND EACH SECTION IS NOW FAULT-ISOLATED, so one failure cannot blank the
      others and reports itself INSIDE its own section rather than silently. Same
      bug and same fix as vendor-portal.html's `_step` — see its comment. */
-  renderDetailOverview();
+  /* ⚠️ THE OVERVIEW IS FAULT-ISOLATED TOO, and it has to be. Nine of the ten
+     sections were wrapped and this one — the one that runs FIRST — was not, so
+     the single unprotected renderer was the only one whose failure could take
+     every other section down with it. It did: a missing _vendorGroupOptions()
+     threw here and the whole page rendered as ten empty boxes with no error.
+     Isolation that skips one renderer is not isolation. */
+  await _dsec('overview', renderDetailOverview, 'dtab-overview');
   await Promise.all([
     _dsec('accreditation', renderDetailAccred, 'dtab-accred'),
     _dsec('work packages', renderDetailWps, 'dtab-wps'),
@@ -5354,6 +5360,26 @@ async function removeDetailPersonnel(id) {
    the same line item. Rows with no class code (the WP carried no cost code)
    are kept in an "Unclassified" group rather than dropped. */
 let _classIdx = null;
+/* Every vendor group already in the directory, so staff pick what SAP actually
+   uses instead of typing a near-duplicate. Free text is kept deliberately — the
+   masterlist can gain a group we have not imported yet — but a datalist makes
+   the existing value the path of least resistance.
+   ⚠️ THIS WAS CALLED FROM renderDetailOverview AND NEVER DEFINED, which threw a
+      ReferenceError and left EVERY section of the vendor page empty with nothing
+      on screen to say why (the throw rejected openVendorPage before it reached
+      the Promise.all that renders the other nine). Same class as bidsInPlay and
+      _vName: node --check cannot see an undefined identifier, only running the
+      page can. */
+function _vendorGroupOptions() {
+  const seen = Object.create(null);
+  (allVendors || []).forEach(function (v) {
+    const g = String(v.vendor_group || '').trim();
+    if (g) seen[g] = true;
+  });
+  return Object.keys(seen).sort(function (a, b) { return a.localeCompare(b); })
+    .map(function (g) { return '<option value="' + esc(g) + '">'; }).join('');
+}
+
 async function renderDetailRates() {
   const el = document.getElementById('dtab-rates');
   const [list, codes] = await Promise.all([
