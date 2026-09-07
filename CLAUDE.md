@@ -8815,6 +8815,127 @@ Real projects only, DEMO excluded:
 | integrity: dangling ids / misaligned amounts | **0 / 0** |
 | Backfill badge | **24** (from 141; structural floor) |
 
+### ⚠⚠ `_alSuggest` COULD PROPOSE THE VERY ALIASES THAT HAD TO BE DELETED — `_alMultiCompany` (2026-09-07)
+
+Deleting the 49 collapsing aliases fixes the damage; it does not stop the next bulk pass recreating
+it. Re-run live against the current directory, the suggester offered **a single suggestion for 208
+unlinked names, and 176 of those were multi-company strings** — every shape that had just been
+removed, plus the worst nonsense (`Adventus It Services (Philippines) Inc. — MCC - EPC Central
+Warehouse` -> **V-00084 CENTRAL LUMBER**, and `Steel Asia, Capitol, Pag-asa, Universal Steel`
+-> Capitol Steel alone).
+
+**Two independent holes, each PROVEN against live data rather than reasoned about:**
+
+1. `MCC-PCS Batching Plant, Beebee Construction, MCI Construction, Solidtech` -> V-00812. The
+   existing length guard requires a **LEGAL SUFFIX** in the residual to corroborate — but these
+   strings separate companies with **"Construction"**, so `_countSuffixTokens` returned **0** and
+   the guard never fired, despite a 0.514 length ratio.
+2. The CENTRAL LUMBER case. Its `why` was labelled **the other containment direction**, and the
+   length guard only applies to one of them — so **no guard applied at all**. `why` is re-derived
+   by testing containment in ONE direction, so when the match came from the other, the label
+   — and therefore which guard runs — is wrong.
+
+**`_alMultiCompany(name)` closes both**, because it needs neither a delimiter nor a correct `why`:
+
+- **(a) Delimiter arm, directory-INDEPENDENT:** two or more segments (split on
+  `[,;:/|\r\n]`) that each carry a non-filler word. This is the only arm that can see a string
+  whose other companies have **no directory row at all** — `Mcc-pcs Cels, Comansa Machinery,
+  Zoomlion` (crane makers). A trailing `, Inc.` is pure filler and correctly does not count.
+  **⚠ THE COLON WAS MISSING FROM THE FIRST CUT** and `J VAZCO COMPANY: TRADETEK: CONCRETE
+  SOLUTION` slipped through. **Keep this set in step with `_splitSegments`.**
+- **(b) Decomposition arm:** greedy longest-match tiling against a **bare index built with NO
+  aliases** — two different vendors inside the text proves two companies. **⚠ The alias
+  exclusion is deliberate: an existing collapsing alias must not be able to vouch for the next
+  one.**
+- **⚠ AN AMBIGUOUS CONSTITUENT COUNTS AS A SECOND COMPANY.** `AMBIGUOUS` means "some vendor
+  matched here, we just cannot say which", which still proves another company is named. Not
+  counting it was a third blind spot. **Longest-match-first** is what stops this firing on a
+  single company whose own leading word is ambiguous, because the full name matches first.
+- **⚠ `_alBareIdx` is invalidated in `loadAll` beside `_alSugIdx`.** A stale vendor snapshot
+  resolves names to rows that no longer exist — exactly how two dangling `proposed_vendor_ids`
+  were written that day — and the id arrays carry no foreign key, so nothing complains.
+
+**⚠ TWO KNOWN, DELIBERATE OUTCOMES, both asserted as tests rather than left implicit:**
+
+- **A company whose OWN name contains a comma between two real words is REFUSED** —
+  `Rp-Ra, Builders` IS one company (RP-RA Builders Corporation). Harmless, because such a name
+  already resolves outright and so never reaches the suggester.
+- **The `Parent Corp - Business Unit` shape PASSES**, and that falls out of arm (b) excluding
+  aliases: the unit half resolves only THROUGH an alias, so only the parent is found and the
+  string reads as the one unit it is. The same exclusion is the arm's limit — a second company
+  reachable only by alias is invisible to it, which is why the delimiter arm runs first.
+- **⚠ NOT COVERED AT ALL: `Doron Builders and Concrete Solution`.** `_vrCore` deliberately KEEPS
+  business-type words, so `Doron Builders` does not resolve to `Doron Builders and Construction
+  Supplies Ltd. Co.` without its alias — and the bare index has no aliases. No delimiter and no
+  resolvable constituent means **the Split tool or a person**. Recorded as a test asserting
+  `false`, not asserted away.
+
+**Verified: 41 assertions against the VERBATIM extracted functions running on the real `db.js`
+resolver under `node:vm`** — both live failures, the other deleted shapes, both arms, the
+ambiguity arm exercised through two vendors sharing an exact core, and (the regression that
+matters) that every single-company name still passes: `*JANGHO (LOCAL)`, `Haffele`,
+`Ebara Pumps Philiipines Inc.` (longer than its match, but a typo not a second company), the
+trailing-comma and trailing-slash names, and every alias written that day.
+
+**⚠ TWO OF MY OWN TEST EXPECTATIONS WERE WRONG BEFORE THE CODE WAS** — the parent+BU
+assertion and the Doron one. That is the fourth and fifth time in this project a red test has been
+the test. **Rule out the harness before the code.**
+
+### 16 typo aliases, one correctly refused (2026-09-07)
+
+Of the 32 names surviving the new guard, **every one carries ₱0 awarded spend** (all
+proposed-only), so nothing here moves money — the value is filter quality. Hand-reviewed, 16 were
+written and the rest refused:
+
+`PRIMEWORKS CONSTRUCTIION`, `WMTan Contstruction`, `Ebara Pumps Philiipines Inc.`,
+`Hilti Philipines Inc.`, `Sika Philiipines Inc.`, `EMBRYO TRADING CORPOATION`,
+`MICROPHASE CRPORATION`, `AACS Constru`, `Ottilie Marketing`, `Philflex Wires and Cables`,
+`Milsen Light Inc *Get from Ethan` (a note typed into the name field), `Thermory`, `Fujilf`,
+`Tyval - spears`.
+
+- **⚠ The two Megawide long forms were RETARGETED, not accepted as suggested.** The suggester
+  proposed the **parent** row V-01175 for `MEGAWIDE CONSTRUCTION CORPORATION - CELS` and
+  `- BU FORMWORKS`; they name the **CELS** and **Formworks** units, so they were written to V-00813
+  and V-00814, consistent with the 24 existing BU aliases.
+- **⚠ `Trigold Bensons Development` was refused by the inline uniqueness re-check: 2 candidates**
+  (V-00422, V-00704) — the exact ambiguity CLAUDE.md already flagged for Trigold. **Re-check
+  uniqueness at WRITE time even when the suggester offered one candidate**; it culls by token, and
+  a directory-wide substring check can see more.
+- Refused and left for a person: `Glory Lumber Const. and Supply` (the suggester picked **V-00830
+  Glory Lumber** when the text plainly means **V-00741 Glory Lumber Construction Supplies** — and
+  those are **two different taxpayers**, TIN 104-080-764 vs 010-389-797); `Magcalas-Romero` (the
+  documented never-merge pair — the problematic row carries **no vendor code**, so it is invisible
+  to a code-based reconciliation); `Jinan PLK Lift` -> The Lift Company Philippines (a Chinese
+  maker matched on the token "lift"); `The Lift Co. (Nippon)` (the parenthetical may denote a
+  different principal); `CASANOVA & OTHER ACCREDITED SUBCONTRACTOR` (a description, not a company);
+  and three strings naming several people or several companies.
+
+### Where the vendor data stands at the end of the session (2026-09-07)
+
+Real projects only, DEMO excluded:
+
+| | start | end |
+|---|---|---|
+| unattributed awarded spend | ₱1.605B (13.5%)* | **₱1.506B (12.7%)**, 77 WPs |
+| awarded WPs carrying stored links | 245 | **363** of 440 |
+| WPs with proposed text carrying links | **0** | **894** of 1,630 (2,231 ids) |
+| directory vendors | 2,404 | **2,435** |
+| aliases | 535 (49 of them harmful) | **516** |
+| masterlist BP codes missing from the app | 40 | **0** |
+| `vendor_bids` / `vendor_rates` / `vendor_products` | — | **1,222 / 517 / 499** |
+| vendors carrying a trade category | — | **571** |
+| Backfill badge | 141 | **24** (structural floor) |
+| `Unlinked vendor names` | 888 | **915** |
+| integrity: dangling ids / misaligned amounts | — | **0 / 0** |
+
+*the honest figure once the collapsing aliases were removed; it had been REPORTED as
+₱1.009B / 8.5%.
+
+**⚠ `Unlinked vendor names` ENDS HIGHER THAN IT STARTED, and that is the correct direction.**
+Removing 49 false resolutions put those multi-company names back on the worklist where they belong,
+and the new guard stops them being resolved away again. **A badge falling is not by itself
+progress.**
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
