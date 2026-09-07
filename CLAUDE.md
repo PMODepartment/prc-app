@@ -3389,8 +3389,13 @@ dependent with the planning app."* Exactly right — `target_delivery` / `target
 the buyer's planning dates, set on the work package long before the round was raised and tied to
 the Planning app's schedule, so on a late-issued RFQ they are already behind us. Showing one to a
 supplier about to quote a lead time reads as a commitment we are asking them to meet.
-**`stillAhead(v)` now gates both**: a date still ahead of us is shown (real information a bidder
-needs), one that has passed is simply omitted, the same way every blank field on that page is.
+**⚠️ SUPERSEDED 2026-09-07 — BOTH DATES ARE NOW ABSENT FROM THAT PAGE ENTIRELY, and
+`stillAhead()` has been deleted.** Gating on "still ahead of us" did not go far enough: these are
+the buyer's own PLANNING dates, so even a future one is an internal plan rather than something we
+are asking the bidder to meet, and a bidder reads any date we print as the date we want. What we
+need from them is their own lead time, which the form asks for directly. See "The bidder goes in
+Bcc, and the bid page stops showing our planning dates". The paragraph below is kept because the
+LOCAL-parts parsing trap and the harness lesson are still worth having.
 **⚠️ Parsed from LOCAL parts, never `new Date('2026-11-30')`** — that is UTC midnight, which reads
 as the previous day in UTC+8 (the app-wide sCurve trap) and would hide a date on its own due day.
 Verified: today's date still shows; **that assertion failed first against a harness that built its
@@ -3658,6 +3663,145 @@ a helper.**
 **⚠️ AND ONE OF MY TEST FAILURES WAS THE TEST.** The dedup check seeded `proposed_vendor_ids` with
 INVITATION ids where the code correctly reads `vendor_id`, so it looked like the dedup was broken
 when the fixture was. Third time in this project — **rule out the harness before the code.**
+
+### The bidder goes in Bcc, and the bid page stops showing our planning dates (2026-09-07)
+
+**⚠️ THE "WRONG EMAIL" WAS NOT A CODE BUG, and knowing why matters more than the fix.**
+Reported off a live Outlook draft — the vendor's address was not in `To:`, and the mail-merge
+list carried the procurement officer's address. `mailTo()` reads `i.vendor_contact_email`,
+which is `vendors.contact_email` — and since the contact-person dedup that column is a
+**MIRROR of whichever Personnel row a vendor flags primary** (`syncPeopleMirror` in
+`vendor-portal.html`). The test vendor was set up by the officer, so the officer's own
+address is what that vendor's record holds as its primary contact. The code was addressing
+the vendor correctly; the vendor's record says the officer. **Check the vendor's Personnel
+tab before treating this class of report as a bug.**
+
+- **Every mailto now goes through ONE `openMail()`**, so the RFQ and the follow-up cannot
+  drift apart: **the bidder is in `bcc`, the officer is in `To:`**. A quotation request
+  discloses that this company was invited, and Bcc keeps the bidder list out of the visible
+  header even if the officer later replies-all, forwards the thread or adds a recipient. `To:`
+  being the officer also gives them the sent copy — and makes the draft that *looked* wrong
+  correct by design.
+- **⚠️ ONE BLAST BCC'd TO EVERY BIDDER IS IMPOSSIBLE, and that is not a limitation to
+  engineer around.** Every letter carries **that bidder's own** `bid-response.html?t=<token>`
+  capability link. A single email BCC'd to ten bidders could carry only one link, and whoever
+  opened it would be submitting **as that one vendor**. So it is one draft per bidder, each
+  with their own link and their own address in Bcc. **Never "simplify" this into a single
+  BCC'd blast while the letter contains a per-vendor link.**
+- **Every draft and toast NAMES the address it is going to** — the bidder is in Bcc and so no
+  longer visible in the draft's header, which means a wrong address on that vendor's record
+  has to be caught here rather than after the send.
+- **The merge list's headers now say WHOSE address each column is** — `Bcc (the bidder)` and
+  `To (you)` as separate columns, instead of a bare `Email`. The old column held the right
+  value; a header reading "Email" simply gave nobody anything to check it against. **The two
+  columns are separate so a merge routes the way the buttons do** — anyone building one off a
+  single "Email" column would put the bidder straight into `To:` and disclose the bidder list.
+- `officerAddress()` is `R.contact_email` (the round's officer, from
+  `migrations/2026-09-06_bid_officer_contact.sql`) then the signed-in profile, then `''` —
+  never the literal string `undefined`.
+- **Verified: 21 assertions against the verbatim extracted `openMail` / `officerAddress` /
+  `copyMergeCsv`** — the routing in every case (including that there is **no `cc` at all** and
+  the bidder never reaches `To:`), the em-dash-and-comma subject round-trip, the chase body's
+  newlines, both officer-address fallbacks, and the CSV's columns, RFC-4180 quoting,
+  per-bidder links and empty-cell handling.
+
+**⚠️ TARGET DELIVERY AND TARGET INSTALLATION ARE NOW ABSENT FROM `bid-response.html`
+ENTIRELY.** An earlier pass showed them only while still ahead of us (a date already behind
+us misleads a bidder). That did not go far enough: they are the **buyer's own planning
+dates**, set on the work package long before the round was raised and mirrored from the
+Planning app's schedule — so even a *future* one is an internal plan rather than something we
+are asking the bidder to meet, and **a bidder reads any date we print as the date we want.**
+What we actually need from them is their own **lead time**, which the form asks for directly.
+- The `stillAhead()` helper went with them — nothing else called it, and a dead helper sitting
+  behind a long rationale reads as live code to the next person.
+- **The RFQ letter itself never printed these**, so only the vendor-facing page changed.
+
+### The grid's dropdown is a styled list, not the OS datalist popup (2026-09-07, `review.html`)
+
+Reported: the Works/Type dropdown "looks like its a microsoft template and its ugly".
+
+**⚠️⚠️ NO STYLESHEET COULD HAVE FIXED IT — A NATIVE `<datalist>` POPUP IS OS CHROME.** It is
+drawn by the browser/OS **outside the page's CSS**: font, row height, colours, dark mode and
+how many rows show are all beyond reach. It literally *was* Windows chrome sitting on a dark
+grid, and no rule on the `<input>` or the `<datalist>` reaches it. **The only fix is to stop
+using one — do not go back to a datalist here.**
+
+**`_xlOpenEdList(ed, opts, curVal)`** replaces it: a real element in the page, in the grid's
+own type size and theme tokens. Type to filter (**substring, not prefix** — "doors" has to
+find *Metal Doors* and *Wood Doors* too, or most of a trade's list is unreachable), ↑/↓ to
+walk, Enter or click to pick.
+
+- **⚠️ THE EDITOR'S MECHANICS ARE DELIBERATELY UNTOUCHED.** The cell editor stays the same
+  `.xl-ed` `<input>`; the list only ever **writes into `ed.value`**. So `finish()`/commit/undo
+  batching, Tab's guided-fill target, Enter's draft-row jump, blur-commit and `xlCoerce`'s
+  snap-to-option all behave exactly as before. On a grid with this keyboard model, that
+  containment is the whole point.
+- **⚠️ It is appended to `#xl-wrap` and positioned in the wrap's own scroll coordinates**, the
+  same frame `.xl-ed` uses. Appended to `<body>` it would sit still while the grid scrolled
+  underneath it. It also **re-parents on every open**, because `renderGrid()` replaces the
+  wrap's contents and would otherwise orphan the node.
+- **⚠️ FIRST ESCAPE DISMISSES THE LIST, THE SECOND CANCELS THE EDIT** — so a stray keystroke
+  that opened the list cannot also throw away the cell's own value.
+- **⚠️ `mousedown`, not `click`.** Click fires after the editor has blurred, and blur commits,
+  so the pick would land *after* the commit. It then dispatches the editor's own Enter so a
+  mouse pick and a keyboard pick share one commit path.
+- An off-list/legacy stored value is still offered and is now **labelled `off-list`** rather
+  than sitting there unexplained.
+
+**Two real bugs found by DRIVING it in a browser, not by reading it — both caught by
+assertions written expecting them to pass:**
+1. **Opening a cell that already held a value filtered the list down to that one value**, so
+   the other 16 works were unreachable without clearing the text first. That is *precisely*
+   the trap the native datalist had, and the documented reason the user-directory columns were
+   moved off it. **`render(useFilter)` now shows everything on open and only typing filters.**
+2. **`render()` writes the `on` class straight into the HTML rather than going through
+   `mark()`**, so a cell holding a later option (*Specialties*, 17th of 17) opened showing the
+   top of the list with **no visible highlight — and Enter would have committed a value the
+   user could not see.** It now scrolls the preselected row into view.
+
+**Also closed a leak:** `_xlEdOpts` is module-level and **only the select branch assigns it**,
+so a plain text/date/money cell could inherit the previous select cell's options and open a
+list for the wrong column. It is reset at the **top of `_xlBeginEdit`**, which covers every
+path rather than only those that reach `finish()`.
+
+**Verified in a real browser against the VERBATIM extracted function** (with the real
+stylesheet and the real 17-entry Architectural Works list, harness deleted before commit):
+15 behaviour assertions — full list on open, preselect-and-scroll for both an early and the
+last option, the off-list label, substring/case-insensitive filtering, an `&` in an option
+rendering as text, arrow walking, the no-match state keeping the typed text, click-to-pick,
+and close/teardown. **Contrast measured in both themes:** plain row 16.30 light / 12.22 dark,
+active row 14.25 / 13.45, the muted blank and the off-list tag 5.22 / 4.95 — all above AA.
+
+**⚠️ Two harness lessons, both already recorded and both re-encountered:** the first
+measurement reported the list 6px outside the grid and `insideWrap:false` — the **Browser pane
+was narrow, so `#xl-wrap` had collapsed to 2px** and `ed.focus()` had scrolled it; at a real
+1440×900 viewport it reads `left:321` against an editor at 320. **Give a harness a real
+viewport before believing a geometry failure.** And a `scrollTop:4` "failure" was just the
+box's own 4px padding — **the assertion was too strict, not the code.**
+
+### The Works column offers 87 options across the 10 trades (2026-09-07)
+
+Asked what the Works column can actually hold. `XL_TRADE_WORKS` in `review.html` and
+`TRADE_WORKS` in `wp-form.html` were **compared programmatically and match exactly** — 10
+trades, 87 works, so the grid and the form cannot disagree about what is offerable:
+
+| trade | works |
+|---|---|
+| General Requirements | 15 |
+| Site Works | 7 |
+| Structural Works | 6 |
+| Architectural Works | 17 |
+| Mechanical Works | 7 |
+| Electrical and Auxiliary Works | 16 |
+| Plumbing Works | 7 |
+| Fire Protection Works | 6 |
+| Allied Services | 5 |
+| Site Development Works | 1 |
+
+**The list is per row, cascading off that row's Trade** (`_xlWorksOpts`), which is why a
+General Requirements row offers 15 and an Architectural row 17. **The screenshot showing only
+4 was the native datalist popup's own row limit, not the option set** — that popup is gone
+(see above), and the styled list now shows the full set with its own scroll.
 
 ### The bid tour lost a fifth of itself, silently (2026-09-06)
 
