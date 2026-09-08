@@ -37,7 +37,9 @@
     .field input:focus{border-color:#EE3124}
     .field input.error-field{border-color:#EE3124;background:#fff8f8}
     .field input:disabled{background:#f5f5f5;color:#999}
-    .field-hint{font-size:11px;color:#bbb;margin-top:4px}
+    /* #6E6C6C, not #bbb: both uses are on the white form side, and #bbb there is
+       about 1.9:1 — far below AA. Same value the main app settled on for --text-hint. */
+    .field-hint{font-size:11px;color:#6E6C6C;margin-top:4px}
     .field-error{font-size:11px;color:#EE3124;margin-top:4px;display:none}
     .field-error.visible{display:block}
     .pw-wrap{position:relative}
@@ -56,6 +58,17 @@
     .step.on{display:block}
     .note{font-size:12px;line-height:1.55;color:#666;background:#FDECEA;border:1px solid #F5B8B3;border-left:3px solid #EE3124;border-radius:6px;padding:10px 13px;margin-bottom:15px}
     .note b{color:#231F20}
+    /* Privacy notice + acknowledgement. Plain text at readable contrast
+       (#555 on white is about 7:1) — a notice nobody can read is not a notice,
+       and the .field-hint grey used elsewhere on this page (#bbb) is far below
+       AA. RA 10173 s16(a). */
+    .privacy{font-size:12px;line-height:1.6;color:#555;border-top:1px solid #eee;margin-top:18px;padding-top:14px}
+    .privacy b{color:#231F20}
+    .privacy a{color:#C42127;font-weight:600;text-decoration:underline}
+    .privacy a:hover{text-decoration:underline}
+    .ack{display:flex;align-items:flex-start;gap:9px;margin:11px 0 4px;font-size:12px;line-height:1.5;color:#555}
+    .ack input{margin-top:2px;flex-shrink:0;width:15px;height:15px;accent-color:#EE3124;cursor:pointer}
+    .ack label{cursor:pointer}
     .status-card{border:1.5px solid #e8e8e8;border-radius:10px;padding:22px;margin-bottom:18px}
     .status-card h3{font-size:16px;font-weight:700;color:#231F20;margin-bottom:8px}
     .status-card p{font-size:13px;color:#666;line-height:1.6}
@@ -164,9 +177,10 @@
           <div class="field-error" id="errCompany">Please enter your company name.</div>
         </div>
         <div class="field">
-          <label>TIN</label>
+          <label>TIN <span style="font-weight:400;color:#888">(optional)</span></label>
           <input type="text" id="tin" placeholder="e.g. 000-313-856-000">
-          <div class="field-hint">Digits, with or without dashes.</div>
+          <div class="field-hint">Digits, with or without dashes. It only helps us match you to a
+            record we may already hold &mdash; leave it blank if you would rather not give it.</div>
         </div>
       </div>
       <!-- ⚠️ WHO is asking for control of this vendor's account, and in what
@@ -193,6 +207,37 @@
         </div>
       </div>
 
+      <!-- RA 10173 s16(a), the right to be informed.
+           This is a SUMMARY POINTING AT Megawide's published Privacy Statement, not a
+           second parallel statement that could contradict it — that statement already
+           covers suppliers explicitly ("conduct the appropriate due diligence checks...
+           process your accreditation"). Keep the two in step: if the corporate statement
+           changes, this summary follows it, never the reverse.
+           The 30 days is not prose — it is what internal.purge_declined_claim_tins()
+           actually does (migrations/2026-09-08_vendor_claim_privacy.sql). Change one and
+           you must change the other, or this page states something untrue. -->
+      <div class="privacy">
+        <b>How we use what you enter here.</b> Megawide uses your company name, TIN, your
+        name, position and email address to check this registration against our existing
+        supplier records, to process your accreditation, and to meet tax and regulatory
+        reporting obligations. It is read by the Megawide Procurement staff who review your
+        registration. If we decline your registration, we clear the TIN from it after 30 days.
+        <br><br>
+        You may ask to access, correct or remove your personal data, and you may complain to
+        the National Privacy Commission. The full details are in Megawide&rsquo;s
+        <a href="https://megawide.com.ph/privacy-statement/" target="_blank" rel="noopener noreferrer">Privacy
+        Statement</a>, and privacy questions go to
+        <a href="mailto:rgomez@megawide.com.ph">rgomez@megawide.com.ph</a>.
+      </div>
+      <!-- The second clause is not boilerplate: it is the only point in the whole flow
+           where the claimant states, on the record, that they may act for this company.
+           The TIN is evidence about the COMPANY and says nothing about the PERSON. -->
+      <div class="ack">
+        <input type="checkbox" id="privacyAck">
+        <label for="privacyAck">I have read the Privacy Statement, and I confirm I am authorised
+          to submit this registration on behalf of the company named above.</label>
+      </div>
+      <div class="field-error" id="errPrivacy" style="margin-bottom:12px">Please confirm this before submitting.</div>
       <button class="btn-primary" id="btnSubmit">Submit Registration</button>
       <div class="form-footer">Already activated? <a href="vendor-login.html">Sign in</a></div>
     </div>
@@ -292,7 +337,7 @@ function fieldErr(id, on) {
 }
 function clearErrs() {
   ['errEmail', 'errPassword', 'errConfirm', 'errCompany',
-   'errFirstName', 'errLastName', 'errPosition'].forEach(function (i) { fieldErr(i, false); });
+   'errFirstName', 'errLastName', 'errPosition', 'errPrivacy'].forEach(function (i) { fieldErr(i, false); });
   msg('');
 }
 
@@ -385,6 +430,10 @@ async function submit() {
   if (!firstName) { fieldErr('errFirstName', true); bad = true; }
   if (!lastName) { fieldErr('errLastName', true); bad = true; }
   if (!position) { fieldErr('errPosition', true); bad = true; }
+  /* The notice is on the page for everyone; this is the claimant stating they may
+     act for the company. Checked LAST so the field errors above surface together. */
+  const ack = document.getElementById('privacyAck');
+  if (!ack || !ack.checked) { fieldErr('errPrivacy', true); bad = true; }
   if (bad) return;
 
   btn.disabled = true;

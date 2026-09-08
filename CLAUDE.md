@@ -9928,3 +9928,106 @@ package** and answer through the portal instead of by email; staff see the submi
   an invitation, comparing submissions, `decide()`/`promote()`) is **NOT built yet** — the API
   exists in `VendorDb.bidBoard`, but `vendors.html` has no UI for it, so today an invitation can
   only be created by SQL. That is the next piece.
+
+### Privacy notice on the registration page, and the TIN stops being kept forever (2026-09-08)
+
+`migrations/2026-09-08_vendor_claim_privacy.sql` (**RUN ME**), `vendor-register.html`.
+
+Asked whether TIN is the only thing protecting a vendor account, whether asking for a TIN
+creates data-protection exposure, and what stops an imposter claiming a vendor they have no
+connection to. The audit that produced this is worth keeping, because two of the three
+worries land somewhere different from where they were aimed.
+
+**⚠️ THE TIN WAS NEVER THE CONTROL, AND IT CANNOT BE.** A Philippine TIN is printed on every
+official receipt, sales invoice and BIR 2303 the vendor issues — any customer, supplier or
+competitor who has ever been billed by them has it. It is a **record-matching key, not a
+credential**, which is what `submit_vendor_claim` and the register page already say in their
+own comments. **The only real control is that a human reviews every claim** and the claimant
+gets no `public.users` row until then, so an un-approved claimant is signed out of every
+internal page by `requireLogin`.
+
+**⚠️⚠️ THE ACTUAL HOLE IS THE EMAIL, NOT THE TIN — and it is still open.**
+`vendor-register.html` calls `signUp({email, password})` with no `emailRedirectTo`, and
+Supabase email confirmation is disabled, so **the address is never proven**. Anyone can
+register from a free mailbox, claim a real company, type a TIN off an invoice they were
+issued, and reach the reviewer wearing a `high` confidence badge. Closing it is NOT a
+one-liner: switching confirmation on **breaks registration outright** (`signUp` returns no
+session, `submit_vendor_claim` raises on a null `auth.uid()`), and the built-in sender is
+development-only on every tier — it needs the saved-but-disabled Resend SMTP config plus a
+reordering of the flow. **Do not turn on email confirmation without doing that work first.**
+
+**⚠️ THE REVIEWER STILL HAS NOTHING TO CORROBORATE AGAINST.** `openReview` displays the
+claimant's email domain and frames it correctly as the evidence about the PERSON — but it
+never shows what Megawide already holds for the matched vendor (`vendors.contact_email`,
+`vendor_personnel` emails, the website domain), so a Gmail claim against a company whose
+domain we hold looks identical to a claim from that company's own domain. That comparison is
+free evidence, needs no new data collected, and is the highest-value remaining fix. **It must
+stay advisory** — plenty of legitimate Philippine suppliers genuinely work from Gmail, so
+treating a free-mail domain as disqualifying would reject real vendors.
+
+#### What actually shipped
+
+**The collection was never the problem; the notice and the retention were.**
+- **⚠️ A CORPORATION'S TIN IS NOT PERSONAL DATA** — a juridical person is not a data subject
+  under RA 10173. For most of the directory this is not a DPA question at all.
+- **⚠️ A SOLE PROPRIETOR'S TIN IS**, and arguably **sensitive** personal information: s3(l)(3)
+  covers information "issued by government agencies peculiar to an individual". A large share
+  of Megawide's suppliers are sole proprietorships, so this is the case that bites.
+- **The lawful basis is strong and is NOT consent** — Megawide is legally obliged to hold
+  supplier TINs (BIR 2307, the Summary List of Purchases, the alphalist), it is the same TIN
+  that arrives on the BIR 2303 every vendor uploads for accreditation, and **the field is
+  optional** (no client-side required check; the matcher does `if n_tin is not null`). The
+  form now says "(optional)" out loud.
+
+- **A SUMMARY THAT POINTS AT THE CORPORATE STATEMENT, never a second parallel one.**
+  Megawide publishes https://megawide.com.ph/privacy-statement/ and it **already covers
+  suppliers explicitly** ("conduct the appropriate due diligence checks... process your
+  accreditation"), so the page summarises and links rather than inventing wording that could
+  contradict it. Privacy contact `rgomez@megawide.com.ph` is taken from that statement.
+  **⚠️ Keep the two in step — if the corporate statement changes, this summary follows it,
+  never the reverse.**
+- **⚠️ THE "30 DAYS" IN THE NOTICE IS NOT PROSE — it is what
+  `internal.purge_declined_claim_tins()` actually does.** Change one and you must change the
+  other, or the page states something untrue to a data subject.
+- **An acknowledgement checkbox gates submit**, and its second clause is not boilerplate:
+  *"I confirm I am authorised to submit this registration on behalf of the company named
+  above"* is **the only point in the whole flow where the claimant states, on the record,
+  that they may act for that company.** Deliberately **not** stored per-row: the lawful basis
+  is contract/legal-obligation rather than consent, the notice is a static gate on the page
+  for everyone, and adding a column would have meant changing `submit_vendor_claim`'s
+  signature — the PostgREST overload trap that has already bitten this project three times.
+
+#### The retention purge
+
+`internal.purge_declined_claim_tins()` nulls `claimed_tin` on claims **declined more than 30
+days ago**, scheduled daily via pg_cron (guarded — the migration still applies cleanly where
+the extension is not enabled, and says so).
+- **⚠️ ONLY THE TIN, NOT THE ROW.** The company name, claimant name, position, email and the
+  decision are the **record that a claim was reviewed and refused** — ordinary business-contact
+  information, and deleting it would destroy the audit trail. The TIN is the sensitive item and
+  the only one with no remaining purpose once the claim is declined (s11(e)).
+- **⚠️ 30 DAYS, NOT IMMEDIATELY**, deliberately: a declined claim is sometimes reconsidered
+  (wrong vendor picked, or the claimant follows up with proof), and clearing on the instant
+  Decline is pressed makes every one of those a full re-submission.
+- **⚠️ NOT callable from the app** — `revoke all ... from public, anon, authenticated`. A
+  SECURITY DEFINER function that mutates claim rows has no business being reachable from a
+  browser session; cron and the SQL Editor run it.
+
+**Two pre-existing contrast failures fixed in the same pass, both measured in a browser
+rather than eyeballed:** `.field-hint` was `#bbb` on white = **1.9:1** (and the new
+"TIN is optional" wording had just been put into it, i.e. effectively invisible) -> `#6E6C6C`
+= 5.22:1; and the Privacy Statement link inherited brand `#EE3124` = **4.12:1**, under AA at
+12px -> `#C42127`, the documented **`--mw-red-ink`** light value = 5.84:1. **Brand red is safe
+as a FILL, not as small TEXT** — the rule already recorded app-wide. Notice body and
+acknowledgement both measure 7.46:1.
+
+**Verified**: migration parses under libpg_query (6 statements, both PL/pgSQL bodies accepted);
+inline scripts parse; no control bytes; and the gate driven in a real browser — unticked blocks
+submit and shows the error with the button still enabled for a retry, ticked clears it (proven
+by blanking a *different* required field so validation returns before ever reaching `signUp`,
+rather than creating a real auth user), and no horizontal overflow.
+
+**⚠️ STILL OPEN, in priority order**: the unverified email above; the reviewer-side domain
+corroboration; and requiring the BIR 2303 **before** approval rather than after — it is
+already uploaded in the portal, just on the wrong side of the access grant, which would give
+the reviewer an actual artifact instead of five self-asserted strings.
