@@ -3101,9 +3101,39 @@ const _PLACEHOLDER_VENDOR_RE = /^(various(\s+(supplier|suppliers|vendors?|contra
    be created as a vendor. A placeholder is often written that way precisely to
    mark it as not-a-name. Only OUTER brackets are stripped — a real company
    like "Acme (Phils.) Inc." keeps its inner ones and is unaffected. */
+/* ⚠️⚠️ A ROLE IS NOT A COMPANY, and the flat pattern above could not see one.
+   Found live 2026-09-08 while measuring the Data Tools badges: `Accredited
+   Vendor` (4 work packages, ₱4.43M), `Local Vendor`, `VARIOUS ACCREDITED
+   DESIGNER`, `MCC VARIOUS ACCREDITED SUBCON` and a dozen more all read as real
+   missing companies — so **Import from WPs was about to CREATE a vendor record
+   for each**, the same class of bug that produced the vendor literally named
+   `n/a`, and they were also being counted as unattributed spend awaiting a
+   company that does not exist.
+   ⚠️ THE TEST IS STRUCTURAL, NOT A WORD LIST: strip the qualifiers a buyer puts
+   in front of a role word and ask whether anything DISTINCTIVE survives. Same
+   idea as `_isContinuationSegment` in the Split tool, and it is what keeps the
+   rule narrow — `Accredited Vendor Corp`, `Local Vendor Supply Inc.` and
+   `Various Industries Inc.` each keep a distinctive token and are NOT caught.
+   ⚠️ A qualifier alone is never enough (`MCC` on its own is a real prefix, not
+   a placeholder) — at least one word must BE the role. */
+const _ROLE_QUALIFIER_RE = /^(various|other|all|any|accredited|local|approved|mcc|regular|assorted|misc|miscellaneous)$/i;
+const _ROLE_WORD_RE = /^(vendors?|suppliers?|subcons?|subcontractors?|contractors?|designers?|consultants?|fabricators?|manufacturers?)$/i;
+function _isRoleNotACompany(s) {
+  const toks = String(s || '').trim()
+    .replace(/^[([{<]+/, '').replace(/[)\]}>]+$/, '')
+    .split(/[^A-Za-z0-9]+/).filter(Boolean);
+  if (!toks.length) return false;
+  let sawRole = false;
+  for (let i = 0; i < toks.length; i++) {
+    if (_ROLE_WORD_RE.test(toks[i])) { sawRole = true; continue; }
+    if (_ROLE_QUALIFIER_RE.test(toks[i])) continue;
+    return false;                 // something distinctive survives — a real name
+  }
+  return sawRole;
+}
 function _isPlaceholderVendorName(s) {
   const t = String(s || '').trim().replace(/^[([{<]+/, '').replace(/[)\]}>]+$/, '').trim();
-  return _PLACEHOLDER_VENDOR_RE.test(t);
+  return _PLACEHOLDER_VENDOR_RE.test(t) || _isRoleNotACompany(t);
 }
 
   /* ── vendor name aliases ────────────────────────────────────────────────
@@ -4891,8 +4921,15 @@ function _isPlaceholderVendorName(s) {
      (that one lives for the whole session until loadAll clears it), and it is
      busted by setAwardedVendor — the one thing on this page that writes a work
      package. */
+  /* ⚠️ `awarded_cost` AND `total_awarded` are BOTH needed and are NOT the same
+     number — `total_awarded` is the GENERATED column (awarded_cost + additionals).
+     The money helpers read `total_awarded`; backfillVendorDataFromWPs gates on
+     `awarded_cost`, so the Backfill badge has to read the same one or it counts
+     work packages the tool then skips. Nearly shipped reading an absent
+     `awarded_cost` as undefined, which would have zeroed that badge silently. */
   const _TOOL_WP_COLS = 'id,project_id,wp_no,contractor,proposed_vendors,vendor_id,'
-    + 'awarded_vendor_ids,award_status,not_to_be_awarded,free_of_charge,total_awarded,'
+    + 'awarded_vendor_ids,award_status,not_to_be_awarded,free_of_charge,'
+    + 'awarded_cost,total_awarded,'
     + 'buyback,buyback_depreciation_percent,buyback_amount';
   const _TOOL_WP_TTL = 90000;
   let _toolWpCache = null;
@@ -5024,7 +5061,21 @@ function _isPlaceholderVendorName(s) {
          914 are blocked on ₱13.8B of awarded spend with NO vendor recorded at
          all, which is the fill-in queue's job, not this one. Two honest numbers
          beat one misleading one. */
-      if (awarded && !hasBid.has(w.id)) {
+      /* ⚠️⚠️ IT MUST ALSO APPLY BACKFILL'S OWN ₱0 GATE, or the badge counts work
+         packages the tool then refuses. Measured live 2026-09-08: the badge read
+         24 while Backfill could write only 18 — the other 6 (all WCB358) are
+         awarded at `awarded_cost = 0`, and backfillVendorDataFromWPs gates on
+         `award_status === 'Awarded' && (awarded_cost || 0) > 0`. So the badge sat
+         permanently at 24 and clicking it left 6 behind with no explanation.
+         Same principle as the resolvable test above: count what the tool WRITES.
+         ⚠️ Co-awards are NOT excluded — I assumed they were and was wrong.
+         Backfill credits every resolved vendor on a work package, using the
+         per-vendor amounts when present and an even split otherwise.
+         ⚠️ STILL OPEN, and a business decision rather than a bug: under the PMO
+         ruling (#43) an award at ₱0 is a real award, so those 6 arguably deserve
+         a ₱0 bid row. Deciding that means deciding what a bid record MEANS at
+         zero — until then they are honestly uncounted rather than promised. */
+      if (awarded && !hasBid.has(w.id) && (w.awarded_cost || 0) > 0) {
         const resolvable = (Array.isArray(w.awarded_vendor_ids) && w.awarded_vendor_ids.some(id => byId[id]))
           || (w.vendor_id && byId[w.vendor_id])
           || _splitAwarded(w.contractor).some(n => known(n));

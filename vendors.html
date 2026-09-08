@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260907n"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260907n"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260907n"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260908a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260908a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260908a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260907n">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260908a">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1538,10 +1538,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260907n"></script>
-<script src="assets/js/db.js?v=20260907n"></script>
-<script src="assets/js/ui.js?v=20260907n"></script>
-<script src="assets/js/coachmarks.js?v=20260907n"></script>
+<script src="assets/js/auth.js?v=20260908a"></script>
+<script src="assets/js/db.js?v=20260908a"></script>
+<script src="assets/js/ui.js?v=20260908a"></script>
+<script src="assets/js/coachmarks.js?v=20260908a"></script>
 <script src="assets/js/vendor-guide.js?v=20260907a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1848,8 +1848,14 @@ function _alKindOf(r) {
 const _AL_KINDS = {
   single: { label: 'Needs a link or a record', icon: 'link',
             note: 'One company. If it is already in the directory under its registered name, link the two — that is what this tool is for. If it genuinely has no record, <b>Import from WPs</b> creates it.' },
+  /* ⚠️ DO NOT SEND THESE TO "NEEDS SPLITTING" — that tool scans DIRECTORY ROWS
+     and these are free text on a WORK PACKAGE, so it has never been able to
+     reach them (it now reads 0 and hides itself, which made the old advice
+     point at a menu item that is not there). An alias is worse than useless
+     here: it maps the WHOLE string to ONE vendor, which is exactly the
+     collapsing-alias damage that had to be undone 49 times. */
   garbled: { label: 'Several companies in one name', icon: 'cut',
-             note: 'Each of these hides real suppliers whose spend is credited to a string that does not exist. <b>Data Tools → Needs Splitting</b>, not an alias.' },
+             note: 'Each of these hides real suppliers whose spend is credited to a string that does not exist. <b>Never alias one</b> — that would credit every company in it to whichever one you picked. Fix the contractor field on the work package so each company is named separately; if one of them has no record yet, create it first.' },
   ambiguous: { label: 'Two vendors could be this', icon: 'help-circle',
                note: 'The name matches more than one directory record, so the resolver refuses to guess. Clean the duplicates first (<b>Merge</b> / <b>Remove Exact Duplicates</b>), or link it explicitly here if you know which company it is.' },
   placeholder: { label: 'Not a company', icon: 'ban',
@@ -2707,7 +2713,7 @@ async function renderVendorAnalytics() {
   const orphanNote = (orphans.length || placeholders.length) ? `<div class="va-notice">
       <div class="va-notice-h"><i class="ti ti-alert-triangle"></i><div><span class="va-notice-fig">${money(orphanSpend + phSpend)}</span> of awarded spend is not attributed to a directory vendor<span class="va-notice-pct">${pct(orphanSpend + phSpend)}% of the total</span></div></div>
       <div class="va-notice-sub">Still counted in the figures above &mdash; it just has no company behind it yet.</div>
-      ${garbled.length ? line('cut', `<b>${garbled.length}</b> are several companies in one name \u2014 ${money(gSpend)}, ${pct(gSpend)}%. Each hides real suppliers whose spend is credited to a string that does not exist. <b>Data Tools \u2192 Needs Splitting</b>.`) : ''}
+      ${garbled.length ? line('cut', `<b>${garbled.length}</b> are several companies in one name \u2014 ${money(gSpend)}, ${pct(gSpend)}%. Each hides real suppliers whose spend is credited to a string that does not exist. Fix the contractor field on those work packages so each company is named separately \u2014 <b>not</b> an alias, which would credit all of them to one.`) : ''}
       ${single.length ? line('file-import', `<b>${single.length}</b> are single companies with no record \u2014 ${money(sSpend)}, ${pct(sSpend)}%. <b>Data Tools \u2192 Import from WPs</b> creates them, with no accreditation standing.`) : ''}
       ${placeholders.length ? line('help-circle', `<b>${placeholders.length}</b> are placeholders, not companies (${placeholders.map(r => esc(r.name)).join(', ')}) \u2014 ${money(phSpend)} across ${phWps} awarded work packages. <b>Excluded from the rankings below</b>; fix the contractor field on those work packages.`) : ''}
       <div class="va-notice-foot">Resolved by id, then exact name, then unambiguous core name \u2014 a name matching two vendors is left unattributed rather than credited to the wrong one.</div>
@@ -3788,8 +3794,10 @@ function _tcApplyWp(c) {
     bits.push(c.awardedTotal + ' awarded work package' + (c.awardedTotal === 1 ? '' : 's'));
   }
   if (c.refused) {
+    /* \u26a0\ufe0f It used to say "use Needs Splitting". These are free text on a WORK
+       PACKAGE; that tool scans directory rows and cannot reach them. */
     bits.push(c.refused + ' vendor name' + (c.refused === 1 ? '' : 's')
-      + ' too garbled to import \u2014 use Needs Splitting');
+      + ' refused \u2014 several companies in one, or not a company at all');
   }
   status.textContent = bits.join(' \u00b7 ');
   /* ⚠️ toggle, NOT add. It only ever ADDED `done`, so once the line had nothing
