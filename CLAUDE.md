@@ -9433,6 +9433,90 @@ that the run was green.** The one time that discipline lapsed, a python heredoc 
 to append 26 assertions, the suite still printed "40 passed", and two brand-new rules shipped
 untested.
 
+### Vendor portal: editable contacts, one dropdown look, price per unit (2026-09-08)
+
+Four reported items, all in `vendor-portal.html`. Two of them uncovered defects that were
+worse than what was reported.
+
+**⚠⚠ A CONTACT ALREADY ON FILE COULD NOT BE CHANGED AT ALL** — *"the one right now
+doesn't have a phone number or role I want to be able to add it."* The card offered delete,
+replace-photo and the two flag toggles and nothing else, so giving somebody a number meant
+deleting and re-adding them, **which discards their photo and their audit trail**. It bit
+hardest on the claimant recorded automatically on approval, who arrives with a name and a
+position and nothing else and is exactly the person a buyer needs to be able to ring.
+
+- **ONE editor for add AND edit** (`_perEditorHtml` / `openPersonEditor` / `closePersonEditor` /
+  `savePerson`), following the catalogue's pattern. The static add-only form is gone: **two form
+  definitions for one record would have drifted**, which is the whole reason it is one builder.
+- **⚠ PRIMARY STAYS EXCLUSIVE.** Saving with Primary ticked clears it on everyone else, the
+  same rule `togglePersonFlag` already enforced — `primaryPerson()` takes the first flagged row
+  and `vendors.contact_*` mirrors it, so two flagged rows make which one wins arbitrary.
+- Name required, email shape checked, both refusing to write anything when they fail.
+
+**⚠ THE ONE PHONE FIELD IN THE PORTAL THAT NEVER GOT A DIAL CODE.** Asked whether the landline
+follows the country (+63). It does, and has since the country picker shipped — but
+`PHONE_FIELDS` is `['f-telephone']` alone, because Company Information's contact/owner numbers
+are **read-only mirrors of Personnel**. So the number a buyer actually rings is typed in the
+Personnel form, and that was the field with no prefill, no placeholder and no normalisation.
+The editor now seeds it from the country, shows the code in the placeholder, and normalises on
+blur (`09171234567` — `+63 9171234567`).
+
+- **⚠ `_dialOnly(v)` IS SHARED WITH `collectOverview`, NOT REIMPLEMENTED.** An untouched
+  prefilled box holds `"+63 "`, and stored as-is the directory fills with contacts whose number
+  is a country code and no digits. The company landline already had that guard; extracting it is
+  what stops the two disagreeing.
+
+**⚠⚠ "DROPDOWNS ARE NOT CONSISTENT" WAS THREE APPEARANCES IN ONE ROW.** Measured: a native
+`<select>` drew the OS chevron, a `<datalist>` input drew **nothing at all** (so it read as a
+plain text box with no hint it offers options), and `TaxonomyPicker`'s button came in **2px
+shorter with 12px type**. All four controls in that editor now measure **39px tall, 13px type,
+8px radius, 1.5px border**, and every control that offers choices carries the same chevron.
+Currency became a datalist too — it was a bare text input for a short known list, and it was
+the third different look in its own three-field row.
+
+- **⚠ `appearance:none` is what removes the OS chevron.** Without it the browser draws its own
+  arrow on top of the background one.
+- **⚠ A `<datalist>` IS DELIBERATELY NOT A `<select>`** here. Origin and currency are free text
+  in the database, so a closed list would silently drop a legitimate value. The chevron gives it
+  the affordance without closing it.
+
+**⚠⚠ AND THE CHEVRON FIX SHIPPED BROKEN FOR ONE RENDER — A LATER `background:` SHORTHAND.**
+Reported from a screenshot as *"wavy fields"*. `html.dark-mode .field input,...{background:#232423}`
+is a **shorthand**, so it resets `background-image`, `-repeat` AND `-position` to initial. Declared
+before it, one rule produced two different-looking bugs from one cause:
+
+| control | specificity vs the shorthand | result |
+|---|---|---|
+| `<select>` | EQUAL — later rule wins | chevron gone entirely, no affordance |
+| `input[list]` | mine is higher (the `[list]`) | image survived, **repeat/position did not** — the arrow TILED across the box as a wavy fill |
+
+The dark rule now sits **after** that shorthand and **restates repeat and position**, which is
+what makes it immune. **A `background` shorthand anywhere downstream will silently undo a
+background-image rule; put the override after it and restate every longhand it touches.**
+
+**⚠⚠ A PRE-EXISTING MOBILE BUG THE EDIT BUTTON MADE CRITICAL: the second contact card was
+off-screen and unreachable.** `@media (max-width:600px){.cat-grid,.prof-grid{grid-template-columns:1fr 1fr}}`
+forced **two columns on a 375px phone** — and because a grid item's default `min-width:auto`
+refuses to shrink below its content, the tracks grew to **181px + 200px inside a 301px
+container**. Nothing scrolled sideways (the page is overflow-clipped), so the second contact's
+Edit and delete buttons simply did not exist on a phone.
+
+- The **base** rule already does the right thing at every width (`auto-fill` over a min track
+  size gives one column on a phone and two from ~554px), so the override now only changes the
+  gap. `min-width:0` on both card types is the belt-and-braces against a long unbroken name.
+- **⚠ `.prof-toggles button` was 21px on a phone**, under the 32px this app requires of a
+  coarse pointer. The portal cannot inherit `dashboard.css`'s rule — it deliberately does not
+  load it — so it has its own. Edit is now the primary way a vendor fills in a contact's
+  number, so it has to be tappable rather than merely visible.
+
+**Verified by driving the real page**, not by reading it: the harness rebuilds `vendor-portal.html`
+verbatim with only the network stubbed, seeded with a second contact shaped exactly like the
+auto-recorded claimant (name + position, no number, no email, no photo). Editing pre-fills and
+writes the right `update`; add mode writes an `add`; **an untouched `+63 ` prefill saves as
+blank**; a blank name and a bad email each write nothing; ticking Primary clears the previous
+one; the four controls measure identically in BOTH themes; and at 375px there is no horizontal
+overflow, one column, and every button on screen at 32px. Zero console errors throughout.
+
 ### Buyback is a WP-List column, and review.html stopped showing contributors every project (2026-09-08)
 
 Reported: **"the buyback column isn't visible for other roles, let's make this available for

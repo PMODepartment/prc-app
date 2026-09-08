@@ -123,6 +123,13 @@
     .prof-toggles button{font-size:11px;padding:3px 8px;border-radius:6px;cursor:pointer;
       border:1px solid var(--border-md);background:var(--surface);color:var(--text-primary)}
     .prof-toggles button:hover{border-color:var(--mw-red);color:var(--mw-red-ink)}
+    /* ⚠ 32px on a touch screen, matching the app-wide rule in dashboard.css —
+       which this page cannot inherit, because it deliberately does not load it.
+       These read 21px on a phone, and Edit is now the primary way a vendor fills
+       in a contact's number, so it has to be tappable rather than merely visible. */
+    @media (hover:none) and (pointer:coarse){
+      .prof-toggles button{min-height:32px;padding:6px 11px;font-size:12px}
+    }
     /* Mirror prompts — the Company Information boxes are read-only, so these say
        where the value comes from and give the one-click way to set it. */
     .mirror-prompt{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
@@ -292,6 +299,20 @@
     .field label{display:block;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#888;margin-bottom:6px}
     .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;font-family:'Montserrat',sans-serif;color:#231F20;outline:none}
     .field input:focus,.field select:focus,.field textarea:focus{border-color:#EE3124}
+    /* ⚠ ONE LOOK FOR EVERY CONTROL THAT OFFERS CHOICES. Three sat side by side in
+       the SAME editor row at three different appearances: a native <select> drew
+       the OS chevron, a <datalist> input drew NOTHING (so it read as a plain text
+       box with no hint it has options at all), and TaxonomyPicker's button came in
+       2px shorter with 12px type. Same box, same chevron, same metrics now.
+       ⚠ appearance:none on the <select> is what removes the OS chevron; without
+       it the browser draws its own arrow on top of the background one. */
+    .field select,.field input[list]{
+      appearance:none;-webkit-appearance:none;-moz-appearance:none;
+      background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236E6C6C' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+    /* The picker is injected by db.js against its own tokens; pull it onto the
+       portal's field metrics so a row of three controls lines up. */
+    .field .txp-btn{padding:10px 12px;font-size:13px;border-color:#e5e5e5}
     .field textarea{resize:vertical;min-height:70px}
     .logo-row{display:flex;align-items:center;gap:14px}
     .logo-box{flex-shrink:0;width:76px;height:76px;border-radius:12px;border:1.5px solid #e5e5e5;
@@ -401,6 +422,17 @@
     html.dark-mode .field input,html.dark-mode .field select,html.dark-mode .field textarea,
     html.dark-mode .add-form input,html.dark-mode .add-form select{
       background:#232423;border-color:#3a3a3a;color:#F0EFEF}
+    /* ⚠⚠ MUST COME AFTER THE RULE ABOVE, AND MUST RESTATE REPEAT/POSITION.
+       That rule uses the `background` SHORTHAND, which resets background-image,
+       -repeat AND -position to initial. Declared earlier it produced two
+       different-looking bugs from one cause: on <select> (equal specificity,
+       later wins) the chevron vanished entirely, and on input[list] (my
+       [list] selector is more specific, so the IMAGE survived but repeat and
+       position did not) the arrow tiled across the whole box as a wavy fill.
+       Restating all three here is what makes it immune to the shorthand. */
+    html.dark-mode .field select,html.dark-mode .field input[list]{
+      background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239D9B9B' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 12px center}
     html.dark-mode .field input:focus,html.dark-mode .field select:focus,
     html.dark-mode .field textarea:focus{border-color:#EE3124}
     html.dark-mode .field input:disabled,html.dark-mode .field select:disabled,
@@ -487,7 +519,7 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     .cat-gcount{font-size:11px;color:#999;font-weight:600}
 
     .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
-    .cat-card{border:1.5px solid #e8e8e8;border-radius:10px;overflow:hidden;background:#fff;
+    .cat-card{border:1.5px solid #e8e8e8;border-radius:10px;overflow:hidden;background:#fff;min-width:0;
       display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s}
     .cat-card:hover{border-color:#F5B8B3;box-shadow:0 2px 10px rgba(0,0,0,.06)}
     .cat-photo{height:132px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;
@@ -514,7 +546,7 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
 
     /* Profile cards — the Stakeholder Map shape */
     .prof-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:12px}
-    .prof-card{border:1px solid #e8e8e8;border-radius:12px;padding:15px;background:#fff;
+    .prof-card{border:1px solid #e8e8e8;border-radius:12px;padding:15px;background:#fff;min-width:0;
       display:flex;align-items:flex-start;gap:13px;position:relative;transition:border-color .15s,box-shadow .15s}
     .prof-card:hover{border-color:#F5B8B3;box-shadow:0 2px 8px rgba(0,0,0,.05)}
     /* padding-right clears the × in the corner on every line, not just the first. */
@@ -633,7 +665,17 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
     html.dark-mode .bid-due-over{color:#FCA5A5}
 
     @media(max-width:600px){
-      .cat-grid,.prof-grid{grid-template-columns:1fr 1fr;gap:9px}
+      /* ⚠⚠ THIS USED TO FORCE `1fr 1fr` AND THE SECOND CARD FELL OFF THE SCREEN.
+         A profile card is an avatar plus three lines of text, so two columns on a
+         375px phone was wrong to begin with — and because a grid item's default
+         `min-width:auto` refuses to shrink below its content, the tracks grew to
+         181px + 200px inside a 301px container. Nothing scrolled sideways (the
+         page is overflow-clipped), so the second contact's Edit and delete
+         buttons were simply unreachable on a phone.
+         The BASE rule already does the right thing at every width — auto-fill
+         over a min track size gives one column here and two from ~554px — so the
+         override only changes the gap now. */
+      .cat-grid,.prof-grid{gap:9px}
       .cat-photo{height:104px}
       .sec-head .btn-primary{margin-left:0;width:100%}
     }
@@ -929,33 +971,17 @@ html.dark-mode .doc-locked{color:#9D9B9B;background:#3a3a3a;border-color:#4a4a4a
 
   <!-- ── Personnel ── -->
   <div class="panel" id="panel-personnel" style="display:none">
-    <div class="sec-head">
+        <div class="sec-head">
       <div class="panel-title">Personnel / Stakeholder Contacts</div>
       <span class="sec-count" id="perCount"></span>
+      <button class="btn-primary" onclick="openPersonEditor()"><i class="ti ti-plus" style="margin-right:5px"></i>Add contact</button>
     </div>
+    <!-- ONE editor for add AND edit (see _perEditorHtml). It was a static add-only
+         form, so a contact already on file could not be given a number or a role
+         without deleting and re-adding them, which throws away their photo and
+         their audit trail. Two form definitions would also have drifted. -->
+    <div class="itm-editor" id="perEditor" style="display:none"></div>
     <div id="personnelList"></div>
-    <div class="itm-editor" style="margin-top:16px;margin-bottom:0">
-      <div class="itm-legend">Add a contact</div>
-      <div class="itm-grid">
-        <div class="field"><label>Name *</label><input id="np-name" placeholder="Full name"></div>
-        <div class="field"><label>Role</label><input id="np-role" placeholder="e.g. Sales Manager"></div>
-        <div class="field"><label>Contact number</label><input id="np-number" placeholder="09xx xxx xxxx"></div>
-        <div class="field"><label>Email</label><input id="np-email" placeholder="name@company.com"></div>
-        <div class="field"><label>Photo</label><input id="np-photo" type="file" accept="image/*"></div>
-        <div class="field"><label>&nbsp;</label>
-          <div class="per-flags">
-            <label><input type="checkbox" id="np-primary" style="width:auto"> Primary contact</label>
-            <label><input type="checkbox" id="np-owner" style="width:auto"> Owner / proprietor</label>
-          </div></div>
-      </div>
-      <div class="per-flag-help">
-        <b>Primary contact</b> is whoever answers a request for quotation fastest — their name,
-        number and email fill in on Company Information. <b>Owner / proprietor</b> is who owns the
-        company; tick it for each owner if there is more than one. Megawide needs both on file to
-        accredit you.
-      </div>
-      <div class="itm-acts"><button class="btn-primary" onclick="addPersonnel()">Add contact</button></div>
-    </div>
   </div>
 
   <!-- ── Bid Board ── -->
@@ -1820,6 +1846,16 @@ function applyDialCode() {
    A trunk-prefix 0 is the convention in the Philippines and most of Europe. In
    countries that have none (US, Canada) a number never legitimately starts with
    0 anyway, so stripping one cannot corrupt a valid number. */
+/* True when a field holds a dial code and nothing else.
+   ⚠ applyDialCode() pre-fills an empty phone box with "+63 ". Left untouched
+      that is what gets SAVED, so the directory fills with rows whose number is a
+      country code and no digits. Shared by the company landline (collectOverview)
+      and the personnel contact number (savePerson) so the two cannot disagree. */
+function _dialOnly(v) {
+  const t = String(v == null ? '' : v).trim();
+  if (!t) return false;                       // blank is blank, not a stray code
+  return !/\d/.test(t.replace(/^\+\d+/, ''));
+}
 function normalisePhone(el) {
   if (!el) return;
   const raw = String(el.value || '').trim();
@@ -2005,7 +2041,7 @@ function collectOverview() {
   // ⚠️ applyDialCode() pre-fills the landline with "+63 ". Left untouched that
   //    is what gets saved, so the directory fills up with rows whose telephone
   //    is a country code and nothing else. No digits after the code => blank.
-  if (f.telephone && !/\d/.test(f.telephone.replace(/^\+\d+/, ''))) f.telephone = '';
+  if (_dialOnly(f.telephone)) f.telephone = '';
   return f;
 }
 /* Tag every locked field with a short "Megawide sets this" note, once. */
@@ -2500,10 +2536,19 @@ function _catEditorHtml(p) {
     + _f('Warranty (months)', 'ce-warranty', p.warranty_months, 'e.g. 12', 'number')
     + _f('Areas served', 'ce-coverage', p.coverage_area, 'e.g. Metro Manila, Cavite')
     + '</div>'
-    + '<div class="itm-legend">Indicative price <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#888">— optional, for early budgeting only. Not a quotation.</span></div>'
+    + '<div class="itm-legend">Indicative price per unit <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#888">— optional, for early budgeting only. Not a quotation.</span></div>'
     + '<div class="itm-grid">'
-    + _fMoney('Indicative price', 'ce-price', p.indicative_price, 'e.g. 4,200')
-    + _f('Currency', 'ce-currency', p.price_currency || 'PHP', 'PHP')
+    /* ⚠ "per unit" is not decoration: the figure is read against the Unit
+       field two rows up, and without it a vendor could give a price per
+       truckload against a unit of cu.m. and nothing on screen would say which. */
+    + _fMoney('Indicative price per unit', 'ce-price', p.indicative_price, 'e.g. 4,200')
+    + '<div class="field"><label>Currency</label>'
+    + '<input id="ce-currency" list="ce-currency-list" autocomplete="off" value="'
+    + esc(p.price_currency || 'PHP') + '" placeholder="PHP">'
+    + '<datalist id="ce-currency-list">'
+    + ['PHP','USD','EUR','JPY','CNY','SGD','AUD','GBP','HKD','KRW','THB','MYR','AED']
+        .map(function (c) { return '<option value="' + c + '">'; }).join('')
+    + '</datalist></div>'
     + _f('Valid until', 'ce-valid', p.price_valid_until, '', 'date')
     + '</div>'
     + '<div class="itm-legend">Photo &amp; spec sheet</div>'
@@ -2625,6 +2670,7 @@ async function renderPersonnel() {
       //    their audit trail. Toggling is the whole point on a directory that
       //    already has people in it.
       + '<div class="prof-toggles">'
+      + '<button onclick="openPersonEditor(' + Q + p.id + Q + ')"><i class="ti ti-pencil"></i> Edit</button>'
       + '<button onclick="togglePersonFlag(' + Q + p.id + Q + ',' + Q + 'is_primary' + Q + ')">'
       + (p.is_primary ? 'Not the primary' : 'Make primary') + '</button>'
       + '<button onclick="togglePersonFlag(' + Q + p.id + Q + ',' + Q + 'is_owner' + Q + ')">'
@@ -2693,32 +2739,130 @@ async function _perLoadPhotos() {
     } catch (_) { /* keep the initials */ }
   }
 }
-async function addPersonnel() {
-  const name = document.getElementById('np-name').value.trim();
+/* One editor for add AND edit.
+   ⚠ A CONTACT ALREADY ON FILE COULD NOT BE CHANGED AT ALL. The card offered
+      only delete, replace-photo and the two flag toggles, so adding a phone
+      number or a role to someone meant deleting and re-adding them — which
+      discards their photo and their audit trail. It also hit the claimant
+      recorded automatically on approval, who arrives with a name and a position
+      and nothing else, and is exactly the person a buyer needs to be able to ring. */
+let _perEditId = null;
+
+function _perEditorHtml(p) {
+  const v = function (x) { return esc(x == null ? '' : x); };
+  const dial = window.countryDial
+    ? window.countryDial((document.getElementById('f-country') || {}).value) : '';
+  /* ⚠ The number a buyer actually rings is typed HERE, not on Company
+        Information — those boxes are read-only mirrors of whoever is flagged
+        primary. So this is the field that needs the country's dial code, and
+        until now it was the one phone field in the portal that never got it. */
+  const num = p.contact_number || (dial ? dial + ' ' : '');
+  return '<div class="itm-legend">' + (p.id ? 'Edit contact' : 'Add a contact') + '</div>'
+    + '<div class="itm-grid">'
+    + '<div class="field"><label>Name <span style="color:#EE3124">*</span></label>'
+    + '<input id="np-name" value="' + v(p.name) + '" placeholder="Full name"></div>'
+    + '<div class="field"><label>Role</label>'
+    + '<input id="np-role" value="' + v(p.role_title) + '" placeholder="e.g. Sales Manager"></div>'
+    + '<div class="field"><label>Contact number</label>'
+    + '<input id="np-number" type="text" onblur="normalisePhone(this)" value="' + v(num) + '"'
+    + ' placeholder="' + v((dial || '+63') + ' 9xx xxx xxxx') + '"></div>'
+    + '<div class="field"><label>Email</label>'
+    + '<input id="np-email" type="email" value="' + v(p.email) + '" placeholder="name@company.com"></div>'
+    + '<div class="field"><label>' + (p.photo_path ? 'Replace photo' : 'Photo') + '</label>'
+    + '<input id="np-photo" type="file" accept="image/*">'
+    + (p.photo_path ? '<div class="field-hint">A photo is already on file \u2014 choosing a new one replaces it.</div>' : '')
+    + '</div>'
+    + '<div class="field"><label>&nbsp;</label><div class="per-flags">'
+    + '<label><input type="checkbox" id="np-primary" style="width:auto"' + (p.is_primary ? ' checked' : '') + '> Primary contact</label>'
+    + '<label><input type="checkbox" id="np-owner" style="width:auto"' + (p.is_owner ? ' checked' : '') + '> Owner / proprietor</label>'
+    + '</div></div>'
+    + '</div>'
+    + '<div class="per-flag-help">'
+    + '<b>Primary contact</b> is whoever answers a request for quotation fastest \u2014 their name, '
+    + 'number and email fill in on Company Information. <b>Owner / proprietor</b> is who owns the '
+    + 'company; tick it for each owner if there is more than one. Megawide needs both on file to '
+    + 'accredit you.</div>'
+    + '<div class="itm-acts">'
+    + '<button class="btn-ghost" onclick="closePersonEditor()">Cancel</button>'
+    + '<button class="btn-primary" id="np-save" onclick="savePerson()">'
+    + (p.id ? 'Save changes' : 'Add contact') + '</button>'
+    + '</div>';
+}
+
+function openPersonEditor(id) {
+  _perEditId = id || null;
+  const p = id ? (_perList.find(function (x) { return x.id === id; }) || {}) : {};
+  const host = document.getElementById('perEditor');
+  host.style.display = '';
+  try {
+    host.innerHTML = _perEditorHtml(p);
+  } catch (err) {
+    // Say WHY rather than leave an empty box \u2014 display is already on by now.
+    console.error('[personnel] editor failed to render', err);
+    host.innerHTML = '<div class="pf-empty"><b>The editor could not open</b>'
+      + esc((err && err.message) || String(err)) + '</div>';
+    return;
+  }
+  host.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const n = document.getElementById('np-name');
+  if (n) n.focus();
+}
+function closePersonEditor() {
+  const host = document.getElementById('perEditor');
+  host.style.display = 'none';
+  host.innerHTML = '';
+  _perEditId = null;
+}
+
+async function savePerson() {
+  const g = function (id) { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+  const name = g('np-name');
   if (!name) { msg('Enter a name first.', 'error'); return; }
+  const email = g('np-email');
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg('That email address does not look right.', 'error'); return; }
   const fields = {
     name: name,
-    role_title: document.getElementById('np-role').value.trim(),
-    contact_number: document.getElementById('np-number').value.trim(),
-    email: document.getElementById('np-email').value.trim(),
-    is_primary: document.getElementById('np-primary').checked,
-    is_owner: document.getElementById('np-owner').checked,
+    role_title: g('np-role'),
+    // ⚠ applyDialCode-style prefill leaves "+63 " in an untouched field, and
+    //    stored as-is the directory fills with contacts whose number is a country
+    //    code and nothing else. No digits after the code => blank. Same guard as
+    //    collectOverview() applies to the company landline.
+    contact_number: _dialOnly(g('np-number')) ? '' : g('np-number'),
+    email: email,
+    is_primary: !!(document.getElementById('np-primary') || {}).checked,
+    is_owner: !!(document.getElementById('np-owner') || {}).checked,
   };
+  const btn = document.getElementById('np-save');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
   try {
-    const row = await VendorDb.personnel.add(vendor.id, fields);
+    let rowId = _perEditId;
+    if (rowId) await VendorDb.personnel.update(rowId, fields);
+    else       rowId = (await VendorDb.personnel.add(vendor.id, fields)).id;
     const ph = document.getElementById('np-photo');
     if (ph && ph.files[0]) {
-      const path = await VendorDb.uploadVendorFile(vendor.id, 'person_' + row.id, ph.files[0]);
-      await VendorDb.personnel.update(row.id, { photo_path: path });
+      const path = await VendorDb.uploadVendorFile(vendor.id, 'person_' + rowId, ph.files[0]);
+      await VendorDb.personnel.update(rowId, { photo_path: path });
     }
-    ['np-name', 'np-role', 'np-number', 'np-email'].forEach(function (id) { document.getElementById(id).value = ''; });
-    document.getElementById('np-primary').checked = false;
-    document.getElementById('np-owner').checked = false;
-    if (ph) ph.value = '';
+    /* ⚠ PRIMARY IS EXCLUSIVE — primaryPerson() takes the first flagged row and
+          vendors.contact_* mirrors it, so two flagged rows make which one wins
+          arbitrary. Same rule togglePersonFlag() enforces. */
+    if (fields.is_primary) {
+      for (const other of _perList) {
+        if (other.id !== rowId && other.is_primary) {
+          try { await VendorDb.personnel.update(other.id, { is_primary: false }); } catch (e) { console.warn(e); }
+        }
+      }
+    }
+    closePersonEditor();
     await renderPersonnel();
     await syncPeopleMirror();
     await flagEdited();
-  } catch (e) { msg('Could not add: ' + (e.message || e), 'error'); }
+    msg(_perEditId ? 'Contact updated.' : 'Contact added.', 'success');
+  } catch (e) {
+    msg('Could not save: ' + (e.message || e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = _perEditId ? 'Save changes' : 'Add contact'; }
+  }
 }
 
 /* ── Bid Board ────────────────────────────────────────────────────────────
