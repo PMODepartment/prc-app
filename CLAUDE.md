@@ -10021,6 +10021,25 @@ rather than eyeballed:** `.field-hint` was `#bbb` on white = **1.9:1** (and the 
 as a FILL, not as small TEXT** — the rule already recorded app-wide. Notice body and
 acknowledgement both measure 7.46:1.
 
+**⚠️⚠️ THE VERIFICATION SELECT FAILED ON THE FIRST REAL RUN WITH `42P01: relation
+"cron.job" does not exist`, and the lesson is worth more than the fix.** It guarded the
+lookup with `case when exists (select 1 from pg_extension ...) then (select ... from
+cron.job) end` — which does nothing, because **a plain SQL statement is parsed IN FULL
+before any of it runs**, so the planner resolves `cron.job` at parse time however
+unreachable that branch is at runtime. Section 2 gets away with naming the same relation
+only because it is **plpgsql**: a DO/function body defers parsing of its SQL statements
+until they execute, so an un-taken branch is never parsed at all. **Reach a possibly-missing
+relation from plpgsql, or through the catalogs (`to_regclass`, which returns NULL rather
+than raising, even when the whole schema is absent) — never from a bare SELECT.** Same trap
+already recorded for `CHECK_migration_status.sql`, in its other form. The cron status is now
+a NOTICE from a `to_regclass`-guarded DO block, and a test asserts **no bare SQL statement in
+the file names `cron.*` at all**.
+
+**⚠️ Sections 1–3 had already applied when that error appeared** — the SQL Editor does not run
+a file as one transaction, so each statement commits independently and only the final SELECT
+died. The function, the schedule attempt and the one-time purge were all in place; the file is
+idempotent, so re-running it is a no-op plus a working report.
+
 **Verified**: migration parses under libpg_query (6 statements, both PL/pgSQL bodies accepted);
 inline scripts parse; no control bytes; and the gate driven in a real browser — unticked blocks
 submit and shows the error with the button still enabled for a retry, ticked clears it (proven

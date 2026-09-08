@@ -103,6 +103,21 @@ select internal.purge_declined_claim_tins() as tins_cleared_now;
 
 
 -- ── 4. verification — every column must read true ───────────────────────────
+-- ⚠️⚠️ NOTHING IN THIS STATEMENT MAY NAME cron.job, AND THAT IS NOT A STYLE
+--    RULE — the first version of this file did, and the whole statement died
+--    with 42P01 on a database where pg_cron is not enabled.
+--
+--    A plain SQL statement is parsed IN FULL before any of it runs, so a
+--    `case when <guard> then (select ... from cron.job) end` does NOT protect
+--    you: the planner resolves cron.job at parse time and fails, however
+--    unreachable that branch is at runtime. This is the same trap already
+--    recorded for CHECK_migration_status.sql, in its other form.
+--
+--    Section 2 gets away with it only because it is plpgsql: a DO/function body
+--    defers parsing of its SQL statements until they actually execute, so an
+--    un-taken branch naming a missing relation is never parsed at all.
+--    ⇒ Reach a possibly-missing relation from plpgsql, or through the catalogs
+--      (to_regclass), never from a bare SELECT.
 select
   (select count(*) = 1 from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
@@ -114,7 +129,31 @@ select
         'internal.purge_declined_claim_tins()', 'execute')                     as not_callable_by_app,
   (select count(*) = 0 from public.vendor_claims
     where status = 'rejected' and claimed_tin is not null
-      and decided_at < now() - interval '30 days')                             as no_stale_tins_left,
-  (select case when exists (select 1 from pg_extension where extname='pg_cron')
-            then exists (select 1 from cron.job where jobname='purge-declined-claim-tins')
-            else null end)                                                     as cron_scheduled_or_null;
+      and decided_at < now() - interval '30 days')                             as no_stale_tins_left;
+
+
+-- ── 5. is it actually scheduled? ────────────────────────────────────────────
+-- Reported as a NOTICE rather than a column, for the reason in section 4.
+-- to_regclass() returns NULL for a missing relation instead of raising, and it
+-- is safe even when the whole `cron` SCHEMA is absent.
+do $verify$
+declare scheduled boolean;
+begin
+  if to_regclass('cron.job') is null then
+    raise notice '--------------------------------------------------------------';
+    raise notice 'pg_cron is NOT enabled, so NOTHING IS PURGED AUTOMATICALLY yet.';
+    raise notice 'The function exists and works — it just has nothing running it.';
+    raise notice 'Either: Database -> Extensions -> enable pg_cron, then re-run this file,';
+    raise notice 'or run   select internal.purge_declined_claim_tins();   periodically.';
+    raise notice '--------------------------------------------------------------';
+  else
+    execute 'select exists (select 1 from cron.job where jobname = $1)'
+       into scheduled using 'purge-declined-claim-tins';
+    if scheduled then
+      raise notice 'OK: cron job "purge-declined-claim-tins" is scheduled (daily, 03:17 UTC).';
+    else
+      raise notice 'pg_cron IS enabled but the job is NOT scheduled — re-run this file.';
+    end if;
+  end if;
+end
+$verify$;
