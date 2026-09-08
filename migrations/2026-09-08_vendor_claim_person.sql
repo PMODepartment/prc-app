@@ -1,20 +1,22 @@
 -- ============================================================================
--- Who is claiming this vendor account — first name, last name, position
+-- Who is claiming this vendor account — first name, last name, position —
+-- and record them under Personnel
 -- ----------------------------------------------------------------------------
 -- Run ONCE in the Supabase SQL Editor, AFTER 2026-09-03_vendor_claim_tin_only.sql.
 -- Safe to re-run: every statement is idempotent and none carries state between
 -- statements (the SQL Editor does not run a file as one transaction).
 --
 -- WHY: the registration form asked only "Your Name — who we should address",
--- one free-text box. A reviewer approving a claim could not see WHO inside the
--- company was asking for control of that vendor's account, or in what capacity.
--- That is the single most useful thing a human reviewer has to go on, because
--- the TIN is evidence about the COMPANY and says nothing about the PERSON.
+-- one optional free-text box. A reviewer approving a claim could not see WHO
+-- inside the company was asking for control of that vendor's account, or in
+-- what capacity — which is the most useful thing a human reviewer has to go on,
+-- because the TIN is evidence about the COMPANY and says nothing about whether
+-- this individual may act for it.
 --
 -- ⚠️ THE OLD 4-ARGUMENT submit_vendor_claim IS DROPPED, NOT LEFT ALONGSIDE.
 --    PostgREST resolves an overload by ARGUMENT NAMES, so leaving both in place
 --    makes rpc('submit_vendor_claim') ambiguous and EVERY registration starts
---    failing. This has already had to be fixed twice in this project
+--    failing. Third time this project has had to take that care
 --    (clarify_bid_by_token, and this same function on 2026-09-03).
 --
 -- ⚠️ claimed_contact_name IS KEPT AND STILL POPULATED, as "First Last". Every
@@ -43,7 +45,7 @@ create or replace function public.submit_vendor_claim(
   p_company text, p_first_name text, p_last_name text, p_position text,
   p_tin text, p_is_new boolean default false)
 returns uuid language plpgsql security definer
-set search_path = public as $$
+set search_path = public as $fn$
 declare
   uid   uuid := auth.uid();
   em    text;
@@ -123,7 +125,7 @@ begin
   --    boolean, would turn this into an oracle for brute-forcing TINs to
   --    discover which companies Megawide works with.
   return v_id;
-end $$;
+end $fn$;
 
 revoke all on function public.submit_vendor_claim(text, text, text, text, text, boolean) from public;
 grant execute on function public.submit_vendor_claim(text, text, text, text, text, boolean) to authenticated;
@@ -134,33 +136,71 @@ comment on function public.submit_vendor_claim(text, text, text, text, text, boo
   'never the match — so it cannot be used to enumerate Megawide''s vendors.';
 
 -- 3 ─────────────────────────────────────────────────────────────────────────
--- Carry the position onto the vendor record when a claim creates a new vendor.
--- ⚠️ Rewritten by SOURCE so the rest of the function is untouched.
-do $$
-declare src text;
+-- The claimant is a PERSON AT THAT COMPANY, so record them under Personnel —
+-- which is where people live, and which vendors.contact_* already mirrors.
+--
+-- ⚠️⚠️ A TRIGGER, NOT AN EDIT TO approve_vendor_claim. Two reasons, and the
+--    second is the one that decided it:
+--    1. It fires for BOTH approval paths without either knowing about it —
+--       create_vendor_from_claim delegates to approve_vendor_claim, so there is
+--       still exactly ONE place that grants access.
+--    2. Editing that function meant either restating it (how
+--       internal.vendor_edit_guard ended up with five migrations silently
+--       disabling each other) or rewriting it by source through a nested
+--       `execute` string — and the first attempt at that came out with its
+--       quoting eaten, turning '\s+' into a bare \s+. A trigger body is
+--       ordinary SQL with ordinary quoting.
+create or replace function internal.record_claimant_as_personnel()
+returns trigger language plpgsql security definer
+set search_path = public as $fn$
+declare person_name text;
 begin
-  select pg_get_functiondef(p.oid) into src
-    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.proname = 'create_vendor_from_claim'
-   limit 1;
-  if src is null then
-    raise notice 'create_vendor_from_claim not found — skipping (run 2026-09-01 first).';
-    return;
-  end if;
-  if position('claimed_position' in src) > 0 then
-    raise notice 'create_vendor_from_claim already carries the position — nothing to do.';
-    return;
-  end if;
-  -- contact_person is written from claimed_contact_name; add contact_position
-  -- immediately after it, in both the column list and the values list.
-  src := replace(src, 'contact_person,', 'contact_person, contact_position,');
-  src := replace(src,
-    'nullif(btrim(coalesce(r.claimed_contact_name, '''')), ''''),',
-    'nullif(btrim(coalesce(r.claimed_contact_name, '''')), ''''), '
-    || 'nullif(btrim(coalesce(r.claimed_position, '''')), ''''),');
-  execute src;
-  raise notice 'create_vendor_from_claim now carries the claimant position.';
-end $$;
+  if new.vendor_id is null then return new; end if;
+
+  person_name := coalesce(
+    nullif(btrim(coalesce(new.claimed_contact_name, '')), ''),
+    split_part(coalesce(new.email, ''), '@', 1));
+  if nullif(btrim(person_name), '') is null then return new; end if;
+
+  -- ⚠️ is_primary ONLY when the vendor has nobody yet. The flag is exclusive,
+  --    and a self-registration must never demote whoever staff already marked
+  --    primary — vendors.contact_* mirrors that row.
+  insert into public.vendor_personnel (vendor_id, name, role_title, email, is_primary)
+  select new.vendor_id,
+         person_name,
+         nullif(btrim(coalesce(new.claimed_position, '')), ''),
+         new.email,
+         not exists (select 1 from public.vendor_personnel x
+                      where x.vendor_id = new.vendor_id)
+   where not exists (
+     select 1 from public.vendor_personnel x
+      where x.vendor_id = new.vendor_id
+        and lower(btrim(regexp_replace(coalesce(x.name, ''), '\s+', ' ', 'g')))
+          = lower(btrim(regexp_replace(person_name, '\s+', ' ', 'g'))));
+
+  -- Fill the vendor contact mirror ONLY where it is still blank. Never
+  -- overwrite curated data — the same rule the masterlist seed follows.
+  update public.vendors v
+     set contact_person   = coalesce(nullif(btrim(coalesce(v.contact_person, '')), ''), person_name),
+         contact_position = coalesce(nullif(btrim(coalesce(v.contact_position, '')), ''),
+                                     nullif(btrim(coalesce(new.claimed_position, '')), '')),
+         contact_email    = coalesce(nullif(btrim(coalesce(v.contact_email, '')), ''), new.email)
+   where v.id = new.vendor_id;
+
+  return new;
+end $fn$;
+
+drop trigger if exists trg_claimant_personnel on public.vendor_claims;
+create trigger trg_claimant_personnel
+  after update on public.vendor_claims
+  for each row
+  when (new.status = 'approved' and old.status is distinct from 'approved')
+  execute function internal.record_claimant_as_personnel();
+
+comment on function internal.record_claimant_as_personnel() is
+  'On approval, records the claimant under vendor_personnel (no photo) and fills '
+  'the vendors.contact_* mirror only where it is blank. Fires for both approval '
+  'paths, since create_vendor_from_claim delegates to approve_vendor_claim.';
 
 -- 4 ─────────────────────────────────────────────────────────────────────────
 -- Verification. Every column must read true.
@@ -168,17 +208,23 @@ select
   (select count(*) = 3 from information_schema.columns
     where table_schema = 'public' and table_name = 'vendor_claims'
       and column_name in ('claimed_first_name','claimed_last_name','claimed_position'))
-                                                                as person_columns_present,
+                                                            as person_columns_present,
   (select count(*) = 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'submit_vendor_claim')
-                                                                as exactly_one_overload,
+                                                            as exactly_one_overload,
   (select p.pronargs = 6 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'submit_vendor_claim')
-                                                                as takes_six_arguments,
+                                                            as takes_six_arguments,
   (select prosecdef from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'submit_vendor_claim')
-                                                                as is_security_definer,
-  (select position('claimed_position' in pg_get_functiondef(p.oid)) > 0
-     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public' and p.proname = 'create_vendor_from_claim')
-                                                                as new_vendor_gets_position;
+                                                            as submit_is_definer,
+  (select count(*) = 1 from pg_trigger t
+    where t.tgrelid = 'public.vendor_claims'::regclass
+      and t.tgname = 'trg_claimant_personnel' and not t.tgisinternal)
+                                                            as personnel_trigger_installed,
+  (select t.tgenabled = 'O' from pg_trigger t
+    where t.tgrelid = 'public.vendor_claims'::regclass
+      and t.tgname = 'trg_claimant_personnel')              as personnel_trigger_enabled,
+  (select prosecdef from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'internal' and p.proname = 'record_claimant_as_personnel')
+                                                            as personnel_fn_is_definer;
