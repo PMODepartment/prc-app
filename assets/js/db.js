@@ -4867,11 +4867,13 @@ function _isPlaceholderVendorName(s) {
         1,360 awarded packages already exceed it — the third time that cap has
         silently hidden data here (see _pagedSelect). */
   async function getAwardedWithoutVendor() {
-    const sb = await getSB();
-    const rows = await _pagedSelect(() => sb.from('work_packages')
-      .select('id,wp_no,project_id,description,trade,works,awarded_cost,'
-        + 'actual_awarding_date,awarding_date,contractor,vendor_id,'
-        + 'awarded_vendor_ids,award_status,not_to_be_awarded'));
+    /* ⚠️ SHARES `_toolWps()` — it used to page the whole work_packages table
+       itself, so this queue cost ~4.5s on EVERY open while the alias queue,
+       already on this cache, opened in 202ms. `_TOOL_WP_COLS` carries the five
+       display columns for exactly this. The 90s TTL is right here: setAwardedVendor
+       busts the cache, so saving a vendor refreshes the queue rather than leaving
+       a filled row on screen. */
+    const rows = await _toolWps();
     const out = rows.filter(w => {
       // DEMO is the read-only sample project: offering its sample rows in a
       // fill-in queue asks an officer to do work that must never be saved.
@@ -4963,7 +4965,13 @@ function _isPlaceholderVendorName(s) {
   const _TOOL_WP_COLS = 'id,project_id,wp_no,contractor,proposed_vendors,vendor_id,'
     + 'awarded_vendor_ids,award_status,not_to_be_awarded,free_of_charge,'
     + 'awarded_cost,total_awarded,'
-    + 'buyback,buyback_depreciation_percent,buyback_amount';
+    + 'buyback,buyback_depreciation_percent,buyback_amount,'
+    /* ⚠️ THE LAST FIVE ARE DISPLAY-ONLY, and they are here so the fill-in queue
+       can share this read instead of doing its own. Measured before adding them:
+       +162ms and +285KB on a 1,879-row read, against 4,481ms saved on EVERY open
+       of "Awarded, no vendor recorded" — it was re-reading the whole table each
+       time while the alias queue, already on this cache, opened in 202ms. */
+    + 'description,trade,works,actual_awarding_date,awarding_date';
   const _TOOL_WP_TTL = 90000;
   let _toolWpCache = null;
   async function _toolWps() {
