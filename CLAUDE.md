@@ -9433,6 +9433,65 @@ that the run was green.** The one time that discipline lapsed, a python heredoc 
 to append 26 assertions, the suite still printed "40 passed", and two brand-new rules shipped
 untested.
 
+### The vendor registration page: measure, consent card, and the gate (2026-09-08)
+
+**⚠⚠ THE FORM COLUMN HAD NO MAX-WIDTH.** It was whatever the window left over
+— measured **1,428px at 1920** — so the sub-heading, the TIN note and the privacy
+text each ran as single lines around 200 characters, with the inputs stretched to
+match. Capped at **840px, centred**: note lines 56 characters, privacy columns 51,
+and the three-up name/position row at 272px each.
+
+- **⚠ The cap goes on `.form-wrap`'s `.step` children, NOT inside `.step`** —
+  `.form-wrap` is the column flex container, and putting it deeper would have left
+  the success and status screens at full width.
+
+**The privacy notice is now one bounded card**, not fine print. It was loose text
+under a hairline with the checkbox floating below as an orphan.
+
+- **⚠ MEASURED DEFECTS, not taste:** the first surface was **1.04:1 against the
+  white form** — effectively invisible, with a 1px hairline doing all the work —
+  and the consent checkbox was a **17px touch target on a REQUIRED action**, against
+  the 32px this app requires of a coarse pointer. Now `#F4F4F6` on a `#DFDFE2`
+  border, and the whole row is the target (20px box, 32px minimum on touch).
+- **⚠ NEUTRAL, NOT RED.** The TIN guidance directly above is already a red
+  `.note`; a second red panel competes with it and reads as an alarm.
+- **⚠ 12px body, not 11.5.** This is the one block a person is legally expected to
+  read, so it does not get the fine-print treatment. Card contrast: body 6.79,
+  links 5.32, acknowledgement 11.5 — all AA.
+- **⚠ SPACING IS THE ONLY LAYOUT KNOB HERE.** The substance — purpose,
+  recipients, data-subject rights, complaint route, DPO contact — is already the
+  short layered form, with the detail behind the Privacy Statement link. **Do not
+  shorten the text to make the page fit.**
+
+**⚠⚠ THE ACKNOWLEDGEMENT IS A HARD GATE, verified by driving it rather than by
+reading it.** With the box unticked: the error shows, **`signUp` is never called and
+the claim RPC is never called** — no auth account, no claim row. Ticked: both fire.
+The check sits at the end of the synchronous validation, before `if (bad) return;`.
+
+**⚠ THE PAGE STILL SCROLLS ON A SMALL LAPTOP, and that is the accepted trade.** It
+needs ~816px; a 1366x768 laptop has ~648px of viewport. It fits 1080p at 100%. The
+privacy card is ~175px of that, and shrinking a legal notice to remove a scrollbar
+is not a trade worth making. If it has to fit, the decision to take is collapsing
+the notice's detail behind the Privacy Statement link — a layered notice — which
+is a legal-adjacent call, not a layout one.
+
+**`vendor-login.html` gained a privacy SIGNPOST, not a notice.** Signing in
+authenticates an account that already exists; the collection notice belongs on the
+registration page, where personal data is actually collected, and it is there. This
+is one line so a vendor can reach the statement from either door.
+
+- **⚠ Its `.form-links` was `#999` — about 2.85:1 on white — and that is the
+  only body text on the page.** Now `#6E6C6C` (the app's own `--text-hint`): 5.22
+  light, 4.95 dark, links 5.84 / 6.18.
+
+**⚠⚠ A HARNESS THAT REMOVES THE SUPABASE SCRIPT CANNOT TEST THIS PAGE.** The
+inline script fails at `createClient`, so every `let`/`const` after it is left in the
+Temporal Dead Zone. Function declarations still hoist, so `submit()` exists and is
+callable — but being `async`, it returns a REJECTED PROMISE instead of throwing,
+so an unawaited call looks like it silently did nothing. The first pass at proving
+the consent gate reported "the error did not show" for exactly that reason. **Stub
+`window.supabase.createClient` so the page initialises; do not delete the script.**
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
