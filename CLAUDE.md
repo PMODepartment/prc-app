@@ -9127,6 +9127,111 @@ placeholder into `notes` and nulling the column is the clean fix; it flips 327 c
 discards the `IMPORT` (foreign, legitimately no PH TIN) vs `NO TIN` distinction, which is real
 information.
 
+### ⚠⚠ A ROLE IS NOT A COMPANY, AND TWO BADGES POINTED AT WORK THEY COULD NOT DO (2026-09-08)
+
+Asked, off the live Data Tools menu: *"What should I do in the data tools so that no
+notification will show and data is clean."* Measuring every badge to answer it found three
+defects, two of them mine.
+
+#### ⚠⚠ `Import from WPs` WAS ABOUT TO CREATE A VENDOR NAMED "ACCREDITED VENDOR"
+
+`_PLACEHOLDER_VENDOR_RE` is a flat list of known placeholder phrases, so it could not see a
+ROLE written as one: **`Accredited Vendor`** (4 work packages, ₱4.43M), **`Local Vendor`**,
+**`VARIOUS ACCREDITED DESIGNER`**, **`MCC VARIOUS ACCREDITED SUBCON`**, `Various Accredited
+Subcon`, `VARIOUS DESIGNER` — and a further dozen inside garbled strings. All five
+single-segment ones were in the `importable` set, so **one click would have created a vendor
+record for each**, the same class of bug that produced the vendor literally named `n/a`. They
+were also counted as unattributed awarded spend waiting on a company that does not exist.
+
+**`_isRoleNotACompany(s)` is STRUCTURAL, not another word list** — strip the qualifiers a
+buyer puts in front of a role word (`various / other / all / any / accredited / local /
+approved / mcc / regular / assorted / misc`) and ask whether anything DISTINCTIVE survives.
+Same idea as `_isContinuationSegment` in the Split tool, and it is what keeps the rule narrow.
+Folded into `_isPlaceholderVendorName`, so every consumer picks it up at once: the
+`createVendor` guard, `importVendorsFromWPs`, the badge counts, the analytics banner and the
+unlinked worklist.
+
+- **⚠ A QUALIFIER ALONE IS NEVER ENOUGH** — at least one word must BE the role, or bare
+  `MCC` (a real prefix on a dozen Megawide business units) would read as a placeholder.
+- **⚠ THE NEGATIVES ARE THE POINT, and they are asserted as tests:** `Accredited Vendor
+  Corp`, `Local Vendor Supply Inc.`, `Various Industries Inc.`, `Assorted Metals Corporation`,
+  `NA Steel Works`, `None Such Builders Inc`, `Noneco Supply`, `Local Cebu Subcon` (— "Cebu"
+  is distinctive) and `Various Scm Recommendations` all keep a distinctive token and are NOT
+  caught. Getting one of these wrong REFUSES TO CREATE a genuine vendor.
+- **Verified: 40 assertions against the verbatim shipped `_isPlaceholderVendorName`**
+  extracted from `db.js` and run under `node:vm`, covering every catch, every documented
+  negative, and the whole pre-existing pattern unchanged.
+- Deliberately still missed, and correctly so: `VRAIOUS ACCREDITED SUBCONTRACTOR` (a typo in
+  the qualifier) and `Various Scm Recommendations`. Both are ₱0-or-tiny and land in the
+  worklist for a person. **Contorting the rule to catch a typo is how it starts catching real
+  companies.**
+
+#### ⚠⚠ THE BACKFILL BADGE READ 24 WHILE THE TOOL COULD WRITE 18 — AND I GOT THE REASON WRONG FIRST
+
+CLAUDE.md recorded the 24 as a structural floor of "7 ₱0 awards and 17 co-awards". Measured
+against production: **co-awards are NOT excluded** — `backfillVendorDataFromWPs` credits
+every resolved vendor on a work package, using the per-vendor amounts when present and an even
+split otherwise. **Only 6 are unwritable**, all on WCB358, all awarded at `awarded_cost = 0`,
+which the tool skips by its own gate `award_status === 'Awarded' && (awarded_cost || 0) > 0`.
+
+So the badge sat permanently at 24 and clicking it left 6 behind with no explanation. The count
+now applies that same ₱0 gate — the principle the resolvable test beside it already follows:
+**count what the tool WRITES.**
+
+- **⚠⚠ `awarded_cost` HAD TO JOIN `_TOOL_WP_COLS`, AND NEARLY DID NOT.** That shared read
+  carried only `total_awarded` — the GENERATED column (`awarded_cost + additionals`), a
+  DIFFERENT number. The new guard would have read `undefined`, `(undefined || 0) > 0` would be
+  false, and **the badge would have silently read 0 for everything.** Caught by reading the
+  column list before trusting the guard. The money helpers read `total_awarded`; Backfill gates
+  on `awarded_cost`; a badge that mirrors a tool must read the same column the tool does.
+- **⚠ STILL OPEN, a business decision rather than a bug:** under the PMO ruling (#43) an award
+  at ₱0 is a real award, so those 6 arguably deserve a ₱0 bid row. That means deciding what
+  a bid record MEANS at zero. Until then they are honestly uncounted rather than promised.
+
+#### ⚠⚠ THREE MESSAGES SENT WORK-PACKAGE GARBLE TO A TOOL THAT CANNOT REACH IT
+
+The analytics banner, the unlinked-worklist group note and the Data Tools status line all said
+**"use Needs Splitting"** for a multi-company string. **That tool scans DIRECTORY ROWS**; these
+are free text in `work_packages.contractor` and were never imported as rows — which
+CLAUDE.md already recorded ("reachable by no tool"). After the BP-code filter took its count to
+0 the tool also **hides itself**, so the advice pointed at a menu item that is not there.
+
+All three now say what actually closes them: **fix the contractor field on the work package so
+each company is named separately** — and never an alias, which maps the WHOLE string to ONE
+vendor, exactly the collapsing-alias damage that had to be undone 49 times.
+
+#### What the badges actually mean, measured 2026-09-08 (DEMO excluded)
+
+| badge | reads | what clears it |
+|---|---|---|
+| **Backfill Trade/Bid Data** | 24 -> **18** | one click. The 6 left are ₱0 awards — see above |
+| **Awarded, no vendor recorded** | **911** (₱13.95B) | **nothing in the app.** Needs the PO or contract |
+| **Unlinked vendor names** | **915** | a person, name by name |
+| **Import from WPs** | **411** -> ~406 | a business decision, not a cleanup |
+| **Merge Duplicates** | uncounted | by design — it is a judgement call, so it is never hidden |
+
+- **⚠⚠ THE 911 IS NOT A MATCHING PROBLEM AND NO RULE REACHES IT.** Of those work packages
+  **840 have no bid row at all**, 32 carry several awarded bids (ambiguous), 39 carry one bid
+  that is not marked awarded, and **0 are resolvable from a single awarded bid** — the 50
+  that were, were already done. Worst: MST347 173 ₱2.68B, QHL706 116, AVR101 113, OPW101 70
+  ₱1.76B.
+- **Of the 915 unlinked names, only 147 carry ANY awarded money**; 732 are proposed-only
+  (₱0). Linking those improves the WP-List vendor filter and the vendor profile, and moves no
+  spend. 480 are multi-company strings, 393 single companies, 4 placeholders, 2 ambiguous.
+- **⚠⚠ THE REMAINING ₱926M OF UNATTRIBUTED AWARDED SPEND CANNOT BE TILED SHUT.** 45
+  awarded work packages carry contractor text but no stored link; 13 are placeholders
+  (₱340.56M, `Various Supplier` alone is ₱340.56M across 11) and **32 tile to a residue
+  — 0 of 45 resolve cleanly**, because each names at least one company that is genuinely not
+  in the directory. The blockers are the names already flagged for a human: `E.C DAUGHSON`
+  (₱177.85M), `Enci` (₱104.06M, 4 WPs), `Ramp` (₱100.35M), `Prime Power` (₱58.49M),
+  `Ursua Sand & Gravel`, `Hitachi/Otis/Kone`, `MCC Admin`, `AMG`, `Nexus`, `Trigold`.
+  **Confirms the earlier finding: the blocker is missing records, not parsing.**
+
+**⚠ A BADGE THAT CAN NEVER CLEAR TRAINS PEOPLE TO IGNORE IT.** Two of these five are standing
+worklists measured in months of human effort, not defects — which is why the alert dot
+deliberately sums only the small actionable counts, and why the fill-in queue is deliberately
+un-badged.
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
