@@ -28,9 +28,9 @@
        login.html's for that reason; this form has three more fields than a
        sign-in does. It still SCROLLS when it has to (`overflow-y:auto` stays) —
        the goal is that it rarely has to, never that content gets clipped. */
-    .form-wrap{flex:1;display:flex;flex-direction:column;justify-content:center;padding:24px 56px;background:#fff;overflow-y:auto}
+    .form-wrap{flex:1;display:flex;flex-direction:column;justify-content:center;padding:16px 56px;background:#fff;overflow-y:auto}
     .form-title{font-size:22px;font-weight:700;color:#231F20;margin-bottom:4px}
-    .form-sub{font-size:13px;color:#999;margin-bottom:14px;line-height:1.5}
+    .form-sub{font-size:13px;color:#999;margin-bottom:10px;line-height:1.5}
     .field{margin-bottom:12px}
     .field label{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888;margin-bottom:4px}
     .field input{width:100%;padding:10px 14px;border:1.5px solid #e8e8e8;border-radius:8px;font-size:14px;font-family:'Montserrat',sans-serif;color:#231F20;background:#fff;outline:none;transition:border-color .15s}
@@ -52,23 +52,55 @@
     .msg{font-size:13px;padding:10px 14px;border-radius:8px;margin-bottom:14px;line-height:1.5;display:none}
     .msg.error{background:#FEE2E2;color:#991B1B;display:block}
     .msg.success{background:#D1FAE5;color:#065F46;display:block}
-    .form-footer{text-align:center;margin-top:13px;font-size:13px;color:#999}
+    .form-footer{text-align:center;margin-top:10px;font-size:13px;color:#999}
     .form-footer a{color:#EE3124;text-decoration:none;font-weight:600}
     .step{display:none}
     .step.on{display:block}
-    .note{font-size:12px;line-height:1.55;color:#666;background:#FDECEA;border:1px solid #F5B8B3;border-left:3px solid #EE3124;border-radius:6px;padding:10px 13px;margin-bottom:15px}
+    .note{font-size:12px;line-height:1.55;color:#666;background:#FDECEA;border:1px solid #F5B8B3;border-left:3px solid #EE3124;border-radius:6px;padding:9px 12px;margin-bottom:11px}
     .note b{color:#231F20}
     /* Privacy notice + acknowledgement. Plain text at readable contrast
        (#555 on white is about 7:1) — a notice nobody can read is not a notice,
        and the .field-hint grey used elsewhere on this page (#bbb) is far below
        AA. RA 10173 s16(a). */
-    .privacy{font-size:12px;line-height:1.6;color:#555;border-top:1px solid #eee;margin-top:18px;padding-top:14px}
-    .privacy b{color:#231F20}
+    /* ⚠️ SPACING ONLY. The SUBSTANCE of this notice is not a layout knob — it is
+       the purpose, the recipients, the data-subject rights, the complaint route
+       and the DPO contact, and it is already the short layered form (the detail
+       lives behind the Privacy Statement link). Tighten the rhythm here; do not
+       shorten the text to make the page fit. */
+    /* ⚠️ ONE BOUNDED COMPONENT, notice + acknowledgement together. They were
+       loose text under a hairline with the checkbox floating below as an orphan,
+       and at this form width that meant 11.5px grey text running ~150 characters
+       per line — roughly twice a readable measure. The two-column body halves the
+       line length AND the height; it collapses to one column under 900px.
+       ⚠️ NEUTRAL, NOT RED. The TIN guidance directly above is already a red
+       `.note`; a second red panel would compete with it and read as an alarm.
+       Body #555 on #FAFAFA is ~7:1. */
+    /* ⚠️ #F4F4F6 with a #DFDFE2 border, not #FAFAFA/#EAEAEA. Measured, the first
+       cut was 1.04:1 against the white form — effectively invisible, with a
+       hairline doing all the work of delineating it. A consent notice has to
+       read as a deliberate block, not as something that faded into the page. */
+    .privacy{border:1px solid #DFDFE2;background:#F4F4F6;border-radius:8px;padding:11px 13px;margin-top:12px}
+    .privacy-h{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;
+               letter-spacing:.05em;text-transform:uppercase;color:#231F20;margin-bottom:7px}
+    .privacy-h svg{flex-shrink:0;width:13px;height:13px;fill:none;stroke:#767676;stroke-width:2}
+    /* 12px, not 11.5: this is the one block on the page a person is legally
+       expected to actually read, so it does not get the fine-print treatment. */
+    .privacy-cols{display:flex;gap:22px;font-size:12px;line-height:1.55;color:#555}
+    .privacy-cols p{flex:1;min-width:0;margin:0}
     .privacy a{color:#C42127;font-weight:600;text-decoration:underline}
-    .privacy a:hover{text-decoration:underline}
-    .ack{display:flex;align-items:flex-start;gap:9px;margin:11px 0 4px;font-size:12px;line-height:1.5;color:#555}
-    .ack input{margin-top:2px;flex-shrink:0;width:15px;height:15px;accent-color:#EE3124;cursor:pointer}
-    .ack label{cursor:pointer}
+    /* ⚠️ THE WHOLE ROW IS THE TARGET. The checkbox alone was 15px and the label
+       17px tall — half the 32px this app requires of a coarse pointer, on a
+       REQUIRED consent action. `flex:1` on the label makes the full row width
+       clickable, and the row keeps a 32px minimum on touch. */
+    .ack{display:flex;align-items:flex-start;gap:10px;margin-top:9px;padding-top:9px;
+         border-top:1px solid #DFDFE2;font-size:12px;line-height:1.5;color:#333}
+    .ack input{margin-top:1px;flex-shrink:0;width:17px;height:17px;accent-color:#EE3124;cursor:pointer}
+    .ack label{cursor:pointer;flex:1;min-width:0}
+    @media(hover:none) and (pointer:coarse){
+      .ack{min-height:32px;align-items:center}
+      .ack input{width:20px;height:20px;margin-top:0}
+    }
+    @media(max-width:900px){ .privacy-cols{flex-direction:column;gap:7px} }
     .status-card{border:1.5px solid #e8e8e8;border-radius:10px;padding:22px;margin-bottom:18px}
     .status-card h3{font-size:16px;font-weight:700;color:#231F20;margin-bottom:8px}
     .status-card p{font-size:13px;color:#666;line-height:1.6}
@@ -228,28 +260,33 @@
            promise, never promise better than you do. DO NOT add the number back here to
            "match" the migration. -->
       <div class="privacy">
-        <b>How we use what you enter here.</b> Megawide uses your company name, TIN, your
-        name, position and email address to check this registration against our existing
-        supplier records, to process your accreditation, and to meet tax and regulatory
-        reporting obligations. It is read by the Megawide Procurement staff who review your
-        registration.
-        <br><br>
-        You may ask to access, correct or remove your personal data, and you may complain to
-        the National Privacy Commission. The full details, including how long we keep your
-        information, are in Megawide&rsquo;s
-        <a href="https://megawide.com.ph/privacy-statement/" target="_blank" rel="noopener noreferrer">Privacy
-        Statement</a>, and privacy questions go to
-        <a href="mailto:rgomez@megawide.com.ph">rgomez@megawide.com.ph</a>.
+        <div class="privacy-h">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/></svg>
+          How we use your information
+        </div>
+        <div class="privacy-cols">
+          <p>Your company name, TIN, name, position and email are used to check this
+          registration against our supplier records, process your accreditation, and meet tax
+          and regulatory reporting obligations. They are read by the Megawide Procurement
+          staff who review it.</p>
+          <p>You may access, correct or remove your personal data, and may complain to the
+          National Privacy Commission. Full details, including how long we keep your
+          information, are in Megawide&rsquo;s
+          <a href="https://megawide.com.ph/privacy-statement/" target="_blank" rel="noopener noreferrer">Privacy
+          Statement</a>. Privacy questions:
+          <a href="mailto:rgomez@megawide.com.ph">rgomez@megawide.com.ph</a>.</p>
+        </div>
+        <!-- ⚠️ INSIDE the card, and its second clause is not boilerplate: it is the only
+             point in the whole flow where the claimant states, on the record, that they
+             may act for this company. The TIN is evidence about the COMPANY and says
+             nothing about the PERSON. -->
+        <div class="ack">
+          <input type="checkbox" id="privacyAck">
+          <label for="privacyAck">I have read the Privacy Statement, and I confirm I am authorised
+            to submit this registration on behalf of the company named above.</label>
+        </div>
       </div>
-      <!-- The second clause is not boilerplate: it is the only point in the whole flow
-           where the claimant states, on the record, that they may act for this company.
-           The TIN is evidence about the COMPANY and says nothing about the PERSON. -->
-      <div class="ack">
-        <input type="checkbox" id="privacyAck">
-        <label for="privacyAck">I have read the Privacy Statement, and I confirm I am authorised
-          to submit this registration on behalf of the company named above.</label>
-      </div>
-      <div class="field-error" id="errPrivacy" style="margin-bottom:12px">Please confirm this before submitting.</div>
+      <div class="field-error" id="errPrivacy" style="margin:6px 0 10px">Please confirm this before submitting.</div>
       <button class="btn-primary" id="btnSubmit">Submit Registration</button>
       <div class="form-footer">Already activated? <a href="vendor-login.html">Sign in</a></div>
     </div>
