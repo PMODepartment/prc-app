@@ -9028,6 +9028,105 @@ where `vendor_id` is not a member of `awarded_vendor_ids`, across all 1,879 work
 | Needs Splitting ₱ exact duplicates ₱ non-canonical trades | **0 ₱ 0 ₱ 0** |
 | Backfill badge | **24** (structural floor: ₱0 awards and co-awards) |
 
+### ⚠⚠ NEEDS SPLITTING WAS 15 FALSE POSITIVES, AND ONE SHAPE WAS DESTRUCTIVE (2026-09-07)
+
+Reported from the live tool: branches were being offered for splitting. Correct — and **my earlier
+"Needs Splitting: 0" reading was MY OWN HARNESS BUG, not the app.** `_looksGarbled(v)` takes the
+**vendor OBJECT** and I passed `v.name`, so `v.name` was `undefined` inside it and it returned false
+for all 2,434 rows. **Sixth time this session a failure has been my own test.** The real count was
+15, and every one was a false positive:
+
+| shape | example | why it is ONE company |
+|---|---|---|
+| a BRANCH | `E.B. Testing Center, Inc. (Iloilo Branch)` | its own BP code and its own TIN branch |
+| OPC / LLC | `Airytrade Construction & Development, Opc` | `OPC` was missing from the suffix list entirely |
+| a PERSON's suffix | `Esteban U. Dychauco, Jr.` | `Jr.` is a name suffix, not a company |
+| a geography parenthetical | `Fujian Electric Power Engineering Company (Philippines) Inc.` | a qualifier |
+| a BROKEN parenthetical | `C.S Enriquez (CSEMSCORP Contractors, Fabricators) Inc.` | the split cut through `( … )` |
+| a joint venture | `BPI/MS Insurance Corporation` | one insurer; the slash is in its registered name |
+| a comma IN the name | `Gotuaco, Del Rosario Insurance Brokers, Inc.` | one brokerage |
+| a PERSON | `Sare, Antoniette Magallanes` | Surname, Firstname |
+| a municipality | `Muncp of Nabas, Aklan (IRA)` | `Nabas, Aklan` is a place |
+| a foreign legal form | `Oracle Corporation Singapore Pte. Ltd.` | `Pte. Ltd.` is Singapore's |
+
+**⚠⚠ THE BRANCH CASE WOULD HAVE DESTROYED DATA.** The tool offered
+**"Split (1 new + 1 linked to existing)"** — it had matched the `E.B. Testing Center` half to the
+parent row, so accepting it would have folded a legitimate branch record into its parent and created
+a junk `Inc. (Iloilo Branch)` vendor. A branch is its own BP code and its own TIN branch code.
+
+**Two fixes, and the second is the decisive one:**
+
+- **`_isContinuationSegment(seg)`** replaces the whole-segment `CORP_SUFFIX_RE` test. A segment that
+  names no company of its own is a CONTINUATION of the one before it, so it merges back when nothing
+  distinctive survives stripping **parentheticals, legal forms (now incl. OPC/LLC/PLC/Pte/Pty/Sdn/
+  Bhd/GmbH/AG/SA/NV/BV/SRL/SpA/AS) and PERSONAL-NAME suffixes (Jr/Sr/II/III/IV)**. Plus an
+  **unbalanced-parenthesis** rule, since a split through `( … )` leaves a fragment that cannot be a
+  company. Fixes 9 of the 15.
+- **⚠⚠ `_splitCandidates()` NOW SKIPS ANY VENDOR CARRYING A BP CODE.** That code comes from
+  Megawide's own SAP accredited masterlist, where it identifies ONE legal entity — or one BRANCH of
+  one, equally not a thing to split. **The garbled records this tool exists for are the
+  work-package-derived rows, and NEITHER `importVendorsFromWPs` NOR `quickCreateVendor` sets a
+  `vendor_code`.** Measured: **15 of 15 flagged rows carried a code and ZERO code-less rows were
+  flagged**, so the filter costs nothing real and takes the backlog to 0 with no judgement calls.
+  It gates the AUTO-FLAGGED list only — the search box still pulls any vendor in by hand.
+
+**Verified: 23 assertions against the verbatim shipped segmenter**, including the regression that
+matters — `A.L Design, BCS, JCDC`, the MCC four-company string, slash- and colon-joined garbles and
+the no-delimiter suffix-run fallback all still split exactly as before. Then confirmed live on the
+deployed site: **0 candidates, branches read as 1 segment, real garbles still 3 and 4.**
+
+### ⚠ A TIN THAT IS NOT A TIN CAN MATCH A REGISTERING VENDOR TO THE WRONG COMPANY (2026-09-07)
+
+Asked whether accredited vendors lack a TIN, and whether `vendor-register` needs reconciling for
+them. **It did.**
+
+**334 of 2,400 accredited vendors have no usable TIN** — 114 blank, 117 `NO TIN`, 91 `IMPORT`, plus
+`NA`/`N/A`/`FOREIGN`/`-` and 7 junk numerics. **Reconciled against the masterlist: 0 are fillable.**
+Every gap in the app is a gap in the workbook (which itself holds `NO TIN` 116, blank 111, `IMPORT`
+95, `0` ₱5, `1`, `3934575`, `NA` ₱2, `FOREIGN`). **The import is faithful; there is nothing to
+copy across.**
+
+**⚠⚠ BUT SEVEN OF THEM WERE A LIVE DEFECT IN THE CLAIM MATCHER.** `internal.norm_tin()` is
+`nullif(regexp_replace(s,'\D','','g'),'')` — strip non-digits, then nullify only an **EMPTY**
+result. So:
+
+- `NO TIN` / `IMPORT` / `FOREIGN` / `NA` / `N/A` / `-` / blank -> **NULL** -> match nobody. Those
+  327 are safe, and Tier 1 correctly skips them.
+- **`"1"` -> `"1"`, which uniquely matched V-01393 Construction Industry Arbitration Commission**,
+  and **`"3934575"` uniquely matched V-01349 SBM Leasing** — so a claimant typing either as their
+  TIN was handed a **`method='tin'`, `confidence='high'` match to the wrong company.** Staff review
+  every claim, so it was never an automatic grant — but the whole design leans on that match being
+  trustworthy, and a confidently-wrong one is what gets approved.
+- **`"0"` -> 5 rows -> `ambiguous`, no match** — safe **only by accident of there being five.**
+  Cleaning any four would have made the fifth uniquely matchable by typing `0`.
+
+**Fixed: all 7 cleared to NULL, with the raw value and the reason recorded in `notes`** — which also
+makes `accredReadiness` honest for them and **un-freezes the field** (`internal.vendor_edit_guard`
+pins `tin` once non-blank, so a placeholder locks a vendor out of ever supplying a real one).
+**⚠ `3934575` was NOT padded to `003-934-575`** even though Excel stripping leading zeros from a
+numeric cell is the obvious explanation — **a wrong TIN is worse than none**; the hypothesis is in
+the note for whoever checks the BIR 2303.
+
+**Coverage after the fix, replicating the RPC's own normalisers over the whole `vendors` table:**
+
+| how an accredited vendor can self-identify | vendors |
+|---|---|
+| unique TIN (Tier 1, `high`) | **2,033** |
+| unique company name (Tier 2, `medium`) | **367** |
+| **cannot self-identify at all** | **0** |
+
+So **every accredited vendor can register**, and no claimant-typed TIN can now hit a short or junk
+value (**0 non-null normalised TINs under 9 digits remain**). The 367 name-only vendors are the ones
+to watch: they match at `medium`, so a reviewer carries more of the weight — 49 of them are the
+same-TIN groups whose TIN is deliberately NOT unique, and the rest are the masterlist's own blanks.
+
+**⚠ STILL THE USER'S CALL, unchanged: the 327 `NO TIN`/`IMPORT` placeholders.** They are safe for
+registration, but `accredReadiness` counts a non-blank TIN as satisfied and the edit guard freezes
+it, so those vendors' checklists claim a TIN on file and they can never supply a real one. Moving the
+placeholder into `notes` and nulling the column is the clean fix; it flips 327 checklists and
+discards the `IMPORT` (foreign, legitimately no PH TIN) vs `NO TIN` distinction, which is real
+information.
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
