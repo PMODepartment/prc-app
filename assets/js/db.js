@@ -607,14 +607,33 @@ window.fmtSavingsBuyback = function (hm) {
   const color = raw >= 0 ? '#2D9B6F' : '#EE3124';
   const sign = raw >= 0 ? '+' : '-';
   const hasBB = bb > 0.5; // ignore rounding dust
-  // Own line (display:block) — the KPI value is white-space:nowrap;overflow:hidden,
-  // so an inline annotation gets clipped mid-word on narrow cards.
-  const bbMoneyNote = hasBB ? `<span style="display:block;font-size:0.5em;font-weight:600;color:#888;line-height:1.4;overflow:hidden;text-overflow:ellipsis">+${Fmt.moneyShort(bb)} Buyback</span>` : '';
-  const bbPctNote = hasBB ? ` <span style="font-weight:600;color:#888">(+${bbPct.toFixed(1)}% Buyback)</span>` : '';
+  const money = sign + Fmt.moneyShort(Math.abs(raw));
+  const pct   = (raw >= 0 ? '+' : '') + rawPct.toFixed(1) + '%';
+  const bbMoneyTxt = hasBB ? '+' + Fmt.moneyShort(bb) + ' Buyback' : '';
+  const bbPctTxt   = hasBB ? '+' + bbPct.toFixed(1) + '% Buyback' : '';
+  /* ⚠️ `val` AND `sub` ARE THE FIGURES ONLY — no buyback annotation rides along.
+     `.ov-cost-grid .metric-value` is white-space:nowrap;overflow:hidden, so anything
+     appended inline there is clipped mid-word (Known Issues #35). Each caller composes
+     the annotation where ITS OWN layout wants it, which is why there are three shapes
+     below rather than one. */
+  /* ⚠️ var(--text-hint), not the #888 used elsewhere in the app: #888 is 3.54:1 on a
+     white card, which the app tolerates for 10-11px BOLD LABELS but these are
+     financial figures somebody reads off a screen in a meeting. --text-hint is
+     5.06:1 light / ~6:1 dark and follows the theme instead of being a fixed hex. */
+  const note = t => `<span style="display:block;font-size:0.5em;font-weight:600;color:var(--text-hint);line-height:1.4;overflow:hidden;text-overflow:ellipsis">${t}</span>`;
   return {
-    val: sign + Fmt.moneyShort(Math.abs(raw)) + bbMoneyNote,
+    val: money,
     full: sign + Fmt.moneyFull(Math.abs(raw)) + (hasBB ? ' (+' + Fmt.moneyFull(bb) + ' Buyback recovery, shown separately)' : ''),
-    sub: (raw >= 0 ? '+' : '') + rawPct.toFixed(1) + '%' + bbPctNote,
+    sub: pct,
+    /* The Overview's SINGLE card: figure, its own percentage directly beneath it, then
+       the buyback pair grouped below after a gap — so each number sits under the one it
+       qualifies, instead of money+buyback on one line and %+buyback on another. */
+    subStack: pct + (hasBB
+      ? `<span style="display:block;margin-top:8px;font-size:0.8125rem;font-weight:600;color:var(--text-hint);line-height:1.5">${bbMoneyTxt}<br>${bbPctTxt}</span>`
+      : ''),
+    /* The Budget tab splits money and % across TWO cards, so each takes its own note. */
+    bbMoneyNote: hasBB ? note(bbMoneyTxt) : '',
+    bbPctNote:   hasBB ? note(bbPctTxt)   : '',
     cls, color, raw, bb,
   };
 };
