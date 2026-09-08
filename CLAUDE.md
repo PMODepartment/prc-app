@@ -9232,6 +9232,106 @@ worklists measured in months of human effort, not defects — which is why the a
 deliberately sums only the small actionable counts, and why the fill-in queue is deliberately
 un-badged.
 
+### ⚠⚠ BACKFILL COULD NOT SEE THE WORK PACKAGES ITS OWN BADGE OFFERED (2026-09-08)
+
+Reported: *"I hard refreshed but the backfill trade data still shows 18 after run completion."*
+The run really did complete, and it really did write **nothing** — `vendor_bids`,
+`vendor_rates` and `vendor_products` were byte-identical before and after.
+
+**`resolveVendors(w)` decides whether a work package is processed AT ALL**
+(`if (!vids.size) { skippedNoVendor++; return; }`) — and it read `vendor_id` and the free
+text only. It never read **`awarded_vendor_ids`**. So a work package whose ONLY link is that
+column was skipped **before** reaching the co-award branch fifteen lines below that reads
+exactly that column. Dead code under a gate the rows it was written for could not pass.
+
+**⚠⚠ AND THAT IS NOT AN EDGE CASE — IT IS THE SHAPE THIS APP DELIBERATELY WRITES.** A
+co-award leaves `vendor_id` NULL rather than naming a primary nobody chose, so every work
+package linked by the bulk tiling pass carries ids and no `vendor_id`. Measured live:
+**18 of 18 work packages the badge offered were invisible to the tool, 0 had a `vendor_id`,
+all 18 had only `awarded_vendor_ids`.**
+
+Fixed by reading the ids first — `awarded_vendor_ids` is the AUTHORITATIVE link when it
+resolves. **Verified by running it: 771 bids and 771 rates upserted, 0 failures, and the badge
+went to 0.** Across the whole session that is **bids 1,222 -> 1,407, rates 517 -> 775,
+products 499 -> 726** — all of it work that had been silently skipped since the tiling pass.
+
+- **⚠ The trade-category phase runs FIRST and writes to `vendors`, not to the three tables
+  you would think to watch.** It updates one vendor at a time, so on a large catch-up run the
+  three counters sit still for minutes while real work happens. Count
+  `vendors where trade_categories <> '{}'` to see it moving, or you will conclude it has hung.
+- The run takes **~7 minutes** when it has a backlog. `skippedNoVendor` was 862 — that is the
+  fill-in queue's population, not a failure.
+
+### ⚠⚠ "IMPORT FROM WPS" IS RETIRED — BY POLICY, NOT BY BUG (2026-09-08)
+
+Stated by the user, and it settles the question the tool existed to answer:
+*"There shouldn't be a new vendor that is not within the list since the vendor masterlist is the
+list where Megawide Procurement only gets their vendors."*
+
+So a name typed into a work package is **never** a source of vendor identity. The directory's
+2,400 accredited rows already reconcile to the masterlist's 2,403 BP codes, which means a name
+that does not resolve is not a Megawide vendor — it is a spelling to link, or a work package
+to fix.
+
+**Audited the 388 it would have created before removing it, and the list speaks for itself:**
+
+| what it would have created | examples |
+|---|---|
+| stubs and instructions | `a`, `n`, `* Add new vendors`, `TBA`, `Terms` |
+| categories, not companies | `ADMIN WORKERS`, `C2W VENDORS`, `MCC In House`, `Local Cebu Subcon` |
+| sourcing notes | `Recommended by LGU`, `Scm Recommendations`, `AND TWENTY O FOUR` |
+| ~20 personal names | `Kristian Carlo Aurelio`, `EDGAR VALERA`, `GRESITO PARAMON CUTAY YNCIERTO` |
+| typos of vendors already on file | `Zenshin Corporaiton`, `KSB Philipiines Inc.`, `METRO SOUCE`, `U&G Construcition`, `Hafele Philippines Inc.Orporated`, `MCC -EPC Central Wareshoue` |
+| brands that are not the vendor | Caterpillar, Panasonic, Kohler, Kone, Hitachi, Viking |
+| **multi-company run-ons up to EIGHT companies long** | `Air Beyond Satisfaction Services Inc. Christian Albert R. Barajas Clay Jars Print Shop Hans Infinite Tools Jiga Mags and Tires MCC - Suncity Site B - Package 3 (MEPF) MCC - West Side City Phase 1 Site B Toyota Pasig` |
+
+Those run-ons have no delimiter and no repeated legal suffix, so **`_looksGarbled` cannot see
+them** — they were counted as single companies and offered for creation.
+
+- **⚠ `VendorDb.importVendorsFromWPs` IS DELIBERATELY LEFT IN PLACE AND IS NOW UNREFERENCED.**
+  Do not delete it, and do not wire it back up without a policy change.
+- **⚠ `_tcSet('import', …)` HAD TO GO TOO.** It sets `item.style.display = ''` for a non-zero
+  count, which would have put the retired tool straight back in the menu. `c.importable` is
+  still computed and still reported — "N names match no vendor on file" is a real measure of
+  what the directory is missing; it is just not an offer to create them.
+- **⚠⚠ THE `hidden` ATTRIBUTE ALONE DID NOT HIDE IT, AND ONLY MEASURING FOUND THAT.**
+  `.tools-menu button{display:flex}` is an element+class rule and **beats the UA stylesheet's
+  `[hidden]{display:none}`**, so the button still rendered. Needed
+  `.tools-menu button[hidden]{display:none!important}`. Same specificity trap as Known Issues
+  #30, in the direction people forget: it is not only inline styles that defeat `hidden`.
+- Every message that pointed at the tool was rewritten — the analytics banner, the
+  unlinked-worklist "single company" note, and the alias picker's no-match hint.
+
+### ⚠ ELEVEN MORE NAMES THAT ARE NOTES, NOT COMPANIES (2026-09-08)
+
+Sanitising the unlinked worklist. `_NOT_A_VENDOR_RE` catches a spreadsheet column header
+(`Terms`), a labour category (`ADMIN WORKERS`), sourcing notes (`Recommended by LGU`,
+`Scm Recommendations`), an internal marker (`MCC In House`), plain garbage
+(`AND TWENTY O FOUR`), and `TBA` — which was simply the missing sibling of `TBD`.
+
+- **⚠ A LENGTH FLOOR OF 2, NOT 3.** Under two alphanumeric characters cannot be a company
+  (found live as the vendor entries **`a`** and **`n`**), but **`3M`, `LG` and `KM` are real
+  two-character vendors** and a floor of 3 would refuse them.
+- **⚠ A LEADING `*` OR BULLET marks an instruction someone typed into the field**
+  (`* Add new vendors`). Only those two glyphs — a leading hyphen or dot is a formatting
+  artifact that real names do carry.
+- **⚠ AN EXPLICIT ANCHORED LIST, NEVER A KEYWORD SEARCH:** `Terms Engineering Inc.`,
+  `C2W Vendors Corp.`, `TBA Construction Corporation`, `In-House Solutions Inc.` and
+  `Other Supplies Trading` are companies and are all asserted NOT to be caught.
+- A blank name now answers `true`, which is the honest answer. No consumer is affected —
+  every caller filters empties first, and `createVendor` refuses a blank on its own guard.
+
+### ⚠⚠ A GREEN SUITE MEANT THE ASSERTIONS NEVER RAN — FOR THE SEVENTH TIME (2026-09-08)
+
+A python heredoc silently failed to append 26 new assertions to `test_role.js`. The suite still
+printed **"40 passed, 0 failed"**, and two brand-new rules — the note list and the length
+floor — went out **completely untested**. Caught only by noticing the COUNT had not moved from
+the previous run.
+
+**`test_role.js` now refuses to report success below 66 assertions.** Put a count floor in any
+suite you extend, and **check the total moved, not just that it was green.** The heredoc was the
+cause again: use the Write/Edit tools for anything containing a backslash.
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
