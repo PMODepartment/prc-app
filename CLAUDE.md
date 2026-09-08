@@ -9986,9 +9986,23 @@ treating a free-mail domain as disqualifying would reject real vendors.
   contradict it. Privacy contact `rgomez@megawide.com.ph` is taken from that statement.
   **⚠️ Keep the two in step — if the corporate statement changes, this summary follows it,
   never the reverse.**
-- **⚠️ THE "30 DAYS" IN THE NOTICE IS NOT PROSE — it is what
-  `internal.purge_declined_claim_tins()` actually does.** Change one and you must change the
-  other, or the page states something untrue to a data subject.
+- **⚠️⚠️ THE NOTICE DELIBERATELY PUBLISHES NO NUMBER OF DAYS** (changed 2026-09-08, same day,
+  on the question "shall we even promise that 30-day purge?" — the answer is no). An earlier
+  draft said "we clear the TIN from it after 30 days", matching what
+  `internal.purge_declined_claim_tins()` does. Three reasons that was the wrong thing to
+  publish: a stated interval is a **falsifiable commitment to a data subject** that has to hold
+  forever and through every refactor; it rests on a **pg_cron job that anyone with database
+  access can silently disable**, after which the page is simply lying; and it made this page
+  **more specific than Megawide's own corporate statement**, which deliberately says only "as
+  long as necessary to fulfill the purposes" — so the two would diverge the moment Legal wanted
+  a different window. It now reads *"we remove your TIN from it and keep only the record that a
+  registration was reviewed"*: same substance, no bright line. **The 30-day purge still runs —
+  it is internal practice, not a published SLA. Do better than you promise, don't promise
+  better than you do.**
+- **⚠️ IT IS STILL A COMMITMENT, just an untimed one.** Softer wording narrows the exposure; it
+  does not remove the need for the purge to actually run. Without pg_cron enabled (or some other
+  runner) the sentence is still untrue.
+
 - **An acknowledgement checkbox gates submit**, and its second clause is not boilerplate:
   *"I confirm I am authorised to submit this registration on behalf of the company named
   above"* is **the only point in the whole flow where the claimant states, on the record,
