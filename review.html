@@ -573,12 +573,26 @@
     // Build project selector — admins see all projects; others see only their assigned ones
     const sel = document.getElementById('proj-select');
     if (sel) {
-      const opts = _isAdminReviewer
-        ? '<option value="ALL">All Projects (Consolidated)</option>' +
-          permitted.map(p=>`<option value="${p.id}" ${p.id===currentProjId?'selected':''}>${p.id} — ${p.name||p.id}</option>`).join('')
-        : permitted.map(p=>`<option value="${p.id}" ${p.id===currentProjId?'selected':''}>${p.id} — ${p.name||p.id}</option>`).join('');
-      sel.innerHTML = opts;
-      if (currentProjId !== 'ALL') sel.value = currentProjId;
+      /* ⚠️⚠️ A CONTRIBUTOR GETS AN "ALL" OPTION TOO — it was admin-only, and that
+         was a real bug on two counts. `currentProjId` stays 'ALL' for anyone with
+         2+ assigned projects (the block above only pins it when they have exactly
+         one), and the ALL branch below correctly loads every one of THEIR projects
+         — but with no ALL option in the list the browser selected the first
+         project instead, so **the dropdown named one project while the grid showed
+         all of them**. And once they picked a single project there was no way back
+         to the combined view of their own work at all.
+         ⚠️ It is scoped, not privileged: the ALL branch loads
+         getAllWPsForProjects(permitted) for a non-admin, never getAllWPsForAdmin,
+         and RLS enforces the same. Labelled "All my projects" so it cannot be read
+         as the admin's portfolio-wide view. */
+      const allOpt = _isAdminReviewer
+        ? '<option value="ALL">All Projects (Consolidated)</option>'
+        : (permitted.length > 1 ? '<option value="ALL">All my projects</option>' : '');
+      sel.innerHTML = allOpt +
+        permitted.map(p=>`<option value="${p.id}" ${p.id===currentProjId?'selected':''}>${p.id} — ${p.name||p.id}</option>`).join('');
+      /* Unconditional now: skipping it on 'ALL' is what left the control showing a
+         project the grid was not scoped to. */
+      sel.value = currentProjId;
     }
 
     // Load WPs based on context and role
@@ -624,7 +638,18 @@
     const userId = window.__profile && window.__profile.id;
     const navEl = document.getElementById('nav-projects-review');
     if (navEl) {
-      const activeProjects = allProjects.filter(p=>p.status!=='archived');
+      /* ⚠⚠ SCOPED TO `permitted`, NOT `allProjects` — it listed EVERY project
+         to everyone. A manager/user assigned to two projects saw all ~21 in the
+         rail, and clicking one navigated to review.html?project=X where RLS
+         returns nothing: an empty grid carrying that project's name in the
+         subtitle, i.e. a dead end that also published the full project list.
+         `getPermittedProjects` still returns everything for admin/super_admin and
+         specialist (view-all by design), so only the roles that were wrong change.
+         ⚠ DEMO is excluded like project.html's rail does: canEditProject('DEMO')
+         is false, so it can only ever open a fully locked grid. */
+      const activeProjects = permitted.filter(p => p.id !== 'DEMO');
+      const projSec = document.getElementById('nav-projects-section');
+      if (projSec && !activeProjects.length) projSec.style.display = 'none';
       if (userId && typeof SidebarPrefs !== 'undefined') {
         const renderReviewNav = () => {
           const { pinned, rest } = SidebarPrefs.sortProjects(userId, activeProjects);

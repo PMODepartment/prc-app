@@ -9433,6 +9433,62 @@ that the run was green.** The one time that discipline lapsed, a python heredoc 
 to append 26 assertions, the suite still printed "40 passed", and two brand-new rules shipped
 untested.
 
+### Buyback is a WP-List column, and review.html stopped showing contributors every project (2026-09-08)
+
+Reported: **"the buyback column isn't visible for other roles, let's make this available for
+contributors"** — and it was not visible to ANY role, because there was no such column. The
+recovered value existed only in the WP **detail panel**, so a buyer scanning the list could not
+see which awards carry a buyback or how much of the cost comes back.
+
+- **⚠ `cost:true` / `COST_KEYS`, NOT a role check.** `window.__hideBudget` is true for plain
+  `viewer` ONLY, so one flag gives exactly the audience asked for: contributors and
+  `viewer_budget` see it, `viewer` does not. Gating on `__isViewer` would have hidden it from
+  `viewer_budget`, which is the trap Known Issue #41 exists to stop.
+- In the **Award** and **All** views on both dashboards — the two that already carry the money
+  columns it belongs beside.
+- **⚠ BLANK FOR A NON-BUYBACK WP, NEVER A DASH.** Empty reads as "not applicable"; a dash in
+  this app reads as "we do not know". Most rows are not buybacks.
+- Shows the recovered value with its **basis** in the cell (`₱7.00M (30%)` / `₱4.00M (exact)`)
+  and the **effective cost** in the tooltip — the basis is what tells a reader whether the
+  figure was negotiated as a percentage or agreed as an amount, and they behave differently.
+- **⚠ THE RENDER CASE MUST BE WRITTEN AGAINST ITS OWN FILE'S SCOPE.** The first cut of the
+  project.html case reused `bbVal`/`bbDep`/`bbExact`/`bbEff` — which exist in the DETAIL PANEL,
+  not in `_wpRenderCell(key, wp, _stickyLeft)`. It would have parsed and then thrown on every
+  render. index.html's cell has different locals again (`w`, `fmtM`, no `td` helper), so the two
+  cases are deliberately NOT copies of each other.
+
+**⚠⚠ AND THE REVIEW PAGE'S SIDEBAR LISTED EVERY PROJECT TO EVERYONE.** Found while auditing
+the rest of `review.html` for contributor bugs. It built the rail from raw `allProjects` while
+every other surface on the page correctly used `permitted`:
+
+```js
+const activeProjects = allProjects.filter(p=>p.status!=='archived');   // was
+const activeProjects = permitted.filter(p => p.id !== 'DEMO');         // now
+```
+
+A manager or user assigned to two projects saw all ~21 in the rail, and clicking one navigated to
+`review.html?project=X` where RLS returns nothing — **an empty grid carrying that project's
+name in the subtitle**, which is a dead end, and it published the full project list to someone
+scoped to two of them. `getPermittedProjects` still returns everything for admin/super_admin and
+specialist (view-all by design), so only the roles that were wrong changed. **DEMO is excluded
+the same way `project.html`'s rail does it** — `canEditProject('DEMO')` is false, so it can
+only ever open a fully locked grid. The section hides itself when the list is empty rather than
+rendering a labelled empty box.
+
+**The rest of the contributor audit came back clean, and it is worth recording what was checked**
+so it is not re-derived: `_xlEditable`, the per-cell `locked` flag, the three Add-WP guards and
+`_xlAddableProjects` (which already filtered by `canEditProject` AND excluded DEMO) all scope
+correctly; the new-row project picker is populated from that same filtered list; the cards view
+degrades to a **"View only"** chip rather than an Edit link; and the legacy-cleanup strip is
+admin-only by design. The one thing a contributor with no assignments hits is
+`xlAddRow`'s **"You have no projects you can add work packages to"** — correct, and it says so.
+
+**Verified: 33 assertions against the VERBATIM shipped render cases**, extracted from both files
+and run on the REAL `db.js` helpers under `node:vm` — both dep% and exact-amount modes, the
+exact-amount-wins precedence, whole vs fractional percent formatting, the clamp to the awarded
+cost, a flagged WP with no basis entered, no `NaN` when there is no awarded cost, the cost gating
+and view membership in both files, and the four review.html scope changes.
+
 ### The vendor registration page: measure, consent card, and the gate (2026-09-08)
 
 **⚠⚠ THE FORM COLUMN HAD NO MAX-WIDTH.** It was whatever the window left over

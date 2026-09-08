@@ -600,6 +600,10 @@ const COLS=[
   {key:'total_awarded',    label:'Awarded Net',        w:'100px'},
   {key:'variance',         label:'Variance',           w:'100px'},
   {key:'pct_wt',           label:'% WT',               w:'70px'},
+  /* One column, not four. The grid in review.html has separate Buyback /
+     Depreciation % / Amount / Value columns because it is an EDITOR; here the
+     useful figure is the recovered value, with its basis beside it. */
+  {key:'buyback',          label:'Buyback',            w:'120px'},
   {key:'surety_bond',      label:'Surety Bond',        w:'90px'},
   {key:'performance_bond', label:'Perf. Bond',         w:'90px'},
   {key:'warranty_bond',    label:'Warranty Bond',      w:'90px'},
@@ -631,7 +635,7 @@ const COLS=[
   {key:'remarks',          label:'Remarks',            w:'150px'},
 ];
 
-const COST_KEYS = new Set(['approved_budget_bcb','total_awarded','variance','pct_wt','dp_amount','retention_percent','retention_amount']);
+const COST_KEYS = new Set(['approved_budget_bcb','total_awarded','variance','pct_wt','dp_amount','retention_percent','retention_amount','buyback']);
 
 // ── SCHEDULE NEED-BY (from the Planners app) ─────────────────────────────────
 // The Planners Project Schedule links each activity to the work package that supplies
@@ -731,6 +735,8 @@ function _xlsxCellVal(w, key){
     case 'total_awarded':       return awd || '';
     case 'variance':            return (bud||awd) ? v : '';
     case 'pct_wt': { const tb = window._projTotalBCB||0; return (bud||awd)&&tb ? +(v/tb*100).toFixed(2) : ''; }
+    // The recovered pesos, so the column sorts and exports as a number.
+    case 'buyback':             return w.buyback ? (window.buybackValue(w)||0) : '';
     case 'dp_percent':          return w.dp_percent!=null ? +(w.dp_percent*100).toFixed(4) : '';
     case 'retention_percent':   return w.retention_percent!=null ? +(w.retention_percent*100).toFixed(4) : '';
     case 'po_jo_count':         return numOr(w.po_jo_count);
@@ -799,10 +805,10 @@ window.wpToggleFreeze = function(key){
 let _wpTableView = 'overview';
 const WP_TABLE_VIEWS = {
   overview:   {keys:new Set(['cost_code','wp_no','works','description','planners_package','scope','proposed_vendors','procurement_status','delivery_status','award_status','remarks'])},
-  financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','award_status']), cost:true},
+  financial:  {keys:new Set(['cost_code','wp_no','description','approved_budget_bcb','total_awarded','variance','pct_wt','buyback','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','award_status']), cost:true},
   schedule:   {keys:new Set(['cost_code','wp_no','description','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','planners_need_by','planners_need_slip','target_completion','award_status'])},
   submittals: {keys:new Set(['cost_code','wp_no','description','proposed_vendors','po_jo_count','po_jo_numbers','approver_name','approval_date','submittal_doc_type','award_status'])},
-  all:        {keys:new Set(['cost_code','wp_no','description','works','planners_package','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','pct_wt','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','planners_need_by','planners_need_slip','target_completion','approver_name','approval_date','submittal_doc_type','procurement_status','delivery_status','award_status','remarks']), cost:true},
+  all:        {keys:new Set(['cost_code','wp_no','description','works','planners_package','type_of_works','scope','proposed_vendors','po_jo_count','po_jo_numbers','approved_budget_bcb','total_awarded','variance','pct_wt','buyback','surety_bond','performance_bond','warranty_bond','payment_terms_days','dp_percent','dp_terms','dp_amount','dp_release_date','retention_percent','retention_amount','awarding_lead_time','awarding_date','actual_awarding_date','target_delivery','actual_delivery','target_installation','planners_need_by','planners_need_slip','target_completion','approver_name','approval_date','submittal_doc_type','procurement_status','delivery_status','award_status','remarks']), cost:true},
 };
 function getActiveCols() {
   const v = WP_TABLE_VIEWS[_wpTableView] || WP_TABLE_VIEWS.overview;
@@ -2614,6 +2620,23 @@ function _wpRenderCell(key,wp,_stickyLeft){
     case 'total_awarded': return td(fmt(awd), 'text-align:right');
     case 'variance':    return td((bud||awd)?(v>=0?'+':'')+fmt(v):'—', `text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}`);
     case 'pct_wt': { const tb=window._projTotalBCB||0; const pw=tb?(v/tb*100):0; return td((bud||awd)?(v>=0?'+':'')+pw.toFixed(2)+'%':'—', `text-align:right;${v>0?'color:#2D9B6F':v<0?'color:#EE3124':''}`, ` title="Savings ÷ Total BCB"`); }
+    /* ⚠️ Everything here is derived from `wp` INSIDE this function. The first cut
+       reused bbVal/bbDep/bbExact/bbEff and `w` from the DETAIL PANEL, which are
+       not in this scope — it would have parsed and then thrown on every render.
+       The parameter is `wp`; the locals available are bud, awd, v, sc, fmt.
+       Blank for a non-buyback WP rather than a dash: an empty cell reads as
+       'not applicable', a dash reads as 'we do not know'. */
+    case 'buyback': {
+      if (!wp.buyback) return td('');
+      const bv  = window.buybackValue(wp) || 0;
+      const eff = window.effectiveAwardedCost(wp);
+      const ex  = window.buybackExactAmount(wp);
+      const dep = window.buybackDepFraction(wp);
+      const basis = ex != null ? 'exact' : (dep != null ? (dep*100).toFixed(dep*100%1?2:0)+'%' : '—');
+      return td(fmt(bv) + ' <span style="color:#888;font-size:0.8571em">(' + esc(basis) + ')</span>',
+        'text-align:right;color:#2D9B6F',
+        ` title="Recovered under the buyback arrangement; counts towards savings. Effective cost ${fmt(eff)}."`);
+    }
     case 'surety_bond': return td(wp.surety_bond||'—', 'text-align:center');
     case 'performance_bond': return td(wp.performance_bond||'—', 'text-align:center');
     case 'warranty_bond': return td(wp.warranty_bond||'—', 'text-align:center');
