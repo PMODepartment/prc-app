@@ -10484,3 +10484,39 @@ no-buyback project and a saving-with-buyback: the DOM text reads
 `-₱192.28M | -7.7% | +₱21.79M Buyback | +0.9% Buyback` for the single card and
 `-₱192.28M | +₱21.79M Buyback` / `-7.7% | +0.9% Buyback` for the Budget tab's two, with
 contrast measured in both themes. Harness deleted before commit.
+
+#### ⚠️ The "wide gap between the number and the %" was `.metric-value { flex:1 }` (2026-09-08)
+
+Reported on the Portfolio right after the above shipped: the same card that reads tightly on
+`project.html` had a large gap between the figure and its percentage on `index.html`. **The CSS
+in the two pages is byte-identical**, which is what makes this worth writing down — the
+difference was never in the rule, it was in the card's HEIGHT.
+
+`dashboard.css` gives **`.metric-value { flex: 1 }`**, and `.metric-card` is a **column flex
+container**. So the value absorbs every spare pixel of card height and shoves `.metric-sub` to
+the bottom. **Measured in a harness against the real CSS: on a tall card the value BOX grew
+26px → 136px while the text stayed 26px — ~110px of dead space between the figure and its
+percentage; on a short card the same markup measured 36px.** The `margin-top:4px` everyone
+would go looking at is a red herring and is identical on both pages.
+
+- **⚠️ CARD HEIGHT IS NOT SET BY THE CARD.** `.ov-cost-grid` is `flex:1` inside an
+  `align-items:stretch` row, so it stretches to whatever the **WP-status column beside it**
+  needs — and that column is taller on the Portfolio, because its battery captions
+  (`₱26.56B of ₱37.71B BCB` / `awarded at ₱25.84B actual cost`) wrap onto more lines than a
+  single project's. Same CSS, taller neighbour, wider gap.
+- **The fix is `flex:0 0 auto` on `.ov-cost-grid .metric-value`**, which also makes the
+  `justify-content:center` already sitting on those cards do something for the first time —
+  `flex:1` had been defeating it, so the block now genuinely centres instead of the value
+  stretching and the sub pinning to the bottom.
+- **⚠️ SCOPED TO `.ov-cost-grid` DELIBERATELY.** `flex:1` is correct for the plain
+  `.metrics-grid` cards elsewhere, which carry no sub-line to push down. Do not lift this into
+  `dashboard.css`.
+- **Applied to BOTH dashboards even though only the Portfolio showed it.** `project.html` has
+  the identical latent bug and would show it the moment its own right column grows a line —
+  and the two files are meant to stay in step.
+- CSS-only, inside each page's own `<style>` block (`dashboard.css` untouched), so **no shared
+  `?v=` bump** — the page HTML is covered by Fastly's ~10 min TTL.
+
+**Verified** by reproducing it: two grids with identical markup, one beside a short neighbour
+and one beside a tall one, measured before and after — value box 36px/136px before, 26px/26px
+after, with screenshots of the bug and the fix.

@@ -52,7 +52,19 @@
     .ov-cost-grid { display:grid; grid-template-columns:repeat(2,1fr); grid-template-rows:repeat(2,1fr); gap:10px; flex:1; align-content:stretch; }
     .ov-cost-grid .metric-card { padding:16px 18px; display:flex; flex-direction:column; justify-content:center; }
     .ov-cost-grid .metric-label { min-height:30px; margin-bottom:8px; font-size:0.7143rem; display:flex; align-items:flex-end; }
-    .ov-cost-grid .metric-value { font-size:1.5714rem !important; letter-spacing:-.4px; line-height:1.2; white-space:nowrap; overflow:hidden; }
+    /* ⚠️ flex:0 0 auto UNDOES dashboard.css's `.metric-value { flex:1 }`, and that is the
+       whole fix for "a wide gap between the number and the %". `.metric-card` is a COLUMN
+       flex container, so a value with flex:1 absorbs every spare pixel of card height and
+       shoves `.metric-sub` to the bottom — the taller the card, the wider the gap. Card
+       height is not ours to control: `.ov-cost-grid` is flex:1 inside an align-items:stretch
+       row, so it matches whatever the WP-status column beside it needs, which is taller on
+       the Portfolio (its battery captions wrap onto more lines). Measured: the value BOX
+       grew 26px -> 136px on a tall card while the text stayed 26px, i.e. ~110px of dead
+       space between the figure and its percentage. This also makes the justify-content:center
+       above actually do something — flex:1 had been defeating it.
+       ⚠️ Scoped to .ov-cost-grid on purpose: flex:1 is right for the plain .metrics-grid
+       cards elsewhere, which have no sub-line to push down. */
+    .ov-cost-grid .metric-value { font-size:1.5714rem !important; letter-spacing:-.4px; line-height:1.2; white-space:nowrap; overflow:hidden; flex:0 0 auto; }
     .ov-wp-split { display:flex; gap:10px; align-items:stretch; flex:1; }
     .ov-ch-btn { font-size:0.7143rem; padding:4px 12px; border-radius:5px; border:1.5px solid var(--border-md); background:var(--surface,#fff); color:#888; cursor:pointer; font-family:inherit; font-weight:600; }
     .ov-ch-btn.active { border-color:#EE3124; background:#EE3124; color:#fff; }
