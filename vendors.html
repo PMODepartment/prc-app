@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260908a"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260908a"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260908a"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260908b"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260908b"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260908b"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260908a">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260908b">
   <style>
     /* Page header — the directory used to open straight onto a row of bare
        numbers with no title or context. */
@@ -1206,7 +1206,24 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
                   </div>
                 <button id="tm-fill" onclick="closeToolsMenu();openFillQueue()"><i class="ti ti-user-question"></i><span>Awarded, no vendor recorded <span class="tools-menu-badge" id="tc-fill" style="display:none">0</span></span><small>Name the vendor on awarded work packages that never recorded one</small></button>
                 <button id="tm-alias" onclick="closeToolsMenu();openAliasQueue()"><i class="ti ti-link"></i><span>Unlinked vendor names <span class="tools-menu-badge" id="tc-alias" style="display:none">0</span></span><small>A spelling on a work package that is really a vendor already in the directory — link the two</small></button>
-                <button id="tm-import" onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs <span class="tools-menu-badge" id="tc-import" style="display:none">0</span></span><small>Add vendors that appear on a work package but not in the directory</small></button>
+                <!-- ⚠️⚠️ "Import from WPs" IS RETIRED (2026-09-08), BY POLICY, NOT BY BUG.
+                     Megawide sources vendors from the accredited masterlist ONLY, so a name
+                     typed into a work package is never a source of vendor identity. Audited
+                     live before removing it: of the 388 it would have created, the list held
+                     `a`, `n`, `* Add new vendors`, `ADMIN WORKERS`, `Terms`, `TBA`,
+                     `Recommended by LGU`, `MCC In House`, `C2W VENDORS`, `Scm Recommendations`,
+                     ~20 personal names, dozens of typos of vendors already on file
+                     (`Zenshin Corporaiton`, `KSB Philipiines Inc.`, `METRO SOUCE`,
+                     `U&G Construcition`), brand names that are not the vendor (Caterpillar,
+                     Panasonic, Kohler, Kone) and multi-company run-ons up to EIGHT companies
+                     long that `_looksGarbled` cannot see. Not one of them belongs in a
+                     directory whose 2,400 accredited rows reconcile to the masterlist.
+                     ⚠️ `VendorDb.importVendorsFromWPs` is deliberately LEFT IN PLACE and is
+                     now unreferenced — do not delete it, and do not wire it back up without a
+                     policy change. A name that is not in the masterlist belongs in
+                     "Unlinked vendor names", where a person either aliases it to the real
+                     company or fixes the work package. -->
+                <button id="tm-import" hidden onclick="closeToolsMenu();importFromWPs()"><i class="ti ti-file-import"></i><span>Import from WPs <span class="tools-menu-badge" id="tc-import" style="display:none">0</span></span><small>Retired — vendors come from the accredited masterlist</small></button>
                 <button id="tm-split" onclick="closeToolsMenu();openSplitModal()"><i class="ti ti-cut"></i><span>Needs Splitting <span class="tools-menu-badge" id="tc-split" style="display:none">0</span></span><small>Records that are several companies joined into one name</small></button>
                 <button id="tm-dupes" onclick="closeToolsMenu();openDupModal()"><i class="ti ti-copy-off"></i><span>Remove Exact Duplicates <span class="tools-menu-badge" id="tc-dupes" style="display:none">0</span></span><small>Fold byte-identical vendor names into one record (keeps children, links and trades)</small></button>
                 <button id="tm-trades" onclick="closeToolsMenu();normalizeVendorTrades()"><i class="ti ti-tags"></i><span>Normalize Trades <span class="tools-menu-badge" id="tc-trades" style="display:none">0</span></span><small>Collapse trade variants (e.g. "GENERAL REQUIREMENT") to the 10 standard trades</small></button>
@@ -1538,10 +1555,10 @@ body.dark-mode .arch-block{border-top-color:var(--border-md)}
 <!-- Vendor Detail Modal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260908a"></script>
-<script src="assets/js/db.js?v=20260908a"></script>
-<script src="assets/js/ui.js?v=20260908a"></script>
-<script src="assets/js/coachmarks.js?v=20260908a"></script>
+<script src="assets/js/auth.js?v=20260908b"></script>
+<script src="assets/js/db.js?v=20260908b"></script>
+<script src="assets/js/ui.js?v=20260908b"></script>
+<script src="assets/js/coachmarks.js?v=20260908b"></script>
 <script src="assets/js/vendor-guide.js?v=20260907a"></script>
 <script>
 const TRADES = ['General Requirements','Site Works','Structural Works','Architectural Works','Mechanical Works','Electrical and Auxiliary Works','Plumbing Works','Fire Protection Works','Allied Services','Site Development Works'];
@@ -1847,7 +1864,10 @@ function _alKindOf(r) {
 }
 const _AL_KINDS = {
   single: { label: 'Needs a link or a record', icon: 'link',
-            note: 'One company. If it is already in the directory under its registered name, link the two — that is what this tool is for. If it genuinely has no record, <b>Import from WPs</b> creates it.' },
+            /* ⚠️ It used to end "<b>Import from WPs</b> creates it". That tool is
+               retired: Megawide sources vendors from the accredited masterlist, so a
+               name typed on a work package is never a source of vendor identity. */
+            note: 'One company. If it is already in the directory under its registered name, link the two — that is what this tool is for. If it genuinely has no record, it is not a Megawide vendor yet: get it onto the accredited masterlist first, or fix the name on the work package.' },
   /* ⚠️ DO NOT SEND THESE TO "NEEDS SPLITTING" — that tool scans DIRECTORY ROWS
      and these are free text on a WORK PACKAGE, so it has never been able to
      reach them (it now reads 0 and hides itself, which made the old advice
@@ -2305,8 +2325,9 @@ function alSearch(id) {
     let list = [];
     try { list = await VendorDb.searchApprovedVendors(q); } catch (e) { list = []; }
     if (!list.length) {
-      pop.innerHTML = '<div class="fq-none">Nothing matches. If this company has no record '
-        + 'at all, <b>Import from WPs</b> creates it — an alias needs something to point at.</div>';
+      pop.innerHTML = '<div class="fq-none">Nothing matches. An alias needs something to '
+        + 'point at, and vendors come from the accredited masterlist — so if this company '
+        + 'has no record at all, get it accredited first, or fix the name on the work package.</div>';
     } else {
       _alResults[id] = list;
       pop.innerHTML = list.slice(0, 25).map(function (v) {
@@ -2716,7 +2737,7 @@ async function renderVendorAnalytics() {
       <div class="va-notice-h"><i class="ti ti-alert-triangle"></i><div><span class="va-notice-fig">${money(orphanSpend + phSpend)}</span> of awarded spend is not attributed to a directory vendor<span class="va-notice-pct">${pct(orphanSpend + phSpend)}% of the total</span></div></div>
       <div class="va-notice-sub">Still counted in the figures above &mdash; it just has no company behind it yet.</div>
       ${garbled.length ? line('cut', `<b>${garbled.length}</b> are several companies in one name \u2014 ${money(gSpend)}, ${pct(gSpend)}%. Each hides real suppliers whose spend is credited to a string that does not exist. Fix the contractor field on those work packages so each company is named separately \u2014 <b>not</b> an alias, which would credit all of them to one.`) : ''}
-      ${single.length ? line('file-import', `<b>${single.length}</b> are single companies with no record \u2014 ${money(sSpend)}, ${pct(sSpend)}%. <b>Data Tools \u2192 Import from WPs</b> creates them, with no accreditation standing.`) : ''}
+      ${single.length ? line('file-import', `<b>${single.length}</b> are single companies with no record \u2014 ${money(sSpend)}, ${pct(sSpend)}%. Vendors come from the accredited masterlist, so each is either a spelling of a company already on file (link it in <b>Data Tools \u2192 Unlinked vendor names</b>) or not a Megawide vendor yet.`) : ''}
       ${placeholders.length ? line('help-circle', `<b>${placeholders.length}</b> are placeholders, not companies (${placeholders.map(r => esc(r.name)).join(', ')}) \u2014 ${money(phSpend)} across ${phWps} awarded work packages. <b>Excluded from the rankings below</b>; fix the contractor field on those work packages.`) : ''}
       <div class="va-notice-foot">Resolved by id, then exact name, then unambiguous core name \u2014 a name matching two vendors is left unattributed rather than credited to the wrong one.</div>
     </div>` : '';
@@ -3787,7 +3808,12 @@ async function refreshToolCounts(force) {
 function _tcApplyWp(c) {
   _tcSet('fill', c.awardedNoVendor);
   _tcSet('alias', c.unlinked);
-  _tcSet('import', c.importable);
+  /* ⚠️ NOT `_tcSet('import', …)` — that sets `style.display = ''` for a non-zero
+     count, which would defeat the button's `hidden` attribute and put the retired
+     tool back in the menu. `c.importable` is still computed and is still reported
+     in the status line below, because "N names match no vendor on file" is a real
+     measure of how much the directory is missing — it just is not an offer to
+     create them. See the tm-import comment for why the tool is retired. */
   _tcSet('backfill', c.awardedNoBidRow);
   const status = document.getElementById('toolsStatus');
   if (!status) return;
@@ -3795,11 +3821,14 @@ function _tcApplyWp(c) {
   if (c.awardedTotal) {
     bits.push(c.awardedTotal + ' awarded work package' + (c.awardedTotal === 1 ? '' : 's'));
   }
-  if (c.refused) {
-    /* \u26a0\ufe0f It used to say "use Needs Splitting". These are free text on a WORK
-       PACKAGE; that tool scans directory rows and cannot reach them. */
-    bits.push(c.refused + ' vendor name' + (c.refused === 1 ? '' : 's')
-      + ' refused \u2014 several companies in one, or not a company at all');
+  /* One honest sentence about the names that match nothing on file. It is
+     deliberately NOT an offer to create them \u2014 Megawide sources vendors from the
+     accredited masterlist, so a name here is a work package to fix or a spelling
+     to link, never a new vendor. */
+  const unmatched = (c.importable || 0) + (c.refused || 0);
+  if (unmatched) {
+    bits.push(unmatched + ' vendor name' + (unmatched === 1 ? '' : 's')
+      + ' on work packages match no vendor on file');
   }
   status.textContent = bits.join(' \u00b7 ');
   /* ⚠️ toggle, NOT add. It only ever ADDED `done`, so once the line had nothing

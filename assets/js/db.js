@@ -3131,9 +3131,28 @@ function _isRoleNotACompany(s) {
   }
   return sawRole;
 }
+/* ⚠️ A NOTE THAT LEAKED INTO THE VENDOR FIELD IS NOT A COMPANY EITHER. Each of
+   these was found live 2026-09-08 sitting in the unlinked worklist as though a
+   real supplier were missing: a spreadsheet column header (`Terms`), a labour
+   category (`ADMIN WORKERS`), a sourcing note (`Recommended by LGU`,
+   `Scm Recommendations`), an internal marker (`MCC In House`), and plain
+   garbage (`AND TWENTY O FOUR`). `TBA` is simply the sibling of `TBD`, which
+   the list above already had.
+   ⚠️ AN EXPLICIT, ANCHORED LIST ON PURPOSE — the same rule as
+   `_PLACEHOLDER_VENDOR_RE`. It must never become a keyword search: "Terms
+   Engineering Inc." and "C2W Vendors Corp." are companies and are NOT caught. */
+const _NOT_A_VENDOR_RE = /^(tba|terms|admin\s+workers|mcc\s+in\s*house|in[-\s]?house|recommended\s+by\s+lgu|scm\s+recommendations?|and\s+twenty\s+o\s+four|c2w\s+vendors|open\s+market|walk[-\s]?in|direct\s+purchase|petty\s+cash|cash\s+purchase|others?|etc\.?|no\s+(vendor|supplier)|to\s+follow|for\s+confirmation)$/i;
 function _isPlaceholderVendorName(s) {
   const t = String(s || '').trim().replace(/^[([{<]+/, '').replace(/[)\]}>]+$/, '').trim();
-  return _PLACEHOLDER_VENDOR_RE.test(t) || _isRoleNotACompany(t);
+  /* ⚠️ Under two alphanumeric characters it cannot be a company name — found
+     live as the vendor entries `a` and `n`. Deliberately NOT three: `3M`, `LG`
+     and `KM` are real two-character vendors. */
+  if (t.replace(/[^A-Za-z0-9]/g, '').length < 2) return true;
+  /* ⚠️ A leading `*` or bullet marks an instruction someone typed into the
+     field — `* Add new vendors`. Only those two glyphs: a leading hyphen or
+     dot is a formatting artifact that real names do carry. */
+  if (/^[*•]/.test(t)) return true;
+  return _PLACEHOLDER_VENDOR_RE.test(t) || _NOT_A_VENDOR_RE.test(t) || _isRoleNotACompany(t);
 }
 
   /* ── vendor name aliases ────────────────────────────────────────────────
@@ -3324,8 +3343,22 @@ function _isPlaceholderVendorName(s) {
     const ratesToUpsert = [];
     let skippedNoVendor = 0;
 
+    /* ⚠️⚠️ IT MUST READ `awarded_vendor_ids` FIRST, AND FOR YEARS IT DID NOT.
+       This gate decides whether a work package is processed at all
+       (`if (!vids.size) { skippedNoVendor++; return; }`), and it looked only at
+       `vendor_id` and the free text — so a WP whose ONLY link is
+       `awarded_vendor_ids` was skipped BEFORE reaching the co-award branch
+       below that reads exactly that column. Dead code under a gate that could
+       not be passed by the rows it was written for.
+       ⚠️ That is not hypothetical: a co-award deliberately leaves `vendor_id`
+       NULL rather than naming a primary nobody chose, so every WP linked by the
+       bulk tiling pass carries ids and no `vendor_id`. Measured live
+       2026-09-08: 18 of 18 work packages the badge offered were invisible here,
+       the tool wrote nothing, and the badge stayed at 18 after a full run.
+       `awarded_vendor_ids` is the AUTHORITATIVE link when it resolves. */
     const resolveVendors = w => {
       const out = new Set();
+      if (Array.isArray(w.awarded_vendor_ids)) w.awarded_vendor_ids.forEach(id => { if (id) out.add(id); });
       if (w.vendor_id) out.add(w.vendor_id);
       // contractor may hold multiple co-awarded vendors (incl. slash-separated)
       _splitAwarded(w.contractor).forEach(nm => { const v = byNorm[_normName(nm)]; if (v) out.add(v.id); });
