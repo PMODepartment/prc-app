@@ -11,12 +11,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260908e"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260908e"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260908e"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260908f"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260908f"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260908f"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260908e">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260908f">
   <style>
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
     .modal{background:#fff;border-radius:12px;width:100%;max-width:420px;display:flex;flex-direction:column;max-height:90vh;overflow:hidden}
@@ -318,9 +318,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260908e"></script>
-<script src="assets/js/db.js?v=20260908e"></script>
-<script src="assets/js/ui.js?v=20260908e"></script>
+<script src="assets/js/auth.js?v=20260908f"></script>
+<script src="assets/js/db.js?v=20260908f"></script>
+<script src="assets/js/ui.js?v=20260908f"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
    Vendor Registrations — the approval queue for vendors who signed up from the
@@ -496,7 +496,9 @@ function rowPending(c) {
     + '<td><div class="vr-strong">' + esc2(c.claimed_company || '—') + '</div>'
     + (c.is_new_vendor ? '<div class="vr-sub">Says new supplier</div>' : '')
     + (c.claimed_tin ? '<div class="vr-sub">TIN ' + esc2(c.claimed_tin) + '</div>' : '') + '</td>'
-    + '<td>' + esc2(c.claimed_contact_name || '—') + '<div class="vr-sub">' + esc2(c.email || '') + '</div></td>'
+    + '<td>' + esc2(c.claimed_contact_name || '—')
+    + (c.claimed_position ? '<div class="vr-sub">' + esc2(c.claimed_position) + '</div>' : '')
+    + '<div class="vr-sub">' + esc2(c.email || '') + '</div></td>'
     + '<td><span class="' + confClass(c) + '">' + esc2(confLabel(c)) + '</span>'
     + (c.vendor_id ? '<div class="vr-sub">' + esc2(vendorName(c.vendor_id)) + '</div>' : '') + '</td>'
     + '<td>' + esc2(fmtDate(c.created_at)) + '</td>'
@@ -509,7 +511,8 @@ function cardPending(c) {
   return '<div class="vr-card">'
     + '<div class="vr-card-head"><div class="vr-strong">' + esc2(c.claimed_company || '—') + '</div>'
     + '<span class="' + confClass(c) + '">' + esc2(confLabel(c)) + '</span></div>'
-    + '<div class="vr-kv"><span>Contact</span><b>' + esc2(c.claimed_contact_name || '—') + '</b></div>'
+    + '<div class="vr-kv"><span>Contact</span><b>' + esc2(c.claimed_contact_name || '—')
+    + (c.claimed_position ? ' · ' + esc2(c.claimed_position) : '') + '</b></div>'
     + '<div class="vr-kv"><span>Email</span><b>' + esc2(c.email || '—') + '</b></div>'
     + (c.claimed_tin ? '<div class="vr-kv"><span>TIN</span><b>' + esc2(c.claimed_tin) + '</b></div>' : '')
     + (c.vendor_id ? '<div class="vr-kv"><span>Matched</span><b>' + esc2(vendorName(c.vendor_id)) + '</b></div>' : '')
@@ -568,14 +571,17 @@ function cardUser(u) {
 function rowDeclined(c) {
   return '<tr>'
     + '<td><div class="vr-strong">' + esc2(c.claimed_company || '—') + '</div></td>'
-    + '<td>' + esc2(c.claimed_contact_name || '—') + '<div class="vr-sub">' + esc2(c.email || '') + '</div></td>'
+    + '<td>' + esc2(c.claimed_contact_name || '—')
+    + (c.claimed_position ? '<div class="vr-sub">' + esc2(c.claimed_position) + '</div>' : '')
+    + '<div class="vr-sub">' + esc2(c.email || '') + '</div></td>'
     + '<td>' + esc2(c.decision_notes || '—') + '</td>'
     + '<td>' + esc2(fmtDate(c.decided_at)) + '<div class="vr-sub">' + esc2(c.decided_by_name || '') + '</div></td></tr>';
 }
 function cardDeclined(c) {
   return '<div class="vr-card">'
     + '<div class="vr-card-head"><div class="vr-strong">' + esc2(c.claimed_company || '—') + '</div></div>'
-    + '<div class="vr-kv"><span>Contact</span><b>' + esc2(c.claimed_contact_name || '—') + '</b></div>'
+    + '<div class="vr-kv"><span>Contact</span><b>' + esc2(c.claimed_contact_name || '—')
+    + (c.claimed_position ? ' · ' + esc2(c.claimed_position) : '') + '</b></div>'
     + '<div class="vr-kv"><span>Email</span><b>' + esc2(c.email || '—') + '</b></div>'
     + '<div class="vr-kv"><span>Reason given</span><b>' + esc2(c.decision_notes || '—') + '</b></div>'
     + '<div class="vr-kv"><span>Decided</span><b>' + esc2(fmtDate(c.decided_at)) + '</b></div>'
@@ -589,10 +595,18 @@ function openReview(i) {
   if (!c || !canManage) return;
   reviewIdx = i;
   reviewPick = c.vendor_id || null;
+  /* ⚠️ POSITION AND EMAIL DOMAIN ARE THE REVIEWER'S EVIDENCE ABOUT THE PERSON.
+     The TIN is evidence about the COMPANY and says nothing about whether this
+     individual may act for it — so who they say they are, in what role, and
+     whether their email is at the company's own domain is what actually decides
+     a claim. None of it is matched on server-side; it is here to be read. */
+  const claimDomain = String(c.email || '').split('@')[1] || '';
   const kv = [
     ['Company as entered', c.claimed_company],
     ['Contact person', c.claimed_contact_name],
+    ['Position', c.claimed_position],
     ['Email', c.email],
+    ['Email domain', claimDomain],
     ['TIN', c.claimed_tin],
     ['Submitted', fmtDate(c.created_at)]
   ].filter(function (r) { return r[1]; })

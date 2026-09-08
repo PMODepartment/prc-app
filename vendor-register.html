@@ -67,6 +67,11 @@
     .seg2-btn.active{border-color:#EE3124;background:#FDECEA;color:#C42127}
     .row2{display:flex;gap:12px}
     .row2 .field{flex:1;min-width:0}
+    /* ⚠️ `min-width:0` is load-bearing on both: a flex item's automatic minimum
+       is its CONTENT size, so without it a long placeholder pushes the row wider
+       than the form column instead of shrinking. */
+    .row3{display:flex;gap:12px}
+    .row3 .field{flex:1;min-width:0}
     @media(max-width:760px){
       .page{flex-direction:column}
       .brand{width:100%;flex:none;min-height:auto;padding:14px 18px;flex-direction:row;align-items:center;gap:14px}
@@ -76,7 +81,7 @@
       .brand-text p{font-size:10px}
       .form-wrap{padding:24px 20px 36px}
       .field input{font-size:16px}
-      .row2{flex-direction:column;gap:0}
+      .row2,.row3{flex-direction:column;gap:0}
       .seg2{flex-direction:column}
     }
   </style>
@@ -147,27 +152,44 @@
         </div>
       </div>
 
-      <div class="field">
-        <label>Registered Company Name</label>
-        <input type="text" id="company" placeholder="As it appears on your BIR 2303" autocomplete="organization">
-        <div class="field-error" id="errCompany">Please enter your company name.</div>
-      </div>
-      <!-- Vendor Code used to sit beside the TIN. Removed: it is Megawide's
-           internal SAP id and appears on nothing a vendor receives, so it could
-           only ever be guessed at. TIN is the proof now — it is on their own
-           BIR 2303. ⚠️ That left the TIN alone in a two-column row, i.e. half a
-           row of dead space, so Your Name moved up beside it — the form now
-           fits a 768px-tall laptop without scrolling. Below 760px `.row2` goes
-           `flex-direction:column`, so on a phone these stack as before. -->
+      <!-- ⚠️ Company and TIN are paired because they are the SAME document — the
+           note above literally says the TIN, with the registered company name, is
+           how we confirm who you are. Pairing them also kept the form to four
+           field rows when First/Last/Position were added, so it still fits a
+           laptop screen without scrolling. -->
       <div class="row2">
         <div class="field">
-          <label>Your Name</label>
-          <input type="text" id="contactName" placeholder="Who we should address" autocomplete="name">
+          <label>Registered Company Name</label>
+          <input type="text" id="company" placeholder="As it appears on your BIR 2303" autocomplete="organization">
+          <div class="field-error" id="errCompany">Please enter your company name.</div>
         </div>
         <div class="field">
           <label>TIN</label>
           <input type="text" id="tin" placeholder="e.g. 000-313-856-000">
           <div class="field-hint">Digits, with or without dashes.</div>
+        </div>
+      </div>
+      <!-- ⚠️ WHO is asking for control of this vendor's account, and in what
+           capacity. This is the reviewer's best evidence about the PERSON: the
+           TIN is evidence about the COMPANY and says nothing about whether this
+           individual is entitled to act for it. It is NEVER matched on — a
+           self-asserted job title proves nothing and treating it as identity
+           would weaken the check, not strengthen it. -->
+      <div class="row3">
+        <div class="field">
+          <label>First Name</label>
+          <input type="text" id="firstName" placeholder="Juan" autocomplete="given-name">
+          <div class="field-error" id="errFirstName">Please enter your first name.</div>
+        </div>
+        <div class="field">
+          <label>Last Name</label>
+          <input type="text" id="lastName" placeholder="Dela Cruz" autocomplete="family-name">
+          <div class="field-error" id="errLastName">Please enter your last name.</div>
+        </div>
+        <div class="field">
+          <label>Your Position</label>
+          <input type="text" id="position" placeholder="e.g. Sales Manager" autocomplete="organization-title">
+          <div class="field-error" id="errPosition">Please enter your position.</div>
         </div>
       </div>
 
@@ -269,7 +291,8 @@ function fieldErr(id, on) {
   if (e) e.classList.toggle('visible', on);
 }
 function clearErrs() {
-  ['errEmail', 'errPassword', 'errConfirm', 'errCompany'].forEach(function (i) { fieldErr(i, false); });
+  ['errEmail', 'errPassword', 'errConfirm', 'errCompany',
+   'errFirstName', 'errLastName', 'errPosition'].forEach(function (i) { fieldErr(i, false); });
   msg('');
 }
 
@@ -343,7 +366,9 @@ async function submit() {
   const pw = document.getElementById('password').value;
   const pw2 = document.getElementById('confirmPassword').value;
   const company = document.getElementById('company').value.trim();
-  const contact = document.getElementById('contactName').value.trim();
+  const firstName = document.getElementById('firstName').value.trim();
+  const lastName = document.getElementById('lastName').value.trim();
+  const position = document.getElementById('position').value.trim();
   const tin = document.getElementById('tin').value.trim();
 
   let bad = false;
@@ -353,6 +378,13 @@ async function submit() {
     if (pw !== pw2) { fieldErr('errConfirm', true); bad = true; }
   }
   if (!company) { fieldErr('errCompany', true); bad = true; }
+  /* ⚠️ REQUIRED, unlike the single optional "Your Name" this replaced. The whole
+     point of asking is that a reviewer can see who is requesting control of a
+     vendor's account and in what capacity; an optional field would be blank on
+     exactly the claims worth questioning. */
+  if (!firstName) { fieldErr('errFirstName', true); bad = true; }
+  if (!lastName) { fieldErr('errLastName', true); bad = true; }
+  if (!position) { fieldErr('errPosition', true); bad = true; }
   if (bad) return;
 
   btn.disabled = true;
@@ -375,12 +407,33 @@ async function submit() {
     // Returns only a claim id. The server deliberately does NOT report whether
     // or to whom it matched — that would let anyone brute-force TINs to
     // discover Megawide's vendors. Never surface a match result here.
-    const r = await sb.rpc('submit_vendor_claim', {
+    /* ⚠️ THE ARGUMENT NAMES ARE THE CONTRACT. PostgREST resolves an overload by
+       argument NAMES, so this call and migrations/2026-09-08_vendor_claim_person.sql
+       must move together — that migration DROPS the old 4-argument function for
+       exactly this reason. If a registration ever fails with PGRST202, check
+       whether the migration has been run. */
+    let r = await sb.rpc('submit_vendor_claim', {
       p_company: company,
-      p_contact_name: contact || null,
+      p_first_name: firstName,
+      p_last_name: lastName,
+      p_position: position,
       p_tin: tin || null,
       p_is_new: isNewVendor
     });
+    /* ⚠️ FALLS BACK TO THE 4-ARGUMENT SIGNATURE while the migration has not been
+       run yet, so shipping this page ahead of it cannot break registration.
+       PGRST202 is "no function matches those argument names". The first/last
+       name are joined into p_contact_name, which is what that version takes;
+       the position is simply not recorded until the migration lands. Same
+       shape as bid-response.html's clarify_bid_by_token fallback. */
+    if (r.error && (r.error.code === 'PGRST202' || /Could not find the function/i.test(r.error.message || ''))) {
+      r = await sb.rpc('submit_vendor_claim', {
+        p_company: company,
+        p_contact_name: (firstName + ' ' + lastName).trim(),
+        p_tin: tin || null,
+        p_is_new: isNewVendor
+      });
+    }
     if (r.error) throw r.error;
     show('stepDone');
     msg('');
