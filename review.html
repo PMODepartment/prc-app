@@ -1643,7 +1643,10 @@
   // column 0). Cells map positionally to the visible columns (VC); read-only/derived
   // columns are skipped. Makes Select all → Ctrl+C → navigate → Ctrl+V behave like
   // the Copy/Paste WPs buttons. Returns true if it handled the paste.
-  function _xlPasteWholeWPs(tsvRows){
+  /* ⚠️ The tiered index has to be loaded BEFORE the rows are built — a TSV
+     carries names, never ids, so this is the one chance to link them. */
+  async function _xlPasteWholeWPs(tsvRows){
+    try { await _xlEnsureVendorIndex(); } catch(_){ /* linking is best-effort */ }
     const pid = _xlTargetProject();
     if (!pid){ AppNotify.warn('Pick a project to add the work packages to first.'); return false; }
     if (!AppAuth.canEditProject(adminProfile, pid)){ AppNotify.warn("You can't add work packages to " + pid + '.'); return false; }
@@ -1658,7 +1661,7 @@
         // unambiguously so a pasted WP keeps its vendor linkage where it safely can.
         if (col.type === 'vendors' && col.idsKey && cv){
           const ids = _xlVendorSplit(cv)
-            .map(function(n){ return _xlVendorByName[_xlVendorNorm(n)]; })
+            .map(function(n){ return _xlLookupVendorId(n); })
             .filter(Boolean);
           if (ids.length){
             o[col.idsKey] = ids;
@@ -2243,7 +2246,7 @@
   function _xlResolveVendorIds(textVal){
     const ids = [];
     _xlVendorSplit(textVal).forEach(function(nm){
-      const hit = _xlVendorByName[_xlVendorNorm(nm)];
+      const hit = _xlLookupVendorId(nm);
       if (hit) ids.push(hit);
     });
     return ids;
@@ -3016,9 +3019,71 @@
     // or a set-all would leave every row's vendor unlinked purely because nobody had
     // searched for it yet this session.
     const col = VC.find(function(x){ return x.k===k; });
-    if (col && col.type === 'vendors' && v && v.trim()) await _xlWarmVendorName(v);
+    if (col && col.type === 'vendors' && v && v.trim()){
+      await _xlEnsureVendorIndex();
+      await _xlWarmVendorName(v);
+    }
     _xlColApply(k, v);
   };
+  /* ⚠️⚠️ THE GRID USED TO RESOLVE A NAME WITH A STRICTLY WEAKER MATCHER THAN THE
+     REST OF THE APP, and that is what "the vendor copy paste doesn't work" was:
+     EXACT normalised name only, against a cache filled from searchApprovedVendors
+     (an ilike over `vendors.name`). It never consulted `vendor_aliases` — ~517 of
+     them, and the whole reason a short form like "LG Philippines" resolves anywhere
+     — and it had no punctuation-insensitive or legal-suffix tier. So a name the
+     Vendor Analytics resolves happily saved here as plain text with nothing linked,
+     and nothing said why.
+     It now goes through db.js's own tiered resolver: alias → exact → same name
+     different punctuation → same name different legal suffix. ONE definition, so
+     the grid and the analytics can no longer disagree about who a name is.
+     ⚠️ AMBIGUOUS STILL RESOLVES TO NOTHING. Two vendors matching one name is a
+     genuine ambiguity and a wrong link mis-credits award money — the refuse-to-guess
+     rule this whole feature rests on. */
+  let _xlVendorIdx = null;          // the tiered index, once per grid session
+  let _xlVendorIdxLoading = null;   // in-flight promise, so a burst loads it once
+  function _xlEnsureVendorIndex(){
+    if (_xlVendorIdx) return Promise.resolve(_xlVendorIdx);
+    if (_xlVendorIdxLoading) return _xlVendorIdxLoading;
+    if (typeof VendorDb === 'undefined' || !VendorDb.buildVendorIndex) return Promise.resolve(null);
+    /* ⚠️ LAZY, NEVER ON GRID OPEN. getVendors() pages the whole ~2,400-row
+       directory and is the slowest read on the vendor pages; the grid does not
+       need it until a vendor name actually has to be resolved. The caller that
+       triggers this already shows a "Linking…" toast, so the wait is covered. */
+    _xlVendorIdxLoading = (async function(){
+      try {
+        const [vendors, aliases] = await Promise.all([
+          VendorDb.getVendors(),
+          VendorDb.getVendorAliases ? VendorDb.getVendorAliases().catch(function(){ return []; }) : []
+        ]);
+        _xlVendorIdx = VendorDb.buildVendorIndex(vendors || [], aliases || []);
+        // Feed the name cache too, so a linked chip shows a real name straight away.
+        (vendors || []).forEach(_xlVendorCacheAdd);
+      } catch(_){ _xlVendorIdx = null; }   // linking is best-effort; text still saves
+      _xlVendorIdxLoading = null;
+      return _xlVendorIdx;
+    })();
+    return _xlVendorIdxLoading;
+  }
+  /* One name → a vendor id, or null. Index first (all four tiers), then the
+     popover's own exact-match cache as a fallback for a session where the index
+     could not load. Both refuse on ambiguity. */
+  function _xlLookupVendorId(nm){
+    if (_xlVendorIdx && typeof VendorDb !== 'undefined' && VendorDb.resolveVendorName){
+      const hit = VendorDb.resolveVendorName(_xlVendorIdx, nm);
+      if (hit === 'AMBIGUOUS') return null;
+      if (hit && hit.id) return hit.id;
+    }
+    const c = _xlVendorByName[_xlVendorNorm(nm)];
+    return c || null;                       // `false` means AMBIGUOUS → null
+  }
+  // Why a name matched, for the paste report. Null when it did not match at all.
+  function _xlLookupWhy(nm){
+    if (_xlVendorIdx && typeof VendorDb !== 'undefined' && VendorDb.resolveVendorNameTier){
+      const t = VendorDb.resolveVendorNameTier(_xlVendorIdx, nm);
+      if (t && t !== 'no match' && t !== 'ambiguous') return t;
+    }
+    return _xlVendorByName[_xlVendorNorm(nm)] ? 'exact name' : null;
+  }
   // Look a vendor name up in the directory once, to populate the name→id cache.
   async function _xlWarmVendorName(text){
     const names = _xlVendorSplit(text).filter(function(n){ return !(_xlVendorNorm(n) in _xlVendorByName); });
@@ -3136,7 +3201,11 @@
     if (vendorNames.length){
       xlToast('Linking ' + vendorNames.length + ' vendor' + (vendorNames.length===1?'':'s')
         + ' across ' + vendorCells + ' cell' + (vendorCells===1?'':'s') + ' to the directory…');
-      try { await _xlWarmVendorName(vendorNames.join('\n')); } catch(_){ /* linking is best-effort */ }
+      // The tiered index is what makes an alias / a different punctuation / a
+      // different legal suffix resolve at all; the per-name search is still worth
+      // doing for anything the index could not load.
+      try { await _xlEnsureVendorIndex(); } catch(_){ /* linking is best-effort */ }
+      try { await _xlWarmVendorName(vendorNames.join('\n')); } catch(_){ /* ditto */ }
     }
     const b=[]; let blocked=0;
     rows.forEach(function(cells,dr){ cells.forEach(function(v,dc){
@@ -3150,8 +3219,15 @@
       // A name that resolves to multiple vendors (ambiguous) is cached as `false`,
       // which is correctly counted here as "not linked" — same refuse-to-guess rule
       // as `_xlRelinkVendorIds` itself.
-      const linked = vendorNames.filter(function(n){ return _xlVendorByName[_xlVendorNorm(n)]; }).length;
-      if (linked < vendorNames.length) xlToast((vendorNames.length-linked)+' vendor name'+(vendorNames.length-linked===1?'':'s')+" didn't match the directory exactly (or matched more than one vendor) — saved as text, not linked.");
+      const linked = vendorNames.filter(function(n){ return _xlLookupVendorId(n); }).length;
+      /* Report the tiers actually used. A name that matched only because somebody
+         recorded an alias, or only on punctuation, is worth SEEING — it is the
+         difference between "the directory knew this" and "a person taught it". */
+      const why = {};
+      vendorNames.forEach(function(n){ const t = _xlLookupWhy(n); if (t && t !== 'exact name') why[t] = (why[t]||0)+1; });
+      const notes = Object.keys(why).map(function(t){ return why[t] + ' by ' + t; });
+      if (linked && notes.length) xlToast('Linked ' + linked + ' of ' + vendorNames.length + ' — ' + notes.join(', ') + '.');
+      if (linked < vendorNames.length) xlToast((vendorNames.length-linked)+' vendor name'+(vendorNames.length-linked===1?'':'s')+" didn't match the directory (or matched more than one vendor) — saved as text, not linked.");
     }
   }
 

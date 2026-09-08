@@ -9433,6 +9433,70 @@ that the run was green.** The one time that discipline lapsed, a python heredoc 
 to append 26 assertions, the suite still printed "40 passed", and two brand-new rules shipped
 untested.
 
+### ⚠⚠ THE GRID RESOLVED A VENDOR NAME WITH A WEAKER MATCHER THAN THE REST OF THE APP (2026-09-08)
+
+Reported twice: *"the vendor copy paste has been reported not working even after the fix"*, then
+the decisive hint — *"probably it has something to do with the linking of the vendor in the
+vendor management database."* That was right, and it is the whole bug.
+
+**The paste itself was never broken.** Driven against the real grid: a two-row paste writes both
+rows, a co-award cell links both vendors in order, a range paste replicates, `preventDefault` is
+on the copy handler, and `Ctrl+V` correctly falls through the keydown handler. All of it works.
+
+**What was broken is what a pasted NAME resolves to.** `_xlResolveVendorIds` looked names up in
+`_xlVendorByName` — a cache filled from `searchApprovedVendors`, an `ilike` over
+`vendors.name` — and matched on the **exact normalised name and nothing else**. So:
+
+| the name pasted | the app's own resolver | the grid, before |
+|---|---|---|
+| `Stealasia` (an alias a person recorded) | links to Steelasia | **text, unlinked** |
+| `Capitol Steel Corp.` | links (different legal suffix) | **text, unlinked** |
+| `Steelasia Manufacturing Corp` (punctuation) | links | **text, unlinked** |
+| `LG Philippines` | links via its alias | **text, unlinked** |
+
+**⚠⚠ IT NEVER CONSULTED `vendor_aliases` AT ALL** — ~517 rows, and the ONLY reason a short
+form or a trade name resolves anywhere in this app. A directory that had been cleaned up
+specifically so these names resolve still could not link them here.
+
+**The fix is to stop having a second matcher.** `db.js` already exports
+`buildVendorIndex` / `resolveVendorName` / `resolveVendorNameTier`, with four tiers — alias
+→ exact → same name different punctuation → same name different legal suffix — each
+refusing on ambiguity. The grid now uses it, through one `_xlLookupVendorId(name)`:
+
+- **⚠ AMBIGUOUS STILL RESOLVES TO NOTHING.** Two vendors matching one name is a genuine
+  ambiguity, and a wrong link mis-credits award money — the rule this whole feature rests on.
+  Asserted, along with the documented never-merge pair (`Magcalas-Romero …Supplies` vs
+  `…Trading`) staying two companies.
+- **⚠ AN UNMATCHED NAME STILL SAVES AS TEXT**, never silently dropped.
+- **⚠ THE INDEX LOADS LAZILY, ONCE.** `getVendors()` pages the whole ~2,400-row directory and
+  is the slowest read on the vendor pages; the grid does not need it until a name actually has
+  to be resolved. Loaded on the paths that resolve a NAME rather than an id — the cell paste,
+  the whole-WP paste, and the header-→ set-all — each of which already shows a toast, so
+  the wait is covered. Asserted: **not loaded on grid open, loaded once by the paste, one read
+  no matter how many names.**
+- **⚠ `_xlPasteWholeWPs` HAD THE SAME GAP AND IS EASY TO MISS** — it builds rows from a TSV,
+  which carries names and never ids, so it is the one chance to link them. It is now `async` and
+  awaits the index first. Its only caller ignores the return value, so that was safe.
+- **The paste report now names the tier** — *"Linked 12 of 14 — 3 by alias set by a person, 2
+  by same name, different legal suffix."* A name that matched only because somebody recorded an
+  alias is worth SEEING; it is the difference between the directory knowing something and a
+  person having taught it.
+- The vendor POPOVER still searches with `searchApprovedVendors`, deliberately: a person picking
+  from a typeahead is not guessing, and the pick carries a real id.
+
+**⚠ READING FOUND NOTHING, TWICE. DRIVING THE PAGE FOUND IT.** `scratchpad/mk_review_harness.py`
+rebuilds `review.html` verbatim with only the network stubbed, seeded with the exact two UTM102
+rows from the screenshot — WP 1 carrying a co-award as free TEXT with no `awarded_vendor_ids`
+(the commonest shape in this data), WP 2 awarded with no vendor at all — plus a directory and
+an alias table. 19 assertions.
+
+**⚠ AND THE HARNESS'S OWN FIRST RUN WAS A FALSE ALARM: `window.WPDb` IS `undefined`.**
+`WPDb` is a top-level `const` in db.js, i.e. a global LEXICAL binding that is **not** a property
+of `window` — the same trap already recorded for `Charts` and `Fmt`. `const W = window.WPDb`
+threw, the whole stub script died silently, every fixture was missing, and the grid rendered zero
+rows. **Reach `WPDb` by the bare identifier.** (`VendorDb` happens to be assigned to `window` as
+well, but the harness uses the bare name for both so it cannot break that way again.)
+
 ### Vendor portal: editable contacts, one dropdown look, price per unit (2026-09-08)
 
 Four reported items, all in `vendor-portal.html`. Two of them uncovered defects that were
