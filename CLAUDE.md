@@ -9332,6 +9332,107 @@ the previous run.
 suite you extend, and **check the total moved, not just that it was green.** The heredoc was the
 cause again: use the Write/Edit tools for anything containing a backslash.
 
+### ⚠⚠ "IT LOADS SO SLOWLY, IS IT BUGGED" WAS A THROW, NOT A HANG (2026-09-08)
+
+Reported: **Unlinked vendor names** and **Awarded, no vendor recorded** both sat forever on
+their progress line and were unusable. Neither was slow. **`renderAliasQueue()` threw
+`ReferenceError: Q is not defined`.**
+
+`Q` is the single quote this file builds every inline `onclick` with. It was declared
+`var Q = String.fromCharCode(39)` **INSIDE `_archivedBlock()`**, in a different `<script>`
+block, so all ten other uses — the whole alias queue and the whole fill-in queue — were
+free variables.
+
+**⚠⚠ THE SYMPTOM WAS A HANG BECAUSE OF WHERE THE THROW LANDS.** It happens after the
+progress callback has painted "Matching against the directory…", and it escapes
+`openAliasQueue`'s `try/catch`, **which only wraps the fetch**. So the modal kept the last
+progress line on screen indefinitely and read as an infinite load. The data call underneath
+takes **69ms**; `renderAliasQueue` now takes **13ms**.
+
+- **⚠ SECOND TIME THIS EXACT BUG HAS SHIPPED** — `bids.html` used `Q` 15 times without
+  declaring it and its New-round modal rendered nothing. **`node --check` cannot catch it:**
+  a free variable parses fine and only throws when its line runs. Declared once at module
+  scope now, and the local re-declaration — which is what hid its absence — is gone.
+- **⚠ A `try/catch` THAT WRAPS ONLY THE FETCH TURNS A RENDER BUG INTO A HANG.** If a panel
+  paints a progress line before doing work, the render has to be inside the guard too, or the
+  failure is indistinguishable from slowness.
+
+**And the fill-in queue really was re-reading the whole table.** `getAwardedWithoutVendor`
+paged `work_packages` itself instead of sharing `_toolWps()`, so it cost **~4.5s on EVERY
+open** while the alias queue, already on that cache, opened in 202ms. Measured the five
+display columns it needs before adding them: **+162ms and +285KB** on the shared read against
+**4,481ms saved per open**. Now **1,941ms cold, 165ms warm**.
+
+### The vendor registration form fits a laptop screen (2026-09-08)
+
+Reported as needing to scroll. Measured: the form column needed **822px** against a
+1366x768 laptop's ~648px of viewport — hence the scrollbar and the footer cut mid-line.
+Now **627px**, which also clears 1080p at 125% and 150% Windows scaling.
+
+- The TIN was sitting **alone in a two-column row**, left over from when Vendor Code was
+  beside it — half a row of dead space.
+- **⚠ `.form-wrap` KEEPS `overflow-y:auto`.** The goal is that it rarely has to scroll,
+  never that content gets clipped. Verified at 1280x420: `body` is the scroll container and
+  the footer is still reachable.
+- **⚠ A MEASUREMENT OF MINE WAS WRONG AND NEARLY CAUSED A BAD "FIX".** At 420px I read
+  `documentElement.scrollHeight` and `formWrap.scrollTop`, concluded nothing scrolled, and was
+  about to change `html,body{height:100%}`. **`body` is the scroller here** — it reports
+  `scrollHeight` 627 and scrolls 207px. Check WHICH element is the scroll container before
+  concluding content is unreachable.
+
+### ⚠ WHO IS CLAIMING THIS VENDOR ACCOUNT (2026-09-08)
+
+`migrations/2026-09-08_vendor_claim_person.sql` (**RUN ME**, after
+`2026-09-03_vendor_claim_tin_only.sql`).
+
+The registration form asked one optional **"Your Name — who we should address"**. A reviewer
+could not see WHO inside the company was asking for control of that vendor's account, or in
+what capacity — which is the most useful evidence they have, **because the TIN is evidence
+about the COMPANY and says nothing about whether that individual may act for it.**
+
+**First name, last name and position are now required**, and the review dialog shows the
+position and the **email domain** beside the TIN.
+
+- **⚠ THE NEW FIELDS ARE NEVER MATCHED ON.** A self-asserted name and job title are not
+  identity; treating them as such would weaken the check, not strengthen it. The matcher is
+  unchanged: TIN, then exact company name, each requiring exactly one hit.
+- **⚠ THE OLD 4-ARGUMENT `submit_vendor_claim` IS DROPPED.** PostgREST resolves an overload
+  by ARGUMENT NAMES, so leaving both makes every registration ambiguous and fail — the third
+  time this project has had to take that care. **`vendor-register.html` falls back to the
+  4-argument call on `PGRST202`**, so the page is safe to deploy ahead of the migration.
+- **⚠ `claimed_contact_name` IS KEPT AND STILL POPULATED** as "First Last" —
+  `approve_vendor_claim` writes it to `users.name` and `create_vendor_from_claim` to
+  `vendors.contact_person`, so splitting it without keeping it would have broken both.
+- **Company and TIN are paired** because they are the same document, which also kept the form
+  at four field rows: **627px with two extra fields, unchanged.** New `.row3` stacks below
+  760px like `.row2`.
+
+**The claimant is recorded under Personnel on approval** (no photo), which is where people
+live and what `vendors.contact_*` already mirrors.
+
+- **⚠⚠ A TRIGGER ON `vendor_claims`, NOT AN EDIT TO `approve_vendor_claim`.** It fires for
+  BOTH approval paths without either knowing (create_vendor_from_claim delegates), so there is
+  still exactly ONE place that grants access — and it needs no source rewriting of a live
+  function. **The first attempt DID rewrite by source and came out with its quoting eaten,
+  turning `'\s+'` into a bare `\s+`.** A trigger body is ordinary SQL with ordinary quoting.
+- **⚠ `is_primary` ONLY when the vendor has nobody yet.** The flag is exclusive and
+  `vendors.contact_*` mirrors that row, so a self-registration must never demote whoever staff
+  already marked primary. The contact mirror is filled **only where blank**.
+
+### ⚠⚠ EIGHT TIMES IN ONE SESSION, A RED TEST WAS THE TEST (2026-09-08)
+
+Worth stating as a rule rather than an anecdote. In this session alone the following were MY
+assertion being wrong, not the code: a `row2Stacked` check that required the values to DIFFER,
+a `data:`-URL harness measured before its viewport was applied, a `DO $$` wrapper rejecting a
+`return v_id` that is valid in the real function, a scroll check reading the wrong scroll
+container, an expected count of `'\D'` that ignored two of its three call sites, and three
+shell greps whose backslashes the heredoc ate.
+
+**Rule out the harness before the code, and check the assertion COUNT moved rather than only
+that the run was green.** The one time that discipline lapsed, a python heredoc silently failed
+to append 26 assertions, the suite still printed "40 passed", and two brand-new rules shipped
+untested.
+
 ### A placeholder can no longer BE a vendor (2026-09-07)
 
 `n/a` being a live vendor record is the reconciliation's most actionable finding, and it was
