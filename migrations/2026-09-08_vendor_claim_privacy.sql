@@ -37,6 +37,18 @@
 --    the BIR 2303 every vendor uploads for accreditation, and the field is
 --    OPTIONAL on the registration form. What was missing was the notice
 --    (see vendor-register.html) and this retention limit.
+--
+-- ⚠️⚠️ THIS WINDOW IS INTERNAL PRACTICE AND IS DELIBERATELY NOT PUBLISHED.
+--    vendor-register.html states NOTHING about retention: it defers to Megawide's
+--    corporate Privacy Statement ("as long as necessary to fulfill the purposes"),
+--    which is the point of a layered notice — the collection point says what and
+--    why, the statement says how long. A published interval would be a falsifiable
+--    commitment to a data subject resting on a pg_cron job that anyone with database
+--    access can silently disable, after which the page is untrue — worse than never
+--    having said it. DO NOT "helpfully" put the number on the page to match this
+--    file. The asymmetry IS the design: do better than you promise, never promise
+--    better than you do. You may shorten or lengthen this window freely — nothing
+--    public depends on it.
 -- ============================================================================
 
 

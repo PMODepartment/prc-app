@@ -9986,22 +9986,26 @@ treating a free-mail domain as disqualifying would reject real vendors.
   contradict it. Privacy contact `rgomez@megawide.com.ph` is taken from that statement.
   **⚠️ Keep the two in step — if the corporate statement changes, this summary follows it,
   never the reverse.**
-- **⚠️⚠️ THE NOTICE DELIBERATELY PUBLISHES NO NUMBER OF DAYS** (changed 2026-09-08, same day,
-  on the question "shall we even promise that 30-day purge?" — the answer is no). An earlier
-  draft said "we clear the TIN from it after 30 days", matching what
-  `internal.purge_declined_claim_tins()` does. Three reasons that was the wrong thing to
-  publish: a stated interval is a **falsifiable commitment to a data subject** that has to hold
-  forever and through every refactor; it rests on a **pg_cron job that anyone with database
-  access can silently disable**, after which the page is simply lying; and it made this page
-  **more specific than Megawide's own corporate statement**, which deliberately says only "as
-  long as necessary to fulfill the purposes" — so the two would diverge the moment Legal wanted
-  a different window. It now reads *"we remove your TIN from it and keep only the record that a
-  registration was reviewed"*: same substance, no bright line. **The 30-day purge still runs —
-  it is internal practice, not a published SLA. Do better than you promise, don't promise
-  better than you do.**
-- **⚠️ IT IS STILL A COMMITMENT, just an untimed one.** Softer wording narrows the exposure; it
-  does not remove the need for the purge to actually run. Without pg_cron enabled (or some other
-  runner) the sentence is still untrue.
+- **⚠️⚠️ THE NOTICE PROMISES NOTHING ABOUT RETENTION AT ALL** (settled 2026-09-08 across two
+  revisions in one day — *"shall we even promise that 30-day purge?"*, then *"let's just not
+  promise anything"*). Draft 1 published *"we clear the TIN after 30 days"*; draft 2 softened it
+  to an untimed *"we remove your TIN from a declined registration"*; the shipped version says
+  **nothing**, and instead points at the corporate statement: *"The full details, including how
+  long we keep your information, are in Megawide's Privacy Statement."*
+  Every version after the first was an improvement for the same reason: **a retention sentence on
+  this page is a commitment it then has to keep forever, resting on a pg_cron job anyone with
+  database access can silently disable — after which the page is untrue to a data subject, which
+  is worse than never having said it.** Deferring is also the correct shape for a **layered
+  notice**: the collection point says what and why, the linked statement says how long. RA 10173
+  s16(b)(6) is satisfied by the link, not by this page re-stating retention in its own words —
+  and re-stating it was actively harmful, because it made the page **more specific than its own
+  parent policy** ("as long as necessary to fulfill the purposes"), so the two would diverge the
+  first time Legal wanted a different window.
+- **⚠️ `internal.purge_declined_claim_tins()` STILL EXISTS AND SHOULD STILL RUN.** Not publishing
+  an interval is not the same as not having one. **Do better than you promise, never promise
+  better than you do** — and **do not "helpfully" put the number back on the page to match the
+  migration.** The asymmetry is the design; the window can now be changed freely because nothing
+  public depends on it. Both files carry that warning at the point someone would be tempted.
 
 - **An acknowledgement checkbox gates submit**, and its second clause is not boilerplate:
   *"I confirm I am authorised to submit this registration on behalf of the company named
