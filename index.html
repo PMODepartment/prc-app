@@ -12,18 +12,18 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260908g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260908g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260908g"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260908g"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260908g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260910a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260910a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260910a"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260910a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260910a"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260908g"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260910a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260908g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260910a"/>
   <!-- PWA / Add-to-Home-Screen app icon -->
   <link rel="manifest" href="manifest.webmanifest"/>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"/>
@@ -55,8 +55,12 @@
       <a class="nav-item active" href="index.html?view=consolidated">
         <i class="ti ti-layout-dashboard"></i>Portfolio Overview
       </a>
+      <!-- Mirrors project.html: always visible for every role, no JS toggle. -->
+      <a class="nav-item" href="login.html" style="opacity:.75;font-size:0.8571rem">
+        <i class="ti ti-switch-horizontal"></i>Switch Project
+      </a>
       <div style="margin:4px 12px 2px;padding:5px 8px;background:rgba(255,255,255,.06);border-radius:6px;font-size:0.7143rem;color:rgba(255,255,255,.38);letter-spacing:.05em;text-transform:uppercase;line-height:1.6;border-left:2px solid rgba(238,49,36,.5)">
-        Read-only view<br>Select a project below<br>to manage work packages
+        Read-only view<br>Open a project from<br>the title above
       </div>
     </div>
 
@@ -71,15 +75,6 @@
       <a class="nav-item" id="nav-bids" href="bids.html">
         <i class="ti ti-gavel"></i>Bid Management
       </a>
-    </div>
-
-    <div class="sidebar-section">
-      <div class="sidebar-section-label">Open a Project</div>
-      <div id="nav-proj-search-wrap" style="position:relative;margin:0 10px 8px;position:sticky;top:0;z-index:3;background:var(--mw-black);padding-bottom:2px;display:none">
-        <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#888;font-size:0.9286rem;pointer-events:none"></i>
-        <input id="nav-proj-search" type="text" placeholder="Search projects…" oninput="window.__sidebarRefresh&&window.__sidebarRefresh()" style="width:100%;box-sizing:border-box;padding:6px 8px 6px 26px;border:1.5px solid rgba(255,255,255,.15);border-radius:7px;background:rgba(255,255,255,.06);color:#fff;caret-color:#fff;font-size:0.8571rem;font-family:inherit;outline:none">
-      </div>
-      <div id="nav-projects"></div>
     </div>
 
     <div class="sidebar-section" id="sidebar-admin-section" style="display:none">
@@ -118,9 +113,18 @@
         <button class="btn-menu" id="btn-menu" aria-label="Open menu">
           <i class="ti ti-menu-2"></i>
         </button>
-        <div style="min-width:0;flex:1 1 auto;overflow:hidden">
-          <div class="page-title">Portfolio Overview</div>
+        <!-- ⚠️ overflow must stay VISIBLE: #hdr-switcher is absolutely positioned
+             inside this wrapper and `hidden` would clip the popover (the same trap
+             already recorded for .topbar-left on mobile). -->
+        <div style="position:relative;min-width:0;flex:1 1 auto">
+          <div class="page-title proj-switcher" id="page-title" onclick="toggleHdrSwitcher(event)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleHdrSwitcher(event);}" title="Switch project" role="button" tabindex="0" aria-haspopup="listbox" style="cursor:pointer;display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%"><span id="page-title-text" class="proj-switcher-text">Portfolio Overview</span><span class="proj-switcher-caret"><i class="ti ti-chevron-down" id="hdr-sw-caret"></i></span></div>
           <div class="page-sub hint-sm" id="page-sub"></div>
+          <div id="hdr-switcher" class="proj-switcher-pop" style="display:none;position:absolute;z-index:60;top:100%;left:0;margin-top:6px">
+            <div class="proj-switcher-pop-search">
+              <input id="hdr-sw-search" type="text" placeholder="Search projects…" autocomplete="off" oninput="renderHdrSwitcher()" onkeydown="if(event.key==='Escape')toggleHdrSwitcher(event)">
+            </div>
+            <div id="hdr-sw-list" class="proj-switcher-pop-list" role="listbox"></div>
+          </div>
         </div>
         <!-- Read-only badge (hidden on mobile via CSS class) -->
         <div class="topbar-badge-readonly" style="align-items:center;gap:4px;padding:3px 10px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:20px;font-size:0.7143rem;font-weight:700;color:#92400E;letter-spacing:.04em;flex-shrink:0">
@@ -738,15 +742,15 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260908g"></script>
-<script src="assets/js/db.js?v=20260908g"></script>
-<script src="assets/js/ui.js?v=20260908g"></script>
-<script src="assets/js/onboarding.js?v=20260908g"></script>
-<script src="assets/js/coachmarks.js?v=20260908g"></script>
+<script src="assets/js/auth.js?v=20260910a"></script>
+<script src="assets/js/db.js?v=20260910a"></script>
+<script src="assets/js/ui.js?v=20260910a"></script>
+<script src="assets/js/onboarding.js?v=20260910a"></script>
+<script src="assets/js/coachmarks.js?v=20260910a"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260908g"></script>
+<script src="assets/js/charts.js?v=20260910a"></script>
 <script>
   // Segmented toggle state — swaps a class instead of rewriting cssText.
   // Rewriting the whole inline style was what made dark-mode attribute
@@ -920,35 +924,18 @@
         act + ' active project' + (act===1?'':'s') + (arch ? ' (+' + arch + ' archived)' : '') + ' · Read-only';
     })();
 
-    // Sidebar project links with pin buttons
-    const navEl = document.getElementById('nav-projects');
-    const userId = profile.id;
-    // Search box appears only when there are enough projects to be worth filtering
-    const _navSearchWrap = document.getElementById('nav-proj-search-wrap');
-    if (_navSearchWrap && permitted.filter(p => p.status !== 'archived').length > 5) _navSearchWrap.style.display = 'block';
-    // Sidebar lists ACTIVE projects only — an archived project (e.g. TES101) is not
-    // something you jump into to manage work packages. Mirrors project.html's sidebar.
-    // Archived projects stay reachable via the login picker, a direct URL, and the
-    // portfolio project cards/table (where their pill starts unselected).
-    const navProjects = permitted.filter(p => p.status !== 'archived');
-    const renderIndexNav = () => {
-      const term = (document.getElementById('nav-proj-search')?.value || '').toLowerCase().trim();
-      const list = term
-        ? navProjects.filter(p => p.id.toLowerCase().includes(term) || (p.name||'').toLowerCase().includes(term))
-        : navProjects;
-      if (!list.length) { navEl.innerHTML = '<div style="padding:8px 14px;font-size:0.7857rem;color:rgba(255,255,255,.35)">No matching projects</div>'; return; }
-      if (typeof SidebarPrefs !== 'undefined') {
-        const { pinned, rest } = SidebarPrefs.sortProjects(userId, list);
-        navEl.innerHTML = [...pinned, ...rest].map(p => SidebarPrefs.projectLink(userId, p)).join('');
-      } else {
-        navEl.innerHTML = list.map(p => `<a class="nav-item" href="project.html?id=${p.id}">
-          <i class="ti ti-building-skyscraper"></i>${p.id}
-          <span style="font-size:0.7143rem;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400">${esc((p.name&&p.name!==p.id?p.name:'').split('—')[0].trim().slice(0,12))}</span>
-        </a>`).join('');
-      }
-    };
-    renderIndexNav();
-    window.__sidebarRefresh = renderIndexNav;
+    // Header project switcher — REPLACED the sidebar "Open a Project" list, which
+    // sat above the Admin section and pushed it past the fold at ~21 projects.
+    // Shared with project.html (initProjSwitcher lives in db.js), and it carries
+    // Portfolio Overview as its own entry so the two pages read the same list.
+    // ACTIVE projects only: an archived one (TES101) is not something you jump into
+    // to manage work packages. Archived stay reachable via the login picker, a
+    // direct URL, and the portfolio cards/table (pill starts unselected).
+    initProjSwitcher(
+      permitted.filter(p => p.status !== 'archived')
+               .sort((a,b) => String(a.id).localeCompare(String(b.id))),
+      'portfolio'
+    );
 
     // Resolve WPs: cache hit → use cache; otherwise fetch (non-admin users fetch by project list)
     let rawWPs;

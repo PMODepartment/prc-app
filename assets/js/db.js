@@ -5328,6 +5328,119 @@ window.filterSidebarProjects = function (q) {
 };
 
 
+/* ══ Header project switcher ══════════════════════════════════════════════
+   ONE searchable dropdown on the topbar title, shared by index.html
+   (Portfolio Overview) and project.html.
+
+   It REPLACED the per-page sidebar project lists. With ~21 projects that rail
+   ran well past the fold, and on both pages the project list sat ABOVE the
+   contributor items below it — so reaching "All Work Packages" (review.html)
+   or "Add Work Package" meant scrolling past every project first. The switcher
+   puts project selection where the user already looks for it (the page title)
+   and gives the sidebar back to navigation.
+
+   ⚠️ PORTFOLIO OVERVIEW IS AN ENTRY IN THE LIST, not merely a sidebar link.
+      The dropdown is now the one place a project is chosen, so the portfolio
+      has to be choosable there too or a project page becomes a one-way door.
+
+   ⚠️ It reads window._sidebarProjects, which each page fills AFTER its own
+      permission filtering (assigned only, no archived, never DEMO). Never
+      fetch the project list here — index.html already has it in hand and a
+      second read would be pure duplication on its render path.
+
+   Shared rather than copied because the markup, the keyboard handling and the
+   outside-click teardown are identical on both pages; two copies would drift.
+   Same reasoning as initSidebarProjects / renderUserBar above.
+
+     initProjSwitcher(projects, 'AVR101')      // a project page
+     initProjSwitcher(projects, 'portfolio')   // index.html                */
+window.initProjSwitcher = function (projects, current) {
+  window._sidebarProjects = projects || [];
+  window.__pswCurrent = current || 'portfolio';
+  const caret = document.getElementById('hdr-sw-caret');
+  const title = document.getElementById('page-title');
+  // Entries = the projects PLUS the portfolio, so a single-project user still
+  // has somewhere to go. Only a user with no projects at all sees no affordance.
+  const entries = window._sidebarProjects.length + 1;
+  if (entries <= 1) {
+    if (caret) caret.style.display = 'none';
+    if (title) {
+      title.style.cursor = 'default';
+      title.onclick = null;
+      title.onkeydown = null;
+      title.removeAttribute('title');
+      title.removeAttribute('role');
+      title.removeAttribute('tabindex');
+    }
+    return;
+  }
+  if (caret) caret.style.display = '';
+  window.renderHdrSwitcher();
+};
+
+window.toggleHdrSwitcher = function (e) {
+  if (e) e.stopPropagation();
+  const pop = document.getElementById('hdr-switcher');
+  if (!pop) return;
+  if (pop.style.display !== 'none') { pop.style.display = 'none'; return; }
+  const s = document.getElementById('hdr-sw-search');
+  if (s) s.value = '';
+  window.renderHdrSwitcher();
+  pop.style.display = 'block';
+  if (s) setTimeout(function () { s.focus(); }, 0);
+};
+
+window.renderHdrSwitcher = function () {
+  const list = document.getElementById('hdr-sw-list');
+  if (!list) return;
+  const q = (document.getElementById('hdr-sw-search') || {}).value || '';
+  const s = q.toLowerCase().trim();
+  const cur = window.__pswCurrent || 'portfolio';
+  const projs = (window._sidebarProjects || []).filter(function (p) {
+    return !s || ((p.name || '') + ' ' + (p.id || '')).toLowerCase().includes(s);
+  });
+  // The portfolio matches on its own words, so a search for "portfolio" or
+  // "overview" finds it rather than emptying the list.
+  const showPortfolio = !s || 'portfolio overview all projects'.includes(s);
+  let html = '';
+  if (showPortfolio) {
+    const on = cur === 'portfolio';
+    html += '<a class="proj-switcher-item' + (on ? ' active' : '') + '" href="index.html" role="option"'
+      + ' aria-selected="' + on + '">'
+      + '<span class="psi-pid psi-pid-all"><i class="ti ti-layout-dashboard" aria-hidden="true"></i></span>'
+      + '<span class="psi-name">Portfolio Overview</span>'
+      + (on ? '<i class="ti ti-check psi-check" aria-hidden="true"></i>' : '')
+      + '</a>';
+    if (projs.length) html += '<div class="psw-sep">Projects</div>';
+  }
+  html += projs.map(function (p) {
+    const on = p.id === cur;
+    // esc() on both — a project name is user-entered (Known Issues #23).
+    const name = (p.name && p.name !== p.id) ? String(p.name).split('—')[0].trim() : '';
+    return '<a class="proj-switcher-item' + (on ? ' active' : '') + '"'
+      + ' href="project.html?id=' + encodeURIComponent(p.id) + '" role="option" aria-selected="' + on + '">'
+      + '<span class="psi-pid">' + esc(p.id) + '</span>'
+      + '<span class="psi-name">' + (esc(name) || esc(p.id)) + '</span>'
+      + (on ? '<i class="ti ti-check psi-check" aria-hidden="true"></i>' : '')
+      + '</a>';
+  }).join('');
+  list.innerHTML = html || '<div class="proj-switcher-empty">No matching projects</div>';
+};
+
+document.addEventListener('click', function (e) {
+  const pop = document.getElementById('hdr-switcher');
+  if (pop && pop.style.display !== 'none'
+      && !e.target.closest('#hdr-switcher') && !e.target.closest('#page-title')) {
+    pop.style.display = 'none';
+  }
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  const pop = document.getElementById('hdr-switcher');
+  if (pop && pop.style.display !== 'none') pop.style.display = 'none';
+});
+
+
 /* ══ TaxonomyPicker ═══════════════════════════════════════════════════════
    A searchable, cascading tree picker for a product_taxonomy node.
 

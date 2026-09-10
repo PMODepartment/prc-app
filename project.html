@@ -12,18 +12,18 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
   <link rel="dns-prefetch" href="https://cayjeqeleenizbdzrums.supabase.co"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"/>
-  <link rel="preload" as="script" href="assets/js/auth.js?v=20260908g"/>
-  <link rel="preload" as="script" href="assets/js/db.js?v=20260908g"/>
-  <link rel="preload" as="script" href="assets/js/ui.js?v=20260908g"/>
-  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260908g"/>
-  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260908g"/>
+  <link rel="preload" as="script" href="assets/js/auth.js?v=20260910a"/>
+  <link rel="preload" as="script" href="assets/js/db.js?v=20260910a"/>
+  <link rel="preload" as="script" href="assets/js/ui.js?v=20260910a"/>
+  <link rel="preload" as="script" href="assets/js/onboarding.js?v=20260910a"/>
+  <link rel="preload" as="script" href="assets/js/coachmarks.js?v=20260910a"/>
   <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
   <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"/>
   <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"/>
-  <link rel="preload" as="script" href="assets/js/charts.js?v=20260908g"/>
+  <link rel="preload" as="script" href="assets/js/charts.js?v=20260910a"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260908g"/>
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=20260910a"/>
   <style>
     /* ── WP Table ── */
     .tbadge{font-size:0.7143rem;background:var(--red-400);color:#fff;border-radius:10px;padding:1px 5px;margin-left:4px;font-weight:700}
@@ -136,16 +136,6 @@
       <a class="nav-item" id="nav-bids" href="bids.html">
         <i class="ti ti-gavel"></i>Bid Management
       </a>
-    </div>
-
-    <!-- Project switcher — searchable list of the user's assigned projects (all views) -->
-    <div class="sidebar-section" id="sidebar-projlist-section" style="display:none">
-      <div class="sidebar-section-label">Projects</div>
-      <div style="position:relative;margin:0 10px 8px;position:sticky;top:0;z-index:3;background:var(--mw-black);padding-bottom:2px">
-        <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#888;font-size:0.9286rem;pointer-events:none"></i>
-        <input id="sidebar-proj-search" type="text" placeholder="Search projects…" oninput="renderSidebarProjects()" style="width:100%;box-sizing:border-box;padding:6px 8px 6px 26px;border:1.5px solid rgba(255,255,255,.15);border-radius:7px;background:rgba(255,255,255,.06);color:#fff;caret-color:#fff;font-size:0.8571rem;font-family:inherit;outline:none">
-      </div>
-      <div id="sidebar-proj-list"></div>
     </div>
 
     <div id="sidebar-projects" style="display:none">
@@ -573,15 +563,15 @@
 </div><!-- /app-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/auth.js?v=20260908g"></script>
-<script src="assets/js/ui.js?v=20260908g"></script>
-<script src="assets/js/db.js?v=20260908g"></script>
-<script src="assets/js/onboarding.js?v=20260908g"></script>
-<script src="assets/js/coachmarks.js?v=20260908g"></script>
+<script src="assets/js/auth.js?v=20260910a"></script>
+<script src="assets/js/ui.js?v=20260910a"></script>
+<script src="assets/js/db.js?v=20260910a"></script>
+<script src="assets/js/onboarding.js?v=20260910a"></script>
+<script src="assets/js/coachmarks.js?v=20260910a"></script>
 <!-- Temporary: safe to remove after 2026-08-07, see CLAUDE.md -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="assets/js/charts.js?v=20260908g"></script>
+<script src="assets/js/charts.js?v=20260910a"></script>
 <script>
 
   // Segmented toggle state — swaps a class instead of rewriting cssText.
@@ -1145,49 +1135,11 @@ function _viewerWireNavSpy(nav) {
   if (sections.length) setActive(sections[0].id);
 }
 
-// Sidebar project switcher list (filtered by the search box; current project highlighted)
-// Header project switcher — searchable dropdown on the page title (mirrors the sidebar list)
-window.toggleHdrSwitcher = function(e){
-  if(e) e.stopPropagation();
-  const pop = document.getElementById('hdr-switcher'); if(!pop) return;
-  const open = pop.style.display !== 'none';
-  if(open){ pop.style.display='none'; return; }
-  renderHdrSwitcher();
-  pop.style.display='block';
-  const s = document.getElementById('hdr-sw-search'); if(s){ s.value=''; renderHdrSwitcher(); setTimeout(()=>s.focus(),0); }
-};
-window.renderHdrSwitcher = function(){
-  const list = document.getElementById('hdr-sw-list'); if(!list) return;
-  const q = (document.getElementById('hdr-sw-search')?.value || '').toLowerCase();
-  const projs = (window._sidebarProjects || []).filter(p => !q || ((p.name||'')+' '+(p.id||'')).toLowerCase().includes(q));
-  if(!projs.length){ list.innerHTML = '<div class="proj-switcher-empty">No matching projects</div>'; return; }
-  list.innerHTML = projs.map(p => {
-    const active = p.id === projId;
-    const name = (p.name && p.name !== p.id) ? p.name.split('—')[0].trim() : '';
-    return `<a class="proj-switcher-item${active?' active':''}" href="project.html?id=${encodeURIComponent(p.id)}" role="option" aria-selected="${active}"><span class="psi-pid">${esc(p.id)}</span><span class="psi-name">${esc(name)||esc(p.id)}</span>${active?'<i class="ti ti-check psi-check" aria-hidden="true"></i>':''}</a>`;
-  }).join('');
-};
-document.addEventListener('click', e=>{
-  const pop = document.getElementById('hdr-switcher');
-  if(pop && pop.style.display!=='none' && !e.target.closest('#hdr-switcher') && !e.target.closest('#page-title')) pop.style.display='none';
-});
-
-window.renderSidebarProjects = function() {
-  const list = document.getElementById('sidebar-proj-list');
-  if (!list) return;
-  const q = (document.getElementById('sidebar-proj-search')?.value || '').toLowerCase();
-  const projs = (window._sidebarProjects || []).filter(p => {
-    if (!q) return true;
-    return ((p.name||'') + ' ' + (p.id||'')).toLowerCase().includes(q);
-  });
-  if (!projs.length) { list.innerHTML = '<div style="padding:6px 12px;font-size:0.7857rem;color:#888">No matches</div>'; return; }
-  list.innerHTML = projs.map(p => {
-    const active = p.id === projId;
-    const disp = (p.name && p.name !== p.id) ? (p.id + ' — ' + p.name.split('—')[0].trim()) : p.id;
-    return `<a class="nav-item${active?' active':''}" href="project.html?id=${encodeURIComponent(p.id)}" style="font-size:0.8571rem${active?'':';opacity:.8'}" title="${esc(disp)}"><i class="ti ti-building-skyscraper"></i><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(disp)}</span></a>`;
-  }).join('');
-};
-
+/* The header project switcher (toggleHdrSwitcher / renderHdrSwitcher) is SHARED —
+   it lives in db.js so index.html's copy cannot drift from this one. It REPLACED
+   the sidebar Projects list that used to sit above Work Packages here: with ~21
+   projects that list pushed "All Work Packages" past the fold. Portfolio Overview
+   is an entry inside it, so this page is not a one-way door. */
 // Vendors live in contractor (awarded) or proposed_vendors. Split on explicit delimiters only —
 // newline / semicolon / pipe. NEVER comma or space, so "Company, Inc." and multi-word names stay intact.
 const _splitVend = s => String(s||'').split(/[\r\n;|]+/).map(x=>x.trim()).filter(Boolean);
@@ -3118,21 +3070,15 @@ AppAuth.requireLogin(async (user, profile) => {
 
   const isAdmin = ['admin','super_admin'].includes(profile.role);
 
-  // Sidebar project switcher — list the user's assigned projects (respects account assignments)
+  // Header project switcher — the ONE place a project is chosen now that the
+  // sidebar list is gone. Fire-and-forget: it must never sit on the render path.
   (async () => {
     try {
       const all = await WPDb.getProjects();
-      window._sidebarProjects = (AppAuth.getPermittedProjects(profile, all) || [])
+      const list = (AppAuth.getPermittedProjects(profile, all) || [])
         .filter(p => p.status !== 'archived' && p.id !== 'DEMO')
         .sort((a,b) => String(a.id).localeCompare(String(b.id)));
-      const sec = document.getElementById('sidebar-projlist-section');
-      if (window._sidebarProjects.length > 1 && sec) { sec.style.display = 'block'; renderSidebarProjects(); }
-      // Header switcher affordance only makes sense with >1 project to switch to
-      const hdrCaret = document.getElementById('hdr-sw-caret'), hdrTitle = document.getElementById('page-title');
-      if (window._sidebarProjects.length <= 1) {
-        if (hdrCaret) hdrCaret.style.display = 'none';
-        if (hdrTitle) { hdrTitle.style.cursor = 'default'; hdrTitle.onclick = null; hdrTitle.removeAttribute('title'); }
-      }
+      initProjSwitcher(list, projId);
     } catch(e) { /* non-fatal */ }
   })();
 
