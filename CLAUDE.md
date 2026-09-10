@@ -9959,6 +9959,66 @@ horizontal overflow**, one row, READ-ONLY badge correctly hidden on mobile.
 **⚠️ The 9px the separator first rendered at was caught by measuring, not by eye** — 10px
 is the app-wide floor for a micro-label.
 
+### Switch Project goes to the picker, the picker fits the screen, and admin.html joins in (2026-09-10)
+
+Three follow-ons to the switcher above.
+
+**⚠️ "Switch Project" landed on the DASHBOARD CHOOSER, not the project picker.** It links to
+`login.html`, whose auto-restore path always ran `showDashboardChooser` — so the answer to
+"WPM or Vendor Management?" was demanded again from someone who had just clicked a control
+that says *project*. The link is now **`login.html?pick=1`** on all six pages that carry it
+(`index`, `project`, `admin`, `wp-form`, `my-wps`, `claim-form`), and `routeAfterAuth()`
+sends that straight to `showProjectPicker(profile, true)`.
+
+- **⚠️ `forced` SUPPRESSES BOTH SKIP-THE-PICKER SHORTCUTS, and it has to.** A `viewer` is
+  normally redirected to `index.html` and a single-project contributor straight into that
+  project — from Switch Project, **both bounce the user back to the page they just left**,
+  which reads as the link being broken. The shortcuts are untouched on the normal login path.
+- Honoured on the auto-restore path AND after a fresh sign-in, so the deep link survives a
+  session that has expired.
+
+**⚠️⚠️ THE "OPEN DASHBOARD" BUTTON WAS UNREACHABLE BELOW ~810px, NOT MERELY BELOW THE FOLD.**
+Reported as needing to scroll; measuring found worse. `.page` centres with
+`min-height:100vh`, and **a flex container that CENTRES overflowing content clips it at BOTH
+ends without growing the document** — measured at a 800px viewport: button bottom **y=825**,
+document overflow **0px**. There was nothing to scroll. With 23 projects and a 133px brand
+header this is the one step that outgrows a laptop.
+
+- **`body.picker-fit` pins the step to the viewport and lets the LIST absorb the slack**, so
+  the button is always on screen and only the list scrolls. **⚠️ Every link in the chain
+  needs `min-height:0`** — a flex item's automatic minimum is its content size, so without it
+  the list refuses to shrink and the card overflows anyway (the same trap as the review
+  grid's flex chain). `height:100dvh` alongside `100vh`, since iOS's `vh` is the *large*
+  viewport (the documented sidebar cut-off).
+- **⚠️ `body.picker-fit .project-picker.visible` must beat `.project-picker.visible{display:block}`**
+   — it does, on specificity (0,3,1 vs 0,2,0).
+- The list keeps its 360px ceiling on a tall screen and shrinks to a 96px floor on a short
+  one; under **680px** a media query also reclaims the brand header.
+- **Scoped to the picker step** — sign-in and the chooser are short and untouched.
+- **Measured at 1000 / 900 / 800 / 720 / 650 / 560 / 480px tall and at 375×667: the button
+  AND the footer are visible at every one**, list 360→96px, zero page and zero horizontal
+  overflow. Before the fix, 800px and below failed.
+
+**`admin.html` got the same sidebar treatment**, and it needed it most: its Projects list was
+the **first** section, so it pushed Navigation, Sourcing, Admin and Manager down. Measured
+after: **6 nav items, whole rail visible, no scroll.**
+
+- The switcher mounts on its title with **`initProjSwitcher(list, 'admin')` — neither the
+  portfolio nor a project, so no row renders active.** It is a jump-to control there, not a
+  statement of where you are.
+- **⚠️ The Performance-tab rename now writes `#page-title-text`, NOT `.page-title`** — the
+  title hosts the caret as a sibling span, and `.textContent` on the parent would wipe it.
+  Same trap `project.html` already documents.
+- **New Project moved into the Admin section** (it lived inside the removed Projects block)
+  and is hidden for managers, who previously lost it when that whole section was hidden.
+- **⚠️ `admin.html`'s own `window.filterSidebarProjects` SHADOWED db.js's identically-named
+  function.** Harmless only because this page has no `#nav-projects-list`; the shadow went
+  with the removal.
+- `#nav-back-section` ("Back to <project>") is kept — that is context, not a list.
+
+`review.html`, `vendors.html`, `bids.html` and `vendor-registrations.html` still keep their
+lists: Projects is the LAST section on those, so it pushes nothing below the fold.
+
 ---
 
 ## Workflow Rules

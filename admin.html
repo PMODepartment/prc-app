@@ -115,27 +115,15 @@
       <div class="sidebar-section-label">Current Project</div>
       <a class="nav-item" id="nav-back-link" href="#"><i class="ti ti-arrow-back-up"></i>Back to <span id="nav-back-name">Project</span></a>
     </div>
-    <div class="sidebar-section" id="nav-projects-section">
-      <div class="sidebar-section-label">Projects</div>
-      <!-- Searchable project list -->
-      <div id="sidebar-proj-search-wrap" style="padding:0 4px 6px;display:none;position:sticky;top:0;z-index:3;background:var(--mw-black)">
-        <div style="position:relative">
-          <i class="ti ti-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.3);font-size:0.8571rem;pointer-events:none"></i>
-          <input id="sidebar-proj-search" type="text" placeholder="Search projects…" oninput="filterSidebarProjects(this.value)"
-            style="width:100%;padding:6px 8px 6px 28px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:0.7857rem;color:#fff;caret-color:#fff;box-sizing:border-box;font-family:inherit;outline:none">
-        </div>
-      </div>
-      <div id="nav-projects-admin"></div>
-      <button class="nav-item" onclick="openNewProjectModal()">
-        <i class="ti ti-folder-plus"></i>New Project
-      </button>
-    </div>
     <!-- ⚠️ Navigation first, Portfolio Overview at the top of it. This block used
          to hold the vendor links and Portfolio under the "Admin" label, which
          put three unrelated jobs in one section. -->
     <div class="sidebar-section">
       <div class="sidebar-section-label">Navigation</div>
       <a class="nav-item" href="index.html"><i class="ti ti-layout-dashboard"></i>Portfolio Overview</a>
+      <a class="nav-item" href="login.html?pick=1" style="opacity:.75;font-size:0.8571rem">
+        <i class="ti ti-switch-horizontal"></i>Switch Project
+      </a>
     </div>
 
     <div class="sidebar-section" id="sidebar-vendor-section" style="display:none">
@@ -147,6 +135,11 @@
     <div class="sidebar-section" id="sidebar-admin-section">
       <div class="sidebar-section-label">Admin</div>
       <a class="nav-item active" href="admin.html"><i class="ti ti-users"></i>User Management</a>
+      <!-- Rehomed from the removed Projects section. Hidden for managers, who
+           reach this page for the Performance tab only (see the isManager block). -->
+      <button class="nav-item" id="nav-new-project" onclick="openNewProjectModal()">
+        <i class="ti ti-folder-plus"></i>New Project
+      </button>
       <!-- ⚠️ SIBLING of the admin-only items, NOT nested inside them. The queue is
            open to every contributor role, while User Management / New Project are
            admin-only — nesting it would hide it from the contributors who work it.
@@ -165,7 +158,16 @@
     <div class="topbar">
       <div class="topbar-left">
         <button class="btn-menu" id="btn-menu" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
-        <div class="page-title">User Management</div>
+        <!-- ⚠️ overflow must stay VISIBLE: #hdr-switcher is absolutely positioned in here. -->
+        <div style="position:relative;min-width:0;flex:1 1 auto">
+          <div class="page-title proj-switcher" id="page-title" onclick="toggleHdrSwitcher(event)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleHdrSwitcher(event);}" title="Go to a project" role="button" tabindex="0" aria-haspopup="listbox" style="cursor:pointer;display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%"><span id="page-title-text" class="proj-switcher-text">User Management</span><span class="proj-switcher-caret"><i class="ti ti-chevron-down" id="hdr-sw-caret"></i></span></div>
+          <div id="hdr-switcher" class="proj-switcher-pop" style="display:none;position:absolute;z-index:60;top:100%;left:0;margin-top:6px">
+            <div class="proj-switcher-pop-search">
+              <input id="hdr-sw-search" type="text" placeholder="Search projects…" autocomplete="off" oninput="renderHdrSwitcher()" onkeydown="if(event.key==='Escape')toggleHdrSwitcher(event)">
+            </div>
+            <div id="hdr-sw-list" class="proj-switcher-pop-list" role="listbox"></div>
+          </div>
+        </div>
       </div>
       <div class="topbar-right"><div id="user-bar"></div></div>
     </div>
@@ -898,15 +900,16 @@
       ]);
       // One choke point: everything downstream reads allUsers.
       allUsers = splitVendorLogins(_users);
-      // Populate sidebar project links — respect the user's assigned projects (role + profile.projects)
+      // Header project switcher — REPLACED the sidebar Projects list, which sat at
+      // the TOP of this rail and pushed Navigation / Sourcing / Admin past the fold
+      // once the portfolio grew past a handful of projects. Shared with the two
+      // dashboards (initProjSwitcher lives in db.js). 'admin' is neither a project
+      // nor the portfolio, so no row renders active — this is a jump-to control.
       const activeProjects = AppAuth.getPermittedProjects(currentProfile, allProjects).filter(p=>p.status!=='archived');
-      window._sidebarProjects = activeProjects;
-      const navProj = document.getElementById('nav-projects-admin');
-      if (navProj) renderSidebarProjects('');
-      if (activeProjects.length > 1) {
-        const sw = document.getElementById('sidebar-proj-search-wrap');
-        if (sw) sw.style.display = 'block';
-      }
+      initProjSwitcher(
+        activeProjects.filter(p=>p.id!=='DEMO').sort((a,b)=>String(a.id).localeCompare(String(b.id))),
+        'admin'
+      );
       updateKPIs();
 
       // Populate bulk project select
@@ -1430,33 +1433,10 @@ window.addEventListener('beforeunload', function(e) {
 });
 
   // ── Sidebar project search ────────────────────────────────────
-  function plainProjectLink(p) {
-    const label = (p.name && p.name !== p.id) ? p.name.split('—')[0].trim().slice(0, 14) : '';
-    return `<a class="nav-item" href="project.html?id=${p.id}">
-      <i class="ti ti-building-skyscraper"></i>${p.id}
-      ${label ? `<span style="font-size:0.7143rem;color:rgba(255,255,255,0.4);margin-left:auto;font-weight:400;flex-shrink:0">${label}</span>` : ''}
-    </a>`;
-  }
-
-  function renderSidebarProjects(q) {
-    const navProj = document.getElementById('nav-projects-admin');
-    if (!navProj || !window._sidebarProjects) return;
-    const all = q
-      ? window._sidebarProjects.filter(p=>p.id.toLowerCase().includes(q)||((p.name||'').toLowerCase().includes(q)))
-      : null;
-
-    // Show the full assigned-project list — grows naturally within the sidebar's OWN scroller
-    // (.sidebar overflow-y:auto). Don't reintroduce an inner max-height scroll box here: that
-    // renders a second scrollbar nested inside the sidebar's, see CLAUDE.md Known Issues.
-    const list = all || [...window._sidebarProjects].sort((a,b)=>a.id.localeCompare(b.id));
-    navProj.innerHTML = list.length
-      ? list.map(plainProjectLink).join('')
-      : '<div style="font-size:0.7857rem;color:rgba(255,255,255,.3);padding:4px 12px">No matches</div>';
-  }
-
-  window.filterSidebarProjects = function(q) {
-    renderSidebarProjects(q.toLowerCase().trim());
-  };
+  /* plainProjectLink / renderSidebarProjects / filterSidebarProjects removed with
+     the sidebar Projects list. The last of those was assigned to `window` and so
+     SHADOWED db.js's own filterSidebarProjects — harmless only because this page
+     has no #nav-projects-list; the shadow is gone with it. */
 
   // ── Init ──────────────────────────────────────────────────────
   AppAuth.requireLogin(async (user, profile) => {
@@ -1479,10 +1459,12 @@ window.addEventListener('beforeunload', function(e) {
       document.getElementById('tabPending').style.display = 'none';
       const sc = document.querySelector('.section-card');
       if (sc) sc.style.display = 'none';
-      document.querySelector('.page-title').textContent = 'Performance';
-      // Also hide project management from sidebar
-      const projSec = document.getElementById('nav-projects-section');
-      if (projSec) projSec.style.display = 'none';
+      // ⚠️ #page-title-text, NOT .page-title — the title now hosts the switcher's
+      // caret as a sibling span, which .textContent would wipe.
+      document.getElementById('page-title-text').textContent = 'Performance';
+      // Managers get the Performance tab only — no project creation.
+      const npBtn = document.getElementById('nav-new-project');
+      if (npBtn) npBtn.style.display = 'none';
       switchTab('perf');
     }
 
@@ -1492,11 +1474,9 @@ window.addEventListener('beforeunload', function(e) {
       const backSec     = document.getElementById('nav-back-section');
       const backLink    = document.getElementById('nav-back-link');
       const backName    = document.getElementById('nav-back-name');
-      const projectsSec = document.getElementById('nav-projects-section');
       if (backSec)  backSec.style.display = 'block';
       if (backLink) backLink.href = 'project.html?id=' + navCtx;
       if (backName) backName.textContent = navCtx;
-      if (projectsSec && !isManager) projectsSec.style.display = 'none';
     }
 
     if (!isManager) {

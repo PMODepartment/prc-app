@@ -108,6 +108,37 @@
     .no-results{text-align:center;color:#bbb;font-size:13px;padding:20px 0}
     .picker-footer{text-align:center;margin-top:12px;font-size:13px;color:#999}
     .picker-footer a{color:#EE3124;text-decoration:none;font-weight:600}
+
+    /* ── Project picker fits the viewport, always ────────────────────────────
+       ⚠️ .page centres with `min-height:100vh`, and a flex container that
+       CENTRES overflowing content clips it at BOTH ends without growing the
+       document — so below ~810px the "Open Dashboard" button was not merely
+       below the fold, it was UNREACHABLE (measured: button bottom y=825,
+       document overflow 0px, nothing to scroll). 20+ projects plus the brand
+       header is the one step that outgrows a laptop screen.
+
+       Fix: pin the step to the viewport and make the LIST the only thing that
+       gives, so the button is always on screen. Every link in the chain needs
+       `min-height:0` — a flex item's automatic minimum is its content size, so
+       without it the list refuses to shrink and the card overflows anyway
+       (the same trap as .vxl-wrap and the review grid's flex chain).
+       Scoped to body.picker-fit so the sign-in and chooser steps are untouched. */
+    body.picker-fit .page{height:100vh;height:100dvh;padding-top:24px;padding-bottom:24px}
+    body.picker-fit .brand{margin-bottom:16px}
+    body.picker-fit .form-wrap{display:flex;flex-direction:column;min-height:0}
+    body.picker-fit .form-inner{display:flex;flex-direction:column;min-height:0}
+    /* Beats .project-picker.visible{display:block} on specificity (0,3,1 vs 0,2,0). */
+    body.picker-fit .project-picker.visible{display:flex;flex-direction:column;min-height:0}
+    /* Keeps its 360px ceiling on a tall screen; shrinks to 96px on a short one. */
+    body.picker-fit .project-list{flex:1 1 auto;min-height:96px;margin-bottom:12px}
+    /* Below this the list alone cannot give back enough — reclaim the brand too. */
+    @media (max-height:680px){
+      body.picker-fit .brand{margin-bottom:10px}
+      body.picker-fit .brand-logo{width:48px}
+      body.picker-fit .brand-text h1{font-size:22px;margin-top:10px}
+      body.picker-fit .brand-text p{display:none}
+      body.picker-fit .form-sub{margin-bottom:14px}
+    }
     .msg2{font-size:13px;padding:10px 14px;border-radius:8px;margin-bottom:12px;display:none;border:1px solid #FFD0D0;background:#FEE2E2;color:#991B1B}
     .msg2.show{display:block}
 
@@ -407,6 +438,19 @@ async function ensureProfile(user) {
 // is: Vendor Management is a co-equal dashboard, not a sub-page of WPM.
 // Vendor-role logins bypass this entirely (they only ever see their own
 // self-service portal, never WPM project data).
+/* ⚠️ "Switch Project" in the app sidebars links to login.html?pick=1. That is a
+   deliberate "I want a different PROJECT", not "which dashboard?" — landing on
+   the chooser made it a two-click detour through a question the user had already
+   answered by being in WPM. The flag routes straight to the project picker, and
+   showProjectPicker(profile, true) suppresses its two skip-the-picker shortcuts:
+   both would bounce the user back to the page they just left (a viewer to
+   index.html, a single-project contributor to that same project), which reads as
+   the link doing nothing. */
+const _WANT_PICKER = new URLSearchParams(location.search).has('pick');
+function routeAfterAuth(profile) {
+  if (_WANT_PICKER && profile.role !== 'vendor') { showProjectPicker(profile, true); return; }
+  showDashboardChooser(profile);
+}
 function showDashboardChooser(profile) {
   if (profile.role === 'vendor') { window.location.href = 'vendor-portal.html'; return; }
   /* ⚠️ VENDOR + BID MANAGEMENT ARE CONTRIBUTOR-ONLY (2026-09-04, explicit
@@ -430,7 +474,7 @@ function showDashboardChooser(profile) {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
     const p = await ensureProfile(session.user);
-    if (p?.status === 'approved') showDashboardChooser(p);
+    if (p?.status === 'approved') routeAfterAuth(p);
     else if (p?.status === 'pending') window.location.href = 'pending.html';
   }
 })();
@@ -460,7 +504,7 @@ async function handleSignIn() {
   if (profile.status === 'rejected') { showMsg('msgBox', 'Your registration was not approved. Please contact your administrator.'); await sb.auth.signOut(); btn.textContent = 'Sign In'; btn.disabled = false; return; }
   // Record last login time (non-blocking)
   sb.from('users').update({ last_login: new Date().toISOString() }).eq('id', data.user.id).then(() => {});
-  showDashboardChooser(profile);
+  routeAfterAuth(profile);
 }
 
 // Project picker state
@@ -504,7 +548,7 @@ document.getElementById('npModal').addEventListener('keydown', e => {
   if (e.key==='Enter') submitNP();
   if (e.key==='Escape') closeNPModal();
 });
-async function showProjectPicker(profile) {
+async function showProjectPicker(profile, forced) {
   // Role-aware landing: viewers are read-only and get the most value from the consolidated
   // Portfolio Overview charts, so drop them straight in (skip the picker). Contributors with a
   // single project already go direct (below); admins/specialists/multi-project users keep the picker.
@@ -513,10 +557,13 @@ async function showProjectPicker(profile) {
   // The stripped-down `viewer` skips the picker -- the portfolio is the whole of their value.
   // viewer_budget does NOT skip: it gets the full contributor UI, so opening a specific
   // project is as useful to them as to anyone else.
-  if (profile.role === 'viewer') { window.location.href = 'index.html'; return; }
+  // `forced` = arrived via Switch Project, so honour the explicit ask (see routeAfterAuth).
+  if (!forced && profile.role === 'viewer') { window.location.href = 'index.html'; return; }
 
+  document.getElementById('loginForm').classList.add('hidden');
   document.getElementById('dashboardChooser').classList.remove('visible');
   document.getElementById('projectPicker').classList.add('visible');
+  document.body.classList.add('picker-fit');
 
   const name = profile.name || profile.email.split('@')[0];
   const _roleLabelMap = { super_admin:'Super Admin', admin:'Admin', specialist:'Specialist', manager:'Manager', viewer:'Viewer', viewer_budget:'Viewer (Budget)' };
@@ -534,7 +581,7 @@ async function showProjectPicker(profile) {
   const visible = (seesAllProjects ? (projects || []) : (projects || []).filter(p => (profile.projects || []).includes(p.id))).filter(p => p.id !== 'DEMO');
 
   // User with exactly 1 project: skip picker, go directly
-  if (!seesAllProjects && visible.length === 1 && !demoProj) {
+  if (!forced && !seesAllProjects && visible.length === 1 && !demoProj) {
     window.location.href = `project.html?id=${visible[0].id}`;
     return;
   }
